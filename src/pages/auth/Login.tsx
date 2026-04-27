@@ -1,13 +1,51 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthLayout, Field, GoogleButton } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
+import { toast } from "sonner";
 
 export default function Login() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [show, setShow] = useState(false);
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+      if (error) {
+        if (error.message.toLowerCase().includes("invalid")) {
+          toast.error(t("auth.toast.invalid_credentials"));
+        } else {
+          toast.error(error.message || t("auth.toast.generic_error"));
+        }
+        return;
+      }
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onGoogle() {
+    setLoading(true);
+    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    if (result.error) {
+      toast.error(t("auth.toast.generic_error"));
+      setLoading(false);
+      return;
+    }
+    if (result.redirected) return;
+    navigate("/");
+  }
 
   return (
     <AuthLayout
@@ -22,8 +60,8 @@ export default function Login() {
         </>
       }
     >
-      <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
-        <Field name="email" type="email" label={t("auth.email")} required autoComplete="email" />
+      <form className="space-y-5" onSubmit={onSubmit}>
+        <Field name="email" type="email" label={t("auth.email")} required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
         <div>
           <Field
             name="password"
@@ -31,6 +69,9 @@ export default function Login() {
             label={t("auth.password")}
             required
             autoComplete="current-password"
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            disabled={loading}
             rightSlot={
               <button type="button" onClick={() => setShow((s) => !s)} className="text-foreground/50 hover:text-foreground transition-colors" aria-label={show ? t("auth.hide") : t("auth.show")}>
                 {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -44,12 +85,12 @@ export default function Login() {
           </div>
         </div>
 
-        <Button type="submit" variant="primary" size="lg" className="w-full justify-center mt-2">
-          {t("auth.login_btn")}
+        <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full justify-center mt-2">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("auth.login_btn")}
         </Button>
 
         <Divider label={t("auth.or")} />
-        <GoogleButton label={t("auth.continue_google")} />
+        <GoogleButton label={t("auth.continue_google")} onClick={onGoogle} disabled={loading} />
       </form>
     </AuthLayout>
   );

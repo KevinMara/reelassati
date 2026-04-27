@@ -52,16 +52,21 @@ export function AuthLayout({
   );
 }
 
-export function Field({
-  name, label, type = "text", required, autoComplete, rightSlot,
-}: {
+type FieldProps = {
   name: string;
   label: string;
   type?: string;
   required?: boolean;
   autoComplete?: string;
   rightSlot?: React.ReactNode;
-}) {
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+};
+
+export function Field({
+  name, label, type = "text", required, autoComplete, rightSlot, value, onChange, disabled,
+}: FieldProps) {
   return (
     <label className="block">
       <span className="mono-eyebrow text-foreground/55 mb-2 block">{label}</span>
@@ -71,7 +76,10 @@ export function Field({
           type={type}
           required={required}
           autoComplete={autoComplete}
-          className="w-full bg-surface-recessed border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-md px-4 py-3 text-base outline-none transition-all duration-200"
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          className="w-full bg-surface-recessed border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-md px-4 py-3 text-base outline-none transition-all duration-200 disabled:opacity-60"
         />
         {rightSlot && <div className="absolute right-3 top-1/2 -translate-y-1/2">{rightSlot}</div>}
       </div>
@@ -79,11 +87,13 @@ export function Field({
   );
 }
 
-export function GoogleButton({ label }: { label: string }) {
+export function GoogleButton({ label, onClick, disabled }: { label: string; onClick?: () => void; disabled?: boolean }) {
   return (
     <button
       type="button"
-      className="w-full inline-flex items-center justify-center gap-3 h-12 rounded-pill border border-border-strong bg-surface text-foreground hover:bg-foreground/[0.03] transition-colors duration-200 text-sm font-medium"
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full inline-flex items-center justify-center gap-3 h-12 rounded-pill border border-border-strong bg-surface text-foreground hover:bg-foreground/[0.03] transition-colors duration-200 text-sm font-medium disabled:opacity-60"
     >
       <GoogleIcon />
       {label}
