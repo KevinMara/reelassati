@@ -120,17 +120,26 @@ function Hero() {
 
 function HeroCutout({ chip }: { chip: string }) {
   return (
-    <div className="relative mx-auto w-full max-w-[420px] aspect-[9/14] cutout overflow-hidden">
+    <div className="relative mx-auto w-full max-w-[420px] aspect-[9/14] cutout">
       {/* Phone-style frame inside */}
-      <div className="absolute inset-3 rounded-xl overflow-hidden bg-gradient-to-b from-primary/15 via-foreground/[0.04] to-foreground/[0.02]">
+      <div className="absolute inset-3 rounded-xl overflow-hidden bg-gradient-to-br from-primary/25 via-primary/10 to-foreground/[0.06]">
         {/* Mock vertical video composition */}
         <div className="absolute inset-0 grain" />
 
-        {/* "Subject" silhouette */}
+        {/* Soft spotlight */}
         <div
           aria-hidden
-          className="absolute left-1/2 -translate-x-1/2 bottom-0 w-3/5 h-3/5 rounded-t-[40%] bg-gradient-to-t from-foreground/30 to-foreground/10"
+          className="absolute -top-10 left-1/2 -translate-x-1/2 h-56 w-56 rounded-full bg-primary/40 blur-3xl"
         />
+
+        {/* "Subject" silhouette — head + shoulders */}
+        <div
+          aria-hidden
+          className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[70%] h-[62%]"
+        >
+          <div className="absolute bottom-0 inset-x-0 h-[78%] rounded-t-[36%] bg-gradient-to-t from-foreground/85 via-foreground/60 to-foreground/30" />
+          <div className="absolute bottom-[60%] left-1/2 -translate-x-1/2 h-24 w-24 rounded-full bg-gradient-to-b from-foreground/70 to-foreground/50" />
+        </div>
 
         {/* Captions overlay */}
         <div className="absolute inset-x-6 bottom-24 text-center">
