@@ -2,8 +2,8 @@ import type { Translations } from "./it";
 
 const en: Translations = {
   brand: {
-    tagline_html: "Make reels, <i>relax</i>.",
-    tagline_short: "Make reels. Relax.",
+    tagline_html: "Make reels, <i>reelassati</i>.",
+    tagline_short: "Make reels. Reelassati.",
     eyebrow: "AI Short-Form Studio",
   },
   nav: {
@@ -23,7 +23,7 @@ const en: Translations = {
   },
   home: {
     hero_lead: "Make reels,",
-    hero_accent: "relax.",
+    hero_accent: "reelassati.",
     hero_sub:
       "Drop your raw footage. Go get a coffee. The AI studio cuts, captions, and publishes your week of content.",
     hero_chip: "5m 12s of human work",

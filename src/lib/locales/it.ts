@@ -1,8 +1,8 @@
 // Italian — primary language. Voice: tu, calm, confident, slightly lazy in a competent way.
 const it = {
   brand: {
-    tagline_html: "Fai reel, <i>rilassati</i>.",
-    tagline_short: "Fai reel, rilassati.",
+    tagline_html: "Fai reel, <i>reelassati</i>.",
+    tagline_short: "Fai reel, reelassati.",
     eyebrow: "AI Short-Form Studio",
   },
   nav: {
@@ -22,7 +22,7 @@ const it = {
   },
   home: {
     hero_lead: "Fai reel,",
-    hero_accent: "rilassati.",
+    hero_accent: "reelassati.",
     hero_sub:
       "Carica il girato. Vai a prenderti un caffè. Lo studio AI monta, sottotitola e pubblica i contenuti della tua settimana.",
     hero_chip: "5m 12s di lavoro umano",
