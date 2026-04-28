@@ -65,6 +65,60 @@ export type Database = {
           },
         ]
       }
+      activity_log: {
+        Row: {
+          action_type: string | null
+          agent_name: string | null
+          client_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          metadata: Json | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type?: string | null
+          agent_name?: string | null
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string | null
+          agent_name?: string | null
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_usage_log: {
         Row: {
           action_type: string | null
@@ -100,6 +154,148 @@ export type Database = {
           {
             foreignKeyName: "api_usage_log_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          created_at: string
+          custom_brand_color: string | null
+          id: string
+          industry: string | null
+          logo_url: string | null
+          name: string
+          primary_language: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_brand_color?: string | null
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          name: string
+          primary_language?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_brand_color?: string | null
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          name?: string
+          primary_language?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          actual_cost_eur: number | null
+          agent_name: string
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          estimated_cost_eur: number | null
+          id: string
+          job_type: string
+          payload: Json | null
+          progress_message: string | null
+          progress_pct: number
+          result: Json | null
+          started_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          actual_cost_eur?: number | null
+          agent_name: string
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          estimated_cost_eur?: number | null
+          id?: string
+          job_type: string
+          payload?: Json | null
+          progress_message?: string | null
+          progress_pct?: number
+          result?: Json | null
+          started_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          actual_cost_eur?: number | null
+          agent_name?: string
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          estimated_cost_eur?: number | null
+          id?: string
+          job_type?: string
+          payload?: Json | null
+          progress_message?: string | null
+          progress_pct?: number
+          result?: Json | null
+          started_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_settings_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
