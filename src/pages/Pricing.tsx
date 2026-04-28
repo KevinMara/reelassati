@@ -149,7 +149,7 @@ export default function Pricing() {
                     size="lg"
                     className="mt-7 w-full justify-center"
                   >
-                    <Link to="/auth/signup">{tier.cta}</Link>
+                    <Link to={`/auth/signup?tier=${key}`}>{tier.cta}</Link>
                   </Button>
 
                   <ul className="mt-8 space-y-3.5 text-sm">
@@ -165,7 +165,7 @@ export default function Pricing() {
             })}
           </motion.div>
 
-          {/* Enterprise card */}
+          {/* Custom / Enterprise card */}
           <motion.div
             variants={fadeUp}
             initial="hidden"
@@ -178,7 +178,7 @@ export default function Pricing() {
               <p className="mt-2 text-sm text-foreground/65 max-w-xl">{t("pricing.enterprise_sub")}</p>
             </div>
             <Button asChild variant="outline" size="lg">
-              <Link to="/support">{t("pricing.contact_us")} <ArrowRight className="h-4 w-4" /></Link>
+              <Link to="/support?subject=Custom+plan+inquiry">{t("pricing.contact_us")} <ArrowRight className="h-4 w-4" /></Link>
             </Button>
           </motion.div>
         </div>
