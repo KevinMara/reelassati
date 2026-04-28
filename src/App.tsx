@@ -17,6 +17,19 @@ import AccessPending from "./pages/auth/AccessPending";
 import Suspended from "./pages/auth/Suspended";
 import DashboardHome from "./pages/dashboard/DashboardHome";
 import AdminPanel from "./pages/dashboard/AdminPanel";
+import Clients from "./pages/dashboard/Clients";
+import SettingsPage from "./pages/dashboard/Settings";
+import {
+  Analyze,
+  Script,
+  Edit,
+  Publish,
+  Analytics,
+  LibraryPage,
+  CalendarPage,
+  SocialAccounts,
+  SupportInApp,
+} from "./pages/dashboard/Placeholders";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -40,6 +53,18 @@ const App = () => (
             <Route path="/auth/suspended" element={<Suspended />} />
             <Route path="/dashboard" element={<DashboardHome />} />
             <Route path="/dashboard/admin" element={<AdminPanel />} />
+            <Route path="/dashboard/clients" element={<Clients />} />
+            <Route path="/dashboard/clients/:id" element={<Clients />} />
+            <Route path="/dashboard/analyze" element={<Analyze />} />
+            <Route path="/dashboard/script" element={<Script />} />
+            <Route path="/dashboard/edit" element={<Edit />} />
+            <Route path="/dashboard/publish" element={<Publish />} />
+            <Route path="/dashboard/analytics" element={<Analytics />} />
+            <Route path="/dashboard/library" element={<LibraryPage />} />
+            <Route path="/dashboard/calendar" element={<CalendarPage />} />
+            <Route path="/dashboard/social-accounts" element={<SocialAccounts />} />
+            <Route path="/dashboard/settings" element={<SettingsPage />} />
+            <Route path="/dashboard/support" element={<SupportInApp />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
