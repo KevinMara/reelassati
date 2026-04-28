@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion, type Variants } from "framer-motion";
-import { Check, ArrowRight, BookOpen, MessageCircle } from "lucide-react";
+import { ArrowRight, BookOpen, MessageCircle } from "lucide-react";
 import { MarketingLayout } from "@/components/brand/MarketingLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,8 @@ const stagger: Variants = { hidden: {}, show: { transition: { staggerChildren: 0
 
 export default function Support() {
   const { t } = useTranslation();
+  const [params] = useSearchParams();
+  const prefillSubject = params.get("subject") ?? "";
   const quick = t("support.quick", { returnObjects: true }) as { q: string; a: string }[];
   const [submitting, setSubmitting] = useState(false);
 
@@ -74,7 +77,7 @@ export default function Support() {
               <Field name="name" label={t("support.form.name")} required />
               <Field name="email" type="email" label={t("support.form.email")} required />
             </div>
-            <Field name="subject" label={t("support.form.subject")} required />
+            <Field name="subject" label={t("support.form.subject")} required defaultValue={prefillSubject} />
             <Field name="message" label={t("support.form.message")} required textarea />
 
             <Button type="submit" variant="primary" size="lg" className="w-full justify-center" disabled={submitting}>
@@ -100,17 +103,17 @@ export default function Support() {
 }
 
 function Field({
-  name, label, type = "text", required, textarea,
-}: { name: string; label: string; type?: string; required?: boolean; textarea?: boolean }) {
+  name, label, type = "text", required, textarea, defaultValue,
+}: { name: string; label: string; type?: string; required?: boolean; textarea?: boolean; defaultValue?: string }) {
   const base =
     "w-full bg-surface-recessed border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-md px-4 py-3 text-base outline-none transition-all duration-200 placeholder:text-foreground/40";
   return (
     <label className="block">
       <span className="mono-eyebrow text-foreground/55 mb-2 block">{label}</span>
       {textarea ? (
-        <textarea name={name} required={required} rows={6} className={base} />
+        <textarea name={name} required={required} rows={6} className={base} defaultValue={defaultValue} />
       ) : (
-        <input name={name} type={type} required={required} className={base} />
+        <input name={name} type={type} required={required} className={base} defaultValue={defaultValue} />
       )}
     </label>
   );
