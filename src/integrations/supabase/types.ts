@@ -14,26 +14,160 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_requests: {
+        Row: {
+          created_at: string
+          id: string
+          request_message: string | null
+          requested_tier: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          request_message?: string | null
+          requested_tier: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          request_message?: string | null
+          requested_tier?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_usage_log: {
+        Row: {
+          action_type: string | null
+          agent_name: string | null
+          cost_eur: number
+          created_at: string
+          external_service: string | null
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          action_type?: string | null
+          agent_name?: string | null
+          cost_eur: number
+          created_at?: string
+          external_service?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string | null
+          agent_name?: string | null
+          cost_eur?: number
+          created_at?: string
+          external_service?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          access_status: string
+          api_spend_this_cycle_eur: number
           avatar_url: string | null
+          budget_cycle_start: string
+          budget_override_reason: string | null
+          budget_set_by: string | null
           created_at: string
+          custom_accent_color: string | null
           display_name: string | null
+          email: string | null
           id: string
+          is_owner: boolean
+          is_unlimited: boolean
+          monthly_api_budget_eur: number
+          plan_tier: string
+          theme_preference: string | null
+          timezone: string | null
+          ui_language: string | null
           updated_at: string
         }
         Insert: {
+          access_status?: string
+          api_spend_this_cycle_eur?: number
           avatar_url?: string | null
+          budget_cycle_start?: string
+          budget_override_reason?: string | null
+          budget_set_by?: string | null
           created_at?: string
+          custom_accent_color?: string | null
           display_name?: string | null
+          email?: string | null
           id: string
+          is_owner?: boolean
+          is_unlimited?: boolean
+          monthly_api_budget_eur?: number
+          plan_tier?: string
+          theme_preference?: string | null
+          timezone?: string | null
+          ui_language?: string | null
           updated_at?: string
         }
         Update: {
+          access_status?: string
+          api_spend_this_cycle_eur?: number
           avatar_url?: string | null
+          budget_cycle_start?: string
+          budget_override_reason?: string | null
+          budget_set_by?: string | null
           created_at?: string
+          custom_accent_color?: string | null
           display_name?: string | null
+          email?: string | null
           id?: string
+          is_owner?: boolean
+          is_unlimited?: boolean
+          monthly_api_budget_eur?: number
+          plan_tier?: string
+          theme_preference?: string | null
+          timezone?: string | null
+          ui_language?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -43,7 +177,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_first_user: { Args: never; Returns: boolean }
+      is_owner: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
