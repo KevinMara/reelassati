@@ -16,11 +16,30 @@ export default function Login() {
   const [pw, setPw] = useState("");
   const [loading, setLoading] = useState(false);
 
+  async function routeByAccess(userId: string) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("access_status, is_owner")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error || !data) {
+      navigate("/dashboard");
+      return;
+    }
+    if (data.access_status === "pending_approval") {
+      navigate("/auth/access-pending");
+    } else if (data.access_status === "suspended") {
+      navigate("/auth/suspended");
+    } else {
+      navigate("/dashboard");
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
       if (error) {
         if (error.message.toLowerCase().includes("invalid")) {
           toast.error(t("auth.toast.invalid_credentials"));
@@ -29,7 +48,8 @@ export default function Login() {
         }
         return;
       }
-      navigate("/");
+      if (data.user) await routeByAccess(data.user.id);
+      else navigate("/dashboard");
     } finally {
       setLoading(false);
     }
@@ -44,7 +64,7 @@ export default function Login() {
       return;
     }
     if (result.redirected) return;
-    navigate("/");
+    navigate("/dashboard");
   }
 
   return (

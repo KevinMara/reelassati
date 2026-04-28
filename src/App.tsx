@@ -13,6 +13,10 @@ import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
+import AccessPending from "./pages/auth/AccessPending";
+import Suspended from "./pages/auth/Suspended";
+import DashboardHome from "./pages/dashboard/DashboardHome";
+import AdminPanel from "./pages/dashboard/AdminPanel";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -32,6 +36,10 @@ const App = () => (
             <Route path="/auth/signup" element={<Signup />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
+            <Route path="/auth/access-pending" element={<AccessPending />} />
+            <Route path="/auth/suspended" element={<Suspended />} />
+            <Route path="/dashboard" element={<DashboardHome />} />
+            <Route path="/dashboard/admin" element={<AdminPanel />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
