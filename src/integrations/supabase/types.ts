@@ -160,6 +160,154 @@ export type Database = {
           },
         ]
       }
+      brief_change_log: {
+        Row: {
+          brief_id: string
+          changed_at: string
+          changed_by: string
+          field_path: string
+          id: string
+          new_value: Json | null
+          old_value: Json | null
+          reason: string | null
+        }
+        Insert: {
+          brief_id: string
+          changed_at?: string
+          changed_by: string
+          field_path: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          reason?: string | null
+        }
+        Update: {
+          brief_id?: string
+          changed_at?: string
+          changed_by?: string
+          field_path?: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brief_change_log_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      caption_styles: {
+        Row: {
+          client_id: string | null
+          config: Json
+          created_at: string
+          id: string
+          is_global: boolean
+          name: string
+          user_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          config: Json
+          created_at?: string
+          id?: string
+          is_global?: boolean
+          name: string
+          user_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          is_global?: boolean
+          name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "caption_styles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "caption_styles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_briefs: {
+        Row: {
+          ads_strategy: Json | null
+          analytics_preferences: Json | null
+          audience: Json | null
+          brand_voice: Json | null
+          client_id: string
+          completion_pct: number
+          content_strategy: Json | null
+          created_at: string
+          editing_preferences: Json | null
+          id: string
+          operational: Json | null
+          publishing_preferences: Json | null
+          schema_version: number
+          scripting_preferences: Json | null
+          updated_at: string
+        }
+        Insert: {
+          ads_strategy?: Json | null
+          analytics_preferences?: Json | null
+          audience?: Json | null
+          brand_voice?: Json | null
+          client_id: string
+          completion_pct?: number
+          content_strategy?: Json | null
+          created_at?: string
+          editing_preferences?: Json | null
+          id?: string
+          operational?: Json | null
+          publishing_preferences?: Json | null
+          schema_version?: number
+          scripting_preferences?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          ads_strategy?: Json | null
+          analytics_preferences?: Json | null
+          audience?: Json | null
+          brand_voice?: Json | null
+          client_id?: string
+          completion_pct?: number
+          content_strategy?: Json | null
+          created_at?: string
+          editing_preferences?: Json | null
+          id?: string
+          operational?: Json | null
+          publishing_preferences?: Json | null
+          schema_version?: number
+          scripting_preferences?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string
@@ -200,6 +348,88 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      connected_accounts: {
+        Row: {
+          account_avatar_url: string | null
+          account_handle: string | null
+          client_id: string
+          connected_at: string
+          id: string
+          last_sync_at: string | null
+          platform: string
+          status: string
+          zernio_profile_key: string | null
+        }
+        Insert: {
+          account_avatar_url?: string | null
+          account_handle?: string | null
+          client_id: string
+          connected_at?: string
+          id?: string
+          last_sync_at?: string | null
+          platform: string
+          status?: string
+          zernio_profile_key?: string | null
+        }
+        Update: {
+          account_avatar_url?: string | null
+          account_handle?: string | null
+          client_id?: string
+          connected_at?: string
+          id?: string
+          last_sync_at?: string | null
+          platform?: string
+          status?: string
+          zernio_profile_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connected_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      connected_ad_accounts: {
+        Row: {
+          account_name: string | null
+          client_id: string
+          connected_at: string
+          id: string
+          platform: string
+          status: string
+          unified_to_connection_id: string | null
+        }
+        Insert: {
+          account_name?: string | null
+          client_id: string
+          connected_at?: string
+          id?: string
+          platform: string
+          status?: string
+          unified_to_connection_id?: string | null
+        }
+        Update: {
+          account_name?: string | null
+          client_id?: string
+          connected_at?: string
+          id?: string
+          platform?: string
+          status?: string
+          unified_to_connection_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connected_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -266,6 +496,56 @@ export type Database = {
           },
           {
             foreignKeyName: "jobs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      music_library: {
+        Row: {
+          bpm: number | null
+          created_at: string
+          duration_s: number | null
+          genre: string | null
+          id: string
+          license: string | null
+          loopable: boolean
+          mood: string[] | null
+          name: string
+          storage_key: string
+          user_id: string
+        }
+        Insert: {
+          bpm?: number | null
+          created_at?: string
+          duration_s?: number | null
+          genre?: string | null
+          id?: string
+          license?: string | null
+          loopable?: boolean
+          mood?: string[] | null
+          name: string
+          storage_key: string
+          user_id: string
+        }
+        Update: {
+          bpm?: number | null
+          created_at?: string
+          duration_s?: number | null
+          genre?: string | null
+          id?: string
+          license?: string | null
+          loopable?: boolean
+          mood?: string[] | null
+          name?: string
+          storage_key?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "music_library_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -368,6 +648,170 @@ export type Database = {
         }
         Relationships: []
       }
+      reference_videos: {
+        Row: {
+          actual_engagement_rate: number | null
+          actual_views: number | null
+          actual_watch_through_pct: number | null
+          audio_events: Json | null
+          auto_promoted: boolean
+          client_id: string | null
+          content_category: string
+          content_hash: string | null
+          created_at: string
+          curated_by_user: boolean
+          dimension_scores: Json | null
+          duration_s: number | null
+          format: string | null
+          goal: string
+          id: string
+          language: string
+          neural_matrix_key: string | null
+          performance_tier: string | null
+          platform: string[] | null
+          quality_verified: boolean
+          reactions: string[]
+          region_timelines: Json | null
+          source_url: string | null
+          storage_key: string | null
+          subcategory: string | null
+          thumbnail_url: string | null
+          title: string | null
+          updated_at: string
+          user_id: string | null
+          visual_events: Json | null
+        }
+        Insert: {
+          actual_engagement_rate?: number | null
+          actual_views?: number | null
+          actual_watch_through_pct?: number | null
+          audio_events?: Json | null
+          auto_promoted?: boolean
+          client_id?: string | null
+          content_category?: string
+          content_hash?: string | null
+          created_at?: string
+          curated_by_user?: boolean
+          dimension_scores?: Json | null
+          duration_s?: number | null
+          format?: string | null
+          goal?: string
+          id?: string
+          language?: string
+          neural_matrix_key?: string | null
+          performance_tier?: string | null
+          platform?: string[] | null
+          quality_verified?: boolean
+          reactions?: string[]
+          region_timelines?: Json | null
+          source_url?: string | null
+          storage_key?: string | null
+          subcategory?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string | null
+          visual_events?: Json | null
+        }
+        Update: {
+          actual_engagement_rate?: number | null
+          actual_views?: number | null
+          actual_watch_through_pct?: number | null
+          audio_events?: Json | null
+          auto_promoted?: boolean
+          client_id?: string | null
+          content_category?: string
+          content_hash?: string | null
+          created_at?: string
+          curated_by_user?: boolean
+          dimension_scores?: Json | null
+          duration_s?: number | null
+          format?: string | null
+          goal?: string
+          id?: string
+          language?: string
+          neural_matrix_key?: string | null
+          performance_tier?: string | null
+          platform?: string[] | null
+          quality_verified?: boolean
+          reactions?: string[]
+          region_timelines?: Json | null
+          source_url?: string | null
+          storage_key?: string | null
+          subcategory?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string | null
+          visual_events?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reference_videos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reference_videos_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sfx_library: {
+        Row: {
+          category: string | null
+          created_at: string
+          duration_s: number | null
+          emotional_tags: string[] | null
+          id: string
+          license: string | null
+          name: string
+          storage_key: string
+          tags: string[] | null
+          user_id: string
+          volume_lufs: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          duration_s?: number | null
+          emotional_tags?: string[] | null
+          id?: string
+          license?: string | null
+          name: string
+          storage_key: string
+          tags?: string[] | null
+          user_id: string
+          volume_lufs?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          duration_s?: number | null
+          emotional_tags?: string[] | null
+          id?: string
+          license?: string | null
+          name?: string
+          storage_key?: string
+          tags?: string[] | null
+          user_id?: string
+          volume_lufs?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sfx_library_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -375,6 +819,10 @@ export type Database = {
     Functions: {
       is_first_user: { Args: never; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      user_owns_client: {
+        Args: { _client_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
