@@ -18,6 +18,10 @@ import Suspended from "./pages/auth/Suspended";
 import DashboardHome from "./pages/dashboard/DashboardHome";
 import AdminPanel from "./pages/dashboard/AdminPanel";
 import Clients from "./pages/dashboard/Clients";
+import ClientDetail from "./pages/dashboard/ClientDetail";
+import LibraryPage from "./pages/dashboard/Library";
+import CalendarPage from "./pages/dashboard/CalendarPage";
+import SocialAccounts from "./pages/dashboard/SocialAccounts";
 import SettingsPage from "./pages/dashboard/Settings";
 import {
   Analyze,
@@ -25,9 +29,6 @@ import {
   Edit,
   Publish,
   Analytics,
-  LibraryPage,
-  CalendarPage,
-  SocialAccounts,
   SupportInApp,
 } from "./pages/dashboard/Placeholders";
 import NotFound from "./pages/NotFound.tsx";
@@ -54,7 +55,7 @@ const App = () => (
             <Route path="/dashboard" element={<DashboardHome />} />
             <Route path="/dashboard/admin" element={<AdminPanel />} />
             <Route path="/dashboard/clients" element={<Clients />} />
-            <Route path="/dashboard/clients/:id" element={<Clients />} />
+            <Route path="/dashboard/clients/:id" element={<ClientDetail />} />
             <Route path="/dashboard/analyze" element={<Analyze />} />
             <Route path="/dashboard/script" element={<Script />} />
             <Route path="/dashboard/edit" element={<Edit />} />
