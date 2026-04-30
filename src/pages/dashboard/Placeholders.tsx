@@ -1,12 +1,8 @@
-import { Video, PenLine, Scissors, Send, BarChart3, LifeBuoy } from "lucide-react";
+import { PenLine, Scissors, Send, BarChart3, LifeBuoy } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { PlaceholderPage } from "@/components/app/PlaceholderPage";
 import { useTranslation } from "react-i18next";
 
-export function Analyze() {
-  const { t } = useTranslation();
-  return <AppShell renderWith={() => <PlaceholderPage title={t("app.nav.analyze")} icon={Video} />} />;
-}
 export function Script() {
   const { t } = useTranslation();
   return <AppShell renderWith={() => <PlaceholderPage title={t("app.nav.script")} icon={PenLine} />} />;
