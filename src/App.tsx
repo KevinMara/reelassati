@@ -23,8 +23,8 @@ import LibraryPage from "./pages/dashboard/Library";
 import CalendarPage from "./pages/dashboard/CalendarPage";
 import SocialAccounts from "./pages/dashboard/SocialAccounts";
 import SettingsPage from "./pages/dashboard/Settings";
+import Analyze from "./pages/dashboard/Analyze";
 import {
-  Analyze,
   Script,
   Edit,
   Publish,
