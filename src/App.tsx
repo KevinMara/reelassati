@@ -24,8 +24,8 @@ import CalendarPage from "./pages/dashboard/CalendarPage";
 import SocialAccounts from "./pages/dashboard/SocialAccounts";
 import SettingsPage from "./pages/dashboard/Settings";
 import Analyze from "./pages/dashboard/Analyze";
+import Script from "./pages/dashboard/Script";
 import {
-  Script,
   Edit,
   Publish,
   Analytics,
