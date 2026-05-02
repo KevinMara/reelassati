@@ -20,7 +20,6 @@ export type AuthedProfile = {
  *  - no session → /auth/login
  *  - pending_approval → /auth/access-pending
  *  - suspended → /auth/suspended
- * Returns null while loading.
  */
 export function useAuthedProfile(opts?: { ownerOnly?: boolean }) {
   const navigate = useNavigate();
@@ -29,18 +28,14 @@ export function useAuthedProfile(opts?: { ownerOnly?: boolean }) {
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!active) return;
-      if (!data.user) {
-        navigate("/auth/login");
-        return;
-      }
+
+    async function loadProfile(userId: string) {
       const { data: prof } = await supabase
         .from("profiles")
         .select(
           "id, email, display_name, avatar_url, plan_tier, access_status, is_owner, is_unlimited, monthly_api_budget_eur, api_spend_this_cycle_eur"
         )
-        .eq("id", data.user.id)
+        .eq("id", userId)
         .maybeSingle();
       if (!active) return;
       if (!prof) {
@@ -61,9 +56,37 @@ export function useAuthedProfile(opts?: { ownerOnly?: boolean }) {
       }
       setProfile(prof as AuthedProfile);
       setLoading(false);
+    }
+
+    // Set up listener FIRST (no await inside)
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      if (!session?.user) {
+        setProfile(null);
+        setLoading(false);
+        navigate("/auth/login");
+        return;
+      }
+      // defer profile fetch to avoid deadlock
+      setTimeout(() => {
+        if (active) loadProfile(session.user.id);
+      }, 0);
     });
+
+    // Then check existing session (restores from storage)
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (!data.session?.user) {
+        setLoading(false);
+        navigate("/auth/login");
+        return;
+      }
+      loadProfile(data.session.user.id);
+    });
+
     return () => {
       active = false;
+      sub.subscription.unsubscribe();
     };
   }, [navigate, opts?.ownerOnly]);
 
