@@ -1,12 +1,8 @@
-import { Send, BarChart3, LifeBuoy } from "lucide-react";
+import { BarChart3, LifeBuoy } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { PlaceholderPage } from "@/components/app/PlaceholderPage";
 import { useTranslation } from "react-i18next";
 
-export function Publish() {
-  const { t } = useTranslation();
-  return <AppShell renderWith={() => <PlaceholderPage title={t("app.nav.publish")} icon={Send} />} />;
-}
 export function Analytics() {
   const { t } = useTranslation();
   return <AppShell renderWith={() => <PlaceholderPage title={t("app.nav.analytics")} icon={BarChart3} />} />;

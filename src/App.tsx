@@ -26,8 +26,8 @@ import SettingsPage from "./pages/dashboard/Settings";
 import Analyze from "./pages/dashboard/Analyze";
 import Script from "./pages/dashboard/Script";
 import Edit from "./pages/dashboard/Edit";
+import Publish from "./pages/dashboard/Publish";
 import {
-  Publish,
   Analytics,
   SupportInApp,
 } from "./pages/dashboard/Placeholders";
