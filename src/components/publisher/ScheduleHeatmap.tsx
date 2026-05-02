@@ -1,5 +1,4 @@
-import { useMemo } from "react";
-import { Platform, PLATFORMS, buildHeatmap, DAYS_ORDER } from "./mockData";
+import { Fragment, useMemo } from "react";
 
 export function ScheduleHeatmap({
   platform,
