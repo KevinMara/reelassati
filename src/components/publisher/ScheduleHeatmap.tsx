@@ -1,4 +1,5 @@
 import { Fragment, useMemo } from "react";
+import { Platform, PLATFORMS, buildHeatmap, DAYS_ORDER } from "./mockData";
 
 export function ScheduleHeatmap({
   platform,
@@ -31,8 +32,8 @@ export function ScheduleHeatmap({
           <div key={d} className="text-center text-foreground/50 font-medium">{d}</div>
         ))}
         {HOURS.map((h) => (
-          <>
-            <div key={`l-${h}`} className="text-right pr-1 text-foreground/40 tabular-nums leading-[18px]">
+          <Fragment key={h}>
+            <div className="text-right pr-1 text-foreground/40 tabular-nums leading-[18px]">
               {h}
             </div>
             {DAYS_ORDER.map((d) => {
@@ -56,7 +57,7 @@ export function ScheduleHeatmap({
                 </button>
               );
             })}
-          </>
+          </Fragment>
         ))}
       </div>
     </div>
