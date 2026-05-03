@@ -27,10 +27,8 @@ import Analyze from "./pages/dashboard/Analyze";
 import Script from "./pages/dashboard/Script";
 import Edit from "./pages/dashboard/Edit";
 import Publish from "./pages/dashboard/Publish";
-import {
-  Analytics,
-  SupportInApp,
-} from "./pages/dashboard/Placeholders";
+import Analytics from "./pages/dashboard/Analytics";
+import { SupportInApp } from "./pages/dashboard/Placeholders";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
