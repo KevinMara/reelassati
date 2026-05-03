@@ -28,6 +28,7 @@ import Script from "./pages/dashboard/Script";
 import Edit from "./pages/dashboard/Edit";
 import Publish from "./pages/dashboard/Publish";
 import Analytics from "./pages/dashboard/Analytics";
+import Orchestrator from "./pages/dashboard/Orchestrator";
 import { SupportInApp } from "./pages/dashboard/Placeholders";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -59,6 +60,7 @@ const App = () => (
             <Route path="/dashboard/edit" element={<Edit />} />
             <Route path="/dashboard/publish" element={<Publish />} />
             <Route path="/dashboard/analytics" element={<Analytics />} />
+            <Route path="/dashboard/orchestrator" element={<Orchestrator />} />
             <Route path="/dashboard/library" element={<LibraryPage />} />
             <Route path="/dashboard/calendar" element={<CalendarPage />} />
             <Route path="/dashboard/social-accounts" element={<SocialAccounts />} />
