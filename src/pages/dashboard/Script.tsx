@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PenLine } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { ScriptBriefStage, ScriptBrief } from "@/components/script/ScriptBriefStage";
 import { ScriptGeneratingStage } from "@/components/script/ScriptGeneratingStage";
 import { ScriptResultsStage } from "@/components/script/ScriptResultsStage";
+import { useAgentJob } from "@/hooks/useAgentJob";
+import { ScriptVariant, generateVariants } from "@/components/script/mockData";
 
 type Stage = "brief" | "generating" | "results";
 
@@ -14,6 +16,49 @@ export default function ScriptRoute() {
 function ScriptPage() {
   const [stage, setStage] = useState<Stage>("brief");
   const [brief, setBrief] = useState<ScriptBrief | null>(null);
+  const [variants, setVariants] = useState<ScriptVariant[] | null>(null);
+  const { job, start, reset } = useAgentJob("scriptwriter");
+
+  // When the job finishes, advance UI.
+  useEffect(() => {
+    if (!job) return;
+    if (job.status === "completed" && job.result?.variants) {
+      setVariants(job.result.variants as ScriptVariant[]);
+      setStage("results");
+    } else if (job.status === "failed") {
+      // Fall back to deterministic generator so the user isn't stuck.
+      if (brief) {
+        setVariants(generateVariants({ goal: brief.goal, angle: brief.angle }));
+        setStage("results");
+      }
+    }
+  }, [job, brief]);
+
+  const onGenerate = async (b: ScriptBrief) => {
+    setBrief(b);
+    setStage("generating");
+    setVariants(null);
+    await start({
+      jobType: "generate_script",
+      payload: {
+        goal: b.goal,
+        angle: b.angle,
+        duration: b.duration,
+        tone: b.tone.join(", "),
+        format: b.format,
+        platform: b.platforms[0] ?? "Reels",
+        language: "it",
+        references: b.references,
+      },
+    });
+  };
+
+  const onReset = () => {
+    reset();
+    setVariants(null);
+    setBrief(null);
+    setStage("brief");
+  };
 
   return (
     <section className="container-page py-8 lg:py-10">
@@ -29,17 +74,16 @@ function ScriptPage() {
         </div>
       </header>
 
-      {stage === "brief" && (
-        <ScriptBriefStage
-          onGenerate={(b) => {
-            setBrief(b);
-            setStage("generating");
-          }}
+      {stage === "brief" && <ScriptBriefStage onGenerate={onGenerate} />}
+      {stage === "generating" && (
+        <ScriptGeneratingStage
+          progress={job?.progress_pct ?? 0}
+          message={job?.progress_message ?? "Queued…"}
+          onCancel={onReset}
         />
       )}
-      {stage === "generating" && <ScriptGeneratingStage onDone={() => setStage("results")} />}
-      {stage === "results" && brief && (
-        <ScriptResultsStage brief={brief} onReset={() => setStage("brief")} />
+      {stage === "results" && brief && variants && (
+        <ScriptResultsStage brief={brief} variants={variants} onReset={onReset} />
       )}
     </section>
   );
