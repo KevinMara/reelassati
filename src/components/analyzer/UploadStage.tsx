@@ -14,7 +14,15 @@ const PLATFORMS = [
   { key: "linkedin", label: "LinkedIn", icon: "💼" },
 ];
 
-export function UploadStage({ onAnalyze }: { onAnalyze: () => void }) {
+export type AnalyzePayload = {
+  goal: string;
+  audience: string;
+  platform: string;
+  notes: string;
+  language: string;
+};
+
+export function UploadStage({ onAnalyze }: { onAnalyze: (p: AnalyzePayload) => void }) {
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
