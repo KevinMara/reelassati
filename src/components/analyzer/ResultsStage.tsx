@@ -18,8 +18,15 @@ import {
   MOCK_DURATION_S,
 } from "./mockData";
 
-export function ResultsStage({ onReset }: { onReset: () => void }) {
+export function ResultsStage({
+  onReset,
+  verdict: verdictOverride,
+}: {
+  onReset: () => void;
+  verdict?: typeof MOCK_VERDICT;
+}) {
   const { t } = useTranslation();
+  const verdict = verdictOverride ?? MOCK_VERDICT;
   const [time, setTime] = useState(0);
   const [selectedMarker, setSelectedMarker] = useState<number | null>(null);
   const [showExports, setShowExports] = useState(false);
