@@ -79,12 +79,14 @@ export function ProcessingStage({
 
       <h2 className="mt-8 text-2xl font-semibold">{t("app.analyze.processing.title")}</h2>
       <p className="mt-2 text-foreground/55 text-sm tabular">
-        {t("app.analyze.processing.eta", { sec: Math.ceil(remaining) })}
+        {driven
+          ? `${message ?? "Processing…"} · ${Math.round(progress!)}%`
+          : t("app.analyze.processing.eta", { sec: Math.ceil(remaining) })}
       </p>
 
       <ol className="mt-10 space-y-2.5 text-left max-w-md mx-auto">
         {MOCK_PROCESSING_STAGES.map((stage, i) => {
-          const status = i < activeIdx ? "done" : i === activeIdx ? "active" : "pending";
+          const status = i < externalIdx ? "done" : i === externalIdx ? "active" : "pending";
           return (
             <li
               key={stage.key}
