@@ -8,19 +8,41 @@ import { MOCK_PROCESSING_STAGES } from "./mockData";
  * Animated brain pulse + 8 named stages.
  * Drives a 30s simulation, calls onDone when all stages complete.
  */
-export function ProcessingStage({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+export function ProcessingStage({
+  onDone,
+  onCancel,
+  progress,
+  message,
+  done,
+}: {
+  onDone: () => void;
+  onCancel: () => void;
+  progress?: number;
+  message?: string;
+  done?: boolean;
+}) {
   const { t } = useTranslation();
+  const driven = progress != null;
   const [activeIdx, setActiveIdx] = useState(0);
   const [stageStart, setStageStart] = useState(performance.now());
   const [now, setNow] = useState(performance.now());
 
   const total = MOCK_PROCESSING_STAGES.reduce((s, st) => s + st.durationS, 0);
-  const elapsed = MOCK_PROCESSING_STAGES.slice(0, activeIdx).reduce((s, st) => s + st.durationS, 0)
-    + Math.min((now - stageStart) / 1000, MOCK_PROCESSING_STAGES[activeIdx]?.durationS ?? 0);
+  const elapsed = driven
+    ? (progress! / 100) * total
+    : MOCK_PROCESSING_STAGES.slice(0, activeIdx).reduce((s, st) => s + st.durationS, 0)
+      + Math.min((now - stageStart) / 1000, MOCK_PROCESSING_STAGES[activeIdx]?.durationS ?? 0);
   const remaining = Math.max(0, total - elapsed);
+  const externalIdx = driven
+    ? Math.min(MOCK_PROCESSING_STAGES.length - 1, Math.floor((progress! / 100) * MOCK_PROCESSING_STAGES.length))
+    : activeIdx;
 
   const raf = useRef<number | null>(null);
   useEffect(() => {
+    if (driven) {
+      if (done) onDone();
+      return;
+    }
     const tick = () => {
       const t = performance.now();
       setNow(t);
@@ -40,7 +62,7 @@ export function ProcessingStage({ onDone, onCancel }: { onDone: () => void; onCa
     return () => {
       if (raf.current) cancelAnimationFrame(raf.current);
     };
-  }, [activeIdx, stageStart, onDone]);
+  }, [activeIdx, stageStart, onDone, driven, done]);
 
   return (
     <div className="max-w-2xl mx-auto py-12 text-center">
