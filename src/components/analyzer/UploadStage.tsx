@@ -14,7 +14,15 @@ const PLATFORMS = [
   { key: "linkedin", label: "LinkedIn", icon: "💼" },
 ];
 
-export function UploadStage({ onAnalyze }: { onAnalyze: () => void }) {
+export type AnalyzePayload = {
+  goal: string;
+  audience: string;
+  platform: string;
+  notes: string;
+  language: string;
+};
+
+export function UploadStage({ onAnalyze }: { onAnalyze: (p: AnalyzePayload) => void }) {
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
@@ -173,7 +181,20 @@ export function UploadStage({ onAnalyze }: { onAnalyze: () => void }) {
       </div>
 
       <div className="flex justify-end pt-2">
-        <Button variant="primary" size="lg" disabled={!ready} onClick={onAnalyze}>
+        <Button
+          variant="primary"
+          size="lg"
+          disabled={!ready}
+          onClick={() =>
+            onAnalyze({
+              goal,
+              audience,
+              platform: platforms[0] ?? "tiktok",
+              notes: file ? `Local file: ${file.name}` : `Source URL: ${url}`,
+              language: "it",
+            })
+          }
+        >
           {t("app.analyze.upload.analyze")}
         </Button>
       </div>

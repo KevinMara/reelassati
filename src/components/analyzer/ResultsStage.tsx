@@ -18,8 +18,15 @@ import {
   MOCK_DURATION_S,
 } from "./mockData";
 
-export function ResultsStage({ onReset }: { onReset: () => void }) {
+export function ResultsStage({
+  onReset,
+  verdict: verdictOverride,
+}: {
+  onReset: () => void;
+  verdict?: typeof MOCK_VERDICT;
+}) {
   const { t } = useTranslation();
+  const verdict = verdictOverride ?? MOCK_VERDICT;
   const [time, setTime] = useState(0);
   const [selectedMarker, setSelectedMarker] = useState<number | null>(null);
   const [showExports, setShowExports] = useState(false);
@@ -32,18 +39,18 @@ export function ResultsStage({ onReset }: { onReset: () => void }) {
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-primary/60 to-transparent" />
 
         <div className="grid md:grid-cols-[auto_1fr_auto] gap-6 md:gap-8 items-center">
-          <ScoreGauge value={MOCK_VERDICT.score} grade={MOCK_VERDICT.grade} size={140} thickness={12} />
+          <ScoreGauge value={verdict.score} grade={verdict.grade} size={140} thickness={12} />
           <div>
             <div className="mono-eyebrow text-foreground/50">{t("app.analyze.results.verdict")}</div>
             <p className="mt-2 text-lg leading-relaxed text-foreground/85 text-pretty max-w-2xl">
-              {MOCK_VERDICT.text}
+              {verdict.text}
             </p>
           </div>
           <div className="text-xs text-foreground/55 space-y-1.5 md:text-right tabular">
-            <div><span className="text-foreground/40">{t("app.analyze.results.goal")}:</span> {MOCK_VERDICT.goal}</div>
-            <div><span className="text-foreground/40">{t("app.analyze.results.cohort")}:</span> N={MOCK_VERDICT.cohort}</div>
-            <div><span className="text-foreground/40">{t("app.analyze.results.lang")}:</span> {MOCK_VERDICT.language}</div>
-            <div><span className="text-foreground/40">{t("app.analyze.results.platform")}:</span> {MOCK_VERDICT.platform}</div>
+            <div><span className="text-foreground/40">{t("app.analyze.results.goal")}:</span> {verdict.goal}</div>
+            <div><span className="text-foreground/40">{t("app.analyze.results.cohort")}:</span> N={verdict.cohort}</div>
+            <div><span className="text-foreground/40">{t("app.analyze.results.lang")}:</span> {verdict.language}</div>
+            <div><span className="text-foreground/40">{t("app.analyze.results.platform")}:</span> {verdict.platform}</div>
           </div>
         </div>
       </div>
