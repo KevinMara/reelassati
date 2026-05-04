@@ -9,12 +9,15 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
 export function ScriptResultsStage({
-  brief, onReset,
+  brief, onReset, variants: initialVariants,
 }: {
   brief: ScriptBrief;
   onReset: () => void;
+  variants?: ScriptVariant[];
 }) {
-  const [variants, setVariants] = useState<ScriptVariant[]>(() => generateVariants(brief));
+  const [variants, setVariants] = useState<ScriptVariant[]>(
+    () => initialVariants ?? generateVariants(brief),
+  );
   const [activeId, setActiveId] = useState<string>(variants[0].id);
   const active = variants.find((v) => v.id === activeId)!;
 
