@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Network, Filter, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
@@ -6,8 +6,24 @@ import { Button } from "@/components/ui/button";
 import { StageColumn } from "@/components/orchestrator/StageColumn";
 import { WorkloadHeatmap } from "@/components/orchestrator/WorkloadHeatmap";
 import { AgentLoadStrip } from "@/components/orchestrator/AgentLoadStrip";
-import { JOBS, CLIENTS, STAGES } from "@/components/orchestrator/mockData";
+import { JOBS as MOCK_JOBS, CLIENTS, STAGES, type Job, type AgentStage } from "@/components/orchestrator/mockData";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+
+const AGENT_TO_STAGE: Record<string, AgentStage> = {
+  analyzer: "analyze",
+  scriptwriter: "script",
+  editor: "edit",
+  publisher: "publish",
+  analytics: "analytics",
+};
+
+const STATUS_MAP: Record<string, Job["status"]> = {
+  queued: "queued",
+  running: "running",
+  completed: "done",
+  failed: "blocked",
+};
 
 export default function OrchestratorPage() {
   return <AppShell renderWith={() => <OrchestratorContent />} />;
@@ -15,9 +31,51 @@ export default function OrchestratorPage() {
 
 function OrchestratorContent() {
   const [activeClient, setActiveClient] = useState<string | "all">("all");
+  const [liveJobs, setLiveJobs] = useState<Job[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const { data } = await supabase
+        .from("jobs")
+        .select("id, agent_name, job_type, status, progress_pct, payload, result, created_at, client_id")
+        .order("created_at", { ascending: false })
+        .limit(40);
+      if (cancelled || !data) return;
+      const mapped: Job[] = data
+        .map((row): Job | null => {
+          const stage = AGENT_TO_STAGE[row.agent_name as string];
+          if (!stage) return null;
+          return {
+            id: row.id,
+            clientId: row.client_id ?? "live",
+            clientName: "Live job",
+            clientColor: "265 70% 60%",
+            title: row.job_type ?? row.agent_name,
+            stage,
+            status: STATUS_MAP[row.status] ?? "queued",
+            progress: (row.progress_pct ?? 0) / 100,
+            updatedAt: relTime(row.created_at as string),
+          };
+        })
+        .filter((j): j is Job => j !== null);
+      setLiveJobs(mapped);
+    }
+    load();
+    const ch = supabase
+      .channel("orchestrator-jobs")
+      .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => load())
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(ch);
+    };
+  }, []);
+
+  const allJobs = useMemo(() => [...liveJobs, ...MOCK_JOBS], [liveJobs]);
   const filteredJobs = useMemo(
-    () => (activeClient === "all" ? JOBS : JOBS.filter((j) => j.clientId === activeClient)),
-    [activeClient],
+    () => (activeClient === "all" ? allJobs : allJobs.filter((j) => j.clientId === activeClient)),
+    [allJobs, activeClient],
   );
 
   const totalActive = filteredJobs.filter((j) => j.status === "running").length;
