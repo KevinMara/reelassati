@@ -56,6 +56,19 @@ function AnalyticsContent() {
         </div>
         <div className="flex items-center gap-2">
           <RangeToggle value={range} onChange={setRange} />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={submitting || job?.status === "running"}
+            onClick={() => start({ jobType: "snapshot", payload: { range } }).catch(() => {})}
+          >
+            {submitting || job?.status === "running" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Refresh
+          </Button>
           <Button variant="outline" size="sm">
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
