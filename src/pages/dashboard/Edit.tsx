@@ -7,6 +7,7 @@ import { TimelineEditor } from "@/components/editor/TimelineEditor";
 import { InspectorPanel } from "@/components/editor/InspectorPanel";
 import { MOCK_PROJECT, EditorProject } from "@/components/editor/mockData";
 import { toast } from "@/hooks/use-toast";
+import { useAgentJob } from "@/hooks/useAgentJob";
 
 type Stage = "intake" | "assembling" | "edit";
 
