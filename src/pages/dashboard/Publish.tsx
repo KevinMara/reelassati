@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Send, Calendar, Clock, CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { CaptionEditor } from "@/components/publisher/CaptionEditor";
 import { ScheduleHeatmap } from "@/components/publisher/ScheduleHeatmap";
 import { CAPTIONS, MOCK_REEL, PLATFORMS, Platform, CaptionVariant } from "@/components/publisher/mockData";
 import { toast } from "@/hooks/use-toast";
+import { useAgentJob } from "@/hooks/useAgentJob";
 
 type Step = "compose" | "schedule" | "review" | "publishing" | "done";
 
@@ -27,6 +28,35 @@ function PublishPage() {
     linkedin: null,
   });
   const [mode, setMode] = useState<"now" | "schedule" | "best">("schedule");
+  const { job, start } = useAgentJob("publisher");
+
+  useEffect(() => {
+    if (job?.status === "completed") setStep("done");
+    if (job?.status === "failed") setStep("review");
+  }, [job?.status]);
+
+  async function handlePublish() {
+    setStep("publishing");
+    const scheduled_at =
+      mode === "now"
+        ? new Date().toISOString()
+        : mode === "best"
+          ? new Date(Date.now() + 60 * 60 * 1000).toISOString()
+          : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    try {
+      await start({
+        jobType: "schedule_posts",
+        payload: {
+          platforms: selected,
+          scheduled_at,
+          mode,
+          captions: captions.filter((c) => selected.includes(c.platform)),
+        },
+      });
+    } catch {
+      setStep("review");
+    }
+  }
 
   function togglePlatform(p: Platform) {
     setSelected((s) => (s.includes(p) ? s.filter((x) => x !== p) : [...s, p]));
@@ -166,10 +196,7 @@ function PublishPage() {
                   Continue
                 </Button>
               ) : (
-                <Button variant="primary" size="lg" onClick={() => {
-                  setStep("publishing");
-                  setTimeout(() => setStep("done"), 2400);
-                }}>
+                <Button variant="primary" size="lg" onClick={handlePublish}>
                   <Send className="h-4 w-4" /> Publish to {selected.length}
                 </Button>
               )}

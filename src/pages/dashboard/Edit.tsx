@@ -7,6 +7,7 @@ import { TimelineEditor } from "@/components/editor/TimelineEditor";
 import { InspectorPanel } from "@/components/editor/InspectorPanel";
 import { MOCK_PROJECT, EditorProject } from "@/components/editor/mockData";
 import { toast } from "@/hooks/use-toast";
+import { useAgentJob } from "@/hooks/useAgentJob";
 
 type Stage = "intake" | "assembling" | "edit";
 
@@ -16,6 +17,28 @@ export default function EditRoute() {
 
 function EditPage() {
   const [stage, setStage] = useState<Stage>("intake");
+  const { job, start, reset } = useAgentJob("editor");
+
+  async function handleAssemble() {
+    setStage("assembling");
+    try {
+      await start({
+        jobType: "assemble_reel",
+        payload: { target_duration: 22.4, script_id: "v1" },
+      });
+    } catch {
+      setStage("intake");
+    }
+  }
+
+  useEffect(() => {
+    if (job?.status === "completed") {
+      const t = setTimeout(() => setStage("edit"), 400);
+      return () => clearTimeout(t);
+    }
+    if (job?.status === "failed") setStage("intake");
+  }, [job?.status]);
+
   return (
     <section className="container-page py-8 lg:py-10">
       <header className="mb-6 flex items-center gap-3">
@@ -30,9 +53,11 @@ function EditPage() {
         </div>
       </header>
 
-      {stage === "intake" && <IntakeStage onAssemble={() => setStage("assembling")} />}
-      {stage === "assembling" && <AssemblingStage onDone={() => setStage("edit")} />}
-      {stage === "edit" && <EditStage onReset={() => setStage("intake")} />}
+      {stage === "intake" && <IntakeStage onAssemble={handleAssemble} />}
+      {stage === "assembling" && (
+        <AssemblingStage progressPct={job?.progress_pct ?? 5} message={job?.progress_message ?? "Starting…"} />
+      )}
+      {stage === "edit" && <EditStage onReset={() => { reset(); setStage("intake"); }} />}
     </section>
   );
 }
@@ -80,7 +105,7 @@ function IntakeStage({ onAssemble }: { onAssemble: () => void }) {
   );
 }
 
-function AssemblingStage({ onDone }: { onDone: () => void }) {
+function AssemblingStage({ progressPct, message }: { progressPct: number; message: string }) {
   const stages = [
     "Indexing footage…",
     "Detecting faces & speech…",
@@ -89,22 +114,18 @@ function AssemblingStage({ onDone }: { onDone: () => void }) {
     "Auto-captioning (Italian)…",
     "Placing SFX & b-roll…",
   ];
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    if (i >= stages.length) { const t = setTimeout(onDone, 350); return () => clearTimeout(t); }
-    const t = setTimeout(() => setI(i + 1), 650 + Math.random() * 500);
-    return () => clearTimeout(t);
-  }, [i, onDone, stages.length]);
+  const activeIdx = Math.min(stages.length - 1, Math.floor((progressPct / 100) * stages.length));
   return (
     <div className="max-w-xl mx-auto py-16 text-center">
       <div className="inline-flex h-14 w-14 rounded-2xl bg-primary/10 text-primary items-center justify-center mb-6">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
-      <h2 className="text-2xl font-semibold mb-8">Assembling your reel.</h2>
+      <h2 className="text-2xl font-semibold mb-2">Assembling your reel.</h2>
+      <p className="text-sm text-foreground/55 mb-8 tabular-nums">{message} · {progressPct}%</p>
       <ul className="space-y-2 text-left max-w-sm mx-auto">
         {stages.map((s, idx) => (
-          <li key={s} className={`flex items-center gap-3 text-sm transition-all duration-300 ${idx < i ? "text-foreground/80" : idx === i ? "text-foreground" : "text-foreground/30"}`}>
-            <span className={`h-2 w-2 rounded-full ${idx < i ? "bg-primary" : idx === i ? "bg-primary animate-pulse" : "bg-foreground/15"}`} />
+          <li key={s} className={`flex items-center gap-3 text-sm transition-all duration-300 ${idx < activeIdx ? "text-foreground/80" : idx === activeIdx ? "text-foreground" : "text-foreground/30"}`}>
+            <span className={`h-2 w-2 rounded-full ${idx < activeIdx ? "bg-primary" : idx === activeIdx ? "bg-primary animate-pulse" : "bg-foreground/15"}`} />
             {s}
           </li>
         ))}

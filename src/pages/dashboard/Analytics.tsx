@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { TrendingUp, TrendingDown, BarChart3, Download } from "lucide-react";
+import { useEffect, useState } from "react";
+import { TrendingUp, TrendingDown, BarChart3, Download, RefreshCw, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/app/StatCard";
@@ -10,6 +10,7 @@ import { PostsTable } from "@/components/analytics/PostsTable";
 import { InsightCard } from "@/components/analytics/InsightCard";
 import { KPIS, INSIGHTS, Range } from "@/components/analytics/mockData";
 import { cn } from "@/lib/utils";
+import { useAgentJob } from "@/hooks/useAgentJob";
 
 export default function AnalyticsPage() {
   return <AppShell renderWith={() => <AnalyticsContent />} />;
@@ -17,7 +18,26 @@ export default function AnalyticsPage() {
 
 function AnalyticsContent() {
   const [range, setRange] = useState<Range>("30d");
-  const kpis = KPIS[range];
+  const baseKpis = KPIS[range];
+  const { job, start, submitting } = useAgentJob("analytics");
+
+  useEffect(() => {
+    start({ jobType: "snapshot", payload: { range } }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range]);
+
+  const live = job?.status === "completed" ? (job.result as any) : null;
+  const kpis = live
+    ? baseKpis.map((k, i) => {
+        if (i === 0 && typeof live.total_views === "number") {
+          return { ...k, value: live.total_views.toLocaleString() };
+        }
+        if (i === 1 && typeof live.avg_engagement === "number") {
+          return { ...k, value: `${(live.avg_engagement * 100).toFixed(1)}%` };
+        }
+        return k;
+      })
+    : baseKpis;
 
   return (
     <section className="p-6 lg:p-10 max-w-[1400px] mx-auto space-y-8">
@@ -36,6 +56,19 @@ function AnalyticsContent() {
         </div>
         <div className="flex items-center gap-2">
           <RangeToggle value={range} onChange={setRange} />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={submitting || job?.status === "running"}
+            onClick={() => start({ jobType: "snapshot", payload: { range } }).catch(() => {})}
+          >
+            {submitting || job?.status === "running" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Refresh
+          </Button>
           <Button variant="outline" size="sm">
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
