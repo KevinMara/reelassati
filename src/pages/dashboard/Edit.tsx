@@ -17,6 +17,28 @@ export default function EditRoute() {
 
 function EditPage() {
   const [stage, setStage] = useState<Stage>("intake");
+  const { job, start, reset } = useAgentJob("editor");
+
+  async function handleAssemble() {
+    setStage("assembling");
+    try {
+      await start({
+        jobType: "assemble_reel",
+        payload: { target_duration: 22.4, script_id: "v1" },
+      });
+    } catch {
+      setStage("intake");
+    }
+  }
+
+  useEffect(() => {
+    if (job?.status === "completed") {
+      const t = setTimeout(() => setStage("edit"), 400);
+      return () => clearTimeout(t);
+    }
+    if (job?.status === "failed") setStage("intake");
+  }, [job?.status]);
+
   return (
     <section className="container-page py-8 lg:py-10">
       <header className="mb-6 flex items-center gap-3">
@@ -31,9 +53,11 @@ function EditPage() {
         </div>
       </header>
 
-      {stage === "intake" && <IntakeStage onAssemble={() => setStage("assembling")} />}
-      {stage === "assembling" && <AssemblingStage onDone={() => setStage("edit")} />}
-      {stage === "edit" && <EditStage onReset={() => setStage("intake")} />}
+      {stage === "intake" && <IntakeStage onAssemble={handleAssemble} />}
+      {stage === "assembling" && (
+        <AssemblingStage progressPct={job?.progress_pct ?? 5} message={job?.progress_message ?? "Starting…"} />
+      )}
+      {stage === "edit" && <EditStage onReset={() => { reset(); setStage("intake"); }} />}
     </section>
   );
 }
