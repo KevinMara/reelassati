@@ -196,10 +196,7 @@ function PublishPage() {
                   Continue
                 </Button>
               ) : (
-                <Button variant="primary" size="lg" onClick={() => {
-                  setStep("publishing");
-                  setTimeout(() => setStep("done"), 2400);
-                }}>
+                <Button variant="primary" size="lg" onClick={handlePublish}>
                   <Send className="h-4 w-4" /> Publish to {selected.length}
                 </Button>
               )}
