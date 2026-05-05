@@ -28,6 +28,35 @@ function PublishPage() {
     linkedin: null,
   });
   const [mode, setMode] = useState<"now" | "schedule" | "best">("schedule");
+  const { job, start } = useAgentJob("publisher");
+
+  useEffect(() => {
+    if (job?.status === "completed") setStep("done");
+    if (job?.status === "failed") setStep("review");
+  }, [job?.status]);
+
+  async function handlePublish() {
+    setStep("publishing");
+    const scheduled_at =
+      mode === "now"
+        ? new Date().toISOString()
+        : mode === "best"
+          ? new Date(Date.now() + 60 * 60 * 1000).toISOString()
+          : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    try {
+      await start({
+        jobType: "schedule_posts",
+        payload: {
+          platforms: selected,
+          scheduled_at,
+          mode,
+          captions: captions.filter((c) => selected.includes(c.platform)),
+        },
+      });
+    } catch {
+      setStep("review");
+    }
+  }
 
   function togglePlatform(p: Platform) {
     setSelected((s) => (s.includes(p) ? s.filter((x) => x !== p) : [...s, p]));
