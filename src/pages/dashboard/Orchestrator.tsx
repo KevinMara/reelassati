@@ -133,10 +133,10 @@ function OrchestratorContent() {
               : "border-border text-foreground/50 hover:text-foreground/80",
           )}
         >
-          All clients ({JOBS.length})
+          All clients ({allJobs.length})
         </button>
         {CLIENTS.map((c) => {
-          const count = JOBS.filter((j) => j.clientId === c.id).length;
+          const count = allJobs.filter((j) => j.clientId === c.id).length;
           const on = activeClient === c.id;
           return (
             <button
