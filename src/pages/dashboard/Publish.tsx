@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Send, Calendar, Clock, CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { CaptionEditor } from "@/components/publisher/CaptionEditor";
 import { ScheduleHeatmap } from "@/components/publisher/ScheduleHeatmap";
 import { CAPTIONS, MOCK_REEL, PLATFORMS, Platform, CaptionVariant } from "@/components/publisher/mockData";
 import { toast } from "@/hooks/use-toast";
+import { useAgentJob } from "@/hooks/useAgentJob";
 
 type Step = "compose" | "schedule" | "review" | "publishing" | "done";
 
