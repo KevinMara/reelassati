@@ -98,7 +98,21 @@ function PublishPage() {
                   <PlatformPicker selected={selected} onToggle={togglePlatform} />
                 </Section>
 
-                <Section title="2 — Tune each caption" subtitle="Switch tabs to edit per-platform.">
+                {selected.length > 0 && (
+                  <Section title="2 — Thumbnail" subtitle="AI-generated cover engineered for engagement.">
+                    <ThumbnailSection
+                      platforms={selected}
+                      activePlatform={activeTab}
+                      title={activeCaption?.text?.split("\n")[0]?.slice(0, 80) ?? MOCK_REEL.title}
+                      candidates={thumbCandidates}
+                      selectedIndex={thumbSelected}
+                      onCandidates={(c) => { setThumbCandidates(c); setThumbSelected(0); }}
+                      onSelect={setThumbSelected}
+                    />
+                  </Section>
+                )}
+
+                <Section title="3 — Tune each caption" subtitle="Switch tabs to edit per-platform.">
                   <PlatformTabs active={activeTab} onChange={setActiveTab} platforms={selected} />
                   {selected.length > 0 ? (
                     <CaptionEditor
