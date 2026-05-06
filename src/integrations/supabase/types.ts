@@ -434,6 +434,63 @@ export type Database = {
           },
         ]
       }
+      drafts: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          description: string | null
+          hashtags: string[] | null
+          id: string
+          platforms: string[] | null
+          source_video_id: string | null
+          status: string
+          thumbnail_candidates: Json | null
+          thumbnail_custom_uploaded: boolean
+          thumbnail_selected_index: number | null
+          thumbnail_source: string | null
+          thumbnail_video_frame_timestamp_s: number | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          hashtags?: string[] | null
+          id?: string
+          platforms?: string[] | null
+          source_video_id?: string | null
+          status?: string
+          thumbnail_candidates?: Json | null
+          thumbnail_custom_uploaded?: boolean
+          thumbnail_selected_index?: number | null
+          thumbnail_source?: string | null
+          thumbnail_video_frame_timestamp_s?: number | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          hashtags?: string[] | null
+          id?: string
+          platforms?: string[] | null
+          source_video_id?: string | null
+          status?: string
+          thumbnail_candidates?: Json | null
+          thumbnail_custom_uploaded?: boolean
+          thumbnail_selected_index?: number | null
+          thumbnail_source?: string | null
+          thumbnail_video_frame_timestamp_s?: number | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       jobs: {
         Row: {
           actual_cost_eur: number | null
@@ -808,6 +865,81 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      thumbnail_generations: {
+        Row: {
+          candidates: Json | null
+          completed_at: string | null
+          created_at: string
+          draft_id: string | null
+          error_details: Json | null
+          generated_image_keys: string[] | null
+          id: string
+          opus_prompts: Json | null
+          parent_generation_id: string | null
+          platform: string | null
+          quality: string
+          refinement_instruction: string | null
+          status: string
+          title: string | null
+          total_cost_eur: number | null
+          tribev2_concept: Json | null
+          user_id: string
+        }
+        Insert: {
+          candidates?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          draft_id?: string | null
+          error_details?: Json | null
+          generated_image_keys?: string[] | null
+          id?: string
+          opus_prompts?: Json | null
+          parent_generation_id?: string | null
+          platform?: string | null
+          quality?: string
+          refinement_instruction?: string | null
+          status?: string
+          title?: string | null
+          total_cost_eur?: number | null
+          tribev2_concept?: Json | null
+          user_id: string
+        }
+        Update: {
+          candidates?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          draft_id?: string | null
+          error_details?: Json | null
+          generated_image_keys?: string[] | null
+          id?: string
+          opus_prompts?: Json | null
+          parent_generation_id?: string | null
+          platform?: string | null
+          quality?: string
+          refinement_instruction?: string | null
+          status?: string
+          title?: string | null
+          total_cost_eur?: number | null
+          tribev2_concept?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thumbnail_generations_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thumbnail_generations_parent_generation_id_fkey"
+            columns: ["parent_generation_id"]
+            isOneToOne: false
+            referencedRelation: "thumbnail_generations"
             referencedColumns: ["id"]
           },
         ]

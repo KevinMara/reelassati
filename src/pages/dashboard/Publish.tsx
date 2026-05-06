@@ -6,6 +6,7 @@ import { PlatformPicker } from "@/components/publisher/PlatformPicker";
 import { CaptionEditor } from "@/components/publisher/CaptionEditor";
 import { ScheduleHeatmap } from "@/components/publisher/ScheduleHeatmap";
 import { CAPTIONS, MOCK_REEL, PLATFORMS, Platform, CaptionVariant } from "@/components/publisher/mockData";
+import { ThumbnailSection, type ThumbnailCandidate } from "@/components/publisher/ThumbnailSection";
 import { toast } from "@/hooks/use-toast";
 import { useAgentJob } from "@/hooks/useAgentJob";
 
@@ -20,6 +21,8 @@ function PublishPage() {
   const [selected, setSelected] = useState<Platform[]>(["instagram", "tiktok"]);
   const [captions, setCaptions] = useState<CaptionVariant[]>(CAPTIONS);
   const [activeTab, setActiveTab] = useState<Platform>("instagram");
+  const [thumbCandidates, setThumbCandidates] = useState<ThumbnailCandidate[]>([]);
+  const [thumbSelected, setThumbSelected] = useState<number | null>(null);
   const [slots, setSlots] = useState<Record<Platform, { day: string; hour: number } | null>>({
     instagram: { day: "Tue", hour: 19 },
     tiktok: { day: "Wed", hour: 21 },
@@ -95,7 +98,21 @@ function PublishPage() {
                   <PlatformPicker selected={selected} onToggle={togglePlatform} />
                 </Section>
 
-                <Section title="2 — Tune each caption" subtitle="Switch tabs to edit per-platform.">
+                {selected.length > 0 && (
+                  <Section title="2 — Thumbnail" subtitle="AI-generated cover engineered for engagement.">
+                    <ThumbnailSection
+                      platforms={selected}
+                      activePlatform={activeTab}
+                      title={activeCaption?.text?.split("\n")[0]?.slice(0, 80) ?? MOCK_REEL.title}
+                      candidates={thumbCandidates}
+                      selectedIndex={thumbSelected}
+                      onCandidates={(c) => { setThumbCandidates(c); setThumbSelected(0); }}
+                      onSelect={setThumbSelected}
+                    />
+                  </Section>
+                )}
+
+                <Section title="3 — Tune each caption" subtitle="Switch tabs to edit per-platform.">
                   <PlatformTabs active={activeTab} onChange={setActiveTab} platforms={selected} />
                   {selected.length > 0 ? (
                     <CaptionEditor
