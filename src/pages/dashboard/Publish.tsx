@@ -21,6 +21,8 @@ function PublishPage() {
   const [selected, setSelected] = useState<Platform[]>(["instagram", "tiktok"]);
   const [captions, setCaptions] = useState<CaptionVariant[]>(CAPTIONS);
   const [activeTab, setActiveTab] = useState<Platform>("instagram");
+  const [thumbCandidates, setThumbCandidates] = useState<ThumbnailCandidate[]>([]);
+  const [thumbSelected, setThumbSelected] = useState<number | null>(null);
   const [slots, setSlots] = useState<Record<Platform, { day: string; hour: number } | null>>({
     instagram: { day: "Tue", hour: 19 },
     tiktok: { day: "Wed", hour: 21 },
