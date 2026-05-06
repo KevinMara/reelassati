@@ -6,6 +6,7 @@ import { PlatformPicker } from "@/components/publisher/PlatformPicker";
 import { CaptionEditor } from "@/components/publisher/CaptionEditor";
 import { ScheduleHeatmap } from "@/components/publisher/ScheduleHeatmap";
 import { CAPTIONS, MOCK_REEL, PLATFORMS, Platform, CaptionVariant } from "@/components/publisher/mockData";
+import { ThumbnailSection, type ThumbnailCandidate } from "@/components/publisher/ThumbnailSection";
 import { toast } from "@/hooks/use-toast";
 import { useAgentJob } from "@/hooks/useAgentJob";
 
