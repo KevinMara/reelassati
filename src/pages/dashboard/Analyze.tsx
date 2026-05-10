@@ -33,7 +33,7 @@ function AnalyzePage() {
       setStage("results");
     } else if (job?.status === "failed") {
       setVerdict(undefined);
-      setStage("results"); // fall back to mock verdict
+      setStage("upload"); // Return to upload so they can try again or check settings
     }
   }, [job]);
 
