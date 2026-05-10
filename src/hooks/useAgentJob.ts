@@ -52,12 +52,25 @@ export function useAgentJob(agent: AgentName) {
       )
       .subscribe();
 
-    // Polling fallback every 1.5s
     pollRef.current = window.setInterval(async () => {
-      const { data } = await supabase.from("jobs").select("*").eq("id", jobId).maybeSingle();
+      const { data, error } = await supabase.from("jobs").select("*").eq("id", jobId).maybeSingle();
+      if (error) {
+        console.error("Polling error:", error);
+        return;
+      }
       if (data) {
-        setJob(data as AgentJob);
-        if (data.status === "completed" || data.status === "failed") cleanup();
+        const typedData = data as AgentJob;
+        setJob(typedData);
+        if (typedData.status === "failed") {
+          toast({
+            title: "Agent task failed",
+            description: typedData.progress_message || "An error occurred during execution.",
+            variant: "destructive",
+          });
+          cleanup();
+        } else if (typedData.status === "completed") {
+          cleanup();
+        }
       }
     }, 1500);
   }, [cleanup]);
