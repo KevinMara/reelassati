@@ -36,12 +36,17 @@ function OrchestratorContent() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("jobs")
         .select("id, agent_name, job_type, status, progress_pct, payload, result, created_at, client_id")
         .order("created_at", { ascending: false })
         .limit(40);
-      if (cancelled || !data) return;
+      if (cancelled) return;
+      if (error) {
+        console.error("Failed to load jobs:", error);
+        return;
+      }
+      if (!data) return;
       const mapped: Job[] = data
         .map((row): Job | null => {
           const stage = AGENT_TO_STAGE[row.agent_name as string];
