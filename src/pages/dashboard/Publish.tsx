@@ -62,8 +62,19 @@ function PublishPage() {
   }
 
   function togglePlatform(p: Platform) {
-    setSelected((s) => (s.includes(p) ? s.filter((x) => x !== p) : [...s, p]));
-    if (!selected.includes(p)) setActiveTab(p);
+    setSelected((prev) => {
+      const isAdding = !prev.includes(p);
+      const next = isAdding ? [...prev, p] : prev.filter((x) => x !== p);
+      
+      if (isAdding) {
+        setActiveTab(p);
+      } else if (activeTab === p) {
+        // If we removed the active tab, switch to the first available or reset
+        setActiveTab(next[0] || "instagram");
+      }
+      
+      return next;
+    });
   }
 
   const activeCaption = captions.find((c) => c.platform === activeTab) ?? captions[0];
