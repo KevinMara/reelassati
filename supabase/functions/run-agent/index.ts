@@ -166,7 +166,7 @@ async function runAnalyzer(p: any, apiKey: string | undefined, admin: any, jobId
   // so the rich UI stays populated.
   const goal = String(p.goal ?? "Virality");
   const platform = String(p.platform ?? "TikTok");
-  const language = String(p.language ?? "IT");
+  const language = String(p.language ?? "en");
   const notes = String(p.notes ?? "Generic short-form video for a small business.");
 
   let verdictText =
