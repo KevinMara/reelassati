@@ -4,7 +4,9 @@ import { AppShell } from "@/components/app/AppShell";
 import { ScriptBriefStage, ScriptBrief } from "@/components/script/ScriptBriefStage";
 import { ScriptGeneratingStage } from "@/components/script/ScriptGeneratingStage";
 import { ScriptResultsStage } from "@/components/script/ScriptResultsStage";
-import { useAgentJob } from "@/hooks/useAgentJob";
+import { useJob } from "@/hooks/useJob";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import { ScriptVariant, generateVariants } from "@/components/script/mockData";
 
 type Stage = "brief" | "generating" | "results";
@@ -17,7 +19,8 @@ function ScriptPage() {
   const [stage, setStage] = useState<Stage>("brief");
   const [brief, setBrief] = useState<ScriptBrief | null>(null);
   const [variants, setVariants] = useState<ScriptVariant[] | null>(null);
-  const { job, start, reset } = useAgentJob("scriptwriter");
+  const [jobId, setJobId] = useState<string | null>(null);
+  const job = useJob(jobId);
 
   // When the job finishes, advance UI.
   useEffect(() => {
@@ -26,6 +29,11 @@ function ScriptPage() {
       setVariants(job.result.variants as ScriptVariant[]);
       setStage("results");
     } else if (job.status === "failed") {
+      toast({
+        title: "Generation failed",
+        description: job.error_details || "An unknown error occurred",
+        variant: "destructive"
+      });
       // Fall back to deterministic generator so the user isn't stuck.
       if (brief) {
         setVariants(generateVariants({ goal: brief.goal, angle: brief.angle }));
@@ -35,26 +43,42 @@ function ScriptPage() {
   }, [job, brief]);
 
   const onGenerate = async (b: ScriptBrief) => {
-    setBrief(b);
-    setStage("generating");
-    setVariants(null);
-    await start({
-      jobType: "generate_script",
-      payload: {
-        goal: b.goal,
-        angle: b.angle,
-        duration: b.duration,
-        tone: b.tone.join(", "),
-        format: b.format,
-        platform: b.platforms[0] ?? "Reels",
-        language: "it",
-        references: b.references,
-      },
-    });
+    try {
+      setBrief(b);
+      setStage("generating");
+      setVariants(null);
+      
+      const { data, error } = await supabase.functions.invoke("generate-script", {
+        body: {
+          client_id: null,
+          goal: b.goal,
+          angle: b.angle,
+          duration: b.duration,
+          tone: b.tone.join(", "),
+          format: b.format,
+          platform: b.platforms[0] ?? "Reels",
+          language: "it",
+          references: b.references,
+        }
+      });
+
+      if (error || data?.error) {
+        throw new Error(data?.error || error?.message || "Failed to start generation");
+      }
+
+      setJobId(data.job_id);
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: e.message,
+        variant: "destructive"
+      });
+      setStage("brief");
+    }
   };
 
   const onReset = () => {
-    reset();
+    setJobId(null);
     setVariants(null);
     setBrief(null);
     setStage("brief");
