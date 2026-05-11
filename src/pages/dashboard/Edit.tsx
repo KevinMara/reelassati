@@ -28,7 +28,7 @@ function EditPage() {
         body: {
           target_duration: 22.4,
           script_id: "v1",
-          timeline: MOCK_PROJECT.tracks,
+          project: MOCK_PROJECT,
           client_id: null
         }
       });
