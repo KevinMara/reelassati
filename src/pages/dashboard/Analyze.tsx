@@ -66,18 +66,15 @@ function AnalyzePage() {
         if (!signed?.signedUrl) throw new Error("Failed to create signed URL");
         videoUrl = signed.signedUrl;
       } else {
-        // Assume p.notes contains the URL if no file provided (from the UploadStage logic)
-        // or we use a provided URL field if we added one.
-        // For now, let's assume it's a URL if it starts with http
         if (p.notes?.startsWith("http")) {
-            videoUrl = p.notes;
+          videoUrl = p.notes;
         }
       }
 
       const { data, error } = await supabase.functions.invoke("analyze-video", {
         body: {
           video_url: videoUrl,
-          client_id: null, // TODO: wire up client selection
+          client_id: null,
           goal: p.goal,
           audience: p.audience,
           platform: p.platform,
@@ -136,7 +133,7 @@ function AnalyzePage() {
         </div>
       )}
 
-      {stage === "upload" && mode === "single" && <UploadStage onAnalyze={(p, file) => onAnalyze(p, file)} />}
+      {stage === "upload" && mode === "single" && <UploadStage onAnalyze={(p, file) => { onAnalyze(p, file); }} />}
 
       {stage === "upload" && mode === "ab" && (
         <ABUploadStage onAnalyze={() => onAnalyze({ goal: "virality", audience: "", platform: "tiktok", notes: "A/B comparison", language: "it" })} />
@@ -167,8 +164,36 @@ function AnalyzePage() {
   );
 }
 
-// ... rest of file (ABUploadStage and TournamentUploadStage) remains the same but they need to pass files
-
+function ABUploadStage({ onAnalyze }: { onAnalyze: () => void }) {
+  const { t } = useTranslation();
+  const [a, setA] = useState<File | null>(null);
+  const [b, setB] = useState<File | null>(null);
+  const [variable, setVariable] = useState("");
+  return (
+    <div className="space-y-6">
+      <div className="grid md:grid-cols-2 gap-4">
+        {([{ side: "A", file: a, set: setA }, { side: "B", file: b, set: setB }] as const).map(({ side, file, set }) => (
+          <div key={side} className="relative rounded-2xl border-2 border-dashed border-border min-h-[220px] flex flex-col items-center justify-center text-center px-6 py-10 bg-surface/50">
+            <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => set(e.target.files?.[0] ?? null)} />
+            <div className="text-3xl font-semibold text-foreground/30 mb-2">{side}</div>
+            <div className="text-sm text-foreground/60">{file ? file.name : t("app.analyze.ab.drop", { side })}</div>
+          </div>
+        ))}
+      </div>
+      <div>
+        <label className="block text-[11px] uppercase tracking-wider text-foreground/55 mb-1.5 font-medium">
+          {t("app.analyze.ab.variable")}
+        </label>
+        <input value={variable} onChange={(e) => setVariable(e.target.value)} placeholder={t("app.analyze.ab.variable_placeholder")} className="w-full h-10 rounded-md bg-surface border border-input px-3 text-sm" />
+      </div>
+      <div className="flex justify-end">
+        <Button variant="primary" size="lg" disabled={!a || !b} onClick={onAnalyze}>
+          {t("app.analyze.ab.compare")}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function TournamentUploadStage({ count, setCount, onAnalyze }: { count: number; setCount: (n: number) => void; onAnalyze: () => void }) {
   const { t } = useTranslation();

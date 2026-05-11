@@ -22,7 +22,7 @@ export type AnalyzePayload = {
   language: string;
 };
 
-export function UploadStage({ onAnalyze }: { onAnalyze: (p: AnalyzePayload) => void }) {
+export function UploadStage({ onAnalyze }: { onAnalyze: (p: AnalyzePayload, file?: File) => void }) {
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
