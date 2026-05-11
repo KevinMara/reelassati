@@ -248,33 +248,50 @@ export type Database = {
       }
       chat_messages: {
         Row: {
+          agent_name: string | null
           content: string
-          created_at: string
+          created_at: string | null
           id: string
-          is_final: boolean
+          is_final: boolean | null
+          is_streaming_chunk: boolean | null
+          metadata: Json | null
           role: string
           session_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
+          agent_name?: string | null
           content: string
-          created_at?: string
+          created_at?: string | null
           id?: string
-          is_final?: boolean
+          is_final?: boolean | null
+          is_streaming_chunk?: boolean | null
+          metadata?: Json | null
           role: string
           session_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
+          agent_name?: string | null
           content?: string
-          created_at?: string
+          created_at?: string | null
           id?: string
-          is_final?: boolean
+          is_final?: boolean | null
+          is_streaming_chunk?: boolean | null
+          metadata?: Json | null
           role?: string
           session_id?: string
-          user_id?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       client_briefs: {
         Row: {
