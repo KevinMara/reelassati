@@ -7,7 +7,8 @@ import { TimelineEditor } from "@/components/editor/TimelineEditor";
 import { InspectorPanel } from "@/components/editor/InspectorPanel";
 import { MOCK_PROJECT, EditorProject } from "@/components/editor/mockData";
 import { toast } from "@/hooks/use-toast";
-import { useAgentJob } from "@/hooks/useAgentJob";
+import { useJob } from "@/hooks/useJob";
+import { supabase } from "@/integrations/supabase/client";
 
 type Stage = "intake" | "assembling" | "edit";
 
@@ -17,16 +18,32 @@ export default function EditRoute() {
 
 function EditPage() {
   const [stage, setStage] = useState<Stage>("intake");
-  const { job, start, reset } = useAgentJob("editor");
+  const [jobId, setJobId] = useState<string | null>(null);
+  const job = useJob(jobId);
 
   async function handleAssemble() {
-    setStage("assembling");
     try {
-      await start({
-        jobType: "assemble_reel",
-        payload: { target_duration: 22.4, script_id: "v1" },
+      setStage("assembling");
+      const { data, error } = await supabase.functions.invoke("start-edit", {
+        body: {
+          target_duration: 22.4,
+          script_id: "v1",
+          timeline: MOCK_PROJECT.tracks,
+          client_id: null
+        }
       });
-    } catch {
+
+      if (error || data?.error) {
+        throw new Error(data?.error || error?.message || "Failed to start editing");
+      }
+
+      setJobId(data.job_id);
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: e.message,
+        variant: "destructive"
+      });
       setStage("intake");
     }
   }
@@ -36,8 +53,16 @@ function EditPage() {
       const t = setTimeout(() => setStage("edit"), 400);
       return () => clearTimeout(t);
     }
-    if (job?.status === "failed") setStage("intake");
-  }, [job?.status]);
+    if (job?.status === "failed") {
+      toast({
+        title: "Edit failed",
+        description: job.error_details || "An unknown error occurred",
+        variant: "destructive"
+      });
+      setStage("intake");
+      setJobId(null);
+    }
+  }, [job]);
 
   return (
     <section className="container-page py-8 lg:py-10">
@@ -57,7 +82,7 @@ function EditPage() {
       {stage === "assembling" && (
         <AssemblingStage progressPct={job?.progress_pct ?? 5} message={job?.progress_message ?? "Starting…"} />
       )}
-      {stage === "edit" && <EditStage onReset={() => { reset(); setStage("intake"); }} />}
+      {stage === "edit" && <EditStage onReset={() => { setJobId(null); setStage("intake"); }} />}
     </section>
   );
 }
