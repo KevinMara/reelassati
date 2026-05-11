@@ -949,6 +949,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      increment_user_spend: {
+        Args: { amount_eur: number; user_id: string }
+        Returns: undefined
+      }
       is_first_user: { Args: never; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       user_owns_client: {
