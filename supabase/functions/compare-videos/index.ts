@@ -1,52 +1,73 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { getAuthenticatedUser, serviceClient } from "../_shared/auth.ts"
-import { checkBudget, logApiUsage } from "../_shared/budget.ts"
-import { invokeAgent, callbackUrl } from "../_shared/hermes.ts"
-import { corsHeaders } from "../_shared/cors.ts"
+import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
+import { getAuthenticatedUser, serviceClient } from '../_shared/auth.ts'
+import { checkBudget } from '../_shared/budget.ts'
+import { invokeAgent, callbackUrl } from '../_shared/hermes.ts'
+import { corsHeaders, handleCors } from '../_shared/cors.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  const cors = handleCors(req)
+  if (cors) return cors
   
   try {
     const user = await getAuthenticatedUser(req.headers.get('Authorization'))
-    if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
+    if (!user) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
     
-    const body = await req.json()
-    const { video_urls, client_id, criterion } = body
+    const { video_urls, client_id, criterion } = await req.json()
     
-    const COST = 0.80
-    const budget = await checkBudget(user.id, COST)
-    if (!budget.allowed) return new Response(JSON.stringify({ error: 'budget_exceeded', ...budget }), { status: 402, headers: corsHeaders })
+    if (!video_urls || !Array.isArray(video_urls) || video_urls.length < 2) {
+      return new Response(JSON.stringify({ error: 'At least 2 video_urls required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    
+    const estimatedCost = 1.00
+    const budgetCheck = await checkBudget(user.id, estimatedCost)
+    if (!budgetCheck.allowed) {
+      return new Response(JSON.stringify({ error: 'budget_exceeded', details: budgetCheck }), {
+        status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
     
     const supabase = serviceClient()
-    const { data: job, error: jobError } = await supabase
-      .from('jobs')
-      .insert({
+    const { data: job, error } = await supabase.from('jobs').insert({
+      user_id: user.id,
+      client_id,
+      agent_name: 'video_analyzer',
+      job_type: 'compare_videos',
+      status: 'queued',
+      payload: { video_urls, criterion },
+      estimated_cost_eur: estimatedCost
+    }).select().single()
+    
+    if (error) throw error
+    
+    try {
+      await invokeAgent({
+        agent: 'video_comparator',
+        job_id: job.id,
         user_id: user.id,
         client_id: client_id || null,
-        agent_name: 'analyzer',
-        job_type: 'compare_videos',
-        payload: { video_urls, criterion },
-        status: 'queued'
+        input: { video_urls, criterion },
+        callback_url: callbackUrl()
       })
-      .select()
-      .single()
+    } catch (hermesError) {
+      await supabase.from('jobs').update({
+        status: 'failed',
+        error_details: { stage: 'hermes_invoke', error: String(hermesError) }
+      }).eq('id', job.id)
       
-    if (jobError) throw jobError
+      return new Response(JSON.stringify({ error: 'agent_unreachable' }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
     
-    await invokeAgent({
-      agent: 'video_comparator',
-      job_id: job.id,
-      user_id: user.id,
-      client_id: client_id || null,
-      input: { video_urls, criterion },
-      callback_url: callbackUrl()
+    return new Response(JSON.stringify({ job_id: job.id }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
     
-    await logApiUsage(user.id, 'analyzer', 'invoke', 'hermes', COST, { job_id: job.id })
-    
-    return new Response(JSON.stringify({ job_id: job.id }), { headers: corsHeaders })
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders })
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 })

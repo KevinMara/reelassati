@@ -12,9 +12,9 @@ serve(async (req) => {
     const user = await getAuthenticatedUser(req.headers.get('Authorization'))
     if (!user) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
     
-    const { range, client_id, platforms } = await req.json()
+    const { edit_project_id, instructions, client_id } = await req.json()
     
-    const estimatedCost = 0.30
+    const estimatedCost = 1.00
     const budgetCheck = await checkBudget(user.id, estimatedCost)
     if (!budgetCheck.allowed) {
       return new Response(JSON.stringify({ error: 'budget_exceeded', details: budgetCheck }), {
@@ -26,10 +26,10 @@ serve(async (req) => {
     const { data: job, error } = await supabase.from('jobs').insert({
       user_id: user.id,
       client_id,
-      agent_name: 'analytics_agent',
-      job_type: 'fetch_analytics',
+      agent_name: 'video_editor',
+      job_type: 'refine_edit',
       status: 'queued',
-      payload: { range, platforms },
+      payload: { edit_project_id, instructions },
       estimated_cost_eur: estimatedCost
     }).select().single()
     
@@ -37,11 +37,11 @@ serve(async (req) => {
     
     try {
       await invokeAgent({
-        agent: 'analytics_analyzer',
+        agent: 'video_editor',
         job_id: job.id,
         user_id: user.id,
         client_id: client_id || null,
-        input: { range, platforms },
+        input: { edit_project_id, instructions },
         callback_url: callbackUrl()
       })
     } catch (hermesError) {

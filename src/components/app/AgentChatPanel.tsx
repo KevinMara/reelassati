@@ -46,7 +46,7 @@ export function AgentChatPanel() {
             if (prev.some(m => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
         });
-        if (payload.new.role === 'assistant' && payload.new.is_final) {
+        if (payload.new.role === 'agent' && payload.new.is_final) {
             setIsStreaming(false);
         }
       })

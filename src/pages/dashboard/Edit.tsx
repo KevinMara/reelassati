@@ -21,15 +21,35 @@ function EditPage() {
   const [jobId, setJobId] = useState<string | null>(null);
   const job = useJob(jobId);
 
-  async function handleAssemble() {
+  async function handleAssemble(files: File[]) {
     try {
       setStage("assembling");
+      
+      let footageKeys: string[] = [];
+      
+      if (files.length > 0) {
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) throw new Error("Not authenticated");
+        
+        const uploads = files.map(async (file) => {
+          const path = `${userData.user.id}/${Date.now()}_${file.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("raw_videos")
+            .upload(path, file);
+          if (uploadError) throw uploadError;
+          return path;
+        });
+        
+        footageKeys = await Promise.all(uploads);
+      }
+
       const { data, error } = await supabase.functions.invoke("start-edit", {
         body: {
-          target_duration: 22.4,
-          script_id: "v1",
-          project: MOCK_PROJECT,
-          client_id: null
+          script_id: "v1", // Default to v1 or get from state
+          footage_keys: footageKeys,
+          client_id: null,
+          music_id: MOCK_PROJECT.music.id,
+          style_id: "k1" // Default style
         }
       });
 
@@ -56,7 +76,7 @@ function EditPage() {
     if (job?.status === "failed") {
       toast({
         title: "Edit failed",
-        description: job.error_details || "An unknown error occurred",
+        description: job.error_details?.error || "An unknown error occurred",
         variant: "destructive"
       });
       setStage("intake");
@@ -87,7 +107,7 @@ function EditPage() {
   );
 }
 
-function IntakeStage({ onAssemble }: { onAssemble: () => void }) {
+function IntakeStage({ onAssemble }: { onAssemble: (files: File[]) => void }) {
   const [files, setFiles] = useState<File[]>([]);
   const [scriptLinked, setScriptLinked] = useState(true);
 
@@ -121,8 +141,8 @@ function IntakeStage({ onAssemble }: { onAssemble: () => void }) {
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onAssemble}>Skip — use mock footage</Button>
-        <Button variant="primary" size="lg" onClick={onAssemble}>
+        <Button variant="ghost" onClick={() => onAssemble([])}>Skip — use mock footage</Button>
+        <Button variant="primary" size="lg" onClick={() => onAssemble(files)}>
           <Sparkles className="h-4 w-4" /> Assemble
         </Button>
       </div>
