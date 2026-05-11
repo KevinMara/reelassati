@@ -192,7 +192,7 @@ export function UploadStage({ onAnalyze }: { onAnalyze: (p: AnalyzePayload, file
               platform: platforms[0] ?? "tiktok",
               notes: file ? `Local file: ${file.name}` : `Source URL: ${url}`,
               language: "it",
-            })
+            }, file || undefined)
           }
         >
           {t("app.analyze.upload.analyze")}
