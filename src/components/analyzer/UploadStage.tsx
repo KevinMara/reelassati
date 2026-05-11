@@ -22,7 +22,7 @@ export type AnalyzePayload = {
   language: string;
 };
 
-export function UploadStage({ onAnalyze }: { onAnalyze: (p: AnalyzePayload) => void }) {
+export function UploadStage({ onAnalyze }: { onAnalyze: (p: AnalyzePayload, file?: File) => void }) {
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
@@ -192,7 +192,7 @@ export function UploadStage({ onAnalyze }: { onAnalyze: (p: AnalyzePayload) => v
               platform: platforms[0] ?? "tiktok",
               notes: file ? `Local file: ${file.name}` : `Source URL: ${url}`,
               language: "it",
-            })
+            }, file || undefined)
           }
         >
           {t("app.analyze.upload.analyze")}

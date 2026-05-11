@@ -12,9 +12,9 @@ serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
     
     const body = await req.json()
-    const { video_id, client_id, prompt } = body
+    const { video_url, client_id, goal, audience, platform, language } = body
     
-    const COST = 0.40
+    const COST = 0.50
     const budget = await checkBudget(user.id, COST)
     if (!budget.allowed) return new Response(JSON.stringify({ error: 'budget_exceeded', ...budget }), { status: 402, headers: corsHeaders })
     
@@ -24,9 +24,9 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         client_id: client_id || null,
-        agent_name: 'publisher',
-        job_type: 'generate_thumbnail',
-        payload: { video_id, prompt },
+        agent_name: 'analyzer',
+        job_type: 'analyze_video',
+        payload: { video_url, goal, audience, platform, language },
         status: 'queued'
       })
       .select()
@@ -35,15 +35,15 @@ serve(async (req) => {
     if (jobError) throw jobError
     
     await invokeAgent({
-      agent: 'thumbnail_agent',
+      agent: 'video_analyzer',
       job_id: job.id,
       user_id: user.id,
       client_id: client_id || null,
-      input: { video_id, prompt },
+      input: { video_url, goal, audience, platform, language },
       callback_url: callbackUrl()
     })
     
-    await logApiUsage(user.id, 'publisher', 'invoke', 'hermes', COST, { job_id: job.id })
+    await logApiUsage(user.id, 'analyzer', 'invoke', 'hermes', COST, { job_id: job.id })
     
     return new Response(JSON.stringify({ job_id: job.id }), { headers: corsHeaders })
   } catch (err) {

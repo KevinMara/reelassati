@@ -12,9 +12,9 @@ serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
     
     const body = await req.json()
-    const { video_id, client_id, prompt } = body
+    const { video_id, platforms, captions, client_id } = body
     
-    const COST = 0.40
+    const COST = 0.20 * platforms.length
     const budget = await checkBudget(user.id, COST)
     if (!budget.allowed) return new Response(JSON.stringify({ error: 'budget_exceeded', ...budget }), { status: 402, headers: corsHeaders })
     
@@ -25,8 +25,8 @@ serve(async (req) => {
         user_id: user.id,
         client_id: client_id || null,
         agent_name: 'publisher',
-        job_type: 'generate_thumbnail',
-        payload: { video_id, prompt },
+        job_type: 'publish_post',
+        payload: { video_id, platforms, captions },
         status: 'queued'
       })
       .select()
@@ -35,11 +35,11 @@ serve(async (req) => {
     if (jobError) throw jobError
     
     await invokeAgent({
-      agent: 'thumbnail_agent',
+      agent: 'publisher_agent',
       job_id: job.id,
       user_id: user.id,
       client_id: client_id || null,
-      input: { video_id, prompt },
+      input: { video_id, platforms, captions },
       callback_url: callbackUrl()
     })
     

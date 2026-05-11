@@ -8,7 +8,8 @@ import { ScheduleHeatmap } from "@/components/publisher/ScheduleHeatmap";
 import { CAPTIONS, MOCK_REEL, PLATFORMS, Platform, CaptionVariant } from "@/components/publisher/mockData";
 import { ThumbnailSection, type ThumbnailCandidate } from "@/components/publisher/ThumbnailSection";
 import { toast } from "@/hooks/use-toast";
-import { useAgentJob } from "@/hooks/useAgentJob";
+import { useJob } from "@/hooks/useJob";
+import { supabase } from "@/integrations/supabase/client";
 
 type Step = "compose" | "schedule" | "review" | "publishing" | "done";
 
@@ -23,6 +24,9 @@ function PublishPage() {
   const [activeTab, setActiveTab] = useState<Platform>("instagram");
   const [thumbCandidates, setThumbCandidates] = useState<ThumbnailCandidate[]>([]);
   const [thumbSelected, setThumbSelected] = useState<number | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const job = useJob(jobId);
+
   const [slots, setSlots] = useState<Record<Platform, { day: string; hour: number } | null>>({
     instagram: { day: "Tue", hour: 19 },
     tiktok: { day: "Wed", hour: 21 },
@@ -31,32 +35,51 @@ function PublishPage() {
     linkedin: null,
   });
   const [mode, setMode] = useState<"now" | "schedule" | "best">("schedule");
-  const { job, start } = useAgentJob("publisher");
 
   useEffect(() => {
     if (job?.status === "completed") setStep("done");
-    if (job?.status === "failed") setStep("review");
-  }, [job?.status]);
+    if (job?.status === "failed") {
+      toast({
+        title: "Publishing failed",
+        description: job.error_details || "An unknown error occurred",
+        variant: "destructive"
+      });
+      setStep("review");
+      setJobId(null);
+    }
+  }, [job]);
 
   async function handlePublish() {
-    setStep("publishing");
-    const scheduled_at =
-      mode === "now"
-        ? new Date().toISOString()
-        : mode === "best"
-          ? new Date(Date.now() + 60 * 60 * 1000).toISOString()
-          : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
     try {
-      await start({
-        jobType: "schedule_posts",
-        payload: {
+      setStep("publishing");
+      const scheduled_at =
+        mode === "now"
+          ? new Date().toISOString()
+          : mode === "best"
+            ? new Date(Date.now() + 60 * 60 * 1000).toISOString()
+            : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+      
+      const { data, error } = await supabase.functions.invoke("publish-post", {
+        body: {
           platforms: selected,
           scheduled_at,
           mode,
           captions: captions.filter((c) => selected.includes(c.platform)),
-        },
+          client_id: null
+        }
       });
-    } catch {
+
+      if (error || data?.error) {
+        throw new Error(data?.error || error?.message || "Failed to start publishing");
+      }
+
+      setJobId(data.job_id);
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: e.message,
+        variant: "destructive"
+      });
       setStep("review");
     }
   }
@@ -69,7 +92,6 @@ function PublishPage() {
       if (isAdding) {
         setActiveTab(p);
       } else if (activeTab === p) {
-        // If we removed the active tab, switch to the first available or reset
         setActiveTab(next[0] || "instagram");
       }
       
@@ -101,7 +123,6 @@ function PublishPage() {
 
       {(step === "compose" || step === "schedule" || step === "review") && (
         <div className="grid lg:grid-cols-[1fr_320px] gap-6 mt-6">
-          {/* main column */}
           <div className="space-y-6">
             {step === "compose" && (
               <>
@@ -202,7 +223,6 @@ function PublishPage() {
               </Section>
             )}
 
-            {/* nav */}
             <div className="flex justify-between pt-2">
               <Button
                 variant="ghost"
@@ -231,7 +251,6 @@ function PublishPage() {
             </div>
           </div>
 
-          {/* sticky preview */}
           <aside className="lg:sticky lg:top-6 self-start">
             <ReelPreview activeCaption={activeCaption} platforms={selected} />
           </aside>
@@ -239,7 +258,7 @@ function PublishPage() {
       )}
 
       {step === "publishing" && <PublishingStage count={selected.length} />}
-      {step === "done" && <DoneStage selected={selected} onAnother={() => setStep("compose")} />}
+      {step === "done" && <DoneStage selected={selected} onAnother={() => { setJobId(null); setStep("compose"); }} />}
     </section>
   );
 }

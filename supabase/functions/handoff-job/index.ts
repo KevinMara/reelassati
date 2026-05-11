@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { getAuthenticatedUser, serviceClient } from "../_shared/auth.ts"
-import { checkBudget, logApiUsage } from "../_shared/budget.ts"
-import { invokeAgent, callbackUrl } from "../_shared/hermes.ts"
+import { invokeHandoff, callbackUrl } from "../_shared/hermes.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 
 serve(async (req) => {
@@ -12,21 +11,18 @@ serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
     
     const body = await req.json()
-    const { video_id, client_id, prompt } = body
-    
-    const COST = 0.40
-    const budget = await checkBudget(user.id, COST)
-    if (!budget.allowed) return new Response(JSON.stringify({ error: 'budget_exceeded', ...budget }), { status: 402, headers: corsHeaders })
+    const { from_agent, to_agent, handoff_type, payload } = body
     
     const supabase = serviceClient()
+    
+    // Create handoff job
     const { data: job, error: jobError } = await supabase
       .from('jobs')
       .insert({
         user_id: user.id,
-        client_id: client_id || null,
-        agent_name: 'publisher',
-        job_type: 'generate_thumbnail',
-        payload: { video_id, prompt },
+        agent_name: to_agent,
+        job_type: `handoff_${handoff_type}`,
+        payload,
         status: 'queued'
       })
       .select()
@@ -34,16 +30,13 @@ serve(async (req) => {
       
     if (jobError) throw jobError
     
-    await invokeAgent({
-      agent: 'thumbnail_agent',
-      job_id: job.id,
-      user_id: user.id,
-      client_id: client_id || null,
-      input: { video_id, prompt },
+    await invokeHandoff({
+      from_agent,
+      to_agent,
+      handoff_type,
+      payload,
       callback_url: callbackUrl()
     })
-    
-    await logApiUsage(user.id, 'publisher', 'invoke', 'hermes', COST, { job_id: job.id })
     
     return new Response(JSON.stringify({ job_id: job.id }), { headers: corsHeaders })
   } catch (err) {

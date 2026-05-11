@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { MessageCircle, X, Send, Video, PenLine, Scissors, Send as SendIcon, BarChart3, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 const agentMap: Record<string, { icon: React.ComponentType<{ className?: string }>; key: string }> = {
   "/dashboard/analyze": { icon: Video, key: "analyzer" },
@@ -17,7 +18,9 @@ export function AgentChatPanel() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<{ role: "user" | "agent"; text: string }[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const agent = useMemo(() => {
     const match = Object.entries(agentMap).find(([p]) => location.pathname.startsWith(p));
@@ -28,19 +31,64 @@ export function AgentChatPanel() {
   const agentName = t(`app.agents.${agent.key}.name`, { defaultValue: "Studio" });
   const agentGreeting = t(`app.agents.${agent.key}.greeting`, { defaultValue: t("app.agents.studio.greeting") });
 
-  const send = () => {
-    if (!input.trim()) return;
-    setMessages((m) => [
-      ...m,
-      { role: "user", text: input.trim() },
-      { role: "agent", text: t("app.agents.placeholder_reply") },
-    ]);
+  // Subscribe to chat messages
+  useEffect(() => {
+    const channel = supabase
+      .channel(`chat-${sessionId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `session_id=eq.${sessionId}`
+      }, (payload) => {
+        setMessages(prev => {
+            // Avoid duplicates if user message was already added locally
+            if (prev.some(m => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+        });
+        if (payload.new.role === 'assistant' && payload.new.is_final) {
+            setIsStreaming(false);
+        }
+      })
+      .subscribe();
+    
+    return () => { supabase.removeChannel(channel); };
+  }, [sessionId]);
+
+  const send = async () => {
+    if (!input.trim() || isStreaming) return;
+    
+    const userMessage = { 
+        id: crypto.randomUUID(),
+        role: "user", 
+        content: input.trim(),
+        session_id: sessionId
+    };
+    
+    setMessages((m) => [...m, userMessage]);
     setInput("");
+    setIsStreaming(true);
+
+    try {
+        const { error } = await supabase.functions.invoke('agent-chat', {
+            body: {
+                agent: agent.key,
+                session_id: sessionId,
+                message: userMessage.content,
+                context: {
+                    page: window.location.pathname
+                }
+            }
+        });
+        if (error) throw error;
+    } catch (e) {
+        console.error("Chat error:", e);
+        setIsStreaming(false);
+    }
   };
 
   return (
     <>
-      {/* Floating button */}
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
@@ -52,7 +100,6 @@ export function AgentChatPanel() {
         <Icon className="h-5 w-5" />
       </button>
 
-      {/* Panel */}
       <div
         className={cn(
           "fixed bottom-6 right-6 z-40 w-[calc(100vw-3rem)] sm:w-[420px] h-[600px] max-h-[calc(100vh-3rem)] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ease-out-expo origin-bottom-right",
@@ -82,7 +129,7 @@ export function AgentChatPanel() {
           </div>
           {messages.map((m, i) => (
             <div
-              key={i}
+              key={m.id || i}
               className={cn(
                 "rounded-lg p-3 max-w-[85%]",
                 m.role === "user"
@@ -90,9 +137,14 @@ export function AgentChatPanel() {
                   : "bg-surface border border-border",
               )}
             >
-              {m.text}
+              {m.content}
             </div>
           ))}
+          {isStreaming && (
+            <div className="bg-surface border border-border rounded-lg p-3 max-w-[85%] animate-pulse">
+                ...
+            </div>
+          )}
         </div>
 
         <div className="border-t border-border p-3 flex items-center gap-2">
@@ -100,7 +152,7 @@ export function AgentChatPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
-            placeholder={t("app.agents.input_placeholder")}
+            placeholder={t("app.analyze.input_placeholder") || "Ask the agent..."}
             className="flex-1 h-10 px-3 rounded-md bg-surface border border-border text-sm outline-none focus:border-primary/50"
           />
           <button
