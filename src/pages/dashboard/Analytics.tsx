@@ -10,7 +10,9 @@ import { PostsTable } from "@/components/analytics/PostsTable";
 import { InsightCard } from "@/components/analytics/InsightCard";
 import { KPIS, INSIGHTS, Range } from "@/components/analytics/mockData";
 import { cn } from "@/lib/utils";
-import { useAgentJob } from "@/hooks/useAgentJob";
+import { useJob } from "@/hooks/useJob";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 export default function AnalyticsPage() {
   return <AppShell renderWith={() => <AnalyticsContent />} />;
@@ -18,11 +20,36 @@ export default function AnalyticsPage() {
 
 function AnalyticsContent() {
   const [range, setRange] = useState<Range>("30d");
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const baseKpis = KPIS[range];
-  const { job, start, submitting } = useAgentJob("analytics");
+  const job = useJob(jobId);
+
+  const fetchAnalytics = async (r: Range) => {
+    try {
+      setSubmitting(true);
+      const { data, error } = await supabase.functions.invoke("fetch-analytics", {
+        body: { range: r, client_id: null }
+      });
+
+      if (error || data?.error) {
+        throw new Error(data?.error || error?.message || "Failed to fetch analytics");
+      }
+
+      setJobId(data.job_id);
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: e.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
-    start({ jobType: "snapshot", payload: { range } }).catch(() => {});
+    fetchAnalytics(range);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range]);
 
@@ -60,7 +87,7 @@ function AnalyticsContent() {
             variant="outline"
             size="sm"
             disabled={submitting || job?.status === "running"}
-            onClick={() => start({ jobType: "snapshot", payload: { range } }).catch(() => {})}
+            onClick={() => fetchAnalytics(range)}
           >
             {submitting || job?.status === "running" ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
