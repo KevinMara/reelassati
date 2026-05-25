@@ -1,12 +1,21 @@
 import { prisma } from '@/lib/prisma'
-import { verifyTribeAuth } from '@/src/lib/reelassati/security'
-import { runVideoAnalyzer } from '@/src/lib/reelassati/agents/videoAnalyzer'
+import { verifyTribeAuth } from '@/lib/reelassati/security'
+import { runVideoAnalyzer } from '@/lib/reelassati/agents/videoAnalyzer'
 
 export default async function handler(req: any, res: any) {
-  if (req.method !== 'POST') return res.status(405).end()
-  if (!verifyTribeAuth(req)) return res.status(401).json({ error: 'Unauthorized' })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'method_not_allowed' })
+  }
+  
+  if (!verifyTribeAuth(req)) {
+    return res.status(401).json({ ok: false, error: 'unauthorized' })
+  }
 
   const { job_id, video_id, status, tribe_data, error_code, error_message } = req.body
+
+  if (!job_id) {
+    return res.status(400).json({ ok: false, error: 'missing_job_id' })
+  }
 
   try {
     // 1. Record the TRIBE run
@@ -56,9 +65,12 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ ok: true })
     }
 
-    return res.status(400).json({ error: 'Unexpected tribe status' })
+    return res.status(400).json({ ok: false, error: 'unexpected_tribe_status' })
   } catch (error: any) {
-    console.error('Webhook error:', error)
-    return res.status(500).json({ error: error.message })
+    console.error('Tribe callback webhook error:', error)
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'database_error' 
+    })
   }
 }
