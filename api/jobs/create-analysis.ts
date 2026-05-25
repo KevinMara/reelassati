@@ -1,15 +1,21 @@
 import { prisma } from '@/lib/prisma'
-import { callTribe } from '@/src/lib/reelassati/tribeClient'
+import { callTribe } from '@/lib/reelassati/tribeClient'
 
 export default async function handler(req: any, res: any) {
-  if (req.method !== 'POST') return res.status(405).end()
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'method_not_allowed' })
+  }
 
   const { blob_url, blob_key, title, goal, platform_targets, language, client_id, user_notes } = req.body
+
+  if (!blob_url) {
+    return res.status(400).json({ ok: false, error: 'missing_blob_url' })
+  }
 
   try {
     const video = await prisma.video.create({
       data: {
-        title,
+        title: title || 'Untitled Video',
         url: blob_url,
         storage_key: blob_key,
         client_id,
@@ -44,11 +50,16 @@ export default async function handler(req: any, res: any) {
     })
 
     return res.status(200).json({
+      ok: true,
       job_id: job.id,
       video_id: video.id,
       status: finalStatus
     })
   } catch (error: any) {
-    return res.status(500).json({ error: error.message })
+    console.error('Create analysis job error:', error)
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'database_error' 
+    })
   }
 }

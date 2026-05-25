@@ -1,15 +1,20 @@
 import { prisma } from '@/lib/prisma'
-import { verifyInternalAuth } from '@/src/lib/reelassati/security'
-import { runVideoAnalyzer } from '@/src/lib/reelassati/agents/videoAnalyzer'
+import { verifyInternalAuth } from '@/lib/reelassati/security'
+import { runVideoAnalyzer } from '@/lib/reelassati/agents/videoAnalyzer'
 
 export default async function handler(req: any, res: any) {
-  if (req.method !== 'POST') return res.status(405).end()
-  if (!verifyInternalAuth(req)) return res.status(401).json({ error: 'Unauthorized' })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'method_not_allowed' })
+  }
+  
+  if (!verifyInternalAuth(req)) {
+    return res.status(401).json({ ok: false, error: 'unauthorized' })
+  }
 
   const { job_id, video_id, tribe_data } = req.body
 
   if (!tribe_data?.normalized_scores) {
-    return res.status(400).json({ error: 'Missing real TRIBE normalized scores' })
+    return res.status(400).json({ ok: false, error: 'missing_tribe_data' })
   }
 
   try {
@@ -26,9 +31,15 @@ export default async function handler(req: any, res: any) {
       }
     })
 
-    // Update analysis record if needed or return
-    return res.status(200).json(analysisOutput)
+    return res.status(200).json({
+      ok: true,
+      analysis: analysisOutput
+    })
   } catch (error: any) {
-    return res.status(500).json({ error: error.message })
+    console.error('Video analyzer agent error:', error)
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'database_error' 
+    })
   }
 }
