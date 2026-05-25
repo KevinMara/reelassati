@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false, // Disabled to ease the React Router integration transition
   swcMinify: true,
+  output: 'standalone',
   images: {
     remotePatterns: [
       {
@@ -10,17 +11,8 @@ const nextConfig = {
       },
     ],
   },
-  // We need this because we are using an 'api' directory at the root
-  // which conflict with Next.js standard API routes.
-  // But we want to move to app/api anyway.
-  rewrites: async () => {
-    return [
-      {
-        source: '/api/:path*',
-        destination: '/api/:path*',
-      },
-    ];
-  },
+  // API routes are handled via app/api/*
+  // All other routes are captured by [[...slug]]/page.tsx for React Router
 };
 
 module.exports = nextConfig;
