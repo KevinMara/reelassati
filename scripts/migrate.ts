@@ -4,13 +4,32 @@ import path from 'path'
 
 const prisma = new PrismaClient()
 
+const REQUIRED_TABLES = [
+  'users_profile',
+  'clients',
+  'videos',
+  'jobs',
+  'tribe_runs',
+  'agent_runs',
+  'video_analyses',
+  'scripts',
+  'edit_plans',
+  'publishing_plans',
+  'analytics_snapshots',
+  'platform_learnings',
+  'cost_events'
+]
+
 async function main() {
   console.log('--- Database Migration Start ---')
   
-  if (!process.env.DATABASE_URL && !process.env.POSTGRES_URL) {
+  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+  if (!dbUrl) {
     console.error('Error: DATABASE_URL or POSTGRES_URL is not set. Migration cannot proceed.')
     process.exit(1)
   }
+
+  console.log(`Using database connection: ${dbUrl.split('@')[1] || 'URL hidden'}`)
 
   try {
     const migrationPath = path.join(process.cwd(), 'prisma', 'migration.sql')
@@ -21,8 +40,7 @@ async function main() {
 
     const sql = fs.readFileSync(migrationPath, 'utf8')
     
-    // Simple split by semicolon. 
-    // This works well for basic CREATE/ALTER statements without nested semicolons (like in functions/triggers)
+    // Split by semicolon, but handle potential issues with simple splitting
     const statements = sql
       .split(';')
       .map(s => s.trim())
@@ -30,11 +48,14 @@ async function main() {
 
     console.log(`Executing ${statements.length} SQL statements...`)
 
+    let executedCount = 0
+    let skippedCount = 0
+
     for (const statement of statements) {
       try {
         await prisma.$executeRawUnsafe(statement)
+        executedCount++
       } catch (err: any) {
-        // Handle common "already exists" errors for idempotency
         const message = err.message || ''
         if (
           message.includes('already exists') || 
@@ -42,18 +63,41 @@ async function main() {
           message.includes('already a foreign key') ||
           message.includes('duplicate key value')
         ) {
-          // console.log(`Skipped (already exists): ${statement.substring(0, 50)}...`)
+          skippedCount++
           continue
         }
         
         console.error(`Error executing statement: ${statement.substring(0, 100)}...`)
         console.error(err)
-        // If it's a critical error, we might want to stop, but for now we'll continue 
-        // because we use IF NOT EXISTS where possible.
+        // For CREATE TABLE statements, we really want them to succeed or be skipped if they exist
+        if (statement.toUpperCase().includes('CREATE TABLE')) {
+           console.error('Critical failure during table creation.')
+           process.exit(1)
+        }
       }
     }
     
-    console.log('--- Migration completed successfully ---')
+    console.log(`Migration execution finished. Executed: ${executedCount}, Skipped: ${skippedCount}`)
+
+    // Verification step
+    console.log('Verifying required tables...')
+    const tables: any[] = await prisma.$queryRaw`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `
+    const existingTables = tables.map(t => t.table_name)
+    console.log('Found tables:', existingTables.join(', '))
+
+    const missingTables = REQUIRED_TABLES.filter(t => !existingTables.includes(t))
+
+    if (missingTables.length > 0) {
+      console.error('ERROR: The following required tables are missing after migration:')
+      console.error(missingTables.join(', '))
+      process.exit(1)
+    }
+
+    console.log('--- Migration completed successfully. All required tables are present. ---')
   } catch (error) {
     console.error('Migration encountered a fatal error:', error)
     process.exit(1)
