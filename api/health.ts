@@ -10,14 +10,15 @@ export default async function handler(req: any, res: any) {
       console.error('Health check database error:', e)
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       ok: true,
       app: "reelassati",
-      env: process.env.NODE_ENV || "production",
+      env: "production",
       database_ready
     })
   } catch (error: any) {
-    res.status(500).json({
+    console.error('Health check unexpected error:', error)
+    return res.status(200).json({
       ok: false,
       error: "health_check_failed"
     })
