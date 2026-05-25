@@ -16,7 +16,7 @@ export default async function handler(req: any, res: any) {
       DATABASE_URL: !!process.env.DATABASE_URL,
       POSTGRES_URL: !!process.env.POSTGRES_URL,
       BLOB_READ_WRITE_TOKEN: !!process.env.BLOB_READ_WRITE_TOKEN,
-      LOVABLE_API_KEY: !!process.env.LOVABLE_API_KEY,
+      AI_GATEWAY_API_KEY: !!(process.env.AI_GATEWAY_API_KEY || process.env.LOVABLE_API_KEY),
       TRIBE_API_URL: !!process.env.TRIBE_API_URL,
       TRIBE_API_KEY: !!process.env.TRIBE_API_KEY,
       INTERNAL_AGENT_SECRET: !!process.env.INTERNAL_AGENT_SECRET,
@@ -35,7 +35,7 @@ export default async function handler(req: any, res: any) {
       database_ready: dbConnected,
       config,
       tribeStatus,
-      aiGatewayConfigured: config.LOVABLE_API_KEY,
+      aiGatewayConfigured: config.AI_GATEWAY_API_KEY,
       blobConfigured: config.BLOB_READ_WRITE_TOKEN
     })
   } catch (error: any) {
