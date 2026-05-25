@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '../../src/lib/prisma'
 
 export default async function handler(req: any, res: any) {
   try {
@@ -19,15 +19,15 @@ export default async function handler(req: any, res: any) {
 
     return res.status(200).json({
       ok: true,
-      tables: existingTables,
-      requiredTables,
+      ready,
       missingTables,
-      ready
+      allRequiredTablesExist: ready
     })
   } catch (error: any) {
     console.error('Database check error:', error)
     return res.status(500).json({ 
       ok: false, 
+      ready: false,
       error: "database_error" 
     })
   }

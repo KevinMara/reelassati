@@ -1,38 +1,33 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '../../src/lib/prisma'
 
 export default async function handler(req: any, res: any) {
   try {
-    const recentJobs = await prisma.job.findMany({
-      take: 10,
+    const jobs = await prisma.job.findMany({
+      take: 20,
       orderBy: { createdAt: 'desc' },
-      include: { video: true }
+      include: {
+        video: true
+      }
     })
 
     const unavailableJobs = await prisma.job.findMany({
-      where: { status: 'tribe_unavailable' },
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-      include: { video: true }
-    })
-
-    const failedJobs = await prisma.job.findMany({
-      where: { status: 'failed' },
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-      include: { video: true }
+      where: {
+        status: 'tribe_unavailable'
+      },
+      take: 20,
+      orderBy: { createdAt: 'desc' }
     })
 
     return res.status(200).json({
       ok: true,
-      recentJobs,
-      unavailableJobs,
-      failedJobs
+      recentJobs: jobs,
+      unavailableJobs: unavailableJobs
     })
   } catch (error: any) {
-    console.error('Fetch admin jobs error:', error)
+    console.error('Error fetching jobs:', error)
     return res.status(500).json({ 
       ok: false, 
-      error: "database_error" 
+      error: 'database_error' 
     })
   }
 }

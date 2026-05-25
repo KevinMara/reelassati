@@ -1,15 +1,10 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '../../../src/lib/prisma'
 
 export default async function handler(req: any, res: any) {
   const { id } = req.query
 
   if (!id) {
     return res.status(400).json({ ok: false, error: 'missing_video_id' })
-  }
-
-  const simpleUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  if (!simpleUuidRegex.test(String(id))) {
-    return res.status(400).json({ ok: false, error: 'invalid_video_id' })
   }
 
   try {
@@ -19,10 +14,7 @@ export default async function handler(req: any, res: any) {
     })
 
     if (!analysis) {
-      return res.status(200).json({ 
-        ok: true, 
-        status: 'not_ready' 
-      })
+      return res.status(404).json({ ok: false, error: 'analysis_not_found' })
     }
 
     return res.status(200).json({
@@ -30,7 +22,7 @@ export default async function handler(req: any, res: any) {
       analysis
     })
   } catch (error: any) {
-    console.error(`Database error fetching analysis for video ${id}:`, error)
+    console.error('Error fetching analysis:', error)
     return res.status(500).json({ 
       ok: false, 
       error: 'database_error' 

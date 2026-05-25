@@ -1,6 +1,6 @@
-import { prisma } from '@/lib/prisma'
-import { verifyInternalAuth } from '@/lib/reelassati/security'
-import { runVideoAnalyzer } from '@/lib/reelassati/agents/videoAnalyzer'
+import { prisma } from '../../src/lib/prisma'
+import { verifyInternalAuth } from '../../src/lib/reelassati/security'
+import { runVideoAnalyzer } from '../../src/lib/reelassati/agents/videoAnalyzer'
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
