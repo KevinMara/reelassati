@@ -1,6 +1,13 @@
 import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient()
+const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: dbUrl
+    }
+  }
+})
 
 const REQUIRED_TABLES = [
   'users_profile',
@@ -19,12 +26,10 @@ const REQUIRED_TABLES = [
 ]
 
 export default async function handler(req: any, res: any) {
-  // Simple check if database env vars are set
-  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
   if (!dbUrl) {
     return res.status(500).json({
       ok: false,
-      error: 'DATABASE_URL or POSTGRES_URL environment variable is not set.'
+      error: 'Neither DATABASE_URL nor POSTGRES_URL environment variable is set.'
     })
   }
 
@@ -43,21 +48,26 @@ export default async function handler(req: any, res: any) {
 
     const existingTables = tables.map(t => t.table_name)
     const missingTables = REQUIRED_TABLES.filter(t => !existingTables.includes(t))
-    const ready = missingTables.length === 0
+    const ready = REQUIRED_TABLES.every(t => existingTables.includes(t))
 
     return res.status(200).json({
       ok: true,
       ready,
       tables: existingTables,
       requiredTables: REQUIRED_TABLES,
-      missingTables: missingTables
+      missingTables: missingTables,
+      env: {
+        has_database_url: !!process.env.DATABASE_URL,
+        has_postgres_url: !!process.env.POSTGRES_URL
+      }
     })
   } catch (error: any) {
     console.error('Database check error:', error)
     return res.status(500).json({
       ok: false,
       ready: false,
-      error: error.message || 'Unknown database error'
+      error: error.message || 'Unknown database error',
+      details: error.toString()
     })
   } finally {
     await prisma.$disconnect()
