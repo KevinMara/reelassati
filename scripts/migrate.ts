@@ -2,7 +2,14 @@ import { PrismaClient } from '@prisma/client'
 import fs from 'fs'
 import path from 'path'
 
-const prisma = new PrismaClient()
+const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: dbUrl
+    }
+  }
+})
 
 const REQUIRED_TABLES = [
   'users_profile',
@@ -23,7 +30,6 @@ const REQUIRED_TABLES = [
 async function main() {
   console.log('--- Database Migration Start ---')
   
-  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
   if (!dbUrl) {
     console.error('Error: DATABASE_URL or POSTGRES_URL is not set. Migration cannot proceed.')
     process.exit(1)
@@ -40,11 +46,17 @@ async function main() {
 
     const sql = fs.readFileSync(migrationPath, 'utf8')
     
-    // Split by semicolon, but handle potential issues with simple splitting
-    const statements = sql
+    // Add extension check at the beginning
+    const baseStatements = [
+      'CREATE EXTENSION IF NOT EXISTS "pgcrypto"'
+    ]
+
+    const sqlStatements = sql
       .split(';')
       .map(s => s.trim())
       .filter(s => s.length > 0 && !s.startsWith('--'))
+    
+    const statements = [...baseStatements, ...sqlStatements]
 
     console.log(`Executing ${statements.length} SQL statements...`)
 
@@ -61,7 +73,8 @@ async function main() {
           message.includes('already exists') || 
           message.includes('relation already exists') ||
           message.includes('already a foreign key') ||
-          message.includes('duplicate key value')
+          message.includes('duplicate key value') ||
+          message.includes('permission denied to create extension') // Some managed DBs don't allow this but have it enabled
         ) {
           skippedCount++
           continue
@@ -69,9 +82,11 @@ async function main() {
         
         console.error(`Error executing statement: ${statement.substring(0, 100)}...`)
         console.error(err)
-        // For CREATE TABLE statements, we really want them to succeed or be skipped if they exist
-        if (statement.toUpperCase().includes('CREATE TABLE')) {
-           console.error('Critical failure during table creation.')
+        
+        // If it's a CREATE TABLE or ALTER TABLE, it's critical
+        const upper = statement.toUpperCase()
+        if (upper.includes('CREATE TABLE') || upper.includes('ALTER TABLE')) {
+           console.error('Critical failure during schema modification.')
            process.exit(1)
         }
       }
@@ -97,7 +112,7 @@ async function main() {
       process.exit(1)
     }
 
-    console.log('--- Migration completed successfully. All required tables are present. ---')
+    console.log('--- Migration completed successfully. All 13 required tables are present. ---')
   } catch (error) {
     console.error('Migration encountered a fatal error:', error)
     process.exit(1)
