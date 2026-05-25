@@ -1,4 +1,6 @@
-import { useEffect, useState, createContext, useContext } from "react";
+"use client";
+import React, { useEffect, useState, createContext, useContext } from "react";
+
 
 type Theme = "light" | "dark";
 
@@ -8,7 +10,7 @@ type ThemeContextValue = {
   setTheme: (t: Theme) => void;
 };
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
+const ThemeContext = React.createContext<ThemeContextValue | null>(null);
 
 const STORAGE_KEY = "reelassati.theme";
 
@@ -20,9 +22,9 @@ function getInitialTheme(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const [theme, setThemeState] = React.useState<Theme>(getInitialTheme);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const root = document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(theme);
@@ -41,7 +43,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useTheme() {
-  const ctx = useContext(ThemeContext);
+  const ctx = React.useContext(ThemeContext);
   if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
   return ctx;
 }
