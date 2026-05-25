@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model UserProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  email       String?
+  displayName String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("users_profile")
+}
+
+model Client {
+  id          String   @id @default(uuid())
+  name        String
+  ownerUserId String   @map("owner_user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  videos      Video[]
+
+  @@map("clients")
+}
+
+model Video {
+  id          String   @id @default(uuid())
+  clientId    String?  @map("client_id")
+  ownerUserId String   @map("owner_user_id")
+  url         String?
+  status      String   @default("pending")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  client      Client?  @relation(fields: [clientId], references: [id])
+  jobs        Job[]
+  tribeRuns   TribeRun[]
+  agentRuns   AgentRun[]
+  analyses    VideoAnalysis[]
+  scripts     Script[]
+  editPlans   EditPlan[]
+  pubPlans    PublishingPlan[]
+  analytics   AnalyticsSnapshot[]
+
+  @@index([ownerUserId])
+  @@index([clientId])
+  @@map("videos")
+}
+
+model Job {
+  id          String   @id @default(uuid())
+  videoId     String   @map("video_id")
+  status      String   @default("pending")
+  jobType     String   @map("job_type")
+  payload     Json?
+  result      Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  video       Video    @relation(fields: [videoId], references: [id])
+  tribeRuns   TribeRun[]
+  agentRuns   AgentRun[]
+
+  @@index([videoId])
+  @@index([status])
+  @@index([jobType])
+  @@map("jobs")
+}
+
+model TribeRun {
+  id        String   @id @default(uuid())
+  jobId     String   @map("job_id")
+  videoId   String   @map("video_id")
+  name      String
+  output    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  job       Job      @relation(fields: [jobId], references: [id])
+  video     Video    @relation(fields: [videoId], references: [id])
+
+  @@index([jobId])
+  @@index([videoId])
+  @@map("tribe_runs")
+}
+
+model AgentRun {
+  id        String   @id @default(uuid())
+  jobId     String   @map("job_id")
+  videoId   String   @map("video_id")
+  agentName String   @map("agent_name")
+  input     Json?
+  output    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  job       Job      @relation(fields: [jobId], references: [id])
+  video     Video    @relation(fields: [videoId], references: [id])
+
+  @@index([jobId])
+  @@index([videoId])
+  @@map("agent_runs")
+}
+
+model VideoAnalysis {
+  id        String   @id @default(uuid())
+  videoId   String   @map("video_id")
+  data      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  video     Video    @relation(fields: [videoId], references: [id])
+
+  @@index([videoId])
+  @@map("video_analyses")
+}
+
+model Script {
+  id        String   @id @default(uuid())
+  videoId   String   @map("video_id")
+  content   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  video     Video    @relation(fields: [videoId], references: [id])
+
+  @@map("scripts")
+}
+
+model EditPlan {
+  id        String   @id @default(uuid())
+  videoId   String   @map("video_id")
+  steps     Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  video     Video    @relation(fields: [videoId], references: [id])
+
+  @@map("edit_plans")
+}
+
+model PublishingPlan {
+  id        String   @id @default(uuid())
+  videoId   String   @map("video_id")
+  platforms Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  video     Video    @relation(fields: [videoId], references: [id])
+
+  @@map("publishing_plans")
+}
+
+model AnalyticsSnapshot {
+  id        String   @id @default(uuid())
+  videoId   String   @map("video_id")
+  platform  String
+  metrics   Json?
+  capturedAt DateTime @default(now()) @map("captured_at")
+
+  video     Video    @relation(fields: [videoId], references: [id])
+
+  @@map("analytics_snapshots")
+}
+
+model PlatformLearning {
+  id        String   @id @default(uuid())
+  platform  String
+  key       String
+  value     Json?
+  archived  Boolean  @default(false)
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([archived])
+  @@index([expiresAt])
+  @@map("platform_learnings")
+}
+
+model CostEvent {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  amount    Decimal  @db.Decimal(10, 2)
+  eventType String   @map("event_type")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("cost_events")
+}
