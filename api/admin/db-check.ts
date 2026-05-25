@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
 
 export default async function handler(req: any, res: any) {
   try {
@@ -27,6 +25,10 @@ export default async function handler(req: any, res: any) {
       ready
     })
   } catch (error: any) {
-    return res.status(500).json({ ok: false, error: error.message })
+    console.error('Database check error:', error)
+    return res.status(500).json({ 
+      ok: false, 
+      error: "database_error" 
+    })
   }
 }
