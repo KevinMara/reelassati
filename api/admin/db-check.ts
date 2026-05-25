@@ -1,13 +1,35 @@
 import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient()
+const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: dbUrl
+    }
+  }
+})
+
+const REQUIRED_TABLES = [
+  'users_profile',
+  'clients',
+  'videos',
+  'jobs',
+  'tribe_runs',
+  'agent_runs',
+  'video_analyses',
+  'scripts',
+  'edit_plans',
+  'publishing_plans',
+  'analytics_snapshots',
+  'platform_learnings',
+  'cost_events'
+]
 
 export default async function handler(req: any, res: any) {
-  // Simple check if DATABASE_URL is set
-  if (!process.env.DATABASE_URL) {
+  if (!dbUrl) {
     return res.status(500).json({
       ok: false,
-      error: 'DATABASE_URL environment variable is not set.'
+      error: 'Neither DATABASE_URL nor POSTGRES_URL environment variable is set.'
     })
   }
 
@@ -24,18 +46,30 @@ export default async function handler(req: any, res: any) {
       ORDER BY table_name ASC
     `
 
+    const existingTables = tables.map(t => t.table_name)
+    const missingTables = REQUIRED_TABLES.filter(t => !existingTables.includes(t))
+    const ready = REQUIRED_TABLES.every(t => existingTables.includes(t))
+
     return res.status(200).json({
       ok: true,
-      tables: tables.map(t => t.table_name)
+      ready,
+      tables: existingTables,
+      requiredTables: REQUIRED_TABLES,
+      missingTables: missingTables,
+      env: {
+        has_database_url: !!process.env.DATABASE_URL,
+        has_postgres_url: !!process.env.POSTGRES_URL
+      }
     })
   } catch (error: any) {
     console.error('Database check error:', error)
     return res.status(500).json({
       ok: false,
-      error: error.message || 'Unknown database error'
+      ready: false,
+      error: error.message || 'Unknown database error',
+      details: error.toString()
     })
   } finally {
     await prisma.$disconnect()
   }
 }
-
