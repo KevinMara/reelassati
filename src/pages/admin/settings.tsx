@@ -5,7 +5,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react'
 
 export default function AdminSettings() {
-  const [dbStatus, setDbStatus] = React.useState<any>(null)
   const [adminStatus, setAdminStatus] = React.useState<any>(null)
   const [jobData, setJobData] = React.useState<any>(null)
   const [loading, setLoading] = React.useState(true)
@@ -13,13 +12,11 @@ export default function AdminSettings() {
   React.useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dbRes, adminRes, jobsRes] = await Promise.all([
-          fetch('/api/admin/db-check').then(res => res.json()),
+        const [statusRes, jobsRes] = await Promise.all([
           fetch('/api/admin/status').then(res => res.json()),
           fetch('/api/admin/jobs').then(res => res.json())
         ])
-        setDbStatus(dbRes)
-        setAdminStatus(adminRes)
+        setAdminStatus(statusRes)
         setJobData(jobsRes)
       } catch (error) {
         console.error('Failed to fetch admin data:', error)
@@ -38,7 +35,11 @@ export default function AdminSettings() {
     )
   }
 
-  const config = adminStatus?.config || {}
+  const database = adminStatus?.database || {}
+  const blob = adminStatus?.blob || {}
+  const tribe = adminStatus?.tribe || {}
+  const aiGateway = adminStatus?.aiGateway || {}
+  const internal = adminStatus?.internal || {}
 
   return (
     <div className="container mx-auto p-8 space-y-8 animate-in fade-in duration-500">
@@ -56,24 +57,24 @@ export default function AdminSettings() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatusCard 
           label="Database" 
-          active={adminStatus?.database_ready && dbStatus?.ready} 
-          description={dbStatus?.ready ? "Schema synchronized" : "Missing tables"}
+          active={database.ready} 
+          description={database.ready ? "Schema synchronized" : (database.configured ? "Missing tables" : "Not configured")}
         />
         <StatusCard 
           label="Vercel Blob" 
-          active={adminStatus?.blobConfigured} 
-          description={adminStatus?.blobConfigured ? "Storage connected" : "Token missing"}
+          active={blob.configured} 
+          description={blob.configured ? "Storage connected" : "Token missing"}
         />
         <StatusCard 
           label="TRIBE Server" 
-          active={adminStatus?.tribeStatus === 'configured'} 
-          statusText={adminStatus?.tribeStatus}
-          description={adminStatus?.tribeStatus === 'configured' ? "API ready" : "Config missing"}
+          active={tribe.configured} 
+          statusText={tribe.status}
+          description={tribe.configured ? "API ready" : "Config missing"}
         />
         <StatusCard 
           label="AI Gateway" 
-          active={adminStatus?.aiGatewayConfigured} 
-          description={adminStatus?.aiGatewayConfigured ? "Model access active" : "Key missing"}
+          active={aiGateway.configured} 
+          description={aiGateway.configured ? "Model access active" : "Key missing"}
         />
       </div>
 
@@ -83,41 +84,40 @@ export default function AdminSettings() {
             <CardTitle className="text-lg">Environment Configuration</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <EnvVarRow label="DATABASE_URL" exists={config.DATABASE_URL} />
-            <EnvVarRow label="POSTGRES_URL" exists={config.POSTGRES_URL} />
-            <EnvVarRow label="BLOB_READ_WRITE_TOKEN" exists={config.BLOB_READ_WRITE_TOKEN} />
-            <EnvVarRow label="AI_GATEWAY_API_KEY" exists={config.AI_GATEWAY_API_KEY} />
-            <EnvVarRow label="TRIBE_API_URL" exists={config.TRIBE_API_URL} />
-            <EnvVarRow label="TRIBE_API_KEY" exists={config.TRIBE_API_KEY} />
-            <EnvVarRow label="INTERNAL_AGENT_SECRET" exists={config.INTERNAL_AGENT_SECRET} />
+            <EnvVarRow label="DATABASE" exists={database.configured} />
+            <EnvVarRow label="VERCEL_BLOB" exists={blob.configured} />
+            <EnvVarRow label="AI_GATEWAY" exists={aiGateway.configured} />
+            <EnvVarRow label="TRIBE_API" exists={tribe.configured} />
+            <EnvVarRow label="INTERNAL_AGENT" exists={internal.agentSecretConfigured} />
           </CardContent>
         </Card>
 
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Database Tables</CardTitle>
-            <Badge variant={dbStatus?.ready ? "default" : "destructive"}>
-              {dbStatus?.ready ? "Ready" : "Incomplete"}
+            <CardTitle className="text-lg">Database Health</CardTitle>
+            <Badge variant={database.ready ? "default" : "destructive"}>
+              {database.ready ? "Ready" : "Incomplete"}
             </Badge>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {dbStatus?.requiredTables?.map((table: string) => {
-                const isPresent = dbStatus?.tables?.includes(table)
-                return (
-                  <div key={table} className="flex items-center space-x-2 text-sm">
-                    {isPresent ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-red-500" />
-                    )}
-                    <span className={isPresent ? "text-foreground" : "text-muted-foreground line-through"}>
-                      {table}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+            {database.missingTables && database.missingTables.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-destructive">Missing Tables:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {database.missingTables.map((table: string) => (
+                    <div key={table} className="flex items-center space-x-2 text-sm text-destructive">
+                      <XCircle className="w-4 h-4" />
+                      <span>{table}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 text-green-600">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="font-medium">All required tables exist and are accessible.</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -132,13 +132,6 @@ export default function AdminSettings() {
             title="Tribe Unavailable Jobs" 
             jobs={jobData?.unavailableJobs} 
             emptyMessage="No unavailable jobs found"
-          />
-        </div>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          <JobTable 
-            title="Recent Failed Jobs" 
-            jobs={jobData?.failedJobs} 
-            emptyMessage="No failed jobs found"
           />
         </div>
       </div>
@@ -166,6 +159,73 @@ function StatusCard({ label, active, description, statusText }: { label: string,
     </Card>
   )
 }
+
+function EnvVarRow({ label, exists }: { label: string, exists: boolean }) {
+  return (
+    <div className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0">
+      <span className="font-mono text-xs">{label}</span>
+      <Badge variant={exists ? "outline" : "secondary"} className={exists ? "text-green-600 border-green-200" : "text-muted-foreground"}>
+        {exists ? "Configured" : "Missing"}
+      </Badge>
+    </div>
+  )
+}
+
+function JobTable({ title, jobs, emptyMessage = "No jobs found" }: { title: string, jobs: any[], emptyMessage?: string }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-md border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="w-[100px]">ID</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Created</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {jobs?.map((job: any) => (
+                <TableRow key={job.id}>
+                  <TableCell className="font-mono text-xs font-medium">{job.id.slice(0, 8)}</TableCell>
+                  <TableCell className="capitalize text-xs">{job.jobType.replace('_', ' ')}</TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant="outline" 
+                      className={`
+                        text-[10px] px-1.5 py-0 capitalize
+                        ${job.status === 'completed' ? 'border-green-200 text-green-700 bg-green-50' : 
+                          job.status === 'failed' || job.status === 'tribe_unavailable' ? 'border-red-200 text-red-700 bg-red-50' : 
+                          'border-blue-200 text-blue-700 bg-blue-50'}
+                      `}
+                    >
+                      {job.status.replace('_', ' ')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-[10px] text-right text-muted-foreground">
+                    {new Date(job.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {(!jobs || jobs.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8 text-sm">
+                    {emptyMessage}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 
 function EnvVarRow({ label, exists }: { label: string, exists: boolean }) {
   return (

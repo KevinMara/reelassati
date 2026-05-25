@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 
 export default async function handler(req: any, res: any) {
+  // Extract id from query (works for /api/jobs/[id].ts in Vercel/Next but we handle path manually if needed)
+  // For Vercel Serverless with Vite, if the file is api/jobs/[id].ts, req.query.id should be populated
   const { id } = req.query
 
   if (!id) {
@@ -10,12 +12,21 @@ export default async function handler(req: any, res: any) {
     })
   }
 
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-  // Standard UUID check (some versions might differ, but jobs usually use v4)
-  // Let's use a more permissive one just in case
-  const simpleUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  // Handle special case "test"
+  if (id === 'test') {
+    return res.status(400).json({
+      ok: false,
+      error: "invalid_job_id"
+    })
+  }
 
-  if (!simpleUuidRegex.test(String(id))) {
+  // UUID Regex as requested
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  const zeroUuid = "00000000-0000-0000-0000-000000000000"
+
+  const isValidUuid = uuidRegex.test(String(id)) || id === zeroUuid
+
+  if (!isValidUuid) {
     return res.status(400).json({
       ok: false,
       error: "invalid_job_id"
@@ -52,7 +63,10 @@ export default async function handler(req: any, res: any) {
       }
     })
   } catch (error: any) {
+    // Log the real error server-side ONLY
     console.error(`Database error fetching job ${id}:`, error)
+    
+    // Return a generic error to the client
     return res.status(500).json({
       ok: false,
       error: "database_error"
