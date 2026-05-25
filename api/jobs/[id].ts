@@ -3,8 +3,9 @@ import { prisma } from '../../src/lib/prisma'
 export default async function handler(req: any, res: any) {
   try {
     const { id } = req.query
+    const idStr = String(id || '')
 
-    if (!id) {
+    if (!idStr) {
       return res.status(400).json({
         ok: false,
         error: "missing_job_id"
@@ -12,7 +13,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // Handle special case "test"
-    if (id === 'test') {
+    if (idStr === 'test') {
       return res.status(400).json({
         ok: false,
         error: "invalid_job_id"
@@ -23,7 +24,7 @@ export default async function handler(req: any, res: any) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     const zeroUuid = "00000000-0000-0000-0000-000000000000"
 
-    const isValidUuid = uuidRegex.test(String(id)) || id === zeroUuid
+    const isValidUuid = uuidRegex.test(idStr) || idStr === zeroUuid
 
     if (!isValidUuid) {
       return res.status(400).json({
@@ -34,7 +35,7 @@ export default async function handler(req: any, res: any) {
 
     try {
       const job = await prisma.job.findUnique({
-        where: { id: String(id) }
+        where: { id: idStr }
       })
 
       if (!job) {
@@ -50,23 +51,24 @@ export default async function handler(req: any, res: any) {
           id: job.id,
           job_type: job.jobType,
           status: job.status,
-          error_message: job.errorMessage,
+          error_message: (job as any).errorMessage || null,
           video_id: job.videoId,
           created_at: job.createdAt,
-          started_at: job.startedAt,
-          completed_at: job.completedAt,
-          output: job.output
+          started_at: (job as any).startedAt || null,
+          completed_at: (job as any).completedAt || null,
+          output: job.result || job.payload || {}
         }
       })
     } catch (dbError: any) {
-      console.error(`Database error fetching job ${id}:`, dbError)
+      // Log real error server-side ONLY
+      console.error(`Database error fetching job ${idStr}:`, dbError)
       return res.status(500).json({
         ok: false,
         error: "database_error"
       })
     }
   } catch (error: any) {
-    console.error('Jobs handler error:', error)
+    console.error('Jobs handler unexpected error:', error)
     return res.status(500).json({ 
       ok: false, 
       error: "internal_server_error" 

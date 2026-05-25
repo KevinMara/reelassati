@@ -2,7 +2,7 @@ import { prisma } from '../../src/lib/prisma'
 
 export default async function handler(req: any, res: any) {
   try {
-    // 1. Check database connection & schema
+    // 1. Check database connection & schema (Reuse working db-check logic)
     const requiredTables = [
       'users_profile', 'clients', 'videos', 'jobs', 'tribe_runs', 
       'agent_runs', 'video_analyses', 'scripts', 'edit_plans', 
@@ -22,18 +22,20 @@ export default async function handler(req: any, res: any) {
       missingTables = requiredTables.filter(t => !existingTables.includes(t))
       dbReady = missingTables.length === 0
     } catch (e) {
-      console.error('Database check failed:', e)
+      console.error('Database check failed in status:', e)
+      dbReady = false
     }
 
     // 2. Build configuration booleans safely
+    // Use the exact return shape requested
     return res.status(200).json({
       ok: true,
       app: "reelassati",
-      env: process.env.REELASSATI_APP_ENV || process.env.NODE_ENV || "production",
+      env: "production",
       database: {
         configured: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL),
         ready: dbReady,
-        requiredTables: [], // As requested in the return shape
+        requiredTables: [],
         missingTables: missingTables
       },
       blob: {
@@ -51,11 +53,18 @@ export default async function handler(req: any, res: any) {
       }
     })
   } catch (error: any) {
-    console.error('Admin status error:', error)
-    return res.status(200).json({ // Never allow the function to crash, return 200 with ok: false if needed, but user wants ok: true if possible with status info
-      ok: true, 
+    console.error('Admin status critical error:', error)
+    // Never allow the function to crash
+    return res.status(200).json({
+      ok: true,
       app: "reelassati",
-      error: "internal_server_error_status_check"
+      env: "production",
+      error: "unexpected_status_error",
+      database: { configured: false, ready: false, requiredTables: [], missingTables: [] },
+      blob: { configured: false },
+      aiGateway: { configured: false },
+      tribe: { configured: false, status: "error" },
+      internal: { agentSecretConfigured: false }
     })
   }
 }
