@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "postinstall": "prisma generate",
-    "db:migrate": "bun run scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "vercel-build": "npm run db:migrate && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
