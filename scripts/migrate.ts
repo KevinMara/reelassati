@@ -44,19 +44,20 @@ async function main() {
       process.exit(1)
     }
 
-    const sql = fs.readFileSync(migrationPath, 'utf8')
+    const rawSql = fs.readFileSync(migrationPath, 'utf8')
     
-    // Add extension check at the beginning
-    const baseStatements = [
-      'CREATE EXTENSION IF NOT EXISTS "pgcrypto"'
-    ]
-
-    const sqlStatements = sql
+    // Remove comments and split by semicolon correctly
+    const cleanSql = rawSql
+      .replace(/--.*$/gm, '') // Remove single-line comments
+      .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments
+    
+    const statements = cleanSql
       .split(';')
       .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'))
+      .filter(s => s.length > 0)
     
-    const statements = [...baseStatements, ...sqlStatements]
+    // Prepend extension check
+    statements.unshift('CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
 
     console.log(`Executing ${statements.length} SQL statements...`)
 
@@ -69,13 +70,15 @@ async function main() {
         executedCount++
       } catch (err: any) {
         const message = err.message || ''
-        if (
+        const isIgnorable = 
           message.includes('already exists') || 
           message.includes('relation already exists') ||
           message.includes('already a foreign key') ||
           message.includes('duplicate key value') ||
-          message.includes('permission denied to create extension') // Some managed DBs don't allow this but have it enabled
-        ) {
+          message.includes('permission denied to create extension') ||
+          message.includes('already enabled')
+        
+        if (isIgnorable) {
           skippedCount++
           continue
         }
@@ -83,7 +86,6 @@ async function main() {
         console.error(`Error executing statement: ${statement.substring(0, 100)}...`)
         console.error(err)
         
-        // If it's a CREATE TABLE or ALTER TABLE, it's critical
         const upper = statement.toUpperCase()
         if (upper.includes('CREATE TABLE') || upper.includes('ALTER TABLE')) {
            console.error('Critical failure during schema modification.')
