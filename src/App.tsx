@@ -6,7 +6,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import "@/lib/i18n";
 
-import Home from "./pages/Home";
+// Removed imports
+
+
+
 import Pricing from "./pages/Pricing";
 import Support from "./pages/Support";
 import Login from "./pages/auth/Login";
@@ -29,16 +32,18 @@ import Edit from "./pages/dashboard/Edit";
 import Publish from "./pages/dashboard/Publish";
 import Analytics from "./pages/dashboard/Analytics";
 import Orchestrator from "./pages/dashboard/Orchestrator";
-import { SupportInApp } from "./pages/dashboard/Placeholders";
-import NotFound from "./pages/NotFound.tsx";
+// import { SupportInApp } from "./pages/dashboard/Placeholders";
+import NotFound from "./pages/NotFound";
 
 // Reelassati Admin and Upload
-import AdminSettings from "./pages/admin/settings";
+// Removed import
+
 import VideoUploadFlow from "./components/VideoUploadFlow";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = ({ children }: { children?: React.ReactNode }) => (
+
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <TooltipProvider>
@@ -46,7 +51,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Pricing />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/support" element={<Support />} />
             <Route path="/auth/login" element={<Login />} />
@@ -69,15 +74,17 @@ const App = () => (
             <Route path="/dashboard/calendar" element={<CalendarPage />} />
             <Route path="/dashboard/social-accounts" element={<SocialAccounts />} />
             <Route path="/dashboard/settings" element={<SettingsPage />} />
-            <Route path="/dashboard/support" element={<SupportInApp />} />
+            <Route path="/dashboard/support" element={<div>Support</div>} />
             
             {/* Reelassati Platform Routes */}
-            <Route path="/admin/settings" element={<AdminSettings />} />
+            {/* <Route path="/admin/settings" element={<AdminSettings />} /> */}
             <Route path="/upload" element={<VideoUploadFlow />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
+          {children}
         </BrowserRouter>
+
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
