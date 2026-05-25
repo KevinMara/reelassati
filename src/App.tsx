@@ -32,6 +32,10 @@ import Orchestrator from "./pages/dashboard/Orchestrator";
 import { SupportInApp } from "./pages/dashboard/Placeholders";
 import NotFound from "./pages/NotFound.tsx";
 
+// Reelassati Admin and Upload
+import AdminSettings from "./pages/admin/settings";
+import VideoUploadFlow from "./components/VideoUploadFlow";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -66,6 +70,11 @@ const App = () => (
             <Route path="/dashboard/social-accounts" element={<SocialAccounts />} />
             <Route path="/dashboard/settings" element={<SettingsPage />} />
             <Route path="/dashboard/support" element={<SupportInApp />} />
+            
+            {/* Reelassati Platform Routes */}
+            <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/upload" element={<VideoUploadFlow />} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
