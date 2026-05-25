@@ -86,7 +86,7 @@ export default function AdminSettings() {
             <EnvVarRow label="DATABASE_URL" exists={config.DATABASE_URL} />
             <EnvVarRow label="POSTGRES_URL" exists={config.POSTGRES_URL} />
             <EnvVarRow label="BLOB_READ_WRITE_TOKEN" exists={config.BLOB_READ_WRITE_TOKEN} />
-            <EnvVarRow label="LOVABLE_API_KEY" exists={config.LOVABLE_API_KEY} />
+            <EnvVarRow label="AI_GATEWAY_API_KEY" exists={config.AI_GATEWAY_API_KEY} />
             <EnvVarRow label="TRIBE_API_URL" exists={config.TRIBE_API_URL} />
             <EnvVarRow label="TRIBE_API_KEY" exists={config.TRIBE_API_KEY} />
             <EnvVarRow label="INTERNAL_AGENT_SECRET" exists={config.INTERNAL_AGENT_SECRET} />
@@ -122,16 +122,25 @@ export default function AdminSettings() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        <JobTable 
-          title="Recent Jobs" 
-          jobs={jobData?.recentJobs} 
-        />
-        <JobTable 
-          title="Tribe Unavailable Jobs" 
-          jobs={jobData?.unavailableJobs} 
-          emptyMessage="No unavailable jobs found"
-        />
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <JobTable 
+            title="Recent Jobs" 
+            jobs={jobData?.recentJobs} 
+          />
+          <JobTable 
+            title="Tribe Unavailable Jobs" 
+            jobs={jobData?.unavailableJobs} 
+            emptyMessage="No unavailable jobs found"
+          />
+        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <JobTable 
+            title="Recent Failed Jobs" 
+            jobs={jobData?.failedJobs} 
+            emptyMessage="No failed jobs found"
+          />
+        </div>
       </div>
     </div>
   )
