@@ -1,4 +1,4 @@
-/** @jsxImportSource react */
+
 import type { Metadata } from "next";
 import { Inter, Fraunces } from "next/font/google";
 import "./globals.css";
