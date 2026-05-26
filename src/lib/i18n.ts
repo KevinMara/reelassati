@@ -29,6 +29,12 @@ i18n
     supportedLngs: ["it", "en"],
     nonExplicitSupportedLngs: true,
     interpolation: { escapeValue: false },
+    parseMissingKeyHandler: (key) => {
+      // Return a slightly cleaner version of the key as a last resort
+      const parts = key.split('.');
+      const last = parts[parts.length - 1];
+      return last.charAt(0).toUpperCase() + last.slice(1).replace(/_/g, ' ');
+    },
     detection: {
       order: ["localStorage", "navigator", "htmlTag"],
       caches: ["localStorage"],
