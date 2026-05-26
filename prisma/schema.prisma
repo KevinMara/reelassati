@@ -3,7 +3,6 @@ generator client {
   binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -11,20 +10,19 @@ datasource db {
 }
 
 model UserProfile {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  email        String?  @unique
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
   displayName  String?  @map("display_name")
   passwordHash String?  @map("password_hash")
   authProvider String   @default("email") @map("auth_provider")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("users_profile")
 }
 
 model Client {
-  id          String   @id @default(uuid())
+  id          String   @id @default(uuid()) @db.Uuid
   name        String
   ownerUserId String   @map("owner_user_id")
   createdAt   DateTime @default(now()) @map("created_at")
@@ -34,8 +32,8 @@ model Client {
 }
 
 model Video {
-  id          String   @id @default(uuid())
-  clientId    String?  @map("client_id")
+  id          String   @id @default(uuid()) @db.Uuid
+  clientId    String?  @map("client_id") @db.Uuid
   ownerUserId String   @map("owner_user_id")
   url         String?
   status      String   @default("pending")
@@ -58,8 +56,8 @@ model Video {
 }
 
 model Job {
-  id          String   @id @default(uuid())
-  videoId     String   @map("video_id")
+  id          String   @id @default(uuid()) @db.Uuid
+  videoId     String   @map("video_id") @db.Uuid
   status      String   @default("pending")
   jobType     String   @map("job_type")
   payload     Json?
@@ -77,9 +75,9 @@ model Job {
 }
 
 model TribeRun {
-  id        String   @id @default(uuid())
-  jobId     String   @map("job_id")
-  videoId   String   @map("video_id")
+  id        String   @id @default(uuid()) @db.Uuid
+  jobId     String   @map("job_id") @db.Uuid
+  videoId   String   @map("video_id") @db.Uuid
   name      String
   output    Json?
   createdAt DateTime @default(now()) @map("created_at")
@@ -93,9 +91,9 @@ model TribeRun {
 }
 
 model AgentRun {
-  id        String   @id @default(uuid())
-  jobId     String   @map("job_id")
-  videoId   String   @map("video_id")
+  id        String   @id @default(uuid()) @db.Uuid
+  jobId     String   @map("job_id") @db.Uuid
+  videoId   String   @map("video_id") @db.Uuid
   agentName String   @map("agent_name")
   input     Json?
   output    Json?
@@ -110,8 +108,8 @@ model AgentRun {
 }
 
 model VideoAnalysis {
-  id        String   @id @default(uuid())
-  videoId   String   @map("video_id")
+  id        String   @id @default(uuid()) @db.Uuid
+  videoId   String   @map("video_id") @db.Uuid
   data      Json?
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -122,8 +120,8 @@ model VideoAnalysis {
 }
 
 model Script {
-  id        String   @id @default(uuid())
-  videoId   String   @map("video_id")
+  id        String   @id @default(uuid()) @db.Uuid
+  videoId   String   @map("video_id") @db.Uuid
   content   Json?
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -133,8 +131,8 @@ model Script {
 }
 
 model EditPlan {
-  id        String   @id @default(uuid())
-  videoId   String   @map("video_id")
+  id        String   @id @default(uuid()) @db.Uuid
+  videoId   String   @map("video_id") @db.Uuid
   steps     Json?
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -144,8 +142,8 @@ model EditPlan {
 }
 
 model PublishingPlan {
-  id        String   @id @default(uuid())
-  videoId   String   @map("video_id")
+  id        String   @id @default(uuid()) @db.Uuid
+  videoId   String   @map("video_id") @db.Uuid
   platforms Json?
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -155,8 +153,8 @@ model PublishingPlan {
 }
 
 model AnalyticsSnapshot {
-  id        String   @id @default(uuid())
-  videoId   String   @map("video_id")
+  id        String   @id @default(uuid()) @db.Uuid
+  videoId   String   @map("video_id") @db.Uuid
   platform  String
   metrics   Json?
   capturedAt DateTime @default(now()) @map("captured_at")
@@ -167,7 +165,7 @@ model AnalyticsSnapshot {
 }
 
 model PlatformLearning {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   platform  String
   key       String
   value     Json?
@@ -181,7 +179,7 @@ model PlatformLearning {
 }
 
 model CostEvent {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   userId    String   @map("user_id")
   amount    Decimal  @db.Decimal(10, 2)
   eventType String   @map("event_type")
