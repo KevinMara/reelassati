@@ -994,27 +994,33 @@ export type Database = {
       users_profile: {
         Row: {
           auth_provider: string | null
+          avatar_url: string | null
           created_at: string | null
           display_name: string | null
           email: string
+          google_id: string | null
           id: string
           password_hash: string | null
           updated_at: string | null
         }
         Insert: {
           auth_provider?: string | null
+          avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
           email: string
+          google_id?: string | null
           id?: string
           password_hash?: string | null
           updated_at?: string | null
         }
         Update: {
           auth_provider?: string | null
+          avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
           email?: string
+          google_id?: string | null
           id?: string
           password_hash?: string | null
           updated_at?: string | null
