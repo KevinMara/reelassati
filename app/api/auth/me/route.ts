@@ -1,21 +1,27 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
     const session = await getSession();
-
     if (!session || !session.userId) {
-      return NextResponse.json({ ok: false, user: null });
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.userProfile.findUnique({
       where: { id: session.userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        avatarUrl: true,
+        authProvider: true,
+      },
     });
 
     if (!user) {
-      return NextResponse.json({ ok: false, user: null });
+      return NextResponse.json({ ok: false, error: "user_not_found" }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -24,9 +30,11 @@ export async function GET() {
         id: user.id,
         email: user.email,
         display_name: user.displayName,
+        avatar_url: user.avatarUrl,
+        auth_provider: user.authProvider,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Auth me error:", error);
     return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
