@@ -991,6 +991,36 @@ export type Database = {
           },
         ]
       }
+      users_profile: {
+        Row: {
+          auth_provider: string | null
+          created_at: string | null
+          display_name: string | null
+          email: string
+          id: string
+          password_hash: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auth_provider?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email: string
+          id?: string
+          password_hash?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auth_provider?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email?: string
+          id?: string
+          password_hash?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
