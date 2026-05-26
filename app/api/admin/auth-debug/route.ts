@@ -7,13 +7,14 @@ export async function GET() {
     const dbCheck = await prisma.$queryRaw`SELECT 1`.catch(() => null);
     
     // Check users_profile table columns
-    const columns: any[] = await prisma.$queryRaw`
+    const columns = await prisma.$queryRaw<any[]>`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'users_profile'
     `.catch(() => []);
     
-    const columnNames = columns.map(c => c.column_name);
+    const columnNames = columns.map((c: any) => c.column_name);
+
 
     return NextResponse.json({
       ok: true,
