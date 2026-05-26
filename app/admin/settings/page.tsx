@@ -58,7 +58,13 @@ async function getStatus() {
     internal: {
       agentSecretConfigured: Boolean(process.env.INTERNAL_AGENT_SECRET)
     },
-    recentJobs: recentJobs
+    recentJobs: recentJobs,
+    googleAuth: {
+      configured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI),
+      clientId: Boolean(process.env.GOOGLE_CLIENT_ID),
+      clientSecret: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+      redirectUri: Boolean(process.env.GOOGLE_REDIRECT_URI)
+    }
   };
 }
 
@@ -104,6 +110,12 @@ export default async function AdminSettingsPage() {
           active={status.aiGateway.configured} 
           description={status.aiGateway.configured ? "Model access active" : "Key missing"}
         />
+        <StatusBox 
+          label="Google OAuth" 
+          active={status.googleAuth.configured} 
+          description={status.googleAuth.configured ? "Login active" : "Requires setup"}
+          link="/admin/google-oauth-setup"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -115,6 +127,7 @@ export default async function AdminSettingsPage() {
             <EnvVar label="AI_GATEWAY" exists={status.aiGateway.configured} />
             <EnvVar label="TRIBE_API" exists={status.tribe.configured} />
             <EnvVar label="INTERNAL_AGENT" exists={status.internal.agentSecretConfigured} />
+            <EnvVar label="GOOGLE_CLIENT_ID" exists={status.googleAuth.clientId} />
           </div>
         </div>
 
@@ -190,9 +203,9 @@ export default async function AdminSettingsPage() {
   );
 }
 
-function StatusBox({ label, active, description, statusText }: any) {
-  return (
-    <div className={`p-6 border rounded-lg bg-card border-l-4 ${active ? 'border-l-green-500' : 'border-l-amber-500'}`}>
+function StatusBox({ label, active, description, statusText, link }: any) {
+  const content = (
+    <div className={`p-6 border rounded-lg bg-card border-l-4 h-full ${active ? 'border-l-green-500' : 'border-l-amber-500'} ${link ? 'hover:bg-muted/50 transition-colors cursor-pointer' : ''}`}>
       <div className="space-y-1">
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
         <p className="text-2xl font-bold">{statusText ? statusText.toUpperCase() : (active ? 'Active' : 'Missing')}</p>
@@ -200,6 +213,12 @@ function StatusBox({ label, active, description, statusText }: any) {
       </div>
     </div>
   );
+
+  if (link) {
+    return <a href={link} className="block">{content}</a>;
+  }
+
+  return content;
 }
 
 function EnvVar({ label, exists }: any) {
