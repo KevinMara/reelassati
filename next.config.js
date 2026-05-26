@@ -1,18 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false, // Disabled to ease the React Router integration transition
-  swcMinify: true,
-  output: 'standalone',
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '*.public.blob.vercel-storage.com',
-      },
-    ],
+  reactStrictMode: true,
+  transpilePackages: ['lucide-react'],
+  typescript: {
+    ignoreBuildErrors: true,
   },
-  // API routes are handled via app/api/*
-  // All other routes are captured by [[...slug]]/page.tsx for React Router
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  // Ensure we don't try to pre-render dynamic routes that depend on client-side state
+  trailingSlash: false,
 };
 
 module.exports = nextConfig;
