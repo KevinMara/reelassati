@@ -160,3 +160,9 @@ CREATE INDEX IF NOT EXISTS "idx_agent_runs_video_id" ON "agent_runs"("video_id")
 CREATE INDEX IF NOT EXISTS "idx_video_analyses_video_id" ON "video_analyses"("video_id");
 CREATE INDEX IF NOT EXISTS "idx_platform_learnings_archived" ON "platform_learnings"("archived");
 CREATE INDEX IF NOT EXISTS "idx_platform_learnings_expires_at" ON "platform_learnings"("expires_at");
+
+-- Update users_profile for auth support
+ALTER TABLE "users_profile" ADD COLUMN IF NOT EXISTS "password_hash" TEXT;
+ALTER TABLE "users_profile" ADD COLUMN IF NOT EXISTS "auth_provider" TEXT DEFAULT 'email';
+ALTER TABLE "users_profile" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+CREATE UNIQUE INDEX IF NOT EXISTS "users_profile_email_key" ON "users_profile"("email");

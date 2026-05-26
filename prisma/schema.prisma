@@ -11,11 +11,14 @@ datasource db {
 }
 
 model UserProfile {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  email       String?
-  displayName String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  email        String?  @unique
+  displayName  String?  @map("display_name")
+  passwordHash String?  @map("password_hash")
+  authProvider String   @default("email") @map("auth_provider")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("users_profile")
 }
