@@ -2,8 +2,15 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 
-const SECRET = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET || "default-secret-change-me-in-production";
-const key = new TextEncoder().encode(SECRET);
+function getKey(): Uint8Array {
+  const SECRET = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
+  if (!SECRET) {
+    throw new Error("AUTH_SECRET (or INTERNAL_AGENT_SECRET) env var is required");
+  }
+  return new TextEncoder().encode(SECRET);
+}
+
+
 
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
@@ -18,11 +25,11 @@ export async function encrypt(payload: any) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(key);
+    .sign(getKey());
 }
 
 export async function decrypt(input: string): Promise<any> {
-  const { payload } = await jwtVerify(input, key, {
+  const { payload } = await jwtVerify(input, getKey(), {
     algorithms: ["HS256"],
   });
   return payload;

@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { requireAdmin } from "@/lib/admin-guard";
 
 export async function GET() {
+  const guard = await requireAdmin();
+  if (guard) return guard;
   try {
     const dbCheck = await prisma.$queryRaw`SELECT 1`.catch(() => null);
     
