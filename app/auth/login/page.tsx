@@ -6,8 +6,6 @@ import { Eye, EyeOff, Loader2, Globe, Sun, Moon } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/Logo";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
 import { useTheme } from "@/lib/theme";
 
@@ -126,29 +124,33 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
-      if (error) {
-        if (error.message.toLowerCase().includes("invalid")) {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: pw }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
           toast.error("Email o password non corretti.");
         } else {
-          toast.error(error.message || "Qualcosa non va. Riprova.");
+          toast.error(data.error || "Qualcosa non va. Riprova.");
         }
         return;
       }
-      window.location.href = "/";
+      
+      window.location.href = "/dashboard";
+    } catch (err) {
+      toast.error("Errore di connessione. Riprova.");
     } finally {
       setLoading(false);
     }
   }
 
   async function onGoogle() {
-    setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) {
-      toast.error("Qualcosa non va. Riprova.");
-      setLoading(false);
-      return;
-    }
+    toast.info("Accesso con Google non ancora disponibile.");
   }
 
   return (

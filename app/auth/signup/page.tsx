@@ -6,8 +6,6 @@ import { Eye, EyeOff, Loader2, Globe, Sun, Moon, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/Logo";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
 import { useTheme } from "@/lib/theme";
 
@@ -136,38 +134,34 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password: pw,
-        options: {
-          data: {
-            full_name: name,
-          },
-        },
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password: pw }),
       });
-      if (error) {
-        if (error.message.toLowerCase().includes("already registered")) {
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.error === "email_already_exists") {
           toast.error("Esiste già un account con questa email.");
         } else {
-          toast.error(error.message || "Qualcosa non va. Riprova.");
+          toast.error(data.error || "Qualcosa non va. Riprova.");
         }
         return;
       }
-      toast.success("Controlla la tua email per confermare l'account.");
-      window.location.href = "/auth/login";
+      
+      toast.success("Account creato con successo!");
+      window.location.href = "/dashboard";
+    } catch (err) {
+      toast.error("Errore di connessione. Riprova.");
     } finally {
       setLoading(false);
     }
   }
 
   async function onGoogle() {
-    setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) {
-      toast.error("Qualcosa non va. Riprova.");
-      setLoading(false);
-      return;
-    }
+    toast.info("Accesso con Google non ancora disponibile.");
   }
 
   return (
