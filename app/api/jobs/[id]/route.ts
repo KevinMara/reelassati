@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth';
+import { isAdminSession } from '@/lib/admin-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,6 +9,11 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const session = await getSession();
+  if (!session?.userId) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
   const { id } = params;
   const idStr = String(id || '');
 
