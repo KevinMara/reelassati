@@ -45,6 +45,31 @@ BEGIN
     END IF;
 END $$;
 
+-- Add google_id if not exists
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users_profile' AND column_name='google_id') THEN
+        ALTER TABLE "users_profile" ADD COLUMN "google_id" TEXT;
+    END IF;
+END $$;
+
+-- Add avatar_url if not exists
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users_profile' AND column_name='avatar_url') THEN
+        ALTER TABLE "users_profile" ADD COLUMN "avatar_url" TEXT;
+    END IF;
+END $$;
+
+-- Make google_id unique if not already
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'users_profile_google_id_key') THEN
+        CREATE UNIQUE INDEX "users_profile_google_id_key" ON "users_profile"("google_id");
+    END IF;
+END $$;
+
+
 -- Ensure created_at is TIMESTAMPTZ
 ALTER TABLE "users_profile" ALTER COLUMN "created_at" TYPE TIMESTAMPTZ;
 ALTER TABLE "users_profile" ALTER COLUMN "updated_at" TYPE TIMESTAMPTZ;
