@@ -15,6 +15,8 @@ model UserProfile {
   displayName  String?  @map("display_name")
   passwordHash String?  @map("password_hash")
   authProvider String   @default("email") @map("auth_provider")
+  googleId     String?  @unique @map("google_id")
+  avatarUrl    String?  @map("avatar_url")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
