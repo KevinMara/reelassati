@@ -10,14 +10,17 @@ export async function GET(
   const { id } = params;
   const idStr = String(id || '');
 
+  // Validation
   if (!idStr) {
     return NextResponse.json({ ok: false, error: "missing_job_id" }, { status: 400 });
   }
 
+  // Explicit check for "test" keyword from requirements
   if (idStr === 'test') {
     return NextResponse.json({ ok: false, error: "invalid_job_id" }, { status: 400 });
   }
 
+  // UUID validation (standard UUID + zero UUID)
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const zeroUuid = "00000000-0000-0000-0000-000000000000";
   const isValidUuid = uuidRegex.test(idStr) || idStr === zeroUuid;
@@ -50,7 +53,8 @@ export async function GET(
       }
     });
   } catch (dbError: any) {
-    console.error(`Database error fetching job ${idStr}:`, dbError);
+    // Real error logged server-side only as requested
+    console.error(`Production Database Error fetching job ${idStr}:`, dbError);
     return NextResponse.json({ ok: false, error: "database_error" }, { status: 500 });
   }
 }
