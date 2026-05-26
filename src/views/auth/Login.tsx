@@ -1,27 +1,107 @@
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { AuthLayout, Field, GoogleButton } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
-import { Field, GoogleButton } from "@/components/auth/AuthLayout";
+import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
+import { toast } from "sonner";
 
 export default function Login() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [show, setShow] = useState(false);
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+      if (error) {
+        if (error.message.toLowerCase().includes("invalid")) {
+          toast.error(t("auth.toast.invalid_credentials"));
+        } else {
+          toast.error(error.message || t("auth.toast.generic_error"));
+        }
+        return;
+      }
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onGoogle() {
+    setLoading(true);
+    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    if (result.error) {
+      toast.error(t("auth.toast.generic_error"));
+      setLoading(false);
+      return;
+    }
+    if (result.redirected) return;
+    navigate("/");
+  }
+
   return (
-    <AuthLayout title={t("auth.login.title")} sub={t("auth.login.sub")}>
-      <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-        <Field name="email" label={t("auth.login.email")} type="email" required />
-        <Field name="password" label={t("auth.login.password")} type="password" required />
-        <Button className="w-full" size="lg">{t("auth.login.submit")}</Button>
-        <div className="relative py-4">
-          <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-          <div className="relative flex justify-center text-xs uppercase"><span className="bg-surface px-2 text-muted-foreground">{t("auth.login.or")}</span></div>
+    <AuthLayout
+      title={t("auth.login.title")}
+      sub={t("auth.login.sub")}
+      footer={
+        <>
+          {t("auth.login.no_account")}{" "}
+          <Link to="/auth/signup" className="text-primary font-medium hover:underline">
+            {t("auth.login.signup_link")}
+          </Link>
+        </>
+      }
+    >
+      <form className="space-y-5" onSubmit={onSubmit}>
+        <Field name="email" type="email" label={t("auth.login.email")} required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
+        <div>
+          <Field
+            name="password"
+            type={show ? "text" : "password"}
+            label={t("auth.login.password")}
+            required
+            autoComplete="current-password"
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            disabled={loading}
+            rightSlot={
+              <button type="button" onClick={() => setShow((s) => !s)} className="text-foreground/50 hover:text-foreground transition-colors" aria-label={show ? t("auth.hide") : t("auth.show")}>
+                {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            }
+          />
+          <div className="mt-2 text-right">
+            <Link to="/auth/forgot-password" className="text-xs text-foreground/55 hover:text-foreground transition-colors">
+              {t("auth.forgot")}
+            </Link>
+          </div>
         </div>
-        <GoogleButton label={t("auth.login.google")} />
+
+        <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full justify-center mt-2">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("auth.login.submit")}
+        </Button>
+
+        <Divider label={t("auth.login.or")} />
+        <GoogleButton label={t("auth.login.google")} onClick={onGoogle} disabled={loading} />
       </form>
-      <div className="mt-8 text-center text-sm">
-        <span className="text-foreground/50">{t("auth.login.no_account")} </span>
-        <Link to="/auth/signup" className="text-primary font-medium hover:underline">{t("auth.login.signup_link")}</Link>
-      </div>
     </AuthLayout>
+  );
+}
+
+function Divider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <div className="flex-1 h-px bg-border" />
+      <span className="mono-eyebrow text-foreground/40 text-[10px]">{label}</span>
+      <div className="flex-1 h-px bg-border" />
+    </div>
   );
 }
