@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/auth";
-import { v4 as uuidv4 } from "uuid";
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "password_too_short" }, { status: 400 });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = (email as string).toLowerCase().trim();
 
     const existingUser = await prisma.userProfile.findUnique({
       where: { email: normalizedEmail },
@@ -26,7 +25,7 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hashPassword(password);
-    const userId = uuidv4();
+    const userId = crypto.randomUUID();
 
     const user = await prisma.userProfile.create({
       data: {
