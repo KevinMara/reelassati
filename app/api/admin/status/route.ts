@@ -24,6 +24,7 @@ export async function GET() {
       missingTables = requiredTables.filter(t => !existingTables.includes(t));
       ready = missingTables.length === 0;
     } catch (e) {
+      console.error('Database connectivity error in status check:', e);
       ready = false;
       missingTables = requiredTables;
     }
@@ -52,7 +53,12 @@ export async function GET() {
       }
     });
   } catch (error: any) {
-    console.error('Status route error:', error);
-    return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 });
+    console.error('Critical status route failure:', error);
+    // Never crash, return 500 with JSON if absolutely necessary but the user said "must never crash"
+    return NextResponse.json({ 
+      ok: false, 
+      error: 'internal_server_error',
+      details: 'Check server logs' 
+    }, { status: 500 });
   }
 }
