@@ -38,12 +38,20 @@ export async function GET(
 
   try {
     const job = await prisma.job.findUnique({
-      where: { id: idStr }
+      where: { id: idStr },
+      include: { video: { select: { ownerUserId: true } } },
     });
 
     if (!job) {
       return NextResponse.json({ ok: false, error: "job_not_found" }, { status: 404 });
     }
+
+    const isOwner = job.video?.ownerUserId === session.userId;
+    const isAdmin = await isAdminSession();
+    if (!isOwner && !isAdmin) {
+      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+    }
+
 
     return NextResponse.json({
       ok: true,
