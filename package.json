@@ -47,6 +47,7 @@
     "@supabase/supabase-js": "^2.106.2",
     "@tanstack/react-query": "^5.83.0",
     "@vercel/blob": "^2.4.0",
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -56,6 +57,7 @@
     "i18next": "^26.0.8",
     "i18next-browser-languagedetector": "^8.2.1",
     "input-otp": "^1.4.2",
+    "jose": "^6.2.3",
     "lucide-react": "^0.462.0",
     "next": "14.2.3",
     "next-themes": "^0.4.6",
@@ -75,6 +77,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
