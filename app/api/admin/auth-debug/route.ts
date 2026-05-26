@@ -15,19 +15,27 @@ export async function GET() {
     
     const columnNames = columns.map((c: any) => c.column_name);
 
-
     return NextResponse.json({
       ok: true,
       databaseConnected: !!dbCheck,
       usersProfileHasPasswordHash: columnNames.includes('password_hash'),
       usersProfileHasAuthProvider: columnNames.includes('auth_provider'),
+      usersProfileHasGoogleId: columnNames.includes('google_id'),
+      usersProfileHasAvatarUrl: columnNames.includes('avatar_url'),
       usersProfileHasUpdatedAt: columnNames.includes('updated_at'),
       authSecretConfigured: !!(process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET),
       passwordHashLibraryAvailable: typeof bcrypt.hash === 'function',
-      googleAuthConfigured: false
+      googleClientIdConfigured: !!process.env.GOOGLE_CLIENT_ID,
+      googleClientSecretConfigured: !!process.env.GOOGLE_CLIENT_SECRET,
+      googleRedirectUriConfigured: !!process.env.GOOGLE_REDIRECT_URI,
+      googleAuthConfigured: !!(
+        process.env.GOOGLE_CLIENT_ID &&
+        process.env.GOOGLE_CLIENT_SECRET &&
+        process.env.GOOGLE_REDIRECT_URI
+      )
     });
   } catch (error: any) {
     console.error("Auth debug error:", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, databaseConnected: false, error: error.message });
   }
 }
