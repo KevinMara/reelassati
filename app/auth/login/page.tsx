@@ -150,8 +150,9 @@ export default function LoginPage() {
   }
 
   async function onGoogle() {
-    toast.info("Accesso con Google non ancora disponibile.");
+    // Disabled as requested
   }
+
 
   return (
     <AuthWrapper
@@ -204,7 +205,13 @@ export default function LoginPage() {
           <span className="font-mono text-[10px] uppercase tracking-wider text-foreground/40">oppure</span>
           <div className="flex-1 h-px bg-black/[0.08] dark:bg-white/[0.08]" />
         </div>
-        <GoogleButton label="Continua con Google" onClick={onGoogle} disabled={loading} />
+        <div className="relative group">
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black dark:bg-white text-white dark:text-black text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Google login coming soon
+          </div>
+          <GoogleButton label="Continua con Google" onClick={onGoogle} disabled={true} />
+        </div>
+
       </form>
     </AuthWrapper>
   );

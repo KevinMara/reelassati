@@ -2,14 +2,21 @@ import { PrismaClient } from '@prisma/client'
 import fs from 'fs'
 import path from 'path'
 
-const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+if (!dbUrl) {
+  console.log('Skipping migration: DATABASE_URL not set.');
+  process.exit(0);
+}
+
 const prisma = new PrismaClient({
   datasources: {
     db: {
       url: dbUrl
     }
   }
-})
+});
+
 
 const REQUIRED_TABLES = [
   'users_profile',

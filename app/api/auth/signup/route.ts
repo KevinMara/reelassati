@@ -4,7 +4,14 @@ import { hashPassword, createSession } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    const { name, email, password } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json({ ok: false, error: "missing_fields" }, { status: 400 });
@@ -15,40 +22,48 @@ export async function POST(request: Request) {
     }
 
     const normalizedEmail = (email as string).toLowerCase().trim();
-
-    const existingUser = await prisma.userProfile.findUnique({
-      where: { email: normalizedEmail },
-    });
-
-    if (existingUser) {
-      return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
+    
+    // Validate email format basic
+    if (!normalizedEmail.includes("@") || !normalizedEmail.includes(".")) {
+      return NextResponse.json({ ok: false, error: "invalid_email" }, { status: 400 });
     }
 
-    const passwordHash = await hashPassword(password);
-    const userId = crypto.randomUUID();
+    try {
+      const existingUser = await prisma.userProfile.findUnique({
+        where: { email: normalizedEmail },
+      });
 
-    const user = await prisma.userProfile.create({
-      data: {
-        userId,
-        email: normalizedEmail,
-        displayName: name,
-        passwordHash,
-        authProvider: "email",
-      },
-    });
+      if (existingUser) {
+        return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
+      }
 
-    await createSession(user.userId);
+      const passwordHash = await hashPassword(password);
 
-    return NextResponse.json({
-      ok: true,
-      user: {
-        id: user.userId,
-        email: user.email,
-        display_name: user.displayName,
-      },
-    });
+      const user = await prisma.userProfile.create({
+        data: {
+          email: normalizedEmail,
+          displayName: name,
+          passwordHash,
+          authProvider: "email",
+        },
+      });
+
+      await createSession(user.id);
+
+      return NextResponse.json({
+        ok: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          display_name: user.displayName,
+        },
+      });
+    } catch (dbError: any) {
+      console.error("Database error during signup:", dbError);
+      return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
+    }
   } catch (error: any) {
     console.error("Signup error:", error);
-    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "auth_session_error" }, { status: 500 });
   }
 }

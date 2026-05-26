@@ -145,9 +145,12 @@ export default function SignupPage() {
       if (!response.ok) {
         if (data.error === "email_already_exists") {
           toast.error("Esiste già un account con questa email.");
+        } else if (data.error === "auth_database_error") {
+          toast.error("Authentication database is not ready. Please contact support.");
         } else {
           toast.error(data.error || "Qualcosa non va. Riprova.");
         }
+
         return;
       }
       
@@ -161,8 +164,9 @@ export default function SignupPage() {
   }
 
   async function onGoogle() {
-    toast.info("Accesso con Google non ancora disponibile.");
+    // Disabled as requested
   }
+
 
   return (
     <AuthWrapper
@@ -230,7 +234,13 @@ export default function SignupPage() {
           <span className="font-mono text-[10px] uppercase tracking-wider text-foreground/40">oppure</span>
           <div className="flex-1 h-px bg-black/[0.08] dark:bg-white/[0.08]" />
         </div>
-        <GoogleButton label="Continua con Google" onClick={onGoogle} disabled={loading} />
+        <div className="relative group">
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black dark:bg-white text-white dark:text-black text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Google login coming soon
+          </div>
+          <GoogleButton label="Continua con Google" onClick={onGoogle} disabled={true} />
+        </div>
+
       </form>
     </AuthWrapper>
   );
