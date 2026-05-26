@@ -119,6 +119,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/auth-check")
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok && data.auth.googleAuth) {
+          setGoogleEnabled(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -149,8 +161,8 @@ export default function LoginPage() {
     }
   }
 
-  async function onGoogle() {
-    // Disabled as requested
+  function onGoogle() {
+    window.location.href = "/api/auth/google";
   }
 
 
@@ -206,10 +218,16 @@ export default function LoginPage() {
           <div className="flex-1 h-px bg-black/[0.08] dark:bg-white/[0.08]" />
         </div>
         <div className="relative group">
-          <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black dark:bg-white text-white dark:text-black text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-            Google login coming soon
-          </div>
-          <GoogleButton label="Continua con Google" onClick={onGoogle} disabled={true} />
+          {!googleEnabled && (
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black dark:bg-white text-white dark:text-black text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+              Google login coming soon
+            </div>
+          )}
+          <GoogleButton 
+            label="Continua con Google" 
+            onClick={onGoogle} 
+            disabled={!googleEnabled} 
+          />
         </div>
 
       </form>
