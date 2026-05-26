@@ -183,7 +183,7 @@ export default function LoginPage() {
             }
           />
           <div className="mt-2 text-right">
-            <Link href="/auth/forgot-password" size="sm" className="text-xs text-foreground/55 hover:text-foreground transition-colors">
+            <Link href="/auth/forgot-password" className="text-xs text-foreground/55 hover:text-foreground transition-colors">
               Password dimenticata?
             </Link>
           </div>
