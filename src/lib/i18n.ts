@@ -37,6 +37,7 @@ i18n
   });
 
 i18n.on("languageChanged", (lng) => {
+  if (typeof window === "undefined") return;
   const base = lng.split("-")[0];
   document.documentElement.lang = base;
   document.documentElement.dir = ["ar", "he", "fa"].includes(base) ? "rtl" : "ltr";
