@@ -2,14 +2,21 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const SECRET = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET || "default-secret-change-me-in-production";
+const SECRET = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
+if (!SECRET) {
+  throw new Error("AUTH_SECRET (or INTERNAL_AGENT_SECRET) env var is required");
+}
 const key = new TextEncoder().encode(SECRET);
+
 
 export async function middleware(request: NextRequest) {
   const session = request.cookies.get("session")?.value;
 
   const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
-  const isProtectedPage = request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/app");
+  const isProtectedPage =
+    request.nextUrl.pathname.startsWith("/dashboard") ||
+    request.nextUrl.pathname.startsWith("/app") ||
+    request.nextUrl.pathname.startsWith("/admin");
 
   if (isProtectedPage) {
     if (!session) {
@@ -36,5 +43,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/app/:path*", "/auth/:path*"],
+  matcher: ["/dashboard/:path*", "/app/:path*", "/auth/:path*", "/admin/:path*"],
 };

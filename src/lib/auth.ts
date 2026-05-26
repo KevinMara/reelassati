@@ -2,8 +2,12 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 
-const SECRET = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET || "default-secret-change-me-in-production";
+const SECRET = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
+if (!SECRET) {
+  throw new Error("AUTH_SECRET (or INTERNAL_AGENT_SECRET) env var is required");
+}
 const key = new TextEncoder().encode(SECRET);
+
 
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
