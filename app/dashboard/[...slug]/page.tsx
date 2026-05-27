@@ -7,9 +7,9 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const dynamic = 'force-dynamic';
 
-const Login = nextDynamic(() => import('@/views/auth/Login'), { ssr: false });
+const App = nextDynamic(() => import('@/App'), { ssr: false });
 
-export default function LoginPage() {
+export default function DashboardCatchAllPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -20,9 +20,7 @@ export default function LoginPage() {
 
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <Login />
-      </BrowserRouter>
+      <App />
     </ErrorBoundary>
   );
 }

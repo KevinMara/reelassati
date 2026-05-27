@@ -28,12 +28,9 @@ import Orchestrator from "./views/dashboard/Orchestrator";
 import NotFound from "./views/NotFound";
 import VideoUploadFlow from "./components/VideoUploadFlow";
 
-const queryClient = new QueryClient();
-
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <Routes>
+  <BrowserRouter>
+    <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/support" element={<Support />} />
@@ -62,8 +59,7 @@ const App = () => (
         <Route path="/upload" element={<VideoUploadFlow />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </BrowserRouter>
-  </QueryClientProvider>
+  </BrowserRouter>
 );
 
 export default App;

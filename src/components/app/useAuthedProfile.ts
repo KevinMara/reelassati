@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+
 
 export type AuthedProfile = {
   id: string;
@@ -15,7 +15,7 @@ export type AuthedProfile = {
 };
 
 export function useAuthedProfile(opts?: { ownerOnly?: boolean }) {
-  const navigate = useNavigate();
+
   const [profile, setProfile] = useState<AuthedProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,9 +30,10 @@ export function useAuthedProfile(opts?: { ownerOnly?: boolean }) {
         if (!active) return;
 
         if (!data.ok || !data.user) {
-          navigate("/auth/login");
+          window.location.href = "/auth/login";
           return;
         }
+
 
         // Map backend user to AuthedProfile format
         // Defaulting plan fields as they might be handled differently now
@@ -50,16 +51,17 @@ export function useAuthedProfile(opts?: { ownerOnly?: boolean }) {
         };
 
         if (opts?.ownerOnly && !prof.is_owner) {
-          navigate("/dashboard");
+          window.location.href = "/dashboard";
           return;
         }
+
 
         setProfile(prof);
         setLoading(false);
       } catch (err) {
         console.error("Auth check failed:", err);
         if (active) {
-          navigate("/auth/login");
+          window.location.href = "/auth/login";
         }
       }
     }
@@ -69,7 +71,8 @@ export function useAuthedProfile(opts?: { ownerOnly?: boolean }) {
     return () => {
       active = false;
     };
-  }, [navigate, opts?.ownerOnly]);
+  }, [opts?.ownerOnly]);
+
 
   return { profile, loading };
 }

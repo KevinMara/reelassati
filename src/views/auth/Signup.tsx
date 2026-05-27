@@ -60,7 +60,7 @@ export default function Signup() {
       }
       
       toast.success(t("auth.toast.signup_success") || "Account created successfully!");
-      navigate("/dashboard");
+      window.location.href = "/dashboard";
     } catch (err) {
       toast.error(t("auth.toast.generic_error") || "An unexpected error occurred.");
     } finally {
@@ -80,9 +80,9 @@ export default function Signup() {
       footer={
         <>
           {t("auth.signup.have_account")}{" "}
-          <Link to="/auth/login" className="text-primary font-medium hover:underline">
+          <a href="/auth/login" className="text-primary font-medium hover:underline">
             {t("auth.signup.login_link")}
-          </Link>
+          </a>
         </>
       }
     >
