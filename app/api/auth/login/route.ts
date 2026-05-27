@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const { email, password } = body;
 
     if (!email || !password) {
-      return NextResponse.json({ ok: false, error: "missing_fields" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 400 });
     }
 
     const normalizedEmail = (email as string).toLowerCase().trim();
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       });
     } catch (dbError: any) {
       console.error("Database error during login:", dbError);
-      return NextResponse.json({ ok: false, error: "database_error", details: dbError.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "auth_database_error", details: dbError.message }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Login error:", error);

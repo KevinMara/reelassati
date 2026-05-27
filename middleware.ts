@@ -16,11 +16,20 @@ export async function middleware(request: NextRequest) {
   const isApiRequest = request.nextUrl.pathname.startsWith("/api");
 
 
-  const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
+  const isAuthPage = request.nextUrl.pathname.startsWith("/auth") || request.nextUrl.pathname.startsWith("/api/auth");
+  const isDiagnosticRoute = 
+    request.nextUrl.pathname === "/api/health" ||
+    request.nextUrl.pathname.startsWith("/api/admin/status") ||
+    request.nextUrl.pathname.startsWith("/api/admin/db-check") ||
+    request.nextUrl.pathname.startsWith("/api/admin/auth-check") ||
+    request.nextUrl.pathname.startsWith("/api/admin/auth-debug");
+
   const isProtectedPage =
-    request.nextUrl.pathname.startsWith("/dashboard") ||
+    (request.nextUrl.pathname.startsWith("/dashboard") ||
     request.nextUrl.pathname.startsWith("/app") ||
-    request.nextUrl.pathname.startsWith("/admin");
+    request.nextUrl.pathname.startsWith("/admin") ||
+    request.nextUrl.pathname.startsWith("/api/admin") ||
+    request.nextUrl.pathname.startsWith("/api/jobs")) && !isDiagnosticRoute;
 
   if (isProtectedPage) {
     if (!session) {

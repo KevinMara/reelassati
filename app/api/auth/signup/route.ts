@@ -16,17 +16,17 @@ export async function POST(request: Request) {
     const { name, email, password } = body;
 
     if (!name || !email || !password) {
-      return NextResponse.json({ ok: false, error: "missing_fields" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
     }
 
     if (password.length < 8) {
-      return NextResponse.json({ ok: false, error: "password_too_short" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
     }
 
     const normalizedEmail = (email as string).toLowerCase().trim();
     
     if (!normalizedEmail.includes("@") || !normalizedEmail.includes(".")) {
-      return NextResponse.json({ ok: false, error: "invalid_email" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
     }
 
     try {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       if (dbError.code === 'P2002') {
          return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
       }
-      return NextResponse.json({ ok: false, error: "database_error", details: dbError.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "auth_database_error", details: dbError.message }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Signup error:", error);
