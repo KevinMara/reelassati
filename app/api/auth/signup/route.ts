@@ -25,11 +25,13 @@ export async function POST(request: Request) {
 
     const normalizedEmail = (email as string).toLowerCase().trim();
     
+    // Basic email validation
     if (!normalizedEmail.includes("@") || !normalizedEmail.includes(".")) {
       return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
     }
 
     try {
+      // Check if user already exists
       const existingUser = await prisma.userProfile.findUnique({
         where: { email: normalizedEmail },
       });
@@ -38,6 +40,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
       }
 
+      // Hash password and create user
       const hash = await hashPassword(password);
 
       const user = await prisma.userProfile.create({
@@ -49,6 +52,7 @@ export async function POST(request: Request) {
         },
       });
 
+      // Create session
       try {
         await createSession(user.id);
       } catch (sessionError) {
@@ -66,6 +70,7 @@ export async function POST(request: Request) {
       });
     } catch (dbError: any) {
       console.error("Database error during signup:", dbError);
+      // Prisma P2002 is Unique constraint violation
       if (dbError.code === 'P2002') {
          return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
       }
@@ -73,8 +78,6 @@ export async function POST(request: Request) {
     }
   } catch (error: any) {
     console.error("Signup exception:", error);
-    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
   }
 }
-
-
