@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const session = await getSession();
     if (!session || !session.userId) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+      return NextResponse.json({ ok: false, user: null });
     }
 
     const user = await prisma.userProfile.findUnique({
