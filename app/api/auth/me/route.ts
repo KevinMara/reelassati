@@ -23,7 +23,8 @@ export async function GET() {
     });
 
     if (!user) {
-      return NextResponse.json({ ok: false, error: "user_not_found" }, { status: 404 });
+      // Session exists but user doesn't - session is orphaned
+      return NextResponse.json({ ok: false, user: null });
     }
 
     return NextResponse.json({
@@ -38,6 +39,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Auth me error:", error);
-    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+    return NextResponse.json({ ok: false, user: null });
   }
 }
