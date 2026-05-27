@@ -1,12 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthLayout, Field, GoogleButton } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
 
 export default function Signup() {
@@ -17,6 +15,18 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/auth-check")
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok && data.auth) {
+          setGoogleEnabled(data.auth.googleAuth);
+        }
+      })
+      .catch(err => console.error("Failed to check auth status", err));
+  }, []);
 
   // crude meter, 0–4
   const strength = (() => {
@@ -32,40 +42,35 @@ export default function Signup() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password: pw,
-        options: {
-          data: {
-            full_name: name,
-          },
-        },
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password: pw }),
       });
-      if (error) {
-        if (error.message.toLowerCase().includes("already registered")) {
-          toast.error(t("auth.toast.already_registered"));
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        if (data.error === "email_already_exists") {
+          toast.error(t("auth.toast.already_registered") || "This email is already registered.");
         } else {
-          toast.error(error.message || t("auth.toast.generic_error"));
+          toast.error(data.error || t("auth.toast.generic_error") || "An error occurred during signup.");
         }
         return;
       }
-      toast.success(t("auth.toast.check_email"));
-      navigate("/auth/login");
+      
+      toast.success(t("auth.toast.signup_success") || "Account created successfully!");
+      navigate("/dashboard");
+    } catch (err) {
+      toast.error(t("auth.toast.generic_error") || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function onGoogle() {
-    setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) {
-      toast.error(t("auth.toast.generic_error"));
-      setLoading(false);
-      return;
-    }
-    if (result.redirected) return;
-    navigate("/");
+  function onGoogle() {
+    if (!googleEnabled) return;
+    window.location.href = "/api/auth/google";
   }
 
   return (
@@ -129,7 +134,11 @@ export default function Signup() {
           <span className="mono-eyebrow text-foreground/40 text-[10px]">{t("auth.signup.or")}</span>
           <div className="flex-1 h-px bg-border" />
         </div>
-        <GoogleButton label={t("auth.signup.google")} onClick={onGoogle} disabled={loading} />
+        <GoogleButton 
+          label={googleEnabled ? t("auth.signup.google") : "Google login not configured yet."} 
+          onClick={onGoogle} 
+          disabled={loading || !googleEnabled} 
+        />
       </form>
     </AuthLayout>
   );

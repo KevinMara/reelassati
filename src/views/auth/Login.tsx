@@ -1,11 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthLayout, Field, GoogleButton } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
 
 export default function Login() {
@@ -15,36 +13,52 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/auth-check")
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok && data.auth) {
+          setGoogleEnabled(data.auth.googleAuth);
+        }
+      })
+      .catch(err => console.error("Failed to check auth status", err));
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
-      if (error) {
-        if (error.message.toLowerCase().includes("invalid")) {
-          toast.error(t("auth.toast.invalid_credentials"));
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: pw }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        if (data.error === "invalid_credentials") {
+          toast.error(t("auth.toast.invalid_credentials") || "Email or password is incorrect.");
         } else {
-          toast.error(error.message || t("auth.toast.generic_error"));
+          toast.error(data.error || t("auth.toast.generic_error") || "An error occurred during login.");
         }
         return;
       }
-      navigate("/");
+      
+      toast.success(t("auth.toast.login_success") || "Successfully logged in!");
+      navigate("/dashboard");
+    } catch (err) {
+      toast.error(t("auth.toast.generic_error") || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function onGoogle() {
-    setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) {
-      toast.error(t("auth.toast.generic_error"));
-      setLoading(false);
-      return;
-    }
-    if (result.redirected) return;
-    navigate("/");
+  function onGoogle() {
+    if (!googleEnabled) return;
+    window.location.href = "/api/auth/google";
   }
 
   return (
@@ -90,7 +104,11 @@ export default function Login() {
         </Button>
 
         <Divider label={t("auth.login.or")} />
-        <GoogleButton label={t("auth.login.google")} onClick={onGoogle} disabled={loading} />
+        <GoogleButton 
+          label={googleEnabled ? t("auth.login.google") : "Google login not configured yet."} 
+          onClick={onGoogle} 
+          disabled={loading || !googleEnabled} 
+        />
       </form>
     </AuthLayout>
   );
