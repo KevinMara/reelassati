@@ -15,4 +15,10 @@ export const getPrisma = () => {
   return globalForPrisma.prisma;
 };
 
-export const prisma = getPrisma();
+// Exporting a getter-proxy for prisma to ensure it's not initialized until accessed
+export const prisma = new Proxy({} as PrismaClient, {
+  get: (target, prop) => {
+    return (getPrisma() as any)[prop];
+  }
+});
+
