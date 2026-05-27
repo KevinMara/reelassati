@@ -22,7 +22,7 @@ import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/Logo";
 import { UsageMeter } from "./UsageMeter";
-import { supabase } from "@/integrations/supabase/client";
+
 import type { AuthedProfile } from "./useAuthedProfile";
 
 type NavItem = {
@@ -74,8 +74,8 @@ export function Sidebar({
     .toUpperCase();
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/";
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/auth/login";
   };
 
   const widthClass = collapsed ? "w-[64px]" : "w-[240px]";
