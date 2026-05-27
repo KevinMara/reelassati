@@ -19,10 +19,20 @@ export async function middleware(request: NextRequest) {
   // Public diagnostic routes - MUST BE EXEMPT FROM AUTH
   const isDiagnosticRoute = 
     pathname === "/api/health" ||
+    pathname === "/api/admin/status" ||
+    pathname === "/api/admin/db-check" ||
+    pathname === "/api/admin/auth-check" ||
+    pathname === "/api/admin/auth-debug" ||
+    pathname.startsWith("/api/health") ||
     pathname.startsWith("/api/admin/status") ||
     pathname.startsWith("/api/admin/db-check") ||
     pathname.startsWith("/api/admin/auth-check") ||
     pathname.startsWith("/api/admin/auth-debug");
+
+  // 1. Allow diagnostic routes regardless of session
+  if (isDiagnosticRoute) {
+    return NextResponse.next();
+  }
 
   // Auth pages (login/signup) should be public
   const isAuthPage = pathname.startsWith("/auth") || pathname.startsWith("/api/auth");
@@ -37,11 +47,6 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/upload")
   );
 
-  // 1. Allow diagnostic routes regardless of session
-  if (isDiagnosticRoute) {
-    return NextResponse.next();
-  }
-
   // 2. Handle protected pages
   if (isProtectedPage) {
     if (!session) {
@@ -53,7 +58,7 @@ export async function middleware(request: NextRequest) {
     try {
       const secret = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
       if (!secret) {
-        // If we have a session but no secret, something is wrong, but let's not block if it's an emergency
+        // If we have a session but no secret, allow diagnostic passage but log
         return NextResponse.next();
       }
       await jwtVerify(session, getKey(), { algorithms: ["HS256"] });
@@ -81,6 +86,7 @@ export async function middleware(request: NextRequest) {
 
   return NextResponse.next();
 }
+
 
 export const config = {
   matcher: [

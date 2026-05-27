@@ -35,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
           <h1 className="text-2xl font-semibold mb-4">Something went wrong.</h1>
           <p className="text-foreground/60 mb-8 max-w-md">
-            We've encountered an unexpected error. Please try reloading the page or go back to home.
+            We've encountered an unexpected error. Please try reloading the page or return home.
           </p>
           
           <div className="flex flex-wrap gap-4 justify-center">
@@ -63,4 +63,3 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
