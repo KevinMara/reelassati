@@ -3,9 +3,12 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { requireAdmin } from "@/lib/admin-guard";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const guard = await requireAdmin();
   if (guard) return guard;
+  
   try {
     const dbCheck = await prisma.$queryRaw`SELECT 1`.catch(() => null);
     
@@ -39,6 +42,6 @@ export async function GET() {
     });
   } catch (error: any) {
     console.error("Auth debug error:", error);
-    return NextResponse.json({ ok: true, databaseConnected: false, error: error.message });
+    return NextResponse.json({ ok: false, databaseConnected: false, error: error.message }, { status: 500 });
   }
 }

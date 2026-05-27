@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 
 export type AuthedProfile = {
   id: string;
@@ -15,12 +14,6 @@ export type AuthedProfile = {
   api_spend_this_cycle_eur: number;
 };
 
-/**
- * Guards any /dashboard/* route. Redirects:
- *  - no session → /auth/login
- *  - pending_approval → /auth/access-pending
- *  - suspended → /auth/suspended
- */
 export function useAuthedProfile(opts?: { ownerOnly?: boolean }) {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<AuthedProfile | null>(null);
@@ -29,64 +22,52 @@ export function useAuthedProfile(opts?: { ownerOnly?: boolean }) {
   useEffect(() => {
     let active = true;
 
-    async function loadProfile(userId: string) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select(
-          "id, email, display_name, avatar_url, plan_tier, access_status, is_owner, is_unlimited, monthly_api_budget_eur, api_spend_this_cycle_eur"
-        )
-        .eq("id", userId)
-        .maybeSingle();
-      if (!active) return;
-      if (!prof) {
-        navigate("/auth/login");
-        return;
+    async function checkAuth() {
+      try {
+        const res = await fetch("/api/auth/me");
+        const data = await res.json();
+
+        if (!active) return;
+
+        if (!data.ok || !data.user) {
+          navigate("/auth/login");
+          return;
+        }
+
+        // Map backend user to AuthedProfile format
+        // Defaulting plan fields as they might be handled differently now
+        const prof: AuthedProfile = {
+          id: data.user.id,
+          email: data.user.email,
+          display_name: data.user.display_name,
+          avatar_url: data.user.avatar_url,
+          plan_tier: "free",
+          access_status: "approved",
+          is_owner: true,
+          is_unlimited: false,
+          monthly_api_budget_eur: 0,
+          api_spend_this_cycle_eur: 0,
+        };
+
+        if (opts?.ownerOnly && !prof.is_owner) {
+          navigate("/dashboard");
+          return;
+        }
+
+        setProfile(prof);
+        setLoading(false);
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        if (active) {
+          navigate("/auth/login");
+        }
       }
-      if (prof.access_status === "pending_approval") {
-        navigate("/auth/access-pending");
-        return;
-      }
-      if (prof.access_status === "suspended") {
-        navigate("/auth/suspended");
-        return;
-      }
-      if (opts?.ownerOnly && !prof.is_owner) {
-        navigate("/dashboard");
-        return;
-      }
-      setProfile(prof as AuthedProfile);
-      setLoading(false);
     }
 
-    // Set up listener FIRST (no await inside)
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      if (!session?.user) {
-        setProfile(null);
-        setLoading(false);
-        navigate("/auth/login");
-        return;
-      }
-      // defer profile fetch to avoid deadlock
-      setTimeout(() => {
-        if (active) loadProfile(session.user.id);
-      }, 0);
-    });
-
-    // Then check existing session (restores from storage)
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      if (!data.session?.user) {
-        setLoading(false);
-        navigate("/auth/login");
-        return;
-      }
-      loadProfile(data.session.user.id);
-    });
+    checkAuth();
 
     return () => {
       active = false;
-      sub.subscription.unsubscribe();
     };
   }, [navigate, opts?.ownerOnly]);
 

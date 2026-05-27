@@ -21,6 +21,9 @@ export async function comparePassword(password: string, hash: string) {
 }
 
 export async function encrypt(payload: any) {
+  const secret = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
+  if (!secret) throw new Error("AUTH_SECRET is not configured");
+  
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -29,6 +32,9 @@ export async function encrypt(payload: any) {
 }
 
 export async function decrypt(input: string): Promise<any> {
+  const secret = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
+  if (!secret) throw new Error("AUTH_SECRET is not configured");
+
   const { payload } = await jwtVerify(input, getKey(), {
     algorithms: ["HS256"],
   });
