@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     try {
       body = await request.json();
     } catch (e) {
-      return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
     }
 
     const { name, email, password } = body;
@@ -49,7 +49,12 @@ export async function POST(request: Request) {
         },
       });
 
-      await createSession(user.id);
+      try {
+        await createSession(user.id);
+      } catch (sessionError) {
+        console.error("Session creation failed during signup:", sessionError);
+        return NextResponse.json({ ok: false, error: "auth_session_error" }, { status: 500 });
+      }
 
       return NextResponse.json({
         ok: true,
@@ -64,16 +69,12 @@ export async function POST(request: Request) {
       if (dbError.code === 'P2002') {
          return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
       }
-      return NextResponse.json({ ok: false, error: "auth_database_error", details: dbError.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Signup exception:", error);
-    return NextResponse.json({ 
-      ok: false, 
-      error: "internal_error", 
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
 }
+
 
