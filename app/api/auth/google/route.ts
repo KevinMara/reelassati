@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-export async function GET() {
+export async function GET(request: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
 
   if (!clientId || !clientSecret || !redirectUri) {
+    // If it's a browser request, redirect to login with error
+    const url = new URL(request.url);
+    if (request.headers.get("accept")?.includes("text/html")) {
+      return NextResponse.redirect(new URL("/auth/login?error=google_not_configured", request.url));
+    }
     return NextResponse.json(
-      { ok: false, error: "google_oauth_not_configured" },
+      { ok: false, error: "google_not_configured" },
       { status: 500 }
     );
   }

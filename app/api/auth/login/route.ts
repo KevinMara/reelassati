@@ -46,10 +46,10 @@ export async function POST(request: Request) {
       });
     } catch (dbError: any) {
       console.error("Database error during login:", dbError);
-      return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Login error:", error);
-    return NextResponse.json({ ok: false, error: "auth_session_error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
 }
