@@ -48,10 +48,12 @@ export function MarketingNav() {
           <ThemeToggle />
           <span className="w-px h-5 bg-border mx-1" aria-hidden />
           <Button asChild variant="nav" size="sm">
-            <Link to="/auth/login">{t("nav.login")}</Link>
+            <a href="/auth/login">{t("nav.login")}</a>
+
           </Button>
           <Button asChild variant="primary" size="sm">
-            <Link to="/auth/signup">{t("nav.start_free")}</Link>
+            <a href="/auth/signup">{t("nav.start_free")}</a>
+
           </Button>
         </div>
 

@@ -68,9 +68,10 @@ export default function Login() {
       footer={
         <>
           {t("auth.login.no_account")}{" "}
-          <Link to="/auth/signup" className="text-primary font-medium hover:underline">
+          <a href="/auth/signup" className="text-primary font-medium hover:underline">
             {t("auth.login.signup_link")}
-          </Link>
+          </a>
+
         </>
       }
     >

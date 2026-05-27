@@ -84,13 +84,14 @@ function Hero() {
 
             <motion.div variants={fadeUp} className="mt-10 flex flex-wrap items-center gap-3">
               <Button asChild variant="primary" size="xl">
-                <Link to="/auth/signup">
+                <a href="/auth/signup">
                   {t("cta.start_free")}
                   <ArrowRight className="h-4 w-4" />
-                </Link>
+                </a>
+
               </Button>
               <Button asChild variant="ghost" size="xl">
-                <Link to="/pricing">{t("cta.view_pricing")}</Link>
+                <a href="/pricing">{t("cta.view_pricing")}</a>
               </Button>
             </motion.div>
           </motion.div>
@@ -363,10 +364,10 @@ function PricingTeaser() {
         />
         <div className="mt-16 flex justify-center">
           <Button asChild variant="primary" size="xl">
-            <Link to="/pricing">
+            <a href="/pricing">
               {t("cta.view_pricing")}
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </a>
           </Button>
         </div>
       </div>
