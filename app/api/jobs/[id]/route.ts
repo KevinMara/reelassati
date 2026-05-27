@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { getSession, isAdminSession } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
+import { isAdminSession } from '@/lib/admin-guard';
 
 export const dynamic = 'force-dynamic';
 
