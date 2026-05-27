@@ -17,30 +17,43 @@ export const SUPPORTED_LANGUAGES = [
   { code: "pt", label: "Português", flag: "🇵🇹", pending: true },
 ] as const;
 
-i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
-    resources: {
-      it: { translation: it },
-      en: { translation: en },
-    },
-    fallbackLng: "it",
-    supportedLngs: ["it", "en"],
-    nonExplicitSupportedLngs: true,
-    interpolation: { escapeValue: false },
-    parseMissingKeyHandler: (key) => {
-      // Return a slightly cleaner version of the key as a last resort
-      const parts = key.split('.');
-      const last = parts[parts.length - 1];
-      return last.charAt(0).toUpperCase() + last.slice(1).replace(/_/g, ' ');
-    },
-    detection: {
-      order: ["localStorage", "navigator", "htmlTag"],
-      caches: ["localStorage"],
-      lookupLocalStorage: "reelassati.lang",
-    },
-  });
+if (typeof window !== "undefined") {
+  i18n
+    .use(LanguageDetector)
+    .use(initReactI18next)
+    .init({
+      resources: {
+        it: { translation: it },
+        en: { translation: en },
+      },
+      fallbackLng: "it",
+      supportedLngs: ["it", "en"],
+      nonExplicitSupportedLngs: true,
+      interpolation: { escapeValue: false },
+      parseMissingKeyHandler: (key) => {
+        const parts = key.split('.');
+        const last = parts[parts.length - 1];
+        return last.charAt(0).toUpperCase() + last.slice(1).replace(/_/g, ' ');
+      },
+      detection: {
+        order: ["localStorage", "navigator", "htmlTag"],
+        caches: ["localStorage"],
+        lookupLocalStorage: "reelassati.lang",
+      },
+    });
+} else {
+  i18n
+    .use(initReactI18next)
+    .init({
+      resources: {
+        it: { translation: it },
+        en: { translation: en },
+      },
+      fallbackLng: "it",
+      supportedLngs: ["it", "en"],
+      interpolation: { escapeValue: false },
+    });
+}
 
 i18n.on("languageChanged", (lng) => {
   if (typeof window === "undefined") return;
