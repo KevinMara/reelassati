@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import nextDynamic from 'next/dynamic';
-import "@/lib/i18n";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const App = nextDynamic(() => import('@/App'), { 
   ssr: false,
@@ -18,5 +18,9 @@ export default function CatchAllPage() {
 
   if (!isClient) return null;
 
-  return <App />;
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
 }

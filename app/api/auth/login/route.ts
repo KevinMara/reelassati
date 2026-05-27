@@ -51,7 +51,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "auth_database_error", details: dbError.message }, { status: 500 });
     }
   } catch (error: any) {
-    console.error("Login error:", error);
-    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+    console.error("Login exception:", error);
+    return NextResponse.json({ 
+      ok: false, 
+      error: "internal_error",
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: 500 });
   }
 }
+
