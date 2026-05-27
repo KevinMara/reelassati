@@ -8,16 +8,8 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: '/api/:path*',
-      },
-      // Note: No general catch-all rewrite here. 
-      // app/[[...slug]]/page.tsx handles other routes in Next.js.
-    ];
-  },
+  // Rewrites removed to avoid conflicts with App Router.
+
 
 };
 
