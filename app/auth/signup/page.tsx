@@ -1,12 +1,13 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 import { BrowserRouter } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const dynamic = 'force-dynamic';
 
-const Signup = dynamic(() => import('@/views/auth/Signup'), { ssr: false });
+const Signup = nextDynamic(() => import('@/views/auth/Signup'), { ssr: false });
+
 
 
 export default function SignupPage() {
