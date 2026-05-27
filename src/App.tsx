@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import "@/lib/i18n";
 import Home from "./views/Home";
+
 import Pricing from "./views/Pricing";
 import Support from "./views/Support";
 import Login from "./views/auth/Login";

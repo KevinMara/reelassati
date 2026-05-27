@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import nextDynamic from 'next/dynamic';
-import "@/lib/i18n";
 
 const App = nextDynamic(() => import('@/App'), { 
   ssr: false,
   loading: () => <div className="min-h-screen flex items-center justify-center">Loading Reelassati...</div>
 });
+
 
 export default function CatchAllPage() {
   const [isClient, setIsClient] = useState(false);
