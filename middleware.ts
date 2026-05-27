@@ -13,6 +13,8 @@ function getKey(): Uint8Array {
 
 export async function middleware(request: NextRequest) {
   const session = request.cookies.get("session")?.value;
+  const isApiRequest = request.nextUrl.pathname.startsWith("/api");
+
 
   const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
   const isProtectedPage =
@@ -22,12 +24,18 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedPage) {
     if (!session) {
+      if (isApiRequest) {
+        return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+      }
       return NextResponse.redirect(new URL("/auth/login", request.url));
     }
     try {
       await jwtVerify(session, getKey(), { algorithms: ["HS256"] });
       return NextResponse.next();
     } catch (e) {
+      if (isApiRequest) {
+        return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+      }
       return NextResponse.redirect(new URL("/auth/login", request.url));
     }
   }
@@ -45,5 +53,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/app/:path*", "/auth/:path*", "/admin/:path*"],
+  matcher: ["/dashboard/:path*", "/app/:path*", "/auth/:path*", "/admin/:path*", "/api/admin/:path*", "/api/jobs/:path*"],
 };

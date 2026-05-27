@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/auth";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     let body;
@@ -23,7 +25,6 @@ export async function POST(request: Request) {
 
     const normalizedEmail = (email as string).toLowerCase().trim();
     
-    // Validate email format basic
     if (!normalizedEmail.includes("@") || !normalizedEmail.includes(".")) {
       return NextResponse.json({ ok: false, error: "invalid_email" }, { status: 400 });
     }
@@ -37,13 +38,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
       }
 
-      const passwordHash = await hashPassword(password);
+      const hash = await hashPassword(password);
 
       const user = await prisma.userProfile.create({
         data: {
           email: normalizedEmail,
           displayName: name,
-          passwordHash,
+          passwordHash: hash,
           authProvider: "email",
         },
       });
@@ -60,7 +61,10 @@ export async function POST(request: Request) {
       });
     } catch (dbError: any) {
       console.error("Database error during signup:", dbError);
-      return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+      if (dbError.code === 'P2002') {
+         return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
+      }
+      return NextResponse.json({ ok: false, error: "database_error", details: dbError.message }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Signup error:", error);

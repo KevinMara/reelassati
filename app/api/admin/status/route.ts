@@ -57,7 +57,6 @@ export async function GET() {
     });
   } catch (error: any) {
     console.error('Critical status route failure:', error);
-    // Never crash, return 500 with JSON if absolutely necessary but the user said "must never crash"
     return NextResponse.json({ 
       ok: false, 
       error: 'internal_server_error',

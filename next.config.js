@@ -8,8 +8,18 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Ensure we don't try to pre-render dynamic routes that depend on client-side state
-  trailingSlash: false,
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: '/api/:path*',
+      },
+      {
+        source: '/:path*',
+        destination: '/',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

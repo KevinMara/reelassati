@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { comparePassword, createSession } from "@/lib/auth";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     let body;
@@ -46,7 +48,7 @@ export async function POST(request: Request) {
       });
     } catch (dbError: any) {
       console.error("Database error during login:", dbError);
-      return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "database_error", details: dbError.message }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Login error:", error);

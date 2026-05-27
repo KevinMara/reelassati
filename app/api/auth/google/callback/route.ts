@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/auth";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
@@ -15,7 +17,6 @@ export async function GET(request: Request) {
     );
   }
 
-  // Clear state cookie
   cookies().delete("google_oauth_state");
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -29,7 +30,6 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Exchange code for tokens
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -51,7 +51,6 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get user info
     const userResponse = await fetch(
       "https://www.googleapis.com/oauth2/v3/userinfo",
       {
@@ -69,13 +68,11 @@ export async function GET(request: Request) {
 
     const email = googleUser.email.toLowerCase();
     
-    // Find or create user
     let user = await prisma.userProfile.findUnique({
       where: { email },
     });
 
     if (user) {
-      // Update existing user with Google info
       user = await prisma.userProfile.update({
         where: { id: user.id },
         data: {
@@ -85,7 +82,6 @@ export async function GET(request: Request) {
         },
       });
     } else {
-      // Create new user
       user = await prisma.userProfile.create({
         data: {
           email,
@@ -97,10 +93,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // Create session
     await createSession(user.id);
-
-    // Redirect to dashboard
     return NextResponse.redirect(new URL("/dashboard", request.url));
   } catch (error) {
     console.error("Google OAuth error:", error);

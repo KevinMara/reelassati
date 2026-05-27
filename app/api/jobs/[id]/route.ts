@@ -9,67 +9,41 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const session = await getSession();
-  if (!session?.userId) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
-
-  const { id } = params;
-  const idStr = String(id || '');
-
-  // Validation
-  if (!idStr) {
-    return NextResponse.json({ ok: false, error: "missing_job_id" }, { status: 400 });
-  }
-
-  // Explicit check for "test" keyword from requirements
-  if (idStr === 'test') {
-    return NextResponse.json({ ok: false, error: "invalid_job_id" }, { status: 400 });
-  }
-
-  // UUID validation (standard UUID + zero UUID)
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const zeroUuid = "00000000-0000-0000-0000-000000000000";
-  const isValidUuid = uuidRegex.test(idStr) || idStr === zeroUuid;
-
-  if (!isValidUuid) {
-    return NextResponse.json({ ok: false, error: "invalid_job_id" }, { status: 400 });
-  }
-
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+    }
+
+    const id = params.id;
     const job = await prisma.job.findUnique({
-      where: { id: idStr },
-      include: { video: { select: { ownerUserId: true } } },
+      where: { id },
+      include: {
+        video: true
+      }
     });
 
     if (!job) {
-      return NextResponse.json({ ok: false, error: "job_not_found" }, { status: 404 });
+      return NextResponse.json({ ok: false, error: 'job_not_found' }, { status: 404 });
     }
 
-    const isOwner = job.video?.ownerUserId === session.userId;
     const isAdmin = await isAdminSession();
-    if (!isOwner && !isAdmin) {
-      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+    if (!isAdmin && job.video?.ownerUserId !== session.userId) {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 });
     }
-
 
     return NextResponse.json({
       ok: true,
       job: {
         id: job.id,
-        job_type: job.jobType,
         status: job.status,
-        error_message: (job as any).errorMessage || null,
-        video_id: job.videoId,
-        created_at: job.createdAt,
-        started_at: (job as any).startedAt || null,
-        completed_at: (job as any).completedAt || null,
-        output: job.result || job.payload || {}
+        jobType: job.jobType,
+        result: job.result,
+        createdAt: job.createdAt
       }
     });
-  } catch (dbError: any) {
-    // Real error logged server-side only as requested
-    console.error(`Production Database Error fetching job ${idStr}:`, dbError);
-    return NextResponse.json({ ok: false, error: "database_error" }, { status: 500 });
+  } catch (error: any) {
+    console.error('Job fetch error:', error);
+    return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 });
   }
 }
