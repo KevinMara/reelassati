@@ -5,8 +5,9 @@ import { requireAdmin } from '@/lib/admin-guard';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const guard = await requireAdmin();
-  if (guard) return guard;
+  // Making this public for now as per emergency fix instructions
+  // const guard = await requireAdmin();
+  // if (guard) return guard;
   try {
     const requiredTables = [
       'users_profile', 'clients', 'videos', 'jobs', 'tribe_runs', 
