@@ -16,7 +16,7 @@ export async function GET() {
     const columns = await prisma.$queryRaw<any[]>`
       SELECT column_name 
       FROM information_schema.columns 
-      WHERE table_name = 'users_profile'
+      WHERE table_schema = 'public' AND table_name = 'users_profile'
     `.catch(() => []);
     
     const columnNames = columns.map((c: any) => c.column_name);

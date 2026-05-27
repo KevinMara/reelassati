@@ -60,7 +60,11 @@ export async function POST(request: Request) {
       });
     } catch (dbError: any) {
       console.error("Database error during signup:", dbError);
-      return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+      // Detailed error for debugging but keeping it "clean" as requested
+      if (dbError.code === 'P2002') {
+         return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
+      }
+      return NextResponse.json({ ok: false, error: "database_error", details: dbError.message }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Signup error:", error);
