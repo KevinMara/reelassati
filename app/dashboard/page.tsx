@@ -1,14 +1,14 @@
 'use client';
 
-import Settings from '@/views/dashboard/Settings';
+import DashboardHome from '@/views/dashboard/DashboardHome';
 import { BrowserRouter } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-export default function AdminSettingsPage() {
+export default function DashboardPage() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <Settings />
+        <DashboardHome />
       </BrowserRouter>
     </ErrorBoundary>
   );

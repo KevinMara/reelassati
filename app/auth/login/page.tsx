@@ -1,14 +1,15 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import Login from '@/views/auth/Login';
+import { BrowserRouter } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-
-const App = dynamic(() => import('@/App'), { ssr: false });
 
 export default function LoginPage() {
   return (
     <ErrorBoundary>
-      <App />
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

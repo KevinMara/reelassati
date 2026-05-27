@@ -1,14 +1,15 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import Signup from '@/views/auth/Signup';
+import { BrowserRouter } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-
-const App = dynamic(() => import('@/App'), { ssr: false });
 
 export default function SignupPage() {
   return (
     <ErrorBoundary>
-      <App />
+      <BrowserRouter>
+        <Signup />
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }
