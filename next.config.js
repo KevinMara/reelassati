@@ -14,12 +14,11 @@ const nextConfig = {
         source: '/api/:path*',
         destination: '/api/:path*',
       },
-      {
-        source: '/:path*',
-        destination: '/',
-      },
+      // Note: No general catch-all rewrite here. 
+      // app/[[...slug]]/page.tsx handles other routes in Next.js.
     ];
   },
+
 };
 
 module.exports = nextConfig;

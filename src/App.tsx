@@ -57,6 +57,8 @@ const App = () => (
         <Route path="/dashboard/calendar" element={<CalendarPage />} />
         <Route path="/dashboard/social-accounts" element={<SocialAccounts />} />
         <Route path="/dashboard/settings" element={<SettingsPage />} />
+        <Route path="/admin/settings" element={<SettingsPage />} />
+
         <Route path="/upload" element={<VideoUploadFlow />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
