@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const { email, password } = body;
 
     if (!email || !password) {
-      return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
     }
 
     const normalizedEmail = (email as string).toLowerCase().trim();
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         where: { email: normalizedEmail },
       });
 
-      if (!user || !user.passwordHash) {
+      if (!user || !user.passwordHash || user.authProvider !== "email") {
         return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
       }
 
@@ -57,8 +57,6 @@ export async function POST(request: Request) {
     }
   } catch (error: any) {
     console.error("Login exception:", error);
-    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
   }
 }
-
-
