@@ -1,6 +1,6 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import LanguageDetector from "i18next-browser-languagedetector";
+
 
 import it from "./locales/it";
 import en from "./locales/en";
@@ -17,31 +17,46 @@ export const SUPPORTED_LANGUAGES = [
   { code: "pt", label: "Português", flag: "🇵🇹", pending: true },
 ] as const;
 
-if (typeof window !== "undefined") {
-  i18n
-    .use(LanguageDetector)
-    .use(initReactI18next)
-    .init({
-      resources: {
-        it: { translation: it },
-        en: { translation: en },
-      },
-      fallbackLng: "it",
-      supportedLngs: ["it", "en"],
-      nonExplicitSupportedLngs: true,
-      interpolation: { escapeValue: false },
-      parseMissingKeyHandler: (key) => {
-        const parts = key.split('.');
-        const last = parts[parts.length - 1];
-        return last.charAt(0).toUpperCase() + last.slice(1).replace(/_/g, ' ');
-      },
-      detection: {
-        order: ["localStorage", "navigator", "htmlTag"],
-        caches: ["localStorage"],
-        lookupLocalStorage: "reelassati.lang",
-      },
-    });
+const isBrowser = typeof window !== "undefined";
+
+if (isBrowser) {
+  // Use a dynamic import for the browser-only detector to avoid server-side crashes
+  import("i18next-browser-languagedetector").then((module) => {
+    const LanguageDetector = module.default;
+    i18n
+      .use(LanguageDetector)
+      .use(initReactI18next)
+      .init({
+        resources: {
+          it: { translation: it },
+          en: { translation: en },
+        },
+        fallbackLng: "it",
+        supportedLngs: ["it", "en"],
+        nonExplicitSupportedLngs: true,
+        interpolation: { escapeValue: false },
+        parseMissingKeyHandler: (key) => {
+          const parts = key.split('.');
+          const last = parts[parts.length - 1];
+          return last.charAt(0).toUpperCase() + last.slice(1).replace(/_/g, ' ');
+        },
+        detection: {
+          order: ["localStorage", "navigator", "htmlTag"],
+          caches: ["localStorage"],
+          lookupLocalStorage: "reelassati.lang",
+        },
+      });
+  });
+
+  i18n.on("languageChanged", (lng) => {
+    const base = lng.split("-")[0];
+    if (document.documentElement) {
+      document.documentElement.lang = base;
+      document.documentElement.dir = ["ar", "he", "fa"].includes(base) ? "rtl" : "ltr";
+    }
+  });
 } else {
+  // Server-side initialization (minimal)
   i18n
     .use(initReactI18next)
     .init({
@@ -52,14 +67,8 @@ if (typeof window !== "undefined") {
       fallbackLng: "it",
       supportedLngs: ["it", "en"],
       interpolation: { escapeValue: false },
+      react: { useSuspense: false }
     });
 }
-
-i18n.on("languageChanged", (lng) => {
-  if (typeof window === "undefined") return;
-  const base = lng.split("-")[0];
-  document.documentElement.lang = base;
-  document.documentElement.dir = ["ar", "he", "fa"].includes(base) ? "rtl" : "ltr";
-});
 
 export default i18n;
