@@ -4,13 +4,13 @@ import dynamic from 'next/dynamic';
 import { NextRouteAdapter } from '@/components/routing/NextRouteAdapter';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-const Login = dynamic(() => import('@/views/auth/Login'), { ssr: false });
+const Home = dynamic(() => import('@/views/Home'), { ssr: false });
 
-export default function LoginPage() {
+export default function RootPage() {
   return (
     <ErrorBoundary>
       <NextRouteAdapter>
-        <Login />
+        <Home />
       </NextRouteAdapter>
     </ErrorBoundary>
   );
