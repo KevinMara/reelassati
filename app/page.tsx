@@ -1,8 +1,10 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import Home from '@/views/Home';
 import { BrowserRouter } from 'react-router-dom';
+
+const Home = dynamic(() => import('@/views/Home'), { ssr: false });
 
 export default function RootPage() {
   return (
@@ -13,3 +15,4 @@ export default function RootPage() {
     </ErrorBoundary>
   );
 }
+

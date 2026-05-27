@@ -1,8 +1,10 @@
 'use client';
 
-import DashboardHome from '@/views/dashboard/DashboardHome';
+import dynamic from 'next/dynamic';
 import { BrowserRouter } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+const DashboardHome = dynamic(() => import('@/views/dashboard/DashboardHome'), { ssr: false });
 
 export default function DashboardPage() {
   return (
@@ -13,3 +15,4 @@ export default function DashboardPage() {
     </ErrorBoundary>
   );
 }
+
