@@ -48,7 +48,7 @@ export default function Login() {
       }
       
       toast.success(t("auth.toast.login_success") || "Successfully logged in!");
-      navigate("/dashboard");
+      window.location.href = "/dashboard";
     } catch (err) {
       toast.error(t("auth.toast.generic_error") || "An unexpected error occurred.");
     } finally {

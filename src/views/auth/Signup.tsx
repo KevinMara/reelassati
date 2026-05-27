@@ -60,7 +60,7 @@ export default function Signup() {
       }
       
       toast.success(t("auth.toast.signup_success") || "Account created successfully!");
-      navigate("/dashboard");
+      window.location.href = "/dashboard";
     } catch (err) {
       toast.error(t("auth.toast.generic_error") || "An unexpected error occurred.");
     } finally {

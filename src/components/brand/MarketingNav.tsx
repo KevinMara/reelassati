@@ -21,7 +21,7 @@ export function MarketingNav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => setOpen(false), [location?.pathname]);
 
   return (
     <header
