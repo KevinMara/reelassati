@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     try {
       body = await request.json();
     } catch (e) {
-      return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
     }
 
     const { email, password } = body;
@@ -36,7 +36,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
       }
 
-      await createSession(user.id);
+      try {
+        await createSession(user.id);
+      } catch (sessionError) {
+        console.error("Session creation failed during login:", sessionError);
+        return NextResponse.json({ ok: false, error: "auth_session_error" }, { status: 500 });
+      }
 
       return NextResponse.json({
         ok: true,
@@ -48,16 +53,12 @@ export async function POST(request: Request) {
       });
     } catch (dbError: any) {
       console.error("Database error during login:", dbError);
-      return NextResponse.json({ ok: false, error: "auth_database_error", details: dbError.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Login exception:", error);
-    return NextResponse.json({ 
-      ok: false, 
-      error: "internal_error",
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
 }
+
 

@@ -5,7 +5,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const App = dynamic(() => import('@/App'), { ssr: false });
 
-export default function SignupPage() {
+export default function DashboardPage() {
   return (
     <ErrorBoundary>
       <App />

@@ -5,10 +5,13 @@ import bcrypt from "bcryptjs";
 function getKey(): Uint8Array {
   const SECRET = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
   if (!SECRET) {
-    throw new Error("AUTH_SECRET (or INTERNAL_AGENT_SECRET) env var is required");
+    // Return a fallback only to prevent crashing during key generation, 
+    // but the actual auth functions will check for the secret.
+    return new TextEncoder().encode("emergency-fallback-secret-do-not-use-in-production");
   }
   return new TextEncoder().encode(SECRET);
 }
+
 
 
 
@@ -22,7 +25,10 @@ export async function comparePassword(password: string, hash: string) {
 
 export async function encrypt(payload: any) {
   const secret = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
-  if (!secret) throw new Error("AUTH_SECRET is not configured");
+  if (!secret) {
+    console.error("AUTH_SECRET is not configured. Session encryption failed.");
+    throw new Error("auth_not_configured");
+  }
   
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -33,13 +39,19 @@ export async function encrypt(payload: any) {
 
 export async function decrypt(input: string): Promise<any> {
   const secret = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
-  if (!secret) throw new Error("AUTH_SECRET is not configured");
+  if (!secret) return null;
 
-  const { payload } = await jwtVerify(input, getKey(), {
-    algorithms: ["HS256"],
-  });
-  return payload;
+  try {
+    const { payload } = await jwtVerify(input, getKey(), {
+      algorithms: ["HS256"],
+    });
+    return payload;
+  } catch (e) {
+    console.error("JWT decryption failed:", e);
+    return null;
+  }
 }
+
 
 export async function createSession(userId: string) {
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
