@@ -40,6 +40,8 @@ export default function Signup() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!name || !email || !pw) return;
+    
     setLoading(true);
     try {
       const response = await fetch("/api/auth/signup", {
@@ -48,21 +50,30 @@ export default function Signup() {
         body: JSON.stringify({ name, email, password: pw }),
       });
       
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error("Invalid server response");
+      }
       
       if (!response.ok) {
         if (data.error === "email_already_exists") {
-          toast.error(t("auth.toast.already_registered") || "This email is already registered.");
+          toast.error(t("auth.toast.already_registered") || "This email already has an account.");
+        } else if (data.error === "invalid_input") {
+          toast.error("Please check your input. Password must be at least 8 characters.");
         } else {
-          toast.error(data.error || t("auth.toast.generic_error") || "An error occurred during signup.");
+          toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
         }
         return;
       }
       
       toast.success(t("auth.toast.signup_success") || "Account created successfully!");
+      // Force reload to dashboard to ensure session is picked up by middleware
       window.location.href = "/dashboard";
     } catch (err) {
-      toast.error(t("auth.toast.generic_error") || "An unexpected error occurred.");
+      console.error("Signup fetch error:", err);
+      toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
     } finally {
       setLoading(false);
     }
@@ -80,9 +91,9 @@ export default function Signup() {
       footer={
         <>
           {t("auth.signup.have_account")}{" "}
-          <a href="/auth/login" className="text-primary font-medium hover:underline">
+          <Link to="/auth/login" className="text-primary font-medium hover:underline">
             {t("auth.signup.login_link")}
-          </a>
+          </Link>
         </>
       }
     >

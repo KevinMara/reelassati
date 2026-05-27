@@ -28,6 +28,8 @@ export default function Login() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!email || !pw) return;
+    
     setLoading(true);
     try {
       const response = await fetch("/api/auth/login", {
@@ -36,21 +38,28 @@ export default function Login() {
         body: JSON.stringify({ email, password: pw }),
       });
       
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error("Invalid server response");
+      }
       
       if (!response.ok) {
         if (data.error === "invalid_credentials") {
           toast.error(t("auth.toast.invalid_credentials") || "Email or password is incorrect.");
         } else {
-          toast.error(data.error || t("auth.toast.generic_error") || "An error occurred during login.");
+          toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
         }
         return;
       }
       
       toast.success(t("auth.toast.login_success") || "Successfully logged in!");
+      // Force reload to dashboard to ensure session is picked up by middleware
       window.location.href = "/dashboard";
     } catch (err) {
-      toast.error(t("auth.toast.generic_error") || "An unexpected error occurred.");
+      console.error("Login fetch error:", err);
+      toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
     } finally {
       setLoading(false);
     }
@@ -68,15 +77,23 @@ export default function Login() {
       footer={
         <>
           {t("auth.login.no_account")}{" "}
-          <a href="/auth/signup" className="text-primary font-medium hover:underline">
+          <Link to="/auth/signup" className="text-primary font-medium hover:underline">
             {t("auth.login.signup_link")}
-          </a>
-
+          </Link>
         </>
       }
     >
       <form className="space-y-5" onSubmit={onSubmit}>
-        <Field name="email" type="email" label={t("auth.login.email")} required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
+        <Field 
+          name="email" 
+          type="email" 
+          label={t("auth.login.email")} 
+          required 
+          autoComplete="email" 
+          value={email} 
+          onChange={(e) => setEmail(e.target.value)} 
+          disabled={loading} 
+        />
         <div>
           <Field
             name="password"
@@ -88,7 +105,12 @@ export default function Login() {
             onChange={(e) => setPw(e.target.value)}
             disabled={loading}
             rightSlot={
-              <button type="button" onClick={() => setShow((s) => !s)} className="text-foreground/50 hover:text-foreground transition-colors" aria-label={show ? t("auth.hide") : t("auth.show")}>
+              <button 
+                type="button" 
+                onClick={() => setShow((s) => !s)} 
+                className="text-foreground/50 hover:text-foreground transition-colors" 
+                aria-label={show ? t("auth.hide") : t("auth.show")}
+              >
                 {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             }

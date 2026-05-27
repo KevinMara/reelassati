@@ -1,13 +1,27 @@
 import { AppShell } from "@/components/app/AppShell";
 import { useAuthedProfile } from "@/components/app/useAuthedProfile";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 
 export default function DashboardHome() {
   const { profile } = useAuthedProfile();
   
+  const onLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/auth/login";
+  };
+  
   return (
     <AppShell>
       <div className="p-8 space-y-4">
-        <h1 className="text-3xl font-bold">Welcome, {profile?.display_name || profile?.email}</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Welcome, {profile?.display_name || profile?.email}</h1>
+          <Button variant="outline" size="sm" onClick={onLogout} className="gap-2">
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
+        
         <p className="text-foreground/60">Your Reelassati dashboard is ready.</p>
         
         <div className="grid gap-6 md:grid-cols-3 mt-8">
