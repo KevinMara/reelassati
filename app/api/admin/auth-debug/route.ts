@@ -1,64 +1,68 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { SignJWT } from "jose";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  try {
-    let usersProfileHasPasswordHash = false;
-    let usersProfileHasAuthProvider = false;
-    let usersProfileHasGoogleId = false;
-    let usersProfileHasAvatarUrl = false;
-    let usersProfileHasUpdatedAt = false;
-    let databaseConnected = false;
+  const debugInfo: any = {
+    ok: true,
+    databaseConnected: false,
+    usersProfileColumns: {
+      id: false,
+      email: false,
+      display_name: false,
+      password_hash: false,
+      auth_provider: false,
+      created_at: false,
+      updated_at: false
+    },
+    authSecretConfigured: !!(process.env.AUTH_SECRET),
+    internalAgentSecretConfigured: !!(process.env.INTERNAL_AGENT_SECRET),
+    bcryptAvailable: typeof bcrypt?.hash === 'function',
+    joseAvailable: typeof SignJWT === 'function',
+    databaseUrlConfigured: !!(process.env.DATABASE_URL),
+    postgresUrlConfigured: !!(process.env.POSTGRES_URL)
+  };
 
-    try {
-      // Check column existence
+  try {
+    // Check database connection with a timeout
+    const dbCheck = await Promise.race([
+      prisma.$queryRaw`SELECT 1 as connected`,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Database timeout")), 5000))
+    ]) as any[];
+
+    if (dbCheck && dbCheck[0]?.connected === 1) {
+      debugInfo.databaseConnected = true;
+
+      // Check columns in users_profile table
+      // We check both public schema specifically to avoid ambiguity
       const columns: any[] = await prisma.$queryRaw`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'users_profile'
+        AND table_schema = 'public'
       `;
-      const columnNames = columns.map(c => c.column_name);
-      
-      usersProfileHasPasswordHash = columnNames.includes('password_hash');
-      usersProfileHasAuthProvider = columnNames.includes('auth_provider');
-      usersProfileHasGoogleId = columnNames.includes('google_id');
-      usersProfileHasAvatarUrl = columnNames.includes('avatar_url');
-      usersProfileHasUpdatedAt = columnNames.includes('updated_at');
-      databaseConnected = true;
-    } catch (e) {
-      console.error("Database check failed in auth-debug:", e);
+
+      if (columns && Array.isArray(columns)) {
+        const columnNames = columns.map(c => c.column_name.toLowerCase());
+        debugInfo.usersProfileColumns = {
+          id: columnNames.includes('id'),
+          email: columnNames.includes('email'),
+          display_name: columnNames.includes('display_name'),
+          password_hash: columnNames.includes('password_hash'),
+          auth_provider: columnNames.includes('auth_provider'),
+          created_at: columnNames.includes('created_at'),
+          updated_at: columnNames.includes('updated_at')
+        };
+      }
     }
-
-    const googleClientIdConfigured = !!process.env.GOOGLE_CLIENT_ID;
-    const googleClientSecretConfigured = !!process.env.GOOGLE_CLIENT_SECRET;
-    const googleRedirectUriConfigured = !!process.env.GOOGLE_REDIRECT_URI;
-    const authSecretConfigured = !!(process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET);
-    
-    let passwordHashLibraryAvailable = false;
-    try {
-      const dummy = await bcrypt.hash("test", 10);
-      passwordHashLibraryAvailable = !!dummy;
-    } catch (e) {}
-
-    return NextResponse.json({
-      ok: true,
-      databaseConnected,
-      usersProfileHasPasswordHash,
-      usersProfileHasAuthProvider,
-      usersProfileHasGoogleId,
-      usersProfileHasAvatarUrl,
-      usersProfileHasUpdatedAt,
-      authSecretConfigured,
-      passwordHashLibraryAvailable,
-      googleClientIdConfigured,
-      googleClientSecretConfigured,
-      googleRedirectUriConfigured,
-      googleAuthConfigured: googleClientIdConfigured && googleClientSecretConfigured && googleRedirectUriConfigured
-    });
-  } catch (error) {
-    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+  } catch (error: any) {
+    console.error("[AUTH-DEBUG] Database check failed:", error.message);
+    debugInfo.databaseConnected = false;
+    debugInfo.error = error.message;
   }
+
+  return NextResponse.json(debugInfo);
 }
