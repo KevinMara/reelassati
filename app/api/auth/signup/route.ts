@@ -22,6 +22,14 @@ function cleanName(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isDuplicateEmail(error: any) {
+  return (
+    error?.code === "P2002" ||
+    error?.meta?.code === "23505" ||
+    String(error?.message || "").includes("duplicate key")
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     await ensureAuthSchema();
@@ -50,12 +58,36 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 12);
 
     const created = await prisma.$queryRaw<UserRow[]>`
-      INSERT INTO users_profile (id, email, display_name, password_hash, auth_provider, updated_at)
-      VALUES (${id}::uuid, ${email}, ${name}, ${passwordHash}, 'email', now())
+      INSERT INTO users_profile (
+        id,
+        email,
+        display_name,
+        password_hash,
+        auth_provider,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${id}::uuid,
+        ${email},
+        ${name},
+        ${passwordHash},
+        'email',
+        now(),
+        now()
+      )
       RETURNING id::text, email, display_name
     `;
 
     const user = created[0];
+
+    if (!user?.id) {
+      return NextResponse.json(
+        { ok: false, error: "auth_database_error", message: "user_not_created" },
+        { status: 500 }
+      );
+    }
+
     const token = await createSessionToken(user);
 
     const response = NextResponse.json({ ok: true, user });
@@ -68,7 +100,7 @@ export async function POST(request: NextRequest) {
       meta: error?.meta,
     });
 
-    if (error?.code === "P2002" || error?.code === "23505") {
+    if (isDuplicateEmail(error)) {
       return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
     }
 
@@ -76,11 +108,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "auth_schema_error", code: "P2022" }, { status: 500 });
     }
 
-    return NextResponse.json({
-      ok: false,
-      error: "auth_database_error",
-      code: error?.code || null,
-      message: error?.message || null
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "auth_database_error",
+        code: error?.code || null,
+        dbCode: error?.meta?.code || null,
+        message: error?.message || null
+      },
+      { status: 500 }
+    );
   }
 }
