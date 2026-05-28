@@ -1,33 +1,48 @@
-import { NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
+import { readSessionToken, SESSION_COOKIE } from "@/lib/auth-session";
 
-export async function GET() {
+export const runtime = "nodejs";
+
+type UserRow = {
+  id: string;
+  email: string;
+  display_name: string | null;
+};
+
+export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
+    await ensureAuthSchema();
 
-    if (!session || !session.userId) {
+    const token = request.cookies.get(SESSION_COOKIE)?.value;
+    const session = await readSessionToken(token);
+
+    if (!session) {
       return NextResponse.json({ ok: false, user: null });
     }
 
-    const user = await prisma.userProfile.findUnique({
-      where: { userId: session.userId },
-    });
+    const rows = await prisma.$queryRaw<UserRow[]>`
+      SELECT id::text, email, display_name
+      FROM users_profile
+      WHERE id = ${session.id}::uuid
+      LIMIT 1
+    `;
+
+    const user = rows[0];
 
     if (!user) {
       return NextResponse.json({ ok: false, user: null });
     }
 
-    return NextResponse.json({
-      ok: true,
-      user: {
-        id: user.userId,
-        email: user.email,
-        display_name: user.displayName,
-      },
-    });
+    return NextResponse.json({ ok: true, user });
   } catch (error: any) {
-    console.error("Auth me error:", error);
-    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+    console.error("Me error:", {
+      code: error?.code,
+      message: error?.message,
+      meta: error?.meta,
+    });
+
+    return NextResponse.json({ ok: false, user: null });
   }
 }
