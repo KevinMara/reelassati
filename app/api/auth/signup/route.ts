@@ -1,6 +1,5 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth-session";
@@ -54,7 +53,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
     }
 
-    const id = randomUUID();
     const passwordHash = await bcrypt.hash(password, 12);
 
     const created = await prisma.$queryRaw<UserRow[]>`
@@ -68,7 +66,7 @@ export async function POST(request: NextRequest) {
         updated_at
       )
       VALUES (
-        ${id}::uuid,
+        gen_random_uuid(),
         ${email},
         ${name},
         ${passwordHash},
