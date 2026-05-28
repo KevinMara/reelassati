@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { comparePassword, createSession } from "@/lib/auth";
+import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    // Ensure schema is up to date before any operation
+    await ensureAuthSchema();
+
     let body;
     try {
       body = await request.json();
@@ -53,7 +57,17 @@ export async function POST(request: Request) {
       });
     } catch (dbError: any) {
       console.error("Database error during login:", dbError);
-      return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
+      
+      // Prisma P2022 is Column does not exist
+      if (dbError.code === 'P2022') {
+        return NextResponse.json({ 
+          ok: false, 
+          error: "auth_schema_error", 
+          code: "P2022" 
+        }, { status: 500 });
+      }
+
+      return NextResponse.json({ ok: false, error: "auth_database_error", code: dbError.code }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Login exception:", error);

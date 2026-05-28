@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    // Ensure schema is up to date
+    await ensureAuthSchema();
+
     const session = await getSession();
     if (!session || !session.userId) {
       return NextResponse.json({ ok: false, user: null });
