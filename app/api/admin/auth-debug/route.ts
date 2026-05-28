@@ -15,6 +15,8 @@ export async function GET() {
       display_name: false,
       password_hash: false,
       auth_provider: false,
+      google_id: false,
+      avatar_url: false,
       created_at: false,
       updated_at: false
     },
@@ -37,7 +39,6 @@ export async function GET() {
       debugInfo.databaseConnected = true;
 
       // Check columns in users_profile table
-      // We check both public schema specifically to avoid ambiguity
       const columns: any[] = await prisma.$queryRaw`
         SELECT column_name 
         FROM information_schema.columns 
@@ -53,6 +54,8 @@ export async function GET() {
           display_name: columnNames.includes('display_name'),
           password_hash: columnNames.includes('password_hash'),
           auth_provider: columnNames.includes('auth_provider'),
+          google_id: columnNames.includes('google_id'),
+          avatar_url: columnNames.includes('avatar_url'),
           created_at: columnNames.includes('created_at'),
           updated_at: columnNames.includes('updated_at')
         };

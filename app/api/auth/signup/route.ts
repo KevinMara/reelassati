@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/auth";
+import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    // Ensure schema is up to date before any operation
+    await ensureAuthSchema();
+
     let body;
     try {
       body = await request.json();
@@ -87,6 +91,15 @@ export async function POST(request: Request) {
       // Prisma P2002 is Unique constraint violation
       if (dbError.code === 'P2002') {
          return NextResponse.json({ ok: false, error: "email_already_exists", code: dbError.code }, { status: 409 });
+      }
+      
+      // Prisma P2022 is Column does not exist
+      if (dbError.code === 'P2022') {
+        return NextResponse.json({ 
+          ok: false, 
+          error: "auth_schema_error", 
+          code: "P2022" 
+        }, { status: 500 });
       }
       
       return NextResponse.json({ 
