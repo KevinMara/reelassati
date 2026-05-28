@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth-session";
@@ -45,11 +46,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
     }
 
+    const id = randomUUID();
     const passwordHash = await bcrypt.hash(password, 12);
 
     const created = await prisma.$queryRaw<UserRow[]>`
-      INSERT INTO users_profile (email, display_name, password_hash, auth_provider, updated_at)
-      VALUES (${email}, ${name}, ${passwordHash}, 'email', now())
+      INSERT INTO users_profile (id, email, display_name, password_hash, auth_provider, updated_at)
+      VALUES (${id}::uuid, ${email}, ${name}, ${passwordHash}, 'email', now())
       RETURNING id::text, email, display_name
     `;
 
@@ -74,6 +76,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "auth_schema_error", code: "P2022" }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
+    return NextResponse.json({
+      ok: false,
+      error: "auth_database_error",
+      code: error?.code || null,
+      message: error?.message || null
+    }, { status: 500 });
   }
 }
