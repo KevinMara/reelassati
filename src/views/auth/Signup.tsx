@@ -4,11 +4,9 @@ import { useToast } from "@/components/ui/use-toast";
 import AuthShell from "./AuthShell";
 import Field from "./Field";
 import LoaderDots from "@/components/brand/LoaderDots";
-import { useI18n } from "@/lib/i18n";
 
 export default function Signup() {
-  const { t } = useI18n();
-  const { toast } = useToast();
+    const { toast } = useToast();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ name: "", email: "", password: "", accepted: false });
@@ -70,36 +68,36 @@ export default function Signup() {
 
   return (
     <AuthShell
-      title={t("auth.signup.title")}
-      sub={t("auth.signup.sub")}
+      title={"Crea il tuo account."}
+      sub={"Solo è gratis, per sempre."}
       footer={
         <>
-          {t("auth.signup.has_account")}{" "}
+          {"Hai già un account?"}{" "}
           <Link to="/auth/login" className="text-primary">
-            {t("auth.signup.login_link")}
+            {"Accedi"}
           </Link>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-5" data-auth-version="email-api-v3">
-        <Field name="name" label={t("auth.signup.name")} autoComplete="name" value={form.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value)} required />
-        <Field name="email" label={t("auth.signup.email")} type="email" autoComplete="email" value={form.email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("email", e.target.value)} required />
-        <Field name="password" label={t("auth.signup.password")} type="password" autoComplete="new-password" value={form.password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("password", e.target.value)} required minLength={8} />
+        <Field name="name" label={"Nome"} autoComplete="name" value={form.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("name", e.target.value)} required />
+        <Field name="email" label={"Email"} type="email" autoComplete="email" value={form.email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("email", e.target.value)} required />
+        <Field name="password" label={"Password"} type="password" autoComplete="new-password" value={form.password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("password", e.target.value)} required minLength={8} />
 
         <label className="flex items-start gap-3 text-sm text-muted-foreground">
           <input type="checkbox" checked={form.accepted} onChange={(e) => update("accepted", e.target.checked)} className="mt-1 h-5 w-5 accent-primary" />
-          <span>{t("auth.signup.terms")}</span>
+          <span>{"Iscrivendoti accetti i Termini e l'Informativa privacy."}</span>
         </label>
 
         {errorText ? <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-200">{errorText}</div> : null}
 
         <button type="submit" className="btn-hero w-full" disabled={loading}>
-          {loading ? <LoaderDots /> : t("auth.signup.submit")}
+          {loading ? <LoaderDots /> : "Crea account"}
         </button>
 
         <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground/60">
           <span className="h-px flex-1 bg-border" />
-          {t("auth.signup.or")}
+          {"OPPURE"}
           <span className="h-px flex-1 bg-border" />
         </div>
 
@@ -110,3 +108,4 @@ export default function Signup() {
     </AuthShell>
   );
 }
+

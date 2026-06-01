@@ -4,11 +4,9 @@ import { useToast } from "@/components/ui/use-toast";
 import AuthShell from "./AuthShell";
 import Field from "./Field";
 import LoaderDots from "@/components/brand/LoaderDots";
-import { useI18n } from "@/lib/i18n";
 
 export default function Login() {
-  const { t } = useI18n();
-  const { toast } = useToast();
+    const { toast } = useToast();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ email: "", password: "" });
@@ -54,30 +52,30 @@ export default function Login() {
 
   return (
     <AuthShell
-      title={t("auth.login.title")}
-      sub={t("auth.login.sub")}
+      title={"Accedi al tuo account."}
+      sub={"Bentornato su Reelassati."}
       footer={
         <>
-          {t("auth.login.no_account")}{" "}
+          {"Non hai un account?"}{" "}
           <Link to="/auth/signup" className="text-primary">
-            {t("auth.login.signup_link")}
+            {"Crea account"}
           </Link>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-5" data-auth-version="email-api-v3">
-        <Field name="email" label={t("auth.login.email")} type="email" autoComplete="email" value={form.email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, email: e.target.value }))} required />
-        <Field name="password" label={t("auth.login.password")} type="password" autoComplete="current-password" value={form.password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, password: e.target.value }))} required />
+        <Field name="email" label={"Email"} type="email" autoComplete="email" value={form.email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, email: e.target.value }))} required />
+        <Field name="password" label={"Password"} type="password" autoComplete="current-password" value={form.password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, password: e.target.value }))} required />
 
         {errorText ? <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-200">{errorText}</div> : null}
 
         <button type="submit" className="btn-hero w-full" disabled={loading}>
-          {loading ? <LoaderDots /> : t("auth.login.submit")}
+          {loading ? <LoaderDots /> : "Accedi"}
         </button>
 
         <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground/60">
           <span className="h-px flex-1 bg-border" />
-          {t("auth.login.or")}
+          {"OPPURE"}
           <span className="h-px flex-1 bg-border" />
         </div>
 
@@ -88,3 +86,4 @@ export default function Login() {
     </AuthShell>
   );
 }
+
