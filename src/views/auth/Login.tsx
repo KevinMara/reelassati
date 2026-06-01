@@ -1,107 +1,144 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { AuthLayout, Field, GoogleButton } from "@/components/auth/AuthLayout";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
-import { toast } from "sonner";
+import { useToast } from "@/components/ui/use-toast";
+import AuthShell from "./AuthShell";
+import Field from "./Field";
+import GoogleButton from "./GoogleButton";
+import LoaderDots from "@/components/brand/LoaderDots";
+import { useI18n } from "@/lib/i18n";
+
+function getLoginMessage(code: string) {
+  if (code === "invalid_credentials") return "Email or password is incorrect.";
+  if (code === "invalid_input") return "Enter email and password.";
+  if (code === "auth_schema_error") return "Authentication database is being repaired. Try again in a few seconds.";
+  if (code === "auth_database_error") return "Authentication is temporarily unavailable.";
+  return "Authentication is temporarily unavailable.";
+}
 
 export default function Login() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [show, setShow] = useState(false);
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState("");
+
+  const update = (field: string, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setErrorText("");
     setLoading(true);
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
-      if (error) {
-        if (error.message.toLowerCase().includes("invalid")) {
-          toast.error(t("auth.toast.invalid_credentials"));
-        } else {
-          toast.error(error.message || t("auth.toast.generic_error"));
-        }
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.ok) {
+        const msg = getLoginMessage(data?.error || "unknown_error");
+        setErrorText(msg);
+        toast({
+          title: msg,
+          variant: "destructive",
+        });
         return;
       }
-      navigate("/");
+
+      toast({
+        title: "Logged in.",
+        description: "Welcome back.",
+      });
+
+      navigate("/dashboard");
+    } catch {
+      const msg = "Network error. Please reload and try again.";
+      setErrorText(msg);
+      toast({
+        title: msg,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  }
-
-  async function onGoogle() {
-    setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) {
-      toast.error(t("auth.toast.generic_error"));
-      setLoading(false);
-      return;
-    }
-    if (result.redirected) return;
-    navigate("/");
-  }
+  };
 
   return (
-    <AuthLayout
+    <AuthShell
       title={t("auth.login.title")}
       sub={t("auth.login.sub")}
       footer={
         <>
           {t("auth.login.no_account")}{" "}
-          <Link to="/auth/signup" className="text-primary font-medium hover:underline">
+          <Link to="/auth/signup" className="text-primary">
             {t("auth.login.signup_link")}
           </Link>
         </>
       }
     >
-      <form className="space-y-5" onSubmit={onSubmit}>
-        <Field name="email" type="email" label={t("auth.login.email")} required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
-        <div>
-          <Field
-            name="password"
-            type={show ? "text" : "password"}
-            label={t("auth.login.password")}
-            required
-            autoComplete="current-password"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            disabled={loading}
-            rightSlot={
-              <button type="button" onClick={() => setShow((s) => !s)} className="text-foreground/50 hover:text-foreground transition-colors" aria-label={show ? t("auth.hide") : t("auth.show")}>
-                {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            }
-          />
-          <div className="mt-2 text-right">
-            <Link to="/auth/forgot-password" className="text-xs text-foreground/55 hover:text-foreground transition-colors">
-              {t("auth.forgot")}
-            </Link>
+      <form onSubmit={submit} className="space-y-5">
+        <Field
+          name="email"
+          label={t("auth.login.email")}
+          type="email"
+          autoComplete="email"
+          value={form.email}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => update("email", event.target.value)}
+          required
+        />
+
+        <Field
+          name="password"
+          label={t("auth.login.password")}
+          type="password"
+          autoComplete="current-password"
+          value={form.password}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => update("password", event.target.value)}
+          required
+        />
+
+        {errorText ? (
+          <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+            {errorText}
           </div>
+        ) : null}
+
+        <button type="submit" className="btn-hero w-full" disabled={loading}>
+          {loading ? <LoaderDots /> : t("auth.login.submit")}
+        </button>
+
+        <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground/60">
+          <span className="h-px flex-1 bg-border" />
+          {t("auth.login.or")}
+          <span className="h-px flex-1 bg-border" />
         </div>
 
-        <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full justify-center mt-2">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("auth.login.submit")}
-        </Button>
-
-        <Divider label={t("auth.login.or")} />
-        <GoogleButton label={t("auth.login.google")} onClick={onGoogle} disabled={loading} />
+        <GoogleButton
+          label="Google login non configurato"
+          disabled
+          onClick={() =>
+            toast({
+              title: "Google login not configured yet.",
+              description: "Email/password login is being restored first.",
+            })
+          }
+        />
       </form>
-    </AuthLayout>
-  );
-}
-
-function Divider({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-3 py-2">
-      <div className="flex-1 h-px bg-border" />
-      <span className="mono-eyebrow text-foreground/40 text-[10px]">{label}</span>
-      <div className="flex-1 h-px bg-border" />
-    </div>
+    </AuthShell>
   );
 }
