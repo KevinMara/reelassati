@@ -22,7 +22,16 @@ export async function GET() {
       logout: fs.existsSync(path.join(process.cwd(), "app/api/auth/logout/route.ts")),
       me: fs.existsSync(path.join(process.cwd(), "app/api/auth/me/route.ts"))
     },
-    usersProfileColumns: {},
+    usersProfileColumns: {
+      id: { exists: false },
+      user_id: { exists: false },
+      email: { exists: false },
+      display_name: { exists: false },
+      password_hash: { exists: false },
+      auth_provider: { exists: false },
+      created_at: { exists: false },
+      updated_at: { exists: false }
+    },
     notNullColumns: [],
     authSecretConfigured: !!(process.env.AUTH_SECRET),
     internalAgentSecretConfigured: !!(process.env.INTERNAL_AGENT_SECRET),
