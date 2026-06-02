@@ -12,13 +12,13 @@ export function ensureAuthSchema() {
         CREATE TABLE IF NOT EXISTS users_profile (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           email TEXT UNIQUE,
-          display_name TEXT,
           created_at TIMESTAMPTZ DEFAULT now()
         );
       `);
 
       await prisma.$executeRawUnsafe(`
         ALTER TABLE users_profile
+        ADD COLUMN IF NOT EXISTS user_id UUID,
         ADD COLUMN IF NOT EXISTS display_name TEXT,
         ADD COLUMN IF NOT EXISTS password_hash TEXT,
         ADD COLUMN IF NOT EXISTS auth_provider TEXT DEFAULT 'email',
@@ -31,6 +31,7 @@ export function ensureAuthSchema() {
       await prisma.$executeRawUnsafe(`
         UPDATE users_profile
         SET
+          user_id = COALESCE(user_id, id),
           auth_provider = COALESCE(auth_provider, 'email'),
           updated_at = COALESCE(updated_at, now());
       `);

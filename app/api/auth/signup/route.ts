@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth-session";
@@ -53,11 +54,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
     }
 
+    const id = randomUUID();
     const passwordHash = await bcrypt.hash(password, 12);
 
     const created = await prisma.$queryRaw<UserRow[]>`
       INSERT INTO users_profile (
         id,
+        user_id,
         email,
         display_name,
         password_hash,
@@ -66,7 +69,8 @@ export async function POST(request: NextRequest) {
         updated_at
       )
       VALUES (
-        gen_random_uuid(),
+        ${id}::uuid,
+        ${id}::uuid,
         ${email},
         ${name},
         ${passwordHash},
@@ -80,10 +84,7 @@ export async function POST(request: NextRequest) {
     const user = created[0];
 
     if (!user?.id) {
-      return NextResponse.json(
-        { ok: false, error: "auth_database_error", message: "user_not_created" },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: "auth_database_error", message: "user_not_created" }, { status: 500 });
     }
 
     const token = await createSessionToken(user);
@@ -102,17 +103,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
     }
 
-    if (error?.code === "P2022") {
-      return NextResponse.json({ ok: false, error: "auth_schema_error", code: "P2022" }, { status: 500 });
-    }
-
     return NextResponse.json(
       {
         ok: false,
         error: "auth_database_error",
         code: error?.code || null,
         dbCode: error?.meta?.code || null,
-        message: error?.message || null
+        message: error?.message || null,
       },
       { status: 500 }
     );
