@@ -80,7 +80,7 @@ export async function GET() {
         .filter(c => !c.nullable)
         .map(c => c.columnName);
 
-      const constraints: any[] = await prisma.$queryRaw`
+      const constraints = await prisma.$queryRaw`
         SELECT
           conname AS name,
           contype AS type,
@@ -88,32 +88,32 @@ export async function GET() {
         FROM pg_constraint
         WHERE conrelid = 'public.users_profile'::regclass
         ORDER BY conname
-      `.catch(() => []);
+      `.catch(() => []) as any[];
       debugInfo.constraints = constraints || [];
 
-      const triggers: any[] = await prisma.$queryRaw`
+      const triggers = await prisma.$queryRaw`
         SELECT 
           trigger_name as "triggerName",
           event_manipulation as "eventManipulation",
           action_statement as "actionStatement"
         FROM information_schema.triggers
         WHERE event_object_table = 'users_profile'
-      `.catch(() => []);
+      `.catch(() => []) as any[];
       debugInfo.triggers = triggers || [];
 
-      const rules: any[] = await prisma.$queryRaw`
+      const rules = await prisma.$queryRaw`
         SELECT 
           schemaname, tablename, rulename as "ruleName", definition
         FROM pg_rules
         WHERE tablename = 'users_profile'
-      `.catch(() => []);
+      `.catch(() => []) as any[];
       debugInfo.rules = rules || [];
 
-      const viewsTables: any[] = await prisma.$queryRaw`
+      const viewsTables = await prisma.$queryRaw`
         SELECT table_schema as "tableSchema", table_name as "tableName", table_type as "tableType"
         FROM information_schema.tables
         WHERE table_name = 'users_profile'
-      `.catch(() => []);
+      `.catch(() => []) as any[];
       debugInfo.viewsOrTablesNamedUsersProfile = viewsTables || [];
     }
   } catch (error: any) {
