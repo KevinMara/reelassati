@@ -183,58 +183,33 @@ export async function POST(request: NextRequest) {
     const id = randomUUID();
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const { insert, unsupportedRequired } = buildInsertPlan(columns, {
-      id,
-      email,
-      name,
-      passwordHash,
-    });
-
-    if (unsupportedRequired.length > 0) {
-      return json(
-        {
-          ok: false,
-          error: "auth_schema_error",
-          message: "unsupported_not_null_columns",
-          columns: unsupportedRequired,
-        },
-        500
-      );
-    }
-
-    const insertColumns: string[] = [];
-    const placeholders: string[] = [];
-    const values: any[] = [];
-
-    for (const [column, value] of Object.entries(insert)) {
-      insertColumns.push(`"${column}"`);
-      const dbColumn = columns.find((c) => c.column_name === column);
-      const placeholder = `${values.length + 1}`;
-      if (dbColumn?.data_type === "uuid") {
-        placeholders.push(`${placeholder}::uuid`);
-      } else {
-        placeholders.push(placeholder);
-      }
-      values.push(value);
-    }
-
-    if (columns.some((c) => c.column_name === "created_at")) {
-      insertColumns.push(`"created_at"`);
-      placeholders.push("now()");
-    }
-
-    if (columns.some((c) => c.column_name === "updated_at")) {
-      insertColumns.push(`"updated_at"`);
-      placeholders.push("now()");
-    }
-
-    const sql = `
-      INSERT INTO public.users_profile (${insertColumns.join(", ")})
-      VALUES (${placeholders.join(", ")})
+        const created = await prisma.$queryRaw<UserRow[]>`
+      INSERT INTO public.users_profile (
+        "id",
+        "userId",
+        "email",
+        "displayName",
+        "password_hash",
+        "auth_provider",
+        "display_name",
+        "user_id",
+        "created_at",
+        "updated_at"
+      )
+      VALUES (
+        ${id}::uuid,
+        ${id},
+        ${email},
+        ${name},
+        ${passwordHash},
+        'email',
+        ${name},
+        ${id}::uuid,
+        now(),
+        now()
+      )
       RETURNING id::text, email, display_name
     `;
-
-    const created = await prisma.$queryRawUnsafe<UserRow[]>(sql, ...values);
     const user = created[0];
 
     if (!user?.id) {
@@ -274,6 +249,7 @@ export async function POST(request: NextRequest) {
     }, 500);
   }
 }
+
 
 
 
