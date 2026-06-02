@@ -4,12 +4,26 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
 export default function DashboardHome() {
-  const { profile } = useAuthedProfile();
+  const { profile, loading } = useAuthedProfile();
   
   const onLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/auth/login";
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      window.location.href = "/auth/login";
+    } catch (err) {
+      console.error("Logout failed:", err);
+      // Still redirect to login
+      window.location.href = "/auth/login";
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
   
   return (
     <AppShell>
