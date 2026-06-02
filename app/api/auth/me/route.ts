@@ -1,9 +1,10 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+﻿export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 import { readSessionToken, SESSION_COOKIE } from "@/lib/auth-session";
-
-export const runtime = "nodejs";
 
 type UserRow = {
   id: string;
@@ -46,4 +47,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, user: null });
   }
 }
+
 

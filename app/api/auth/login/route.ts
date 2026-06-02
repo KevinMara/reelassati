@@ -1,10 +1,11 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+﻿export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth-session";
-
-export const runtime = "nodejs";
 
 type UserRow = {
   id: string;
@@ -73,4 +74,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
   }
 }
+
 
