@@ -19,7 +19,7 @@ function getFingerprint(url: string | undefined): string {
 export async function GET() {
   const debugInfo: any = {
     ok: true,
-    debugVersion: "schema-debug-v3-live-check",
+    debugVersion: "schema-debug-v3-live-check-force-redeployment-1",
     databaseConnected: false,
     runtime: typeof process !== 'undefined' ? `Node ${process.version}` : 'Unknown',
     nodeEnv: process.env.NODE_ENV,
