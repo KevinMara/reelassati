@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app/AppShell";
 import { useAuthedProfile } from "@/components/app/useAuthedProfile";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Loader2 } from "lucide-react";
 
 export default function DashboardHome() {
   const { profile, loading } = useAuthedProfile();
