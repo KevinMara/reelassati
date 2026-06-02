@@ -208,7 +208,13 @@ export async function POST(request: NextRequest) {
 
     for (const [column, value] of Object.entries(insert)) {
       insertColumns.push(`"${column}"`);
-      placeholders.push(`$${values.length + 1}`);
+      const dbColumn = columns.find((c) => c.column_name === column);
+      const placeholder = `${values.length + 1}`;
+      if (dbColumn?.data_type === "uuid") {
+        placeholders.push(`${placeholder}::uuid`);
+      } else {
+        placeholders.push(placeholder);
+      }
       values.push(value);
     }
 
@@ -268,6 +274,7 @@ export async function POST(request: NextRequest) {
     }, 500);
   }
 }
+
 
 
 
