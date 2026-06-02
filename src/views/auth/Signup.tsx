@@ -74,8 +74,8 @@ export default function Signup() {
   }
 
   function onGoogle() {
-    if (!googleEnabled) return;
-    window.location.href = "/api/auth/google";
+    // Google OAuth is explicitly disabled in Phase 1
+    return;
   }
 
   return (
