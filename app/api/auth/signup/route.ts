@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/auth";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
+import { v4 as uuidv4 } from "uuid";
 
 export const dynamic = 'force-dynamic';
 
@@ -39,9 +40,9 @@ export async function POST(request: Request) {
     }
 
     try {
-      // Check if user already exists
-      const existingUser = await prisma.userProfile.findUnique({
-        where: { email: normalizedEmail },
+      // Check if user already exists case-insensitively
+      const existingUser = await prisma.userProfile.findFirst({
+        where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
       });
 
       if (existingUser) {
@@ -51,16 +52,22 @@ export async function POST(request: Request) {
 
       // Hash password and create user
       const hash = await hashPassword(password);
+      const userId = uuidv4();
 
       console.log("[SIGNUP] Attempting to create user profile in database...");
+      
+      // Use raw query to satisfy potential non-Prisma columns like user_id if they are NOT NULL
+      // But we'll try Prisma first as it's cleaner. If it fails with 23502, we'll know which column.
       const user = await prisma.userProfile.create({
         data: {
+          id: userId,
           email: normalizedEmail,
           displayName: name,
           passwordHash: hash,
           authProvider: "email",
         },
       });
+      
       console.log("[SIGNUP] User profile created successfully:", user.id);
 
       // Create session
@@ -84,7 +91,6 @@ export async function POST(request: Request) {
       console.error("[SIGNUP] Prisma database error:", {
         code: dbError.code,
         message: dbError.message,
-        clientVersion: dbError.clientVersion,
         meta: dbError.meta
       });
       
@@ -95,10 +101,18 @@ export async function POST(request: Request) {
       
       // Prisma P2022 is Column does not exist
       if (dbError.code === 'P2022') {
+        return NextResponse.json({ ok: false, error: "auth_schema_error", code: "P2022" }, { status: 500 });
+      }
+
+      // Check for 23502 (NOT NULL violation) in meta or message
+      const isNotNullViolation = dbError.message?.includes("23502") || dbError.code === "P2011";
+      if (isNotNullViolation) {
         return NextResponse.json({ 
           ok: false, 
-          error: "auth_schema_error", 
-          code: "P2022" 
+          error: "auth_database_error", 
+          code: "23502", 
+          message: "not_null_violation",
+          meta: dbError.meta
         }, { status: 500 });
       }
       
