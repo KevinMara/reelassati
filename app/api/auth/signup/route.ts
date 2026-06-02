@@ -259,9 +259,16 @@ export async function POST(request: NextRequest) {
       return json({ ok: false, error: "auth_database_error", code: "23502", message: "not_null_violation" }, 500);
     }
 
-    return json({ ok: false, error: "auth_database_error" }, 500);
+    return json({
+      ok: false,
+      error: "auth_database_error",
+      debugCode: error?.code || null,
+      debugMeta: error?.meta || null,
+      debugMessage: String(error?.message || "").slice(0, 500)
+    }, 500);
   }
 }
+
 
 
 
