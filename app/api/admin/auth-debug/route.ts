@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { SignJWT } from "jose";
+import fs from "fs";
+import path from "path";
 
 export const dynamic = 'force-dynamic';
 
@@ -9,60 +11,63 @@ export async function GET() {
   const debugInfo: any = {
     ok: true,
     databaseConnected: false,
-    usersProfileColumns: {
-      id: false,
-      email: false,
-      display_name: false,
-      password_hash: false,
-      auth_provider: false,
-      google_id: false,
-      avatar_url: false,
-      created_at: false,
-      updated_at: false
+    runtime: typeof process !== 'undefined' ? `Node ${process.version}` : 'Unknown',
+    frameworkDetected: "Next.js App Router (Hybrid with React Router components)",
+    activeSignupComponent: "app/auth/signup/page.tsx -> src/views/auth/Signup.tsx",
+    activeLoginComponent: "app/auth/login/page.tsx -> src/views/auth/Login.tsx",
+    activeDashboardComponent: "app/dashboard/page.tsx -> src/views/dashboard/DashboardHome.tsx",
+    authRoutesDetected: {
+      signup: fs.existsSync(path.join(process.cwd(), "app/api/auth/signup/route.ts")),
+      login: fs.existsSync(path.join(process.cwd(), "app/api/auth/login/route.ts")),
+      logout: fs.existsSync(path.join(process.cwd(), "app/api/auth/logout/route.ts")),
+      me: fs.existsSync(path.join(process.cwd(), "app/api/auth/me/route.ts"))
     },
+    usersProfileColumns: {},
+    notNullColumns: [],
     authSecretConfigured: !!(process.env.AUTH_SECRET),
     internalAgentSecretConfigured: !!(process.env.INTERNAL_AGENT_SECRET),
-    bcryptAvailable: typeof bcrypt?.hash === 'function',
-    joseAvailable: typeof SignJWT === 'function',
+    sessionSecretConfigured: !!(process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET),
     databaseUrlConfigured: !!(process.env.DATABASE_URL),
-    postgresUrlConfigured: !!(process.env.POSTGRES_URL)
+    postgresUrlConfigured: !!(process.env.POSTGRES_URL),
+    bcryptAvailable: typeof bcrypt?.hash === 'function',
+    joseAvailable: typeof SignJWT === 'function'
   };
 
   try {
-    // Check database connection with a timeout
-    const dbCheck = await Promise.race([
-      prisma.$queryRaw`SELECT 1 as connected`,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Database timeout")), 5000))
-    ]) as any[];
+    // Check database connection
+    const dbCheck = await prisma.$queryRaw`SELECT 1 as connected`.catch(() => null) as any[];
 
     if (dbCheck && dbCheck[0]?.connected === 1) {
       debugInfo.databaseConnected = true;
 
-      // Check columns in users_profile table
+      // Detailed column inspection
       const columns: any[] = await prisma.$queryRaw`
-        SELECT column_name 
+        SELECT 
+          column_name, 
+          is_nullable, 
+          column_default, 
+          data_type 
         FROM information_schema.columns 
         WHERE table_name = 'users_profile'
         AND table_schema = 'public'
       `;
 
       if (columns && Array.isArray(columns)) {
-        const columnNames = columns.map(c => c.column_name.toLowerCase());
-        debugInfo.usersProfileColumns = {
-          id: columnNames.includes('id'),
-          email: columnNames.includes('email'),
-          display_name: columnNames.includes('display_name'),
-          password_hash: columnNames.includes('password_hash'),
-          auth_provider: columnNames.includes('auth_provider'),
-          google_id: columnNames.includes('google_id'),
-          avatar_url: columnNames.includes('avatar_url'),
-          created_at: columnNames.includes('created_at'),
-          updated_at: columnNames.includes('updated_at')
-        };
+        columns.forEach(col => {
+          const name = col.column_name.toLowerCase();
+          debugInfo.usersProfileColumns[name] = {
+            exists: true,
+            nullable: col.is_nullable === 'YES',
+            hasDefault: col.column_default !== null,
+            dataType: col.data_type
+          };
+          if (col.is_nullable === 'NO') {
+            debugInfo.notNullColumns.push(name);
+          }
+        });
       }
     }
   } catch (error: any) {
-    console.error("[AUTH-DEBUG] Database check failed:", error.message);
     debugInfo.databaseConnected = false;
     debugInfo.error = error.message;
   }
