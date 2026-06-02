@@ -6,7 +6,9 @@ import fs from "fs";
 import path from "path";
 import { createHash } from "crypto";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
 
 function getFingerprint(url: string | undefined): string {
   if (!url) return "none";
@@ -17,6 +19,7 @@ function getFingerprint(url: string | undefined): string {
 export async function GET() {
   const debugInfo: any = {
     ok: true,
+    debugVersion: "schema-debug-v3-live-check",
     databaseConnected: false,
     runtime: typeof process !== 'undefined' ? `Node ${process.version}` : 'Unknown',
     nodeEnv: process.env.NODE_ENV,
@@ -74,7 +77,8 @@ export async function GET() {
         WHERE table_name = 'users_profile'
         AND table_schema = 'public'
         ORDER BY ordinal_position
-      `;
+      `.catch(() => []) as any[];
+      
       debugInfo.usersProfileColumnsOrdered = columns || [];
       debugInfo.notNullColumns = (columns || [])
         .filter(c => !c.nullable)
@@ -121,5 +125,11 @@ export async function GET() {
     debugInfo.error = error.message;
   }
 
-  return NextResponse.json(debugInfo);
+  return NextResponse.json(debugInfo, {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    }
+  });
 }
