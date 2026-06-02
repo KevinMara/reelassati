@@ -73,3 +73,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
   }
 }
+

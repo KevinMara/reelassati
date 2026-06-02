@@ -113,9 +113,9 @@ function buildInsertPlan(columns: DbColumn[], input: { id: string; email: string
   const insert: Record<string, string> = {};
 
   if (byName.has("id")) insert.id = input.id;
-  if (byName.has("user_id")) insert.user_id = input.id;
+  if (byName.has("userId")) insert.userId = input.id; if (byName.has("user_id")) insert.user_id = input.id;
   if (byName.has("email")) insert.email = input.email;
-  if (byName.has("display_name")) insert.display_name = input.name;
+  if (byName.has("displayName")) insert.displayName = input.name; if (byName.has("display_name")) insert.display_name = input.name;
   if (byName.has("name")) insert.name = input.name;
   if (byName.has("password_hash")) insert.password_hash = input.passwordHash;
   if (byName.has("auth_provider")) insert.auth_provider = "email";
@@ -124,9 +124,9 @@ function buildInsertPlan(columns: DbColumn[], input: { id: string; email: string
 
   const safeKnown = new Set([
     "id",
-    "user_id",
+    "userId",`n    "user_id",
     "email",
-    "display_name",
+    "displayName",`n    "display_name",
     "name",
     "password_hash",
     "auth_provider",
@@ -259,3 +259,4 @@ export async function POST(request: NextRequest) {
     return json({ ok: false, error: "auth_database_error" }, 500);
   }
 }
+
