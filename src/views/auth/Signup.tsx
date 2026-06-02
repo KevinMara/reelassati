@@ -17,15 +17,9 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [googleEnabled, setGoogleEnabled] = useState(false);
 
+  // Google OAuth is explicitly disabled in Phase 1
   useEffect(() => {
-    fetch("/api/admin/auth-check")
-      .then(res => res.json())
-      .then(data => {
-        if (data.ok && data.auth) {
-          setGoogleEnabled(data.auth.googleAuth);
-        }
-      })
-      .catch(err => console.error("Failed to check auth status", err));
+    setGoogleEnabled(false);
   }, []);
 
   // crude meter, 0–4
@@ -80,8 +74,8 @@ export default function Signup() {
   }
 
   function onGoogle() {
-    if (!googleEnabled) return;
-    window.location.href = "/api/auth/google";
+    // Google OAuth is explicitly disabled in Phase 1
+    return;
   }
 
   return (
