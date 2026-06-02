@@ -7,8 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // Ensure schema is up to date
-    await ensureAuthSchema();
+    console.log("[AUTH-ME] Check called");
 
     const session = await getSession();
     if (!session || !session.userId) {
