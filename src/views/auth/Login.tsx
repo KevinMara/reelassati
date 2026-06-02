@@ -51,9 +51,13 @@ export default function Login() {
       toast.success(t("auth.toast.login_success") || "Successfully logged in!");
       // Force reload to dashboard to ensure session is picked up by middleware
       window.location.href = "/dashboard";
-    } catch (err) {
+    } catch (err: any) {
       console.error("Login fetch error:", err);
-      toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
+      if (err.message === "Failed to fetch") {
+        toast.error("Network error. Please reload and try again.");
+      } else {
+        toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
+      }
     } finally {
       setLoading(false);
     }

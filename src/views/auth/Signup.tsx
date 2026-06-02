@@ -55,7 +55,10 @@ export default function Signup() {
         if (data.error === "email_already_exists") {
           toast.error(t("auth.toast.already_registered") || "This email already has an account.");
         } else if (data.error === "invalid_input") {
-          toast.error("Please check your input. Password must be at least 8 characters.");
+          toast.error("Please check your input. Name, email and password (min 8 chars) are required.");
+        } else if (data.error === "auth_database_error") {
+          console.error("Database error details:", data);
+          toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable (database error).");
         } else {
           toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
         }
@@ -65,9 +68,13 @@ export default function Signup() {
       toast.success(t("auth.toast.signup_success") || "Account created successfully!");
       // Force reload to dashboard to ensure session is picked up by middleware
       window.location.href = "/dashboard";
-    } catch (err) {
+    } catch (err: any) {
       console.error("Signup fetch error:", err);
-      toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
+      if (err.message === "Failed to fetch") {
+        toast.error("Network error. Please reload and try again.");
+      } else {
+        toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
+      }
     } finally {
       setLoading(false);
     }

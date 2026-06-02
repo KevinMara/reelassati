@@ -26,8 +26,9 @@ export async function POST(request: Request) {
     const normalizedEmail = (email as string).toLowerCase().trim();
 
     try {
-      const user = await prisma.userProfile.findUnique({
-        where: { email: normalizedEmail },
+      // Find user case-insensitively
+      const user = await prisma.userProfile.findFirst({
+        where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
       });
 
       if (!user || !user.passwordHash || user.authProvider !== "email") {
@@ -67,7 +68,11 @@ export async function POST(request: Request) {
         }, { status: 500 });
       }
 
-      return NextResponse.json({ ok: false, error: "auth_database_error", code: dbError.code }, { status: 500 });
+      return NextResponse.json({ 
+        ok: false, 
+        error: "auth_database_error", 
+        code: dbError.code || "UNKNOWN_PRISMA_ERROR" 
+      }, { status: 500 });
     }
   } catch (error: any) {
     console.error("Login exception:", error);
