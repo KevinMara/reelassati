@@ -1,18 +1,19 @@
-import { NextResponse } from "next/server";
-import { deleteSession } from "@/lib/auth";
+﻿import { NextResponse } from "next/server";
+import { SESSION_COOKIE } from "@/lib/auth-session";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
 
 export async function POST() {
-  try {
-    // Ensure schema is up to date
-    await ensureAuthSchema();
+  await ensureAuthSchema().catch(() => null);
 
-    deleteSession();
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Logout error:", error);
-    return NextResponse.json({ ok: true }); // Still return ok:true as we want the user to be logged out anyway
-  }
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
 }

@@ -1,81 +1,78 @@
-import { NextResponse } from "next/server";
+﻿export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { comparePassword, createSession } from "@/lib/auth";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
+import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth-session";
 
-export const dynamic = 'force-dynamic';
+type UserRow = {
+  id: string;
+  email: string;
+  display_name: string | null;
+  password_hash: string | null;
+};
 
-export async function POST(request: Request) {
+function cleanEmail(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+export async function POST(request: NextRequest) {
   try {
-    // Ensure schema is up to date before any operation
     await ensureAuthSchema();
 
-    let body;
-    try {
-      body = await request.json();
-    } catch (e) {
+    const body = await request.json().catch(() => ({}));
+    const email = cleanEmail(body.email);
+    const password = typeof body.password === "string" ? body.password : "";
+
+    if (!email.includes("@") || password.length < 1) {
       return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
     }
 
-    const { email, password } = body;
+    const rows = await prisma.$queryRaw<UserRow[]>`
+      SELECT id::text, email, display_name, password_hash
+      FROM users_profile
+      WHERE lower(email) = lower(${email})
+      LIMIT 1
+    `;
 
-    if (!email || !password) {
+    const user = rows[0];
+
+    if (!user?.password_hash) {
       return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
     }
 
-    const normalizedEmail = (email as string).toLowerCase().trim();
+    const valid = await bcrypt.compare(password, user.password_hash);
 
-    try {
-      // Find user case-insensitively
-      const user = await prisma.userProfile.findFirst({
-        where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
-      });
-
-      if (!user || !user.passwordHash || user.authProvider !== "email") {
-        return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
-      }
-
-      const isValid = await comparePassword(password, user.passwordHash);
-
-      if (!isValid) {
-        return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
-      }
-
-      try {
-        await createSession(user.id);
-      } catch (sessionError) {
-        console.error("Session creation failed during login:", sessionError);
-        return NextResponse.json({ ok: false, error: "auth_session_error" }, { status: 500 });
-      }
-
-      return NextResponse.json({
-        ok: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          display_name: user.displayName,
-        },
-      });
-    } catch (dbError: any) {
-      console.error("Database error during login:", dbError);
-      
-      // Prisma P2022 is Column does not exist
-      if (dbError.code === 'P2022') {
-        return NextResponse.json({ 
-          ok: false, 
-          error: "auth_schema_error", 
-          code: "P2022" 
-        }, { status: 500 });
-      }
-
-      return NextResponse.json({ 
-        ok: false, 
-        error: "auth_database_error", 
-        code: dbError.code || "UNKNOWN_PRISMA_ERROR" 
-      }, { status: 500 });
+    if (!valid) {
+      return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
     }
+
+    const safeUser = {
+      id: user.id,
+      email: user.email,
+      display_name: user.display_name,
+    };
+
+    const token = await createSessionToken(safeUser);
+
+    const response = NextResponse.json({ ok: true, user: safeUser });
+    response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    return response;
   } catch (error: any) {
-    console.error("Login exception:", error);
+    console.error("Login error:", {
+      code: error?.code,
+      message: error?.message,
+      meta: error?.meta,
+    });
+
+    if (error?.code === "P2022") {
+      return NextResponse.json({ ok: false, error: "auth_schema_error", code: "P2022" }, { status: 500 });
+    }
+
     return NextResponse.json({ ok: false, error: "auth_database_error" }, { status: 500 });
   }
 }
+
+
