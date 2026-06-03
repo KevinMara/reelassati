@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -10,6 +10,17 @@ import { toast } from "sonner";
 export default function Signup() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetch("/api/auth/me", { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.ok && data?.user) {
+          window.location.replace("/dashboard");
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [show, setShow] = useState(false);
   const [pw, setPw] = useState("");
   const [email, setEmail] = useState("");
@@ -22,7 +33,7 @@ export default function Signup() {
     setGoogleEnabled(false);
   }, []);
 
-  // crude meter, 0–4
+  // crude meter, 0â€“4
   const strength = (() => {
     let s = 0;
     if (pw.length >= 8) s++;
@@ -67,7 +78,7 @@ export default function Signup() {
       
       toast.success(t("auth.toast.signup_success") || "Account created successfully!");
       // Force reload to dashboard to ensure session is picked up by middleware
-      window.location.href = "/dashboard";
+      window.location.replace("/dashboard");
     } catch (err: any) {
       console.error("Signup fetch error:", err);
       if (err.message === "Failed to fetch") {
@@ -155,3 +166,4 @@ export default function Signup() {
     </AuthLayout>
   );
 }
+
