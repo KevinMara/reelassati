@@ -1,146 +1,135 @@
-import { useState, useEffect } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { AuthLayout, Field, GoogleButton } from "@/components/auth/AuthLayout";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { useToast } from "@/components/ui/use-toast";
+import AuthShell from "./AuthShell";
+import Field from "./Field";
+import LoaderDots from "@/components/brand/LoaderDots";
 
 export default function Login() {
-  const { t } = useTranslation();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [show, setShow] = useState(false);
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [googleEnabled, setGoogleEnabled] = useState(false);
 
-  // Google OAuth is explicitly disabled in Phase 1
   useEffect(() => {
-    setGoogleEnabled(false);
+    fetch("/api/auth/me", { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.ok && data?.user) {
+          window.location.replace("/dashboard");
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email || !pw) return;
-    
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState("");
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setErrorText("");
     setLoading(true);
+
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: pw }),
+        credentials: "include",
+        body: JSON.stringify(form),
       });
-      
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonErr) {
-        throw new Error("Invalid server response");
-      }
-      
-      if (!response.ok) {
-        if (data.error === "invalid_credentials") {
-          toast.error(t("auth.toast.invalid_credentials") || "Email or password is incorrect.");
-        } else {
-          toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
-        }
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.ok) {
+        const msg =
+          data?.error === "invalid_credentials"
+            ? "Email or password is incorrect."
+            : data?.message || data?.error || "Authentication is temporarily unavailable.";
+
+        setErrorText(msg);
+        toast({ title: msg, variant: "destructive" });
         return;
       }
-      
-      toast.success(t("auth.toast.login_success") || "Successfully logged in!");
-      // Force reload to dashboard to ensure session is picked up by middleware
-      window.location.href = "/dashboard";
-    } catch (err: any) {
-      console.error("Login fetch error:", err);
-      if (err.message === "Failed to fetch") {
-        toast.error("Network error. Please reload and try again.");
-      } else {
-        toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
-      }
+
+      toast({ title: "Logged in." });
+      window.location.replace("/dashboard");
+    } catch {
+      const msg = "Network error. Please reload and try again.";
+      setErrorText(msg);
+      toast({ title: msg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }
-
-  function onGoogle() {
-    // Google OAuth is explicitly disabled in Phase 1
-    return;
-  }
+  };
 
   return (
-    <AuthLayout
-      title={t("auth.login.title")}
-      sub={t("auth.login.sub")}
+    <AuthShell
+      title="Accedi al tuo account."
+      sub="Bentornato su Reelassati."
       footer={
         <>
-          {t("auth.login.no_account")}{" "}
-          <Link to="/auth/signup" className="text-primary font-medium hover:underline">
-            {t("auth.login.signup_link")}
+          Non hai un account?{" "}
+          <Link to="/auth/signup" className="text-primary">
+            Crea account
           </Link>
         </>
       }
     >
-      <form className="space-y-5" onSubmit={onSubmit}>
-        <Field 
-          name="email" 
-          type="email" 
-          label={t("auth.login.email")} 
-          required 
-          autoComplete="email" 
-          value={email} 
-          onChange={(e) => setEmail(e.target.value)} 
-          disabled={loading} 
+      <form onSubmit={submit} className="space-y-5" data-auth-version="no-i18n-login-v1">
+        <Field
+          name="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={form.email}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setForm((current) => ({ ...current, email: event.target.value }))
+          }
+          required
         />
-        <div>
-          <Field
-            name="password"
-            type={show ? "text" : "password"}
-            label={t("auth.login.password")}
-            required
-            autoComplete="current-password"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            disabled={loading}
-            rightSlot={
-              <button 
-                type="button" 
-                onClick={() => setShow((s) => !s)} 
-                className="text-foreground/50 hover:text-foreground transition-colors" 
-                aria-label={show ? t("auth.hide") : t("auth.show")}
-              >
-                {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            }
-          />
-          <div className="mt-2 text-right">
-            <Link to="/auth/forgot-password" className="text-xs text-foreground/55 hover:text-foreground transition-colors">
-              {t("auth.forgot")}
-            </Link>
+
+        <Field
+          name="password"
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          value={form.password}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setForm((current) => ({ ...current, password: event.target.value }))
+          }
+          required
+        />
+
+        {errorText ? (
+          <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+            {errorText}
           </div>
+        ) : null}
+
+        <button type="submit" className="btn-hero w-full" disabled={loading}>
+          {loading ? <LoaderDots /> : "Accedi"}
+        </button>
+
+        <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground/60">
+          <span className="h-px flex-1 bg-border" />
+          OPPURE
+          <span className="h-px flex-1 bg-border" />
         </div>
 
-        <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full justify-center mt-2">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("auth.login.submit")}
-        </Button>
-
-        <Divider label={t("auth.login.or")} />
-        <GoogleButton 
-          label={googleEnabled ? t("auth.login.google") : "Google login not configured yet."} 
-          onClick={onGoogle} 
-          disabled={loading || !googleEnabled} 
-        />
+        <button
+          type="button"
+          disabled
+          className="w-full rounded-full border border-border px-4 py-3 text-sm text-muted-foreground opacity-60"
+        >
+          Google login non configurato
+        </button>
       </form>
-    </AuthLayout>
+    </AuthShell>
   );
 }
 
-function Divider({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-3 py-2">
-      <div className="flex-1 h-px bg-border" />
-      <span className="mono-eyebrow text-foreground/40 text-[10px]">{label}</span>
-      <div className="flex-1 h-px bg-border" />
-    </div>
-  );
-}
+
+

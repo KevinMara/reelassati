@@ -1,108 +1,257 @@
-import { NextResponse } from "next/server";
+﻿export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, createSession } from "@/lib/auth";
-import { v4 as uuidv4 } from "uuid";
+import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth-session";
 
-export const dynamic = 'force-dynamic';
+type DbColumn = {
+  column_name: string;
+  is_nullable: string;
+  column_default: string | null;
+  data_type: string;
+};
 
-export async function POST(request: Request) {
+type UserRow = {
+  id: string;
+  email: string;
+  display_name: string | null;
+};
+
+function cleanEmail(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function cleanName(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function json(payload: unknown, status = 200) {
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+    },
+  });
+}
+
+async function getUsersProfileColumns() {
+  const rows = await prisma.$queryRaw<DbColumn[]>`
+    SELECT column_name, is_nullable, column_default, data_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'users_profile'
+    ORDER BY ordinal_position
+  `;
+
+  return rows;
+}
+
+async function ensureSafeAuthColumns(columns: DbColumn[]) {
+  const names = new Set(columns.map((c) => c.column_name));
+
+  if (!names.has("users_profile")) {
+    // no-op, kept intentionally harmless
+  }
+
+  if (!names.has("display_name")) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE public.users_profile ADD COLUMN IF NOT EXISTS display_name TEXT`);
+  }
+
+  if (!names.has("password_hash")) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE public.users_profile ADD COLUMN IF NOT EXISTS password_hash TEXT`);
+  }
+
+  if (!names.has("auth_provider")) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE public.users_profile ADD COLUMN IF NOT EXISTS auth_provider TEXT DEFAULT 'email'`);
+  }
+
+  if (!names.has("created_at")) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE public.users_profile ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now()`);
+  }
+
+  if (!names.has("updated_at")) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE public.users_profile ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`);
+  }
+
+  if (!names.has("google_id")) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE public.users_profile ADD COLUMN IF NOT EXISTS google_id TEXT`);
+  }
+
+  if (!names.has("avatar_url")) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE public.users_profile ADD COLUMN IF NOT EXISTS avatar_url TEXT`);
+  }
+
+  if (names.has("user_id")) {
+    await prisma.$executeRawUnsafe(`
+      UPDATE public.users_profile
+      SET user_id = id
+      WHERE user_id IS NULL
+    `);
+  }
+
+  await prisma.$executeRawUnsafe(`
+    UPDATE public.users_profile
+    SET auth_provider = COALESCE(auth_provider, 'email')
+    WHERE auth_provider IS NULL
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    UPDATE public.users_profile
+    SET updated_at = COALESCE(updated_at, now())
+    WHERE updated_at IS NULL
+  `);
+}
+
+function buildInsertPlan(columns: DbColumn[], input: { id: string; email: string; name: string; passwordHash: string }) {
+  const byName = new Map(columns.map((c) => [c.column_name, c]));
+  const insert: Record<string, string> = {};
+
+  if (byName.has("id")) insert.id = input.id;
+  if (byName.has("userId")) insert.userId = input.id;
+  if (byName.has("user_id")) insert.user_id = input.id;
+  if (byName.has("email")) insert.email = input.email;
+  if (byName.has("displayName")) insert.displayName = input.name;
+  if (byName.has("display_name")) insert.display_name = input.name;
+  if (byName.has("name")) insert.name = input.name;
+  if (byName.has("password_hash")) insert.password_hash = input.passwordHash;
+  if (byName.has("auth_provider")) insert.auth_provider = "email";
+  if (byName.has("google_id")) insert.google_id = null as any;
+  if (byName.has("avatar_url")) insert.avatar_url = null as any;
+
+  const safeKnown = new Set([
+    "id",
+    "userId",
+    "user_id",
+    "email",
+    "displayName",
+    "display_name",
+    "name",
+    "password_hash",
+    "auth_provider",
+    "google_id",
+    "avatar_url",
+    "created_at",
+    "updated_at",
+  ]);
+
+  const unsupportedRequired = columns
+    .filter((c) => c.is_nullable === "NO")
+    .filter((c) => !c.column_default)
+    .filter((c) => !safeKnown.has(c.column_name))
+    .map((c) => c.column_name);
+
+  return { insert, unsupportedRequired };
+}
+
+export async function POST(request: NextRequest) {
   try {
-    let body;
-    try {
-      body = await request.json();
-    } catch (e) {
-      return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
+    const body = await request.json().catch(() => ({}));
+
+    const name = cleanName(body.name);
+    const email = cleanEmail(body.email);
+    const password = typeof body.password === "string" ? body.password : "";
+
+    if (!name || !email.includes("@") || password.length < 8) {
+      return json({ ok: false, error: "invalid_input" }, 400);
     }
 
-    const { name, email, password } = body;
+    let columns = await getUsersProfileColumns();
 
-    if (!name || !email || !password || password.length < 8) {
-      return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400 });
+    if (!columns.length) {
+      return json({ ok: false, error: "auth_schema_error", message: "users_profile_not_found" }, 500);
     }
 
-    const normalizedEmail = (email as string).toLowerCase().trim();
+    await ensureSafeAuthColumns(columns);
+    columns = await getUsersProfileColumns();
 
-    // 1. Fetch real schema at runtime
-    const columns: any[] = await prisma.$queryRaw`
-      SELECT column_name, is_nullable, column_default 
-      FROM information_schema.columns 
-      WHERE table_name = 'users_profile' AND table_schema = 'public'
+    const existing = await prisma.$queryRaw<UserRow[]>`
+      SELECT id::text, email, display_name
+      FROM public.users_profile
+      WHERE lower(email) = lower(${email})
+      LIMIT 1
     `;
-    
-    const colMap = new Set(columns.map(c => c.column_name.toLowerCase()));
-    const notNullNoDefault = columns
-      .filter(c => c.is_nullable === 'NO' && c.column_default === null)
-      .map(c => c.column_name.toLowerCase());
 
-    // 2. Build the data object based on existing columns
-    const userId = uuidv4();
-    const data: any = {};
-    const timestamp = new Date();
-
-    if (colMap.has("id")) data.id = userId;
-    if (colMap.has("email")) data.email = normalizedEmail;
-    if (colMap.has("display_name")) data.display_name = name;
-    else if (colMap.has("name")) data.name = name;
-
-    const hash = await hashPassword(password);
-    if (colMap.has("password_hash")) data.password_hash = hash;
-    if (colMap.has("auth_provider")) data.auth_provider = "email";
-    if (colMap.has("user_id")) data.user_id = userId;
-    if (colMap.has("created_at")) data.created_at = timestamp;
-    if (colMap.has("updated_at")) data.updated_at = timestamp;
-
-    // Check for missing NOT NULL columns
-    const missing = notNullNoDefault.filter(col => data[col] === undefined);
-    if (missing.length > 0) {
-      return NextResponse.json({
-        ok: false,
-        error: "auth_schema_error",
-        message: "unsupported_not_null_columns",
-        columns: missing
-      }, { status: 500 });
+    if (existing.length > 0) {
+      return json({ ok: false, error: "email_already_exists" }, 409);
     }
 
-    // 3. Perform explicit column insert using raw SQL to be safe from Prisma model drift
-    const colNames = Object.keys(data);
-    const colValues = Object.values(data);
-    const valuePlaceholders = colNames.map((_, i) => `$${i + 1}`).join(", ");
-    const columnList = colNames.join(", ");
+    const id = randomUUID();
+    const passwordHash = await bcrypt.hash(password, 12);
 
-    try {
-      // Check for existing user first (using explicit column)
-      const existing: any[] = await prisma.$queryRawUnsafe(
-        `SELECT id FROM users_profile WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-        normalizedEmail
-      );
-      
-      if (existing.length > 0) {
-        return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
-      }
+        const created = await prisma.$queryRaw<UserRow[]>`
+      INSERT INTO public.users_profile (
+        "id",
+        "userId",
+        "email",
+        "displayName",
+        "password_hash",
+        "auth_provider",
+        "display_name",
+        "user_id",
+        "created_at",
+        "updated_at"
+      )
+      VALUES (
+        ${id}::uuid,
+        ${id},
+        ${email},
+        ${name},
+        ${passwordHash},
+        'email',
+        ${name},
+        ${id}::uuid,
+        now(),
+        now()
+      )
+      RETURNING id::text, email, display_name
+    `;
+    const user = created[0];
 
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO users_profile (${columnList}) VALUES (${valuePlaceholders})`,
-        ...colValues
-      );
-
-      await createSession(userId);
-
-      return NextResponse.json({
-        ok: true,
-        user: { id: userId, email: normalizedEmail, display_name: name }
-      });
-    } catch (dbError: any) {
-      console.error("[SIGNUP] Database error:", dbError.message);
-      return NextResponse.json({ 
-        ok: false, 
-        error: "auth_database_error",
-        message: "Authentication is temporarily unavailable."
-      }, { status: 500 });
+    if (!user?.id) {
+      return json({ ok: false, error: "auth_database_error", message: "user_not_created" }, 500);
     }
+
+    const token = await createSessionToken(user);
+
+    const response = json({ ok: true, user });
+    response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    return response;
   } catch (error: any) {
-    return NextResponse.json({ 
-      ok: false, 
+    console.error("Signup error:", {
+      code: error?.code,
+      meta: error?.meta,
+      message: error?.message,
+    });
+
+    if (error?.code === "P2002" || String(error?.message || "").includes("duplicate key")) {
+      return json({ ok: false, error: "email_already_exists" }, 409);
+    }
+
+    if (error?.code === "P2022") {
+      return json({ ok: false, error: "auth_schema_error", code: "P2022" }, 500);
+    }
+
+    if (error?.code === "P2010" && String(error?.message || "").includes("23502")) {
+      return json({ ok: false, error: "auth_database_error", code: "23502", message: "not_null_violation" }, 500);
+    }
+
+    return json({
+      ok: false,
       error: "auth_database_error",
-      message: "Authentication is temporarily unavailable."
-    }, { status: 500 });
+      debugCode: error?.code || null,
+      debugMeta: error?.meta || null,
+      debugMessage: String(error?.message || "").slice(0, 500)
+    }, 500);
   }
 }
+
+
+
+
+
+

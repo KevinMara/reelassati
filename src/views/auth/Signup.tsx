@@ -1,157 +1,179 @@
-import { useState, useEffect } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { AuthLayout, Field, GoogleButton } from "@/components/auth/AuthLayout";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "sonner";
+import { useToast } from "@/components/ui/use-toast";
+import AuthShell from "./AuthShell";
+import Field from "./Field";
+import LoaderDots from "@/components/brand/LoaderDots";
 
 export default function Signup() {
-  const { t } = useTranslation();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [show, setShow] = useState(false);
-  const [pw, setPw] = useState("");
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [googleEnabled, setGoogleEnabled] = useState(false);
 
-  // Google OAuth is explicitly disabled in Phase 1
   useEffect(() => {
-    setGoogleEnabled(false);
+    fetch("/api/auth/me", { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.ok && data?.user) {
+          window.location.replace("/dashboard");
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  // crude meter, 0–4
-  const strength = (() => {
-    let s = 0;
-    if (pw.length >= 8) s++;
-    if (/[A-Z]/.test(pw)) s++;
-    if (/[0-9]/.test(pw)) s++;
-    if (/[^A-Za-z0-9]/.test(pw)) s++;
-    return s;
-  })();
+  useEffect(() => {
+    fetch("/api/auth/me", { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.ok && data?.user) {
+          window.location.replace("/dashboard");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name || !email || !pw) return;
-    
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    accepted: false,
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState("");
+
+  const update = (field: string, value: string | boolean) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setErrorText("");
+
+    if (!form.accepted) {
+      setErrorText("Accetta i termini per continuare.");
+      return;
+    }
+
     setLoading(true);
+
     try {
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password: pw }),
+        credentials: "include",
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+        }),
       });
-      
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonErr) {
-        throw new Error("Invalid server response");
-      }
-      
-      if (!response.ok) {
-        if (data.error === "email_already_exists") {
-          toast.error(t("auth.toast.already_registered") || "This email already has an account.");
-        } else if (data.error === "invalid_input") {
-          toast.error("Please check your input. Name, email and password (min 8 chars) are required.");
-        } else if (data.error === "auth_database_error") {
-          console.error("Database error details:", data);
-          toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable (database error).");
-        } else {
-          toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
-        }
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.ok) {
+        const msg =
+          data?.error === "email_already_exists"
+            ? "This email already has an account."
+            : data?.error === "invalid_input"
+              ? "Check name, email and password."
+              : data?.message || data?.error || "Authentication is temporarily unavailable.";
+
+        setErrorText(msg);
+        toast({ title: msg, variant: "destructive" });
         return;
       }
-      
-      toast.success(t("auth.toast.signup_success") || "Account created successfully!");
-      // Force reload to dashboard to ensure session is picked up by middleware
-      window.location.href = "/dashboard";
-    } catch (err: any) {
-      console.error("Signup fetch error:", err);
-      if (err.message === "Failed to fetch") {
-        toast.error("Network error. Please reload and try again.");
-      } else {
-        toast.error(t("auth.toast.generic_error") || "Authentication is temporarily unavailable.");
-      }
+
+      toast({ title: "Account created." });
+      window.location.replace("/dashboard");
+    } catch {
+      const msg = "Network error. Please reload and try again.";
+      setErrorText(msg);
+      toast({ title: msg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }
-
-  function onGoogle() {
-    // Google OAuth is explicitly disabled in Phase 1
-    return;
-  }
+  };
 
   return (
-    <AuthLayout
-      title={t("auth.signup.title")}
-      sub={t("auth.signup.sub")}
+    <AuthShell
+      title="Crea il tuo account."
+      sub="Solo è gratis, per sempre."
       footer={
         <>
-          {t("auth.signup.have_account")}{" "}
-          <Link to="/auth/login" className="text-primary font-medium hover:underline">
-            {t("auth.signup.login_link")}
+          Hai già un account?{" "}
+          <Link to="/auth/login" className="text-primary">
+            Accedi
           </Link>
         </>
       }
     >
-      <form className="space-y-5" onSubmit={onSubmit}>
-        <Field name="name" label={t("auth.signup.name")} required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} disabled={loading} />
-        <Field name="email" type="email" label={t("auth.signup.email")} required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
+      <form onSubmit={submit} className="space-y-5" data-auth-version="no-i18n-signup-v1">
+        <Field
+          name="name"
+          label="Nome"
+          autoComplete="name"
+          value={form.name}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => update("name", event.target.value)}
+          required
+        />
 
-        <div>
-          <Field
-            name="password"
-            type={show ? "text" : "password"}
-            label={t("auth.signup.password")}
-            required
-            autoComplete="new-password"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            disabled={loading}
-            rightSlot={
-              <button type="button" onClick={() => setShow((s) => !s)} className="text-foreground/50 hover:text-foreground transition-colors" aria-label={show ? t("auth.hide") : t("auth.show")}>
-                {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            }
+        <Field
+          name="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={form.email}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => update("email", event.target.value)}
+          required
+        />
+
+        <Field
+          name="password"
+          label="Password"
+          type="password"
+          autoComplete="new-password"
+          value={form.password}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => update("password", event.target.value)}
+          required
+          minLength={8}
+        />
+
+        <label className="flex items-start gap-3 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={form.accepted}
+            onChange={(event) => update("accepted", event.target.checked)}
+            className="mt-1 h-5 w-5 accent-primary"
           />
-          <div className="mt-2.5 flex gap-1.5" aria-hidden>
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
-                  i < strength
-                    ? strength <= 1 ? "bg-destructive" : strength === 2 ? "bg-warning" : "bg-success"
-                    : "bg-border-strong"
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-
-        <label className="flex items-start gap-3 text-sm text-foreground/70 cursor-pointer">
-          <Checkbox id="tos" required className="mt-0.5" />
-          <span>{t("auth.terms")}</span>
+          <span>Iscrivendoti accetti i Termini e l'Informativa privacy.</span>
         </label>
 
-        <Button type="submit" variant="primary" size="lg" disabled={loading} className="w-full justify-center mt-2">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("auth.signup.submit")}
-        </Button>
+        {errorText ? (
+          <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+            {errorText}
+          </div>
+        ) : null}
 
-        <div className="flex items-center gap-3 py-2">
-          <div className="flex-1 h-px bg-border" />
-          <span className="mono-eyebrow text-foreground/40 text-[10px]">{t("auth.signup.or")}</span>
-          <div className="flex-1 h-px bg-border" />
+        <button type="submit" className="btn-hero w-full" disabled={loading}>
+          {loading ? <LoaderDots /> : "Crea account"}
+        </button>
+
+        <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground/60">
+          <span className="h-px flex-1 bg-border" />
+          OPPURE
+          <span className="h-px flex-1 bg-border" />
         </div>
-        <GoogleButton 
-          label={googleEnabled ? t("auth.signup.google") : "Google login not configured yet."} 
-          onClick={onGoogle} 
-          disabled={loading || !googleEnabled} 
-        />
+
+        <button
+          type="button"
+          disabled
+          className="w-full rounded-full border border-border px-4 py-3 text-sm text-muted-foreground opacity-60"
+        >
+          Google login non configurato
+        </button>
       </form>
-    </AuthLayout>
+    </AuthShell>
   );
 }
+
+

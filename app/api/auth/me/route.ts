@@ -1,47 +1,51 @@
-import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+﻿export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
+import { readSessionToken, SESSION_COOKIE } from "@/lib/auth-session";
 
-export const dynamic = 'force-dynamic';
+type UserRow = {
+  id: string;
+  email: string;
+  display_name: string | null;
+};
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    console.log("[AUTH-ME] Check called");
+    await ensureAuthSchema();
 
-    const session = await getSession();
-    if (!session || !session.userId) {
+    const token = request.cookies.get(SESSION_COOKIE)?.value;
+    const session = await readSessionToken(token);
+
+    if (!session) {
       return NextResponse.json({ ok: false, user: null });
     }
 
-    const user = await prisma.userProfile.findUnique({
-      where: { id: session.userId },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        avatarUrl: true,
-        authProvider: true,
-      },
-    });
+    const rows = await prisma.$queryRaw<UserRow[]>`
+      SELECT id::text, email, display_name
+      FROM users_profile
+      WHERE id = ${session.id}::uuid
+      LIMIT 1
+    `;
+
+    const user = rows[0];
 
     if (!user) {
-      // Session exists but user doesn't - session is orphaned
       return NextResponse.json({ ok: false, user: null });
     }
 
-    return NextResponse.json({
-      ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        display_name: user.displayName,
-        avatar_url: user.avatarUrl,
-        auth_provider: user.authProvider,
-      },
+    return NextResponse.json({ ok: true, user });
+  } catch (error: any) {
+    console.error("Me error:", {
+      code: error?.code,
+      message: error?.message,
+      meta: error?.meta,
     });
-  } catch (error) {
-    console.error("Auth me error:", error);
+
     return NextResponse.json({ ok: false, user: null });
   }
 }
+
+
