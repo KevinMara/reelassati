@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import AuthShell from "./AuthShell";
@@ -8,6 +8,17 @@ import LoaderDots from "@/components/brand/LoaderDots";
 export default function Login() {
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetch("/api/auth/me", { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.ok && data?.user) {
+          window.location.replace("/dashboard");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [form, setForm] = useState({
     email: "",
@@ -44,7 +55,7 @@ export default function Login() {
       }
 
       toast({ title: "Logged in." });
-      window.location.assign("/dashboard");
+      window.location.replace("/dashboard");
     } catch {
       const msg = "Network error. Please reload and try again.";
       setErrorText(msg);
@@ -119,5 +130,6 @@ export default function Login() {
     </AuthShell>
   );
 }
+
 
 
