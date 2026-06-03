@@ -44,7 +44,7 @@ export default function Login() {
       }
 
       toast({ title: "Logged in." });
-      navigate("/dashboard");
+      window.location.assign("/dashboard");
     } catch {
       const msg = "Network error. Please reload and try again.";
       setErrorText(msg);
@@ -119,3 +119,4 @@ export default function Login() {
     </AuthShell>
   );
 }
+
