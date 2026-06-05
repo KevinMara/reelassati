@@ -6,16 +6,24 @@ import { AuthLayout, Field, GoogleButton } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function Signup() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { state, refresh } = useAuth();
   const [show, setShow] = useState(false);
   const [pw, setPw] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    if (state === "loggedIn") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [state, navigate]);
 
   // Google OAuth is explicitly disabled in Phase 1
   useEffect(() => {
@@ -66,8 +74,8 @@ export default function Signup() {
       }
       
       toast.success(t("auth.toast.signup_success") || "Account created successfully!");
-      // Force reload to dashboard to ensure session is picked up by middleware
-      window.location.href = "/dashboard";
+      await refresh();
+      navigate("/dashboard", { replace: true });
     } catch (err: any) {
       console.error("Signup fetch error:", err);
       if (err.message === "Failed to fetch") {

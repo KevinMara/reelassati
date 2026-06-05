@@ -5,15 +5,23 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthLayout, Field, GoogleButton } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { state, refresh } = useAuth();
   const [show, setShow] = useState(false);
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    if (state === "loggedIn") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [state, navigate]);
 
   // Google OAuth is explicitly disabled in Phase 1
   useEffect(() => {
@@ -49,8 +57,8 @@ export default function Login() {
       }
       
       toast.success(t("auth.toast.login_success") || "Successfully logged in!");
-      // Force reload to dashboard to ensure session is picked up by middleware
-      window.location.href = "/dashboard";
+      await refresh();
+      navigate("/dashboard", { replace: true });
     } catch (err: any) {
       console.error("Login fetch error:", err);
       if (err.message === "Failed to fetch") {
