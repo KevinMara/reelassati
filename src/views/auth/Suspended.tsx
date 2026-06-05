@@ -1,11 +1,21 @@
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ShieldAlert, Mail } from "lucide-react";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function Suspended() {
   const { t } = useTranslation();
+  const { state } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (state === "loggedIn") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [state, navigate]);
 
   return (
     <AuthLayout

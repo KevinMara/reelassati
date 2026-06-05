@@ -4,40 +4,29 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { AuthLayout, Field } from "@/components/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function ResetPassword() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { state } = useAuth();
   const [pw, setPw] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Check if we have a session (the link from email automatically sets it)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        toast.error("Sessione scaduta o non valida.");
-        navigate("/auth/login");
-      }
-    });
-  }, [navigate]);
+    if (state === "loggedIn") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [state, navigate]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: pw });
-      if (error) {
-        toast.error(error.message || t("auth.toast.generic_error"));
-        return;
-      }
-      toast.success(t("auth.toast.password_updated"));
-      navigate("/dashboard");
-    } finally {
-      setLoading(false);
-    }
+    // Suppress actual reset password logic for now
+    toast.info("Password reset is currently disabled.");
+    setLoading(false);
   }
 
   return (
