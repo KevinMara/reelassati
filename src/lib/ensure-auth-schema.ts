@@ -22,7 +22,6 @@ export async function ensureAuthSchema() {
       ADD COLUMN IF NOT EXISTS auth_provider TEXT DEFAULT 'email',
       ADD COLUMN IF NOT EXISTS google_id TEXT,
       ADD COLUMN IF NOT EXISTS avatar_url TEXT,
-      ADD COLUMN IF NOT EXISTS user_id UUID,
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now(),
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
     `);
@@ -33,9 +32,8 @@ export async function ensureAuthSchema() {
       SET
         auth_provider = COALESCE(auth_provider, 'email'),
         updated_at = COALESCE(updated_at, now()),
-        created_at = COALESCE(created_at, now()),
-        user_id = COALESCE(user_id, id)
-      WHERE auth_provider IS NULL OR updated_at IS NULL OR created_at IS NULL OR user_id IS NULL;
+        created_at = COALESCE(created_at, now())
+      WHERE auth_provider IS NULL OR updated_at IS NULL OR created_at IS NULL;
     `);
 
     // 3. Optional: If we found user_id was NOT NULL and failing, we ensure it's handled.

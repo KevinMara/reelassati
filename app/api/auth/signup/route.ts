@@ -21,88 +21,68 @@ export async function POST(request: Request) {
     }
 
     const normalizedEmail = (email as string).toLowerCase().trim();
-
-    // 1. Fetch real schema at runtime
-    const columns: any[] = await prisma.$queryRaw`
-      SELECT column_name, is_nullable, column_default 
-      FROM information_schema.columns 
-      WHERE table_name = 'users_profile' AND table_schema = 'public'
-    `;
-    
-    const colMap = new Set(columns.map(c => c.column_name.toLowerCase()));
-    const notNullNoDefault = columns
-      .filter(c => c.is_nullable === 'NO' && c.column_default === null)
-      .map(c => c.column_name.toLowerCase());
-
-    // 2. Build the data object based on existing columns
-    const userId = uuidv4();
-    const data: any = {};
-    const timestamp = new Date();
-
-    if (colMap.has("id")) data.id = userId;
-    if (colMap.has("email")) data.email = normalizedEmail;
-    if (colMap.has("display_name")) data.display_name = name;
-    else if (colMap.has("name")) data.name = name;
-
-    const hash = await hashPassword(password);
-    if (colMap.has("password_hash")) data.password_hash = hash;
-    if (colMap.has("auth_provider")) data.auth_provider = "email";
-    if (colMap.has("user_id")) data.user_id = userId;
-    if (colMap.has("created_at")) data.created_at = timestamp;
-    if (colMap.has("updated_at")) data.updated_at = timestamp;
-
-    // Check for missing NOT NULL columns
-    const missing = notNullNoDefault.filter(col => data[col] === undefined);
-    if (missing.length > 0) {
-      return NextResponse.json({
-        ok: false,
-        error: "auth_schema_error",
-        message: "unsupported_not_null_columns",
-        columns: missing
-      }, { status: 500 });
-    }
-
-    // 3. Perform explicit column insert using raw SQL to be safe from Prisma model drift
-    const colNames = Object.keys(data);
-    const colValues = Object.values(data);
-    const valuePlaceholders = colNames.map((_, i) => `$${i + 1}`).join(", ");
-    const columnList = colNames.join(", ");
+    const passwordHash = await hashPassword(password);
 
     try {
-      // Check for existing user first (using explicit column)
-      const existing: any[] = await prisma.$queryRawUnsafe(
-        `SELECT id FROM users_profile WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-        normalizedEmail
-      );
+      // 1. Check for existing user (using explicit columns and lower email)
+      const existing: any[] = await prisma.$queryRaw`
+        SELECT id::text, email, display_name, password_hash
+        FROM users_profile
+        WHERE lower(email) = lower(${normalizedEmail})
+        LIMIT 1;
+      `;
       
       if (existing.length > 0) {
         return NextResponse.json({ ok: false, error: "email_already_exists" }, { status: 409 });
       }
 
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO users_profile (${columnList}) VALUES (${valuePlaceholders})`,
-        ...colValues
-      );
+      // 2. Perform explicit column insert matching real schema
+      const result: any[] = await prisma.$queryRaw`
+        INSERT INTO users_profile (
+          email,
+          display_name,
+          password_hash,
+          auth_provider,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${normalizedEmail},
+          ${name},
+          ${passwordHash},
+          'email',
+          now(),
+          now()
+        )
+        RETURNING id::text, email, display_name;
+      `;
 
-      await createSession(userId);
+      const newUser = result[0];
+      if (!newUser || !newUser.id) {
+        throw new Error("Failed to retrieve new user ID after insert");
+      }
+
+      await createSession(newUser.id);
 
       return NextResponse.json({
         ok: true,
-        user: { id: userId, email: normalizedEmail, display_name: name }
+        user: { id: newUser.id, email: newUser.email, display_name: newUser.display_name }
       });
     } catch (dbError: any) {
-      console.error("[SIGNUP] Database error:", dbError.message);
+      console.error("[SIGNUP] Database error:", dbError.message, dbError.code);
+      return NextResponse.json({ 
+        ok: false, 
+        error: "auth_database_error",
+        code: dbError.code,
+        message: dbError.message || "Authentication is temporarily unavailable."
+      }, { status: 500 });
+    }
+    } catch (error: any) {
+      console.error("[SIGNUP] Exception:", error);
       return NextResponse.json({ 
         ok: false, 
         error: "auth_database_error",
         message: "Authentication is temporarily unavailable."
       }, { status: 500 });
     }
-  } catch (error: any) {
-    return NextResponse.json({ 
-      ok: false, 
-      error: "auth_database_error",
-      message: "Authentication is temporarily unavailable."
-    }, { status: 500 });
-  }
 }

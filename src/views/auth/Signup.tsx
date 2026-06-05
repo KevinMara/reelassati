@@ -147,9 +147,9 @@ export default function Signup() {
           <div className="flex-1 h-px bg-border" />
         </div>
         <GoogleButton 
-          label={googleEnabled ? t("auth.signup.google") : "Google login not configured yet."} 
+          label="Google login non configurato" 
           onClick={onGoogle} 
-          disabled={loading || !googleEnabled} 
+          disabled={true} 
         />
       </form>
     </AuthLayout>
