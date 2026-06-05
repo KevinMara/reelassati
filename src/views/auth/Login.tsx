@@ -126,9 +126,9 @@ export default function Login() {
 
         <Divider label={t("auth.login.or")} />
         <GoogleButton 
-          label={googleEnabled ? t("auth.login.google") : "Google login not configured yet."} 
+          label="Google login non configurato" 
           onClick={onGoogle} 
-          disabled={loading || !googleEnabled} 
+          disabled={true} 
         />
       </form>
     </AuthLayout>

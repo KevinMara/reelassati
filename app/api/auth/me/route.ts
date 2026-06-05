@@ -14,16 +14,14 @@ export async function GET() {
       return NextResponse.json({ ok: false, user: null });
     }
 
-    const user = await prisma.userProfile.findUnique({
-      where: { id: session.userId },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        avatarUrl: true,
-        authProvider: true,
-      },
-    });
+    const results: any[] = await prisma.$queryRaw`
+      SELECT id::text, email, display_name, avatar_url, auth_provider
+      FROM users_profile
+      WHERE id = ${session.userId}::uuid
+      LIMIT 1;
+    `;
+
+    const user = results[0];
 
     if (!user) {
       // Session exists but user doesn't - session is orphaned
@@ -35,9 +33,9 @@ export async function GET() {
       user: {
         id: user.id,
         email: user.email,
-        display_name: user.displayName,
-        avatar_url: user.avatarUrl,
-        auth_provider: user.authProvider,
+        display_name: user.display_name,
+        avatar_url: user.avatar_url,
+        auth_provider: user.auth_provider,
       },
     });
   } catch (error) {

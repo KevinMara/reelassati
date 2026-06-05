@@ -26,16 +26,21 @@ export async function POST(request: Request) {
     const normalizedEmail = (email as string).toLowerCase().trim();
 
     try {
-      // Find user case-insensitively
-      const user = await prisma.userProfile.findFirst({
-        where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
-      });
+      // Find user case-insensitively using raw query for exact control
+      const results: any[] = await prisma.$queryRaw`
+        SELECT id::text, email, display_name, password_hash, auth_provider
+        FROM users_profile
+        WHERE lower(email) = lower(${normalizedEmail})
+        LIMIT 1;
+      `;
 
-      if (!user || !user.passwordHash || user.authProvider !== "email") {
+      const user = results[0];
+
+      if (!user || !user.password_hash || user.auth_provider !== "email") {
         return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
       }
 
-      const isValid = await comparePassword(password, user.passwordHash);
+      const isValid = await comparePassword(password, user.password_hash);
 
       if (!isValid) {
         return NextResponse.json({ ok: false, error: "invalid_credentials" }, { status: 401 });
@@ -53,7 +58,7 @@ export async function POST(request: Request) {
         user: {
           id: user.id,
           email: user.email,
-          display_name: user.displayName,
+          display_name: user.display_name,
         },
       });
     } catch (dbError: any) {
