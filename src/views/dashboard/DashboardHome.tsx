@@ -1,28 +1,35 @@
 import { AppShell } from "@/components/app/AppShell";
-import { useAuthedProfile } from "@/components/app/useAuthedProfile";
 import { Button } from "@/components/ui/button";
 import { LogOut, Loader2 } from "lucide-react";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 export default function DashboardHome() {
-  const { profile, loading } = useAuthedProfile();
+  const { state, profile, logout } = useAuth();
+  const navigate = useNavigate();
   
-  const onLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      window.location.href = "/auth/login";
-    } catch (err) {
-      console.error("Logout failed:", err);
-      // Still redirect to login
-      window.location.href = "/auth/login";
+  useEffect(() => {
+    if (state === "loggedOut") {
+      navigate("/auth/login", { replace: true });
     }
+  }, [state, navigate]);
+
+  const onLogout = async () => {
+    await logout();
+    navigate("/auth/login", { replace: true });
   };
 
-  if (loading) {
+  if (state === "loading") {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (state === "loggedOut") {
+    return null;
   }
   
   return (
