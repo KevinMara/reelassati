@@ -77,20 +77,12 @@ export async function POST(request: Request) {
         message: dbError.message || "Authentication is temporarily unavailable."
       }, { status: 500 });
     }
-  } catch (error: any) {
-    console.error("[SIGNUP] Exception:", error);
-    return NextResponse.json({ 
-      ok: false, 
-      error: "auth_database_error",
-      message: "Authentication is temporarily unavailable."
-    }, { status: 500 });
-  }
-}
-  } catch (error: any) {
-    return NextResponse.json({ 
-      ok: false, 
-      error: "auth_database_error",
-      message: "Authentication is temporarily unavailable."
-    }, { status: 500 });
-  }
+    } catch (error: any) {
+      console.error("[SIGNUP] Exception:", error);
+      return NextResponse.json({ 
+        ok: false, 
+        error: "auth_database_error",
+        message: "Authentication is temporarily unavailable."
+      }, { status: 500 });
+    }
 }
