@@ -115,7 +115,15 @@ export default function Publish() {
               <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50 mb-4">
                 Media Preview
               </h3>
-              <ThumbnailSection reel={MOCK_REEL} />
+              <ThumbnailSection 
+                platforms={selectedPlatforms}
+                activePlatform={activeTab}
+                title={MOCK_REEL.title}
+                candidates={[]}
+                selectedIndex={null}
+                onCandidates={() => {}}
+                onSelect={() => {}}
+              />
             </section>
 
             {/* Schedule Heatmap */}
@@ -125,7 +133,11 @@ export default function Publish() {
               </h3>
               <div className="bg-surface border border-border rounded-xl p-4">
                 <p className="text-xs text-foreground/50 mb-4">Based on historical client performance.</p>
-                <ScheduleHeatmap slots={buildHeatmap(activeTab)} />
+                <ScheduleHeatmap 
+                  platform={activeTab}
+                  selectedSlot={null}
+                  onSelect={() => {}}
+                />
               </div>
             </section>
           </aside>
