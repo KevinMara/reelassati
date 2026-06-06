@@ -4,13 +4,13 @@ import { RangeToggle } from "@/components/analytics/RangeToggle";
 import { InsightCard } from "@/components/analytics/InsightCard";
 import { PlatformChart } from "@/components/analytics/PlatformChart";
 import { PostsTable } from "@/components/analytics/PostsTable";
-import { INSIGHTS, PLATFORM_STATS, POSTS } from "@/components/analytics/mockData";
+import { INSIGHTS, Range } from "@/components/analytics/mockData";
 import { useTranslation } from "react-i18next";
-import { BarChart3, TrendingUp, TrendingDown, Target } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 
 export default function Analytics() {
   const { t } = useTranslation();
-  const [range, setRange] = useState("7d");
+  const [range, setRange] = useState<Range>("7d");
 
   return (
     <AppShell>
@@ -26,16 +26,12 @@ export default function Analytics() {
 
         {/* Insights Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {INSIGHTS.map((insight, i) => {
-            const Icon = i === 0 ? TrendingUp : i === 1 ? Target : TrendingDown;
-            return (
-              <InsightCard 
-                key={i}
-                insight={insight}
-                icon={Icon}
-              />
-            )
-          })}
+          {INSIGHTS.map((insight) => (
+            <InsightCard 
+              key={insight.id}
+              insight={insight}
+            />
+          ))}
         </div>
 
         <div className="grid lg:grid-cols-[1fr_360px] gap-8">
@@ -46,22 +42,16 @@ export default function Analytics() {
                 <BarChart3 className="h-4 w-4" /> Views by Platform
               </h3>
               <div className="h-[300px]">
-                {/* PlatformChart probably expects some props, let's assume it's like this for now */}
-                <PlatformChart data={PLATFORM_STATS} />
+                <PlatformChart range={range} />
               </div>
             </div>
 
             {/* Posts Table */}
-            <div className="bg-surface border border-border rounded-xl overflow-hidden">
-              <div className="p-6 border-b border-border">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50">Recent Content Performance</h3>
-              </div>
-              <PostsTable posts={POSTS} />
-            </div>
+            <PostsTable />
           </div>
 
           <aside className="space-y-8">
-            {/* Sidebar analytics components if any */}
+            {/* Sidebar analytics components */}
             <div className="bg-primary/[0.03] border border-primary/20 rounded-2xl p-6">
               <h3 className="font-semibold text-lg mb-4">Neural Learning</h3>
               <p className="text-sm text-foreground/70 leading-relaxed">
