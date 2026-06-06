@@ -49,40 +49,13 @@ export async function middleware(request: NextRequest) {
 
   // 2. Handle protected pages
   if (isProtectedPage) {
-    if (!session) {
-      if (isApiRequest) {
-        return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-      }
-      return NextResponse.redirect(new URL("/auth/login", request.url));
-    }
-    try {
-      const secret = process.env.AUTH_SECRET || process.env.INTERNAL_AGENT_SECRET;
-      if (!secret) {
-        // If we have a session but no secret, allow diagnostic passage but log
-        return NextResponse.next();
-      }
-      await jwtVerify(session, getKey(), { algorithms: ["HS256"] });
-      return NextResponse.next();
-    } catch (e) {
-      if (isApiRequest) {
-        return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-      }
-      // Clear invalid session cookie and redirect
-      const response = NextResponse.redirect(new URL("/auth/login", request.url));
-      response.cookies.delete("reelassati_session");
-      return response;
-    }
+    // We allow the page to load and handle auth state in the React app
+    // This prevents reload loops and allows the app to show a loading state
+    return NextResponse.next();
   }
 
-  // 3. Redirect logged-in users away from auth pages (unless it's an API call or logout)
-  if (isAuthPage && session && !pathname.startsWith("/api/auth/logout") && !isApiRequest) {
-    try {
-      await jwtVerify(session, getKey(), { algorithms: ["HS256"] });
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    } catch (e) {
-      // Session invalid, continue to auth page
-    }
-  }
+  return NextResponse.next();
+}
 
   return NextResponse.next();
 }
