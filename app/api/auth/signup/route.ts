@@ -39,18 +39,26 @@ export async function POST(request: Request) {
       // 2. Perform explicit column insert matching real schema
       const result: any[] = await prisma.$queryRaw`
         INSERT INTO users_profile (
+          id,
+          "userId",
           email,
-          display_name,
+          "displayName",
           password_hash,
           auth_provider,
+          display_name,
+          user_id,
           created_at,
           updated_at
         )
         VALUES (
+          gen_random_uuid(),
+          ${normalizedEmail},
           ${normalizedEmail},
           ${name},
           ${passwordHash},
           'email',
+          ${name},
+          gen_random_uuid(),
           now(),
           now()
         )

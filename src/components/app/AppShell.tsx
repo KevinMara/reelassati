@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Sidebar } from "./Sidebar";
@@ -26,6 +28,7 @@ export function AppShell({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
+    // Only redirect if we are sure we are logged out
     if (state === "loggedOut") {
       navigate("/auth/login", { replace: true });
     }
