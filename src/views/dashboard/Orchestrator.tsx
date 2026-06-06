@@ -2,13 +2,12 @@ import { AppShell } from "@/components/app/AppShell";
 import { StageColumn } from "@/components/orchestrator/StageColumn";
 import { AgentLoadStrip } from "@/components/orchestrator/AgentLoadStrip";
 import { WorkloadHeatmap } from "@/components/orchestrator/WorkloadHeatmap";
-import { STAGES, JOBS, AGENT_LOADS, buildWorkload } from "@/components/orchestrator/mockData";
+import { STAGES, JOBS } from "@/components/orchestrator/mockData";
 import { useTranslation } from "react-i18next";
 import { LayoutGrid, Activity } from "lucide-react";
 
 export default function Orchestrator() {
   const { t } = useTranslation();
-  const workload = buildWorkload();
 
   return (
     <AppShell>
@@ -26,7 +25,7 @@ export default function Orchestrator() {
           <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50 mb-4 flex items-center gap-2">
             <Activity className="h-4 w-4" /> Agent Load Status
           </h3>
-          <AgentLoadStrip loads={AGENT_LOADS} />
+          <AgentLoadStrip />
         </section>
 
         {/* Pipeline Board */}
@@ -34,23 +33,23 @@ export default function Orchestrator() {
           <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50 mb-4 flex items-center gap-2">
             <LayoutGrid className="h-4 w-4" /> Pipeline Board
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-x-auto pb-4">
             {STAGES.map((s) => (
               <StageColumn
                 key={s.id}
-                stage={s}
-                jobs={JOBS.filter((j) => j.stage === s.id)}
+                stage={s.id}
+                jobs={JOBS}
               />
             ))}
           </div>
         </section>
 
         {/* Global Workload Heatmap */}
-        <section className="bg-surface border border-border rounded-xl p-6">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50 mb-6">
-            Global Infrastructure Workload
+        <section className="space-y-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50 flex items-center gap-2">
+            <Activity className="h-4 w-4" /> Global Infrastructure Workload
           </h3>
-          <WorkloadHeatmap cells={workload} />
+          <WorkloadHeatmap />
         </section>
       </div>
     </AppShell>
