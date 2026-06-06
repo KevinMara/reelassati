@@ -11,7 +11,7 @@ import ForgotPassword from "./views/auth/ForgotPassword";
 import ResetPassword from "./views/auth/ResetPassword";
 import AccessPending from "./views/auth/AccessPending";
 import Suspended from "./views/auth/Suspended";
-import DashboardHome from "./views/dashboard/DashboardHome";
+import DashboardHome from "@/views/dashboard/DashboardHome"; // Force absolute path
 import AdminPanel from "./views/dashboard/AdminPanel";
 import Clients from "./views/dashboard/Clients";
 import ClientDetail from "./views/dashboard/ClientDetail";

@@ -22,6 +22,9 @@ export default function DashboardHome() {
   const { profile } = useAuth();
   const { t } = useTranslation();
 
+  console.log("[DASHBOARD-HOME] Rendering full dashboard home view");
+
+
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return t("dash.greet_morning");

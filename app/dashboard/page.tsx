@@ -1,19 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import nextDynamic from 'next/dynamic';
 import { BrowserRouter } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import DashboardHome from '@/views/dashboard/DashboardHome';
 
 export const dynamic = 'force-dynamic';
-
-const DashboardHome = nextDynamic(() => import('@/views/dashboard/DashboardHome'), { ssr: false });
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    console.log("[DASHBOARD-PAGE] Rendering main dashboard view");
   }, []);
 
   if (!mounted) return null;
