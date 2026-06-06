@@ -12,7 +12,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setMounted(true);
-    console.log("[DASHBOARD-PAGE] Rendering main dashboard view");
+    console.log("[DASHBOARD-PAGE] Rendering main dashboard view - Version: 0b4bd8f");
   }, []);
 
   if (!mounted) return null;

@@ -22,7 +22,7 @@ export default function DashboardHome() {
   const { profile } = useAuth();
   const { t } = useTranslation();
 
-  console.log("[DASHBOARD-HOME] Rendering full dashboard home view - Build Verification v2");
+  console.log("[DASHBOARD-HOME] Rendering full dashboard home view - Build Verification v3 - Commit: 0b4bd8f");
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
