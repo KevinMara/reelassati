@@ -1,134 +1,63 @@
-import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
-import { Shield, Check, ExternalLink } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Settings as SettingsIcon, User, Bell, Shield, CreditCard } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function Settings() {
-  const [debug, setDebug] = useState<any>(null);
-
-  useEffect(() => {
-    fetch("/api/admin/auth-debug")
-      .then(res => res.json())
-      .then(data => setDebug(data))
-      .catch(err => console.error("Failed to load debug info", err));
-  }, []);
-
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://reelassati.vercel.app';
-  const redirectUri = `${origin}/api/auth/google/callback`;
+  const { t } = useTranslation();
+  const { profile } = useAuth();
 
   return (
     <AppShell>
       <div className="p-8 max-w-4xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">Settings</h1>
-          <p className="text-foreground/60 text-sm">Configure your Reelassati instance.</p>
-        </div>
+        <header>
+          <p className="mono-eyebrow text-primary mb-2">{t("app.nav.settings")}</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Profile & Preferences</h1>
+        </header>
 
-        <section className="bg-surface border border-border rounded-xl p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Shield className="h-5 w-5 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold">Google OAuth Setup</h2>
-          </div>
-
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium">Environment Variables</h3>
-                <ul className="space-y-2">
-                  <StatusItem label="GOOGLE_CLIENT_ID" active={debug?.googleClientIdConfigured} />
-                  <StatusItem label="GOOGLE_CLIENT_SECRET" active={debug?.googleClientSecretConfigured} />
-                  <StatusItem label="GOOGLE_REDIRECT_URI" active={debug?.googleRedirectUriConfigured} />
-                </ul>
-              </div>
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium">Database Status</h3>
-                <ul className="space-y-2">
-                  <StatusItem label="Connected" active={debug?.databaseConnected} />
-                  <StatusItem label="Auth Provider Col" active={debug?.usersProfileHasAuthProvider} />
-                  <StatusItem label="Google ID Col" active={debug?.usersProfileHasGoogleId} />
-                </ul>
-              </div>
-            </div>
-
-            <div className="bg-muted/30 border border-border rounded-lg p-5 space-y-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                Google Cloud Console Instructions
-                <a 
-                  href="https://console.cloud.google.com/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1 font-normal"
-                >
-                  Open Console <ExternalLink className="h-3 w-3" />
-                </a>
-              </h3>
-              
-              <div className="space-y-4 text-sm">
-                <div>
-                  <p className="font-medium text-foreground/80 mb-2">1. Authorized JavaScript origin</p>
-                  <code className="bg-background px-3 py-2 rounded border border-border block select-all">
-                    {origin}
-                  </code>
-                </div>
-                
-                <div>
-                  <p className="font-medium text-foreground/80 mb-2">2. Authorized redirect URI</p>
-                  <code className="bg-background px-3 py-2 rounded border border-border block select-all">
-                    {redirectUri}
-                  </code>
-                </div>
-
-                <div className="text-xs text-foreground/50 italic bg-primary/5 p-3 rounded border border-primary/10">
-                  Tip: Make sure you've enabled the "Google People API" in your Google Cloud project to allow email/profile access.
+        <div className="grid gap-8">
+          <section className="bg-surface border border-border rounded-xl p-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50 mb-6 flex items-center gap-2">
+              <User className="h-4 w-4" /> Personal Information
+            </h3>
+            <div className="space-y-4 max-w-md">
+              <div className="grid gap-1.5">
+                <label className="text-xs font-medium text-foreground/70">Display Name</label>
+                <div className="px-3 py-2 bg-foreground/[0.03] border border-border rounded-md text-sm">
+                  {profile?.display_name || "Not set"}
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {debug && (
-          <section className="bg-surface border border-border rounded-xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold mb-4">Diagnostics</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <DebugBadge label="Secret" active={debug.authSecretConfigured} />
-              <DebugBadge label="Bcrypt" active={debug.passwordHashLibraryAvailable} />
-              <DebugBadge label="Auth Provider" active={debug.usersProfileHasAuthProvider} />
-              <DebugBadge label="Google Auth" active={debug.googleAuthConfigured} />
+              <div className="grid gap-1.5">
+                <label className="text-xs font-medium text-foreground/70">Email Address</label>
+                <div className="px-3 py-2 bg-foreground/[0.03] border border-border rounded-md text-sm">
+                  {profile?.email}
+                </div>
+              </div>
             </div>
           </section>
-        )}
+
+          <section className="bg-surface border border-border rounded-xl p-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50 mb-6 flex items-center gap-2">
+              <CreditCard className="h-4 w-4" /> Subscription & Usage
+            </h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">Solo Plan</div>
+                <div className="text-xs text-foreground/50 mt-1">Free forever. Great for trying the platform.</div>
+              </div>
+              <Button variant="outline" size="sm">Upgrade plan</Button>
+            </div>
+          </section>
+
+          <section className="bg-surface border border-border rounded-xl p-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground/50 mb-6 flex items-center gap-2">
+              <Shield className="h-4 w-4" /> Security
+            </h3>
+            <Button variant="outline" size="sm">Update password</Button>
+          </section>
+        </div>
       </div>
     </AppShell>
   );
 }
-
-function StatusItem({ label, active }: { label: string; active?: boolean }) {
-  return (
-    <li className="flex items-center justify-between text-xs py-1">
-      <span className="text-foreground/70">{label}</span>
-      {active ? (
-        <span className="flex items-center gap-1 text-green-500 font-medium">
-          <Check className="h-3 w-3" /> Configured
-        </span>
-      ) : (
-        <span className="text-foreground/30">Missing</span>
-      )}
-    </li>
-  );
-}
-
-function DebugBadge({ label, active }: { label: string; active: boolean }) {
-  return (
-    <div className={cn(
-      "px-3 py-2 rounded-lg text-center text-xs font-medium border",
-      active 
-        ? "bg-green-500/10 text-green-600 border-green-500/20" 
-        : "bg-red-500/10 text-red-600 border-red-500/20"
-    )}>
-      {label}
-    </div>
-  );
-}
-
-import { cn } from "@/lib/utils";
