@@ -22,8 +22,7 @@ export default function DashboardHome() {
   const { profile } = useAuth();
   const { t } = useTranslation();
 
-  console.log("[DASHBOARD-HOME] Rendering full dashboard home view");
-
+  console.log("[DASHBOARD-HOME] Rendering full dashboard home view - Build Verification v2");
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -166,3 +165,4 @@ export default function DashboardHome() {
     </AppShell>
   );
 }
+
