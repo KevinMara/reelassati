@@ -13,7 +13,7 @@ function getKey(): Uint8Array {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const session = request.cookies.get("session")?.value;
+  const session = request.cookies.get("reelassati_session")?.value;
   const isApiRequest = pathname.startsWith("/api");
 
   // Public diagnostic routes - MUST BE EXEMPT FROM AUTH
@@ -69,7 +69,7 @@ export async function middleware(request: NextRequest) {
       }
       // Clear invalid session cookie and redirect
       const response = NextResponse.redirect(new URL("/auth/login", request.url));
-      response.cookies.delete("session");
+      response.cookies.delete("reelassati_session");
       return response;
     }
   }
