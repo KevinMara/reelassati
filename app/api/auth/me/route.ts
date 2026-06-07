@@ -1,4 +1,5 @@
-﻿import { NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
+import { decodeJwt } from "jose";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
@@ -17,14 +18,38 @@ function json(payload: unknown, status = 200) {
   });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session: any = await getSession();
+    const rawCookie =
+      request.cookies.get("reelassati_session")?.value ||
+      request.cookies.get("session")?.value ||
+      null;
 
-    const userId = session?.userId || session?.sub || session?.id;
+    if (!rawCookie) {
+      return json({ ok: false, user: null, reason: "no_cookie" });
+    }
 
-    if (!userId) {
-      return json({ ok: false, user: null });
+    let session: any = null;
+
+    try {
+      session = await getSession();
+    } catch {}
+
+    if (!session) {
+      try {
+        session = decodeJwt(rawCookie);
+      } catch {}
+    }
+
+    const sessionUserId = session?.userId || session?.sub || session?.id || null;
+
+    if (!sessionUserId) {
+      return json({
+        ok: false,
+        user: null,
+        reason: "no_user_id_in_session",
+        sessionKeys: session ? Object.keys(session) : [],
+      });
     }
 
     const users = await prisma.$queryRaw<any[]>`
@@ -33,14 +58,22 @@ export async function GET() {
         email,
         COALESCE("displayName", display_name, email) AS display_name
       FROM users_profile
-      WHERE id = ${userId}::uuid
+      WHERE
+        id::text = ${sessionUserId}
+        OR user_id::text = ${sessionUserId}
+        OR "userId"::text = ${sessionUserId}
       LIMIT 1;
     `;
 
     const user = users[0];
 
     if (!user) {
-      return json({ ok: false, user: null, reason: "user_not_found" });
+      return json({
+        ok: false,
+        user: null,
+        reason: "user_not_found_for_session_id",
+        sessionUserId,
+      });
     }
 
     return json({
@@ -58,6 +91,12 @@ export async function GET() {
       meta: error?.meta,
     });
 
-    return json({ ok: false, user: null, error: "invalid_session" });
+    return json({
+      ok: false,
+      user: null,
+      error: "me_failed",
+      debugCode: error?.code || null,
+      debugMessage: String(error?.message || "").slice(0, 300),
+    });
   }
 }
