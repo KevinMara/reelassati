@@ -1,6 +1,6 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth-session";
+import { getSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,23 +17,14 @@ function json(payload: unknown, status = 200) {
   });
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const token =
-      request.cookies.get(SESSION_COOKIE)?.value ||
-      request.cookies.get("reelassati_session")?.value ||
-      request.cookies.get("session")?.value;
+    const session: any = await getSession();
 
-    if (!token) {
-      return json({ ok: false, user: null });
-    }
-
-    const payload: any = await verifySessionToken(token);
-
-    const userId = payload?.userId || payload?.sub || payload?.id;
+    const userId = session?.userId || session?.sub || session?.id;
 
     if (!userId) {
-      return json({ ok: false, user: null, reason: "missing_user_id" });
+      return json({ ok: false, user: null });
     }
 
     const users = await prisma.$queryRaw<any[]>`
@@ -41,9 +32,9 @@ export async function GET(request: NextRequest) {
         id::text AS id,
         email,
         COALESCE("displayName", display_name, email) AS display_name
-      FROM public.users_profile
+      FROM users_profile
       WHERE id = ${userId}::uuid
-      LIMIT 1
+      LIMIT 1;
     `;
 
     const user = users[0];
