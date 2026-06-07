@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -18,6 +18,38 @@ export default function Signup() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleEnabled, setGoogleEnabled] = useState(false);
+  // REELASSATI_AUTH_ESCAPE_V1
+  useEffect(() => {
+    let alive = true;
+
+    const checkSessionAndEnter = async () => {
+      try {
+        const response = await fetch("/api/auth/me?auth_escape=" + Date.now(), {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (
+          alive &&
+          data?.ok === true &&
+          data?.user &&
+          window.location.pathname.startsWith("/auth")
+        ) {
+          window.location.replace("/dashboard?from=auth_escape");
+        }
+      } catch {}
+    };
+
+    checkSessionAndEnter();
+    const timer = window.setInterval(checkSessionAndEnter, 750);
+
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (state === "loggedIn") {
@@ -30,7 +62,7 @@ export default function Signup() {
     setGoogleEnabled(false);
   }, []);
 
-  // crude meter, 0–4
+  // crude meter, 0â€“4
   const strength = (() => {
     let s = 0;
     if (pw.length >= 8) s++;
@@ -163,3 +195,4 @@ export default function Signup() {
     </AuthLayout>
   );
 }
+
