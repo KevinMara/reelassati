@@ -35,7 +35,7 @@ export default function Login() {
           data?.user &&
           window.location.pathname.startsWith("/auth")
         ) {
-          window.location.replace("/dashboard?from=auth_escape");
+          window.location.replace("/dashboard?from=login_patch_v2"); return;
         }
       } catch {}
     };
@@ -166,7 +166,7 @@ export default function Login() {
 
         <Divider label={t("auth.login.or")} />
         <GoogleButton 
-          label="Google login non configurato" 
+          label="Google login non configurato - LOGIN_PATCH_V2" 
           onClick={onGoogle} 
           disabled={true} 
         />
@@ -184,4 +184,5 @@ function Divider({ label }: { label: string }) {
     </div>
   );
 }
+
 
