@@ -1,0 +1,148 @@
+{
+  "app\\admin\\settings\\page.tsx -> @/views/dashboard/Settings": {
+    "id": 1610,
+    "files": [
+      "static/chunks/44530001-62eb27fcaf2f0684.js",
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/4238-ebc4cbf2ca912daa.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/5156-25f04dc3e7c3750e.js",
+      "static/chunks/7593.862ee61e1562cced.js"
+    ]
+  },
+  "app\\auth\\access-pending\\page.tsx -> @/views/auth/AccessPending": {
+    "id": 9147,
+    "files": [
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/9322.686fd0ea6781e10e.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/1353.8f6f123842e93efd.js",
+      "static/chunks/9147.b7bf5c801dae2a50.js"
+    ]
+  },
+  "app\\auth\\forgot-password\\page.tsx -> @/views/auth/ForgotPassword": {
+    "id": 4191,
+    "files": [
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/9322.686fd0ea6781e10e.js",
+      "static/chunks/1555.5abf360b149abf62.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/1353.8f6f123842e93efd.js",
+      "static/chunks/4191.6a243b09634847c2.js"
+    ]
+  },
+  "app\\auth\\login\\page.tsx -> @/views/auth/Login": {
+    "id": 3673,
+    "files": [
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/9322.686fd0ea6781e10e.js",
+      "static/chunks/1555.5abf360b149abf62.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/1353.8f6f123842e93efd.js",
+      "static/chunks/3673.83268bc27b6dfa58.js"
+    ]
+  },
+  "app\\auth\\reset-password\\page.tsx -> @/views/auth/ResetPassword": {
+    "id": 3641,
+    "files": [
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/9322.686fd0ea6781e10e.js",
+      "static/chunks/1555.5abf360b149abf62.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/1353.8f6f123842e93efd.js",
+      "static/chunks/3641.97046d74e8ad59f6.js"
+    ]
+  },
+  "app\\auth\\signup\\page.tsx -> @/views/auth/Signup": {
+    "id": 1119,
+    "files": [
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/9322.686fd0ea6781e10e.js",
+      "static/chunks/1555.5abf360b149abf62.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/1353.8f6f123842e93efd.js",
+      "static/chunks/1119.0211933bcafd36a8.js"
+    ]
+  },
+  "app\\auth\\suspended\\page.tsx -> @/views/auth/Suspended": {
+    "id": 4389,
+    "files": [
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/9322.686fd0ea6781e10e.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/1353.8f6f123842e93efd.js",
+      "static/chunks/4389.b2b0b3e7924f1750.js"
+    ]
+  },
+  "app\\dashboard\\[...slug]\\page.tsx -> @/App": {
+    "id": 4746,
+    "files": [
+      "static/chunks/6c761737-ccd7539b60c611f2.js",
+      "static/chunks/44530001-62eb27fcaf2f0684.js",
+      "static/chunks/b536a0f1.a2720d16829caf29.js",
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/9322.686fd0ea6781e10e.js",
+      "static/chunks/1555.5abf360b149abf62.js",
+      "static/chunks/4238-ebc4cbf2ca912daa.js",
+      "static/chunks/4422.c81f735c3bc10443.js",
+      "static/chunks/646.3e21941c96857e1b.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/1353.8f6f123842e93efd.js",
+      "static/chunks/5156-25f04dc3e7c3750e.js",
+      "static/chunks/2129.fa8d3d4171377cc7.js",
+      "static/chunks/4746.408d6e72dee22019.js"
+    ]
+  },
+  "app\\page.tsx -> @/views/Home": {
+    "id": 2129,
+    "files": [
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/9322.686fd0ea6781e10e.js",
+      "static/chunks/4422.c81f735c3bc10443.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/2129.fa8d3d4171377cc7.js",
+      "static/chunks/4781.2d5f924b1bb95331.js"
+    ]
+  },
+  "app\\pricing\\page.tsx -> @/views/Pricing": {
+    "id": 5538,
+    "files": [
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/5538.2d78398f2184cce3.js"
+    ]
+  },
+  "app\\support\\page.tsx -> @/views/Support": {
+    "id": 8350,
+    "files": [
+      "static/chunks/3855-27c2d79571da790c.js",
+      "static/chunks/990-04ad1cbdbb60f4ef.js",
+      "static/chunks/4716-2e14016d41a5941e.js",
+      "static/chunks/8350.d85c0a246b173dd6.js"
+    ]
+  },
+  "node_modules\\@react-three\\drei\\core\\VideoTexture.js -> hls.js": {
+    "id": null,
+    "files": []
+  },
+  "node_modules\\@react-three\\drei\\web\\FaceLandmarker.js -> @mediapipe/tasks-vision": {
+    "id": null,
+    "files": []
+  },
+  "src\\lib\\i18n.ts -> i18next-browser-languagedetector": {
+    "id": 4583,
+    "files": [
+      "static/chunks/4583.5cfcb1ef22b9ca91.js"
+    ]
+  }
+}

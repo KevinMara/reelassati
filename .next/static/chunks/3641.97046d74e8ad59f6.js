@@ -1,0 +1,11 @@
+"use strict";(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[3641],{7019:function(e,t,a){a.d(t,{Z:function(){return s}});/**
+ * @license lucide-react v0.462.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */let s=(0,a(8030).Z)("EyeOff",[["path",{d:"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49",key:"ct8e1f"}],["path",{d:"M14.084 14.158a3 3 0 0 1-4.242-4.242",key:"151rxh"}],["path",{d:"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143",key:"13bj9a"}],["path",{d:"m2 2 20 20",key:"1ooewy"}]])},5733:function(e,t,a){a.d(t,{Z:function(){return s}});/**
+ * @license lucide-react v0.462.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */let s=(0,a(8030).Z)("Eye",[["path",{d:"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0",key:"1nclc0"}],["circle",{cx:"12",cy:"12",r:"3",key:"1v7zrd"}]])},3641:function(e,t,a){a.r(t),a.d(t,{default:function(){return p}});var s=a(7437),n=a(2265),r=a(455),u=a(3855),l=a(7019),c=a(5733),o=a(3274),i=a(4172),d=a(9733),h=a(7776),f=a(9408);function p(){let{t:e}=(0,u.$G)(),t=(0,r.s0)(),{state:a}=(0,f.a)(),[p,y]=(0,n.useState)(""),[m,w]=(0,n.useState)(!1),[b,x]=(0,n.useState)(!1);async function k(e){e.preventDefault(),x(!0),h.Am.info("Password reset is currently disabled."),x(!1)}return(0,n.useEffect)(()=>{"loggedIn"===a&&t("/dashboard",{replace:!0})},[a,t]),(0,s.jsx)(i.g1,{title:e("auth.reset_title"),sub:e("auth.reset_sub"),children:(0,s.jsxs)("form",{className:"space-y-5",onSubmit:k,children:[(0,s.jsx)(i.gN,{name:"password",type:m?"text":"password",label:e("auth.new_password"),required:!0,autoComplete:"new-password",value:p,onChange:e=>y(e.target.value),disabled:b,rightSlot:(0,s.jsx)("button",{type:"button",onClick:()=>w(e=>!e),className:"text-foreground/50 hover:text-foreground transition-colors",children:m?(0,s.jsx)(l.Z,{className:"h-4 w-4"}):(0,s.jsx)(c.Z,{className:"h-4 w-4"})})}),(0,s.jsx)(d.z,{type:"submit",variant:"primary",size:"lg",disabled:b,className:"w-full justify-center mt-2",children:b?(0,s.jsx)(o.Z,{className:"h-4 w-4 animate-spin"}):e("auth.update_password")})]})})}}}]);

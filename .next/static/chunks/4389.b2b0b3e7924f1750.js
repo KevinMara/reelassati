@@ -1,0 +1,11 @@
+"use strict";(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[4389],{4086:function(e,t,s){s.d(t,{Z:function(){return a}});/**
+ * @license lucide-react v0.462.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */let a=(0,s(8030).Z)("Mail",[["rect",{width:"20",height:"16",x:"2",y:"4",rx:"2",key:"18n3k1"}],["path",{d:"m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7",key:"1ocrg3"}]])},4341:function(e,t,s){s.d(t,{Z:function(){return a}});/**
+ * @license lucide-react v0.462.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */let a=(0,s(8030).Z)("ShieldAlert",[["path",{d:"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",key:"oel41y"}],["path",{d:"M12 8v4",key:"1got3b"}],["path",{d:"M12 16h.01",key:"1drbdi"}]])},4389:function(e,t,s){s.r(t),s.d(t,{default:function(){return o}});var a=s(7437),n=s(3855),r=s(455),c=s(4341),d=s(4086),l=s(4172),i=s(9733),u=s(2265),h=s(9408);function o(){let{t:e}=(0,n.$G)(),{state:t}=(0,h.a)(),s=(0,r.s0)();return(0,u.useEffect)(()=>{"loggedIn"===t&&s("/dashboard",{replace:!0})},[t,s]),(0,a.jsx)(l.g1,{title:e("auth.suspended_title"),sub:e("auth.suspended_sub"),children:(0,a.jsxs)("div",{className:"space-y-6 text-center",children:[(0,a.jsx)("div",{className:"flex justify-center",children:(0,a.jsx)("div",{className:"h-16 w-16 rounded-full bg-destructive/10 text-destructive flex items-center justify-center",children:(0,a.jsx)(c.Z,{className:"h-8 w-8"})})}),(0,a.jsx)("p",{className:"text-foreground/70 leading-relaxed",children:e("auth.suspended_body")}),(0,a.jsxs)("div",{className:"space-y-3",children:[(0,a.jsx)(i.z,{asChild:!0,variant:"primary",className:"w-full",children:(0,a.jsxs)(r.rU,{to:"/support",children:[(0,a.jsx)(d.Z,{className:"mr-2 h-4 w-4"}),e("auth.contact_support")]})}),(0,a.jsx)(i.z,{asChild:!0,variant:"ghost",className:"w-full",children:(0,a.jsx)(r.rU,{to:"/",children:e("auth.pending_back_home")})})]})]})})}}}]);
