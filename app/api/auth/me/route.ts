@@ -1,52 +1,72 @@
-import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
+import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth-session";
 
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export async function GET() {
+function json(payload: unknown, status = 200) {
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+    },
+  });
+}
+
+export async function GET(request: NextRequest) {
   try {
-    console.log("[AUTH-ME] Check called");
+    const token =
+      request.cookies.get(SESSION_COOKIE)?.value ||
+      request.cookies.get("reelassati_session")?.value ||
+      request.cookies.get("session")?.value;
 
-    const session = await getSession();
-    if (!session || !session.userId) {
-      return NextResponse.json({ ok: false, user: null });
+    if (!token) {
+      return json({ ok: false, user: null });
     }
 
-    const results: any[] = await prisma.$queryRaw`
-      SELECT 
-        id::text, email, display_name, avatar_url, auth_provider,
-        is_owner, is_unlimited, monthly_api_budget_eur, api_spend_this_cycle_eur, status
-      FROM users_profile
-      WHERE id = ${session.userId}::uuid
-      LIMIT 1;
+    const payload: any = await verifySessionToken(token);
+
+    const userId = payload?.userId || payload?.sub || payload?.id;
+
+    if (!userId) {
+      return json({ ok: false, user: null, reason: "missing_user_id" });
+    }
+
+    const users = await prisma.$queryRaw<any[]>`
+      SELECT
+        id::text AS id,
+        email,
+        COALESCE("displayName", display_name, email) AS display_name
+      FROM public.users_profile
+      WHERE id = ${userId}::uuid
+      LIMIT 1
     `;
 
-    const user = results[0];
+    const user = users[0];
 
     if (!user) {
-      // Session exists but user doesn't - session is orphaned
-      return NextResponse.json({ ok: false, user: null });
+      return json({ ok: false, user: null, reason: "user_not_found" });
     }
 
-    return NextResponse.json({
+    return json({
       ok: true,
       user: {
         id: user.id,
         email: user.email,
         display_name: user.display_name,
-        avatar_url: user.avatar_url,
-        auth_provider: user.auth_provider,
-        is_owner: user.is_owner,
-        is_unlimited: user.is_unlimited,
-        monthly_api_budget_eur: user.monthly_api_budget_eur,
-        api_spend_this_cycle_eur: user.api_spend_this_cycle_eur,
-        status: user.status,
       },
     });
-  } catch (error) {
-    console.error("Auth me error:", error);
-    return NextResponse.json({ ok: false, user: null });
+  } catch (error: any) {
+    console.error("Me error:", {
+      code: error?.code,
+      message: error?.message,
+      meta: error?.meta,
+    });
+
+    return json({ ok: false, user: null, error: "invalid_session" });
   }
 }
