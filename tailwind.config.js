@@ -3,16 +3,38 @@ module.exports = {
   darkMode: ["class"],
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
+    container: {
+      center: true,
+      padding: "1.5rem",
+      screens: { "2xl": "1280px" },
+    },
     extend: {
+      fontFamily: {
+        sans: ["Geist", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        serif: ["Fraunces", "Georgia", "serif"],
+        mono: ["Geist Mono", "ui-monospace", "monospace"],
+      },
+      fontSize: {
+        "display-xl": ["clamp(3.5rem, 8vw + 1rem, 7rem)", { lineHeight: "1.02", letterSpacing: "-0.028em" }],
+        "display-lg": ["clamp(2.5rem, 5vw + 0.5rem, 4.5rem)", { lineHeight: "1.05", letterSpacing: "-0.024em" }],
+        "display-md": ["clamp(2rem, 3.5vw + 0.5rem, 3rem)", { lineHeight: "1.08", letterSpacing: "-0.02em" }],
+      },
       colors: {
         border: "hsl(var(--border))",
+        "border-strong": "hsl(var(--border-strong))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          recessed: "hsl(var(--surface-recessed))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--primary-hover))",
+          wash: "hsl(var(--primary-wash))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -38,26 +60,25 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
-        },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
       },
       borderRadius: {
-        xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-        xs: "calc(var(--radius) - 6px)",
+        md: "calc(var(--radius) - 4px)",
+        sm: "calc(var(--radius) - 8px)",
+        pill: "9999px",
       },
       boxShadow: {
-        xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        subtle: "var(--shadow-subtle)",
+        card: "var(--shadow-card)",
+        "card-hover": "var(--shadow-card-hover)",
+        cutout: "var(--shadow-cutout)",
+        modal: "var(--shadow-modal)",
+      },
+      transitionTimingFunction: {
+        "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "in-out-expo": "cubic-bezier(0.65, 0, 0.35, 1)",
       },
       keyframes: {
         "accordion-down": {
@@ -68,15 +89,25 @@ module.exports = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "caret-blink": {
-          "0%,70%,100%": { opacity: "1" },
-          "20%,50%": { opacity: "0" },
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(12px)", filter: "blur(4px)" },
+          "100%": { opacity: "1", transform: "translateY(0)", filter: "blur(0)" },
+        },
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        "pulse-soft": {
+          "0%, 100%": { opacity: "0.6" },
+          "50%": { opacity: "1" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "caret-blink": "caret-blink 1.25s ease-out infinite",
+        "fade-up": "fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both",
+        marquee: "marquee 40s linear infinite",
+        "pulse-soft": "pulse-soft 2.4s ease-in-out infinite",
       },
     },
   },

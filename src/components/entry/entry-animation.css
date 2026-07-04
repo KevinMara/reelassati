@@ -1,0 +1,67 @@
+/* ============================================================================
+   REELASSATI — Entry Animation Theme Tokens
+   Supports light, dark (system preference), and reduced-motion.
+   ============================================================================ */
+
+/* Light theme (default) */
+:root {
+  --anim-bg: #fafafa;
+  --anim-purple: hsl(250 49% 54%);
+  --anim-purple-rgb: 94, 75, 198;
+  --anim-text: hsl(30 10% 10%);
+  --anim-glow: rgba(0, 0, 0, 0.12);
+  --anim-bloom-opacity: 0;
+}
+
+/* Dark theme via .dark class (set by next-themes / useTheme) */
+.dark {
+  --anim-bg: #0a0a0f;
+  --anim-purple: hsl(250 70% 70%);
+  --anim-purple-rgb: 155, 139, 240;
+  --anim-text: hsl(42 27% 95%);
+  --anim-glow: rgba(124, 92, 255, 0.55);
+  --anim-bloom-opacity: 0.5;
+}
+
+/* Dark theme via system preference (no JS) */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --anim-bg: #0a0a0f;
+    --anim-purple: hsl(250 70% 70%);
+    --anim-purple-rgb: 155, 139, 240;
+    --anim-text: hsl(42 27% 95%);
+    --anim-glow: rgba(124, 92, 255, 0.55);
+    --anim-bloom-opacity: 0.5;
+  }
+}
+
+/* Player drop-shadow in light (soft depth, no bloom) */
+.entry-player {
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.12));
+}
+
+/* Bloom layer — enabled in dark only */
+.entry-bloom-layer {
+  mix-blend-mode: screen;
+  opacity: var(--anim-bloom-opacity, 0);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .entry-anim-overlay {
+    --anim-glow: transparent !important;
+  }
+  .entry-bloom-layer {
+    display: none !important;
+  }
+}
+
+/* will-change management */
+.entry-will-animate {
+  will-change: transform, opacity;
+}
+
+/* pointer-events during wipe */
+.entry-pointer-pass {
+  pointer-events: none;
+}
