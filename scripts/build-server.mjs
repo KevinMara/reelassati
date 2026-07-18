@@ -1,12 +1,15 @@
 import { build } from "esbuild";
+import { copyFile, mkdir } from "node:fs/promises";
 
+await mkdir("dist/server", { recursive: true });
 await build({
-  entryPoints: ["api/boot.ts"],
-  platform: "node",
+  entryPoints: ["sites/server.ts"],
+  platform: "browser",
   bundle: true,
   format: "esm",
-  outdir: "dist",
-  banner: {
-    js: "import { createRequire } from 'module';const require = createRequire(import.meta.url);",
-  },
+  target: "es2022",
+  outfile: "dist/server/index.js",
 });
+
+await mkdir("dist/.openai", { recursive: true });
+await copyFile(".openai/hosting.json", "dist/.openai/hosting.json");
