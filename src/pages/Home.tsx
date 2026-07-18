@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/sections/Hero";
+import AISandbox from "@/sections/AISandbox";
 import { Features } from "@/sections/Features";
 import { HowItWorks } from "@/sections/HowItWorks";
 import { Platforms } from "@/sections/Platforms";
@@ -12,6 +13,7 @@ export default function Home() {
       <Navbar />
       <main className="pt-16">
         <Hero />
+        <AISandbox />
         <Features />
         <HowItWorks />
         <Platforms />

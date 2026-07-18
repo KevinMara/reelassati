@@ -43,6 +43,8 @@ export function Navbar() {
 
         <nav className="hidden md:flex items-center gap-1">
           <NavItem to="/#features">{t("nav.features")}</NavItem>
+          <NavItem to="/showcase">Showcase</NavItem>
+          <NavItem to="/templates">Templates</NavItem>
           <NavItem to="/pricing">{t("nav.pricing")}</NavItem>
           <NavItem to="/support">{t("nav.support")}</NavItem>
         </nav>
@@ -92,6 +94,8 @@ export function Navbar() {
       >
         <div className="container-page py-6 flex flex-col gap-1">
           <MobileLink to="/#features">{t("nav.features")}</MobileLink>
+          <MobileLink to="/showcase">Showcase</MobileLink>
+          <MobileLink to="/templates">Templates</MobileLink>
           <MobileLink to="/pricing">{t("nav.pricing")}</MobileLink>
           <MobileLink to="/support">{t("nav.support")}</MobileLink>
           <div className="h-px bg-border my-3" />
