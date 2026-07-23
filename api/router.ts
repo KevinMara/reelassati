@@ -7,6 +7,7 @@ import {
   platformConnections, brandKits,
 } from "@db/schema";
 import { eq, desc, and, sql, like, inArray } from "drizzle-orm";
+import { videoRouter } from "./routers/video";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -518,6 +519,14 @@ export const appRouter = createRouter({
       return db.select().from(platformConnections);
     }),
 
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // VIDEO GENERATION (OpenRouter)
+  // ═══════════════════════════════════════════════════════════════════════════════
+  video: videoRouter,
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // PLATFORM CONNECTIONS (Zernio-Powered)
+  // ═══════════════════════════════════════════════════════════════════════════════
     // ── DEPRECATED: Old connect endpoint (replaced by Zernio flow) ───────────
     connect: publicQuery
       .input(z.object({
