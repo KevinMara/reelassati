@@ -32,7 +32,9 @@ export interface VideoGenerationParams {
   model?: VideoModel;
   duration?: 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   ratio?: "16:9" | "9:16" | "1:1" | "3:4" | "4:3";
+  resolution?: "720p" | "1080p";
   referenceImageUrl?: string; // For HappyHorse R2V
+  generateAudio?: boolean; // Native audio generation (default: true)
 }
 
 export interface VideoGenerationResult {
@@ -54,12 +56,17 @@ export async function generateVideo(
     const duration = params.duration || 5;
     const ratio = params.ratio || "9:16";
 
+    const resolution = params.resolution || "1080p";
+    const generateAudio = params.generateAudio !== false; // default true
+
     const body: any = {
       model,
       input: {
         prompt: params.prompt,
         duration,
         ratio,
+        resolution,
+        generate_audio: generateAudio,
       },
     };
 
@@ -134,10 +141,13 @@ export async function checkVideoStatus(
   }
 }
 
-function estimateVideoCost(model: string, duration: number): number {
-  if (model.includes("happyhorse")) return duration * 0.144; // ~$0.144/sec at 1080p
-  if (model.includes("veo")) return duration * 0.1; // ~$0.10/sec
-  return duration * 0.12;
+function estimateVideoCost(model: string, duration: number, resolution?: string): number {
+  if (model.includes("happyhorse")) {
+    // HappyHorse: 720p = $0.13/sec, 1080p = $0.16/sec
+    return duration * (resolution === "720p" ? 0.13 : 0.16);
+  }
+  if (model.includes("veo")) return duration * 0.12; // ~$0.12/sec
+  return duration * 0.14;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

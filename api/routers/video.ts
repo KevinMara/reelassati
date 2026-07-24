@@ -9,8 +9,8 @@ export const videoRouter = createRouter({
   config: publicQuery.query(() => ({
     enabled: isConfigured(),
     models: [
-      { id: "alibaba/happyhorse-1.1", name: "HappyHorse 1.1", quality: "Best", cost: "~$0.144/sec" },
-      { id: "google/veo-3.1-fast", name: "Veo 3.1 Fast", quality: "Fast", cost: "~$0.10/sec" },
+      { id: "alibaba/happyhorse-1.1", name: "HappyHorse 1.1", quality: "Best + Audio", cost: "720p: $0.13/sec | 1080p: $0.16/sec", audio: true, lipSync: true },
+      { id: "google/veo-3.1-fast", name: "Veo 3.1 Fast", quality: "Fast + Audio", cost: "~$0.12/sec", audio: true, lipSync: false },
     ],
   })),
 
@@ -21,6 +21,8 @@ export const videoRouter = createRouter({
       model: z.enum(["alibaba/happyhorse-1.1", "google/veo-3.1-fast"]).optional(),
       duration: z.number().min(4).max(12).optional(),
       ratio: z.enum(["16:9", "9:16", "1:1", "3:4", "4:3"]).optional(),
+      resolution: z.enum(["720p", "1080p"]).optional(),
+      generateAudio: z.boolean().optional(),
       referenceImageUrl: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
@@ -52,6 +54,8 @@ export const videoRouter = createRouter({
         model: input.model || "alibaba/happyhorse-1.1",
         duration: (input.duration || 5) as 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12,
         ratio: input.ratio || "9:16",
+        resolution: input.resolution || "1080p",
+        generateAudio: input.generateAudio,
         referenceImageUrl: input.referenceImageUrl,
       });
 

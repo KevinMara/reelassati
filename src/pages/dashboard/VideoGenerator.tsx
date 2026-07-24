@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Wand2, Film, Clock, Image, DollarSign, Loader2, Download, AlertCircle } from "lucide-react";
+import { Wand2, Film, Clock, Image, DollarSign, Loader2, Download, AlertCircle, Volume2, Mic } from "lucide-react";
 import { motion } from "framer-motion";
 import { trpc } from "@/providers/trpc";
 
 const MODELS = [
-  { id: "alibaba/happyhorse-1.1" as const, name: "HappyHorse 1.1", desc: "Best quality, lip sync, 15s max", cost: "~$0.144/sec", badge: "RECOMMENDED" },
-  { id: "google/veo-3.1-fast" as const, name: "Veo 3.1 Fast", desc: "Faster generation, 8s max", cost: "~$0.10/sec", badge: "FAST" },
+  { id: "alibaba/happyhorse-1.1" as const, name: "HappyHorse 1.1", desc: "Best quality, native audio + lip sync, up to 15s", cost720: "$0.13/sec", cost1080: "$0.16/sec", badge: "AUDIO + LIP SYNC", hasAudio: true, hasLipSync: true },
+  { id: "google/veo-3.1-fast" as const, name: "Veo 3.1 Fast", desc: "Fast generation, native audio, up to 8s", cost720: "$0.10/sec", cost1080: "$0.12/sec", badge: "AUDIO", hasAudio: true, hasLipSync: false },
 ];
 
 const RATIOS = [
@@ -22,6 +22,8 @@ export default function VideoGenerator() {
   const [model, setModel] = useState<"alibaba/happyhorse-1.1" | "google/veo-3.1-fast">("alibaba/happyhorse-1.1");
   const [ratio, setRatio] = useState<"16:9" | "9:16" | "1:1" | "3:4" | "4:3">("9:16");
   const [duration, setDuration] = useState(5);
+  const [resolution, setResolution] = useState<"720p" | "1080p">("1080p");
+  const [generateAudio, setGenerateAudio] = useState(true);
   const [result, setResult] = useState<{
     videoUrl?: string;
     thumbnailUrl?: string;
@@ -46,9 +48,10 @@ export default function VideoGenerator() {
     },
   });
 
-  const estimatedCost = model.includes("happyhorse")
-    ? (duration * 0.144).toFixed(2)
-    : (duration * 0.1).toFixed(2);
+  const selectedModel = MODELS.find((m) => m.id === model)!;
+  const estimatedCost = resolution === "720p"
+    ? (duration * (model.includes("happyhorse") ? 0.13 : 0.10)).toFixed(2)
+    : (duration * (model.includes("happyhorse") ? 0.16 : 0.12)).toFixed(2);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -57,8 +60,16 @@ export default function VideoGenerator() {
         <p className="mono-eyebrow text-primary mb-2">AI Video Studio</p>
         <h1 className="text-3xl font-semibold">Generate Video</h1>
         <p className="text-foreground/60 mt-2">
-          Describe your video and AI generates it — optimized for short-form content
+          AI generates video with synchronized audio in a single pass
         </p>
+        <div className="flex items-center gap-4 mt-3">
+          <span className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full font-medium">
+            <Volume2 className="h-3 w-3" /> Native audio included
+          </span>
+          <span className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full font-medium">
+            <Mic className="h-3 w-3" /> Lip sync on HappyHorse
+          </span>
+        </div>
       </div>
 
       {/* Status */}
@@ -98,8 +109,48 @@ export default function VideoGenerator() {
                     </span>
                   </div>
                   <p className="text-xs text-foreground/50 mt-1">{m.desc}</p>
-                  <p className="text-xs text-foreground/30 mt-0.5 flex items-center gap-1">
-                    <DollarSign className="h-3 w-3" /> {m.cost}
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <p className="text-xs text-foreground/30">
+                      720p: <span className="font-medium">{m.cost720}</span>
+                    </p>
+                    <p className="text-xs text-foreground/30">
+                      1080p: <span className="font-medium">{m.cost1080}</span>
+                    </p>
+                  </div>
+                  {m.hasAudio && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <Volume2 className="h-3 w-3 text-emerald-500" />
+                      <span className="text-[10px] text-emerald-500">Audio generated with video</span>
+                    </div>
+                  )}
+                  {m.hasLipSync && (
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Mic className="h-3 w-3 text-primary" />
+                      <span className="text-[10px] text-primary">7-language lip sync</span>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Resolution */}
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <h3 className="text-sm font-medium mb-3">Resolution</h3>
+            <div className="flex gap-2">
+              {(["720p", "1080p"] as const).map((res) => (
+                <button
+                  key={res}
+                  onClick={() => setResolution(res)}
+                  className={`flex-1 p-3 rounded-lg border text-center transition-all ${
+                    resolution === res
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border hover:border-primary/30"
+                  }`}
+                >
+                  <span className="text-sm font-medium">{res}</span>
+                  <p className="text-[10px] text-foreground/40 mt-0.5">
+                    {res === "720p" ? "Faster, cheaper" : "Best quality"}
                   </p>
                 </button>
               ))}
@@ -153,6 +204,31 @@ export default function VideoGenerator() {
             </div>
           </div>
 
+          {/* Audio Toggle */}
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Volume2 className="h-4 w-4 text-emerald-500" />
+                <span className="text-sm font-medium">Generate Audio</span>
+              </div>
+              <button
+                onClick={() => setGenerateAudio(!generateAudio)}
+                className={`relative h-6 w-11 rounded-full transition-colors ${
+                  generateAudio ? "bg-emerald-500" : "bg-foreground/20"
+                }`}
+              >
+                <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                  generateAudio ? "translate-x-5" : "translate-x-0"
+                }`} />
+              </button>
+            </div>
+            <p className="text-xs text-foreground/40 mt-2">
+              {generateAudio
+                ? "Video will include synchronized audio (ambient sound, effects, dialogue). Turn off for silent video."
+                : "Silent video only. Enable to add native audio generation."}
+            </p>
+          </div>
+
           {/* Cost Estimate */}
           <div className="p-4 rounded-xl border border-primary/20 bg-primary/5">
             <div className="flex items-center justify-between">
@@ -160,7 +236,7 @@ export default function VideoGenerator() {
               <span className="text-lg font-semibold text-primary">${estimatedCost}</span>
             </div>
             <p className="text-xs text-foreground/40 mt-1">
-              {duration}s at {model.includes("happyhorse") ? "$0.144" : "$0.10"}/sec
+              {duration}s at {resolution} — includes video + audio
             </p>
           </div>
         </div>
@@ -173,7 +249,7 @@ export default function VideoGenerator() {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe your video in detail. Example: A young woman in a bright studio reviewing a skincare product, holding the bottle up to the camera, natural lighting, enthusiastic expression, 9:16 vertical format..."
+              placeholder="Describe your video scene. For talking-head content, include dialogue in quotes. Example: A young woman in a bright studio holding a skincare product, saying 'This serum changed my skin in just 7 days', enthusiastic expression, natural lighting, 9:16 vertical..."
               rows={6}
               className="w-full px-4 py-3 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
             />
@@ -188,6 +264,8 @@ export default function VideoGenerator() {
                   model,
                   duration,
                   ratio,
+                  resolution,
+                  generateAudio,
                 });
               }}
               disabled={!prompt.trim() || generate.isPending || !isEnabled}
@@ -196,12 +274,12 @@ export default function VideoGenerator() {
               {generate.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating... (~30-60s)
+                  Generating video + audio... (~30-60s)
                 </>
               ) : (
                 <>
                   <Wand2 className="h-4 w-4" />
-                  Generate Video — ${estimatedCost}
+                  Generate Video + Audio — ${estimatedCost}
                 </>
               )}
             </button>
@@ -214,7 +292,12 @@ export default function VideoGenerator() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-surface border border-border rounded-xl p-5"
             >
-              <h3 className="text-sm font-medium mb-3">Generated Video</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium">Generated Video</h3>
+                <span className="flex items-center gap-1 text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                  <Volume2 className="h-3 w-3" /> With Audio
+                </span>
+              </div>
               <div className="relative rounded-lg overflow-hidden bg-black aspect-[9/16] max-h-[500px]">
                 <video
                   src={result.videoUrl}
@@ -247,13 +330,14 @@ export default function VideoGenerator() {
 
           {/* Tips */}
           <div className="p-4 rounded-xl border border-border bg-surface">
-            <h4 className="text-sm font-medium mb-2">Prompt Tips</h4>
+            <h4 className="text-sm font-medium mb-2">Prompt Tips for Video + Audio</h4>
             <ul className="space-y-1.5 text-xs text-foreground/50">
-              <li>• Be specific: describe the scene, characters, lighting, and mood</li>
-              <li>• Include camera movement: "slow pan", "static shot", "tracking shot"</li>
-              <li>• Specify style: "cinematic", "UGC iPhone style", "studio lighting"</li>
-              <li>• Add motion: "person talking to camera", "product rotating"</li>
-              <li>• HappyHorse supports reference images for character consistency</li>
+              <li>• Include dialogue in quotes: A person saying &quot;This product is amazing&quot;</li>
+              <li>• Describe the scene: lighting, setting, camera angle, mood</li>
+              <li>• Mention sound: &quot;upbeat music&quot;, &quot;calm ambient noise&quot;, &quot;laughter&quot;</li>
+              <li>• Specify camera: &quot;close-up&quot;, &quot;tracking shot&quot;, &quot;static tripod&quot;</li>
+              <li>• HappyHorse lip-syncs 7 languages: EN, CN, JP, KR, DE, FR, CA</li>
+              <li>• Write dialogue directly in the prompt for talking-head content</li>
             </ul>
           </div>
         </div>
