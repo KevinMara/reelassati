@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { createRouter, publicQuery } from "../middleware";
-import { generateVideo, checkVideoStatus, isConfigured, PRIMARY_VIDEO_MODEL } from "../lib/openrouter";
-import { getDb } from "../queries/connection";
+import { eq } from "drizzle-orm";
+import { createRouter, publicQuery } from "../middleware.js";
+import { generateVideo, checkVideoStatus, isConfigured, PRIMARY_VIDEO_MODEL } from "../lib/openrouter.js";
+import { getDb } from "../queries/connection.js";
 import { aiJobs } from "@db/schema";
 
 export const videoRouter = createRouter({
@@ -75,7 +76,7 @@ export const videoRouter = createRouter({
         if (jobId) {
           await db.update(aiJobs)
             .set({ status: "failed", errorMessage: result?.error || "Unknown error" })
-            .where(aiJobs.id.equals(jobId));
+            .where(eq(aiJobs.id, jobId));
         }
         throw new Error(result?.error || "Video generation failed");
       }
@@ -88,7 +89,7 @@ export const videoRouter = createRouter({
             output: { videoUrl: result.videoUrl, thumbnailUrl: result.thumbnailUrl, hasAudio: result.hasAudio },
             completedAt: new Date(),
           })
-          .where(aiJobs.id.equals(jobId));
+          .where(eq(aiJobs.id, jobId));
       }
 
       return {
