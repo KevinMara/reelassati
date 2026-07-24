@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, publicQuery } from "../middleware";
-import { generateVideo, checkVideoStatus, isConfigured } from "../lib/openrouter";
+import { generateVideo, checkVideoStatus, isConfigured, PRIMARY_VIDEO_MODEL } from "../lib/openrouter";
 import { getDb } from "../queries/connection";
 import { aiJobs } from "@db/schema";
 
@@ -8,59 +8,70 @@ export const videoRouter = createRouter({
   // ── Check if OpenRouter video is configured ────────────────────────────────
   config: publicQuery.query(() => ({
     enabled: isConfigured(),
-    models: [
-      { id: "alibaba/happyhorse-1.1", name: "HappyHorse 1.1", quality: "Best + Audio", cost: "720p: $0.13/sec | 1080p: $0.16/sec", audio: true, lipSync: true },
-      { id: "google/veo-3.1-fast", name: "Veo 3.1 Fast", quality: "Fast + Audio", cost: "~$0.12/sec", audio: true, lipSync: false },
-    ],
+    model: {
+      id: PRIMARY_VIDEO_MODEL,
+      name: "Kling v3.0 Standard",
+      quality: "720p + Native Audio",
+      costSilent: "$0.084/sec",
+      costAudio: "$0.126/sec",
+      maxDuration: 15,
+      ratios: ["9:16", "16:9", "1:1"],
+      features: ["Native audio generation", "First frame image-to-video", "Last frame image-to-video", "Negative prompt", "CFG scale control"],
+    },
   })),
 
   // ── Generate video ─────────────────────────────────────────────────────────
   generate: publicQuery
     .input(z.object({
       prompt: z.string().min(1).max(2500),
-      model: z.enum(["alibaba/happyhorse-1.1", "google/veo-3.1-fast"]).optional(),
-      duration: z.number().min(4).max(12).optional(),
-      ratio: z.enum(["16:9", "9:16", "1:1", "3:4", "4:3"]).optional(),
-      resolution: z.enum(["720p", "1080p"]).optional(),
+      duration: z.number().min(3).max(15).optional(),
+      ratio: z.enum(["16:9", "9:16", "1:1"]).optional(),
       generateAudio: z.boolean().optional(),
-      referenceImageUrl: z.string().optional(),
+      negativePrompt: z.string().max(500).optional(),
+      cfgScale: z.number().min(0).max(1).optional(),
+      firstFrameUrl: z.string().optional(),
+      lastFrameUrl: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (!ctx.session?.userId) throw new Error("Not authenticated");
       if (!isConfigured()) throw new Error("OpenRouter API key not configured");
 
       const userId = Number(ctx.session.userId);
+      const db = getDb();
 
       // Create AI job record
-      const db = getDb();
       const jobResult = await db.insert(aiJobs).values({
         userId,
         type: "video_edit",
         status: "processing",
         input: {
           prompt: input.prompt,
-          model: input.model,
           duration: input.duration,
           ratio: input.ratio,
+          generateAudio: input.generateAudio,
+          negativePrompt: input.negativePrompt,
+          cfgScale: input.cfgScale,
+          hasFirstFrame: !!input.firstFrameUrl,
+          hasLastFrame: !!input.lastFrameUrl,
         },
-        creditsUsed: Math.round((input.duration || 5) * 10), // 10 credits per second
+        creditsUsed: Math.round((input.duration || 5) * 13), // ~13 credits per second (with audio)
       }).returning({ id: aiJobs.id });
 
       const jobId = jobResult[0]?.id;
 
-      // Call OpenRouter
+      // Call OpenRouter with Kling v3.0 Standard
       const result = await generateVideo({
         prompt: input.prompt,
-        model: input.model || "alibaba/happyhorse-1.1",
-        duration: (input.duration || 5) as 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12,
+        duration: (input.duration || 5) as 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15,
         ratio: input.ratio || "9:16",
-        resolution: input.resolution || "1080p",
         generateAudio: input.generateAudio,
-        referenceImageUrl: input.referenceImageUrl,
+        negativePrompt: input.negativePrompt,
+        cfgScale: input.cfgScale,
+        firstFrameUrl: input.firstFrameUrl,
+        lastFrameUrl: input.lastFrameUrl,
       });
 
       if (!result || result.status === "failed") {
-        // Update job as failed
         if (jobId) {
           await db.update(aiJobs)
             .set({ status: "failed", errorMessage: result?.error || "Unknown error" })
@@ -74,7 +85,7 @@ export const videoRouter = createRouter({
         await db.update(aiJobs)
           .set({
             status: "completed",
-            output: { videoUrl: result.videoUrl, thumbnailUrl: result.thumbnailUrl },
+            output: { videoUrl: result.videoUrl, thumbnailUrl: result.thumbnailUrl, hasAudio: result.hasAudio },
             completedAt: new Date(),
           })
           .where(aiJobs.id.equals(jobId));
@@ -87,7 +98,7 @@ export const videoRouter = createRouter({
         videoUrl: result.videoUrl,
         thumbnailUrl: result.thumbnailUrl,
         duration: result.duration,
-        model: result.model,
+        hasAudio: result.hasAudio,
         cost: result.cost,
       };
     }),

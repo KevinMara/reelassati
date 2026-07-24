@@ -2,7 +2,7 @@
 // OPENROUTER API CLIENT
 // ═══════════════════════════════════════════════════════════════════════════════
 // Unified client for: LLM (Kimi), Whisper transcription, MiniMax TTS,
-// and video generation (HappyHorse, Veo)
+// and video generation (Kling v3.0 Standard — video + native audio)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
@@ -22,19 +22,25 @@ export function isConfigured(): boolean {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// VIDEO GENERATION
+// VIDEO GENERATION — KLING v3.0 STANDARD (Primary)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Video + native audio in a single pass. 720p, 3-15s, 9:16/16:9/1:1.
+// Costs: $0.084/sec (silent) | $0.126/sec (with audio)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export type VideoModel = "alibaba/happyhorse-1.1" | "google/veo-3.1-fast";
+export type VideoModel = "kwaivgi/kling-v3.0-std";
+
+export const PRIMARY_VIDEO_MODEL: VideoModel = "kwaivgi/kling-v3.0-std";
 
 export interface VideoGenerationParams {
   prompt: string;
-  model?: VideoModel;
-  duration?: 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
-  ratio?: "16:9" | "9:16" | "1:1" | "3:4" | "4:3";
-  resolution?: "720p" | "1080p";
-  referenceImageUrl?: string; // For HappyHorse R2V
+  duration?: 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+  ratio?: "16:9" | "9:16" | "1:1";
   generateAudio?: boolean; // Native audio generation (default: true)
+  negativePrompt?: string; // What to exclude from the video
+  cfgScale?: number; // Prompt adherence 0-1 (default: 0.5)
+  firstFrameUrl?: string; // Image-to-video: starting frame
+  lastFrameUrl?: string; // Image-to-video: ending frame
 }
 
 export interface VideoGenerationResult {
@@ -44,6 +50,7 @@ export interface VideoGenerationResult {
   thumbnailUrl?: string;
   duration: number;
   model: string;
+  hasAudio: boolean;
   cost: number; // estimated cost in USD
   error?: string;
 }
@@ -52,27 +59,30 @@ export async function generateVideo(
   params: VideoGenerationParams,
 ): Promise<VideoGenerationResult | null> {
   try {
-    const model = params.model || "alibaba/happyhorse-1.1";
+    const model = PRIMARY_VIDEO_MODEL;
     const duration = params.duration || 5;
     const ratio = params.ratio || "9:16";
+    const generateAudio = params.generateAudio !== false;
 
-    const resolution = params.resolution || "1080p";
-    const generateAudio = params.generateAudio !== false; // default true
-
-    const body: any = {
-      model,
-      input: {
-        prompt: params.prompt,
-        duration,
-        ratio,
-        resolution,
-        generate_audio: generateAudio,
-      },
+    const input: any = {
+      prompt: params.prompt,
+      duration,
+      ratio,
     };
 
-    // Add reference image for HappyHorse R2V feature
-    if (params.referenceImageUrl && model === "alibaba/happyhorse-1.1") {
-      body.input.reference_image = params.referenceImageUrl;
+    // Kling-specific passthrough parameters
+    if (params.negativePrompt) input.negative_prompt = params.negativePrompt;
+    if (params.cfgScale !== undefined) input.cfg_scale = params.cfgScale;
+
+    // Image-to-video: first frame and/or last frame
+    if (params.firstFrameUrl) input.first_frame = params.firstFrameUrl;
+    if (params.lastFrameUrl) input.last_frame = params.lastFrameUrl;
+
+    const body: any = { model, input };
+
+    // Enable native audio generation
+    if (generateAudio) {
+      body.input.audio = true;
     }
 
     const res = await fetch(`${OPENROUTER_BASE}/video/generations`, {
@@ -89,6 +99,7 @@ export async function generateVideo(
         status: "failed",
         duration,
         model,
+        hasAudio: generateAudio,
         cost: 0,
         error: `API error: ${res.status} - ${error}`,
       };
@@ -103,7 +114,8 @@ export async function generateVideo(
       thumbnailUrl: data.output?.thumbnail_url,
       duration,
       model,
-      cost: estimateVideoCost(model, duration),
+      hasAudio: generateAudio,
+      cost: estimateVideoCost(duration, generateAudio),
     };
   } catch (err: any) {
     console.error("Video generation error:", err);
@@ -111,7 +123,8 @@ export async function generateVideo(
       id: "",
       status: "failed",
       duration: params.duration || 5,
-      model: params.model || "alibaba/happyhorse-1.1",
+      model: PRIMARY_VIDEO_MODEL,
+      hasAudio: params.generateAudio !== false,
       cost: 0,
       error: err.message,
     };
@@ -133,21 +146,20 @@ export async function checkVideoStatus(
       videoUrl: data.output?.video_url,
       thumbnailUrl: data.output?.thumbnail_url,
       duration: data.input?.duration || 5,
-      model: data.model || "",
-      cost: estimateVideoCost(data.model, data.input?.duration || 5),
+      model: data.model || PRIMARY_VIDEO_MODEL,
+      hasAudio: !!data.input?.audio,
+      cost: estimateVideoCost(data.input?.duration || 5, !!data.input?.audio),
     };
   } catch {
     return null;
   }
 }
 
-function estimateVideoCost(model: string, duration: number, resolution?: string): number {
-  if (model.includes("happyhorse")) {
-    // HappyHorse: 720p = $0.13/sec, 1080p = $0.16/sec
-    return duration * (resolution === "720p" ? 0.13 : 0.16);
-  }
-  if (model.includes("veo")) return duration * 0.12; // ~$0.12/sec
-  return duration * 0.14;
+function estimateVideoCost(duration: number, withAudio: boolean): number {
+  // Kling v3.0 Standard pricing:
+  // Without audio: $0.084/sec
+  // With audio: $0.126/sec
+  return duration * (withAudio ? 0.126 : 0.084);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -162,7 +174,6 @@ export async function transcribeAudio(
   segments: { start: number; end: number; text: string }[];
 } | null> {
   try {
-    // Download audio and send to Whisper
     const audioRes = await fetch(audioUrl);
     const audioBlob = await audioRes.blob();
 
@@ -173,9 +184,7 @@ export async function transcribeAudio(
 
     const res = await fetch(`${OPENROUTER_BASE}/audio/transcriptions`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-      },
+      headers: { Authorization: `Bearer ${API_KEY}` },
       body: formData,
     });
 
@@ -202,10 +211,10 @@ export async function transcribeAudio(
 
 export interface TTSParams {
   text: string;
-  voice?: string; // minimax voice preset ID
-  speed?: number; // 0.5 - 2.0
-  emotion?: string; // "happy", "sad", "angry", "neutral", "excited", "calm", "fearful", "disgusted"
-  language?: string; // "en", "it", etc.
+  voice?: string;
+  speed?: number;
+  emotion?: string;
+  language?: string;
 }
 
 export async function synthesizeSpeech(
