@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Search, Bell, Sun, Moon, Globe,
   Users, FileText, BarChart3, Euro, Search as SearchIcon, PenLine,
   Scissors, Send, Library, Calendar, AtSign, Shield, Settings, LogOut,
-  X, ChevronRight, Flame, Film,
+  X, ChevronRight, Flame, Film, Mic, MessageCircle, Target, Mail, Gift,
 } from "lucide-react";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,11 @@ import SocialHub from "./dashboard/SocialHub";
 import SettingsPage from "./dashboard/SettingsPage";
 import TrendsPage from "./dashboard/TrendsPage";
 import VideoGenerator from "./dashboard/VideoGenerator";
+import VoiceNotes from "./dashboard/VoiceNotes";
+import InterviewMe from "./dashboard/InterviewMe";
+import GoalTracker from "./dashboard/GoalTracker";
+import CoachingPage from "./dashboard/CoachingPage";
+import ReferralPage from "./dashboard/ReferralPage";
 
 const EntryAnimation = lazy(() => import("@/components/entry/EntryAnimation"));
 
@@ -169,10 +174,16 @@ export default function Dashboard() {
     { icon: Search, label: t("nav.analyze"), to: "/dashboard/analyze" },
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
     { icon: Film, label: "AI Video", to: "/dashboard/video" },
+    { icon: Mic, label: "Voice Studio", to: "/dashboard/voice" },
+    { icon: MessageCircle, label: "Interview Me", to: "/dashboard/interview" },
     { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
     { icon: Send, label: t("nav.publish"), to: "/dashboard/publish" },
     { icon: BarChart3, label: t("nav.analytics"), to: "/dashboard/analytics" },
     { icon: Flame, label: "Trends", to: "/dashboard/trends" },
+    { separator: true },
+    { icon: Target, label: "Goals", to: "/dashboard/goals" },
+    { icon: Mail, label: "Weekly Coach", to: "/dashboard/coaching" },
+    { icon: Gift, label: "Refer & Earn", to: "/dashboard/referral" },
     { separator: true },
     { icon: Library, label: t("nav.library"), to: "/dashboard/library" },
     { icon: Users, label: t("nav.clients"), to: "/dashboard/clients" },
@@ -261,6 +272,11 @@ export default function Dashboard() {
             <Route path="/social" element={<SocialHub />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/trends" element={<TrendsPage />} />
+            <Route path="/voice" element={<VoiceNotes />} />
+            <Route path="/interview" element={<InterviewMe />} />
+            <Route path="/goals" element={<GoalTracker />} />
+            <Route path="/coaching" element={<CoachingPage />} />
+            <Route path="/referral" element={<ReferralPage />} />
             <Route path="/admin" element={<div className="text-center py-20"><Shield className="h-12 w-12 mx-auto text-foreground/20 mb-4" /><h2 className="text-xl font-semibold">Admin Panel</h2><p className="text-foreground/50 mt-2">Coming soon</p></div>} />
           </Routes>
         </main>

@@ -8,6 +8,11 @@ import {
 } from "@db/schema";
 import { eq, desc, and, sql, like, inArray } from "drizzle-orm";
 import { videoRouter } from "./routers/video";
+import { referralRouter } from "./routers/referral";
+import { voiceRouter } from "./routers/voice";
+import { interviewRouter } from "./routers/interview";
+import { goalsRouter } from "./routers/goals";
+import { coachingRouter } from "./routers/coaching";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -520,9 +525,34 @@ export const appRouter = createRouter({
     }),
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // VIDEO GENERATION (OpenRouter)
+  // VIDEO GENERATION (OpenRouter — Kling v3.0)
   // ═══════════════════════════════════════════════════════════════════════════════
   video: videoRouter,
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // VOICE NOTES — Audio → Transcription → Scripts
+  // ═══════════════════════════════════════════════════════════════════════════════
+  voice: voiceRouter,
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // INTERVIEW ME — AI Interviews → Content
+  // ═══════════════════════════════════════════════════════════════════════════════
+  interview: interviewRouter,
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // GOALS — Follower & Content Target Tracking
+  // ═══════════════════════════════════════════════════════════════════════════════
+  goals: goalsRouter,
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // COACHING — Weekly Performance Digest
+  // ═══════════════════════════════════════════════════════════════════════════════
+  coaching: coachingRouter,
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // REFERRALS — Credit-based Affiliate System
+  // ═══════════════════════════════════════════════════════════════════════════════
+  referral: referralRouter,
 
   // ═══════════════════════════════════════════════════════════════════════════════
   // PLATFORM CONNECTIONS (Zernio-Powered)

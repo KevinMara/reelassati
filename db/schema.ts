@@ -224,3 +224,92 @@ export const brandKits = pgTable("brand_kits", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: GOALS — Follower & Content Targets
+// ═══════════════════════════════════════════════════════════════════════════════
+export const goals = pgTable("goals", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  type: pgEnum("goal_type", ["followers", "posts", "engagement", "views", "revenue"])("type").notNull(),
+  platform: platformEnum("platform"),
+  targetValue: integer("target_value").notNull(),
+  currentValue: integer("current_value").default(0),
+  deadline: timestamp("deadline"),
+  status: pgEnum("goal_status", ["active", "achieved", "expired", "paused"])("status").notNull().default("active"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: REFERRALS — Credit-based Affiliate System
+// ═══════════════════════════════════════════════════════════════════════════════
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerUserId: bigint("referrer_user_id", { mode: "number" }).notNull(),
+  referredUserId: bigint("referred_user_id", { mode: "number" }),
+  referralCode: varchar("referral_code", { length: 50 }).notNull().unique(),
+  status: pgEnum("referral_status", ["pending", "completed", "rewarded"])("status").notNull().default("pending"),
+  creditsEarned: integer("credits_earned").default(0),
+  dollarValue: varchar("dollar_value", { length: 20 }).default("$0.00"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: VOICE NOTES — Audio Uploads + Transcriptions
+// ═══════════════════════════════════════════════════════════════════════════════
+export const voiceNotes = pgTable("voice_notes", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  title: varchar("title", { length: 255 }),
+  audioUrl: varchar("audio_url", { length: 1000 }),
+  transcription: text("transcription"),
+  segments: json("segments"),
+  language: varchar("language", { length: 10 }),
+  duration: integer("duration"),
+  generatedScripts: json("generated_scripts"),
+  status: pgEnum("voice_status", ["uploaded", "transcribing", "transcribed", "generating", "completed"])("status").notNull().default("uploaded"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: INTERVIEW SESSIONS — AI Interview Mode
+// ═══════════════════════════════════════════════════════════════════════════════
+export const interviewSessions = pgTable("interview_sessions", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  topic: varchar("topic", { length: 255 }),
+  niche: varchar("niche", { length: 255 }),
+  platform: platformEnum("platform"),
+  questions: json("questions"),
+  answers: json("answers"),
+  generatedContent: json("generated_content"),
+  status: pgEnum("interview_status", ["in_progress", "completed", "generating"])("status").notNull().default("in_progress"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: COACHING INSIGHTS — Weekly Performance Digest
+// ═══════════════════════════════════════════════════════════════════════════════
+export const coachingInsights = pgTable("coaching_insights", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  weekStart: timestamp("week_start").notNull(),
+  weekEnd: timestamp("week_end").notNull(),
+  postsCreated: integer("posts_created").default(0),
+  postsPublished: integer("posts_published").default(0),
+  totalViews: integer("total_views").default(0),
+  totalEngagements: integer("total_engagements").default(0),
+  topPerformingPost: json("top_performing_post"),
+  growthRate: varchar("growth_rate", { length: 20 }),
+  insights: json("insights"),
+  recommendations: json("recommendations"),
+  nextWeekGoals: json("next_week_goals"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
