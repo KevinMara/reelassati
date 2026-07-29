@@ -92,6 +92,12 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@supabase/ssr':
+        specifier: ^0.12.3
+        version: 0.12.4(@supabase/supabase-js@2.111.0)
+      '@supabase/supabase-js':
+        specifier: ^2.109.0
+        version: 2.111.0
       '@tanstack/react-query':
         specifier: ^5.90.16
         version: 5.101.2(react@19.2.7)
@@ -104,6 +110,9 @@ importers:
       '@trpc/server':
         specifier: ^11.8.1
         version: 11.18.0(typescript@5.9.3)
+      '@vercel/analytics':
+        specifier: ^2.0.1
+        version: 2.0.1(react@19.2.7)
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -124,7 +133,7 @@ importers:
         version: 17.4.2
       drizzle-orm:
         specifier: ^0.45.1
-        version: 0.45.2(mysql2@3.23.0(@types/node@24.13.3))
+        version: 0.45.2(@types/pg@8.20.0)(mysql2@3.23.0(@types/node@24.13.3))(pg@8.22.0)
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.2.7)
@@ -149,12 +158,12 @@ importers:
       lucide-react:
         specifier: ^0.562.0
         version: 0.562.0(react@19.2.7)
-      mysql2:
-        specifier: ^3.14.1
-        version: 3.23.0(@types/node@24.13.3)
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
       react:
         specifier: ^19.2.0
         version: 19.2.7
@@ -210,6 +219,9 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.13.3
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
       '@types/react':
         specifier: ^19.2.5
         version: 19.2.17
@@ -1850,6 +1862,38 @@ packages:
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
 
+  '@supabase/auth-js@2.111.0':
+    resolution: {integrity: sha512-hbRLgyQZEX0SDyF4LYXpv94qOIQyFATfpT5SIs2V0SisHnisVRkYgiPQWzv80l4S2mO3qof78rmoH9j5zoFsYQ==}
+    engines: {node: '>=22.0.0'}
+
+  '@supabase/functions-js@2.111.0':
+    resolution: {integrity: sha512-RW/OCsd6MO592zU8ifzP8/f8XzxxIdpb+Up5XaOtE26Fw+3zTp475WX7+GuuktiD1WF8pFUDe6khUPbMp77RCw==}
+    engines: {node: '>=22.0.0'}
+
+  '@supabase/phoenix@0.4.5':
+    resolution: {integrity: sha512-aAn9H9ovVyeApKy11OWOrrOGq8DV68yWeH4ud2lN9fzn4aO8Zb5GLL9m1pUg9nLqIcT+ZDfAcsZe0E/nqdv2lw==}
+
+  '@supabase/postgrest-js@2.111.0':
+    resolution: {integrity: sha512-pcqeDsnWP0lx9GawduYxNZJHeuTm53O7L0SC8RF8tniV3GWIPY6me6OTdnwzdwNUmNy1dzUVtSyIfE6+OflzPQ==}
+    engines: {node: '>=22.0.0'}
+
+  '@supabase/realtime-js@2.111.0':
+    resolution: {integrity: sha512-6oRf/vZyRwg8f8GbFSJkrD2w4HAu/yTvyMViHXHS+H5hNJzdXCrUR7cP5oW7daT3YlRnzRPY9LcGSJKZAmfMSg==}
+    engines: {node: '>=22.0.0'}
+
+  '@supabase/ssr@0.12.4':
+    resolution: {integrity: sha512-xHzcgI8cC1TpBKSwJcR5Yd8CCwfIq0SBc5yb4yz/YFw5tbCrEQ0QT3a+2jymCxHgQWLfzwN93HZ6eRbcoMkOlA==}
+    peerDependencies:
+      '@supabase/supabase-js': ^2.111.0
+
+  '@supabase/storage-js@2.111.0':
+    resolution: {integrity: sha512-UEViNmTzVOxE8dqUA81wls+n9xgmlvSFfhfwo6QxrO4kQOytCYyw3ciYFoi4XoD4Jl95NJ3jnndHN5iIudWzqw==}
+    engines: {node: '>=22.0.0'}
+
+  '@supabase/supabase-js@2.111.0':
+    resolution: {integrity: sha512-9q0/AULthQnWeiDh1vGyjoJZbSY04bu6qHcWit70pqEYn5Kv/dkCPY62Ja1123jEnJbB9Vd2pjY7Kvk/lK3peA==}
+    engines: {node: '>=22.0.0'}
+
   '@tabby_ai/hijri-converter@1.0.5':
     resolution: {integrity: sha512-r5bClKrcIusDoo049dSL8CawnHR6mRdDwhlQuIgZRNty68q0x8k3Lf1BtPAMxRf/GgnHBnIO4ujd3+GQdLWzxQ==}
     engines: {node: '>=16.0.0'}
@@ -1938,6 +1982,9 @@ packages:
   '@types/node@24.13.3':
     resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
 
+  '@types/pg@8.20.0':
+    resolution: {integrity: sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow==}
+
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
     peerDependencies:
@@ -2004,6 +2051,35 @@ packages:
   '@typescript-eslint/visitor-keys@8.64.0':
     resolution: {integrity: sha512-mrtuL8Nsn6gi2H4mo5KMTp823M+3Q19Ew/i+Zlikq20tIMm99C3Ez0dCmkWWnxut20esQvTg8aUSEhMcAOXhEw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@vercel/analytics@2.0.1':
+    resolution: {integrity: sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g==}
+    peerDependencies:
+      '@remix-run/react': ^2
+      '@sveltejs/kit': ^1 || ^2
+      next: '>= 13'
+      nuxt: '>= 3'
+      react: ^18 || ^19 || ^19.0.0-rc
+      svelte: '>= 4'
+      vue: ^3
+      vue-router: ^4
+    peerDependenciesMeta:
+      '@remix-run/react':
+        optional: true
+      '@sveltejs/kit':
+        optional: true
+      next:
+        optional: true
+      nuxt:
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+      vue-router:
+        optional: true
 
   '@vitejs/plugin-react@5.2.0':
     resolution: {integrity: sha512-YmKkfhOAi3wsB1PhJq5Scj3GXMn3WvtQ/JC0xoopuHoXSdmtdStOpFrYaT1kie2YgFBcIe64ROzMYRjCrYOdYw==}
@@ -2638,6 +2714,10 @@ packages:
       typescript:
         optional: true
 
+  iceberg-js@0.8.1:
+    resolution: {integrity: sha512-1dhVQZXhcHje7798IVM+xoo/1ZdVfzOMIc8/rgVSijRK38EDqOJoGula9N/8ZI5RD8QTxNQtK/Gozpr+qUqRRA==}
+    engines: {node: '>=20.0.0'}
+
   iconv-lite@0.7.3:
     resolution: {integrity: sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ==}
     engines: {node: '>=0.10.0'}
@@ -2882,6 +2962,40 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
+  pg-cloudflare@1.4.0:
+    resolution: {integrity: sha512-Vo7z/6rrQYxpNRylp4Tlob2elzbh+N/MOQbxFVWCxS7oEx6jF53GTJFxK2WWpKuBRkmiin4Mt+xofFDjx09R0A==}
+
+  pg-connection-string@2.14.0:
+    resolution: {integrity: sha512-XwWDGcLRGCXAR8F/AM5bG7Q+A3Wm2s6QeEjlOKZLlH3UYcguiqCWKyWXVag5TLTIjR7oOJUY8kcADaZgWPyLeg==}
+
+  pg-int8@1.0.1:
+    resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
+    engines: {node: '>=4.0.0'}
+
+  pg-pool@3.14.0:
+    resolution: {integrity: sha512-gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw==}
+    peerDependencies:
+      pg: '>=8.0'
+
+  pg-protocol@1.15.0:
+    resolution: {integrity: sha512-cq9sECI5s0+uPUXjbz8ioyPJni6RzsRib0US67i5IoTZKw8fNeYlVE7u8F4dG7vEJJtc5wdD1K189lCCUwqWTQ==}
+
+  pg-types@2.2.0:
+    resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
+    engines: {node: '>=4'}
+
+  pg@8.22.0:
+    resolution: {integrity: sha512-8wih1vVIBMxoUM2oB4soJsD9tDnDpLv4OXBJ+EJzFsvycD+lfyIreC2gGHq78f8jbLLt+bvlPTFdFZfJkOuzAA==}
+    engines: {node: '>= 16.0.0'}
+    peerDependencies:
+      pg-native: '>=3.0.1'
+    peerDependenciesMeta:
+      pg-native:
+        optional: true
+
+  pgpass@1.0.5:
+    resolution: {integrity: sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==}
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -2947,6 +3061,22 @@ packages:
   postcss@8.5.19:
     resolution: {integrity: sha512-Mz8SaolMd8nB+G13WkORcxQKHZ/NE4xXevtkJHVuG+guo9/wYKlIMTKAqGdEmYOXR2ijPjTYNHssizdaVSUNdQ==}
     engines: {node: ^10 || ^12 || >=14}
+
+  postgres-array@2.0.0:
+    resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
+    engines: {node: '>=4'}
+
+  postgres-bytea@1.0.1:
+    resolution: {integrity: sha512-5+5HqXnsZPE65IJZSMkZtURARZelel2oXUEO8rH83VS/hxH5vv1uHquPg5wZs8yMAfdv971IU+kcPUczi7NVBQ==}
+    engines: {node: '>=0.10.0'}
+
+  postgres-date@1.0.7:
+    resolution: {integrity: sha512-suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q==}
+    engines: {node: '>=0.10.0'}
+
+  postgres-interval@1.2.0:
+    resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
+    engines: {node: '>=0.10.0'}
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -3166,6 +3296,10 @@ packages:
   source-map@0.6.1:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==}
     engines: {node: '>=0.10.0'}
+
+  split2@4.2.0:
+    resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
+    engines: {node: '>= 10.x'}
 
   sql-escaper@1.5.1:
     resolution: {integrity: sha512-4toX5E1fQbBrpfXidaHnF0669nkAdETeIPTs2SUjxxD7RRIs9ICG4gtpmfc68JCEKehsdwLFqBu9VlQqZ1P1gg==}
@@ -3427,6 +3561,10 @@ packages:
   word-wrap@1.2.5:
     resolution: {integrity: sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA==}
     engines: {node: '>=0.10.0'}
+
+  xtend@4.0.2:
+    resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
+    engines: {node: '>=0.4'}
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
@@ -4727,6 +4865,43 @@ snapshots:
 
   '@standard-schema/utils@0.3.0': {}
 
+  '@supabase/auth-js@2.111.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@supabase/functions-js@2.111.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@supabase/phoenix@0.4.5': {}
+
+  '@supabase/postgrest-js@2.111.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@supabase/realtime-js@2.111.0':
+    dependencies:
+      '@supabase/phoenix': 0.4.5
+      tslib: 2.8.1
+
+  '@supabase/ssr@0.12.4(@supabase/supabase-js@2.111.0)':
+    dependencies:
+      '@supabase/supabase-js': 2.111.0
+      cookie: 1.1.1
+
+  '@supabase/storage-js@2.111.0':
+    dependencies:
+      iceberg-js: 0.8.1
+      tslib: 2.8.1
+
+  '@supabase/supabase-js@2.111.0':
+    dependencies:
+      '@supabase/auth-js': 2.111.0
+      '@supabase/functions-js': 2.111.0
+      '@supabase/postgrest-js': 2.111.0
+      '@supabase/realtime-js': 2.111.0
+      '@supabase/storage-js': 2.111.0
+
   '@tabby_ai/hijri-converter@1.0.5': {}
 
   '@tanstack/query-core@5.101.2': {}
@@ -4812,6 +4987,12 @@ snapshots:
   '@types/node@24.13.3':
     dependencies:
       undici-types: 7.18.2
+
+  '@types/pg@8.20.0':
+    dependencies:
+      '@types/node': 24.13.3
+      pg-protocol: 1.15.0
+      pg-types: 2.2.0
 
   '@types/react-dom@19.2.3(@types/react@19.2.17)':
     dependencies:
@@ -4912,6 +5093,10 @@ snapshots:
       '@typescript-eslint/types': 8.64.0
       eslint-visitor-keys: 5.0.1
 
+  '@vercel/analytics@2.0.1(react@19.2.7)':
+    optionalDependencies:
+      react: 19.2.7
+
   '@vitejs/plugin-react@5.2.0(vite@7.3.6(@types/node@24.13.3)(jiti@1.21.7)(tsx@4.23.1))':
     dependencies:
       '@babel/core': 7.29.7
@@ -5008,7 +5193,8 @@ snapshots:
       postcss: 8.5.19
       postcss-value-parser: 4.2.0
 
-  aws-ssl-profiles@1.1.2: {}
+  aws-ssl-profiles@1.1.2:
+    optional: true
 
   balanced-match@1.0.2: {}
 
@@ -5168,7 +5354,8 @@ snapshots:
 
   deep-is@0.1.4: {}
 
-  denque@2.1.0: {}
+  denque@2.1.0:
+    optional: true
 
   detect-node-es@1.1.0: {}
 
@@ -5190,9 +5377,11 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.23.1
 
-  drizzle-orm@0.45.2(mysql2@3.23.0(@types/node@24.13.3)):
+  drizzle-orm@0.45.2(@types/pg@8.20.0)(mysql2@3.23.0(@types/node@24.13.3))(pg@8.22.0):
     optionalDependencies:
+      '@types/pg': 8.20.0
       mysql2: 3.23.0(@types/node@24.13.3)
+      pg: 8.22.0
 
   electron-to-chromium@1.5.393: {}
 
@@ -5484,6 +5673,7 @@ snapshots:
   generate-function@2.3.1:
     dependencies:
       is-property: 1.0.2
+    optional: true
 
   gensync@1.0.0-beta.2: {}
 
@@ -5531,9 +5721,12 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
+  iceberg-js@0.8.1: {}
+
   iconv-lite@0.7.3:
     dependencies:
       safer-buffer: 2.1.2
+    optional: true
 
   ignore@5.3.2: {}
 
@@ -5569,7 +5762,8 @@ snapshots:
 
   is-number@7.0.0: {}
 
-  is-property@1.0.2: {}
+  is-property@1.0.2:
+    optional: true
 
   is-what@5.5.0: {}
 
@@ -5616,7 +5810,8 @@ snapshots:
 
   lodash@4.18.1: {}
 
-  long@5.3.2: {}
+  long@5.3.2:
+    optional: true
 
   loose-envify@1.4.0:
     dependencies:
@@ -5626,7 +5821,8 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
-  lru.min@1.1.4: {}
+  lru.min@1.1.4:
+    optional: true
 
   lucide-react@0.562.0(react@19.2.7):
     dependencies:
@@ -5674,6 +5870,7 @@ snapshots:
       lru.min: 1.1.4
       named-placeholders: 1.1.6
       sql-escaper: 1.5.1
+    optional: true
 
   mz@2.7.0:
     dependencies:
@@ -5684,6 +5881,7 @@ snapshots:
   named-placeholders@1.1.6:
     dependencies:
       lru.min: 1.1.4
+    optional: true
 
   nanoid@3.3.16: {}
 
@@ -5733,6 +5931,41 @@ snapshots:
 
   pathe@2.0.3: {}
 
+  pg-cloudflare@1.4.0:
+    optional: true
+
+  pg-connection-string@2.14.0: {}
+
+  pg-int8@1.0.1: {}
+
+  pg-pool@3.14.0(pg@8.22.0):
+    dependencies:
+      pg: 8.22.0
+
+  pg-protocol@1.15.0: {}
+
+  pg-types@2.2.0:
+    dependencies:
+      pg-int8: 1.0.1
+      postgres-array: 2.0.0
+      postgres-bytea: 1.0.1
+      postgres-date: 1.0.7
+      postgres-interval: 1.2.0
+
+  pg@8.22.0:
+    dependencies:
+      pg-connection-string: 2.14.0
+      pg-pool: 3.14.0(pg@8.22.0)
+      pg-protocol: 1.15.0
+      pg-types: 2.2.0
+      pgpass: 1.0.5
+    optionalDependencies:
+      pg-cloudflare: 1.4.0
+
+  pgpass@1.0.5:
+    dependencies:
+      split2: 4.2.0
+
   picocolors@1.1.1: {}
 
   picomatch@2.3.2: {}
@@ -5780,6 +6013,16 @@ snapshots:
       nanoid: 3.3.16
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  postgres-array@2.0.0: {}
+
+  postgres-bytea@1.0.1: {}
+
+  postgres-date@1.0.7: {}
+
+  postgres-interval@1.2.0:
+    dependencies:
+      xtend: 4.0.2
 
   prelude-ls@1.2.1: {}
 
@@ -5967,7 +6210,8 @@ snapshots:
     dependencies:
       queue-microtask: 1.2.3
 
-  safer-buffer@2.1.2: {}
+  safer-buffer@2.1.2:
+    optional: true
 
   scheduler@0.27.0: {}
 
@@ -5999,7 +6243,10 @@ snapshots:
 
   source-map@0.6.1: {}
 
-  sql-escaper@1.5.1: {}
+  split2@4.2.0: {}
+
+  sql-escaper@1.5.1:
+    optional: true
 
   stackback@0.0.2: {}
 
@@ -6233,6 +6480,8 @@ snapshots:
       stackback: 0.0.2
 
   word-wrap@1.2.5: {}
+
+  xtend@4.0.2: {}
 
   yallist@3.1.1: {}
 

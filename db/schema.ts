@@ -1,32 +1,52 @@
 import {
-  mysqlTable,
+  pgTable,
   serial,
   varchar,
   text,
   timestamp,
-  int,
+  integer,
   bigint,
   json,
   boolean,
-  mysqlEnum,
-} from "drizzle-orm/mysql-core";
+  pgEnum,
+} from "drizzle-orm/pg-core";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// REELASSATI — Complete Database Schema
+// REELASSATI — PostgreSQL Database Schema (for Supabase)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ── Users ──
-export const users = mysqlTable("users", {
+// ── Enums ────────────────────────────────────────────────────────────────────
+export const roleEnum = pgEnum("role", ["admin", "editor", "client"]);
+export const subscriptionEnum = pgEnum("subscription", ["free", "pro", "agency"]);
+export const platformEnum = pgEnum("platform", [
+  "tiktok", "instagram", "youtube", "x", "facebook", "linkedin",
+  "pinterest", "snapchat", "spotify", "threads", "reddit", "bluesky",
+  "telegram", "discord",
+]);
+export const statusEnum = pgEnum("status", ["active", "paused", "archived"]);
+export const connectionStatusEnum = pgEnum("connection_status", ["connected", "expired", "disconnected"]);
+export const contentTypeEnum = pgEnum("content_type", ["video", "script", "image", "audio", "template", "avatar"]);
+export const contentStatusEnum = pgEnum("content_status", ["draft", "review", "approved", "scheduled", "published", "archived"]);
+export const contentFormatEnum = pgEnum("content_format", ["slideshow", "wall_of_text", "hook_demo", "green_screen", "ugc", "meme", "reel", "short", "carousel", "story"]);
+export const scheduleStatusEnum = pgEnum("schedule_status", ["pending", "processing", "published", "failed", "cancelled"]);
+export const aiJobTypeEnum = pgEnum("ai_job_type", [
+  "script_generate", "video_analyze", "video_edit", "avatar_generate",
+  "caption_generate", "image_generate", "voice_synthesize",
+]);
+export const aiJobStatusEnum = pgEnum("ai_job_status", ["queued", "processing", "completed", "failed"]);
+
+// ── Users ────────────────────────────────────────────────────────────────────
+export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  password: varchar("password", { length: 255 }), // nullable for OAuth users
+  password: varchar("password", { length: 255 }),
   googleId: varchar("google_id", { length: 255 }).unique(),
-  authProvider: mysqlEnum("auth_provider", ["local", "google"]).notNull().default("local"),
+  authProvider: pgEnum("auth_provider", ["local", "google"])("auth_provider").notNull().default("local"),
   avatar: varchar("avatar", { length: 500 }),
-  role: mysqlEnum("role", ["admin", "editor", "client"]).notNull().default("editor"),
-  subscription: mysqlEnum("subscription", ["free", "pro", "agency"]).notNull().default("free"),
-  credits: int("credits").notNull().default(100),
+  role: roleEnum("role").notNull().default("editor"),
+  subscription: subscriptionEnum("subscription").notNull().default("free"),
+  credits: integer("credits").notNull().default(100),
   language: varchar("language", { length: 10 }).default("en"),
   timezone: varchar("timezone", { length: 50 }).default("Europe/Rome"),
   onboardingCompleted: boolean("onboarding_completed").default(false),
@@ -34,10 +54,10 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// ── Clients ──
-export const clients = mysqlTable("clients", {
+// ── Clients ──────────────────────────────────────────────────────────────────
+export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   brand: varchar("brand", { length: 255 }),
   niche: varchar("niche", { length: 255 }),
@@ -48,170 +68,248 @@ export const clients = mysqlTable("clients", {
   primaryColor: varchar("primary_color", { length: 50 }),
   secondaryColor: varchar("secondary_color", { length: 50 }),
   fonts: varchar("fonts", { length: 255 }),
-  status: mysqlEnum("status", ["active", "paused", "archived"]).notNull().default("active"),
+  status: statusEnum("status").notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// ── Platform Connections ──
-export const platformConnections = mysqlTable("platform_connections", {
+// ── Platform Connections ─────────────────────────────────────────────────────
+export const platformConnections = pgTable("platform_connections", {
   id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-  clientId: bigint("client_id", { mode: "number", unsigned: true }),
-  platform: mysqlEnum("platform", ["tiktok", "instagram", "youtube", "x", "facebook", "linkedin", "pinterest", "snapchat", "spotify", "threads", "reddit", "bluesky", "telegram", "discord"]).notNull(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  platform: platformEnum("platform").notNull(),
   accountName: varchar("account_name", { length: 255 }),
   accountHandle: varchar("account_handle", { length: 255 }),
   avatarUrl: varchar("avatar_url", { length: 1000 }),
-  // Zernio integration: store the Zernio account ID (replaces local token storage)
   zernioAccountId: varchar("zernio_account_id", { length: 255 }),
-  // Legacy fields — kept for backward compatibility
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
   expiresAt: timestamp("expires_at"),
-  followers: int("followers").default(0),
-  status: mysqlEnum("status", ["connected", "expired", "disconnected"]).notNull().default("disconnected"),
+  followers: integer("followers").default(0),
+  status: connectionStatusEnum("status").notNull().default("disconnected"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// ── Content Library ──
-export const contentLibrary = mysqlTable("content_library", {
+// ── Content Library ──────────────────────────────────────────────────────────
+export const contentLibrary = pgTable("content_library", {
   id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-  clientId: bigint("client_id", { mode: "number", unsigned: true }),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
-  type: mysqlEnum("type", ["video", "script", "image", "audio", "template", "avatar"]).notNull(),
+  type: contentTypeEnum("type").notNull(),
   url: varchar("url", { length: 1000 }),
   thumbnail: varchar("thumbnail", { length: 1000 }),
   tags: json("tags"),
-  format: mysqlEnum("format", ["slideshow", "wall_of_text", "hook_demo", "green_screen", "ugc", "meme", "reel", "short", "carousel", "story"]),
-  duration: int("duration"),
-  status: mysqlEnum("status", ["draft", "review", "approved", "scheduled", "published", "archived"]).notNull().default("draft"),
+  format: contentFormatEnum("format"),
+  duration: integer("duration"),
+  status: contentStatusEnum("status").notNull().default("draft"),
   metadata: json("metadata"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// ── Scripts ──
-export const scripts = mysqlTable("scripts", {
+// ── Scripts ──────────────────────────────────────────────────────────────────
+export const scripts = pgTable("scripts", {
   id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-  clientId: bigint("client_id", { mode: "number", unsigned: true }),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
   title: varchar("title", { length: 255 }).notNull(),
   hook: text("hook"),
   body: text("body"),
   cta: text("cta"),
   fullScript: text("full_script"),
-  targetPlatform: mysqlEnum("target_platform", ["tiktok", "instagram", "youtube", "x", "facebook", "linkedin"]),
-  tone: varchar("tone", { length: 100 }),
-  duration: int("duration"),
-  language: varchar("language", { length: 10 }).default("en"),
-  tags: json("tags"),
-  hookScore: int("hook_score"),
+  targetPlatform: platformEnum("target_platform"),
+  tone: varchar("tone", { length: 50 }),
+  duration: integer("duration"),
+  language: varchar("language", { length: 10 }),
+  hookScore: integer("hook_score"),
   aiGenerated: boolean("ai_generated").default(false),
-  parentScriptId: bigint("parent_script_id", { mode: "number", unsigned: true }),
-  status: mysqlEnum("status", ["draft", "review", "approved", "archived"]).notNull().default("draft"),
+  status: pgEnum("script_status", ["draft", "review", "approved", "archived"])("status").notNull().default("draft"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// ── Templates ──
-export const templates = mysqlTable("templates", {
+// ── Templates ────────────────────────────────────────────────────────────────
+export const templates = pgTable("templates", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  type: mysqlEnum("type", ["slideshow", "wall_of_text", "hook_demo", "green_screen", "ugc", "meme", "reel", "short"]).notNull(),
-  niche: varchar("niche", { length: 255 }),
-  thumbnail: varchar("thumbnail", { length: 1000 }),
+  niche: varchar("niche", { length: 100 }),
   structure: json("structure"),
-  aiPrompt: text("ai_prompt"),
-  usageCount: int("usage_count").default(0),
-  avgPerformance: int("avg_performance"),
-  isSystem: boolean("is_system").default(false),
-  createdBy: bigint("created_by", { mode: "number", unsigned: true }),
+  bestFor: varchar("best_for", { length: 255 }),
+  performance: varchar("performance", { length: 100 }),
+  usageCount: integer("usage_count").default(0),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// ── Publishing Schedule ──
-export const publishingSchedule = mysqlTable("publishing_schedule", {
+// ── Publishing Schedule ──────────────────────────────────────────────────────
+export const publishingSchedule = pgTable("publishing_schedule", {
   id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-  clientId: bigint("client_id", { mode: "number", unsigned: true }),
-  contentId: bigint("content_id", { mode: "number", unsigned: true }).notNull(),
-  platform: mysqlEnum("platform", ["tiktok", "instagram", "youtube", "x", "facebook", "linkedin", "pinterest", "snapchat", "spotify"]).notNull(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  contentId: bigint("content_id", { mode: "number" }),
+  platform: platformEnum("platform").notNull(),
   scheduledAt: timestamp("scheduled_at").notNull(),
-  status: mysqlEnum("status", ["pending", "processing", "published", "failed", "cancelled"]).notNull().default("pending"),
   caption: text("caption"),
   hashtags: text("hashtags"),
-  thumbnail: varchar("thumbnail", { length: 1000 }),
-  publishedUrl: varchar("published_url", { length: 1000 }),
-  errorMessage: text("error_message"),
+  mediaUrl: varchar("media_url", { length: 1000 }),
+  status: scheduleStatusEnum("status").notNull().default("pending"),
+  zernioPostId: varchar("zernio_post_id", { length: 255 }),
+  publishedAt: timestamp("published_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// ── Analytics ──
-export const analytics = mysqlTable("analytics", {
+// ── Analytics ────────────────────────────────────────────────────────────────
+export const analytics = pgTable("analytics", {
   id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-  clientId: bigint("client_id", { mode: "number", unsigned: true }),
-  contentId: bigint("content_id", { mode: "number", unsigned: true }),
-  platform: mysqlEnum("platform", ["tiktok", "instagram", "youtube", "x", "facebook", "linkedin", "pinterest", "snapchat", "spotify"]).notNull(),
-  views: int("views").default(0),
-  likes: int("likes").default(0),
-  comments: int("comments").default(0),
-  shares: int("shares").default(0),
-  saves: int("saves").default(0),
-  watchTime: int("watch_time").default(0),
-  followers: int("followers").default(0),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  contentId: bigint("content_id", { mode: "number" }),
+  platform: platformEnum("platform").notNull(),
+  views: integer("views").default(0),
+  likes: integer("likes").default(0),
+  comments: integer("comments").default(0),
+  shares: integer("shares").default(0),
+  impressions: integer("impressions").default(0),
   engagementRate: varchar("engagement_rate", { length: 20 }),
-  clickThroughRate: varchar("ctr", { length: 20 }),
-  revenue: int("revenue").default(0),
   recordedAt: timestamp("recorded_at").notNull().defaultNow(),
 });
 
-// ── Trending Content ──
-export const trendingContent = mysqlTable("trending_content", {
+// ── Trending Content ─────────────────────────────────────────────────────────
+export const trendingContent = pgTable("trending_content", {
   id: serial("id").primaryKey(),
-  platform: mysqlEnum("platform", ["tiktok", "instagram", "youtube", "x"]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  platform: platformEnum("platform").notNull(),
+  niche: varchar("niche", { length: 100 }),
+  format: contentFormatEnum("format"),
+  views: integer("views").default(0),
+  likes: integer("likes").default(0),
+  shares: integer("shares").default(0),
+  viralScore: integer("viral_score"),
   sourceUrl: varchar("source_url", { length: 1000 }),
-  creator: varchar("creator", { length: 255 }),
-  niche: varchar("niche", { length: 255 }),
-  format: mysqlEnum("format", ["slideshow", "wall_of_text", "hook_demo", "green_screen", "ugc", "meme", "reel", "short"]),
-  hook: text("hook"),
-  structure: json("structure"),
-  views: int("views").default(0),
-  engagementRate: varchar("engagement_rate", { length: 20 }),
-  soundId: varchar("sound_id", { length: 255 }),
-  soundName: varchar("sound_name", { length: 255 }),
+  thumbnailUrl: varchar("thumbnail_url", { length: 1000 }),
   isActive: boolean("is_active").default(true),
-  scrapedAt: timestamp("scraped_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// ── AI Processing Jobs ──
-export const aiJobs = mysqlTable("ai_jobs", {
+// ── AI Jobs ──────────────────────────────────────────────────────────────────
+export const aiJobs = pgTable("ai_jobs", {
   id: serial("id").primaryKey(),
-  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-  clientId: bigint("client_id", { mode: "number", unsigned: true }),
-  type: mysqlEnum("type", ["script_generate", "video_analyze", "video_edit", "avatar_generate", "caption_generate", "image_generate", "voice_synthesize"]).notNull(),
-  status: mysqlEnum("status", ["queued", "processing", "completed", "failed"]).notNull().default("queued"),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  type: aiJobTypeEnum("type").notNull(),
+  status: aiJobStatusEnum("status").notNull().default("queued"),
   input: json("input"),
   output: json("output"),
-  creditsUsed: int("credits_used").default(0),
+  creditsUsed: integer("credits_used").default(0),
   errorMessage: text("error_message"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ── Brand Kits ───────────────────────────────────────────────────────────────
+export const brandKits = pgTable("brand_kits", {
+  id: serial("id").primaryKey(),
+  clientId: bigint("client_id", { mode: "number" }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  colors: json("colors"),
+  fonts: json("fonts"),
+  voiceGuidelines: text("voice_guidelines"),
+  visualGuidelines: text("visual_guidelines"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: GOALS — Follower & Content Targets
+// ═══════════════════════════════════════════════════════════════════════════════
+export const goals = pgTable("goals", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  type: pgEnum("goal_type", ["followers", "posts", "engagement", "views", "revenue"])("type").notNull(),
+  platform: platformEnum("platform"),
+  targetValue: integer("target_value").notNull(),
+  currentValue: integer("current_value").default(0),
+  deadline: timestamp("deadline"),
+  status: pgEnum("goal_status", ["active", "achieved", "expired", "paused"])("status").notNull().default("active"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: REFERRALS — Credit-based Affiliate System
+// ═══════════════════════════════════════════════════════════════════════════════
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerUserId: bigint("referrer_user_id", { mode: "number" }).notNull(),
+  referredUserId: bigint("referred_user_id", { mode: "number" }),
+  referralCode: varchar("referral_code", { length: 50 }).notNull().unique(),
+  status: pgEnum("referral_status", ["pending", "completed", "rewarded"])("status").notNull().default("pending"),
+  creditsEarned: integer("credits_earned").default(0),
+  dollarValue: varchar("dollar_value", { length: 20 }).default("$0.00"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
 });
 
-// ── Brand Kits ──
-export const brandKits = mysqlTable("brand_kits", {
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: VOICE NOTES — Audio Uploads + Transcriptions
+// ═══════════════════════════════════════════════════════════════════════════════
+export const voiceNotes = pgTable("voice_notes", {
   id: serial("id").primaryKey(),
-  clientId: bigint("client_id", { mode: "number", unsigned: true }).notNull(),
-  fonts: json("fonts"),
-  colors: json("colors"),
-  logo: varchar("logo", { length: 1000 }),
-  voiceGuidelines: text("voice_guidelines"),
-  musicPreferences: json("music_preferences"),
-  doNotUse: text("do_not_use"),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  title: varchar("title", { length: 255 }),
+  audioUrl: varchar("audio_url", { length: 1000 }),
+  transcription: text("transcription"),
+  segments: json("segments"),
+  language: varchar("language", { length: 10 }),
+  duration: integer("duration"),
+  generatedScripts: json("generated_scripts"),
+  status: pgEnum("voice_status", ["uploaded", "transcribing", "transcribed", "generating", "completed"])("status").notNull().default("uploaded"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: INTERVIEW SESSIONS — AI Interview Mode
+// ═══════════════════════════════════════════════════════════════════════════════
+export const interviewSessions = pgTable("interview_sessions", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  clientId: bigint("client_id", { mode: "number" }),
+  topic: varchar("topic", { length: 255 }),
+  niche: varchar("niche", { length: 255 }),
+  platform: platformEnum("platform"),
+  questions: json("questions"),
+  answers: json("answers"),
+  generatedContent: json("generated_content"),
+  status: pgEnum("interview_status", ["in_progress", "completed", "generating"])("status").notNull().default("in_progress"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: COACHING INSIGHTS — Weekly Performance Digest
+// ═══════════════════════════════════════════════════════════════════════════════
+export const coachingInsights = pgTable("coaching_insights", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number" }).notNull(),
+  weekStart: timestamp("week_start").notNull(),
+  weekEnd: timestamp("week_end").notNull(),
+  postsCreated: integer("posts_created").default(0),
+  postsPublished: integer("posts_published").default(0),
+  totalViews: integer("total_views").default(0),
+  totalEngagements: integer("total_engagements").default(0),
+  topPerformingPost: json("top_performing_post"),
+  growthRate: varchar("growth_rate", { length: 20 }),
+  insights: json("insights"),
+  recommendations: json("recommendations"),
+  nextWeekGoals: json("next_week_goals"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
