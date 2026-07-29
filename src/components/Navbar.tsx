@@ -1,17 +1,17 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Menu, X, Globe, Sun, Moon } from "lucide-react";
+import { Globe, Menu, Moon, Sun, X } from "lucide-react";
 import { Logo } from "./Logo";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 
 export function Navbar() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  const location = useLocation();
+  const isItalian = i18n.resolvedLanguage?.startsWith("it");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -20,116 +20,179 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => setOpen(false), [location?.pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [open]);
 
   const toggleLang = () => {
-    const next = i18n.language === "it" ? "en" : "it";
-    i18n.changeLanguage(next);
+    void i18n.changeLanguage(isItalian ? "en" : "it");
+  };
+
+  const labels = {
+    capabilities: isItalian ? "Funzioni" : "Capabilities",
+    examples: isItalian ? "Esempi" : "Walkthroughs",
+    presets: isItalian ? "Preset" : "Presets",
+    access: isItalian ? "Accesso" : "Access",
+    support: isItalian ? "Supporto" : "Support",
+    studio: isItalian ? "Apri lo Studio" : "Open Studio",
+    beta: isItalian ? "Beta privata" : "Private beta",
   };
 
   return (
     <header
       className={cn(
-        "fixed top-0 inset-x-0 z-50 transition-all duration-300 ease-out-expo",
+        "fixed inset-x-0 top-0 z-50 border-b transition-all duration-300 ease-out-expo",
         scrolled
-          ? "bg-background/75 backdrop-blur-xl border-b border-border"
-          : "bg-transparent border-b border-transparent",
+          ? "border-border bg-background/80 backdrop-blur-xl"
+          : "border-transparent bg-background/55 backdrop-blur-md",
       )}
     >
       <div className="container-page flex h-16 items-center justify-between">
-        <Link to="/" className="shrink-0" aria-label="Reelassati home">
-          <Logo size="md" />
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/" className="shrink-0" aria-label="REELassati home">
+            <Logo size="md" />
+          </Link>
+          <span className="hidden rounded-pill bg-primary/10 px-2 py-1 font-mono text-[8px] uppercase tracking-wider text-primary sm:inline-flex">
+            {labels.beta}
+          </span>
+        </div>
 
-        <nav className="hidden md:flex items-center gap-1">
-          <NavItem to="/#features">{t("nav.features")}</NavItem>
-          <NavItem to="/showcase">Showcase</NavItem>
-          <NavItem to="/templates">Templates</NavItem>
-          <NavItem to="/pricing">{t("nav.pricing")}</NavItem>
-          <NavItem to="/support">{t("nav.support")}</NavItem>
+        <nav className="hidden items-center gap-1 md:flex" aria-label={isItalian ? "Navigazione principale" : "Primary navigation"}>
+          <NavItem to="/#features">{labels.capabilities}</NavItem>
+          <NavItem to="/showcase">{labels.examples}</NavItem>
+          <NavItem to="/templates">{labels.presets}</NavItem>
+          <NavItem to="/pricing">{labels.access}</NavItem>
+          <NavItem to="/support">{labels.support}</NavItem>
         </nav>
 
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden items-center gap-2 md:flex">
           <button
+            type="button"
             onClick={toggleLang}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            aria-label={isItalian ? "Passa all’inglese" : "Switch to Italian"}
           >
-            <Globe className="h-3.5 w-3.5" /> {i18n.language === "it" ? "IT" : "EN"}
+            <Globe className="h-3.5 w-3.5" aria-hidden /> {isItalian ? "IT" : "EN"}
           </button>
           <button
+            type="button"
             onClick={toggleTheme}
-            className="p-1.5 text-muted-foreground hover:text-foreground rounded-md transition-colors"
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            aria-label={theme === "light"
+              ? isItalian ? "Attiva tema scuro" : "Use dark theme"
+              : isItalian ? "Attiva tema chiaro" : "Use light theme"}
           >
-            {theme === "light" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === "light" ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
           </button>
-          <span className="w-px h-5 bg-border mx-1" aria-hidden />
+          <span className="mx-1 h-5 w-px bg-border" aria-hidden />
           <Link
-            to="/auth/login"
-            className="inline-flex items-center h-9 px-3.5 rounded-pill text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+            to="/dashboard/edit"
+            className="inline-flex h-9 items-center rounded-pill bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
           >
-            {t("nav.login")}
-          </Link>
-          <Link
-            to="/auth/signup"
-            className="inline-flex items-center h-9 px-4 rounded-pill text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover transition-colors"
-          >
-            {t("nav.start_free")}
+            {labels.studio}
           </Link>
         </div>
 
         <button
-          className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-pill text-foreground hover:bg-foreground/[0.04]"
-          onClick={() => setOpen((o) => !o)}
-          aria-label="Menu"
+          type="button"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-pill text-foreground hover:bg-foreground/[0.04] md:hidden"
+          onClick={() => setOpen((current) => !current)}
+          aria-label={open ? (isItalian ? "Chiudi menu" : "Close menu") : (isItalian ? "Apri menu" : "Open menu")}
+          aria-expanded={open}
+          aria-controls="mobile-navigation"
         >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          {open ? <X className="h-5 w-5" aria-hidden /> : <Menu className="h-5 w-5" aria-hidden />}
         </button>
       </div>
 
       <div
+        id="mobile-navigation"
         className={cn(
-          "md:hidden overflow-hidden border-t border-border bg-background/95 backdrop-blur-xl transition-all duration-300 ease-out-expo",
-          open ? "max-h-[420px]" : "max-h-0",
+          "overflow-hidden border-t bg-background/95 backdrop-blur-xl transition-all duration-300 ease-out-expo md:hidden",
+          open ? "max-h-[520px] border-border" : "max-h-0 border-transparent",
         )}
       >
-        <div className="container-page py-6 flex flex-col gap-1">
-          <MobileLink to="/#features">{t("nav.features")}</MobileLink>
-          <MobileLink to="/showcase">Showcase</MobileLink>
-          <MobileLink to="/templates">Templates</MobileLink>
-          <MobileLink to="/pricing">{t("nav.pricing")}</MobileLink>
-          <MobileLink to="/support">{t("nav.support")}</MobileLink>
-          <div className="h-px bg-border my-3" />
+        <nav className="container-page flex flex-col gap-1 py-6" aria-label={isItalian ? "Navigazione mobile" : "Mobile navigation"}>
+          <MobileLink to="/#features" onNavigate={() => setOpen(false)}>{labels.capabilities}</MobileLink>
+          <MobileLink to="/showcase" onNavigate={() => setOpen(false)}>{labels.examples}</MobileLink>
+          <MobileLink to="/templates" onNavigate={() => setOpen(false)}>{labels.presets}</MobileLink>
+          <MobileLink to="/pricing" onNavigate={() => setOpen(false)}>{labels.access}</MobileLink>
+          <MobileLink to="/support" onNavigate={() => setOpen(false)}>{labels.support}</MobileLink>
+          <div className="my-3 h-px bg-border" />
           <div className="flex items-center justify-between">
-            <button onClick={toggleLang} className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Globe className="h-3.5 w-3.5" /> {i18n.language === "it" ? "IT" : "EN"}
+            <button type="button" onClick={toggleLang} className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Globe className="h-3.5 w-3.5" aria-hidden /> {isItalian ? "IT" : "EN"}
             </button>
-            <button onClick={toggleTheme} className="p-1.5 text-muted-foreground">
-              {theme === "light" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="p-1.5 text-muted-foreground"
+              aria-label={theme === "light"
+                ? isItalian ? "Attiva tema scuro" : "Use dark theme"
+                : isItalian ? "Attiva tema chiaro" : "Use light theme"}
+            >
+              {theme === "light" ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
             </button>
           </div>
-          <Link to="/auth/login" className="mt-3 w-full inline-flex items-center justify-center h-11 text-sm border border-border rounded-pill hover:bg-foreground/[0.04] transition-colors">
-            {t("nav.login")}
+          <Link
+            to="/dashboard/edit"
+            onClick={() => setOpen(false)}
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-pill bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+          >
+            {labels.studio}
           </Link>
-          <Link to="/auth/signup" className="w-full inline-flex items-center justify-center h-11 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover rounded-pill transition-colors">
-            {t("nav.start_free")}
-          </Link>
-        </div>
+        </nav>
       </div>
     </header>
   );
 }
 
-function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
+function NavItem({ to, children }: { to: string; children: ReactNode }) {
+  if (to.includes("#")) {
+    return (
+      <a
+        href={to}
+        className="inline-flex h-9 items-center rounded-pill px-3 text-sm text-foreground/70 transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+      >
+        {children}
+      </a>
+    );
+  }
+
   return (
-    <Link to={to} className="inline-flex items-center h-9 px-3.5 rounded-pill text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors">
+    <Link
+      to={to}
+      className="inline-flex h-9 items-center rounded-pill px-3 text-sm text-foreground/70 transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+    >
       {children}
     </Link>
   );
 }
 
-function MobileLink({ to, children }: { to: string; children: React.ReactNode }) {
+function MobileLink({ to, onNavigate, children }: { to: string; onNavigate: () => void; children: ReactNode }) {
+  if (to.includes("#")) {
+    return (
+      <a
+        href={to}
+        onClick={onNavigate}
+        className="block border-b border-border px-2 py-3 text-lg text-foreground/80 transition-colors last:border-0 hover:text-foreground"
+      >
+        {children}
+      </a>
+    );
+  }
+
   return (
-    <Link to={to} className="block px-2 py-3 text-lg text-foreground/80 hover:text-foreground border-b border-border last:border-0">
+    <Link
+      to={to}
+      onClick={onNavigate}
+      className="block border-b border-border px-2 py-3 text-lg text-foreground/80 transition-colors last:border-0 hover:text-foreground"
+    >
       {children}
     </Link>
   );

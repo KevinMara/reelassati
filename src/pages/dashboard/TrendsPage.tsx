@@ -1,101 +1,443 @@
-import { useState } from "react";
-import { Flame, TrendingUp, ExternalLink, Sparkles, Filter } from "lucide-react";
-import { motion } from "framer-motion";
+import { useMemo, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
+import {
+  ArrowRight,
+  Beaker,
+  CheckCircle2,
+  FileText,
+  FlaskConical,
+  Plus,
+  Scissors,
+  Trash2,
+  X,
+} from "lucide-react";
+import type { Platform, ScriptDraft } from "@contracts/workspace";
+import { useWorkspace } from "@/providers/workspace";
 
-const TRENDS = [
-  { id: 1, title: "3 Mistakes Killing Your Gains", platform: "tiktok", creator: "@fitnessexpert", niche: "fitness", format: "hook_demo", views: "2.4M", hook: "Stop making these 3 mistakes...", score: 94 },
-  { id: 2, title: "POV: You found the perfect outfit", platform: "instagram", creator: "@fashiondaily", niche: "fashion", format: "reel", views: "1.2M", hook: "POV: You just found...", score: 91 },
-  { id: 3, title: "3 ingredients, 5 minutes, infinite flavor", platform: "tiktok", creator: "@foodieking", niche: "food", format: "slideshow", views: "3.2M", hook: "3 ingredients...", score: 93 },
-  { id: 4, title: "I tested 100 phones so you don't have to", platform: "youtube", creator: "@techreview", niche: "tech", format: "hook_demo", views: "1.5M", hook: "I tested 100...", score: 92 },
-  { id: 5, title: "5 habits that 99% of millionaires have", platform: "tiktok", creator: "@motivationdaily", niche: "self_improvement", format: "wall_of_text", views: "4.5M", hook: "5 habits...", score: 95 },
-  { id: 6, title: "This hidden gem costs $10 a night", platform: "instagram", creator: "@travelbug", niche: "travel", format: "green_screen", views: "800K", hook: "This hidden gem...", score: 89 },
+const HYPOTHESIS_TONE = "format-hypothesis";
+
+const PLATFORMS: Array<{ value: Platform; label: string }> = [
+  { value: "tiktok", label: "TikTok" },
+  { value: "instagram", label: "Instagram" },
+  { value: "youtube", label: "YouTube Shorts" },
+  { value: "twitter", label: "X / Twitter" },
+  { value: "facebook", label: "Facebook" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "pinterest", label: "Pinterest" },
+  { value: "threads", label: "Threads" },
 ];
 
-const PLATFORM_COLORS: Record<string, string> = {
-  tiktok: "bg-black text-white",
-  instagram: "bg-gradient-to-br from-purple-500 to-pink-500 text-white",
-  youtube: "bg-red-600 text-white",
-};
+function createId() {
+  return `hypothesis_${
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  }`;
+}
 
 export default function TrendsPage() {
-  const [filter, setFilter] = useState("all");
-  const [niche, setNiche] = useState("all");
+  const { workspace, updateWorkspace, saving } = useWorkspace();
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [hook, setHook] = useState("");
+  const [evidence, setEvidence] = useState("");
+  const [successSignal, setSuccessSignal] = useState("");
+  const [platform, setPlatform] = useState<Platform>("tiktok");
+  const [duration, setDuration] = useState(30);
+  const [filter, setFilter] = useState<"all" | Platform>("all");
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const filtered = TRENDS.filter((t) => {
-    if (filter !== "all" && t.platform !== filter) return false;
-    if (niche !== "all" && t.niche !== niche) return false;
-    return true;
-  });
+  const hypotheses = useMemo(
+    () =>
+      workspace.scripts
+        .filter((script) => script.tone === HYPOTHESIS_TONE)
+        .filter((script) => filter === "all" || script.platform === filter)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [filter, workspace.scripts],
+  );
+
+  const sourceMaterials = useMemo(() => {
+    const scripts = workspace.scripts
+      .filter((script) => script.tone !== HYPOTHESIS_TONE)
+      .map((script) => ({
+        id: `script-${script.id}`,
+        type: "Script",
+        title: script.title,
+        platform: script.platform,
+        hook: script.hook,
+        evidence: `Workspace script created ${new Date(
+          script.createdAt,
+        ).toLocaleDateString()}.`,
+      }));
+    const projects = workspace.projects.map((project) => ({
+      id: `project-${project.id}`,
+      type: "Edit project",
+      title: project.title,
+      platform: project.platform,
+      hook: project.transcript[0]?.text || "",
+      evidence: `Workspace project using the “${project.template}” format; current status: ${project.status}.`,
+    }));
+    return [...projects, ...scripts]
+      .sort((left, right) => left.title.localeCompare(right.title))
+      .slice(0, 8);
+  }, [workspace.projects, workspace.scripts]);
+
+  const resetForm = () => {
+    setTitle("");
+    setHook("");
+    setEvidence("");
+    setSuccessSignal("");
+    setPlatform("tiktok");
+    setDuration(30);
+    setShowForm(false);
+  };
+
+  const saveHypothesis = async (event: FormEvent) => {
+    event.preventDefault();
+    if (
+      !title.trim() ||
+      !hook.trim() ||
+      !evidence.trim() ||
+      !successSignal.trim()
+    ) {
+      setNotice("Define the idea, opening, evidence, and pass signal before saving.");
+      return;
+    }
+    const now = new Date().toISOString();
+    const hypothesis: ScriptDraft = {
+      id: createId(),
+      title: title.trim(),
+      hook: hook.trim(),
+      body: evidence.trim(),
+      cta: successSignal.trim(),
+      fullScript: [
+        `Format hypothesis: ${title.trim()}`,
+        `Opening: ${hook.trim()}`,
+        `Evidence: ${evidence.trim()}`,
+        `Pass signal: ${successSignal.trim()}`,
+      ].join("\n\n"),
+      platform,
+      tone: HYPOTHESIS_TONE,
+      duration,
+      language: workspace.profile.language,
+      createdAt: now,
+    };
+    try {
+      await updateWorkspace((current) => ({
+        ...current,
+        scripts: [hypothesis, ...current.scripts],
+        activity: [
+          {
+            id: `event_${hypothesis.id}`,
+            type: "script" as const,
+            label: "Format hypothesis saved",
+            detail: hypothesis.title,
+            createdAt: now,
+          },
+          ...current.activity,
+        ].slice(0, 100),
+      }));
+      resetForm();
+      setNotice("Hypothesis saved to this workspace.");
+    } catch (cause) {
+      setNotice(
+        cause instanceof Error ? cause.message : "The hypothesis could not be saved.",
+      );
+    }
+  };
+
+  const prefillFromSource = (source: (typeof sourceMaterials)[number]) => {
+    setTitle(source.title);
+    setHook(source.hook);
+    setEvidence(source.evidence);
+    setPlatform(source.platform);
+    setShowForm(true);
+    setNotice(null);
+  };
+
+  const deleteHypothesis = async (hypothesis: ScriptDraft) => {
+    if (!window.confirm(`Delete the hypothesis “${hypothesis.title}”?`)) return;
+    await updateWorkspace((current) => ({
+      ...current,
+      scripts: current.scripts.filter((script) => script.id !== hypothesis.id),
+    }));
+  };
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-8">
-        <p className="mono-eyebrow text-primary mb-2">Viral Intelligence</p>
-        <h1 className="text-3xl font-semibold">Trending Now</h1>
-        <p className="text-foreground/60 mt-2">Discover what's going viral and remix it for your brand</p>
+    <div className="mx-auto max-w-6xl">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="mono-eyebrow mb-2 text-primary">Evidence before imitation</p>
+          <h1 className="text-3xl font-semibold">Trend Workbench</h1>
+          <p className="mt-2 max-w-2xl text-sm text-foreground/55">
+            Turn a real observation into a testable format hypothesis. REELassati does
+            not claim that a hard-coded feed is live trend intelligence.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setShowForm((current) => !current);
+            setNotice(null);
+          }}
+          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover"
+        >
+          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {showForm ? "Close" : "New hypothesis"}
+        </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex gap-1">
-          {["all", "tiktok", "instagram", "youtube"].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium capitalize transition-colors ${filter === f ? "bg-primary text-white" : "bg-surface border border-border"}`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1">
-          {["all", "fitness", "fashion", "food", "tech", "travel"].map((n) => (
-            <button
-              key={n}
-              onClick={() => setNiche(n)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium capitalize transition-colors ${niche === n ? "bg-primary/10 text-primary border border-primary/20" : "bg-surface border border-border text-foreground/50"}`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {filtered.map((trend) => (
-          <motion.div
-            key={trend.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-surface border border-border rounded-xl p-5 hover:shadow-card-hover transition-all"
-          >
-            <div className="flex items-start gap-4">
-              <div className="h-12 w-12 rounded-lg bg-background flex items-center justify-center text-2xl shrink-0">
-                <Flame className="h-6 w-6 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${PLATFORM_COLORS[trend.platform]}`}>
-                    {trend.platform}
-                  </span>
-                  <span className="text-xs text-foreground/50">by {trend.creator}</span>
-                  <span className="text-xs text-foreground/30">•</span>
-                  <span className="text-xs text-foreground/50 capitalize">{trend.niche}</span>
-                </div>
-                <h3 className="font-medium">{trend.title}</h3>
-                <p className="text-sm text-foreground/60 mt-1">Hook: "{trend.hook}"</p>
-                <div className="flex items-center gap-4 mt-3">
-                  <span className="text-sm font-medium">{trend.views} views</span>
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                    Score: {trend.score}
-                  </span>
-                  <button className="text-xs text-primary hover:underline flex items-center gap-1 ml-auto">
-                    <Sparkles className="h-3 w-3" /> Remix this
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
+      <div className="mb-6 grid gap-3 sm:grid-cols-4">
+        {[
+          ["01", "Observe", "Save the exact pattern and where you saw it."],
+          ["02", "Isolate", "Change one creative variable at a time."],
+          ["03", "Define", "Choose the real signal that would count as a win."],
+          ["04", "Produce", "Build controlled variants in the editor."],
+        ].map(([step, label, detail]) => (
+          <div key={step} className="rounded-xl border border-border bg-surface p-4">
+            <p className="font-mono text-[10px] text-primary">{step}</p>
+            <p className="mt-2 text-sm font-medium">{label}</p>
+            <p className="mt-1 text-xs leading-relaxed text-foreground/45">{detail}</p>
+          </div>
         ))}
+      </div>
+
+      {notice ? (
+        <div
+          role="status"
+          className="mb-5 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary"
+        >
+          <CheckCircle2 className="h-4 w-4" /> {notice}
+        </div>
+      ) : null}
+
+      {showForm ? (
+        <form
+          onSubmit={saveHypothesis}
+          className="mb-7 rounded-xl border border-primary/25 bg-surface p-6"
+        >
+          <div className="mb-5 flex items-center gap-2">
+            <FlaskConical className="h-5 w-5 text-primary" />
+            <h2 className="font-medium">Define a controlled test</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm sm:col-span-2">
+              <span className="mb-1.5 block font-medium">Format idea</span>
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Example: Result first, process second"
+                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="text-sm sm:col-span-2">
+              <span className="mb-1.5 block font-medium">Opening line or first frame</span>
+              <textarea
+                value={hook}
+                onChange={(event) => setHook(event.target.value)}
+                rows={2}
+                placeholder="Write the concrete opening you will test"
+                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1.5 block font-medium">Observed evidence</span>
+              <textarea
+                value={evidence}
+                onChange={(event) => setEvidence(event.target.value)}
+                rows={4}
+                placeholder="Source, repeated pattern, audience comment, or result you personally observed"
+                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1.5 block font-medium">Pass signal</span>
+              <textarea
+                value={successSignal}
+                onChange={(event) => setSuccessSignal(event.target.value)}
+                rows={4}
+                placeholder="Example: Higher 3-second hold than the current baseline"
+                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1.5 block font-medium">Platform</span>
+              <select
+                value={platform}
+                onChange={(event) => setPlatform(event.target.value as Platform)}
+                className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
+              >
+                {PLATFORMS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="mb-1.5 block font-medium">Target duration</span>
+              <select
+                value={duration}
+                onChange={(event) => setDuration(Number(event.target.value))}
+                className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
+              >
+                {[15, 20, 30, 45, 60].map((seconds) => (
+                  <option key={seconds} value={seconds}>
+                    {seconds} seconds
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="mt-5 flex justify-end">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white disabled:opacity-45"
+            >
+              <Beaker className="h-4 w-4" /> Save hypothesis
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)]">
+        <section>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="mono-eyebrow text-[10px] text-foreground/45">
+                Saved experiments
+              </p>
+              <h2 className="mt-1 font-medium">Format hypotheses</h2>
+            </div>
+            <select
+              value={filter}
+              onChange={(event) =>
+                setFilter(event.target.value as "all" | Platform)
+              }
+              className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
+              aria-label="Filter hypotheses by platform"
+            >
+              <option value="all">All platforms</option>
+              {PLATFORMS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {hypotheses.length ? (
+            <div className="space-y-4">
+              {hypotheses.map((hypothesis) => (
+                <article
+                  key={hypothesis.id}
+                  className="rounded-xl border border-border bg-surface p-5"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-primary">
+                        {PLATFORMS.find(
+                          (option) => option.value === hypothesis.platform,
+                        )?.label || hypothesis.platform}
+                      </span>
+                      <h3 className="mt-3 font-medium">{hypothesis.title}</h3>
+                      <p className="mt-2 text-sm font-medium text-foreground/75">
+                        “{hypothesis.hook}”
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void deleteHypothesis(hypothesis)}
+                      disabled={saving}
+                      className="rounded-md p-2 text-foreground/35 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
+                      aria-label={`Delete ${hypothesis.title}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <dl className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg bg-background p-3">
+                      <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                        Evidence
+                      </dt>
+                      <dd className="mt-1 text-xs leading-relaxed text-foreground/60">
+                        {hypothesis.body}
+                      </dd>
+                    </div>
+                    <div className="rounded-lg bg-background p-3">
+                      <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                        Pass signal
+                      </dt>
+                      <dd className="mt-1 text-xs leading-relaxed text-foreground/60">
+                        {hypothesis.cta}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link
+                      to="/dashboard/edit"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary"
+                    >
+                      <Scissors className="h-3.5 w-3.5" /> Build the variant
+                    </Link>
+                    <Link
+                      to="/dashboard/script"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/55 hover:text-primary"
+                    >
+                      <FileText className="h-3.5 w-3.5" /> Write the script
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center">
+              <Beaker className="mx-auto h-7 w-7 text-primary" />
+              <h3 className="mt-3 text-sm font-medium">No saved hypotheses</h3>
+              <p className="mt-1 text-xs text-foreground/45">
+                Start with an observation, not a fabricated trend score.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <aside>
+          <div className="mb-4">
+            <p className="mono-eyebrow text-[10px] text-foreground/45">
+              Your evidence base
+            </p>
+            <h2 className="mt-1 font-medium">Workspace source material</h2>
+          </div>
+          {sourceMaterials.length ? (
+            <div className="space-y-3">
+              {sourceMaterials.map((source) => (
+                <button
+                  key={source.id}
+                  type="button"
+                  onClick={() => prefillFromSource(source)}
+                  className="group w-full rounded-xl border border-border bg-surface p-4 text-left hover:border-primary/35"
+                >
+                  <span className="text-[10px] uppercase tracking-wide text-foreground/40">
+                    {source.type}
+                  </span>
+                  <span className="mt-1 block text-sm font-medium">{source.title}</span>
+                  <span className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
+                    Use as starting point
+                    <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border bg-surface p-6">
+              <p className="text-sm font-medium">No source material yet</p>
+              <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+                Scripts and edit projects will appear here as real inputs for future
+                tests.
+              </p>
+            </div>
+          )}
+        </aside>
       </div>
     </div>
   );

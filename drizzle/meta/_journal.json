@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1785360922113,
+      "tag": "0000_smart_aqueduct",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785363526815,
+      "tag": "0001_nifty_fantastic_four",
+      "breakpoints": true
+    }
+  ]
+}

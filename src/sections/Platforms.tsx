@@ -13,24 +13,54 @@ const PLATFORMS: { name: string; color: string; path: string; viewBox?: string }
 ];
 
 export function Platforms() {
-  const { t } = useTranslation();
+  const { i18n } = useTranslation();
+  const isItalian = i18n.resolvedLanguage?.startsWith("it");
+  const deliveryTargets = PLATFORMS.slice(0, 7);
+
   return (
     <section id="platforms" className="py-24 md:py-36">
       <div className="container-page">
         <div className="max-w-3xl">
-          <p className="mono-eyebrow text-primary mb-4">{t("platforms.eyebrow")}</p>
-          <h2 className="text-display-md font-semibold">{t("platforms.lead")} <span className="serif-accent">{t("platforms.accent")}</span></h2>
-          <p className="mt-6 text-lg text-foreground/70 leading-relaxed max-w-xl">{t("platforms.sub")}</p>
+          <p className="mono-eyebrow mb-4 text-primary">{isItalian ? "Consegna" : "Delivery"}</p>
+          <h2 className="text-display-md font-semibold">
+            {isItalian ? "Un montaggio." : "One master edit."}{" "}
+            <span className="serif-accent">{isItalian ? "Ogni destinazione." : "Every destination."}</span>
+          </h2>
+          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-foreground/70">
+            {isItalian
+              ? "Prepara varianti per i principali canali short-form. La pubblicazione diventa disponibile nello Studio solo dopo una connessione account autorizzata; nessun account è dato per collegato."
+              : "Prepare variants for the major short-form channels. Publishing becomes available in the Studio only after an authorized account connection; no account is assumed to be connected."}
+          </p>
         </div>
-        <div className="mt-16 flex flex-wrap justify-center gap-8">
-          {PLATFORMS.map((p) => (
-            <div key={p.name} className="flex flex-col items-center gap-3">
-              <div className="h-16 w-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${p.color}14` }}>
-                <svg width="32" height="32" viewBox={p.viewBox || "0 0 256 256"} fill={p.color}><path d={p.path} /></svg>
+
+        <div className="mt-12 rounded-xl border border-border bg-surface p-6 md:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+            <p className="text-sm font-medium">{isItalian ? "Destinazioni supportate dal flusso di consegna" : "Targets supported by the delivery workflow"}</p>
+            <span className="rounded-pill bg-primary/10 px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-primary">
+              {isItalian ? "Connessione richiesta" : "Connection required"}
+            </span>
+          </div>
+          <div className="mt-7 grid grid-cols-3 gap-6 sm:grid-cols-4 lg:grid-cols-7">
+            {deliveryTargets.map((platform) => (
+              <div key={platform.name} className="flex flex-col items-center gap-3">
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-background"
+                  style={{ color: platform.color }}
+                >
+                  <svg
+                    width="27"
+                    height="27"
+                    viewBox={platform.viewBox || "0 0 256 256"}
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d={platform.path} />
+                  </svg>
+                </div>
+                <span className="text-center text-xs font-medium text-foreground/60">{platform.name}</span>
               </div>
-              <span className="text-sm font-medium text-foreground/60">{p.name}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>

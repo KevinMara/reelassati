@@ -1,59 +1,85 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Globe, Sun, Moon } from "lucide-react";
+import { Globe, Moon, Sun } from "lucide-react";
 import { Logo } from "./Logo";
 import { useTheme } from "@/hooks/useTheme";
 
 export function Footer() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
+  const isItalian = i18n.resolvedLanguage?.startsWith("it");
 
   const toggleLang = () => {
-    i18n.changeLanguage(i18n.language === "it" ? "en" : "it");
+    void i18n.changeLanguage(isItalian ? "en" : "it");
   };
 
   return (
-    <footer className="border-t border-border bg-background mt-32">
+    <footer className="mt-32 border-t border-border bg-background">
       <div className="container-page py-16 md:py-24">
-        <div className="grid grid-cols-2 md:grid-cols-12 gap-10">
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-12">
           <div className="col-span-2 md:col-span-5">
             <Logo size="lg" />
-            <p className="mt-5 text-sm text-foreground/60 max-w-xs leading-relaxed">
-              {t("footer.tagline")}
+            <p className="mt-5 max-w-sm text-sm leading-relaxed text-foreground/60">
+              {isItalian
+                ? "Lo studio short-form centrato sul montaggio: controllo manuale, assistenza revisionabile e un flusso completo dall’idea alla consegna."
+                : "The editing-first short-form studio: manual control, reviewable assistance, and one complete path from idea to delivery."}
             </p>
-            <p className="mt-8 mono-eyebrow text-foreground/40">{t("footer.made_in")}</p>
+            <span className="mt-7 inline-flex rounded-pill bg-primary/10 px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-primary">
+              {isItalian ? "Checkpoint beta privato" : "Private beta checkpoint"}
+            </span>
           </div>
 
-          <FooterCol title={t("footer.product")} items={[
-            { label: t("nav.features"), to: "/#features" },
-            { label: t("nav.pricing"), to: "/pricing" },
-            { label: t("nav.support"), to: "/support" },
-            { label: t("footer.changelog"), to: "#" },
-          ]} />
-          <FooterCol title={t("footer.resources")} items={[
-            { label: t("footer.documentation"), to: "#" },
-            { label: t("footer.blog"), to: "#" },
-            { label: t("footer.api"), to: "#" },
-            { label: t("footer.community"), to: "#" },
-          ]} />
-          <FooterCol title={t("footer.company")} items={[
-            { label: t("footer.about"), to: "#" },
-            { label: t("footer.contact"), to: "/support" },
-            { label: t("footer.privacy"), to: "#" },
-            { label: t("footer.terms"), to: "#" },
-          ]} />
+          <FooterCol
+            title={isItalian ? "Prodotto" : "Product"}
+            items={[
+              { label: isItalian ? "Funzioni" : "Capabilities", to: "/#features" },
+              { label: isItalian ? "Esempi" : "Walkthroughs", to: "/showcase" },
+              { label: "Prompt Director", to: "/templates" },
+              { label: isItalian ? "Accesso beta" : "Beta access", to: "/pricing" },
+            ]}
+          />
+          <FooterCol
+            title="Studio"
+            items={[
+              { label: isItalian ? "Montaggio" : "Editing", to: "/dashboard/edit" },
+              { label: "Script", to: "/dashboard/script" },
+              { label: isItalian ? "Generazione video" : "Video generation", to: "/dashboard/video" },
+              { label: isItalian ? "Consegna" : "Delivery", to: "/dashboard/publish" },
+            ]}
+          />
+          <FooterCol
+            title={isItalian ? "Aiuto" : "Help"}
+            items={[
+              { label: isItalian ? "Piano locale" : "Local edit plan", to: "/#edit-plan" },
+              { label: isItalian ? "Guida rapida" : "Quick start", to: "/support" },
+              { label: "FAQ", to: "/support#faq" },
+              { label: isItalian ? "Contatto" : "Contact", to: "/support" },
+            ]}
+          />
         </div>
 
-        <div className="mt-16 pt-8 border-t border-border flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="mt-16 flex flex-col items-start justify-between gap-6 border-t border-border pt-8 md:flex-row md:items-center">
           <p className="mono-eyebrow text-foreground/40">
-            &copy; {new Date().getFullYear()} Reelassati &middot; {t("footer.copyright")}
+            &copy; {new Date().getFullYear()} REELassati · {isItalian ? "Tutti i diritti riservati" : "All rights reserved"}
           </p>
           <div className="flex items-center gap-1">
-            <button onClick={toggleLang} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground px-2 py-1 transition-colors">
-              <Globe className="h-3.5 w-3.5" /> {i18n.language === "it" ? "IT" : "EN"}
+            <button
+              type="button"
+              onClick={toggleLang}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              aria-label={isItalian ? "Passa all’inglese" : "Switch to Italian"}
+            >
+              <Globe className="h-3.5 w-3.5" aria-hidden /> {isItalian ? "IT" : "EN"}
             </button>
-            <button onClick={toggleTheme} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
-              {theme === "light" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label={theme === "light"
+                ? isItalian ? "Attiva tema scuro" : "Use dark theme"
+                : isItalian ? "Attiva tema chiaro" : "Use light theme"}
+            >
+              {theme === "light" ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
             </button>
           </div>
         </div>
@@ -65,13 +91,19 @@ export function Footer() {
 function FooterCol({ title, items }: { title: string; items: { label: string; to: string }[] }) {
   return (
     <div className="md:col-span-2">
-      <h4 className="mono-eyebrow text-foreground/50 mb-4">{title}</h4>
+      <h2 className="mono-eyebrow mb-4 text-foreground/50">{title}</h2>
       <ul className="space-y-3">
-        {items.map((it) => (
-          <li key={it.label}>
-            <Link to={it.to} className="text-sm text-foreground/75 hover:text-foreground transition-colors">
-              {it.label}
-            </Link>
+        {items.map((item) => (
+          <li key={`${title}-${item.label}`}>
+            {item.to.includes("#") ? (
+              <a href={item.to} className="text-sm text-foreground/75 transition-colors hover:text-foreground">
+                {item.label}
+              </a>
+            ) : (
+              <Link to={item.to} className="text-sm text-foreground/75 transition-colors hover:text-foreground">
+                {item.label}
+              </Link>
+            )}
           </li>
         ))}
       </ul>

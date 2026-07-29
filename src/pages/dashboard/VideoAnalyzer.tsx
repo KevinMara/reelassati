@@ -1,247 +1,721 @@
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { trpc } from "@/providers/trpc";
-import { Search, Sparkles, TrendingUp, Clock, Users, Heart, MessageCircle, Share2, BarChart3, Zap, Copy } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  AlertCircle,
+  BarChart3,
+  Check,
+  ChevronRight,
+  Film,
+  Gauge,
+  Link2,
+  Loader2,
+  Search,
+  Sparkles,
+  Upload,
+  WandSparkles,
+} from "lucide-react";
+import type {
+  Asset,
+  EditOperation,
+  Platform,
+  QualitySignal,
+  WorkspaceEvent,
+} from "@contracts/workspace";
+import { platformApi } from "@/lib/platform-api";
+import { useWorkspace } from "@/providers/workspace";
 
-const DEMO_ANALYSIS = {
-  url: "https://tiktok.com/@creator/video/123456",
-  platform: "tiktok" as const,
-  title: "3 Gym Mistakes Killing Your Gains",
-  creator: "@fitnessexpert",
-  duration: 45,
-  hookScore: 94,
-  structureScore: 88,
-  engagementScore: 91,
-  overallScore: 91,
-  views: "2.4M",
-  likes: "185K",
-  comments: "4.2K",
-  shares: "12K",
-  structure: [
-    { time: "0-1s", label: "Hook", desc: "'Stop making these 3 mistakes' — pattern interrupt with finger point", score: 95 },
-    { time: "1-3s", label: "Problem", desc: "'Your gains are suffering and you don't even know it'", score: 92 },
-    { time: "3-15s", label: "Mistake 1", desc: "Not progressive overload — visual demo with text overlay", score: 88 },
-    { time: "15-25s", label: "Mistake 2", desc: "Wrong form — split-screen comparison", score: 90 },
-    { time: "25-38s", label: "Mistake 3", desc: "Not enough protein — quick recipe insert", score: 85 },
-    { time: "38-45s", label: "CTA", desc: "'Follow for daily tips + which mistake are YOU making?'", score: 93 },
-  ],
-  hookBreakdown: {
-    patternInterrupt: 95,
-    curiosityGap: 92,
-    relatability: 88,
-    urgency: 85,
-  },
-  whyItWorks: [
-    "Uses a '3 mistakes' framework — proven pattern in fitness niche",
-    "Opens with direct address + visual gesture (pattern interrupt)",
-    "Each mistake gets a unique visual treatment (no repetition)",
-    "CTA uses comment-bait technique ('which mistake are YOU making?')",
-    "45s length is optimal for TikTok algorithm (high completion rate)",
-  ],
-  remixSuggestions: [
-    "Apply same '3 mistakes' structure to your niche",
-    "Replace gym footage with your product/service context",
-    "Keep the comment-bait CTA — it drives 3x more comments",
-    "Use similar color scheme (high contrast text on dark background)",
-  ],
-};
+type AnalysisResult = Awaited<ReturnType<typeof platformApi.analyzeVideo>>;
+type SourceMode = "upload" | "url";
+
+const ANALYSIS_PLATFORMS: Array<{ value: Platform; label: string }> = [
+  { value: "tiktok", label: "TikTok" },
+  { value: "instagram", label: "Instagram Reels" },
+  { value: "youtube", label: "YouTube Shorts" },
+];
+
+function validatePublicVideoUrl(value: string) {
+  if (!value.trim()) return "Enter a public HTTPS video URL.";
+  try {
+    const parsed = new URL(value.trim());
+    const hostname = parsed.hostname.toLowerCase();
+    if (parsed.protocol !== "https:") return "The video URL must use HTTPS.";
+    if (
+      hostname === "localhost" ||
+      hostname === "0.0.0.0" ||
+      hostname === "::1" ||
+      hostname.endsWith(".local") ||
+      /^10\./.test(hostname) ||
+      /^127\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+    ) {
+      return "Use a public URL, not a local or private network address.";
+    }
+    return null;
+  } catch {
+    return "Enter a valid public HTTPS video URL.";
+  }
+}
+
+function clampScore(score: number) {
+  return Math.max(0, Math.min(100, score));
+}
+
+function confidencePercent(confidence: number) {
+  const normalized = confidence <= 1 ? confidence * 100 : confidence;
+  return Math.round(clampScore(normalized));
+}
+
+function signalColor(score: number) {
+  if (score >= 75) return "text-emerald-500";
+  if (score >= 50) return "text-amber-500";
+  return "text-red-500";
+}
+
+function signalBar(score: number) {
+  if (score >= 75) return "bg-emerald-500";
+  if (score >= 50) return "bg-amber-500";
+  return "bg-red-500";
+}
+
+function retentionToQualitySignals(
+  retention: AnalysisResult["retention"],
+): QualitySignal[] {
+  return retention.map((segment, index) => ({
+    id: `analysis-signal-${crypto.randomUUID()}-${index}`,
+    label: segment.score >= 75 ? "Retention strength" : "Retention risk",
+    detail: segment.note,
+    start: segment.start,
+    end: segment.end,
+    level:
+      segment.score >= 75
+        ? "good"
+        : segment.score >= 50
+          ? "attention"
+          : "risk",
+  }));
+}
+
+function createEvent(
+  type: WorkspaceEvent["type"],
+  label: string,
+  detail: string,
+): WorkspaceEvent {
+  return {
+    id: crypto.randomUUID(),
+    type,
+    label,
+    detail,
+    createdAt: new Date().toISOString(),
+  };
+}
 
 export default function VideoAnalyzer() {
-  const { t } = useTranslation();
-  const [url, setUrl] = useState("");
+  const { workspace, capabilities, loading, updateWorkspace } = useWorkspace();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sourceMode, setSourceMode] = useState<SourceMode>("upload");
+  const [file, setFile] = useState<File | null>(null);
+  const [sourceAsset, setSourceAsset] = useState<Asset | null>(null);
+  const [publicUrl, setPublicUrl] = useState("");
+  const [platform, setPlatform] = useState<Platform>("tiktok");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [queued, setQueued] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAnalyze = () => {
-    if (!url.trim()) return;
+  const videoAssets = useMemo(
+    () => workspace.assets.filter((asset) => asset.kind === "video"),
+    [workspace.assets],
+  );
+  const urlError = sourceMode === "url" ? validatePublicVideoUrl(publicUrl) : null;
+  const sourceReady =
+    sourceMode === "upload" ? Boolean(file || sourceAsset) : !urlError;
+  const analysisReady = capabilities.ai;
+  const analysisMissing = capabilities.missing.filter((item) =>
+    item.includes("OPENROUTER"),
+  );
+
+  const saveUploadedAsset = async (asset: Asset) => {
+    await updateWorkspace((current) => ({
+      ...current,
+      assets: [
+        asset,
+        ...current.assets.filter((candidate) => candidate.id !== asset.id),
+      ],
+      activity: [
+        createEvent("upload", "Video uploaded for analysis", asset.name),
+        ...current.activity,
+      ].slice(0, 100),
+    }));
+  };
+
+  const resolveSourceAsset = async () => {
+    if (sourceAsset) return sourceAsset;
+    if (!file) return null;
+    const asset = await platformApi.uploadAsset(file, "video", setUploadProgress);
+    setSourceAsset(asset);
+    await saveUploadedAsset(asset);
+    return asset;
+  };
+
+  const handleAnalyze = async () => {
+    if (!sourceReady || !analysisReady || analyzing) return;
     setAnalyzing(true);
-    // Simulate AI analysis delay
-    setTimeout(() => {
-      setResult(DEMO_ANALYSIS);
+    setError(null);
+    setResult(null);
+    setQueued(false);
+
+    try {
+      const asset = sourceMode === "upload" ? await resolveSourceAsset() : null;
+      if (sourceMode === "upload" && !asset) {
+        throw new Error("Select or upload a video before running analysis.");
+      }
+
+      const analysis = await platformApi.analyzeVideo({
+        assetId: asset?.id,
+        publicUrl: sourceMode === "url" ? publicUrl.trim() : undefined,
+        platform,
+      });
+      setResult(analysis);
+      await updateWorkspace((current) => ({
+        ...current,
+        activity: [
+          createEvent(
+            "generation",
+            "Video analysis completed",
+            asset?.name ?? new URL(publicUrl.trim()).hostname,
+          ),
+          ...current.activity,
+        ].slice(0, 100),
+      }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The video could not be analyzed.");
+    } finally {
       setAnalyzing(false);
-    }, 2000);
+    }
   };
 
-  const scoreColor = (score: number) => {
-    if (score >= 90) return "text-emerald-500";
-    if (score >= 75) return "text-amber-500";
-    return "text-red-500";
-  };
-
-  const scoreBg = (score: number) => {
-    if (score >= 90) return "bg-emerald-500";
-    if (score >= 75) return "bg-amber-500";
-    return "bg-red-500";
+  const queueChanges = async () => {
+    if (!result || !selectedProjectId) return;
+    setError(null);
+    try {
+      const signals = retentionToQualitySignals(result.retention);
+      await updateWorkspace((current) => ({
+        ...current,
+        projects: current.projects.map((project) => {
+          if (project.id !== selectedProjectId) return project;
+          const existingChangeIds = new Set(
+            project.proposedChanges.map((change) => change.id),
+          );
+          const existingSignalIds = new Set(
+            project.qualitySignals.map((signal) => signal.id),
+          );
+          return {
+            ...project,
+            status: "editing",
+            updatedAt: new Date().toISOString(),
+            proposedChanges: [
+              ...project.proposedChanges,
+              ...result.changes
+                .filter((change) => !existingChangeIds.has(change.id))
+                .map((change) => ({
+                  ...change,
+                  targetClipIds: project.clips
+                    .filter(
+                      (clip) =>
+                        clip.start < change.end &&
+                        clip.start + clip.duration > change.start,
+                    )
+                    .map((clip) => clip.id),
+                  status: "proposed" as const,
+                })),
+            ],
+            qualitySignals: [
+              ...project.qualitySignals,
+              ...signals.filter((signal) => !existingSignalIds.has(signal.id)),
+            ],
+          };
+        }),
+        activity: [
+          createEvent(
+            "project",
+            "Analysis queued in editor",
+            `${result.changes.length} proposed changes`,
+          ),
+          ...current.activity,
+        ].slice(0, 100),
+      }));
+      setQueued(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The edit plan could not be queued.");
+    }
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl">
       <div className="mb-8">
-        <p className="mono-eyebrow text-primary mb-2">Neural Analyzer</p>
+        <p className="mono-eyebrow mb-2 text-primary">Edit Intelligence</p>
         <h1 className="text-3xl font-semibold">Video Analyzer</h1>
-        <p className="text-foreground/60 mt-2">Paste any viral video URL to uncover why it works and remix it for your brand</p>
+        <p className="mt-2 max-w-3xl text-foreground/60">
+          Analyze your footage or a public video, inspect the evidence by time range,
+          then queue the returned changes in a real edit project.
+        </p>
       </div>
 
-      {/* URL Input */}
-      <div className="bg-surface border border-border rounded-xl p-6 mb-6">
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
-            <input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste TikTok, Instagram, or YouTube URL..."
-              className="w-full pl-10 pr-4 py-3 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
+      {!loading && !analysisReady ? (
+        <div
+          className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4"
+          role="status"
+        >
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+          <div>
+            <p className="text-sm font-medium">AI analysis needs provider setup</p>
+            <p className="mt-1 text-xs text-foreground/55">
+              Uploads and saved assets remain available, but analysis will stay
+              disabled until the server-side AI capability is connected.
+            </p>
+            {analysisMissing.length > 0 ? (
+              <p className="mt-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
+                Missing: {analysisMissing.join(", ")}
+              </p>
+            ) : null}
           </div>
-          <button
-            onClick={handleAnalyze}
-            disabled={!url.trim() || analyzing}
-            className="px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {analyzing ? (
-              <><span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" /> Analyzing...</>
-            ) : (
-              <><Sparkles className="h-4 w-4" /> Analyze</>
-            )}
-          </button>
         </div>
-        <p className="text-xs text-foreground/40 mt-2">Supports TikTok, Instagram Reels, YouTube Shorts</p>
-      </div>
+      ) : null}
 
-      <AnimatePresence>
-        {result && (
+      <section className="mb-6 rounded-xl border border-border bg-surface p-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex rounded-lg border border-border bg-background p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setSourceMode("upload");
+                setResult(null);
+              }}
+              aria-pressed={sourceMode === "upload"}
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                sourceMode === "upload"
+                  ? "bg-primary text-white"
+                  : "text-foreground/55"
+              }`}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Upload or asset
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSourceMode("url");
+                setResult(null);
+              }}
+              aria-pressed={sourceMode === "url"}
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                sourceMode === "url"
+                  ? "bg-primary text-white"
+                  : "text-foreground/55"
+              }`}
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              Public URL
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-foreground/45" htmlFor="analysis-platform">
+              Optimize for
+            </label>
+            <select
+              id="analysis-platform"
+              value={platform}
+              onChange={(event) => setPlatform(event.target.value as Platform)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-xs"
+            >
+              {ANALYSIS_PLATFORMS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {sourceMode === "upload" ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(event) => {
+                  const nextFile = event.target.files?.[0] ?? null;
+                  setFile(nextFile);
+                  setSourceAsset(null);
+                  setUploadProgress(0);
+                  setResult(null);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!capabilities.uploads}
+                className="flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-background p-5 text-left transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <Upload className="h-5 w-5 text-primary" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">
+                    {file?.name ?? "Choose a video file"}
+                  </span>
+                  <span className="mt-1 block text-xs text-foreground/45">
+                    {file
+                      ? `${(file.size / 1024 / 1024).toFixed(1)} MB · uploads when analysis starts`
+                      : capabilities.uploads
+                        ? "Stored privately in your workspace"
+                        : "Upload storage is not configured"}
+                  </span>
+                </span>
+              </button>
+              {uploadProgress > 0 && uploadProgress < 100 ? (
+                <div className="mt-2">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-background">
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-foreground/40">
+                    Uploading {uploadProgress}%
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-medium" htmlFor="existing-video">
+                Or select a saved video
+              </label>
+              <select
+                id="existing-video"
+                value={sourceAsset?.id ?? ""}
+                onChange={(event) => {
+                  const asset =
+                    videoAssets.find((candidate) => candidate.id === event.target.value) ??
+                    null;
+                  setSourceAsset(asset);
+                  setFile(null);
+                  setResult(null);
+                }}
+                className="w-full rounded-lg border border-border bg-background px-3 py-3 text-sm"
+              >
+                <option value="">No saved video selected</option>
+                {videoAssets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-[11px] text-foreground/40">
+                Analysis receives the stored asset ID. A browser-only blob URL is
+                never sent to the AI provider.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <label className="mb-2 block text-xs font-medium" htmlFor="public-video-url">
+              Public HTTPS video URL
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/35" />
+              <input
+                id="public-video-url"
+                type="url"
+                inputMode="url"
+                value={publicUrl}
+                onChange={(event) => {
+                  setPublicUrl(event.target.value);
+                  setResult(null);
+                }}
+                placeholder="https://cdn.example.com/video.mp4"
+                className="w-full rounded-lg border border-border bg-background py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <p
+              className={`mt-2 text-[11px] ${
+                publicUrl && urlError ? "text-red-500" : "text-foreground/40"
+              }`}
+            >
+              {publicUrl && urlError
+                ? urlError
+                : "Use a URL the analysis service can fetch without browser cookies or local access."}
+            </p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => void handleAnalyze()}
+          disabled={!sourceReady || analyzing || !analysisReady}
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {analyzing ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {uploadProgress > 0 && uploadProgress < 100
+                ? "Uploading source"
+                : "Analyzing edit"}
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4" />
+              Analyze video
+            </>
+          )}
+        </button>
+
+        {error ? (
+          <p className="mt-3 text-sm text-red-500" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </section>
+
+      <AnimatePresence mode="wait">
+        {result ? (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            key="analysis-result"
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
-            {/* Header */}
-            <div className="bg-surface border border-border rounded-xl p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold">{result.title}</h2>
-                  <p className="text-sm text-foreground/60 mt-1">by {result.creator} • {result.duration}s • {result.platform}</p>
+            <section className="rounded-xl border border-border bg-surface p-6">
+              <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                <div className="max-w-3xl">
+                  <p className="mono-eyebrow mb-2 text-primary">AI edit review</p>
+                  <h2 className="text-xl font-semibold">What the model found</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-foreground/65">
+                    {result.summary}
+                  </p>
                 </div>
-                <div className="text-center">
-                  <div className={`text-4xl font-bold ${scoreColor(result.overallScore)}`}>{result.overallScore}</div>
-                  <p className="text-xs text-foreground/50">Overall Score</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-4 mt-6">
-                <div className="text-center p-3 rounded-lg bg-background">
-                  <p className="text-lg font-semibold">{result.views}</p>
-                  <p className="text-xs text-foreground/50">Views</p>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-background">
-                  <p className="text-lg font-semibold">{result.likes}</p>
-                  <Heart className="h-3.5 w-3.5 mx-auto text-foreground/40 mt-1" />
-                </div>
-                <div className="text-center p-3 rounded-lg bg-background">
-                  <p className="text-lg font-semibold">{result.comments}</p>
-                  <MessageCircle className="h-3.5 w-3.5 mx-auto text-foreground/40 mt-1" />
-                </div>
-                <div className="text-center p-3 rounded-lg bg-background">
-                  <p className="text-lg font-semibold">{result.shares}</p>
-                  <Share2 className="h-3.5 w-3.5 mx-auto text-foreground/40 mt-1" />
-                </div>
-              </div>
-            </div>
-
-            {/* Score Breakdown */}
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="bg-surface border border-border rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium">Hook Strength</span>
-                  <span className={`text-lg font-bold ${scoreColor(result.hookScore)}`}>{result.hookScore}</span>
-                </div>
-                <div className="h-2 rounded-full bg-background overflow-hidden">
-                  <div className={`h-full rounded-full ${scoreBg(result.hookScore)}`} style={{ width: `${result.hookScore}%` }} />
-                </div>
-              </div>
-              <div className="bg-surface border border-border rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium">Structure</span>
-                  <span className={`text-lg font-bold ${scoreColor(result.structureScore)}`}>{result.structureScore}</span>
-                </div>
-                <div className="h-2 rounded-full bg-background overflow-hidden">
-                  <div className={`h-full rounded-full ${scoreBg(result.structureScore)}`} style={{ width: `${result.structureScore}%` }} />
-                </div>
-              </div>
-              <div className="bg-surface border border-border rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium">Engagement</span>
-                  <span className={`text-lg font-bold ${scoreColor(result.engagementScore)}`}>{result.engagementScore}</span>
-                </div>
-                <div className="h-2 rounded-full bg-background overflow-hidden">
-                  <div className={`h-full rounded-full ${scoreBg(result.engagementScore)}`} style={{ width: `${result.engagementScore}%` }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Structure Timeline */}
-            <div className="bg-surface border border-border rounded-xl p-6">
-              <h3 className="font-medium mb-4 flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                Structure Breakdown
-              </h3>
-              <div className="space-y-3">
-                {result.structure.map((s: any, i: number) => (
-                  <div key={i} className="flex items-start gap-4 p-3 rounded-lg bg-background">
-                    <div className="shrink-0 text-center w-16">
-                      <span className="text-xs font-mono text-foreground/40">{s.time}</span>
+                <div className="grid shrink-0 grid-cols-2 gap-2">
+                  {[
+                    { label: "Hook", score: result.hook.score },
+                    { label: "Pacing", score: result.pacing.score },
+                  ].map((signal) => (
+                    <div
+                      key={signal.label}
+                      className="min-w-24 rounded-lg border border-border bg-background p-3 text-center"
+                    >
+                      <p className={`text-2xl font-semibold ${signalColor(signal.score)}`}>
+                        {Math.round(signal.score)}
+                      </p>
+                      <p className="mt-0.5 text-[10px] uppercase tracking-wider text-foreground/40">
+                        {signal.label}
+                      </p>
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{s.label}</span>
-                        <span className={`text-xs font-mono ${scoreColor(s.score)}`}>{s.score}</span>
-                      </div>
-                      <p className="text-xs text-foreground/60 mt-1">{s.desc}</p>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {[
+                  { label: "Hook assessment", value: result.hook },
+                  { label: "Pacing assessment", value: result.pacing },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border border-border bg-background p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium">{item.label}</span>
+                      <span className={`text-xs font-mono ${signalColor(item.value.score)}`}>
+                        {Math.round(item.value.score)}/100
+                      </span>
                     </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface">
+                      <div
+                        className={`h-full rounded-full ${signalBar(item.value.score)}`}
+                        style={{ width: `${clampScore(item.value.score)}%` }}
+                      />
+                    </div>
+                    <p className="mt-3 text-xs leading-relaxed text-foreground/55">
+                      {item.value.note}
+                    </p>
                   </div>
                 ))}
               </div>
-            </div>
+              <p className="mt-3 text-[11px] text-foreground/35">
+                Scores are the AI model&apos;s assessment of this source, not measured
+                reach or a guarantee of performance.
+              </p>
+            </section>
 
-            {/* Why It Works */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="bg-surface border border-border rounded-xl p-6">
-                <h3 className="font-medium mb-3 flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-primary" />
-                  Why It Works
-                </h3>
-                <ul className="space-y-2">
-                  {result.whyItWorks.map((item: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-foreground/70">
-                      <span className="text-primary mt-1">•</span>
-                      {item}
-                    </li>
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <section className="rounded-xl border border-border bg-surface p-6">
+                <h2 className="flex items-center gap-2 font-medium">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  Retention map
+                </h2>
+                <div className="mt-4 space-y-3">
+                  {result.retention.map((segment, index) => (
+                    <div
+                      key={`${segment.start}-${segment.end}-${index}`}
+                      className="rounded-lg border border-border bg-background p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-mono text-[11px] text-foreground/45">
+                          {segment.start.toFixed(1)}s–{segment.end.toFixed(1)}s
+                        </span>
+                        <span className={`text-xs font-medium ${signalColor(segment.score)}`}>
+                          {Math.round(segment.score)}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface">
+                        <div
+                          className={`h-full rounded-full ${signalBar(segment.score)}`}
+                          style={{ width: `${clampScore(segment.score)}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs leading-relaxed text-foreground/55">
+                        {segment.note}
+                      </p>
+                    </div>
                   ))}
-                </ul>
-              </div>
+                  {result.retention.length === 0 ? (
+                    <p className="rounded-lg border border-border bg-background p-4 text-xs text-foreground/45">
+                      The analyzer did not return time-based retention signals for
+                      this source.
+                    </p>
+                  ) : null}
+                </div>
+              </section>
 
-              <div className="bg-surface border border-border rounded-xl p-6">
-                <h3 className="font-medium mb-3 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  Remix for Your Brand
-                </h3>
-                <ul className="space-y-2">
-                  {result.remixSuggestions.map((item: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-foreground/70">
-                      <span className="text-primary mt-1">→</span>
-                      {item}
-                    </li>
+              <section className="rounded-xl border border-border bg-surface p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="flex items-center gap-2 font-medium">
+                    <WandSparkles className="h-4 w-4 text-primary" />
+                    Actionable edit plan
+                  </h2>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-primary">
+                    {result.changes.length} proposed
+                  </span>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {result.changes.map((change: EditOperation) => (
+                    <article
+                      key={change.id}
+                      className="rounded-lg border border-border bg-background p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{change.label}</p>
+                          <p className="mt-1 font-mono text-[10px] text-foreground/40">
+                            {change.start.toFixed(1)}s–{change.end.toFixed(1)}s ·{" "}
+                            {change.type}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-foreground/[0.06] px-2 py-1 text-[10px] text-foreground/50">
+                          {confidencePercent(change.confidence)}% confidence
+                        </span>
+                      </div>
+                      <p className="mt-3 text-xs leading-relaxed text-foreground/60">
+                        {change.reason}
+                      </p>
+                      <p className="mt-2 text-[10px] uppercase tracking-wider text-foreground/35">
+                        {change.intensity} intensity · review before accepting
+                      </p>
+                    </article>
                   ))}
-                </ul>
-                <button className="w-full mt-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors">
-                  <Sparkles className="h-3.5 w-3.5 inline mr-1" /> Generate Remix Script
-                </button>
-              </div>
+                  {result.changes.length === 0 ? (
+                    <p className="rounded-lg border border-border bg-background p-4 text-xs text-foreground/45">
+                      No edit operations were returned. Refine the source or try a
+                      different platform target.
+                    </p>
+                  ) : null}
+                </div>
+
+                {result.changes.length > 0 ? (
+                  <div className="mt-5 border-t border-border pt-5">
+                    {workspace.projects.length > 0 ? (
+                      <>
+                        <label
+                          className="mb-2 block text-xs font-medium"
+                          htmlFor="analysis-project"
+                        >
+                          Queue in project
+                        </label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <select
+                            id="analysis-project"
+                            value={selectedProjectId}
+                            onChange={(event) => {
+                              setSelectedProjectId(event.target.value);
+                              setQueued(false);
+                            }}
+                            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                          >
+                            <option value="">Choose an edit project</option>
+                            {workspace.projects.map((project) => (
+                              <option key={project.id} value={project.id}>
+                                {project.title}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => void queueChanges()}
+                            disabled={!selectedProjectId || queued}
+                            className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white disabled:opacity-45"
+                          >
+                            {queued ? (
+                              <>
+                                <Check className="h-4 w-4" />
+                                Queued
+                              </>
+                            ) : (
+                              <>
+                                Queue changes
+                                <ChevronRight className="h-4 w-4" />
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <p className="mt-2 text-[11px] text-foreground/40">
+                          Changes enter the editor as proposed operations. Nothing is
+                          applied until you review and accept it.
+                        </p>
+                      </>
+                    ) : (
+                      <div className="flex items-start gap-3 rounded-lg bg-background p-4">
+                        <Film className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <p className="text-xs leading-relaxed text-foreground/55">
+                          Create an edit project first, then rerun or reopen this
+                          analysis to queue its proposed timeline changes.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </section>
             </div>
           </motion.div>
+        ) : (
+          <motion.section
+            key="analysis-empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-border bg-surface p-10 text-center"
+          >
+            <Gauge className="h-9 w-9 text-primary/40" />
+            <h2 className="mt-4 text-lg font-medium text-foreground/65">
+              Evidence before edits
+            </h2>
+            <p className="mt-2 max-w-md text-sm text-foreground/45">
+              Analysis starts only after you provide a real source. Results include
+              time ranges, model notes, and reviewable edit operations.
+            </p>
+          </motion.section>
         )}
       </AnimatePresence>
     </div>

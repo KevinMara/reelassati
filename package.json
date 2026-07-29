@@ -9,10 +9,12 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "NODE_ENV=production node dist/boot.js",
-    "check": "tsc -b",
+    "check": "tsc -b tsconfig.app.json tsconfig.node.json && tsc -p tsconfig.sites.json",
+    "check:legacy-api": "tsc -p tsconfig.server.json",
     "format": "prettier --write .",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
+    "db:sites:generate": "drizzle-kit generate --config drizzle.sites.config.ts",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push"
   },

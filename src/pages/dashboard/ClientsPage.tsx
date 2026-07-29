@@ -1,137 +1,425 @@
-import { useState } from "react";
-import { Users, Plus, Search, MoreHorizontal, Edit, Trash2, FileText, BarChart3 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useMemo, useState, type FormEvent } from "react";
+import {
+  Captions,
+  CheckCircle2,
+  Loader2,
+  Palette,
+  Save,
+  SlidersHorizontal,
+  Target,
+  Type,
+  Volume2,
+} from "lucide-react";
+import type { BrandKit } from "@contracts/workspace";
+import { useWorkspace } from "@/providers/workspace";
 
-const DEMO_CLIENTS = [
-  { id: 1, name: "Fashion Brand Co.", brand: "FABCO", niche: "Fashion", status: "active", content: 24, views: "452K", since: "2024-01" },
-  { id: 2, name: "FitLife Supplements", brand: "FitLife", niche: "Fitness", status: "active", content: 18, views: "289K", since: "2024-02" },
-  { id: 3, name: "Gourmet Kitchen", brand: "Gourmet", niche: "Food", status: "active", content: 12, views: "156K", since: "2024-03" },
-  { id: 4, name: "TechZone Electronics", brand: "TechZone", niche: "Tech", status: "paused", content: 8, views: "89K", since: "2024-04" },
-  { id: 5, name: "Wellness Hub", brand: "Wellness", niche: "Health", status: "active", content: 15, views: "201K", since: "2024-02" },
-  { id: 6, name: "StudioX Creative", brand: "StudioX", niche: "Design", status: "archived", content: 6, views: "45K", since: "2024-01" },
+const CAPTION_PRESETS: Array<{
+  value: BrandKit["captionPreset"];
+  label: string;
+  detail: string;
+}> = [
+  {
+    value: "kinetic",
+    label: "Kinetic",
+    detail: "Fast emphasis for high-energy cuts",
+  },
+  {
+    value: "editorial",
+    label: "Editorial",
+    detail: "Structured, premium hierarchy",
+  },
+  {
+    value: "minimal",
+    label: "Minimal",
+    detail: "Quiet typography with fewer distractions",
+  },
 ];
 
-export default function ClientsPage() {
-  const [search, setSearch] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
-  const [filter, setFilter] = useState("all");
+const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
-  const filtered = DEMO_CLIENTS.filter((c) => {
-    if (filter !== "all" && c.status !== filter) return false;
-    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+export default function ClientsPage() {
+  const { workspace, updateWorkspace, loading, saving } = useWorkspace();
+  const [edits, setEdits] = useState<Partial<BrandKit>>({});
+  const [notice, setNotice] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
+  const draft = useMemo(
+    () => ({ ...workspace.brandKit, ...edits }),
+    [edits, workspace.brandKit],
+  );
+  const dirty = Object.keys(edits).length > 0;
+
+  const readiness = useMemo(() => {
+    const checks = [
+      Boolean(draft.name.trim()),
+      draft.voice.trim().length >= 20,
+      draft.audience.trim().length >= 20,
+      COLOR_PATTERN.test(draft.primaryColor),
+      COLOR_PATTERN.test(draft.accentColor),
+    ];
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  }, [draft]);
+
+  const updateDraft = <Key extends keyof BrandKit>(
+    key: Key,
+    value: BrandKit[Key],
+  ) => {
+    setEdits((current) => ({ ...current, [key]: value }));
+    setNotice(null);
+  };
+
+  const saveBrandKit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!draft.name.trim() || !COLOR_PATTERN.test(draft.primaryColor)) {
+      setNotice({
+        tone: "error",
+        message: "Add a brand name and use six-digit hexadecimal colors.",
+      });
+      return;
+    }
+    if (!COLOR_PATTERN.test(draft.accentColor)) {
+      setNotice({
+        tone: "error",
+        message: "The accent color must use a six-digit hexadecimal value.",
+      });
+      return;
+    }
+
+    try {
+      const next: BrandKit = {
+        ...draft,
+        name: draft.name.trim(),
+        voice: draft.voice.trim(),
+        audience: draft.audience.trim(),
+        font: draft.font.trim() || "Geist",
+        safeZone: Math.min(25, Math.max(0, draft.safeZone)),
+        audioDucking: Math.min(100, Math.max(0, draft.audioDucking)),
+      };
+      await updateWorkspace((current) => ({ ...current, brandKit: next }));
+      setEdits({});
+      setNotice({
+        tone: "success",
+        message: "Brand DNA saved. New scripts and edits can now use it.",
+      });
+    } catch (cause) {
+      setNotice({
+        tone: "error",
+        message: cause instanceof Error ? cause.message : "Brand DNA could not be saved.",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[45vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="flex items-start justify-between mb-8">
+    <div className="mx-auto max-w-6xl">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mono-eyebrow text-primary mb-2">Multi-Client</p>
-          <h1 className="text-3xl font-semibold">Clients</h1>
+          <p className="mono-eyebrow mb-2 text-primary">Reusable creative memory</p>
+          <h1 className="text-3xl font-semibold">Brand DNA</h1>
+          <p className="mt-2 max-w-2xl text-sm text-foreground/55">
+            One truthful source of creative constraints for this workspace. Multi-brand
+            client workspaces are not simulated here.
+          </p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Add Client
-        </button>
+        <div className="rounded-xl border border-border bg-surface px-4 py-3 text-right">
+          <p className="mono-eyebrow text-[10px] text-foreground/45">Definition depth</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">{readiness}%</p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex-1 relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search clients..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-surface border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
+      {notice ? (
+        <div
+          role="status"
+          className={`mb-5 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm ${
+            notice.tone === "error"
+              ? "border-red-500/20 bg-red-500/5 text-red-600"
+              : "border-emerald-500/20 bg-emerald-500/5 text-emerald-600"
+          }`}
+        >
+          {notice.tone === "success" ? <CheckCircle2 className="h-4 w-4" /> : null}
+          {notice.message}
         </div>
-        <div className="flex gap-1">
-          {["all", "active", "paused", "archived"].map((f) => (
+      ) : null}
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]">
+        <form
+          onSubmit={saveBrandKit}
+          className="space-y-7 rounded-xl border border-border bg-surface p-6"
+        >
+          <section>
+            <div className="mb-4 flex items-center gap-2">
+              <Target className="h-4 w-4 text-primary" />
+              <h2 className="font-medium">Positioning</h2>
+            </div>
+            <div className="grid gap-4">
+              <label className="text-sm">
+                <span className="mb-1.5 block font-medium">Brand name</span>
+                <input
+                  value={draft.name}
+                  onChange={(event) => updateDraft("name", event.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="Your public-facing brand"
+                  required
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1.5 block font-medium">Voice rules</span>
+                <textarea
+                  value={draft.voice}
+                  onChange={(event) => updateDraft("voice", event.target.value)}
+                  rows={4}
+                  className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="How the brand speaks, phrases it avoids, energy level, point of view, and proof style"
+                />
+                <span className="mt-1.5 block text-xs text-foreground/45">
+                  Be concrete enough that an editor can reject an off-brand line.
+                </span>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1.5 block font-medium">Audience tension</span>
+                <textarea
+                  value={draft.audience}
+                  onChange={(event) => updateDraft("audience", event.target.value)}
+                  rows={4}
+                  className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="Who this is for, what they already believe, and what problem creates urgency"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="border-t border-border pt-7">
+            <div className="mb-4 flex items-center gap-2">
+              <Palette className="h-4 w-4 text-primary" />
+              <h2 className="font-medium">Visual system</h2>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm">
+                <span className="mb-1.5 block font-medium">Primary color</span>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={
+                      COLOR_PATTERN.test(draft.primaryColor)
+                        ? draft.primaryColor
+                        : "#6F5AD8"
+                    }
+                    onChange={(event) =>
+                      updateDraft("primaryColor", event.target.value.toUpperCase())
+                    }
+                    className="h-10 w-12 rounded-lg border border-border bg-background p-1"
+                    aria-label="Choose primary color"
+                  />
+                  <input
+                    value={draft.primaryColor}
+                    onChange={(event) =>
+                      updateDraft("primaryColor", event.target.value)
+                    }
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs uppercase"
+                    aria-label="Primary color hexadecimal value"
+                  />
+                </div>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1.5 block font-medium">Accent color</span>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={
+                      COLOR_PATTERN.test(draft.accentColor)
+                        ? draft.accentColor
+                        : "#D8FF4F"
+                    }
+                    onChange={(event) =>
+                      updateDraft("accentColor", event.target.value.toUpperCase())
+                    }
+                    className="h-10 w-12 rounded-lg border border-border bg-background p-1"
+                    aria-label="Choose accent color"
+                  />
+                  <input
+                    value={draft.accentColor}
+                    onChange={(event) =>
+                      updateDraft("accentColor", event.target.value)
+                    }
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs uppercase"
+                    aria-label="Accent color hexadecimal value"
+                  />
+                </div>
+              </label>
+              <label className="text-sm sm:col-span-2">
+                <span className="mb-1.5 flex items-center gap-1.5 font-medium">
+                  <Type className="h-3.5 w-3.5" /> Brand typeface
+                </span>
+                <input
+                  value={draft.font}
+                  onChange={(event) => updateDraft("font", event.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
+                  placeholder="Geist"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="border-t border-border pt-7">
+            <div className="mb-4 flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              <h2 className="font-medium">Editing defaults</h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {CAPTION_PRESETS.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => updateDraft("captionPreset", preset.value)}
+                  aria-pressed={draft.captionPreset === preset.value}
+                  className={`rounded-xl border p-4 text-left transition-colors ${
+                    draft.captionPreset === preset.value
+                      ? "border-primary bg-primary/5"
+                      : "border-border bg-background hover:border-primary/35"
+                  }`}
+                >
+                  <Captions className="h-4 w-4 text-primary" />
+                  <span className="mt-3 block text-sm font-medium">{preset.label}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-foreground/45">
+                    {preset.detail}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <label className="text-sm">
+                <span className="mb-2 flex items-center justify-between">
+                  <span className="font-medium">Safe-zone inset</span>
+                  <span className="font-mono text-xs text-primary">{draft.safeZone}%</span>
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="25"
+                  value={draft.safeZone}
+                  onChange={(event) =>
+                    updateDraft("safeZone", Number(event.target.value))
+                  }
+                  className="w-full accent-primary"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Volume2 className="h-3.5 w-3.5" /> Voice ducking
+                  </span>
+                  <span className="font-mono text-xs text-primary">
+                    {draft.audioDucking}%
+                  </span>
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={draft.audioDucking}
+                  onChange={(event) =>
+                    updateDraft("audioDucking", Number(event.target.value))
+                  }
+                  className="w-full accent-primary"
+                />
+              </label>
+            </div>
+          </section>
+
+          <div className="flex items-center justify-between border-t border-border pt-5">
+            <span className="text-xs text-foreground/45">
+              {dirty ? "Unsaved Brand DNA changes" : "Brand DNA is saved"}
+            </span>
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium capitalize transition-colors ${filter === f ? "bg-primary text-white" : "bg-surface border border-border"}`}
+              type="submit"
+              disabled={!dirty || saving}
+              className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {f}
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Save Brand DNA
             </button>
-          ))}
-        </div>
-      </div>
+          </div>
+        </form>
 
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-border text-xs uppercase tracking-wider text-foreground/40">
-          <div className="col-span-3">Client</div>
-          <div className="col-span-2">Niche</div>
-          <div className="col-span-1">Status</div>
-          <div className="col-span-2">Content</div>
-          <div className="col-span-2">Views</div>
-          <div className="col-span-1">Since</div>
-          <div className="col-span-1"></div>
-        </div>
-        {filtered.map((client) => (
-          <div key={client.id} className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-border last:border-0 hover:bg-background/50 transition-colors items-center">
-            <div className="col-span-3 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                {client.brand.slice(0, 2)}
-              </div>
-              <div>
-                <p className="font-medium text-sm">{client.name}</p>
-                <p className="text-xs text-foreground/50">{client.brand}</p>
+        <aside className="space-y-5">
+          <div className="sticky top-6 overflow-hidden rounded-xl border border-border bg-surface">
+            <div
+              className="relative aspect-[9/12] p-6"
+              style={{
+                background: `linear-gradient(145deg, ${draft.primaryColor} 0%, #15131c 68%)`,
+              }}
+            >
+              <div
+                className="absolute right-5 top-5 h-3 w-3 rounded-full"
+                style={{ backgroundColor: draft.accentColor }}
+              />
+              <div className="flex h-full flex-col justify-end">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/55">
+                  Live constraint preview
+                </p>
+                <p
+                  className={`mt-3 max-w-[15rem] text-white ${
+                    draft.captionPreset === "kinetic"
+                      ? "text-3xl font-black uppercase leading-[0.92]"
+                      : draft.captionPreset === "editorial"
+                        ? "text-3xl font-medium leading-tight"
+                        : "text-2xl font-medium leading-snug"
+                  }`}
+                  style={{ fontFamily: draft.font || "Geist" }}
+                >
+                  Make every frame earn the next one.
+                </p>
+                <div
+                  className="mt-4 h-1 rounded-full"
+                  style={{
+                    width: `${100 - draft.safeZone * 2}%`,
+                    backgroundColor: draft.accentColor,
+                  }}
+                />
               </div>
             </div>
-            <div className="col-span-2 text-sm text-foreground/70">{client.niche}</div>
-            <div className="col-span-1">
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium capitalize ${
-                client.status === "active" ? "text-emerald-500 bg-emerald-500/10" :
-                client.status === "paused" ? "text-amber-500 bg-amber-500/10" :
-                "text-foreground/40 bg-foreground/5"
-              }`}>
-                {client.status}
-              </span>
-            </div>
-            <div className="col-span-2 text-sm">{client.content} pieces</div>
-            <div className="col-span-2 text-sm font-medium">{client.views}</div>
-            <div className="col-span-1 text-sm text-foreground/50">{client.since}</div>
-            <div className="col-span-1 flex justify-end gap-1">
-              <button className="p-1.5 rounded hover:bg-background"><FileText className="h-3.5 w-3.5 text-foreground/40" /></button>
-              <button className="p-1.5 rounded hover:bg-background"><BarChart3 className="h-3.5 w-3.5 text-foreground/40" /></button>
+            <div className="p-5">
+              <h2 className="font-medium">{draft.name || "Unnamed brand"}</h2>
+              <p className="mt-1 text-xs leading-relaxed text-foreground/50">
+                {draft.audience ||
+                  "Define the audience tension to make creative decisions more specific."}
+              </p>
+              <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-background p-3">
+                  <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                    Projects
+                  </dt>
+                  <dd className="mt-1 font-semibold">{workspace.projects.length}</dd>
+                </div>
+                <div className="rounded-lg bg-background p-3">
+                  <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                    Assets
+                  </dt>
+                  <dd className="mt-1 font-semibold">{workspace.assets.length}</dd>
+                </div>
+                <div className="rounded-lg bg-background p-3">
+                  <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                    Scripts
+                  </dt>
+                  <dd className="mt-1 font-semibold">{workspace.scripts.length}</dd>
+                </div>
+              </dl>
             </div>
           </div>
-        ))}
+        </aside>
       </div>
-
-      {/* Add Client Modal */}
-      <AnimatePresence>
-        {showAdd && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center"
-            onClick={() => setShowAdd(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-background border border-border rounded-xl p-6 w-full max-w-md"
-            >
-              <h2 className="text-lg font-semibold mb-4">Add New Client</h2>
-              <div className="space-y-4">
-                <input placeholder="Client name" className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-sm" />
-                <input placeholder="Brand name" className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-sm" />
-                <input placeholder="Niche (e.g., Fashion, Fitness)" className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-sm" />
-                <textarea placeholder="Brand voice & guidelines" rows={3} className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-sm" />
-                <div className="flex gap-2">
-                  <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 border border-border rounded-lg text-sm font-medium">Cancel</button>
-                  <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-medium">Add Client</button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -6,7 +6,14 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores([
+    'dist',
+    'api/**',
+    'db/migrations/**',
+    'db/schema.ts',
+    'db/seed.ts',
+    'src/components/ui/**',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -18,6 +25,10 @@ export default defineConfig([
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
+    },
+    rules: {
+      // Context modules intentionally export their provider and matching hook.
+      'react-refresh/only-export-components': 'off',
     },
   },
 ])

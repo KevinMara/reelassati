@@ -1,296 +1,334 @@
-import { useState } from "react";
-import { Link2, Unlink, CheckCircle, AlertCircle, TrendingUp, ArrowUpRight, ArrowDownRight, ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Link2,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  Unlink,
+} from "lucide-react";
 import { motion } from "framer-motion";
-import { trpc } from "@/providers/trpc";
+import type { Platform, PublishingAccount } from "@contracts/workspace";
+import { platformApi, PlatformApiError } from "@/lib/platform-api";
+import { useWorkspace } from "@/providers/workspace";
 
-const PLATFORM_META: Record<string, { name: string; color: string; icon: string }> = {
-  tiktok: { name: "TikTok", color: "bg-black", icon: "T" },
-  instagram: { name: "Instagram", color: "bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400", icon: "I" },
-  youtube: { name: "YouTube", color: "bg-red-600", icon: "Y" },
-  x: { name: "X / Twitter", color: "bg-slate-900", icon: "X" },
-  facebook: { name: "Facebook", color: "bg-blue-600", icon: "F" },
-  linkedin: { name: "LinkedIn", color: "bg-blue-700", icon: "L" },
-  pinterest: { name: "Pinterest", color: "bg-red-700", icon: "P" },
-  threads: { name: "Threads", color: "bg-slate-900", icon: "Th" },
-  reddit: { name: "Reddit", color: "bg-orange-600", icon: "R" },
-  bluesky: { name: "Bluesky", color: "bg-sky-500", icon: "B" },
-  telegram: { name: "Telegram", color: "bg-sky-600", icon: "Tg" },
-  discord: { name: "Discord", color: "bg-indigo-500", icon: "D" },
+const PLATFORM_META: Record<
+  Platform,
+  { name: string; badge: string; mark: string }
+> = {
+  tiktok: { name: "TikTok", badge: "bg-black", mark: "TT" },
+  instagram: {
+    name: "Instagram",
+    badge: "bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400",
+    mark: "IG",
+  },
+  youtube: { name: "YouTube", badge: "bg-red-600", mark: "YT" },
+  twitter: { name: "X / Twitter", badge: "bg-slate-900", mark: "X" },
+  facebook: { name: "Facebook", badge: "bg-blue-600", mark: "FB" },
+  linkedin: { name: "LinkedIn", badge: "bg-blue-700", mark: "IN" },
+  pinterest: { name: "Pinterest", badge: "bg-red-700", mark: "P" },
+  threads: { name: "Threads", badge: "bg-slate-900", mark: "TH" },
 };
 
-const DEMO_PLATFORMS = [
-  { id: "tiktok", name: "TikTok", followers: "45.2K", posts: 156, growth: "+12.5%", connected: true },
-  { id: "instagram", name: "Instagram", followers: "31.2K", posts: 203, growth: "+8.3%", connected: true },
-  { id: "youtube", name: "YouTube", followers: "18.5K", posts: 89, growth: "-2.1%", connected: true },
-];
+const CONNECTABLE_PLATFORMS = Object.keys(PLATFORM_META) as Platform[];
+
+function accountFingerprint(accounts: PublishingAccount[]) {
+  return [...accounts]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map(({ id, providerId, platform, accountName, handle, status }) => ({
+      id,
+      providerId,
+      platform,
+      accountName,
+      handle,
+      status,
+    }));
+}
+
+function errorMessage(cause: unknown) {
+  if (cause instanceof PlatformApiError && cause.missing.length > 0) {
+    return `${cause.message} Missing: ${cause.missing.join(", ")}.`;
+  }
+  return cause instanceof Error ? cause.message : "The account request failed.";
+}
 
 export default function SocialHub() {
-  const [connecting, setConnecting] = useState<string | null>(null);
+  const { workspace, capabilities, updateWorkspace, saving, loading } =
+    useWorkspace();
+  const [configured, setConfigured] = useState(capabilities.publishing);
+  const [syncing, setSyncing] = useState(false);
+  const [connecting, setConnecting] = useState<Platform | null>(null);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
-  // ── Fetch connected accounts from DB ───────────────────────────────────────
-  const utils = trpc.useUtils();
-  const accountsQuery = trpc.platform.list.useQuery(undefined, {
-    retry: false,
-  });
-  const accounts = accountsQuery.data || [];
-
-  // ── Zernio config check ────────────────────────────────────────────────────
-  const configQuery = trpc.platform.config.useQuery(undefined, { retry: false });
-  const zernioEnabled = configQuery.data?.enabled ?? false;
-  const availablePlatforms = configQuery.data?.platforms || [];
-
-  // ── Mutations ──────────────────────────────────────────────────────────────
-  const initiateConnect = trpc.platform.initiateConnect.useMutation({
-    onSuccess: (data) => {
-      // Redirect to the platform's OAuth page
-      if (data.authUrl) {
-        window.location.href = data.authUrl;
-      }
-      setConnecting(null);
-    },
-    onError: (err) => {
-      setError(err.message);
-      setConnecting(null);
-    },
-  });
-
-  const disconnect = trpc.platform.disconnect.useMutation({
-    onSuccess: () => {
-      utils.platform.list.invalidate();
-    },
-  });
-
-  // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleConnect = (platform: string) => {
+  const syncAccounts = useCallback(async () => {
+    setSyncing(true);
     setError("");
-    setConnecting(platform);
-    initiateConnect.mutate({ platform: platform as any });
-  };
+    try {
+      const result = await platformApi.publishingAccounts();
+      setConfigured(result.configured);
+      setLastSyncedAt(new Date().toISOString());
 
-  const handleDisconnect = (id: number) => {
-    if (window.confirm("Disconnect this account?")) {
-      disconnect.mutate({ id });
+      if (
+        JSON.stringify(accountFingerprint(result.accounts)) !==
+        JSON.stringify(accountFingerprint(workspace.accounts))
+      ) {
+        await updateWorkspace((current) => ({
+          ...current,
+          accounts: result.accounts,
+        }));
+      }
+    } catch (cause) {
+      setConfigured(false);
+      setError(errorMessage(cause));
+    } finally {
+      setSyncing(false);
+    }
+  }, [updateWorkspace, workspace.accounts]);
+
+  useEffect(() => {
+    if (loading) return;
+    const timer = window.setTimeout(() => {
+      void syncAccounts();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loading, syncAccounts]);
+
+  const connectedPlatforms = useMemo(
+    () =>
+      new Set(
+        workspace.accounts
+          .filter((account) => account.status === "connected")
+          .map((account) => account.platform),
+      ),
+    [workspace.accounts],
+  );
+
+  const handleConnect = async (platform: Platform) => {
+    setConnecting(platform);
+    setError("");
+    try {
+      const { authUrl } = await platformApi.connectPublishingAccount(platform);
+      window.location.assign(authUrl);
+    } catch (cause) {
+      setError(errorMessage(cause));
+      setConnecting(null);
     }
   };
 
-  // Build a merged view: connected accounts from DB + available platforms not yet connected
-  const connectedIds = new Set(accounts.map((a) => a.platform));
-  const unconnectedPlatforms = availablePlatforms
-    .filter((p: any) => p.posting && !connectedIds.has(p.id))
-    .map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      meta: PLATFORM_META[p.id] || { name: p.name, color: "bg-surface", icon: "?" },
-      connected: false,
-    }));
+  const handleDisconnect = async (account: PublishingAccount) => {
+    if (!window.confirm(`Disconnect ${account.accountName}?`)) return;
+    setDisconnecting(account.id);
+    setError("");
+    try {
+      await platformApi.disconnectPublishingAccount(account.id);
+      await updateWorkspace((current) => ({
+        ...current,
+        accounts: current.accounts.filter((item) => item.id !== account.id),
+      }));
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setDisconnecting(null);
+    }
+  };
 
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <p className="mono-eyebrow text-primary mb-2">Social Hub</p>
-        <h1 className="text-3xl font-semibold">Connected Accounts</h1>
-        <p className="text-foreground/60 mt-2">
-          Connect your social media accounts to publish content across 12+ platforms
-        </p>
+    <div className="mx-auto max-w-6xl">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mono-eyebrow mb-2 text-primary">Distribution layer</p>
+          <h1 className="text-3xl font-semibold">Social Hub</h1>
+          <p className="mt-2 max-w-2xl text-foreground/60">
+            Link real publishing accounts through Zernio, then use the same
+            verified destinations everywhere in your workspace.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void syncAccounts()}
+          disabled={syncing || saving}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/40 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? "Syncing" : "Sync accounts"}
+        </button>
       </div>
 
-      {/* Zernio Status */}
-      <div className={`mb-6 p-4 rounded-xl border ${zernioEnabled ? "border-emerald-500/20 bg-emerald-500/5" : "border-amber-500/20 bg-amber-500/5"}`}>
-        <div className="flex items-center gap-3">
-          <div className={`h-2 w-2 rounded-full ${zernioEnabled ? "bg-emerald-500" : "bg-amber-500"}`} />
-          <p className="text-sm">
-            {zernioEnabled ? (
-              <span className="text-emerald-500 font-medium">Zernio API connected</span>
-            ) : (
-              <span className="text-amber-500">
-                Zernio API key not configured — add <code className="text-xs bg-amber-500/10 px-1.5 py-0.5 rounded">ZERNIO_API_KEY</code> to your .env to enable publishing
-              </span>
-            )}
-          </p>
+      <div
+        className={`mb-6 rounded-xl border p-4 ${
+          configured
+            ? "border-emerald-500/20 bg-emerald-500/5"
+            : "border-amber-500/20 bg-amber-500/5"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          {configured ? (
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+          ) : (
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+          )}
+          <div>
+            <p className="text-sm font-medium">
+              {configured
+                ? "Publishing connection is ready"
+                : "Publishing setup is incomplete"}
+            </p>
+            <p className="mt-1 text-xs text-foreground/55">
+              {configured
+                ? "Account data below comes from Zernio. Follower and growth analytics are not invented or estimated here."
+                : "A server-side ZERNIO_API_KEY is required before OAuth connections and account sync can work."}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Error */}
       {error && (
-        <div className="mb-6 p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-sm text-red-500">
+        <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-500">
           {error}
         </div>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid sm:grid-cols-3 gap-4 mb-8">
-        <div className="bg-surface border border-border rounded-xl p-5">
-          <p className="text-3xl font-semibold">{accounts.length}</p>
+      <div className="mb-8 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-surface p-5">
+          <p className="text-3xl font-semibold">
+            {
+              workspace.accounts.filter(
+                (account) => account.status === "connected",
+              ).length
+            }
+          </p>
           <p className="text-sm text-foreground/50">Connected accounts</p>
         </div>
-        <div className="bg-surface border border-border rounded-xl p-5">
-          <p className="text-3xl font-semibold">
-            {accounts.reduce((a, acc) => a + (acc.followers || 0), 0).toLocaleString()}
-          </p>
-          <p className="text-sm text-foreground/50">Total followers</p>
+        <div className="rounded-xl border border-border bg-surface p-5">
+          <p className="text-3xl font-semibold">{connectedPlatforms.size}</p>
+          <p className="text-sm text-foreground/50">Active platforms</p>
         </div>
-        <div className="bg-surface border border-border rounded-xl p-5">
-          <p className="text-3xl font-semibold text-emerald-500 flex items-center gap-1">
-            +8.4% <TrendingUp className="h-5 w-5" />
+        <div className="rounded-xl border border-border bg-surface p-5">
+          <p className="text-sm font-medium">
+            {lastSyncedAt
+              ? new Date(lastSyncedAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Not synced yet"}
           </p>
-          <p className="text-sm text-foreground/50">Avg. monthly growth</p>
+          <p className="mt-1 text-sm text-foreground/50">Last provider sync</p>
         </div>
       </div>
 
-      {/* Connected Accounts */}
-      {accounts.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-sm font-medium text-foreground/50 mb-4 uppercase tracking-wider">Connected</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {accounts.map((account) => {
-              const meta = PLATFORM_META[account.platform] || { name: account.platform, color: "bg-surface", icon: "?" };
+      {workspace.accounts.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/45">
+            Connected destinations
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {workspace.accounts.map((account) => {
+              const meta = PLATFORM_META[account.platform];
               return (
-                <motion.div
+                <motion.article
                   key={account.id}
                   whileHover={{ y: -2 }}
-                  className="bg-surface border border-border rounded-xl p-5"
+                  className="rounded-xl border border-border bg-surface p-5"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-10 w-10 rounded-lg ${meta.color} flex items-center justify-center text-white font-bold text-xs`}>
-                        {meta.icon}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white ${meta.badge}`}
+                      >
+                        {meta.mark}
                       </div>
-                      <div>
-                        <h3 className="font-medium">{meta.name}</h3>
-                        <p className="text-xs text-foreground/50">{account.accountHandle || account.accountName}</p>
+                      <div className="min-w-0">
+                        <h3 className="truncate font-medium">
+                          {account.accountName}
+                        </h3>
+                        <p className="truncate text-xs text-foreground/50">
+                          {account.handle || meta.name}
+                        </p>
                       </div>
                     </div>
-                    <CheckCircle className="h-5 w-5 text-emerald-500" />
+                    <CheckCircle2
+                      className={`h-5 w-5 shrink-0 ${
+                        account.status === "connected"
+                          ? "text-emerald-500"
+                          : "text-amber-500"
+                      }`}
+                    />
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-foreground/60">Followers</span>
-                      <span className="font-medium">{(account.followers || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-foreground/60">Status</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-medium">
-                        {account.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 mt-4">
-                    <button className="flex-1 py-2 text-xs border border-border rounded-lg hover:bg-background transition-colors flex items-center justify-center gap-1">
-                      <ExternalLink className="h-3 w-3" /> View Profile
-                    </button>
+                  <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+                    <span className="text-xs capitalize text-foreground/50">
+                      {account.status}
+                    </span>
                     <button
-                      onClick={() => handleDisconnect(account.id)}
-                      className="p-2 border border-border rounded-lg hover:bg-red-500/5 hover:border-red-500/30 transition-colors"
-                      title="Disconnect"
+                      type="button"
+                      onClick={() => void handleDisconnect(account)}
+                      disabled={disconnecting === account.id}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-foreground/45 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
                     >
-                      <Unlink className="h-3.5 w-3.5 text-foreground/40" />
+                      {disconnecting === account.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Unlink className="h-3.5 w-3.5" />
+                      )}
+                      Disconnect
                     </button>
                   </div>
-                </motion.div>
+                </motion.article>
               );
             })}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Available Platforms (Not Connected) */}
-      {unconnectedPlatforms.length > 0 && (
-        <div>
-          <h2 className="text-sm font-medium text-foreground/50 mb-4 uppercase tracking-wider">Available Platforms</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {unconnectedPlatforms.map((platform) => (
-              <motion.div
-                key={platform.id}
-                whileHover={{ y: -2 }}
-                className="bg-surface border border-dashed border-border/50 rounded-xl p-5 opacity-80 hover:opacity-100 transition-opacity"
+      <section>
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/45">
+          Add a destination
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {CONNECTABLE_PLATFORMS.map((platform) => {
+            const meta = PLATFORM_META[platform];
+            const alreadyConnected = connectedPlatforms.has(platform);
+            return (
+              <motion.article
+                key={platform}
+                whileHover={alreadyConnected ? undefined : { y: -2 }}
+                className="rounded-xl border border-border bg-surface p-4"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-lg ${platform.meta.color} flex items-center justify-center text-white font-bold text-xs`}>
-                      {platform.meta.icon}
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{platform.name}</h3>
-                      <p className="text-xs text-foreground/50">Not connected</p>
-                    </div>
+                <div className="mb-4 flex items-center gap-3">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-lg text-[10px] font-bold text-white ${meta.badge}`}
+                  >
+                    {meta.mark}
                   </div>
-                  <AlertCircle className="h-5 w-5 text-foreground/20" />
+                  <div>
+                    <p className="text-sm font-medium">{meta.name}</p>
+                    <p className="text-xs text-foreground/45">
+                      {alreadyConnected ? "Connected" : "OAuth connection"}
+                    </p>
+                  </div>
                 </div>
-
-                <p className="text-sm text-foreground/50 mb-4">
-                  Connect your {platform.name} account to publish content
-                </p>
-
                 <button
-                  onClick={() => handleConnect(platform.id)}
-                  disabled={!zernioEnabled || connecting === platform.id}
-                  className="w-full py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                  type="button"
+                  onClick={() => void handleConnect(platform)}
+                  disabled={
+                    !configured || alreadyConnected || connecting === platform
+                  }
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-35"
                 >
-                  {connecting === platform.id ? (
-                    <>
-                      <span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full" />
-                      Redirecting...
-                    </>
+                  {connecting === platform ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <><Link2 className="h-3.5 w-3.5" /> Connect {platform.name}</>
+                    <Link2 className="h-3.5 w-3.5" />
                   )}
+                  {alreadyConnected ? "Already linked" : "Connect"}
                 </button>
-              </motion.div>
-            ))}
-          </div>
+              </motion.article>
+            );
+          })}
         </div>
-      )}
-
-      {/* Demo fallback: show placeholder platforms if Zernio not configured */}
-      {!zernioEnabled && accounts.length === 0 && (
-        <div className="mt-8">
-          <h2 className="text-sm font-medium text-foreground/50 mb-4 uppercase tracking-wider">Supported Platforms (Preview Mode)</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {DEMO_PLATFORMS.map((platform) => (
-              <motion.div
-                key={platform.id}
-                whileHover={{ y: -2 }}
-                className="bg-surface border border-dashed border-border/50 rounded-xl p-5"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-lg ${PLATFORM_META[platform.id]?.color || "bg-surface"} flex items-center justify-center text-white font-bold text-xs`}>
-                      {PLATFORM_META[platform.id]?.icon || "?"}
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{platform.name}</h3>
-                      <p className="text-xs text-foreground/50">{platform.followers} followers</p>
-                    </div>
-                  </div>
-                  <CheckCircle className="h-5 w-5 text-emerald-500" />
-                </div>
-                <div className="space-y-2 opacity-60">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-foreground/60">Posts</span>
-                    <span className="font-medium">{platform.posts}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-foreground/60">Growth</span>
-                    <span className={`font-medium flex items-center gap-0.5 ${platform.growth.startsWith("+") ? "text-emerald-500" : "text-red-500"}`}>
-                      {platform.growth.startsWith("+") ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                      {platform.growth}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-          <div className="mt-6 p-4 rounded-xl border border-border bg-surface text-center">
-            <p className="text-sm text-foreground/50">
-              Add your <code className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">ZERNIO_API_KEY</code> to enable real connections across 12+ platforms
-            </p>
-          </div>
-        </div>
-      )}
+      </section>
     </div>
   );
 }

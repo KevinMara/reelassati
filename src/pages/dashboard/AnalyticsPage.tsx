@@ -1,124 +1,286 @@
-import { useState } from "react";
-import { BarChart3, TrendingUp, TrendingDown, Eye, Heart, MessageCircle, Share2, Users, ArrowUpRight } from "lucide-react";
-import { motion } from "framer-motion";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import {
+  AlertCircle,
+  CalendarClock,
+  CheckCircle2,
+  Film,
+  Radio,
+  Send,
+} from "lucide-react";
+import type { Platform } from "@contracts/workspace";
+import { useWorkspace } from "@/providers/workspace";
 
-const PLATFORMS = [
-  { name: "TikTok", views: 125400, likes: 18200, comments: 840, shares: 1200, followers: 45200, growth: 12.5 },
-  { name: "Instagram", views: 89300, likes: 12400, comments: 620, shares: 890, followers: 31200, growth: 8.3 },
-  { name: "YouTube", views: 56700, likes: 8900, comments: 1200, shares: 340, followers: 18500, growth: -2.1 },
-  { name: "X / Twitter", views: 23400, likes: 3400, comments: 420, shares: 1800, followers: 12300, growth: 5.7 },
-];
-
-const TOP_CONTENT = [
-  { title: "Summer Collection Promo", platform: "TikTok", views: "12.4K", engagement: "8.2%", trend: "up" },
-  { title: "5 Gym Mistakes", platform: "Instagram", views: "9.1K", engagement: "7.5%", trend: "up" },
-  { title: "Protein Powder Review", platform: "YouTube", views: "6.8K", engagement: "5.1%", trend: "down" },
-  { title: "Behind the Scenes", platform: "TikTok", views: "5.2K", engagement: "9.1%", trend: "up" },
-  { title: "Product Unboxing", platform: "Instagram", views: "4.7K", engagement: "6.3%", trend: "up" },
-];
-
-const formatNumber = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
+const PLATFORM_LABELS: Record<Platform, string> = {
+  tiktok: "TikTok",
+  instagram: "Instagram",
+  youtube: "YouTube",
+  twitter: "X / Twitter",
+  facebook: "Facebook",
+  linkedin: "LinkedIn",
+  pinterest: "Pinterest",
+  threads: "Threads",
+};
 
 export default function AnalyticsPage() {
-  const [period, setPeriod] = useState("7d");
+  const { workspace, capabilities, loading } = useWorkspace();
 
-  const totalViews = PLATFORMS.reduce((a, p) => a + p.views, 0);
-  const totalLikes = PLATFORMS.reduce((a, p) => a + p.likes, 0);
-  const totalComments = PLATFORMS.reduce((a, p) => a + p.comments, 0);
-  const totalFollowers = PLATFORMS.reduce((a, p) => a + p.followers, 0);
+  const publishedPosts = useMemo(
+    () =>
+      workspace.posts.filter(
+        (post) => post.status === "published" || Boolean(post.publishedAt),
+      ),
+    [workspace.posts],
+  );
+  const scheduledPosts = useMemo(
+    () => workspace.posts.filter((post) => post.status === "scheduled"),
+    [workspace.posts],
+  );
+  const activeProjects = useMemo(
+    () =>
+      workspace.projects.filter(
+        (project) =>
+          project.status === "editing" ||
+          project.status === "review" ||
+          project.status === "draft",
+      ),
+    [workspace.projects],
+  );
+  const readyAssets = useMemo(
+    () => workspace.assets.filter((asset) => asset.status === "ready"),
+    [workspace.assets],
+  );
+
+  const platformRows = useMemo(() => {
+    const totals = new Map<
+      Platform,
+      { platform: Platform; drafts: number; scheduled: number; published: number }
+    >();
+    for (const post of workspace.posts) {
+      for (const platform of post.platforms) {
+        const row = totals.get(platform) || {
+          platform,
+          drafts: 0,
+          scheduled: 0,
+          published: 0,
+        };
+        if (post.status === "published" || post.publishedAt) row.published += 1;
+        else if (post.status === "scheduled") row.scheduled += 1;
+        else if (post.status === "draft") row.drafts += 1;
+        totals.set(platform, row);
+      }
+    }
+    return Array.from(totals.values()).sort(
+      (left, right) =>
+        right.published +
+        right.scheduled +
+        right.drafts -
+        (left.published + left.scheduled + left.drafts),
+    );
+  }, [workspace.posts]);
+
+  const publicationHistory = useMemo(
+    () =>
+      [...publishedPosts]
+        .sort((left, right) =>
+          (right.publishedAt || right.createdAt).localeCompare(
+            left.publishedAt || left.createdAt,
+          ),
+        )
+        .slice(0, 8),
+    [publishedPosts],
+  );
+
+  if (loading) {
+    return <div className="min-h-[45vh] animate-pulse rounded-xl bg-surface" />;
+  }
+
+  const kpis = [
+    {
+      label: "Active edits",
+      value: activeProjects.length,
+      detail: `${workspace.projects.length} total projects`,
+      icon: Film,
+    },
+    {
+      label: "Ready assets",
+      value: readyAssets.length,
+      detail: `${workspace.assets.length} stored assets`,
+      icon: CheckCircle2,
+    },
+    {
+      label: "Scheduled",
+      value: scheduledPosts.length,
+      detail: "Saved to the publishing queue",
+      icon: CalendarClock,
+    },
+    {
+      label: "Published records",
+      value: publishedPosts.length,
+      detail: "Recorded by this workspace",
+      icon: Send,
+    },
+  ];
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <p className="mono-eyebrow text-primary mb-2">Performance Loop</p>
-          <h1 className="text-3xl font-semibold">Analytics</h1>
-        </div>
-        <div className="flex gap-1">
-          {["24h", "7d", "30d", "90d"].map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium ${period === p ? "bg-primary text-white" : "bg-surface border border-border"}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+    <div className="mx-auto max-w-6xl">
+      <div className="mb-8">
+        <p className="mono-eyebrow mb-2 text-primary">Measured workspace</p>
+        <h1 className="text-3xl font-semibold">Analytics</h1>
+        <p className="mt-2 max-w-2xl text-sm text-foreground/55">
+          Production and publication facts currently stored in REELassati. Reach,
+          retention, and engagement are never estimated.
+        </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: "Total Views", value: formatNumber(totalViews), icon: Eye, change: "+23.5%", positive: true },
-          { label: "Engagement", value: formatNumber(totalLikes), icon: Heart, change: "+18.2%", positive: true },
-          { label: "Comments", value: formatNumber(totalComments), icon: MessageCircle, change: "+31.0%", positive: true },
-          { label: "Followers", value: formatNumber(totalFollowers), icon: Users, change: "+8.7%", positive: true },
-        ].map((kpi) => (
-          <motion.div
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {kpis.map((kpi) => (
+          <article
             key={kpi.label}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-surface border border-border rounded-xl p-5"
+            className="rounded-xl border border-border bg-surface p-5"
           >
-            <div className="flex items-center justify-between mb-3">
-              <kpi.icon className="h-4 w-4 text-foreground/40" />
-              <span className={`text-xs font-medium flex items-center gap-0.5 ${kpi.positive ? "text-emerald-500" : "text-red-500"}`}>
-                {kpi.change} {kpi.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              </span>
+            <div className="mb-4 flex items-center justify-between">
+              <p className="mono-eyebrow text-[10px] text-foreground/45">
+                {kpi.label}
+              </p>
+              <kpi.icon className="h-4 w-4 text-primary" />
             </div>
-            <p className="text-2xl font-semibold">{kpi.value}</p>
-            <p className="text-xs text-foreground/50 mt-1">{kpi.label}</p>
-          </motion.div>
+            <p className="text-3xl font-semibold tabular-nums">{kpi.value}</p>
+            <p className="mt-1 text-xs text-foreground/45">{kpi.detail}</p>
+          </article>
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Platform Breakdown */}
-        <div className="bg-surface border border-border rounded-xl p-6">
-          <h2 className="font-medium mb-4">Platform Performance</h2>
-          <div className="space-y-4">
-            {PLATFORMS.map((p) => (
-              <div key={p.name} className="flex items-center gap-4">
-                <div className="w-24 shrink-0">
-                  <p className="text-sm font-medium">{p.name}</p>
-                  <p className="text-xs text-foreground/50">{formatNumber(p.views)} views</p>
-                </div>
-                <div className="flex-1 h-8 bg-background rounded-lg overflow-hidden relative">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(p.views / 125400) * 100}%` }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="h-full bg-primary/20 rounded-lg"
-                  />
-                </div>
-                <span className={`text-xs font-medium ${p.growth >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                  {p.growth >= 0 ? "+" : ""}{p.growth}%
-                </span>
-              </div>
-            ))}
+      <section className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="flex-1">
+            <h2 className="font-medium">Audience metrics are not synced yet</h2>
+            <p className="mt-1 text-sm leading-relaxed text-foreground/55">
+              {capabilities.publishing
+                ? "Zernio distribution is configured, but account-level views, watch time, retention, and engagement are not yet imported into this workspace."
+                : "Zernio publishing is not configured, and no platform analytics source is connected."}{" "}
+              This screen will not manufacture performance numbers.
+            </p>
+            <Link
+              to="/dashboard/social"
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-hover"
+            >
+              <Radio className="h-4 w-4" />
+              Review publishing connections
+            </Link>
           </div>
         </div>
+      </section>
 
-        {/* Top Content */}
-        <div className="bg-surface border border-border rounded-xl p-6">
-          <h2 className="font-medium mb-4">Top Performing Content</h2>
-          <div className="space-y-3">
-            {TOP_CONTENT.map((c, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-background">
-                <span className="text-sm font-mono text-foreground/30 w-5">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{c.title}</p>
-                  <p className="text-xs text-foreground/50">{c.platform} • {c.engagement} engagement</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium">{c.views}</p>
-                  <ArrowUpRight className={`h-3 w-3 inline ${c.trend === "up" ? "text-emerald-500" : "text-red-500"}`} />
-                </div>
-              </div>
-            ))}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-xl border border-border bg-surface p-6">
+          <div className="mb-5 flex items-end justify-between gap-3">
+            <div>
+              <p className="mono-eyebrow text-[10px] text-foreground/45">
+                Distribution footprint
+              </p>
+              <h2 className="mt-1 font-medium">Posts by platform</h2>
+            </div>
+            <span className="text-xs text-foreground/40">Workspace records only</span>
           </div>
-        </div>
+          {platformRows.length ? (
+            <div className="space-y-3">
+              {platformRows.map((row) => {
+                const total = row.drafts + row.scheduled + row.published;
+                return (
+                  <div
+                    key={row.platform}
+                    className="rounded-lg border border-border bg-background p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">
+                        {PLATFORM_LABELS[row.platform]}
+                      </p>
+                      <span className="font-mono text-xs text-foreground/45">
+                        {total} {total === 1 ? "post" : "posts"}
+                      </span>
+                    </div>
+                    <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                          Draft
+                        </dt>
+                        <dd className="mt-1 text-sm font-semibold">{row.drafts}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                          Scheduled
+                        </dt>
+                        <dd className="mt-1 text-sm font-semibold">{row.scheduled}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                          Published
+                        </dt>
+                        <dd className="mt-1 text-sm font-semibold">{row.published}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border p-8 text-center">
+              <p className="text-sm font-medium">No platform distribution data yet</p>
+              <p className="mt-1 text-xs text-foreground/45">
+                Saving a draft with a connected account will create the first record.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-border bg-surface p-6">
+          <div className="mb-5">
+            <p className="mono-eyebrow text-[10px] text-foreground/45">
+              Verified output
+            </p>
+            <h2 className="mt-1 font-medium">Publication history</h2>
+          </div>
+          {publicationHistory.length ? (
+            <div className="space-y-3">
+              {publicationHistory.map((post) => (
+                <article
+                  key={post.id}
+                  className="rounded-lg border border-border bg-background p-4"
+                >
+                  <p className="line-clamp-2 text-sm font-medium">
+                    {post.caption.trim() || "Untitled publication"}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-foreground/45">
+                    <span>
+                      {post.platforms.map((platform) => PLATFORM_LABELS[platform]).join(", ") ||
+                        "No platform recorded"}
+                    </span>
+                    <time dateTime={post.publishedAt || post.createdAt}>
+                      {new Date(
+                        post.publishedAt || post.createdAt,
+                      ).toLocaleDateString()}
+                    </time>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border p-8 text-center">
+              <p className="text-sm font-medium">Nothing has been recorded as published</p>
+              <p className="mt-1 text-xs text-foreground/45">
+                Publishing history will appear after a real distribution action.
+              </p>
+              <Link
+                to="/dashboard/publish"
+                className="mt-4 inline-flex text-sm font-medium text-primary"
+              >
+                Open Publisher
+              </Link>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

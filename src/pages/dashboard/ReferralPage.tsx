@@ -1,132 +1,159 @@
-import { useState, useEffect } from "react";
-import { Gift, Copy, CheckCircle, Users, DollarSign, CreditCard, TrendingUp } from "lucide-react";
-import { trpc } from "@/providers/trpc";
+import { useMemo } from "react";
+import {
+  Coins,
+  Gift,
+  Info,
+  LockKeyhole,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
+import { useWorkspace } from "@/providers/workspace";
 
-const CREDIT_VALUE = 0.01; // 1 credit = $0.01
-const REFERRAL_REWARD = 500; // 500 credits per referral
+const RETAIL_VALUE_PER_CREDIT = 0.01;
+
+function stableReferralCode(email: string) {
+  let hash = 0x811c9dc5;
+  for (const character of email.trim().toLowerCase()) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `REEL-${(hash >>> 0).toString(36).toUpperCase().padStart(7, "0")}`;
+}
 
 export default function ReferralPage() {
-  const [copied, setCopied] = useState(false);
-
-  const codeQuery = trpc.referral.myCode.useQuery(undefined, { retry: false });
-  const statsQuery = trpc.referral.stats.useQuery(undefined, { retry: false });
-
-  const code = codeQuery.data?.code || "";
-  const stats = statsQuery.data;
-
-  const referralLink = typeof window !== "undefined"
-    ? `${window.location.origin}/auth/signup?ref=${code}`
-    : `https://reelassati.vercel.app/auth/signup?ref=${code}`;
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const dollarValue = stats?.creditsEarned ? (stats.creditsEarned * CREDIT_VALUE).toFixed(2) : "0.00";
-  const potentialValue = ((stats?.totalReferrals || 0) * REFERRAL_REWARD * CREDIT_VALUE).toFixed(2);
+  const { workspace } = useWorkspace();
+  const referralCode = useMemo(
+    () => stableReferralCode(workspace.profile.email),
+    [workspace.profile.email],
+  );
+  const retailEquivalent = (
+    workspace.profile.credits * RETAIL_VALUE_PER_CREDIT
+  ).toFixed(2);
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="mx-auto max-w-5xl">
       <div className="mb-8">
-        <p className="mono-eyebrow text-primary mb-2">Refer & Earn</p>
-        <h1 className="text-3xl font-semibold">Invite Friends, Earn Credits</h1>
-        <p className="text-foreground/60 mt-2">Share REELassati with creators you know. Both of you get 500 free credits.</p>
+        <p className="mono-eyebrow mb-2 text-primary">Creator network</p>
+        <h1 className="text-3xl font-semibold">Referral program readiness</h1>
+        <p className="mt-2 max-w-2xl text-foreground/60">
+          Your creator code is reserved. Invites stay locked until public
+          accounts, qualification tracking, and credit billing are connected.
+        </p>
       </div>
 
-      {/* Hero Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-surface border border-border rounded-xl p-5 text-center">
-          <p className="text-3xl font-semibold">{stats?.totalReferrals || 0}</p>
-          <p className="text-xs text-foreground/50 mt-1">Total Invites</p>
+      <div className="mb-8 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-surface p-5">
+          <Users className="mb-3 h-5 w-5 text-primary" />
+          <p className="text-3xl font-semibold">0</p>
+          <p className="text-sm text-foreground/50">Tracked referrals</p>
+          <p className="mt-2 text-xs text-foreground/35">
+            No referral records are stored yet.
+          </p>
         </div>
-        <div className="bg-surface border border-border rounded-xl p-5 text-center">
-          <p className="text-3xl font-semibold text-emerald-500">{stats?.completedReferrals || 0}</p>
-          <p className="text-xs text-foreground/50 mt-1">Completed</p>
+        <div className="rounded-xl border border-border bg-surface p-5">
+          <Coins className="mb-3 h-5 w-5 text-emerald-500" />
+          <p className="text-3xl font-semibold">
+            {workspace.profile.credits.toLocaleString()}
+          </p>
+          <p className="text-sm text-foreground/50">Current credit balance</p>
+          <p className="mt-2 text-xs text-foreground/35">
+            Persisted in your workspace profile.
+          </p>
         </div>
-        <div className="bg-surface border border-border rounded-xl p-5 text-center">
-          <div className="flex items-center justify-center gap-1">
-            <CreditCard className="h-5 w-5 text-primary" />
-            <p className="text-3xl font-semibold text-primary">{stats?.creditsEarned || 0}</p>
-          </div>
-          <p className="text-xs text-foreground/50 mt-1">Credits Earned</p>
-        </div>
-        <div className="bg-surface border border-primary/20 rounded-xl p-5 text-center bg-primary/5">
-          <div className="flex items-center justify-center gap-1">
-            <DollarSign className="h-5 w-5 text-primary" />
-            <p className="text-3xl font-semibold text-primary">{dollarValue}</p>
-          </div>
-          <p className="text-xs text-foreground/50 mt-1">Value Earned</p>
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
+          <Gift className="mb-3 h-5 w-5 text-primary" />
+          <p className="text-3xl font-semibold text-primary">
+            ${retailEquivalent}
+          </p>
+          <p className="text-sm text-foreground/50">
+            Retail-equivalent product value
+          </p>
+          <p className="mt-2 text-xs text-foreground/35">
+            Not cash and not redeemable for money.
+          </p>
         </div>
       </div>
 
-      {/* Referral Link */}
-      <div className="bg-surface border border-primary/20 rounded-xl p-6 mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Gift className="h-5 w-5 text-primary" />
-          <h3 className="font-medium">Your Referral Link</h3>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex-1 px-4 py-3 rounded-lg bg-background border border-border text-sm font-mono truncate">
-            {referralLink}
+      <section className="mb-8 rounded-xl border border-primary/20 bg-surface p-6">
+        <div className="mb-5 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <LockKeyhole className="h-5 w-5 text-primary" />
           </div>
+          <div>
+            <h2 className="font-medium">Reserved creator code</h2>
+            <p className="text-xs text-foreground/45">
+              Derived from your account identity; not an active invite yet.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            readOnly
+            value={referralCode}
+            onFocus={(event) => event.currentTarget.select()}
+            aria-label="Reserved referral code"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-4 py-3 font-mono text-xs"
+          />
           <button
-            onClick={copyLink}
-            className="px-4 py-3 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors flex items-center gap-2 shrink-0"
+            type="button"
+            disabled
+            className="inline-flex shrink-0 cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-foreground/10 px-5 py-3 text-sm font-medium text-foreground/45"
           >
-            {copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copied" : "Copy Link"}
+            <LockKeyhole className="h-4 w-4" />
+            Invites locked
           </button>
         </div>
-        <div className="flex items-center gap-4 mt-4 text-xs text-foreground/40">
-          <span className="flex items-center gap-1"><Users className="h-3 w-3" /> You get {REFERRAL_REWARD} credits</span>
-          <span className="flex items-center gap-1"><Users className="h-3 w-3" /> They get {REFERRAL_REWARD} credits</span>
-          <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> = ${(REFERRAL_REWARD * CREDIT_VALUE).toFixed(2)} value each</span>
-        </div>
+        <p className="mt-4 text-xs leading-relaxed text-foreground/45">
+          No shareable URL or reward promise is issued in this private build.
+          That prevents untracked signups and balances the product cannot yet
+          verify.
+        </p>
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <article className="rounded-xl border border-border bg-surface p-5">
+          <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+            1
+          </div>
+          <h3 className="text-sm font-medium">Connect public accounts</h3>
+          <p className="mt-2 text-xs leading-relaxed text-foreground/45">
+            Invitees need their own verified identity before attribution can be
+            trusted.
+          </p>
+        </article>
+        <article className="rounded-xl border border-border bg-surface p-5">
+          <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/10 text-sm font-semibold text-blue-500">
+            2
+          </div>
+          <h3 className="text-sm font-medium">Define qualification</h3>
+          <p className="mt-2 text-xs leading-relaxed text-foreground/45">
+            A billing-backed event must reject self-referrals, duplicates, and
+            reversals.
+          </p>
+        </article>
+        <article className="rounded-xl border border-border bg-surface p-5">
+          <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-sm font-semibold text-emerald-500">
+            3
+          </div>
+          <h3 className="text-sm font-medium">Activate verified credits</h3>
+          <p className="mt-2 text-xs leading-relaxed text-foreground/45">
+            Only then should product credits enter the persisted balance and
+            become spendable.
+          </p>
+        </article>
       </div>
 
-      {/* How It Works */}
-      <div className="grid sm:grid-cols-3 gap-4 mb-8">
-        <div className="p-4 rounded-xl border border-border bg-surface text-center">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-            <Copy className="h-5 w-5 text-primary" />
-          </div>
-          <p className="text-sm font-medium mb-1">Share Your Link</p>
-          <p className="text-xs text-foreground/40">Copy and send to fellow creators</p>
+      <div className="mt-8 flex items-start gap-3 rounded-xl border border-border bg-surface p-4">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+        <div>
+          <p className="text-sm font-medium">Clear reward terms</p>
+          <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+            The current ${retailEquivalent} figure is a retail-equivalent display
+            of the existing workspace balance only. Credits have no cash value,
+            cannot be withdrawn, and are not financial earnings.
+          </p>
         </div>
-        <div className="p-4 rounded-xl border border-border bg-surface text-center">
-          <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
-            <Users className="h-5 w-5 text-emerald-500" />
-          </div>
-          <p className="text-sm font-medium mb-1">They Sign Up</p>
-          <p className="text-xs text-foreground/40">Friend creates a REELassati account</p>
-        </div>
-        <div className="p-4 rounded-xl border border-border bg-surface text-center">
-          <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
-            <CreditCard className="h-5 w-5 text-amber-500" />
-          </div>
-          <p className="text-sm font-medium mb-1">Both Get Credits</p>
-          <p className="text-xs text-foreground/40">{REFERRAL_REWARD} credits each = ${(REFERRAL_REWARD * CREDIT_VALUE).toFixed(2)}</p>
-        </div>
-      </div>
-
-      {/* Earning Potential */}
-      <div className="bg-surface border border-border rounded-xl p-6">
-        <h3 className="font-medium mb-4 flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-primary" />
-          Earning Potential
-        </h3>
-        <div className="space-y-3">
-          {[1, 5, 10, 25, 50].map((num) => (
-            <div key={num} className="flex items-center justify-between p-3 rounded-lg bg-background">
-              <span className="text-sm">{num} referral{num > 1 ? "s" : ""}</span>
-              <span className="text-sm font-medium text-primary">
-                {num * REFERRAL_REWARD} credits = ${(num * REFERRAL_REWARD * CREDIT_VALUE).toFixed(2)}
-              </span>
-            </div>
-          ))}
-        </div>
+        <Info className="ml-auto h-4 w-4 shrink-0 text-foreground/25" />
       </div>
     </div>
   );

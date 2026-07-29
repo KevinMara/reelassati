@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  SESSION_KEY,
-} from "./entry-constants";
+import { SESSION_KEY } from "./entry-constants";
 import "./entry-animation.css";
 
 export interface EntryAnimationProps {
@@ -14,46 +12,29 @@ export function hasEntryPlayed(): boolean {
   if (typeof window === "undefined") return false;
   return sessionStorage.getItem(SESSION_KEY) === "1";
 }
+
 export function markEntryPlayed(): void {
   if (typeof window !== "undefined") sessionStorage.setItem(SESSION_KEY, "1");
 }
 
-export default function EntryAnimation({ force = false, onComplete }: EntryAnimationProps) {
-  const [phase, setPhase] = useState<"hidden" | "ready" | "playing" | "done">("hidden");
+export default function EntryAnimation({
+  force = false,
+  onComplete,
+}: EntryAnimationProps) {
+  const [phase, setPhase] = useState<"hidden" | "ready" | "playing" | "done">(
+    () => (force || !hasEntryPlayed() ? "ready" : "done"),
+  );
+  const [reducedMotion] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
-
-  const [reducedMotion, setReducedMotion] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReducedMotion(mq.matches);
-    if (force || !hasEntryPlayed()) {
-      setPhase("ready");
-      document.documentElement.style.overflow = "hidden";
-    } else {
-      setPhase("done");
-      onCompleteRef.current?.();
-    }
-    return () => { document.documentElement.style.overflow = ""; };
-  }, [force]);
+  const initiallyCompleteRef = useRef(phase === "done");
 
   useEffect(() => {
-    if (phase !== "ready") return;
-    const r = requestAnimationFrame(() => setPhase("playing"));
-    return () => cancelAnimationFrame(r);
-  }, [phase]);
-
-  useEffect(() => {
-    if (phase !== "playing") return;
-    if (reducedMotion) {
-      const t = setTimeout(() => finish(), 300);
-      return () => clearTimeout(t);
-    }
-    // HARD 10 SECOND TIMER — all phases + wipe + buffer
-    const timer = setTimeout(() => finish(), 10000);
-    const failSafe = setTimeout(() => finish(), 12000); // must be > timer
-    return () => { clearTimeout(timer); clearTimeout(failSafe); };
-  }, [phase, reducedMotion]);
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   const finish = useCallback(() => {
     document.documentElement.style.overflow = "";
@@ -62,169 +43,251 @@ export default function EntryAnimation({ force = false, onComplete }: EntryAnima
     onCompleteRef.current?.();
   }, []);
 
+  useEffect(() => {
+    if (initiallyCompleteRef.current) {
+      onCompleteRef.current?.();
+      return;
+    }
+
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = "";
+    };
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "ready") return;
+    const frame = requestAnimationFrame(() => setPhase("playing"));
+    return () => cancelAnimationFrame(frame);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const timer = window.setTimeout(finish, reducedMotion ? 350 : 4_250);
+    const failSafe = window.setTimeout(finish, reducedMotion ? 700 : 5_000);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(failSafe);
+    };
+  }, [finish, phase, reducedMotion]);
+
   if (phase === "hidden" || phase === "done") return null;
 
   if (reducedMotion) {
     return (
       <motion.div
-        role="status" aria-live="polite"
+        role="status"
+        aria-live="polite"
         className="fixed inset-0 z-[9999] flex items-center justify-center"
         style={{ backgroundColor: "var(--anim-bg)" }}
-        initial={{ opacity: 1 }} animate={{ opacity: 0 }} transition={{ duration: 0.25 }}
+        initial={{ opacity: 1 }}
+        animate={{ opacity: 0 }}
+        transition={{ delay: 0.1, duration: 0.2 }}
       >
-        <span className="sr-only">Loading dashboard</span>
+        <span className="sr-only">Opening REELassati Studio</span>
         <StaticLockup />
       </motion.div>
     );
   }
 
-  // NO AnimatePresence — just a fixed overlay that wipes at the end
   return (
-    <div
-      role="status" aria-live="polite"
+    <motion.div
+      role="status"
+      aria-live="polite"
       className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
       style={{ backgroundColor: "var(--anim-bg)" }}
+      initial={{ opacity: 1 }}
+      animate={{ opacity: [1, 1, 0] }}
+      transition={{
+        duration: 4.05,
+        times: [0, 0.83, 1],
+        ease: [0.22, 1, 0.36, 1],
+      }}
     >
-      <span className="sr-only">Loading dashboard</span>
+      <span className="sr-only">Opening REELassati Studio</span>
 
-      {/* Wipe layer — slides up at 5.0s */}
-      <motion.div
-        className="absolute inset-0"
-        style={{ backgroundColor: "var(--anim-bg)" }}
-        initial={{ y: "100%" }}
-        animate={{ y: "0%" }}
-        transition={{ delay: 7.0, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      />
-
-      {/* Bloom */}
       <motion.div
         className="absolute inset-0 flex items-center justify-center pointer-events-none"
-        style={{ opacity: "var(--anim-bloom-opacity, 0)" }}
-        initial={{ opacity: 0, scale: 0.6 }}
-        animate={{ opacity: [0, 0.5, 0], scale: [0.6, 1.4, 1.6] }}
-        transition={{ delay: 2.5, duration: 0.4, ease: "easeOut" }}
+        initial={{ opacity: 0, scale: 0.7 }}
+        animate={{ opacity: [0, 0.45, 0], scale: [0.7, 1.35, 1.65] }}
+        transition={{ delay: 1.45, duration: 0.55, ease: "easeOut" }}
       >
-        <div className="w-96 h-96 rounded-full" style={{ background: "radial-gradient(circle, var(--anim-glow), transparent 70%)" }} />
+        <div
+          className="w-96 h-96 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle, var(--anim-glow), transparent 70%)",
+          }}
+        />
       </motion.div>
 
-      {/* Lockup */}
-      <div className="relative flex items-center">
-
-        {/* Wordmark — reveals at 3.5s */}
+      <motion.div
+        className="relative flex items-center"
+        initial={{ scale: 1, y: 0 }}
+        animate={{ scale: [1, 1, 7.5], y: [0, 0, 24] }}
+        transition={{
+          duration: 4,
+          times: [0, 0.79, 1],
+          ease: [0.72, 0, 0.25, 1],
+        }}
+      >
         <motion.div
-          className="absolute left-[90px] top-1/2 -translate-y-1/2 overflow-hidden"
-          initial={{ clipPath: "inset(0 100% 0 0)", opacity: 0 }}
-          animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
-          transition={{ delay: 3.5, duration: 0.8, ease: "easeOut" }}
+          className="absolute left-[86px] top-1/2 -translate-y-1/2 overflow-hidden"
+          initial={{ clipPath: "inset(0 100% 0 0)", x: -72, opacity: 0 }}
+          animate={{ clipPath: "inset(0 0% 0 0)", x: 0, opacity: 1 }}
+          transition={{ delay: 1.95, duration: 0.62, ease: [0.22, 1, 0.36, 1] }}
         >
           <span className="flex items-baseline leading-none whitespace-nowrap pl-10">
-            <span className="font-bold uppercase tracking-[0.02em] text-[64px]" style={{ color: "var(--anim-text)", fontFamily: "'Geist',sans-serif" }}>REEL</span>
-            <span className="italic font-normal -ml-[0.04em]" style={{ color: "var(--anim-text)", fontFamily: "'Fraunces',serif", fontSize: "60px" }}>assati</span>
+            <span
+              className="font-bold uppercase tracking-[0.02em] text-[64px]"
+              style={{
+                color: "var(--anim-text)",
+                fontFamily: "'Geist', sans-serif",
+              }}
+            >
+              REEL
+            </span>
+            <span
+              className="italic font-normal -ml-[0.04em]"
+              style={{
+                color: "var(--anim-text)",
+                fontFamily: "'Fraunces', serif",
+                fontSize: "60px",
+              }}
+            >
+              assati
+            </span>
           </span>
         </motion.div>
 
-        {/* Player — nudges left at 3.5s */}
         <motion.div
-          className="relative"
+          className="relative entry-player"
           initial={{ x: 0 }}
-          animate={{ x: -40 }}
-          transition={{ delay: 3.5, type: "spring", stiffness: 220, damping: 22 }}
+          animate={{ x: -42 }}
+          transition={{
+            delay: 1.95,
+            type: "spring",
+            stiffness: 240,
+            damping: 24,
+          }}
         >
-          <svg width="240" height="240" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            width="240"
+            height="240"
+            viewBox="0 0 120 120"
+            fill="none"
+            aria-hidden="true"
+          >
             <g transform="translate(10,10)">
-
-              {/* STEP 4 (2.0s): Circle outline draws on */}
               <motion.circle
-                cx="50" cy="50" r="46"
+                cx="50"
+                cy="50"
+                r="46"
                 fill="none"
                 stroke="var(--anim-purple)"
                 strokeWidth="3"
                 strokeLinecap="round"
                 initial={{ pathLength: 0, opacity: 0 }}
                 animate={{ pathLength: 1, opacity: 1 }}
-                transition={{ delay: 2.0, duration: 0.5, ease: "easeInOut" }}
+                transition={{ delay: 1.05, duration: 0.42, ease: "easeInOut" }}
               />
 
-              {/* STEP 5 (2.5s): Purple fill sweeps from bottom */}
               <motion.circle
-                cx="50" cy="50" r="46"
+                cx="50"
+                cy="50"
+                r="46"
                 fill="var(--anim-purple)"
                 initial={{ scaleY: 0, opacity: 0 }}
                 animate={{ scaleY: 1, opacity: 1 }}
-                transition={{ delay: 2.5, duration: 0.5, ease: "easeOut" }}
+                transition={{ delay: 1.42, duration: 0.38, ease: "easeOut" }}
                 style={{ transformOrigin: "50px 96px" }}
               />
 
-              {/* STEP 6 (3.0s): Arc + dot fade in */}
               <motion.g
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 3.0, duration: 0.4, ease: "easeOut" }}
+                transition={{ delay: 1.72, duration: 0.28 }}
               >
-                <path d="M28 56 C 38 74, 56 80, 75 63" stroke="var(--anim-bg)" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+                <path
+                  d="M28 56 C 38 74, 56 80, 75 63"
+                  stroke="var(--anim-bg)"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  fill="none"
+                />
                 <circle cx="75" cy="63" r="5" fill="var(--anim-bg)" />
               </motion.g>
 
-              {/* STEPS 1-3: THE ONE TRIANGLE — slides in alone, arcs up-then-down */}
-              <motion.g
-                id="triangle"
-                initial={{ x: -200, y: 0, rotate: -10 }}
-                animate={{ x: 0, y: [0, -30, 0], rotate: 0 }}
-                transition={{
-                  x: { duration: 1.5, ease: "easeOut" },
-                  y: { duration: 1.5, ease: "easeInOut", times: [0, 0.5, 1] },
-                  rotate: { duration: 1.5, ease: "easeOut" },
+              <motion.path
+                d="M30 24 L30 76 L76 50 Z"
+                stroke="var(--anim-purple)"
+                strokeWidth="5"
+                strokeLinejoin="round"
+                initial={{
+                  x: -170,
+                  y: 14,
+                  rotate: -12,
+                  fill: "var(--anim-bg)",
                 }}
-              >
-                {/* Hop at 2.0s */}
-                <motion.g
-                  initial={{ y: 0, scaleY: 1 }}
-                  animate={{ y: [0, -30, 0], scaleY: [1, 1.15, 0.92, 1] }}
-                  transition={{
-                    y: { delay: 2.0, duration: 0.3, ease: "easeOut", times: [0, 0.5, 1] },
-                    scaleY: { delay: 2.0, duration: 0.3, times: [0, 0.3, 0.7, 1] },
-                  }}
-                >
-                  <motion.path
-                    d="M14 14 L14 70 L66 42 Z"
-                    fill="none"
-                    stroke="var(--anim-purple)"
-                    strokeWidth="5"
-                    strokeLinejoin="round"
-                    initial={{ strokeOpacity: 1 }}
-                    animate={{ strokeOpacity: 0 }}
-                    transition={{ delay: 2.5, duration: 0.4 }}
-                  />
-                  <motion.path
-                    d="M14 14 L14 70 L66 42 Z"
-                    fill="var(--anim-bg)"
-                    initial={{ fillOpacity: 0 }}
-                    animate={{ fillOpacity: 1 }}
-                    transition={{ delay: 2.5, duration: 0.4 }}
-                  />
-                </motion.g>
-              </motion.g>
-
+                animate={{
+                  x: 0,
+                  y: [14, -10, 0, -14, 0],
+                  rotate: 0,
+                  fill: "var(--anim-bg)",
+                  stroke: [
+                    "var(--anim-purple)",
+                    "var(--anim-purple)",
+                    "var(--anim-purple)",
+                    "var(--anim-purple)",
+                    "var(--anim-bg)",
+                  ],
+                }}
+                transition={{
+                  duration: 1.68,
+                  times: [0, 0.35, 0.58, 0.76, 1],
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+              />
             </g>
           </svg>
         </motion.div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
 function StaticLockup() {
   return (
     <div className="flex items-center gap-3">
-      <svg width="48" height="48" viewBox="0 0 32 32" fill="none">
+      <svg width="48" height="48" viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <circle cx="16" cy="16" r="15" fill="var(--anim-purple)" />
         <path d="M9 9 L9 17 L16 13 Z" fill="var(--anim-bg)" />
-        <path d="M9 17 C 12 22, 18 24, 24 19" stroke="var(--anim-bg)" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+        <path
+          d="M9 17 C 12 22, 18 24, 24 19"
+          stroke="var(--anim-bg)"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          fill="none"
+        />
         <circle cx="24" cy="19" r="1.6" fill="var(--anim-bg)" />
       </svg>
       <span className="flex items-baseline leading-none">
-        <span className="font-bold uppercase tracking-[0.02em] text-2xl" style={{ color: "var(--anim-text)", fontFamily: "'Geist',sans-serif" }}>REEL</span>
-        <span className="italic font-normal -ml-[0.04em]" style={{ color: "var(--anim-text)", fontFamily: "'Fraunces',serif", fontSize: "1.35rem" }}>assati</span>
+        <span
+          className="font-bold uppercase tracking-[0.02em] text-2xl"
+          style={{ color: "var(--anim-text)", fontFamily: "'Geist', sans-serif" }}
+        >
+          REEL
+        </span>
+        <span
+          className="italic font-normal -ml-[0.04em]"
+          style={{
+            color: "var(--anim-text)",
+            fontFamily: "'Fraunces', serif",
+            fontSize: "1.35rem",
+          }}
+        >
+          assati
+        </span>
       </span>
     </div>
   );
