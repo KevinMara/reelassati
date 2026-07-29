@@ -112,6 +112,7 @@ interface PublishingIntentRow {
   id: string;
   owner_email: string;
   request_json: string;
+  provider_request: string | null;
   provider_response: string | null;
   status: string;
   submitting_at: string | null;
@@ -275,6 +276,7 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
             id TEXT PRIMARY KEY NOT NULL,
             owner_email TEXT NOT NULL,
             request_json TEXT NOT NULL,
+            provider_request TEXT,
             provider_response TEXT,
             status TEXT NOT NULL DEFAULT 'pending',
             submitting_at TEXT,
@@ -323,6 +325,15 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
         ) {
           await env.DB.prepare(
             "ALTER TABLE publishing_intents ADD COLUMN submitting_at TEXT"
+          ).run();
+        }
+        if (
+          !publishingColumns.results.some(
+            column => column.name === "provider_request"
+          )
+        ) {
+          await env.DB.prepare(
+            "ALTER TABLE publishing_intents ADD COLUMN provider_request TEXT"
           ).run();
         }
       })
@@ -1155,6 +1166,65 @@ async function zernioRequest(
   } catch {
     return { message: text.trim() };
   }
+}
+
+async function recoverZernioConflict(
+  env: SitesEnvironment,
+  response: Response
+): Promise<Record<string, unknown> | null> {
+  if (response.status !== 409) return null;
+  const body = (await response
+    .clone()
+    .json()
+    .catch(() => null)) as Record<string, unknown> | null;
+  const details = recordValue(body?.details);
+  const existingPostId = stringValue(
+    details?.existingPostId || body?.existingPostId
+  );
+  if (!existingPostId) return null;
+  try {
+    return await zernioRequest(
+      env,
+      `/posts/${encodeURIComponent(existingPostId)}`
+    );
+  } catch {
+    return null;
+  }
+}
+
+function isAmbiguousProviderFailure(cause: unknown): boolean {
+  return (
+    !(cause instanceof Response) ||
+    cause.status === 408 ||
+    cause.status === 425 ||
+    cause.status >= 500
+  );
+}
+
+async function submitZernioPost(
+  env: SitesEnvironment,
+  intentId: string,
+  providerRequest: string
+): Promise<Record<string, unknown>> {
+  const requestId = await stableRequestUuid(intentId);
+  let lastFailure: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await zernioRequest(env, "/posts", {
+        method: "POST",
+        headers: { "x-request-id": requestId },
+        body: providerRequest,
+      });
+    } catch (cause) {
+      if (cause instanceof Response) {
+        const recovered = await recoverZernioConflict(env, cause);
+        if (recovered) return recovered;
+      }
+      lastFailure = cause;
+      if (!isAmbiguousProviderFailure(cause) || attempt === 1) throw cause;
+    }
+  }
+  throw lastFailure;
 }
 
 async function ensureZernioProfile(
@@ -2475,11 +2545,20 @@ async function handlePublishing(
         409
       );
     }
-    if (
+    const ambiguousIntent =
       intent &&
       !intent.provider_response &&
-      ["provider_calling", "confirmation_pending"].includes(intent.status)
-    ) {
+      ["provider_calling", "confirmation_pending"].includes(intent.status);
+    const ambiguousUpdatedAt = intent
+      ? new Date(intent.updated_at).getTime()
+      : Number.NaN;
+    const canSafelyRetryAmbiguousIntent = Boolean(
+      ambiguousIntent &&
+      Number.isFinite(ambiguousUpdatedAt) &&
+      Date.now() - ambiguousUpdatedAt >= 0 &&
+      Date.now() - ambiguousUpdatedAt < 4 * 60 * 1000
+    );
+    if (ambiguousIntent && !canSafelyRetryAmbiguousIntent) {
       return json(
         {
           post: {
@@ -2495,7 +2574,10 @@ async function handlePublishing(
 
     let selected: PublishingAccount[];
     let content = "";
-    if (intent?.provider_response) {
+    if (
+      intent?.provider_response ||
+      (canSafelyRetryAmbiguousIntent && intent?.provider_request)
+    ) {
       const fallbackPlatform =
         input.post.platforms
           .map(platform => knownPlatform(platform))
@@ -2514,7 +2596,10 @@ async function handlePublishing(
       }
       if (!publishNow && input.post.scheduledAt) {
         const scheduleTime = new Date(input.post.scheduledAt).getTime();
-        if (!Number.isFinite(scheduleTime) || scheduleTime <= Date.now()) {
+        if (
+          !Number.isFinite(scheduleTime) ||
+          (scheduleTime <= Date.now() && !canSafelyRetryAmbiguousIntent)
+        ) {
           return errorResponse("Choose a valid future schedule date and time");
         }
       }
@@ -2541,9 +2626,9 @@ async function handlePublishing(
       await env.DB.prepare(
         `
         INSERT INTO publishing_intents
-          (id, owner_email, request_json, provider_response, status,
-           submitting_at, error, created_at, updated_at)
-        VALUES (?, ?, ?, NULL, 'pending', NULL, NULL, ?, ?)
+          (id, owner_email, request_json, provider_request, provider_response,
+           status, submitting_at, error, created_at, updated_at)
+        VALUES (?, ?, ?, NULL, NULL, 'pending', NULL, NULL, ?, ?)
         ON CONFLICT(id) DO NOTHING
       `
       )
@@ -2578,14 +2663,25 @@ async function handlePublishing(
       const submissionCutoff = new Date(
         Date.now() - 2 * 60 * 1000
       ).toISOString();
+      const providerRetryCutoff = new Date(
+        Date.now() - 4 * 60 * 1000
+      ).toISOString();
       const submission = await env.DB.prepare(
         `
         UPDATE publishing_intents
         SET submitting_at = ?, status = 'preparing', error = NULL,
             updated_at = ?
         WHERE id = ? AND owner_email = ? AND provider_response IS NULL
-          AND status IN ('pending', 'preparing', 'submitting')
-          AND (submitting_at IS NULL OR submitting_at < ?)
+          AND (
+            (
+              status IN ('pending', 'preparing', 'submitting')
+              AND (submitting_at IS NULL OR submitting_at < ?)
+            )
+            OR (
+              status IN ('provider_calling', 'confirmation_pending')
+              AND updated_at > ?
+            )
+          )
       `
       )
         .bind(
@@ -2593,7 +2689,8 @@ async function handlePublishing(
           intentCreatedAt,
           intentId,
           user.email,
-          submissionCutoff
+          submissionCutoff,
+          providerRetryCutoff
         )
         .run();
       if ((submission.meta?.changes || 0) !== 1) {
@@ -2605,83 +2702,76 @@ async function handlePublishing(
 
       let providerCallStarted = false;
       try {
-        const mediaItems: Array<{ type: "image" | "video"; url: string }> = [];
-        if (input.post.mediaAssetId) {
-          const media = await getAssetRow(env, user, input.post.mediaAssetId);
-          if (!media) {
-            throw errorResponse("The selected media asset was not found", 404);
+        let providerRequest = intent.provider_request;
+        if (!providerRequest) {
+          const mediaItems: Array<{ type: "image" | "video"; url: string }> =
+            [];
+          if (input.post.mediaAssetId) {
+            const media = await getAssetRow(env, user, input.post.mediaAssetId);
+            if (!media) {
+              throw errorResponse(
+                "The selected media asset was not found",
+                404
+              );
+            }
+            const mediaType = media.content_type.startsWith("image/")
+              ? "image"
+              : media.content_type.startsWith("video/")
+                ? "video"
+                : null;
+            if (!mediaType) {
+              throw errorResponse(
+                "Zernio publishing accepts an image or video asset"
+              );
+            }
+            if (
+              !publishNow &&
+              input.post.scheduledAt &&
+              new Date(input.post.scheduledAt).getTime() - Date.now() >
+                6 * 24 * 60 * 60 * 1000
+            ) {
+              throw errorResponse(
+                "Media uploads are temporary until publication; schedule this media post within 6 days"
+              );
+            }
+            const presign = await zernioRequest(env, "/media/presign", {
+              method: "POST",
+              body: JSON.stringify({
+                filename: sanitizeFilename(media.name),
+                contentType: media.content_type,
+              }),
+            });
+            const presignData = nestedData(presign);
+            const uploadUrl = stringValue(presignData.uploadUrl);
+            const publicUrl = stringValue(presignData.publicUrl);
+            if (!isPublicHttpsUrl(uploadUrl) || !isPublicHttpsUrl(publicUrl)) {
+              throw errorResponse(
+                "Zernio returned an invalid media upload URL",
+                502
+              );
+            }
+            const object = await env.BUCKET.get(media.r2_key);
+            if (!object) {
+              throw errorResponse("The selected media bytes are missing", 404);
+            }
+            const uploadResponse = await fetch(uploadUrl, {
+              method: "PUT",
+              redirect: "error",
+              headers: {
+                "Content-Type": media.content_type,
+                "Content-Length": String(media.bytes),
+              },
+              body: object.body,
+            });
+            if (!uploadResponse.ok) {
+              throw errorResponse(
+                "Zernio could not receive the selected media",
+                502
+              );
+            }
+            mediaItems.push({ type: mediaType, url: publicUrl });
           }
-          const mediaType = media.content_type.startsWith("image/")
-            ? "image"
-            : media.content_type.startsWith("video/")
-              ? "video"
-              : null;
-          if (!mediaType) {
-            throw errorResponse(
-              "Zernio publishing accepts an image or video asset"
-            );
-          }
-          if (
-            !publishNow &&
-            input.post.scheduledAt &&
-            new Date(input.post.scheduledAt).getTime() - Date.now() >
-              6 * 24 * 60 * 60 * 1000
-          ) {
-            throw errorResponse(
-              "Media uploads are temporary until publication; schedule this media post within 6 days"
-            );
-          }
-          const presign = await zernioRequest(env, "/media/presign", {
-            method: "POST",
-            body: JSON.stringify({
-              filename: sanitizeFilename(media.name),
-              contentType: media.content_type,
-            }),
-          });
-          const presignData = nestedData(presign);
-          const uploadUrl = stringValue(presignData.uploadUrl);
-          const publicUrl = stringValue(presignData.publicUrl);
-          if (!isPublicHttpsUrl(uploadUrl) || !isPublicHttpsUrl(publicUrl)) {
-            throw errorResponse(
-              "Zernio returned an invalid media upload URL",
-              502
-            );
-          }
-          const object = await env.BUCKET.get(media.r2_key);
-          if (!object) {
-            throw errorResponse("The selected media bytes are missing", 404);
-          }
-          const uploadResponse = await fetch(uploadUrl, {
-            method: "PUT",
-            redirect: "error",
-            headers: {
-              "Content-Type": media.content_type,
-              "Content-Length": String(media.bytes),
-            },
-            body: object.body,
-          });
-          if (!uploadResponse.ok) {
-            throw errorResponse(
-              "Zernio could not receive the selected media",
-              502
-            );
-          }
-          mediaItems.push({ type: mediaType, url: publicUrl });
-        }
-        await env.DB.prepare(
-          `
-          UPDATE publishing_intents
-          SET status = 'provider_calling', updated_at = ?
-          WHERE id = ? AND owner_email = ? AND provider_response IS NULL
-        `
-        )
-          .bind(new Date().toISOString(), intentId, user.email)
-          .run();
-        providerCallStarted = true;
-        payload = await zernioRequest(env, "/posts", {
-          method: "POST",
-          headers: { "x-request-id": await stableRequestUuid(intentId) },
-          body: JSON.stringify({
+          providerRequest = JSON.stringify({
             content,
             platforms: selected.map(account => ({
               platform: account.platform,
@@ -2694,8 +2784,19 @@ async function handlePublishing(
                   scheduledFor: input.post.scheduledAt,
                   timezone: (await getWorkspace(env, user)).profile.timezone,
                 }),
-          }),
-        });
+          });
+        }
+        await env.DB.prepare(
+          `
+          UPDATE publishing_intents
+          SET provider_request = ?, status = 'provider_calling', updated_at = ?
+          WHERE id = ? AND owner_email = ? AND provider_response IS NULL
+        `
+        )
+          .bind(providerRequest, new Date().toISOString(), intentId, user.email)
+          .run();
+        providerCallStarted = true;
+        payload = await submitZernioPost(env, intentId, providerRequest);
         await env.DB.prepare(
           `
           UPDATE publishing_intents
@@ -2712,7 +2813,9 @@ async function handlePublishing(
           )
           .run();
       } catch (cause) {
-        if (!providerCallStarted || cause instanceof Response) {
+        const ambiguousFailure =
+          providerCallStarted && isAmbiguousProviderFailure(cause);
+        if (!providerCallStarted || !ambiguousFailure) {
           await env.DB.prepare(
             `
             UPDATE publishing_intents
@@ -2729,7 +2832,7 @@ async function handlePublishing(
             )
             .run();
         }
-        if (providerCallStarted && !(cause instanceof Response)) {
+        if (ambiguousFailure) {
           await env.DB.prepare(
             `
             UPDATE publishing_intents
@@ -2755,7 +2858,7 @@ async function handlePublishing(
                 status: "publishing" as const,
               },
               warning:
-                "The provider outcome is unconfirmed. This durable intent is locked to prevent a duplicate; verify it in Zernio before replacing it.",
+                "The provider outcome is unconfirmed. Retry this unchanged composer now: the same request identifier will recover the accepted post without duplicating it.",
             },
             202
           );

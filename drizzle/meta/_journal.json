@@ -15,6 +15,13 @@
       "when": 1785363526815,
       "tag": "0001_nifty_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785364454537,
+      "tag": "0002_lean_union_jack",
+      "breakpoints": true
     }
   ]
 }

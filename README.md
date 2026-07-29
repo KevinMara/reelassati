@@ -38,9 +38,10 @@ product reports the exact missing capability.
 - Provider keys remain server-only hosted variables.
 - Video jobs are registered before provider submission, resume by stable
   request ID, and finalize into deterministic R2 keys under a D1 lease.
-- Publishing uses a durable outbox plus Zernio's request identifier, preserves
-  ambiguous submissions instead of retrying blindly, and refreshes scheduled,
-  published, partial, and failed provider states.
+- Publishing uses a durable outbox plus Zernio's request identifier, stores the
+  exact provider payload for safe in-window recovery, resolves duplicate
+  conflicts back to the original post, and refreshes scheduled, published,
+  partial, and failed provider states.
 
 The original Node/PostgreSQL API is retained as historical source while the
 Sites deployment uses the Worker-native API. New product work should target

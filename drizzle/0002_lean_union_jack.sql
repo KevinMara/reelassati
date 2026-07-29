@@ -1,0 +1,1 @@
+ALTER TABLE `publishing_intents` ADD `provider_request` text;

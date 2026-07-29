@@ -55,6 +55,7 @@ export const publishingIntents = sqliteTable(
     id: text("id").primaryKey().notNull(),
     ownerEmail: text("owner_email").notNull(),
     requestJson: text("request_json").notNull(),
+    providerRequest: text("provider_request"),
     providerResponse: text("provider_response"),
     status: text("status").notNull().default("pending"),
     submittingAt: text("submitting_at"),
