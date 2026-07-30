@@ -172,7 +172,7 @@ export default function EntryAnimation({
           }}
         >
           <motion.img
-            src="/brand/reelassati-mark.png"
+            src="/brand/reelassati-mark-transparent.png"
             alt=""
             aria-hidden="true"
             width="240"
@@ -196,7 +196,7 @@ function StaticLockup() {
   return (
     <div className="flex items-center gap-3">
       <img
-        src="/brand/reelassati-mark.png"
+        src="/brand/reelassati-mark-transparent.png"
         alt=""
         width="48"
         height="48"

@@ -36,12 +36,12 @@ export function Logo({ className, size = "md", glyphOnly = false, collapsed = fa
 function ReelassatiGlyph({ size = 22 }: { size?: number }) {
   return (
     <img
-      src="/brand/reelassati-mark.png"
+      src="/brand/reelassati-mark-transparent.png"
       alt=""
       width={size}
       height={size}
       aria-hidden="true"
-      className="block shrink-0 rounded-[20%] object-contain"
+      className="block shrink-0 object-contain"
     />
   );
 }
