@@ -10,6 +10,34 @@ const env = {
 };
 
 describe("Sites worker", () => {
+  it("serves the SPA entry for the production root route", async () => {
+    const requestedPaths: string[] = [];
+    const response = await worker.fetch(
+      new Request("https://studio.example/", {
+        headers: { accept: "text/html" },
+      }),
+      {
+        ...env,
+        ASSETS: {
+          fetch: async (request: Request) => {
+            const pathname = new URL(request.url).pathname;
+            requestedPaths.push(pathname);
+            return pathname === "/index.html"
+              ? new Response("<!doctype html><title>REELassati</title>", {
+                  headers: { "content-type": "text/html" },
+                })
+              : new Response("not found", { status: 404 });
+          },
+        },
+      } as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(await response.text()).toContain("REELassati");
+    expect(requestedPaths).toEqual(["/", "/index.html"]);
+  });
+
   it("reports storage bindings without exposing secrets", async () => {
     const response = await worker.fetch(
       new Request("https://studio.example/api/health"),

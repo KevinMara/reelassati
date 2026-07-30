@@ -1,5 +1,7 @@
 import { build } from "esbuild";
-import { copyFile, cp, mkdir } from "node:fs/promises";
+import { access, copyFile, cp, mkdir } from "node:fs/promises";
+
+await access("dist/client/index.html");
 
 await mkdir("dist/server", { recursive: true });
 await build({
