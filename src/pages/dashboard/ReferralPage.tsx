@@ -78,7 +78,7 @@ export default function ReferralPage() {
     if (navigator.share) {
       await navigator.share({
         title: "REELassati",
-        text: `Join REELassati with my creator link. I earn ${stats.rewardCredits} credits (${stats.rewardDollarValue} of product value) when you join.`,
+        text: `Join REELassati with my creator link. I earn ${stats.rewardCredits} credits (${stats.rewardDollarValue} of product value) after you buy a paid plan.`,
         url: stats.shareUrl,
       });
       return;
@@ -95,8 +95,10 @@ export default function ReferralPage() {
       const result = await platformApi.claimReferral(claimCode.trim());
       setNotice(
         result.alreadyClaimed
-          ? "This creator referral was already attached to your account."
-          : "Referral applied. The creator received 500 credits ($5.00 of product value).",
+          ? result.status === "verified"
+            ? "This paid referral has already been verified."
+            : "This referral is already attached to your account and is waiting for a paid-plan purchase."
+          : "Referral saved. The creator earns 500 credits only after you successfully buy a paid plan.",
       );
       setClaimCode("");
       await loadStats();
@@ -113,17 +115,23 @@ export default function ReferralPage() {
         <p className="mono-eyebrow mb-2 text-primary">Creator rewards</p>
         <h1 className="text-3xl font-semibold">Refer creators. Earn studio credits.</h1>
         <p className="mt-2 max-w-2xl text-foreground/60">
-          Each creator who joins through your unique link adds 500 credits to
-          your balance—equivalent to $5.00 of REELassati product usage.
+          Earn 500 credits—$5.00 of REELassati product value—when a referred
+          creator successfully buys a paid plan. Link visits and sign-ups do not count.
         </p>
       </div>
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           icon={Users}
           label="Successful referrals"
           value={loading ? "—" : String(stats?.completedReferrals ?? 0)}
-          detail="One verified account can reward one creator."
+          detail="Only confirmed paid-plan purchases count."
+        />
+        <Metric
+          icon={Link2}
+          label="Pending referrals"
+          value={loading ? "—" : String(stats?.pendingReferrals ?? 0)}
+          detail="Linked accounts that have not bought a paid plan."
         />
         <Metric
           icon={Coins}
@@ -200,24 +208,30 @@ export default function ReferralPage() {
         <section className="rounded-xl border border-border bg-surface p-6">
           <h2 className="font-medium">Reward history</h2>
           <p className="mt-1 text-xs text-foreground/45">
-            Persistent, account-verified referral events.
+            Paid-plan purchases verified by the billing system.
           </p>
           <div className="mt-5 divide-y divide-border">
             {stats?.referrals.length ? (
               stats.referrals.map((referral) => (
                 <div key={referral.id} className="flex items-center gap-3 py-4">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10">
-                    <Check className="h-4 w-4 text-emerald-500" />
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-full ${referral.status === "verified" ? "bg-emerald-500/10" : "bg-primary/10"}`}>
+                    {referral.status === "verified" ? (
+                      <Check className="h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <Link2 className="h-4 w-4 text-primary" />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{referral.referredDisplay}</p>
                     <p className="text-xs text-foreground/40">
-                      {new Date(referral.createdAt).toLocaleDateString()}
+                      {referral.status === "verified"
+                        ? `Paid plan verified ${new Date(referral.qualifiedAt ?? referral.createdAt).toLocaleDateString()}`
+                        : `Linked ${new Date(referral.createdAt).toLocaleDateString()} · waiting for paid plan`}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-emerald-500">
-                      +{referral.creditsAwarded}
+                    <p className={`text-sm font-semibold ${referral.status === "verified" ? "text-emerald-500" : "text-foreground/40"}`}>
+                      {referral.status === "verified" ? `+${referral.creditsAwarded}` : "Pending"}
                     </p>
                     <p className="text-xs text-foreground/40">{referral.dollarValue}</p>
                   </div>
@@ -234,7 +248,7 @@ export default function ReferralPage() {
         <section className="h-fit rounded-xl border border-border bg-surface p-6">
           <h2 className="font-medium">Have a creator code?</h2>
           <p className="mt-1 text-xs leading-relaxed text-foreground/45">
-            Apply it once. Self-referrals and duplicate claims are blocked.
+            Attach it once. The reward unlocks only after your first successful paid-plan purchase.
           </p>
           <input
             value={claimCode}
@@ -258,6 +272,7 @@ export default function ReferralPage() {
             <p className="text-[11px] leading-relaxed text-foreground/40">
               Credits pay for REELassati usage. The dollar amount communicates
               equivalent product value; it is not cash or a withdrawal balance.
+              Opening a link, creating an account, or using the app never triggers a reward.
             </p>
           </div>
         </section>

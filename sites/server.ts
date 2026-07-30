@@ -132,8 +132,12 @@ interface ReferralClaimRow {
   referral_code: string;
   referrer_email: string;
   referred_email: string;
+  status: "pending" | "verified";
   credits_awarded: number;
   value_cents: number;
+  qualified_at: string | null;
+  payment_event_id: string | null;
+  plan_id: string | null;
   created_at: string;
 }
 
@@ -326,8 +330,12 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
             referral_code TEXT NOT NULL,
             referrer_email TEXT NOT NULL,
             referred_email TEXT NOT NULL UNIQUE,
-            credits_awarded INTEGER NOT NULL DEFAULT 500,
-            value_cents INTEGER NOT NULL DEFAULT 500,
+            status TEXT NOT NULL DEFAULT 'pending',
+            credits_awarded INTEGER NOT NULL DEFAULT 0,
+            value_cents INTEGER NOT NULL DEFAULT 0,
+            qualified_at TEXT,
+            payment_event_id TEXT UNIQUE,
+            plan_id TEXT,
             created_at TEXT NOT NULL
           )
         `),
@@ -375,6 +383,42 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
             "ALTER TABLE publishing_intents ADD COLUMN provider_request TEXT"
           ).run();
         }
+        const referralColumns = await env.DB.prepare(
+          "PRAGMA table_info(referral_claims)"
+        ).all<{ name: string }>();
+        const referralColumnNames = new Set(
+          referralColumns.results.map(column => column.name)
+        );
+        if (!referralColumnNames.has("status")) {
+          await env.DB.prepare(
+            "ALTER TABLE referral_claims ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'"
+          ).run();
+        }
+        if (!referralColumnNames.has("qualified_at")) {
+          await env.DB.prepare(
+            "ALTER TABLE referral_claims ADD COLUMN qualified_at TEXT"
+          ).run();
+        }
+        if (!referralColumnNames.has("payment_event_id")) {
+          await env.DB.prepare(
+            "ALTER TABLE referral_claims ADD COLUMN payment_event_id TEXT"
+          ).run();
+        }
+        if (!referralColumnNames.has("plan_id")) {
+          await env.DB.prepare(
+            "ALTER TABLE referral_claims ADD COLUMN plan_id TEXT"
+          ).run();
+        }
+        await env.DB.prepare(
+          `
+            UPDATE referral_claims
+            SET credits_awarded = 0, value_cents = 0
+            WHERE status = 'pending'
+          `
+        ).run();
+        await env.DB.prepare(
+          "CREATE UNIQUE INDEX IF NOT EXISTS referral_claims_payment_event_id_unique ON referral_claims (payment_event_id)"
+        ).run();
       })
       .catch(cause => {
         schemaInitialization = undefined;
@@ -3087,7 +3131,8 @@ async function referralStats(
   const result = await env.DB.prepare(
     `
       SELECT id, referral_code, referrer_email, referred_email,
-             credits_awarded, value_cents, created_at
+             status, credits_awarded, value_cents, qualified_at,
+             payment_event_id, plan_id, created_at
       FROM referral_claims
       WHERE referrer_email = ?
       ORDER BY created_at DESC
@@ -3096,11 +3141,14 @@ async function referralStats(
   )
     .bind(user.email)
     .all<ReferralClaimRow>();
-  const creditsEarned = result.results.reduce(
+  const verifiedClaims = result.results.filter(
+    claim => claim.status === "verified"
+  );
+  const creditsEarned = verifiedClaims.reduce(
     (sum, claim) => sum + Math.max(0, claim.credits_awarded),
     0
   );
-  const valueCents = result.results.reduce(
+  const valueCents = verifiedClaims.reduce(
     (sum, claim) => sum + Math.max(0, claim.value_cents),
     0
   );
@@ -3109,7 +3157,8 @@ async function referralStats(
   return json({
     code: referralCode.code,
     shareUrl: shareUrl.toString(),
-    completedReferrals: result.results.length,
+    completedReferrals: verifiedClaims.length,
+    pendingReferrals: result.results.length - verifiedClaims.length,
     creditsEarned,
     dollarValue: referralDollarValue(valueCents),
     rewardCredits: REFERRAL_REWARD_CREDITS,
@@ -3117,8 +3166,11 @@ async function referralStats(
     referrals: result.results.map(claim => ({
       id: claim.id,
       referredDisplay: maskReferralEmail(claim.referred_email),
+      status: claim.status,
       creditsAwarded: claim.credits_awarded,
       dollarValue: referralDollarValue(claim.value_cents),
+      qualifiedAt: claim.qualified_at,
+      planId: claim.plan_id,
       createdAt: claim.created_at,
     })),
   });
@@ -3148,7 +3200,8 @@ async function claimReferral(
   const existing = await env.DB.prepare(
     `
       SELECT id, referral_code, referrer_email, referred_email,
-             credits_awarded, value_cents, created_at
+             status, credits_awarded, value_cents, qualified_at,
+             payment_event_id, plan_id, created_at
       FROM referral_claims
       WHERE referred_email = ?
     `
@@ -3165,6 +3218,7 @@ async function claimReferral(
     return json({
       success: true,
       alreadyClaimed: true,
+      status: existing.status,
       creditsAwarded: existing.credits_awarded,
       dollarValue: referralDollarValue(existing.value_cents),
     });
@@ -3177,8 +3231,8 @@ async function claimReferral(
       `
         INSERT INTO referral_claims (
           id, referral_code, referrer_email, referred_email,
-          credits_awarded, value_cents, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          status, credits_awarded, value_cents, created_at
+        ) VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)
       `
     )
       .bind(
@@ -3186,8 +3240,6 @@ async function claimReferral(
         code,
         referral.owner_email,
         user.email,
-        REFERRAL_REWARD_CREDITS,
-        REFERRAL_REWARD_CENTS,
         createdAt
       )
       .run();
@@ -3195,7 +3247,8 @@ async function claimReferral(
     const raced = await env.DB.prepare(
       `
         SELECT id, referral_code, referrer_email, referred_email,
-               credits_awarded, value_cents, created_at
+               status, credits_awarded, value_cents, qualified_at,
+               payment_event_id, plan_id, created_at
         FROM referral_claims
         WHERE referred_email = ?
       `
@@ -3211,6 +3264,7 @@ async function claimReferral(
     return json({
       success: true,
       alreadyClaimed: true,
+      status: raced.status,
       creditsAwarded: raced.credits_awarded,
       dollarValue: referralDollarValue(raced.value_cents),
     });
@@ -3220,8 +3274,9 @@ async function claimReferral(
     {
       success: true,
       alreadyClaimed: false,
-      creditsAwarded: REFERRAL_REWARD_CREDITS,
-      dollarValue: referralDollarValue(REFERRAL_REWARD_CENTS),
+      status: "pending",
+      creditsAwarded: 0,
+      dollarValue: referralDollarValue(0),
     },
     201
   );

@@ -64,8 +64,11 @@ export interface SessionResponse {
 export interface ReferralClaim {
   id: string;
   referredDisplay: string;
+  status: "pending" | "verified";
   creditsAwarded: number;
   dollarValue: string;
+  qualifiedAt: string | null;
+  planId: string | null;
   createdAt: string;
 }
 
@@ -73,6 +76,7 @@ export interface ReferralStats {
   code: string;
   shareUrl: string;
   completedReferrals: number;
+  pendingReferrals: number;
   creditsEarned: number;
   dollarValue: string;
   rewardCredits: number;
@@ -105,6 +109,7 @@ export const platformApi = {
     requestJson<{
       success: true;
       alreadyClaimed: boolean;
+      status: "pending" | "verified";
       creditsAwarded: number;
       dollarValue: string;
     }>("/api/referrals/claim", {
