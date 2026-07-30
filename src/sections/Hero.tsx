@@ -19,9 +19,8 @@ const WAVEFORM = Array.from({ length: 48 }, (_, index) =>
 const COPY = {
   en: {
     eyebrow: "The editing-first short-form studio",
-    title: "SHORT-FORM CONTENT,",
-    accent: "ACCELERATED.",
-    finish: "SHARPENED.",
+    title: "Short-form content,",
+    accent: "Accelerated. Sharpened.",
     body: "Script, cut, caption and publish in one workspace.",
     primary: "Open the Studio",
     secondary: "Explore the product",
@@ -38,9 +37,8 @@ const COPY = {
   },
   it: {
     eyebrow: "Studio short-form centrato sul montaggio",
-    title: "SHORT-FORM CONTENT,",
-    accent: "ACCELERATED.",
-    finish: "SHARPENED.",
+    title: "Short-form content,",
+    accent: "Accelerated. Sharpened.",
     body: "Script, montaggio, sottotitoli e pubblicazione in un solo workspace.",
     primary: "Apri lo Studio",
     secondary: "Esplora il prodotto",
@@ -82,12 +80,13 @@ export function Hero() {
             </motion.p>
             <motion.h1
               variants={fadeUp}
-              className="text-display-xl font-semibold uppercase tracking-[-0.045em]"
+              className="max-w-[760px] tracking-[-0.04em]"
             >
-              <span className="block">{copy.title}</span>
-              <span className="block">
-                <span className="text-primary">{copy.accent}</span>{" "}
-                <span>{copy.finish}</span>
+              <span className="block text-[clamp(3.25rem,5vw,4.75rem)] font-semibold leading-[0.98]">
+                {copy.title}
+              </span>
+              <span className="mt-2 block font-serif text-[clamp(3rem,4.7vw,4.45rem)] font-normal italic leading-[1.02] tracking-[-0.035em] text-primary">
+                {copy.accent}
               </span>
             </motion.h1>
             <motion.p
