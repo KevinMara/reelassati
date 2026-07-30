@@ -31,6 +31,7 @@ export interface WorkspaceProfile {
   name: string;
   workspaceName: string;
   language: "en" | "it";
+  contentLanguage: string;
   timezone: string;
   credits: number;
 }
@@ -252,6 +253,7 @@ export function createEmptyWorkspace(
       name,
       workspaceName: "My studio",
       language: "en",
+      contentLanguage: "en",
       timezone: "Europe/Rome",
       credits: 0,
     },

@@ -19,6 +19,7 @@ import type {
 } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { WRITING_LANGUAGES } from "@/lib/languages";
 
 const PLATFORMS: Array<{ value: Platform; label: string }> = [
   { value: "tiktok", label: "TikTok" },
@@ -107,7 +108,9 @@ export default function ScriptGenerator() {
   const [platform, setPlatform] = useState<Platform>("tiktok");
   const [tone, setTone] = useState<(typeof TONES)[number]>("energetic");
   const [duration, setDuration] = useState<(typeof DURATIONS)[number]>(30);
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState(
+    workspace.profile.contentLanguage || "en",
+  );
   const [hookDirection, setHookDirection] = useState("");
   const [generatedScript, setGeneratedScript] = useState<ScriptDraft | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -337,10 +340,11 @@ export default function ScriptGenerator() {
                   onChange={(event) => setLanguage(event.target.value)}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 >
-                  <option value="en">English</option>
-                  <option value="it">Italian</option>
-                  <option value="es">Spanish</option>
-                  <option value="fr">French</option>
+                  {WRITING_LANGUAGES.map((item) => (
+                    <option key={item.code} value={item.code}>
+                      {item.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

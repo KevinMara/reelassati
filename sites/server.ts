@@ -121,11 +121,29 @@ interface PublishingIntentRow {
   updated_at: string;
 }
 
+interface ReferralCodeRow {
+  owner_email: string;
+  code: string;
+  created_at: string;
+}
+
+interface ReferralClaimRow {
+  id: string;
+  referral_code: string;
+  referrer_email: string;
+  referred_email: string;
+  credits_awarded: number;
+  value_cents: number;
+  created_at: string;
+}
+
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 const MAX_WORKSPACE_BYTES = 2_000_000;
 const MAX_UPLOAD_BYTES = 64 * 1024 * 1024;
 const MAX_AI_MEDIA_BYTES = 24 * 1024 * 1024;
+const REFERRAL_REWARD_CREDITS = 500;
+const REFERRAL_REWARD_CENTS = 500;
 const ALLOWED_UPLOAD_PREFIXES = ["video/", "audio/", "image/"];
 const ACTIVE_UPLOAD_TYPES = new Set(["image/svg+xml"]);
 const ZERNIO_PLATFORMS = new Set([
@@ -295,6 +313,27 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
             created_at TEXT NOT NULL
           )
         `),
+      env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS referral_codes (
+            owner_email TEXT PRIMARY KEY NOT NULL,
+            code TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL
+          )
+        `),
+      env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS referral_claims (
+            id TEXT PRIMARY KEY NOT NULL,
+            referral_code TEXT NOT NULL,
+            referrer_email TEXT NOT NULL,
+            referred_email TEXT NOT NULL UNIQUE,
+            credits_awarded INTEGER NOT NULL DEFAULT 500,
+            value_cents INTEGER NOT NULL DEFAULT 500,
+            created_at TEXT NOT NULL
+          )
+        `),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS referral_claims_referrer_created_idx ON referral_claims (referrer_email, created_at)"
+      ),
     ])
       .then(async () => {
         const columns = await env.DB.prepare(
@@ -2987,6 +3026,207 @@ async function handlePublishing(
   return errorResponse("Publishing route not found", 404);
 }
 
+function referralDollarValue(cents: number): string {
+  return `$${(Math.max(0, cents) / 100).toFixed(2)}`;
+}
+
+function referralCodeCandidate(): string {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return `REEL-${Array.from(bytes, byte => byte.toString(36).padStart(2, "0"))
+    .join("")
+    .toUpperCase()
+    .slice(0, 9)}`;
+}
+
+function maskReferralEmail(email: string): string {
+  const [local = "creator", domain = "private"] = email.split("@");
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${local.length > 2 ? "•••" : "•"}@${domain}`;
+}
+
+async function ensureReferralCode(
+  env: SitesEnvironment,
+  user: AuthenticatedUser
+): Promise<ReferralCodeRow> {
+  await initializeSchema(env);
+  const existing = await env.DB.prepare(
+    "SELECT owner_email, code, created_at FROM referral_codes WHERE owner_email = ?"
+  )
+    .bind(user.email)
+    .first<ReferralCodeRow>();
+  if (existing) return existing;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const code = referralCodeCandidate();
+    const createdAt = new Date().toISOString();
+    const inserted = await env.DB.prepare(
+      "INSERT OR IGNORE INTO referral_codes (owner_email, code, created_at) VALUES (?, ?, ?)"
+    )
+      .bind(user.email, code, createdAt)
+      .run();
+    if ((inserted.meta?.changes || 0) > 0) {
+      return { owner_email: user.email, code, created_at: createdAt };
+    }
+    const raced = await env.DB.prepare(
+      "SELECT owner_email, code, created_at FROM referral_codes WHERE owner_email = ?"
+    )
+      .bind(user.email)
+      .first<ReferralCodeRow>();
+    if (raced) return raced;
+  }
+  throw new Error("A unique referral code could not be created");
+}
+
+async function referralStats(
+  env: SitesEnvironment,
+  user: AuthenticatedUser,
+  url: URL
+): Promise<Response> {
+  const referralCode = await ensureReferralCode(env, user);
+  const result = await env.DB.prepare(
+    `
+      SELECT id, referral_code, referrer_email, referred_email,
+             credits_awarded, value_cents, created_at
+      FROM referral_claims
+      WHERE referrer_email = ?
+      ORDER BY created_at DESC
+      LIMIT 100
+    `
+  )
+    .bind(user.email)
+    .all<ReferralClaimRow>();
+  const creditsEarned = result.results.reduce(
+    (sum, claim) => sum + Math.max(0, claim.credits_awarded),
+    0
+  );
+  const valueCents = result.results.reduce(
+    (sum, claim) => sum + Math.max(0, claim.value_cents),
+    0
+  );
+  const shareUrl = new URL("/", url.origin);
+  shareUrl.searchParams.set("ref", referralCode.code);
+  return json({
+    code: referralCode.code,
+    shareUrl: shareUrl.toString(),
+    completedReferrals: result.results.length,
+    creditsEarned,
+    dollarValue: referralDollarValue(valueCents),
+    rewardCredits: REFERRAL_REWARD_CREDITS,
+    rewardDollarValue: referralDollarValue(REFERRAL_REWARD_CENTS),
+    referrals: result.results.map(claim => ({
+      id: claim.id,
+      referredDisplay: maskReferralEmail(claim.referred_email),
+      creditsAwarded: claim.credits_awarded,
+      dollarValue: referralDollarValue(claim.value_cents),
+      createdAt: claim.created_at,
+    })),
+  });
+}
+
+async function claimReferral(
+  request: Request,
+  env: SitesEnvironment,
+  user: AuthenticatedUser
+): Promise<Response> {
+  await initializeSchema(env);
+  const input = await parseJsonBody<{ code?: string }>(request);
+  const code = stringValue(input.code).trim().toUpperCase();
+  if (!/^REEL-[A-Z0-9]{6,12}$/.test(code)) {
+    return errorResponse("Enter a valid REELassati referral code");
+  }
+  const referral = await env.DB.prepare(
+    "SELECT owner_email, code, created_at FROM referral_codes WHERE code = ?"
+  )
+    .bind(code)
+    .first<ReferralCodeRow>();
+  if (!referral) return errorResponse("Referral code not found", 404);
+  if (referral.owner_email === user.email) {
+    return errorResponse("You cannot use your own referral link", 409);
+  }
+
+  const existing = await env.DB.prepare(
+    `
+      SELECT id, referral_code, referrer_email, referred_email,
+             credits_awarded, value_cents, created_at
+      FROM referral_claims
+      WHERE referred_email = ?
+    `
+  )
+    .bind(user.email)
+    .first<ReferralClaimRow>();
+  if (existing) {
+    if (existing.referral_code !== code) {
+      return errorResponse(
+        "This account has already joined through another creator",
+        409
+      );
+    }
+    return json({
+      success: true,
+      alreadyClaimed: true,
+      creditsAwarded: existing.credits_awarded,
+      dollarValue: referralDollarValue(existing.value_cents),
+    });
+  }
+
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  try {
+    await env.DB.prepare(
+      `
+        INSERT INTO referral_claims (
+          id, referral_code, referrer_email, referred_email,
+          credits_awarded, value_cents, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+      .bind(
+        id,
+        code,
+        referral.owner_email,
+        user.email,
+        REFERRAL_REWARD_CREDITS,
+        REFERRAL_REWARD_CENTS,
+        createdAt
+      )
+      .run();
+  } catch {
+    const raced = await env.DB.prepare(
+      `
+        SELECT id, referral_code, referrer_email, referred_email,
+               credits_awarded, value_cents, created_at
+        FROM referral_claims
+        WHERE referred_email = ?
+      `
+    )
+      .bind(user.email)
+      .first<ReferralClaimRow>();
+    if (!raced || raced.referral_code !== code) {
+      return errorResponse(
+        "This account has already joined through another creator",
+        409
+      );
+    }
+    return json({
+      success: true,
+      alreadyClaimed: true,
+      creditsAwarded: raced.credits_awarded,
+      dollarValue: referralDollarValue(raced.value_cents),
+    });
+  }
+
+  return json(
+    {
+      success: true,
+      alreadyClaimed: false,
+      creditsAwarded: REFERRAL_REWARD_CREDITS,
+      dollarValue: referralDollarValue(REFERRAL_REWARD_CENTS),
+    },
+    201
+  );
+}
+
 async function handleApi(
   request: Request,
   env: SitesEnvironment,
@@ -3027,6 +3267,14 @@ async function handleApi(
 
   if (url.pathname === "/api/capabilities" && request.method === "GET") {
     return json({ capabilities: capabilities(env) });
+  }
+
+  if (url.pathname === "/api/referrals" && request.method === "GET") {
+    return referralStats(env, user, url);
+  }
+
+  if (url.pathname === "/api/referrals/claim" && request.method === "POST") {
+    return claimReferral(request, env, user);
   }
 
   if (url.pathname === "/api/workspace") {

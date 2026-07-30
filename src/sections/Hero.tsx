@@ -19,7 +19,7 @@ const WAVEFORM = Array.from({ length: 48 }, (_, index) =>
 const COPY = {
   en: {
     eyebrow: "The editing-first short-form studio",
-    title: "Short-form content,",
+    title: "Short-form content.",
     accent: "Accelerated. Sharpened.",
     body: "Script, cut, caption and publish in one workspace.",
     primary: "Open the Studio",
@@ -37,7 +37,7 @@ const COPY = {
   },
   it: {
     eyebrow: "Studio short-form centrato sul montaggio",
-    title: "Short-form content,",
+    title: "Short-form content.",
     accent: "Accelerated. Sharpened.",
     body: "Script, montaggio, sottotitoli e pubblicazione in un solo workspace.",
     primary: "Apri lo Studio",

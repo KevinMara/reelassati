@@ -119,7 +119,7 @@ export default function TrendsPage() {
       platform,
       tone: HYPOTHESIS_TONE,
       duration,
-      language: workspace.profile.language,
+      language: workspace.profile.contentLanguage,
       createdAt: now,
     };
     try {

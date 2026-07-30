@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { WorkspaceProvider } from "@/providers/workspace";
+import { ReferralCapture } from "@/components/ReferralCapture";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -38,6 +39,7 @@ function StudioRoute() {
 export default function App() {
   return (
     <AuthProvider>
+      <ReferralCapture />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<Home />} />

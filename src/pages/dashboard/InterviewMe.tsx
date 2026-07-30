@@ -148,7 +148,7 @@ export default function InterviewMe() {
         platform,
         tone: "direct, specific, human",
         duration: 45,
-        language: workspace.profile.language,
+        language: workspace.profile.contentLanguage,
         brandVoice: workspace.brandKit.voice || undefined,
       });
 

@@ -22,6 +22,7 @@ import type {
 } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { CONTENT_LANGUAGES } from "@/lib/languages";
 
 type BusyAction = "upload" | "transcribe" | "script" | "speech" | null;
 
@@ -53,7 +54,9 @@ export default function VoiceNotes() {
   const [title, setTitle] = useState("");
   const [sourceAsset, setSourceAsset] = useState<Asset | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState(
+    workspace.profile.contentLanguage || "auto",
+  );
   const [transcription, setTranscription] = useState("");
   const [segmentCount, setSegmentCount] = useState(0);
   const [scriptPlatform, setScriptPlatform] = useState<Platform>("tiktok");
@@ -155,7 +158,7 @@ export default function VoiceNotes() {
         tone: "conversational",
         duration: 45,
         language:
-          language === "auto" ? workspace.profile.language : language,
+          language === "auto" ? workspace.profile.contentLanguage : language,
         brandVoice: [
           workspace.brandKit.voice
             ? `Keep this brand voice: ${workspace.brandKit.voice}`
@@ -409,11 +412,11 @@ export default function VoiceNotes() {
                 onChange={(event) => setLanguage(event.target.value)}
                 className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
               >
-                <option value="en">English</option>
-                <option value="it">Italian</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="auto">Auto-detect</option>
+                {CONTENT_LANGUAGES.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
               </select>
               <button
                 type="button"

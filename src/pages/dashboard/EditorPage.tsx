@@ -784,7 +784,7 @@ export default function EditorPage() {
     try {
       const result = await platformApi.transcribe(
         previewAsset.id,
-        workspace.profile.language,
+        workspace.profile.contentLanguage,
       );
       setTranscriptDraft(result.segments);
       await commitProject("Media transcribed", current => ({

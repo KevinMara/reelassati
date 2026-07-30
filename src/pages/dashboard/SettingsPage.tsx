@@ -22,6 +22,7 @@ import {
 import type { BrandKit, WorkspaceProfile } from "@contracts/workspace";
 import { useTheme } from "@/hooks/useTheme";
 import { useWorkspace } from "@/providers/workspace";
+import { WRITING_LANGUAGES } from "@/lib/languages";
 
 type Tab = "profile" | "brand" | "appearance" | "integrations";
 
@@ -308,6 +309,24 @@ export default function SettingsPage() {
                   >
                     <option value="en">English</option>
                     <option value="it">Italiano</option>
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1.5 block font-medium">
+                    Default creation language
+                  </span>
+                  <select
+                    value={profileDraft.contentLanguage}
+                    onChange={(event) =>
+                      setProfileField("contentLanguage", event.target.value)
+                    }
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
+                  >
+                    {WRITING_LANGUAGES.map((language) => (
+                      <option key={language.code} value={language.code}>
+                        {language.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="text-sm">

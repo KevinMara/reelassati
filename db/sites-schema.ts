@@ -76,3 +76,28 @@ export const zernioProfiles = sqliteTable("zernio_profiles", {
   profileId: text("profile_id").notNull().unique(),
   createdAt: text("created_at").notNull(),
 });
+
+export const referralCodes = sqliteTable("referral_codes", {
+  ownerEmail: text("owner_email").primaryKey().notNull(),
+  code: text("code").notNull().unique(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const referralClaims = sqliteTable(
+  "referral_claims",
+  {
+    id: text("id").primaryKey().notNull(),
+    referralCode: text("referral_code").notNull(),
+    referrerEmail: text("referrer_email").notNull(),
+    referredEmail: text("referred_email").notNull().unique(),
+    creditsAwarded: integer("credits_awarded").notNull().default(500),
+    valueCents: integer("value_cents").notNull().default(500),
+    createdAt: text("created_at").notNull(),
+  },
+  table => [
+    index("referral_claims_referrer_created_idx").on(
+      table.referrerEmail,
+      table.createdAt
+    ),
+  ]
+);

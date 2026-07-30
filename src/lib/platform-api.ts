@@ -61,6 +61,25 @@ export interface SessionResponse {
   capabilities: CapabilityState;
 }
 
+export interface ReferralClaim {
+  id: string;
+  referredDisplay: string;
+  creditsAwarded: number;
+  dollarValue: string;
+  createdAt: string;
+}
+
+export interface ReferralStats {
+  code: string;
+  shareUrl: string;
+  completedReferrals: number;
+  creditsEarned: number;
+  dollarValue: string;
+  rewardCredits: number;
+  rewardDollarValue: string;
+  referrals: ReferralClaim[];
+}
+
 export const platformApi = {
   session: () => requestJson<SessionResponse>("/api/session"),
 
@@ -77,6 +96,20 @@ export const platformApi = {
     requestJson<{ workspace: WorkspaceDocument }>("/api/workspace", {
       method: "PUT",
       body: JSON.stringify({ workspace }),
+    }),
+
+  referralStats: () =>
+    requestJson<ReferralStats>("/api/referrals"),
+
+  claimReferral: (code: string) =>
+    requestJson<{
+      success: true;
+      alreadyClaimed: boolean;
+      creditsAwarded: number;
+      dollarValue: string;
+    }>("/api/referrals/claim", {
+      method: "POST",
+      body: JSON.stringify({ code }),
     }),
 
   uploadAsset: async (
