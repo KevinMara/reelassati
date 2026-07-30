@@ -18,10 +18,11 @@ const WAVEFORM = Array.from({ length: 48 }, (_, index) =>
 
 const COPY = {
   en: {
-    eyebrow: "Editing-first short-form studio",
-    title: "Direct every cut.",
-    accent: "Accelerate everything else.",
-    body: "REELassati turns footage, ideas, and references into a reviewable short-form edit—while you keep precise control of timing, captions, generated shots, and every version.",
+    eyebrow: "The editing-first short-form studio",
+    title: "SHORT-FORM CONTENT,",
+    accent: "ACCELERATED.",
+    finish: "SHARPENED.",
+    body: "Script, cut, caption and publish in one workspace.",
     primary: "Open the Studio",
     secondary: "Explore the product",
     preview: "Product preview",
@@ -37,9 +38,10 @@ const COPY = {
   },
   it: {
     eyebrow: "Studio short-form centrato sul montaggio",
-    title: "Dirigi ogni taglio.",
-    accent: "Accelera tutto il resto.",
-    body: "REELassati trasforma girato, idee e reference in un montaggio short-form revisionabile, lasciandoti il controllo preciso di ritmo, sottotitoli, scene generate e versioni.",
+    title: "SHORT-FORM CONTENT,",
+    accent: "ACCELERATED.",
+    finish: "SHARPENED.",
+    body: "Script, montaggio, sottotitoli e pubblicazione in un solo workspace.",
     primary: "Apri lo Studio",
     secondary: "Esplora il prodotto",
     preview: "Anteprima prodotto",
@@ -78,12 +80,19 @@ export function Hero() {
             <motion.p variants={fadeUp} className="mono-eyebrow mb-5 text-primary">
               {copy.eyebrow}
             </motion.p>
-            <motion.h1 variants={fadeUp} className="text-display-xl font-semibold">
-              {copy.title} <span className="serif-accent">{copy.accent}</span>
+            <motion.h1
+              variants={fadeUp}
+              className="text-display-xl font-semibold uppercase tracking-[-0.045em]"
+            >
+              <span className="block">{copy.title}</span>
+              <span className="block">
+                <span className="text-primary">{copy.accent}</span>{" "}
+                <span>{copy.finish}</span>
+              </span>
             </motion.h1>
             <motion.p
               variants={fadeUp}
-              className="mt-7 max-w-[610px] text-lg leading-relaxed text-foreground/70 md:text-xl"
+              className="mt-6 max-w-[610px] text-lg leading-relaxed text-foreground/65 md:text-xl"
             >
               {copy.body}
             </motion.p>

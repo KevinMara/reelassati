@@ -171,85 +171,21 @@ export default function EntryAnimation({
             damping: 24,
           }}
         >
-          <svg
+          <motion.img
+            src="/brand/reelassati-mark.png"
+            alt=""
+            aria-hidden="true"
             width="240"
             height="240"
-            viewBox="0 0 120 120"
-            fill="none"
-            aria-hidden="true"
-          >
-            <g transform="translate(10,10)">
-              <motion.circle
-                cx="50"
-                cy="50"
-                r="46"
-                fill="none"
-                stroke="var(--anim-purple)"
-                strokeWidth="3"
-                strokeLinecap="round"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 1 }}
-                transition={{ delay: 1.05, duration: 0.42, ease: "easeInOut" }}
-              />
-
-              <motion.circle
-                cx="50"
-                cy="50"
-                r="46"
-                fill="var(--anim-purple)"
-                initial={{ scaleY: 0, opacity: 0 }}
-                animate={{ scaleY: 1, opacity: 1 }}
-                transition={{ delay: 1.42, duration: 0.38, ease: "easeOut" }}
-                style={{ transformOrigin: "50px 96px" }}
-              />
-
-              <motion.g
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.72, duration: 0.28 }}
-              >
-                <path
-                  d="M28 56 C 38 74, 56 80, 75 63"
-                  stroke="var(--anim-bg)"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  fill="none"
-                />
-                <circle cx="75" cy="63" r="5" fill="var(--anim-bg)" />
-              </motion.g>
-
-              <motion.path
-                d="M30 24 L30 76 L76 50 Z"
-                stroke="var(--anim-purple)"
-                strokeWidth="5"
-                strokeLinejoin="round"
-                initial={{
-                  x: -170,
-                  y: 14,
-                  rotate: -12,
-                  fill: "var(--anim-bg)",
-                }}
-                animate={{
-                  x: 0,
-                  y: [14, -10, 0, -14, 0],
-                  rotate: 0,
-                  fill: "var(--anim-bg)",
-                  stroke: [
-                    "var(--anim-purple)",
-                    "var(--anim-purple)",
-                    "var(--anim-purple)",
-                    "var(--anim-purple)",
-                    "var(--anim-bg)",
-                  ],
-                }}
-                transition={{
-                  duration: 1.68,
-                  times: [0, 0.35, 0.58, 0.76, 1],
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-              />
-            </g>
-          </svg>
+            className="block rounded-[20%]"
+            initial={{ x: -170, y: 14, rotate: -12, opacity: 0 }}
+            animate={{ x: 0, y: [14, -10, 0, -14, 0], rotate: 0, opacity: 1 }}
+            transition={{
+              duration: 1.68,
+              times: [0, 0.35, 0.58, 0.76, 1],
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          />
         </motion.div>
       </motion.div>
     </motion.div>
@@ -259,18 +195,14 @@ export default function EntryAnimation({
 function StaticLockup() {
   return (
     <div className="flex items-center gap-3">
-      <svg width="48" height="48" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <circle cx="16" cy="16" r="15" fill="var(--anim-purple)" />
-        <path d="M9 9 L9 17 L16 13 Z" fill="var(--anim-bg)" />
-        <path
-          d="M9 17 C 12 22, 18 24, 24 19"
-          stroke="var(--anim-bg)"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          fill="none"
-        />
-        <circle cx="24" cy="19" r="1.6" fill="var(--anim-bg)" />
-      </svg>
+      <img
+        src="/brand/reelassati-mark.png"
+        alt=""
+        width="48"
+        height="48"
+        aria-hidden="true"
+        className="rounded-[20%]"
+      />
       <span className="flex items-baseline leading-none">
         <span
           className="font-bold uppercase tracking-[0.02em] text-2xl"

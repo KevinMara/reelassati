@@ -10,7 +10,7 @@ interface LogoProps {
 export function Logo({ className, size = "md", glyphOnly = false, collapsed = false }: LogoProps) {
   const wordSize =
     size === "sm" ? "text-base" : size === "lg" ? "text-2xl" : "text-lg";
-  const glyphPx = size === "sm" ? 18 : size === "lg" ? 28 : 22;
+  const glyphPx = size === "sm" ? 22 : size === "lg" ? 38 : 30;
 
   return (
     <span
@@ -35,24 +35,13 @@ export function Logo({ className, size = "md", glyphOnly = false, collapsed = fa
 
 function ReelassatiGlyph({ size = 22 }: { size?: number }) {
   return (
-    <svg
+    <img
+      src="/brand/reelassati-mark.png"
+      alt=""
       width={size}
       height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-    >
-      <circle cx="16" cy="16" r="15" className="fill-primary/8" />
-      <path d="M9 9 L9 17 L16 13 Z" className="fill-primary" />
-      <path
-        d="M9 17 C 12 22, 18 24, 24 19"
-        className="stroke-primary"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <circle cx="24" cy="19" r="1.6" className="fill-primary" />
-    </svg>
+      className="block shrink-0 rounded-[20%] object-contain"
+    />
   );
 }
