@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { SESSION_KEY } from "./entry-constants";
+import { ThemedLogoMark } from "@/components/Logo";
 import "./entry-animation.css";
 
 export interface EntryAnimationProps {
@@ -171,13 +172,8 @@ export default function EntryAnimation({
             damping: 24,
           }}
         >
-          <motion.img
-            src="/brand/reelassati-mark-transparent.png"
-            alt=""
-            aria-hidden="true"
-            width="240"
-            height="240"
-            className="block rounded-[20%]"
+          <motion.div
+            className="block"
             initial={{ x: -170, y: 14, rotate: -12, opacity: 0 }}
             animate={{ x: 0, y: [14, -10, 0, -14, 0], rotate: 0, opacity: 1 }}
             transition={{
@@ -185,7 +181,9 @@ export default function EntryAnimation({
               times: [0, 0.35, 0.58, 0.76, 1],
               ease: [0.22, 1, 0.36, 1],
             }}
-          />
+          >
+            <ThemedLogoMark size={240} />
+          </motion.div>
         </motion.div>
       </motion.div>
     </motion.div>
@@ -195,14 +193,7 @@ export default function EntryAnimation({
 function StaticLockup() {
   return (
     <div className="flex items-center gap-3">
-      <img
-        src="/brand/reelassati-mark-transparent.png"
-        alt=""
-        width="48"
-        height="48"
-        aria-hidden="true"
-        className="rounded-[20%]"
-      />
+      <ThemedLogoMark size={48} />
       <span className="flex items-baseline leading-none">
         <span
           className="font-bold uppercase tracking-[0.02em] text-2xl"

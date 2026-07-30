@@ -35,13 +35,37 @@ export function Logo({ className, size = "md", glyphOnly = false, collapsed = fa
 
 function ReelassatiGlyph({ size = 22 }: { size?: number }) {
   return (
-    <img
-      src="/brand/reelassati-mark-transparent.png"
-      alt=""
-      width={size}
-      height={size}
+    <ThemedLogoMark size={size} />
+  );
+}
+
+export function ThemedLogoMark({
+  size = 22,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn("relative block shrink-0", className)}
+      style={{ width: size, height: size }}
       aria-hidden="true"
-      className="block shrink-0 object-contain"
-    />
+    >
+      <img
+        src="/brand/reelassati-mark-light.png"
+        alt=""
+        width={size}
+        height={size}
+        className="block h-full w-full object-contain dark:hidden"
+      />
+      <img
+        src="/brand/reelassati-mark-transparent.png"
+        alt=""
+        width={size}
+        height={size}
+        className="hidden h-full w-full object-contain dark:block"
+      />
+    </span>
   );
 }

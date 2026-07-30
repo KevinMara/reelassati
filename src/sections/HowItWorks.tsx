@@ -47,7 +47,7 @@ export function HowItWorks() {
           </h2>
         </div>
 
-        <div className="mx-auto mt-16 w-full max-w-4xl rounded-xl border border-border bg-background p-4 shadow-card md:p-6">
+        <div className="mx-auto mt-16 w-full max-w-4xl rounded-xl border border-border-strong bg-surface p-4 shadow-cutout md:p-6">
           <div className="flex items-center justify-between border-b border-border pb-4">
             <span className="font-mono text-[10px] uppercase tracking-wider text-foreground/50">
               {isItalian ? "Sequenza / Lancio prodotto" : "Sequence / Product launch"}
@@ -56,7 +56,7 @@ export function HowItWorks() {
               {isItalian ? "Versione 03" : "Version 03"}
             </span>
           </div>
-          <div className="relative mt-5 space-y-2 overflow-hidden rounded-lg bg-surface-recessed p-3">
+          <div className="relative mt-5 space-y-2 overflow-hidden rounded-lg border border-border bg-surface-recessed/90 p-3">
             <motion.div
               aria-hidden
               style={{ left: reduceMotion ? "48%" : playhead }}
@@ -68,7 +68,7 @@ export function HowItWorks() {
             <Track label={isItalian ? "Voce" : "Voice"} widths={["18%", "42%", "28%"]} muted />
             <Track label={isItalian ? "Testo" : "Text"} widths={["24%", "29%", "36%"]} />
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-foreground/50">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-foreground/65">
             <span>{isItalian ? "L’intervallo viola è selezionato. Il resto rimane bloccato." : "The purple range is selected. Everything else stays locked."}</span>
             <span className="font-mono text-[10px] uppercase tracking-wider text-primary">
               {isItalian ? "1 modifica in revisione" : "1 change in review"}
@@ -102,12 +102,12 @@ export function HowItWorks() {
 function Track({ label, widths, muted = false }: { label: string; widths: string[]; muted?: boolean }) {
   return (
     <div className="grid grid-cols-[48px_1fr] items-center gap-2">
-      <span className="font-mono text-[8px] uppercase tracking-wider text-foreground/35">{label}</span>
+      <span className="font-mono text-[8px] uppercase tracking-wider text-foreground/50">{label}</span>
       <div className="flex h-9 items-stretch gap-1">
         {widths.map((width, index) => (
           <div
             key={`${label}-${index}`}
-            className={`rounded-sm border ${index === 1 && !muted ? "border-primary/50 bg-primary/25" : "border-border bg-surface"}`}
+            className={`rounded-sm border shadow-subtle ${index === 1 && !muted ? "border-primary/60 bg-primary/30" : "border-border-strong bg-background"}`}
             style={{ width, opacity: muted ? 0.62 : 1 }}
           />
         ))}
