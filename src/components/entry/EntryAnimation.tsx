@@ -94,12 +94,17 @@ function AnimatedWordmark() {
     >
       {WORDMARK.split("").map((letter, index) => {
         const isReel = index < 4;
+        const isFirstAssatiLetter = index === 4;
 
         return (
           <motion.span
             // Index is safe here because this word is immutable.
             key={`${letter}-${index}`}
-            className={isReel ? "entry-wordmark-reel" : "entry-wordmark-assati"}
+            className={
+              isReel
+                ? "entry-wordmark-reel"
+                : `entry-wordmark-assati${isFirstAssatiLetter ? " entry-wordmark-assati-first" : ""}`
+            }
             initial={{ opacity: 0, x: -10, filter: "blur(7px)" }}
             animate={{
               opacity: [0, 0.5, 1],
@@ -219,7 +224,7 @@ export default function EntryAnimation({
       animate={{ opacity: [1, 1, 0] }}
       transition={{
         duration: 4,
-        times: [0, 0.92, 1],
+        times: [0, 0.885, 1],
         ease: [0.22, 1, 0.36, 1],
       }}
     >

@@ -32,7 +32,7 @@
 
 .entry-lockup-stage {
   --entry-mark-size: clamp(126px, 18vw, 228px);
-  --entry-word-width: clamp(194px, 27vw, 338px);
+  --entry-word-width: clamp(208px, 29vw, 365px);
   --entry-gap: clamp(16px, 2.1vw, 28px);
   --entry-mark-start-x: calc((var(--entry-word-width) + var(--entry-gap)) / 2);
   position: relative;
@@ -103,15 +103,15 @@
 .entry-wordmark {
   position: absolute;
   left: calc(var(--entry-mark-size) + var(--entry-gap));
-  top: 50%;
+  bottom: calc(var(--entry-mark-size) * 0.086);
   display: flex;
   width: var(--entry-word-width);
   align-items: baseline;
-  transform: translateY(-50%);
   color: var(--anim-text);
-  line-height: 0.82;
+  font-family: "Geist", sans-serif;
+  font-size: clamp(34px, 5.45vw, 66px);
+  line-height: 1;
   white-space: nowrap;
-  filter: drop-shadow(0 5px 18px var(--anim-shadow));
 }
 
 .entry-wordmark span {
@@ -120,20 +120,22 @@
 }
 
 .entry-wordmark-reel {
-  font-family: "Geist", sans-serif;
-  font-size: clamp(34px, 5.45vw, 66px);
-  font-weight: 750;
-  letter-spacing: 0.015em;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .entry-wordmark-assati {
-  margin-left: -0.025em;
   font-family: "Fraunces", Georgia, serif;
-  font-size: clamp(32px, 5.1vw, 62px);
+  font-size: 0.95em;
   font-style: italic;
-  font-weight: 420;
-  letter-spacing: -0.035em;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.entry-wordmark-assati-first {
+  margin-left: -0.04em;
 }
 
 .entry-static-lockup {
@@ -177,11 +179,7 @@
   }
 
   .entry-wordmark-reel {
-    font-size: clamp(29px, 8.1vw, 39px);
-  }
-
-  .entry-wordmark-assati {
-    font-size: clamp(27px, 7.7vw, 37px);
+    font-size: inherit;
   }
 }
 
