@@ -11,13 +11,6 @@ export function useTheme() {
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
-    const favicon = document.querySelector<HTMLLinkElement>("#app-favicon");
-    if (favicon) {
-      favicon.href =
-        theme === "dark"
-          ? "/brand/reelassati-mark-transparent.png"
-          : "/brand/reelassati-mark-light.png";
-    }
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
