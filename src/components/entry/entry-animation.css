@@ -1,67 +1,194 @@
-/* ============================================================================
-   REELASSATI — Entry Animation Theme Tokens
-   Supports light, dark (system preference), and reduced-motion.
-   ============================================================================ */
-
-/* Light theme (default) */
+/* REELassati entry lockup — theme-aware and built from the definitive PNGs. */
 :root {
   --anim-bg: #fafafa;
-  --anim-purple: hsl(250 49% 54%);
-  --anim-purple-rgb: 94, 75, 198;
   --anim-text: hsl(30 10% 10%);
-  --anim-glow: rgba(0, 0, 0, 0.12);
-  --anim-bloom-opacity: 0;
+  --anim-shadow: rgba(23, 20, 35, 0.2);
 }
 
-/* Dark theme via .dark class (set by next-themes / useTheme) */
 .dark {
   --anim-bg: #0a0a0f;
-  --anim-purple: hsl(250 70% 70%);
-  --anim-purple-rgb: 155, 139, 240;
   --anim-text: hsl(42 27% 95%);
-  --anim-glow: rgba(124, 92, 255, 0.55);
-  --anim-bloom-opacity: 0.5;
+  --anim-shadow: rgba(155, 139, 240, 0.3);
 }
 
-/* Dark theme via system preference (no JS) */
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     --anim-bg: #0a0a0f;
-    --anim-purple: hsl(250 70% 70%);
-    --anim-purple-rgb: 155, 139, 240;
     --anim-text: hsl(42 27% 95%);
-    --anim-glow: rgba(124, 92, 255, 0.55);
-    --anim-bloom-opacity: 0.5;
+    --anim-shadow: rgba(155, 139, 240, 0.3);
   }
 }
 
-/* Player drop-shadow in light (soft depth, no bloom) */
-.entry-player {
-  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.12));
+.entry-anim-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--anim-bg);
 }
 
-/* Bloom layer — enabled in dark only */
-.entry-bloom-layer {
-  mix-blend-mode: screen;
-  opacity: var(--anim-bloom-opacity, 0);
+.entry-lockup-stage {
+  --entry-mark-size: clamp(126px, 18vw, 228px);
+  --entry-word-width: clamp(194px, 27vw, 338px);
+  --entry-gap: clamp(16px, 2.1vw, 28px);
+  --entry-mark-start-x: calc((var(--entry-word-width) + var(--entry-gap)) / 2);
+  position: relative;
+  width: calc(var(--entry-mark-size) + var(--entry-gap) + var(--entry-word-width));
+  height: var(--entry-mark-size);
 }
 
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .entry-anim-overlay {
-    --anim-glow: transparent !important;
-  }
-  .entry-bloom-layer {
-    display: none !important;
-  }
+.entry-mark {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: var(--entry-mark-size);
+  height: var(--entry-mark-size);
+  filter: drop-shadow(0 8px 22px var(--anim-shadow));
+  will-change: transform;
 }
 
-/* will-change management */
-.entry-will-animate {
-  will-change: transform, opacity;
+.entry-mark-slice {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  will-change: transform, opacity, filter;
 }
 
-/* pointer-events during wipe */
-.entry-pointer-pass {
+.entry-mark-slice-top {
+  clip-path: inset(0 0 64% 0);
+}
+
+.entry-mark-slice-middle {
+  clip-path: inset(34% 0 34% 0);
+}
+
+.entry-mark-slice-bottom {
+  clip-path: inset(64% 0 0 0);
+}
+
+.entry-mark-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
   pointer-events: none;
+}
+
+.entry-mark-image-dark {
+  display: none;
+}
+
+.dark .entry-mark-image-light {
+  display: none;
+}
+
+.dark .entry-mark-image-dark {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .entry-mark-image-light {
+    display: none;
+  }
+
+  :root:not(.light) .entry-mark-image-dark {
+    display: block;
+  }
+}
+
+.entry-wordmark {
+  position: absolute;
+  left: calc(var(--entry-mark-size) + var(--entry-gap));
+  top: 50%;
+  display: flex;
+  width: var(--entry-word-width);
+  align-items: baseline;
+  transform: translateY(-50%);
+  color: var(--anim-text);
+  line-height: 0.82;
+  white-space: nowrap;
+  filter: drop-shadow(0 5px 18px var(--anim-shadow));
+}
+
+.entry-wordmark span {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+}
+
+.entry-wordmark-reel {
+  font-family: "Geist", sans-serif;
+  font-size: clamp(34px, 5.45vw, 66px);
+  font-weight: 750;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+}
+
+.entry-wordmark-assati {
+  margin-left: -0.025em;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: clamp(32px, 5.1vw, 62px);
+  font-style: italic;
+  font-weight: 420;
+  letter-spacing: -0.035em;
+}
+
+.entry-static-lockup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.entry-static-mark {
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 64px;
+}
+
+.entry-static-wordmark {
+  display: flex;
+  align-items: baseline;
+  color: var(--anim-text);
+  line-height: 1;
+}
+
+.entry-static-wordmark strong {
+  font-family: "Geist", sans-serif;
+  font-size: 30px;
+  letter-spacing: 0.02em;
+}
+
+.entry-static-wordmark em {
+  margin-left: -0.04em;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 28px;
+  font-weight: 400;
+}
+
+@media (max-width: 520px) {
+  .entry-lockup-stage {
+    --entry-mark-size: clamp(102px, 27vw, 132px);
+    --entry-word-width: clamp(174px, 44vw, 210px);
+    --entry-gap: 13px;
+  }
+
+  .entry-wordmark-reel {
+    font-size: clamp(29px, 8.1vw, 39px);
+  }
+
+  .entry-wordmark-assati {
+    font-size: clamp(27px, 7.7vw, 37px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry-mark,
+  .entry-wordmark span {
+    filter: none;
+  }
 }
