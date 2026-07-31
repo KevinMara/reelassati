@@ -112,8 +112,8 @@ function AnimatedWordmark() {
               filter: ["blur(7px)", "blur(3px)", "blur(0px)"],
             }}
             transition={{
-              delay: 0.4 + index * 0.094,
-              duration: 0.5,
+              delay: 0.4 + index * 0.048,
+              duration: 0.3,
               times: [0, 0.42, 1],
               ease: [0.22, 1, 0.36, 1],
             }}
