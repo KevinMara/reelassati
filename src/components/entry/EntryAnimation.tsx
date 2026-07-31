@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { SESSION_KEY } from "./entry-constants";
 import "./entry-animation.css";
@@ -9,8 +9,10 @@ export interface EntryAnimationProps {
 }
 
 const WORDMARK = "REELassati";
-const FADE_START_MS = 980;
-const FADE_DURATION_MS = 280;
+const BACKDROP_FADE_START_MS = 620;
+const BACKDROP_FADE_DURATION_MS = 620;
+const LOCKUP_FADE_START_MS = 940;
+const LOCKUP_FADE_DURATION_MS = 360;
 
 export function hasEntryPlayed(): boolean {
   if (typeof window === "undefined") return false;
@@ -148,7 +150,8 @@ export default function EntryAnimation({
   const [phase, setPhase] = useState<"ready" | "playing" | "done">(() =>
     force || !hasEntryPlayed() ? "ready" : "done",
   );
-  const [isFading, setIsFading] = useState(false);
+  const [isBackdropFading, setIsBackdropFading] = useState(false);
+  const [isLockupFading, setIsLockupFading] = useState(false);
   const [reducedMotion] = useState(
     () =>
       typeof window !== "undefined" &&
@@ -160,6 +163,11 @@ export default function EntryAnimation({
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
+
+  useLayoutEffect(() => {
+    document.documentElement.classList.remove("entry-route-pending");
+    document.getElementById("entry-boot-screen")?.remove();
+  }, []);
 
   const finish = useCallback(() => {
     document.documentElement.style.overflow = "";
@@ -196,8 +204,18 @@ export default function EntryAnimation({
 
   useEffect(() => {
     if (phase !== "playing" || reducedMotion) return;
-    const timer = window.setTimeout(() => setIsFading(true), FADE_START_MS);
-    return () => window.clearTimeout(timer);
+    const backdropTimer = window.setTimeout(
+      () => setIsBackdropFading(true),
+      BACKDROP_FADE_START_MS,
+    );
+    const lockupTimer = window.setTimeout(
+      () => setIsLockupFading(true),
+      LOCKUP_FADE_START_MS,
+    );
+    return () => {
+      window.clearTimeout(backdropTimer);
+      window.clearTimeout(lockupTimer);
+    };
   }, [phase, reducedMotion]);
 
   if (phase === "done") return null;
@@ -212,8 +230,11 @@ export default function EntryAnimation({
         animate={{ opacity: 0 }}
         transition={{ delay: 0.1, duration: 0.2 }}
       >
+        <div className="entry-anim-backdrop" />
         <span className="sr-only">Opening REELassati Studio</span>
-        <StaticLockup />
+        <div className="entry-lockup-layer">
+          <StaticLockup />
+        </div>
       </motion.div>
     );
   }
@@ -223,21 +244,34 @@ export default function EntryAnimation({
       role="status"
       aria-live="polite"
       className="entry-anim-overlay"
-      initial={{ opacity: 1 }}
-      animate={{ opacity: isFading ? 0 : 1 }}
-      transition={{
-        duration: isFading ? FADE_DURATION_MS / 1_000 : 0,
-        ease: [0.22, 1, 0.36, 1],
-      }}
-      onAnimationComplete={() => {
-        if (isFading) finish();
-      }}
     >
+      <motion.div
+        className="entry-anim-backdrop"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: isBackdropFading ? 0 : 1 }}
+        transition={{
+          duration: isBackdropFading ? BACKDROP_FADE_DURATION_MS / 1_000 : 0,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+      />
       <span className="sr-only">Opening REELassati Studio</span>
-      <div className="entry-lockup-stage">
-        <AnimatedMark />
-        <AnimatedWordmark />
-      </div>
+      <motion.div
+        className="entry-lockup-layer"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: isLockupFading ? 0 : 1 }}
+        transition={{
+          duration: isLockupFading ? LOCKUP_FADE_DURATION_MS / 1_000 : 0,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        onAnimationComplete={() => {
+          if (isLockupFading) finish();
+        }}
+      >
+        <div className="entry-lockup-stage">
+          <AnimatedMark />
+          <AnimatedWordmark />
+        </div>
+      </motion.div>
     </motion.div>
   );
 }

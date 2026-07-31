@@ -26,15 +26,38 @@
     <script>
       // SPA redirect handler
       (function() {
+        var savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark' || savedTheme === 'light') {
+          document.documentElement.classList.add(savedTheme);
+        }
         var params = new URLSearchParams(window.location.search);
         var redirect = params.get('redirect');
         if (redirect) {
           window.history.replaceState(null, null, redirect);
         }
+        if (/^#\/dashboard(?:\/|$)/.test(window.location.hash)) {
+          document.documentElement.classList.add('entry-route-pending');
+        }
       })();
     </script>
+    <style>
+      #entry-boot-screen { display: none; }
+      .entry-route-pending #entry-boot-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: block;
+        background: #fafafa;
+      }
+      @media (prefers-color-scheme: dark) {
+        .entry-route-pending #entry-boot-screen { background: #0a0a0f; }
+      }
+      .entry-route-pending.light #entry-boot-screen { background: #fafafa; }
+      .entry-route-pending.dark #entry-boot-screen { background: #0a0a0f; }
+    </style>
   </head>
   <body>
+    <div id="entry-boot-screen" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { WorkspaceProvider } from "@/providers/workspace";
 import { ReferralCapture } from "@/components/ReferralCapture";
+import EntryAnimation from "@/components/entry/EntryAnimation";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -30,9 +31,14 @@ function RouteFallback() {
 
 function StudioRoute() {
   return (
-    <WorkspaceProvider>
-      <Dashboard />
-    </WorkspaceProvider>
+    <>
+      <EntryAnimation />
+      <Suspense fallback={<div className="min-h-screen bg-background" aria-hidden="true" />}>
+        <WorkspaceProvider>
+          <Dashboard />
+        </WorkspaceProvider>
+      </Suspense>
+    </>
   );
 }
 

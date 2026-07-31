@@ -11,7 +11,7 @@ import {
   Menu, Database, HardDrive, BrainCircuit, Radio,
   type LucideIcon,
 } from "lucide-react";
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace";
 
@@ -33,8 +33,6 @@ import InterviewMe from "./dashboard/InterviewMe";
 import GoalTracker from "./dashboard/GoalTracker";
 import CoachingPage from "./dashboard/CoachingPage";
 import ReferralPage from "./dashboard/ReferralPage";
-
-const EntryAnimation = lazy(() => import("@/components/entry/EntryAnimation"));
 
 // ── Dashboard Home ──
 function DashboardHome() {
@@ -298,11 +296,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
-      {/* Entry animation */}
-      <Suspense fallback={null}>
-        <EntryAnimation />
-      </Suspense>
-
       {/* Mobile overlay */}
       {mobileOpen && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setMobileOpen(false)} />}
 
