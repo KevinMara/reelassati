@@ -56,15 +56,15 @@
 }
 
 .entry-mark-slice-top {
-  clip-path: inset(0 0 64% 0);
+  clip-path: inset(0 0 69.14% 0);
 }
 
 .entry-mark-slice-middle {
-  clip-path: inset(34% 0 34% 0);
+  clip-path: inset(30.86% 0 31.45% 0);
 }
 
 .entry-mark-slice-bottom {
-  clip-path: inset(64% 0 0 0);
+  clip-path: inset(68.55% 0 0 0);
 }
 
 .entry-mark-image {

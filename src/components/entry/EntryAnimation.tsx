@@ -41,9 +41,9 @@ function ThemeMarkImage({ className = "" }: { className?: string }) {
 
 function AnimatedMark() {
   const slices = [
-    { name: "bottom", delay: 0.2 },
-    { name: "middle", delay: 0.58 },
-    { name: "top", delay: 0.96 },
+    { name: "bottom", delay: 0.18 },
+    { name: "middle", delay: 0.43 },
+    { name: "top", delay: 0.68 },
   ] as const;
 
   return (
@@ -52,8 +52,8 @@ function AnimatedMark() {
       initial={{ x: "var(--entry-mark-start-x)" }}
       animate={{ x: "0px" }}
       transition={{
-        delay: 1.54,
-        duration: 0.76,
+        delay: 1.05,
+        duration: 0.7,
         ease: [0.22, 1, 0.36, 1],
       }}
     >
@@ -71,7 +71,7 @@ function AnimatedMark() {
           }}
           transition={{
             delay: slice.delay,
-            duration: 0.44,
+            duration: 0.34,
             times: [0, 0.06, 1],
             ease: [0.22, 1, 0.36, 1],
           }}
@@ -90,7 +90,7 @@ function AnimatedWordmark() {
       aria-hidden="true"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ delay: 1.62, duration: 0.12 }}
+      transition={{ delay: 1.15, duration: 0.12 }}
     >
       {WORDMARK.split("").map((letter, index) => {
         const isReel = index < 4;
@@ -112,7 +112,7 @@ function AnimatedWordmark() {
               filter: ["blur(7px)", "blur(3px)", "blur(0px)"],
             }}
             transition={{
-              delay: 1.66 + index * 0.094,
+              delay: 1.19 + index * 0.094,
               duration: 0.5,
               times: [0, 0.42, 1],
               ease: [0.22, 1, 0.36, 1],
