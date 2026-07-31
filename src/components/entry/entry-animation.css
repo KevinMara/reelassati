@@ -27,7 +27,44 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  background: transparent;
+  isolation: isolate;
+  pointer-events: none;
+}
+
+.entry-page-melt,
+.entry-page-origin,
+.entry-page-wash {
+  position: absolute;
+  inset: 0;
+}
+
+.entry-page-melt {
+  z-index: -2;
+  overflow: hidden;
+  background: transparent;
+}
+
+.entry-page-origin {
+  z-index: 0;
+  min-height: 100%;
+  transform: translate3d(0, calc(var(--entry-origin-scroll, 0px) * -1), 0) scale(1.003);
+  transform-origin: center;
+  will-change: opacity, filter;
+}
+
+.entry-page-origin > * {
+  min-height: 100vh;
+}
+
+.entry-page-wash {
+  z-index: 1;
   background: var(--anim-bg);
+  will-change: opacity;
+}
+
+.entry-page-wash-reduced {
+  opacity: 0.82;
 }
 
 .entry-lockup-stage {
@@ -36,6 +73,7 @@
   --entry-gap: clamp(16px, 2.1vw, 28px);
   --entry-mark-start-x: calc((var(--entry-word-width) + var(--entry-gap)) / 2);
   position: relative;
+  z-index: 2;
   width: calc(var(--entry-mark-size) + var(--entry-gap) + var(--entry-word-width));
   height: var(--entry-mark-size);
 }
@@ -139,6 +177,8 @@
 }
 
 .entry-static-lockup {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 16px;

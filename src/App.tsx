@@ -1,8 +1,9 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { WorkspaceProvider } from "@/providers/workspace";
 import { ReferralCapture } from "@/components/ReferralCapture";
+import { ENTRY_ORIGIN_SCROLL_KEY, SESSION_KEY } from "@/components/entry/entry-constants";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -36,10 +37,39 @@ function StudioRoute() {
   );
 }
 
+function StudioEntryCapture() {
+  useEffect(() => {
+    const rememberOrigin = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const link = target.closest<HTMLAnchorElement>("a[href]");
+      if (!link) return;
+
+      const destination = new URL(link.href, window.location.href);
+      if (
+        destination.origin !== window.location.origin ||
+        !destination.pathname.startsWith("/dashboard") ||
+        window.location.pathname.startsWith("/dashboard")
+      ) {
+        return;
+      }
+
+      sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.setItem(ENTRY_ORIGIN_SCROLL_KEY, String(window.scrollY));
+    };
+
+    document.addEventListener("click", rememberOrigin, true);
+    return () => document.removeEventListener("click", rememberOrigin, true);
+  }, []);
+
+  return null;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <ReferralCapture />
+      <StudioEntryCapture />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<Home />} />
