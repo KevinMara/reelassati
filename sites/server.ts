@@ -65,6 +65,9 @@ type SitesEnvironment = {
   ASSETS: AssetBinding;
   DB: D1Database;
   BUCKET: R2Bucket;
+  KIMI_TEST_MODE?: string;
+  KIMI_CODE_API_KEY?: string;
+  KIMI_CODE_MODEL?: string;
   OPENROUTER_API_KEY?: string;
   OPENROUTER_TEXT_MODEL?: string;
   OPENROUTER_ANALYSIS_MODEL?: string;
@@ -142,6 +145,7 @@ interface ReferralClaimRow {
 }
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+const KIMI_CODE_BASE = "https://api.kimi.com/coding/v1";
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 const MAX_WORKSPACE_BYTES = 2_000_000;
 const MAX_UPLOAD_BYTES = 64 * 1024 * 1024;
@@ -232,13 +236,19 @@ function getUser(request: Request): AuthenticatedUser | null {
 
 function capabilities(env: SitesEnvironment): CapabilityState {
   const missing: string[] = [];
+  const kimiTestMode = env.KIMI_TEST_MODE === "enabled";
+  if (kimiTestMode && !env.KIMI_CODE_API_KEY) {
+    missing.push("KIMI_CODE_API_KEY");
+  }
   if (!env.OPENROUTER_API_KEY) missing.push("OPENROUTER_API_KEY");
   if (!env.ZERNIO_API_KEY) missing.push("ZERNIO_API_KEY");
 
   return {
     persistence: Boolean(env.DB),
     uploads: Boolean(env.BUCKET),
-    ai: Boolean(env.OPENROUTER_API_KEY),
+    ai: kimiTestMode
+      ? Boolean(env.KIMI_CODE_API_KEY)
+      : Boolean(env.OPENROUTER_API_KEY),
     transcription: Boolean(env.OPENROUTER_API_KEY && env.BUCKET),
     speech: Boolean(env.OPENROUTER_API_KEY && env.BUCKET),
     videoGeneration: Boolean(env.OPENROUTER_API_KEY && env.BUCKET),
@@ -925,6 +935,13 @@ function openRouterHeaders(env: SitesEnvironment): HeadersInit {
   };
 }
 
+function kimiCodeHeaders(env: SitesEnvironment): HeadersInit {
+  return {
+    Authorization: `Bearer ${env.KIMI_CODE_API_KEY}`,
+    "Content-Type": "application/json",
+  };
+}
+
 async function providerError(
   response: Response,
   provider: string
@@ -986,30 +1003,47 @@ async function chatJson(
   userContent: unknown,
   model?: string
 ): Promise<Record<string, unknown>> {
-  if (!env.OPENROUTER_API_KEY) {
+  const useKimiSubscription = !model && env.KIMI_TEST_MODE === "enabled";
+  const credential = useKimiSubscription
+    ? env.KIMI_CODE_API_KEY
+    : env.OPENROUTER_API_KEY;
+  if (!credential) {
+    const missingKey = useKimiSubscription
+      ? "KIMI_CODE_API_KEY"
+      : "OPENROUTER_API_KEY";
     throw new Response(
       JSON.stringify({
-        error: "AI is ready but needs a new OpenRouter key",
-        missing: ["OPENROUTER_API_KEY"],
+        error: useKimiSubscription
+          ? "Kimi subscription test mode needs a Kimi Code API key"
+          : "AI is ready but needs a new OpenRouter key",
+        missing: [missingKey],
       }),
       { status: 503, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: "POST",
-    headers: openRouterHeaders(env),
-    body: JSON.stringify({
-      model: model || env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userContent },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.45,
-    }),
-  });
-  if (!response.ok) await providerError(response, "OpenRouter");
+  const providerName = useKimiSubscription ? "Kimi Code" : "OpenRouter";
+  const response = await fetch(
+    `${useKimiSubscription ? KIMI_CODE_BASE : OPENROUTER_BASE}/chat/completions`,
+    {
+      method: "POST",
+      headers: useKimiSubscription
+        ? kimiCodeHeaders(env)
+        : openRouterHeaders(env),
+      body: JSON.stringify({
+        model: useKimiSubscription
+          ? env.KIMI_CODE_MODEL || "k3-256k"
+          : model || env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userContent },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.45,
+      }),
+    }
+  );
+  if (!response.ok) await providerError(response, providerName);
   return parseModelJson(await response.json());
 }
 
@@ -3235,13 +3269,7 @@ async function claimReferral(
         ) VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)
       `
     )
-      .bind(
-        id,
-        code,
-        referral.owner_email,
-        user.email,
-        createdAt
-      )
+      .bind(id, code, referral.owner_email, user.email, createdAt)
       .run();
   } catch {
     const raced = await env.DB.prepare(

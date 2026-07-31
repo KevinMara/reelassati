@@ -55,6 +55,19 @@ Required for AI creation:
 OPENROUTER_API_KEY
 ```
 
+Owner-only Kimi subscription testing can temporarily replace only the default
+text model path:
+
+```text
+KIMI_TEST_MODE=enabled
+KIMI_CODE_API_KEY
+KIMI_CODE_MODEL=k3-256k
+```
+
+This switch does not replace OpenRouter globally. Analysis, transcription,
+speech, and video generation continue to use their configured OpenRouter
+models. Leave `KIMI_TEST_MODE` disabled for the official product route.
+
 Required for social publishing:
 
 ```text

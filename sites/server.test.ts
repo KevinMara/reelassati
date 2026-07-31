@@ -123,4 +123,100 @@ describe("Sites worker", () => {
       error: "Request body is not valid JSON",
     });
   });
+
+  it("routes only default text generation through Kimi subscription test mode", async () => {
+    const originalFetch = globalThis.fetch;
+    let providerUrl = "";
+    let providerBody: Record<string, unknown> = {};
+    globalThis.fetch = async (input, init) => {
+      providerUrl = String(input);
+      providerBody = JSON.parse(String(init?.body || "{}"));
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content:
+                '{"title":"Test","hook":"Hook","body":"Body","cta":"CTA","fullScript":"Hook\\nBody\\nCTA"}',
+            },
+          },
+        ],
+      });
+    };
+
+    try {
+      const response = await worker.fetch(
+        new Request("https://studio.example/api/ai/script", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "oai-authenticated-user-email": "creator@example.com",
+          },
+          body: JSON.stringify({ topic: "A useful test" }),
+        }),
+        {
+          ...env,
+          KIMI_TEST_MODE: "enabled",
+          KIMI_CODE_API_KEY: "test-kimi-key",
+          KIMI_CODE_MODEL: "k3-256k",
+          OPENROUTER_API_KEY: "test-openrouter-key",
+        } as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(providerUrl).toBe(
+        "https://api.kimi.com/coding/v1/chat/completions"
+      );
+      expect(providerBody.model).toBe("k3-256k");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("keeps explicitly selected non-Kimi analysis models on OpenRouter", async () => {
+    const originalFetch = globalThis.fetch;
+    let providerUrl = "";
+    let providerBody: Record<string, unknown> = {};
+    globalThis.fetch = async (input, init) => {
+      providerUrl = String(input);
+      providerBody = JSON.parse(String(init?.body || "{}"));
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content:
+                '{"summary":"Reviewed","hook":{"score":70},"pacing":{"score":75},"retention":[],"changes":[]}',
+            },
+          },
+        ],
+      });
+    };
+
+    try {
+      const response = await worker.fetch(
+        new Request("https://studio.example/api/ai/analyze", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "oai-authenticated-user-email": "creator@example.com",
+          },
+          body: JSON.stringify({
+            publicUrl: "https://media.example.com/test.mp4",
+          }),
+        }),
+        {
+          ...env,
+          KIMI_TEST_MODE: "enabled",
+          KIMI_CODE_API_KEY: "test-kimi-key",
+          OPENROUTER_API_KEY: "test-openrouter-key",
+          OPENROUTER_ANALYSIS_MODEL: "google/gemini-2.5-flash",
+        } as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(providerUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
+      expect(providerBody.model).toBe("google/gemini-2.5-flash");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
