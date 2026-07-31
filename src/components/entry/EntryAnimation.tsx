@@ -9,7 +9,7 @@ export interface EntryAnimationProps {
 }
 
 const WORDMARK = "REELassati";
-const TOTAL_DURATION_MS = 4_000;
+const TOTAL_DURATION_MS = 4_500;
 
 export function hasEntryPlayed(): boolean {
   if (typeof window === "undefined") return false;
@@ -223,8 +223,8 @@ export default function EntryAnimation({
       initial={{ opacity: 1 }}
       animate={{ opacity: [1, 1, 0] }}
       transition={{
-        duration: 4,
-        times: [0, 0.885, 1],
+        duration: 4.5,
+        times: [0, 0.898, 1],
         ease: [0.22, 1, 0.36, 1],
       }}
     >
