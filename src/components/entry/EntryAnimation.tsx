@@ -41,9 +41,9 @@ function ThemeMarkImage({ className = "" }: { className?: string }) {
 
 function AnimatedMark() {
   const slices = [
-    { name: "bottom", delay: 0.18 },
-    { name: "middle", delay: 0.43 },
-    { name: "top", delay: 0.68 },
+    { name: "bottom", delay: 0.14 },
+    { name: "middle", delay: 0.27 },
+    { name: "top", delay: 0.4 },
   ] as const;
 
   return (
@@ -71,7 +71,7 @@ function AnimatedMark() {
           }}
           transition={{
             delay: slice.delay,
-            duration: 0.34,
+            duration: 0.24,
             times: [0, 0.06, 1],
             ease: [0.22, 1, 0.36, 1],
           }}
