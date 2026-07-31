@@ -48,15 +48,15 @@ export function HowItWorks() {
         </div>
 
         <div className="mx-auto mt-16 w-full max-w-4xl rounded-xl border border-border-strong bg-surface p-4 shadow-cutout md:p-6">
-          <div className="flex items-center justify-between border-b border-border pb-4">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-foreground/50">
+          <div className="timeline-preview-header flex items-center justify-between border-b pb-4">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-foreground/60">
               {isItalian ? "Sequenza / Lancio prodotto" : "Sequence / Product launch"}
             </span>
             <span className="rounded-pill bg-primary/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-primary">
               {isItalian ? "Versione 03" : "Version 03"}
             </span>
           </div>
-          <div className="relative mt-5 space-y-2 overflow-hidden rounded-lg border border-border bg-surface-recessed/90 p-3">
+          <div className="timeline-preview-canvas relative mt-5 space-y-2 overflow-hidden rounded-lg border p-3">
             <motion.div
               aria-hidden
               style={{ left: reduceMotion ? "48%" : playhead }}
@@ -102,13 +102,17 @@ export function HowItWorks() {
 function Track({ label, widths, muted = false }: { label: string; widths: string[]; muted?: boolean }) {
   return (
     <div className="grid grid-cols-[48px_1fr] items-center gap-2">
-      <span className="font-mono text-[8px] uppercase tracking-wider text-foreground/50">{label}</span>
+      <span className="timeline-preview-label font-mono text-[8px] font-medium uppercase tracking-wider">{label}</span>
       <div className="flex h-9 items-stretch gap-1">
         {widths.map((width, index) => (
           <div
             key={`${label}-${index}`}
-            className={`rounded-sm border shadow-subtle ${index === 1 && !muted ? "border-primary/60 bg-primary/30" : "border-border-strong bg-background"}`}
-            style={{ width, opacity: muted ? 0.62 : 1 }}
+            className={`rounded-sm border ${
+              index === 1 && !muted
+                ? "timeline-preview-clip-selected"
+                : "timeline-preview-clip"
+            }`}
+            style={{ width, opacity: muted ? 0.72 : 1 }}
           />
         ))}
       </div>

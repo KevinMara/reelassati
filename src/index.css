@@ -66,6 +66,12 @@
 
     --radius: 0.75rem;
 
+    /* Timeline preview — intentionally stronger than whisper UI borders */
+    --timeline-canvas: 38 18% 88%;
+    --timeline-clip: 42 25% 97%;
+    --timeline-clip-border: 30 9% 42% / 0.34;
+    --timeline-divider: 30 10% 10% / 0.13;
+
     /* Typography */
     --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-serif: 'Fraunces', Georgia, serif;
@@ -118,6 +124,11 @@
     --border-strong: 42 27% 95% / 0.16;
     --input: 42 27% 95% / 0.12;
     --ring: 250 70% 70%;
+
+    --timeline-canvas: 30 7% 8%;
+    --timeline-clip: 30 6% 14%;
+    --timeline-clip-border: 42 18% 80% / 0.18;
+    --timeline-divider: 42 27% 95% / 0.1;
 
     --shadow-card: 0 2px 8px hsl(0 0% 0% / 0.4), 0 1px 2px hsl(0 0% 0% / 0.2);
     --shadow-card-hover: 0 12px 32px -8px hsl(0 0% 0% / 0.5), 0 0 0 1px hsl(250 70% 70% / 0.06);
@@ -204,6 +215,46 @@
   /* Whisper border */
   .border-whisper {
     border: 1px solid hsl(var(--border));
+  }
+
+  .timeline-preview-header {
+    border-color: hsl(var(--timeline-divider));
+  }
+
+  .timeline-preview-canvas {
+    background: hsl(var(--timeline-canvas));
+    border-color: hsl(var(--timeline-clip-border));
+    box-shadow: inset 0 1px 2px hsl(30 10% 10% / 0.035);
+  }
+
+  .dark .timeline-preview-canvas {
+    box-shadow: inset 0 1px 2px hsl(0 0% 0% / 0.28);
+  }
+
+  .timeline-preview-label {
+    color: hsl(var(--foreground) / 0.58);
+  }
+
+  .timeline-preview-clip {
+    background: hsl(var(--timeline-clip));
+    border-color: hsl(var(--timeline-clip-border));
+    box-shadow:
+      0 1px 2px hsl(30 10% 10% / 0.07),
+      inset 0 1px hsl(0 0% 100% / 0.58);
+  }
+
+  .dark .timeline-preview-clip {
+    box-shadow:
+      0 1px 2px hsl(0 0% 0% / 0.3),
+      inset 0 1px hsl(42 27% 95% / 0.025);
+  }
+
+  .timeline-preview-clip-selected {
+    background: hsl(var(--primary) / 0.28);
+    border-color: hsl(var(--primary) / 0.7);
+    box-shadow:
+      0 1px 2px hsl(var(--primary) / 0.12),
+      inset 0 1px hsl(0 0% 100% / 0.2);
   }
 
   /* Ambient grain — adds tactile feel to cream surfaces */
