@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ENTRY_ORIGIN_SCROLL_KEY, SESSION_KEY } from "./entry-constants";
-import Home from "@/pages/Home";
+import { SESSION_KEY } from "./entry-constants";
 import "./entry-animation.css";
 
 export interface EntryAnimationProps {
@@ -12,65 +11,6 @@ export interface EntryAnimationProps {
 const WORDMARK = "REELassati";
 const FADE_START_MS = 980;
 const FADE_DURATION_MS = 280;
-
-function PageMeltBackdrop({ reducedMotion }: { reducedMotion: boolean }) {
-  const [originScroll] = useState(() => {
-    if (typeof window === "undefined") return 0;
-    const stored = Number(sessionStorage.getItem(ENTRY_ORIGIN_SCROLL_KEY));
-    return Number.isFinite(stored) ? Math.max(0, stored) : 0;
-  });
-  const originStyle = {
-    "--entry-origin-scroll": `${originScroll}px`,
-  } as CSSProperties;
-
-  if (reducedMotion) {
-    return (
-      <div className="entry-page-melt" aria-hidden="true" inert>
-        <div className="entry-page-origin" style={originStyle}>
-          <Home />
-        </div>
-        <div className="entry-page-wash entry-page-wash-reduced" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="entry-page-melt" aria-hidden="true" inert>
-      <motion.div
-        className="entry-page-origin"
-        style={originStyle}
-        initial={{ opacity: 1, filter: "grayscale(0%) contrast(100%) blur(0px)" }}
-        animate={{
-          opacity: [1, 0.96, 0.58, 0],
-          filter: [
-            "grayscale(0%) contrast(100%) blur(0px)",
-            "grayscale(72%) contrast(94%) blur(0.5px)",
-            "grayscale(100%) contrast(88%) blur(1.5px)",
-            "grayscale(100%) contrast(92%) blur(2px)",
-          ],
-        }}
-        transition={{
-          duration: 1.24,
-          times: [0, 0.3, 0.68, 1],
-          ease: [0.22, 1, 0.36, 1],
-        }}
-      >
-        <Home />
-      </motion.div>
-
-      <motion.div
-        className="entry-page-wash"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 0.9, 0.94, 0] }}
-        transition={{
-          duration: 1.24,
-          times: [0, 0.38, 0.6, 1],
-          ease: [0.22, 1, 0.36, 1],
-        }}
-      />
-    </div>
-  );
-}
 
 export function hasEntryPlayed(): boolean {
   if (typeof window === "undefined") return false;
@@ -224,7 +164,6 @@ export default function EntryAnimation({
   const finish = useCallback(() => {
     document.documentElement.style.overflow = "";
     markEntryPlayed();
-    sessionStorage.removeItem(ENTRY_ORIGIN_SCROLL_KEY);
     setPhase("done");
     onCompleteRef.current?.();
   }, []);
@@ -274,7 +213,6 @@ export default function EntryAnimation({
         transition={{ delay: 0.1, duration: 0.2 }}
       >
         <span className="sr-only">Opening REELassati Studio</span>
-        <PageMeltBackdrop reducedMotion />
         <StaticLockup />
       </motion.div>
     );
@@ -296,7 +234,6 @@ export default function EntryAnimation({
       }}
     >
       <span className="sr-only">Opening REELassati Studio</span>
-      <PageMeltBackdrop reducedMotion={false} />
       <div className="entry-lockup-stage">
         <AnimatedMark />
         <AnimatedWordmark />

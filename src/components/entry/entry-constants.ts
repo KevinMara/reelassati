@@ -41,4 +41,3 @@ export const TOTAL_DURATION = 2.8;
 
 /** sessionStorage key to track if animation has played */
 export const SESSION_KEY = "entryAnimPlayed";
-export const ENTRY_ORIGIN_SCROLL_KEY = "entryOriginScroll";
