@@ -52,7 +52,7 @@ function AnimatedMark() {
       initial={{ x: "var(--entry-mark-start-x)" }}
       animate={{ x: "0px" }}
       transition={{
-        delay: 1.05,
+        delay: 0.34,
         duration: 0.7,
         ease: [0.22, 1, 0.36, 1],
       }}
@@ -90,7 +90,7 @@ function AnimatedWordmark() {
       aria-hidden="true"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ delay: 1.15, duration: 0.12 }}
+      transition={{ delay: 0.38, duration: 0.12 }}
     >
       {WORDMARK.split("").map((letter, index) => {
         const isReel = index < 4;
@@ -112,7 +112,7 @@ function AnimatedWordmark() {
               filter: ["blur(7px)", "blur(3px)", "blur(0px)"],
             }}
             transition={{
-              delay: 1.19 + index * 0.094,
+              delay: 0.4 + index * 0.094,
               duration: 0.5,
               times: [0, 0.42, 1],
               ease: [0.22, 1, 0.36, 1],
