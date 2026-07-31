@@ -45,7 +45,6 @@
   inset: 0 auto auto 0;
   width: var(--entry-mark-size);
   height: var(--entry-mark-size);
-  filter: drop-shadow(0 8px 22px var(--anim-shadow));
   will-change: transform;
 }
 
@@ -53,7 +52,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  will-change: transform, opacity, filter;
+  will-change: transform, opacity;
 }
 
 .entry-mark-slice-top {

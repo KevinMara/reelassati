@@ -41,9 +41,9 @@ function ThemeMarkImage({ className = "" }: { className?: string }) {
 
 function AnimatedMark() {
   const slices = [
-    { name: "bottom", delay: 0.28 },
-    { name: "middle", delay: 0.86 },
-    { name: "top", delay: 1.44 },
+    { name: "bottom", delay: 0.2 },
+    { name: "middle", delay: 0.58 },
+    { name: "top", delay: 0.96 },
   ] as const;
 
   return (
@@ -52,8 +52,8 @@ function AnimatedMark() {
       initial={{ x: "var(--entry-mark-start-x)" }}
       animate={{ x: "0px" }}
       transition={{
-        delay: 2.12,
-        duration: 0.92,
+        delay: 1.54,
+        duration: 0.76,
         ease: [0.22, 1, 0.36, 1],
       }}
     >
@@ -62,19 +62,17 @@ function AnimatedMark() {
           key={slice.name}
           className={`entry-mark-slice entry-mark-slice-${slice.name}`}
           initial={{
-            x: "-72%",
+            x: "-108%",
             opacity: 0,
-            filter: "blur(12px)",
           }}
           animate={{
             x: 0,
-            opacity: [0, 0.42, 1],
-            filter: ["blur(12px)", "blur(7px)", "blur(0px)"],
+            opacity: [0, 1, 1],
           }}
           transition={{
             delay: slice.delay,
-            duration: 0.66,
-            times: [0, 0.42, 1],
+            duration: 0.44,
+            times: [0, 0.06, 1],
             ease: [0.22, 1, 0.36, 1],
           }}
         >
@@ -92,7 +90,7 @@ function AnimatedWordmark() {
       aria-hidden="true"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ delay: 2.18, duration: 0.18 }}
+      transition={{ delay: 1.62, duration: 0.12 }}
     >
       {WORDMARK.split("").map((letter, index) => {
         const isReel = index < 4;
@@ -102,15 +100,15 @@ function AnimatedWordmark() {
             // Index is safe here because this word is immutable.
             key={`${letter}-${index}`}
             className={isReel ? "entry-wordmark-reel" : "entry-wordmark-assati"}
-            initial={{ opacity: 0, x: -12, filter: "blur(10px)" }}
+            initial={{ opacity: 0, x: -10, filter: "blur(7px)" }}
             animate={{
-              opacity: [0, 0.38, 1],
+              opacity: [0, 0.5, 1],
               x: 0,
-              filter: ["blur(10px)", "blur(5px)", "blur(0px)"],
+              filter: ["blur(7px)", "blur(3px)", "blur(0px)"],
             }}
             transition={{
-              delay: 2.2 + index * 0.072,
-              duration: 0.52,
+              delay: 1.66 + index * 0.094,
+              duration: 0.5,
               times: [0, 0.42, 1],
               ease: [0.22, 1, 0.36, 1],
             }}
