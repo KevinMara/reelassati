@@ -23,6 +23,7 @@ import {
 import type { Asset, AssetKind, ScriptDraft } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { useFileDropZone } from "@/hooks/useFileDropZone";
 
 type LibraryFilter = "all" | AssetKind;
 
@@ -165,9 +166,7 @@ export default function ContentLibrary() {
     [deferredSearch, filter, items],
   );
 
-  const uploadFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  const uploadSelectedFile = async (file: File | undefined) => {
     if (!file) return;
 
     setUploading(true);
@@ -203,6 +202,17 @@ export default function ContentLibrary() {
       setUploadProgress(0);
     }
   };
+
+  const uploadFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    void uploadSelectedFile(file);
+  };
+
+  const { isDragging, dropZoneProps } = useFileDropZone({
+    disabled: uploading || !capabilities.uploads,
+    onFiles: (files) => void uploadSelectedFile(files[0]),
+  });
 
   const deleteItem = async (item: LibraryItem) => {
     if (!window.confirm(`Permanently delete “${item.title}”?`)) return;
@@ -256,7 +266,14 @@ export default function ContentLibrary() {
   return (
     <div className="mx-auto max-w-7xl">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div
+          {...dropZoneProps}
+          className={`rounded-xl border border-dashed p-2 transition-all ${
+            isDragging
+              ? "border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+              : "border-transparent"
+          }`}
+        >
           <p className="mono-eyebrow mb-2 text-primary">Private media system</p>
           <h1 className="text-3xl font-semibold">Content Library</h1>
           <p className="mt-2 max-w-2xl text-sm text-foreground/55">
@@ -286,6 +303,9 @@ export default function ContentLibrary() {
             )}
             {uploading ? `Uploading ${uploadProgress}%` : "Upload media"}
           </button>
+          <p className="mt-1 text-center text-[11px] text-foreground/45">
+            {isDragging ? "Drop files here" : "or drop a file here"}
+          </p>
           {!capabilities.uploads ? (
             <p className="mt-2 max-w-52 text-right text-xs text-amber-600">
               Media storage needs configuration.

@@ -23,6 +23,7 @@ import type {
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { CONTENT_LANGUAGES } from "@/lib/languages";
+import { useFileDropZone } from "@/hooks/useFileDropZone";
 
 type BusyAction = "upload" | "transcribe" | "script" | "speech" | null;
 
@@ -67,6 +68,30 @@ export default function VoiceNotes() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const selectAudioFile = (nextFile: File | null) => {
+    setFile(nextFile);
+    setSourceAsset(null);
+    setUploadProgress(0);
+    setTranscription("");
+    setGeneratedScript(null);
+    setSpeechAsset(null);
+  };
+
+  const { isDragging, dropZoneProps } = useFileDropZone({
+    disabled: !capabilities.uploads || Boolean(busyAction),
+    onFiles: (files) => {
+      const audioFile = files.find((candidate) =>
+        candidate.type.startsWith("audio/"),
+      );
+      if (!audioFile) {
+        setError("Drop an audio file in this section.");
+        return;
+      }
+      setError(null);
+      selectAudioFile(audioFile);
+    },
+  });
 
   const audioAssets = useMemo(
     () => workspace.assets.filter((asset) => asset.kind === "audio"),
@@ -306,19 +331,19 @@ export default function VoiceNotes() {
               accept="audio/*"
               className="hidden"
               onChange={(event) => {
-                setFile(event.target.files?.[0] ?? null);
-                setSourceAsset(null);
-                setUploadProgress(0);
-                setTranscription("");
-                setGeneratedScript(null);
-                setSpeechAsset(null);
+                selectAudioFile(event.target.files?.[0] ?? null);
               }}
             />
             <button
               type="button"
+              {...dropZoneProps}
               onClick={() => fileInputRef.current?.click()}
               disabled={!capabilities.uploads || Boolean(busyAction)}
-              className="mt-4 flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-background p-5 text-left transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-45"
+              className={`mt-4 flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed p-5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
+                isDragging
+                  ? "scale-[1.01] border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+                  : "border-border bg-background hover:border-primary/50"
+              }`}
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                 <FileAudio className="h-5 w-5 text-primary" />
@@ -330,7 +355,9 @@ export default function VoiceNotes() {
                 <span className="mt-1 block text-xs text-foreground/45">
                   {file
                     ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
-                    : "MP3, WAV, M4A, or another browser-supported audio file"}
+                    : isDragging
+                      ? "Drop it here"
+                      : "Drop audio here, or click · MP3, WAV, M4A"}
                 </span>
               </span>
             </button>

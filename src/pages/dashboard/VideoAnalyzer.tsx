@@ -23,6 +23,7 @@ import type {
 } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { useFileDropZone } from "@/hooks/useFileDropZone";
 
 type AnalysisResult = Awaited<ReturnType<typeof platformApi.analyzeVideo>>;
 type SourceMode = "upload" | "url";
@@ -124,6 +125,28 @@ export default function VideoAnalyzer() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [queued, setQueued] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const selectVideoFile = (nextFile: File | null) => {
+    setFile(nextFile);
+    setSourceAsset(null);
+    setUploadProgress(0);
+    setResult(null);
+  };
+
+  const { isDragging, dropZoneProps } = useFileDropZone({
+    disabled: !capabilities.uploads || sourceMode !== "upload" || analyzing,
+    onFiles: (files) => {
+      const videoFile = files.find((candidate) =>
+        candidate.type.startsWith("video/"),
+      );
+      if (!videoFile) {
+        setError("Drop a video file in this section.");
+        return;
+      }
+      setError(null);
+      selectVideoFile(videoFile);
+    },
+  });
 
   const videoAssets = useMemo(
     () => workspace.assets.filter((asset) => asset.kind === "video"),
@@ -350,18 +373,19 @@ export default function VideoAnalyzer() {
                 accept="video/*"
                 className="hidden"
                 onChange={(event) => {
-                  const nextFile = event.target.files?.[0] ?? null;
-                  setFile(nextFile);
-                  setSourceAsset(null);
-                  setUploadProgress(0);
-                  setResult(null);
+                  selectVideoFile(event.target.files?.[0] ?? null);
                 }}
               />
               <button
                 type="button"
+                {...dropZoneProps}
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!capabilities.uploads}
-                className="flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-background p-5 text-left transition-colors hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-45"
+                className={`flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed p-5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
+                  isDragging
+                    ? "scale-[1.01] border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+                    : "border-border bg-background hover:border-primary/50"
+                }`}
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                   <Upload className="h-5 w-5 text-primary" />
@@ -374,7 +398,9 @@ export default function VideoAnalyzer() {
                     {file
                       ? `${(file.size / 1024 / 1024).toFixed(1)} MB · uploads when analysis starts`
                       : capabilities.uploads
-                        ? "Stored privately in your workspace"
+                        ? isDragging
+                          ? "Drop it here"
+                          : "Drop video here, or click · stored privately"
                         : "Upload storage is not configured"}
                   </span>
                 </span>

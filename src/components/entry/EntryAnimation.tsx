@@ -9,10 +9,8 @@ export interface EntryAnimationProps {
 }
 
 const WORDMARK = "REELassati";
-const TOTAL_DURATION_MS = 4_500;
-const FADE_DURATION_MS = 460;
-const FADE_NOT_BEFORE_MS = TOTAL_DURATION_MS - FADE_DURATION_MS;
-const COMPLETED_LOCKUP_HOLD_MS = 500;
+const FADE_START_MS = 980;
+const FADE_DURATION_MS = 280;
 
 export function hasEntryPlayed(): boolean {
   if (typeof window === "undefined") return false;
@@ -86,7 +84,7 @@ function AnimatedMark() {
   );
 }
 
-function AnimatedWordmark({ onComplete }: { onComplete: () => void }) {
+function AnimatedWordmark() {
   return (
     <motion.div
       className="entry-wordmark"
@@ -120,9 +118,6 @@ function AnimatedWordmark({ onComplete }: { onComplete: () => void }) {
               times: [0, 0.42, 1],
               ease: [0.22, 1, 0.36, 1],
             }}
-            onAnimationComplete={
-              index === WORDMARK.length - 1 ? onComplete : undefined
-            }
           >
             {letter}
           </motion.span>
@@ -153,7 +148,6 @@ export default function EntryAnimation({
   const [phase, setPhase] = useState<"ready" | "playing" | "done">(() =>
     force || !hasEntryPlayed() ? "ready" : "done",
   );
-  const [wordmarkComplete, setWordmarkComplete] = useState(false);
   const [isFading, setIsFading] = useState(false);
   const [reducedMotion] = useState(
     () =>
@@ -162,7 +156,6 @@ export default function EntryAnimation({
   );
   const onCompleteRef = useRef(onComplete);
   const initiallyCompleteRef = useRef(phase === "done");
-  const animationStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -190,7 +183,6 @@ export default function EntryAnimation({
   useEffect(() => {
     if (phase !== "ready") return;
     const frame = requestAnimationFrame(() => {
-      animationStartedAtRef.current = performance.now();
       setPhase("playing");
     });
     return () => cancelAnimationFrame(frame);
@@ -203,16 +195,10 @@ export default function EntryAnimation({
   }, [finish, phase, reducedMotion]);
 
   useEffect(() => {
-    if (phase !== "playing" || !wordmarkComplete || reducedMotion) return;
-
-    const elapsed = performance.now() - (animationStartedAtRef.current ?? 0);
-    const delay = Math.max(
-      COMPLETED_LOCKUP_HOLD_MS,
-      FADE_NOT_BEFORE_MS - elapsed,
-    );
-    const timer = window.setTimeout(() => setIsFading(true), delay);
+    if (phase !== "playing" || reducedMotion) return;
+    const timer = window.setTimeout(() => setIsFading(true), FADE_START_MS);
     return () => window.clearTimeout(timer);
-  }, [phase, reducedMotion, wordmarkComplete]);
+  }, [phase, reducedMotion]);
 
   if (phase === "done") return null;
 
@@ -250,7 +236,7 @@ export default function EntryAnimation({
       <span className="sr-only">Opening REELassati Studio</span>
       <div className="entry-lockup-stage">
         <AnimatedMark />
-        <AnimatedWordmark onComplete={() => setWordmarkComplete(true)} />
+        <AnimatedWordmark />
       </div>
     </motion.div>
   );

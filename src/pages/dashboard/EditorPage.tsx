@@ -53,6 +53,7 @@ import type {
 } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { useFileDropZone } from "@/hooks/useFileDropZone";
 
 const PROJECT_TEMPLATES = [
   {
@@ -570,6 +571,34 @@ export default function EditorPage() {
     if (files.length > 0) void addUploadedFiles(files);
   };
 
+  const acceptDroppedMedia = (files: File[]) => {
+    const mediaFiles = files.filter(
+      (file) =>
+        file.type.startsWith("video/") ||
+        file.type.startsWith("image/") ||
+        file.type.startsWith("audio/"),
+    );
+    if (mediaFiles.length === 0) {
+      setLocalError("Drop video, image, or audio files in this section.");
+      return;
+    }
+    setLocalError(null);
+    void addUploadedFiles(mediaFiles);
+  };
+
+  const newEditDrop = useFileDropZone({
+    disabled: busyAction === "upload",
+    onFiles: acceptDroppedMedia,
+  });
+  const previewDrop = useFileDropZone({
+    disabled: busyAction === "upload",
+    onFiles: acceptDroppedMedia,
+  });
+  const timelineDrop = useFileDropZone({
+    disabled: busyAction === "upload",
+    onFiles: acceptDroppedMedia,
+  });
+
   const applyClipDraft = async () => {
     if (!clipDraft || !selectedClip || selectedClip.locked) return;
     const safeStart = Math.max(0, clipDraft.start);
@@ -907,8 +936,13 @@ export default function EditorPage() {
 
         <button
           type="button"
+          {...newEditDrop.dropZoneProps}
           onClick={() => fileInputRef.current?.click()}
-          className="group mb-8 flex w-full flex-col items-center justify-center rounded-2xl border border-dashed border-primary/30 bg-primary/[0.035] px-6 py-12 text-center transition-colors hover:border-primary/60 hover:bg-primary/[0.06]"
+          className={`group mb-8 flex w-full flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-12 text-center transition-all ${
+            newEditDrop.isDragging
+              ? "scale-[1.005] border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+              : "border-primary/30 bg-primary/[0.035] hover:border-primary/60 hover:bg-primary/[0.06]"
+          }`}
         >
           <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-card">
             {busyAction === "upload" ? (
@@ -917,9 +951,11 @@ export default function EditorPage() {
               <Upload className="h-5 w-5" />
             )}
           </span>
-          <span className="text-base font-medium">Upload footage to a new edit</span>
+          <span className="text-base font-medium">
+            {newEditDrop.isDragging ? "Drop files to start the edit" : "Upload footage to a new edit"}
+          </span>
           <span className="mt-1 text-sm text-foreground/50">
-            Video, image, or audio. Files are stored in your workspace.
+            Drop video, image, or audio here, or click to choose.
           </span>
           {uploadProgress !== null && (
             <span className="mt-4 font-mono text-xs text-primary">
@@ -1128,12 +1164,24 @@ export default function EditorPage() {
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <main className="min-w-0 space-y-4">
-          <section className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#0D0C0E] shadow-card">
+          <section
+            {...previewDrop.dropZoneProps}
+            className={`relative overflow-hidden rounded-2xl border bg-[#0D0C0E] shadow-card transition-all ${
+              previewDrop.isDragging
+                ? "border-[#A894FF] ring-4 ring-[#A894FF]/20"
+                : "border-white/5"
+            }`}
+          >
             <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-white/60 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-[#A894FF]" />
               Source preview
             </div>
-            <div className="flex min-h-[390px] items-center justify-center p-7">
+            <div className="relative flex min-h-[390px] items-center justify-center p-7">
+              {previewDrop.isDragging ? (
+                <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border border-dashed border-[#A894FF] bg-black/75 text-sm font-medium text-white backdrop-blur-sm">
+                  Drop media into this edit
+                </div>
+              ) : null}
               {previewAsset?.kind === "video" && (
                 <video
                   key={previewAsset.id}
@@ -1226,7 +1274,14 @@ export default function EditorPage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
+          <section
+            {...timelineDrop.dropZoneProps}
+            className={`overflow-hidden rounded-2xl border bg-surface shadow-card transition-all ${
+              timelineDrop.isDragging
+                ? "border-primary ring-4 ring-primary/10"
+                : "border-border"
+            }`}
+          >
             <div className="flex flex-wrap items-center gap-1 border-b border-border p-2">
               <button
                 type="button"
@@ -1240,6 +1295,9 @@ export default function EditorPage() {
                 )}
                 Add media
               </button>
+              <span className="hidden text-[11px] text-foreground/40 sm:inline">
+                or drop files in this timeline
+              </span>
               <span className="mx-1 h-5 w-px bg-border" />
               <button
                 type="button"
