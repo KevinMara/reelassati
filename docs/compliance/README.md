@@ -33,6 +33,9 @@ does not silently remove a safeguard or damage an approved product behavior.
    release identity, runtime-route snapshot, verification evidence, open risks,
    decision, and post-deployment record.
 
+Completed, deployment-specific records live in [`releases/`](releases/); they
+preserve what was actually shipped and which blockers remained at that time.
+
 ## Source-of-truth order
 
 When records conflict, use this order:
