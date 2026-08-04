@@ -24,6 +24,7 @@ import type {
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
+import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 
 type AnalysisResult = Awaited<ReturnType<typeof platformApi.analyzeVideo>>;
 type SourceMode = "upload" | "url";
@@ -80,7 +81,7 @@ function signalBar(score: number) {
 }
 
 function retentionToQualitySignals(
-  retention: AnalysisResult["retention"],
+  retention: AnalysisResult["retention"]
 ): QualitySignal[] {
   return retention.map((segment, index) => ({
     id: `analysis-signal-${crypto.randomUUID()}-${index}`,
@@ -89,18 +90,14 @@ function retentionToQualitySignals(
     start: segment.start,
     end: segment.end,
     level:
-      segment.score >= 75
-        ? "good"
-        : segment.score >= 50
-          ? "attention"
-          : "risk",
+      segment.score >= 75 ? "good" : segment.score >= 50 ? "attention" : "risk",
   }));
 }
 
 function createEvent(
   type: WorkspaceEvent["type"],
   label: string,
-  detail: string,
+  detail: string
 ): WorkspaceEvent {
   return {
     id: crypto.randomUUID(),
@@ -120,24 +117,31 @@ export default function VideoAnalyzer() {
   const [publicUrl, setPublicUrl] = useState("");
   const [platform, setPlatform] = useState<Platform>("tiktok");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [analysisAuthorized, setAnalysisAuthorized] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [queued, setQueued] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const invalidateSourceAuthorization = () => {
+    setAnalysisAuthorized(false);
+    setResult(null);
+    setQueued(false);
+  };
+
   const selectVideoFile = (nextFile: File | null) => {
     setFile(nextFile);
     setSourceAsset(null);
     setUploadProgress(0);
-    setResult(null);
+    invalidateSourceAuthorization();
   };
 
   const { isDragging, dropZoneProps } = useFileDropZone({
     disabled: !capabilities.uploads || sourceMode !== "upload" || analyzing,
-    onFiles: (files) => {
-      const videoFile = files.find((candidate) =>
-        candidate.type.startsWith("video/"),
+    onFiles: files => {
+      const videoFile = files.find(candidate =>
+        candidate.type.startsWith("video/")
       );
       if (!videoFile) {
         setError("Drop a video file in this section.");
@@ -149,23 +153,24 @@ export default function VideoAnalyzer() {
   });
 
   const videoAssets = useMemo(
-    () => workspace.assets.filter((asset) => asset.kind === "video"),
-    [workspace.assets],
+    () => workspace.assets.filter(asset => asset.kind === "video"),
+    [workspace.assets]
   );
-  const urlError = sourceMode === "url" ? validatePublicVideoUrl(publicUrl) : null;
+  const urlError =
+    sourceMode === "url" ? validatePublicVideoUrl(publicUrl) : null;
   const sourceReady =
     sourceMode === "upload" ? Boolean(file || sourceAsset) : !urlError;
-  const analysisReady = capabilities.ai;
-  const analysisMissing = capabilities.missing.filter((item) =>
-    item.includes("OPENROUTER"),
+  const analysisReady = capabilities.analysis;
+  const analysisMissing = capabilities.missing.filter(item =>
+    item.includes("OPENROUTER")
   );
 
   const saveUploadedAsset = async (asset: Asset) => {
-    await updateWorkspace((current) => ({
+    await updateWorkspace(current => ({
       ...current,
       assets: [
         asset,
-        ...current.assets.filter((candidate) => candidate.id !== asset.id),
+        ...current.assets.filter(candidate => candidate.id !== asset.id),
       ],
       activity: [
         createEvent("upload", "Video uploaded for analysis", asset.name),
@@ -177,14 +182,19 @@ export default function VideoAnalyzer() {
   const resolveSourceAsset = async () => {
     if (sourceAsset) return sourceAsset;
     if (!file) return null;
-    const asset = await platformApi.uploadAsset(file, "video", setUploadProgress);
+    const asset = await platformApi.uploadAsset(
+      file,
+      "video",
+      setUploadProgress
+    );
     setSourceAsset(asset);
     await saveUploadedAsset(asset);
     return asset;
   };
 
   const handleAnalyze = async () => {
-    if (!sourceReady || !analysisReady || analyzing) return;
+    if (!sourceReady || !analysisReady || !analysisAuthorized || analyzing)
+      return;
     setAnalyzing(true);
     setError(null);
     setResult(null);
@@ -200,21 +210,26 @@ export default function VideoAnalyzer() {
         assetId: asset?.id,
         publicUrl: sourceMode === "url" ? publicUrl.trim() : undefined,
         platform,
+        sourceRightsConfirmed: analysisAuthorized,
       });
       setResult(analysis);
-      await updateWorkspace((current) => ({
+      await updateWorkspace(current => ({
         ...current,
         activity: [
           createEvent(
             "generation",
             "Video analysis completed",
-            asset?.name ?? new URL(publicUrl.trim()).hostname,
+            asset?.name ?? new URL(publicUrl.trim()).hostname
           ),
           ...current.activity,
         ].slice(0, 100),
       }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The video could not be analyzed.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The video could not be analyzed."
+      );
     } finally {
       setAnalyzing(false);
     }
@@ -225,15 +240,15 @@ export default function VideoAnalyzer() {
     setError(null);
     try {
       const signals = retentionToQualitySignals(result.retention);
-      await updateWorkspace((current) => ({
+      await updateWorkspace(current => ({
         ...current,
-        projects: current.projects.map((project) => {
+        projects: current.projects.map(project => {
           if (project.id !== selectedProjectId) return project;
           const existingChangeIds = new Set(
-            project.proposedChanges.map((change) => change.id),
+            project.proposedChanges.map(change => change.id)
           );
           const existingSignalIds = new Set(
-            project.qualitySignals.map((signal) => signal.id),
+            project.qualitySignals.map(signal => signal.id)
           );
           return {
             ...project,
@@ -242,22 +257,23 @@ export default function VideoAnalyzer() {
             proposedChanges: [
               ...project.proposedChanges,
               ...result.changes
-                .filter((change) => !existingChangeIds.has(change.id))
-                .map((change) => ({
+                .filter(change => !existingChangeIds.has(change.id))
+                .map(change => ({
                   ...change,
+                  provenance: change.provenance ?? result.provenance,
                   targetClipIds: project.clips
                     .filter(
-                      (clip) =>
+                      clip =>
                         clip.start < change.end &&
-                        clip.start + clip.duration > change.start,
+                        clip.start + clip.duration > change.start
                     )
-                    .map((clip) => clip.id),
+                    .map(clip => clip.id),
                   status: "proposed" as const,
                 })),
             ],
             qualitySignals: [
               ...project.qualitySignals,
-              ...signals.filter((signal) => !existingSignalIds.has(signal.id)),
+              ...signals.filter(signal => !existingSignalIds.has(signal.id)),
             ],
           };
         }),
@@ -265,14 +281,18 @@ export default function VideoAnalyzer() {
           createEvent(
             "project",
             "Analysis queued in editor",
-            `${result.changes.length} proposed changes`,
+            `${result.changes.length} proposed changes`
           ),
           ...current.activity,
         ].slice(0, 100),
       }));
       setQueued(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The edit plan could not be queued.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The edit plan could not be queued."
+      );
     }
   };
 
@@ -282,8 +302,8 @@ export default function VideoAnalyzer() {
         <p className="mono-eyebrow mb-2 text-primary">Edit Intelligence</p>
         <h1 className="text-3xl font-semibold">Video Analyzer</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          Analyze your footage or a public video, inspect the evidence by time range,
-          then queue the returned changes in a real edit project.
+          Analyze your footage or a public video, inspect the evidence by time
+          range, then queue the returned changes in a real edit project.
         </p>
       </div>
 
@@ -294,7 +314,9 @@ export default function VideoAnalyzer() {
         >
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
-            <p className="text-sm font-medium">AI analysis needs provider setup</p>
+            <p className="text-sm font-medium">
+              AI analysis needs provider setup
+            </p>
             <p className="mt-1 text-xs text-foreground/55">
               Uploads and saved assets remain available, but analysis will stay
               disabled until the server-side AI capability is connected.
@@ -314,8 +336,10 @@ export default function VideoAnalyzer() {
             <button
               type="button"
               onClick={() => {
-                setSourceMode("upload");
-                setResult(null);
+                if (sourceMode !== "upload") {
+                  setSourceMode("upload");
+                  invalidateSourceAuthorization();
+                }
               }}
               aria-pressed={sourceMode === "upload"}
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
@@ -330,8 +354,10 @@ export default function VideoAnalyzer() {
             <button
               type="button"
               onClick={() => {
-                setSourceMode("url");
-                setResult(null);
+                if (sourceMode !== "url") {
+                  setSourceMode("url");
+                  invalidateSourceAuthorization();
+                }
               }}
               aria-pressed={sourceMode === "url"}
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
@@ -346,16 +372,19 @@ export default function VideoAnalyzer() {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs text-foreground/45" htmlFor="analysis-platform">
+            <label
+              className="text-xs text-foreground/45"
+              htmlFor="analysis-platform"
+            >
               Optimize for
             </label>
             <select
               id="analysis-platform"
               value={platform}
-              onChange={(event) => setPlatform(event.target.value as Platform)}
+              onChange={event => setPlatform(event.target.value as Platform)}
               className="rounded-lg border border-border bg-background px-3 py-2 text-xs"
             >
-              {ANALYSIS_PLATFORMS.map((item) => (
+              {ANALYSIS_PLATFORMS.map(item => (
                 <option key={item.value} value={item.value}>
                   {item.label}
                 </option>
@@ -372,7 +401,7 @@ export default function VideoAnalyzer() {
                 type="file"
                 accept="video/*"
                 className="hidden"
-                onChange={(event) => {
+                onChange={event => {
                   selectVideoFile(event.target.files?.[0] ?? null);
                 }}
               />
@@ -421,38 +450,45 @@ export default function VideoAnalyzer() {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-medium" htmlFor="existing-video">
+              <label
+                className="mb-2 block text-xs font-medium"
+                htmlFor="existing-video"
+              >
                 Or select a saved video
               </label>
               <select
                 id="existing-video"
                 value={sourceAsset?.id ?? ""}
-                onChange={(event) => {
+                onChange={event => {
                   const asset =
-                    videoAssets.find((candidate) => candidate.id === event.target.value) ??
-                    null;
+                    videoAssets.find(
+                      candidate => candidate.id === event.target.value
+                    ) ?? null;
                   setSourceAsset(asset);
                   setFile(null);
-                  setResult(null);
+                  invalidateSourceAuthorization();
                 }}
                 className="w-full rounded-lg border border-border bg-background px-3 py-3 text-sm"
               >
                 <option value="">No saved video selected</option>
-                {videoAssets.map((asset) => (
+                {videoAssets.map(asset => (
                   <option key={asset.id} value={asset.id}>
                     {asset.name}
                   </option>
                 ))}
               </select>
               <p className="mt-2 text-[11px] text-foreground/40">
-                Analysis receives the stored asset ID. A browser-only blob URL is
-                never sent to the AI provider.
+                Analysis receives the stored asset ID. A browser-only blob URL
+                is never sent to the AI provider.
               </p>
             </div>
           </div>
         ) : (
           <div>
-            <label className="mb-2 block text-xs font-medium" htmlFor="public-video-url">
+            <label
+              className="mb-2 block text-xs font-medium"
+              htmlFor="public-video-url"
+            >
               Public HTTPS video URL
             </label>
             <div className="relative">
@@ -462,9 +498,9 @@ export default function VideoAnalyzer() {
                 type="url"
                 inputMode="url"
                 value={publicUrl}
-                onChange={(event) => {
+                onChange={event => {
                   setPublicUrl(event.target.value);
-                  setResult(null);
+                  invalidateSourceAuthorization();
                 }}
                 placeholder="https://cdn.example.com/video.mp4"
                 className="w-full rounded-lg border border-border bg-background py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -482,11 +518,36 @@ export default function VideoAnalyzer() {
           </div>
         )}
 
+        <div className="mt-5 rounded-lg border border-border bg-background/60 p-3">
+          <p className="flex items-center gap-1.5 text-[11px] font-medium text-foreground/55">
+            <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
+            AI analysis · Gemini via OpenRouter
+          </p>
+          <label className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-foreground/60">
+            <input
+              type="checkbox"
+              checked={analysisAuthorized}
+              onChange={event => setAnalysisAuthorized(event.target.checked)}
+              className="mt-0.5 accent-primary"
+            />
+            <span>
+              I&apos;m authorized to provide this video and send it to the
+              analysis provider for this review.
+            </span>
+          </label>
+          <p className="mt-1 pl-5 text-[10px] text-foreground/40">
+            The selected source is sent only after you confirm and press
+            Analyze.
+          </p>
+        </div>
+
         <button
           type="button"
           onClick={() => void handleAnalyze()}
-          disabled={!sourceReady || analyzing || !analysisReady}
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+          disabled={
+            !sourceReady || !analysisAuthorized || analyzing || !analysisReady
+          }
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
         >
           {analyzing ? (
             <>
@@ -521,22 +582,31 @@ export default function VideoAnalyzer() {
             <section className="rounded-xl border border-border bg-surface p-6">
               <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                 <div className="max-w-3xl">
-                  <p className="mono-eyebrow mb-2 text-primary">AI edit review</p>
-                  <h2 className="text-xl font-semibold">What the model found</h2>
+                  <p className="mono-eyebrow mb-2 text-primary">
+                    AI edit review
+                  </p>
+                  <h2 className="text-xl font-semibold">
+                    What the model found
+                  </h2>
                   <p className="mt-2 text-sm leading-relaxed text-foreground/65">
                     {result.summary}
                   </p>
+                  <div className="mt-3">
+                    <AiProvenanceBadge provenance={result.provenance} />
+                  </div>
                 </div>
                 <div className="grid shrink-0 grid-cols-2 gap-2">
                   {[
                     { label: "Hook", score: result.hook.score },
                     { label: "Pacing", score: result.pacing.score },
-                  ].map((signal) => (
+                  ].map(signal => (
                     <div
                       key={signal.label}
                       className="min-w-24 rounded-lg border border-border bg-background p-3 text-center"
                     >
-                      <p className={`text-2xl font-semibold ${signalColor(signal.score)}`}>
+                      <p
+                        className={`text-2xl font-semibold ${signalColor(signal.score)}`}
+                      >
                         {Math.round(signal.score)}
                       </p>
                       <p className="mt-0.5 text-[10px] uppercase tracking-wider text-foreground/40">
@@ -551,11 +621,16 @@ export default function VideoAnalyzer() {
                 {[
                   { label: "Hook assessment", value: result.hook },
                   { label: "Pacing assessment", value: result.pacing },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-lg border border-border bg-background p-4">
+                ].map(item => (
+                  <div
+                    key={item.label}
+                    className="rounded-lg border border-border bg-background p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium">{item.label}</span>
-                      <span className={`text-xs font-mono ${signalColor(item.value.score)}`}>
+                      <span
+                        className={`text-xs font-mono ${signalColor(item.value.score)}`}
+                      >
                         {Math.round(item.value.score)}/100
                       </span>
                     </div>
@@ -572,8 +647,8 @@ export default function VideoAnalyzer() {
                 ))}
               </div>
               <p className="mt-3 text-[11px] text-foreground/35">
-                Scores are the AI model&apos;s assessment of this source, not measured
-                reach or a guarantee of performance.
+                Scores are the AI model&apos;s assessment of this source, not
+                measured reach or a guarantee of performance.
               </p>
             </section>
 
@@ -593,7 +668,9 @@ export default function VideoAnalyzer() {
                         <span className="font-mono text-[11px] text-foreground/45">
                           {segment.start.toFixed(1)}s–{segment.end.toFixed(1)}s
                         </span>
-                        <span className={`text-xs font-medium ${signalColor(segment.score)}`}>
+                        <span
+                          className={`text-xs font-medium ${signalColor(segment.score)}`}
+                        >
                           {Math.round(segment.score)}
                         </span>
                       </div>
@@ -610,8 +687,8 @@ export default function VideoAnalyzer() {
                   ))}
                   {result.retention.length === 0 ? (
                     <p className="rounded-lg border border-border bg-background p-4 text-xs text-foreground/45">
-                      The analyzer did not return time-based retention signals for
-                      this source.
+                      The analyzer did not return time-based retention signals
+                      for this source.
                     </p>
                   ) : null}
                 </div>
@@ -637,8 +714,8 @@ export default function VideoAnalyzer() {
                         <div>
                           <p className="text-sm font-medium">{change.label}</p>
                           <p className="mt-1 font-mono text-[10px] text-foreground/40">
-                            {change.start.toFixed(1)}s–{change.end.toFixed(1)}s ·{" "}
-                            {change.type}
+                            {change.start.toFixed(1)}s–{change.end.toFixed(1)}s
+                            · {change.type}
                           </p>
                         </div>
                         <span className="rounded-full bg-foreground/[0.06] px-2 py-1 text-[10px] text-foreground/50">
@@ -655,8 +732,8 @@ export default function VideoAnalyzer() {
                   ))}
                   {result.changes.length === 0 ? (
                     <p className="rounded-lg border border-border bg-background p-4 text-xs text-foreground/45">
-                      No edit operations were returned. Refine the source or try a
-                      different platform target.
+                      No edit operations were returned. Refine the source or try
+                      a different platform target.
                     </p>
                   ) : null}
                 </div>
@@ -675,14 +752,14 @@ export default function VideoAnalyzer() {
                           <select
                             id="analysis-project"
                             value={selectedProjectId}
-                            onChange={(event) => {
+                            onChange={event => {
                               setSelectedProjectId(event.target.value);
                               setQueued(false);
                             }}
                             className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                           >
                             <option value="">Choose an edit project</option>
-                            {workspace.projects.map((project) => (
+                            {workspace.projects.map(project => (
                               <option key={project.id} value={project.id}>
                                 {project.title}
                               </option>
@@ -708,16 +785,16 @@ export default function VideoAnalyzer() {
                           </button>
                         </div>
                         <p className="mt-2 text-[11px] text-foreground/40">
-                          Changes enter the editor as proposed operations. Nothing is
-                          applied until you review and accept it.
+                          Changes enter the editor as proposed operations.
+                          Nothing is applied until you review and accept it.
                         </p>
                       </>
                     ) : (
                       <div className="flex items-start gap-3 rounded-lg bg-background p-4">
                         <Film className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                         <p className="text-xs leading-relaxed text-foreground/55">
-                          Create an edit project first, then rerun or reopen this
-                          analysis to queue its proposed timeline changes.
+                          Create an edit project first, then rerun or reopen
+                          this analysis to queue its proposed timeline changes.
                         </p>
                       </div>
                     )}
@@ -738,8 +815,8 @@ export default function VideoAnalyzer() {
               Evidence before edits
             </h2>
             <p className="mt-2 max-w-md text-sm text-foreground/45">
-              Analysis starts only after you provide a real source. Results include
-              time ranges, model notes, and reviewable edit operations.
+              Analysis starts only after you provide a real source. Results
+              include time ranges, model notes, and reviewable edit operations.
             </p>
           </motion.section>
         )}

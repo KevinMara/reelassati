@@ -24,6 +24,12 @@ import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { CONTENT_LANGUAGES } from "@/lib/languages";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
+import {
+  withoutTextProvenanceMarker,
+  type ContentProvenance,
+} from "@contracts/compliance";
+import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { copyTextWithProvenance } from "@/lib/provenance";
 
 type BusyAction = "upload" | "transcribe" | "script" | "speech" | null;
 
@@ -37,7 +43,7 @@ const SCRIPT_PLATFORMS: Array<{ value: Platform; label: string }> = [
 function createEvent(
   type: WorkspaceEvent["type"],
   label: string,
-  detail: string,
+  detail: string
 ): WorkspaceEvent {
   return {
     id: crypto.randomUUID(),
@@ -56,33 +62,45 @@ export default function VoiceNotes() {
   const [sourceAsset, setSourceAsset] = useState<Asset | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [language, setLanguage] = useState(
-    workspace.profile.contentLanguage || "auto",
+    workspace.profile.contentLanguage || "auto"
   );
   const [transcription, setTranscription] = useState("");
+  const [transcriptionProvenance, setTranscriptionProvenance] =
+    useState<ContentProvenance | null>(null);
   const [segmentCount, setSegmentCount] = useState(0);
   const [scriptPlatform, setScriptPlatform] = useState<Platform>("tiktok");
-  const [generatedScript, setGeneratedScript] = useState<ScriptDraft | null>(null);
+  const [generatedScript, setGeneratedScript] = useState<ScriptDraft | null>(
+    null
+  );
   const [speechText, setSpeechText] = useState("");
   const [voiceId, setVoiceId] = useState("English_Graceful_Lady");
   const [speechAsset, setSpeechAsset] = useState<Asset | null>(null);
+  const [voiceRightsConfirmed, setVoiceRightsConfirmed] = useState(false);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const invalidateVoiceAttestation = () => {
+    setVoiceRightsConfirmed(false);
+  };
 
   const selectAudioFile = (nextFile: File | null) => {
     setFile(nextFile);
     setSourceAsset(null);
     setUploadProgress(0);
     setTranscription("");
+    setTranscriptionProvenance(null);
     setGeneratedScript(null);
+    setSpeechText("");
     setSpeechAsset(null);
+    invalidateVoiceAttestation();
   };
 
   const { isDragging, dropZoneProps } = useFileDropZone({
     disabled: !capabilities.uploads || Boolean(busyAction),
-    onFiles: (files) => {
-      const audioFile = files.find((candidate) =>
-        candidate.type.startsWith("audio/"),
+    onFiles: files => {
+      const audioFile = files.find(candidate =>
+        candidate.type.startsWith("audio/")
       );
       if (!audioFile) {
         setError("Drop an audio file in this section.");
@@ -94,19 +112,19 @@ export default function VoiceNotes() {
   });
 
   const audioAssets = useMemo(
-    () => workspace.assets.filter((asset) => asset.kind === "audio"),
-    [workspace.assets],
+    () => workspace.assets.filter(asset => asset.kind === "audio"),
+    [workspace.assets]
   );
-  const voiceMissing = capabilities.missing.filter((item) =>
-    item.includes("OPENROUTER"),
+  const voiceMissing = capabilities.missing.filter(item =>
+    item.includes("OPENROUTER")
   );
 
   const saveAsset = async (asset: Asset, label: string) => {
-    await updateWorkspace((current) => ({
+    await updateWorkspace(current => ({
       ...current,
       assets: [
         asset,
-        ...current.assets.filter((candidate) => candidate.id !== asset.id),
+        ...current.assets.filter(candidate => candidate.id !== asset.id),
       ],
       activity: [
         createEvent("upload", label, asset.name),
@@ -118,9 +136,14 @@ export default function VoiceNotes() {
   const uploadSelectedFile = async () => {
     if (sourceAsset) return sourceAsset;
     if (!file) throw new Error("Choose an audio file first.");
-    if (!capabilities.uploads) throw new Error("Upload storage is not configured.");
+    if (!capabilities.uploads)
+      throw new Error("Upload storage is not configured.");
 
-    const uploaded = await platformApi.uploadAsset(file, "audio", setUploadProgress);
+    const uploaded = await platformApi.uploadAsset(
+      file,
+      "audio",
+      setUploadProgress
+    );
     const asset = title.trim() ? { ...uploaded, name: title.trim() } : uploaded;
     setSourceAsset(asset);
     await saveAsset(asset, "Voice note uploaded");
@@ -134,14 +157,19 @@ export default function VoiceNotes() {
     try {
       await uploadSelectedFile();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The audio could not be uploaded.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The audio could not be uploaded."
+      );
     } finally {
       setBusyAction(null);
     }
   };
 
   const handleTranscribe = async () => {
-    if ((!sourceAsset && !file) || busyAction || !capabilities.transcription) return;
+    if ((!sourceAsset && !file) || busyAction || !capabilities.transcription)
+      return;
     setBusyAction("transcribe");
     setError(null);
     setGeneratedScript(null);
@@ -149,24 +177,30 @@ export default function VoiceNotes() {
       const asset = await uploadSelectedFile();
       const result = await platformApi.transcribe(
         asset.id,
-        language === "auto" ? undefined : language,
+        language === "auto" ? undefined : language
       );
       setTranscription(result.transcript);
-      setSpeechText(result.transcript);
+      setTranscriptionProvenance(result.provenance);
+      setSpeechText(withoutTextProvenanceMarker(result.transcript));
+      invalidateVoiceAttestation();
       setSegmentCount(result.segments.length);
-      await updateWorkspace((current) => ({
+      await updateWorkspace(current => ({
         ...current,
         activity: [
           createEvent(
             "generation",
             "Voice note transcribed",
-            `${asset.name} · ${result.segments.length} timestamped segments`,
+            `${asset.name} · ${result.segments.length} timestamped segments`
           ),
           ...current.activity,
         ].slice(0, 100),
       }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The voice note could not be transcribed.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The voice note could not be transcribed."
+      );
     } finally {
       setBusyAction(null);
     }
@@ -178,7 +212,7 @@ export default function VoiceNotes() {
     setError(null);
     try {
       const result = await platformApi.generateScript({
-        topic: transcription.trim(),
+        topic: withoutTextProvenanceMarker(transcription).trim(),
         platform: scriptPlatform,
         tone: "conversational",
         duration: 45,
@@ -194,32 +228,42 @@ export default function VoiceNotes() {
           .join("\n"),
       });
       setGeneratedScript(result.script);
-      await updateWorkspace((current) => ({
+      await updateWorkspace(current => ({
         ...current,
         scripts: [
           result.script,
           ...current.scripts.filter(
-            (candidate) => candidate.id !== result.script.id,
+            candidate => candidate.id !== result.script.id
           ),
         ],
         activity: [
           createEvent(
             "script",
             "Voice note turned into script",
-            `${result.script.title} · ${result.script.platform}`,
+            `${result.script.title} · ${result.script.platform}`
           ),
           ...current.activity,
         ].slice(0, 100),
       }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The script could not be generated.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The script could not be generated."
+      );
     } finally {
       setBusyAction(null);
     }
   };
 
   const handleSynthesize = async () => {
-    if (!speechText.trim() || !voiceId.trim() || busyAction || !capabilities.speech) {
+    if (
+      !speechText.trim() ||
+      !voiceId.trim() ||
+      !voiceRightsConfirmed ||
+      busyAction ||
+      !capabilities.speech
+    ) {
       return;
     }
     setBusyAction("speech");
@@ -230,11 +274,16 @@ export default function VoiceNotes() {
         text: speechText.trim(),
         voice: voiceId.trim(),
         projectId: workspace.projects[0]?.id,
+        rightsConfirmed: voiceRightsConfirmed,
       });
       setSpeechAsset(asset);
       await saveAsset(asset, "Speech generated");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Speech could not be generated.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Speech could not be generated."
+      );
     } finally {
       setBusyAction(null);
     }
@@ -243,11 +292,16 @@ export default function VoiceNotes() {
   const copyScript = async () => {
     if (!generatedScript) return;
     try {
-      await navigator.clipboard.writeText(generatedScript.fullScript);
+      await copyTextWithProvenance(
+        generatedScript.fullScript,
+        generatedScript.provenance
+      );
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      setError("Clipboard access is blocked. Select the script and copy it manually.");
+      setError(
+        "Clipboard access is blocked. Select the script and copy it manually."
+      );
     }
   };
 
@@ -257,10 +311,12 @@ export default function VoiceNotes() {
     setTitle("");
     setUploadProgress(0);
     setTranscription("");
+    setTranscriptionProvenance(null);
     setSegmentCount(0);
     setGeneratedScript(null);
     setSpeechText("");
     setSpeechAsset(null);
+    invalidateVoiceAttestation();
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -271,8 +327,9 @@ export default function VoiceNotes() {
         <p className="mono-eyebrow mb-2 text-primary">Voice Studio</p>
         <h1 className="text-3xl font-semibold">Voice to Content</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          Upload a real audio asset, transcribe it by asset ID, shape the transcript
-          into a short-form script, or synthesize a production-ready voice track.
+          Upload a real audio asset, transcribe it by asset ID, shape the
+          transcript into a short-form script, or synthesize a production-ready
+          voice track.
         </p>
       </div>
 
@@ -288,8 +345,8 @@ export default function VoiceNotes() {
           <div>
             <p className="text-sm font-medium">Some voice tools need setup</p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/55">
-              Available controls stay active; unavailable provider-backed actions
-              are disabled without pretending to process audio.
+              Available controls stay active; unavailable provider-backed
+              actions are disabled without pretending to process audio.
             </p>
             {voiceMissing.length > 0 ? (
               <p className="mt-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
@@ -314,13 +371,16 @@ export default function VoiceNotes() {
               <Mic className="h-5 w-5 text-primary" />
             </div>
 
-            <label className="mb-2 block text-xs font-medium" htmlFor="voice-title">
+            <label
+              className="mb-2 block text-xs font-medium"
+              htmlFor="voice-title"
+            >
               Working title
             </label>
             <input
               id="voice-title"
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={event => setTitle(event.target.value)}
               placeholder="Launch idea — raw voice note"
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             />
@@ -330,7 +390,7 @@ export default function VoiceNotes() {
               type="file"
               accept="audio/*"
               className="hidden"
-              onChange={(event) => {
+              onChange={event => {
                 selectAudioFile(event.target.files?.[0] ?? null);
               }}
             />
@@ -406,40 +466,51 @@ export default function VoiceNotes() {
               <div className="h-px flex-1 bg-border" />
             </div>
 
-            <label className="mb-2 block text-xs font-medium" htmlFor="saved-audio">
+            <label
+              className="mb-2 block text-xs font-medium"
+              htmlFor="saved-audio"
+            >
               Saved audio
             </label>
             <select
               id="saved-audio"
               value={sourceAsset?.id ?? ""}
-              onChange={(event) => {
+              onChange={event => {
                 const asset =
-                  audioAssets.find((candidate) => candidate.id === event.target.value) ??
-                  null;
+                  audioAssets.find(
+                    candidate => candidate.id === event.target.value
+                  ) ?? null;
                 setSourceAsset(asset);
                 setFile(null);
                 setTranscription("");
+                setTranscriptionProvenance(null);
                 setGeneratedScript(null);
+                setSpeechText("");
                 setSpeechAsset(null);
+                invalidateVoiceAttestation();
               }}
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             >
               <option value="">No saved audio selected</option>
-              {audioAssets.map((asset) => (
+              {audioAssets.map(asset => (
                 <option key={asset.id} value={asset.id}>
                   {asset.name}
                 </option>
               ))}
             </select>
 
-            <div className="mt-4 flex gap-2">
+            <p className="mt-4 flex items-center gap-1.5 text-[11px] text-foreground/45">
+              <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
+              AI transcription · Whisper via OpenRouter
+            </p>
+            <div className="mt-2 flex gap-2">
               <select
                 aria-label="Transcription language"
                 value={language}
-                onChange={(event) => setLanguage(event.target.value)}
+                onChange={event => setLanguage(event.target.value)}
                 className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
               >
-                {CONTENT_LANGUAGES.map((item) => (
+                {CONTENT_LANGUAGES.map(item => (
                   <option key={item.code} value={item.code}>
                     {item.label}
                   </option>
@@ -482,24 +553,38 @@ export default function VoiceNotes() {
               </div>
               <Volume2 className="h-5 w-5 text-primary" />
             </div>
-            <label className="mb-2 block text-xs font-medium" htmlFor="speech-copy">
+            <label
+              className="mb-2 block text-xs font-medium"
+              htmlFor="speech-copy"
+            >
               Copy to speak
             </label>
             <textarea
               id="speech-copy"
               value={speechText}
-              onChange={(event) => setSpeechText(event.target.value)}
+              onChange={event => {
+                if (event.target.value === speechText) return;
+                setSpeechText(event.target.value);
+                invalidateVoiceAttestation();
+              }}
               rows={7}
               placeholder="Paste final voice-over copy or transcribe a note first."
               className="w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-relaxed"
             />
-            <label className="mb-2 mt-4 block text-xs font-medium" htmlFor="voice-id">
+            <label
+              className="mb-2 mt-4 block text-xs font-medium"
+              htmlFor="voice-id"
+            >
               Provider voice ID
             </label>
             <input
               id="voice-id"
               value={voiceId}
-              onChange={(event) => setVoiceId(event.target.value)}
+              onChange={event => {
+                if (event.target.value === voiceId) return;
+                setVoiceId(event.target.value);
+                invalidateVoiceAttestation();
+              }}
               placeholder="English_Graceful_Lady"
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             />
@@ -507,12 +592,32 @@ export default function VoiceNotes() {
               Use a voice ID supported by the configured speech provider. The
               default uses its standard voice.
             </p>
+            <p className="mt-3 flex items-center gap-1.5 text-[11px] text-foreground/45">
+              <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
+              AI-generated audio · MiniMax via OpenRouter
+            </p>
+            <label className="mt-2 flex items-start gap-2 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground/60">
+              <input
+                type="checkbox"
+                checked={voiceRightsConfirmed}
+                onChange={event =>
+                  setVoiceRightsConfirmed(event.target.checked)
+                }
+                className="mt-0.5 accent-primary"
+              />
+              <span>
+                I may use this text and voice. If the voice identifies a real
+                person, I have documented consent or another verified legal
+                basis.
+              </span>
+            </label>
             <button
               type="button"
               onClick={() => void handleSynthesize()}
               disabled={
                 !speechText.trim() ||
                 !voiceId.trim() ||
+                !voiceRightsConfirmed ||
                 Boolean(busyAction) ||
                 !capabilities.speech
               }
@@ -541,6 +646,9 @@ export default function VoiceNotes() {
                   <Save className="h-3.5 w-3.5" />
                   Saved to your audio library
                 </div>
+                <div className="mt-2">
+                  <AiProvenanceBadge provenance={speechAsset.provenance} />
+                </div>
                 <audio
                   src={speechAsset.url}
                   controls
@@ -564,16 +672,24 @@ export default function VoiceNotes() {
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="mono-eyebrow mb-1 text-primary">Transcript</p>
-                    <h2 className="font-medium">Clean the thought before writing</h2>
+                    <h2 className="font-medium">
+                      Clean the thought before writing
+                    </h2>
                   </div>
                   <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 text-[10px] text-foreground/45">
                     {segmentCount} timestamped segments
                   </span>
                 </div>
+                <AiProvenanceBadge
+                  provenance={transcriptionProvenance || undefined}
+                />
                 <textarea
                   value={transcription}
-                  onChange={(event) => {
-                    setTranscription(event.target.value);
+                  onChange={event => {
+                    setTranscription(
+                      withoutTextProvenanceMarker(event.target.value)
+                    );
+                    setTranscriptionProvenance(null);
                     setGeneratedScript(null);
                   }}
                   rows={15}
@@ -581,20 +697,20 @@ export default function VoiceNotes() {
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-3 text-sm leading-relaxed"
                 />
                 <p className="mt-2 text-[11px] text-foreground/40">
-                  Transcript edits affect the script brief. The original uploaded
-                  audio asset remains unchanged.
+                  Transcript edits affect the script brief. The original
+                  uploaded audio asset remains unchanged.
                 </p>
 
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <select
                     value={scriptPlatform}
-                    onChange={(event) =>
+                    onChange={event =>
                       setScriptPlatform(event.target.value as Platform)
                     }
                     aria-label="Script platform"
                     className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   >
-                    {SCRIPT_PLATFORMS.map((item) => (
+                    {SCRIPT_PLATFORMS.map(item => (
                       <option key={item.value} value={item.value}>
                         {item.label}
                       </option>
@@ -636,8 +752,8 @@ export default function VoiceNotes() {
                   Your transcript will stay editable
                 </h2>
                 <p className="mt-2 max-w-sm text-sm text-foreground/45">
-                  Select a stored audio asset or upload a new one. The app waits for
-                  the real transcription response before showing content.
+                  Select a stored audio asset or upload a new one. The app waits
+                  for the real transcription response before showing content.
                 </p>
               </motion.section>
             )}
@@ -656,6 +772,11 @@ export default function VoiceNotes() {
                   <p className="mt-1 text-xs text-foreground/40">
                     {generatedScript.platform} · {generatedScript.duration}s
                   </p>
+                  <div className="mt-2">
+                    <AiProvenanceBadge
+                      provenance={generatedScript.provenance}
+                    />
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -688,13 +809,15 @@ export default function VoiceNotes() {
                   <p className="text-xs font-medium uppercase tracking-wider text-foreground/40">
                     Call to action
                   </p>
-                  <p className="mt-2 text-sm font-medium">{generatedScript.cta}</p>
+                  <p className="mt-2 text-sm font-medium">
+                    {generatedScript.cta}
+                  </p>
                 </div>
               </div>
             </motion.section>
           ) : null}
 
-          {(file || sourceAsset || transcription) ? (
+          {file || sourceAsset || transcription ? (
             <button
               type="button"
               onClick={resetSource}

@@ -19,11 +19,13 @@ const EMPTY_CAPABILITIES: CapabilityState = {
   persistence: false,
   uploads: false,
   ai: false,
+  analysis: false,
   transcription: false,
   speech: false,
   videoGeneration: false,
   publishing: false,
   missing: [],
+  modelRoutes: [],
 };
 
 interface WorkspaceContextValue {
@@ -33,7 +35,8 @@ interface WorkspaceContextValue {
   saving: boolean;
   error: string | null;
   updateWorkspace: (
-    updater: WorkspaceDocument | ((current: WorkspaceDocument) => WorkspaceDocument),
+    updater:
+      WorkspaceDocument | ((current: WorkspaceDocument) => WorkspaceDocument)
   ) => Promise<WorkspaceDocument>;
   adoptWorkspace: (workspace: WorkspaceDocument) => void;
   refresh: () => Promise<void>;
@@ -43,7 +46,7 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspace, setWorkspace] = useState<WorkspaceDocument>(() =>
-    createEmptyWorkspace("creator@reelassati.local"),
+    createEmptyWorkspace("creator@reelassati.local")
   );
   const [capabilities, setCapabilities] =
     useState<CapabilityState>(EMPTY_CAPABILITIES);
@@ -79,7 +82,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setReady(true);
       setSaveConflict(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load the workspace");
+      setError(
+        cause instanceof Error ? cause.message : "Could not load the workspace"
+      );
     } finally {
       setLoading(false);
     }
@@ -89,7 +94,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     let active = true;
     platformApi
       .workspace()
-      .then((result) => {
+      .then(result => {
         if (!active) return;
         setWorkspace(result.workspace);
         currentRef.current = result.workspace;
@@ -101,7 +106,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       .catch((cause: unknown) => {
         if (!active) return;
         setError(
-          cause instanceof Error ? cause.message : "Could not load the workspace",
+          cause instanceof Error
+            ? cause.message
+            : "Could not load the workspace"
         );
       })
       .finally(() => {
@@ -115,15 +122,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const updateWorkspace = useCallback(
     async (
       updater:
-        | WorkspaceDocument
-        | ((current: WorkspaceDocument) => WorkspaceDocument),
+        WorkspaceDocument | ((current: WorkspaceDocument) => WorkspaceDocument)
     ) => {
       if (!readyRef.current) {
-        throw new Error("The workspace has not loaded, so changes are blocked.");
+        throw new Error(
+          "The workspace has not loaded, so changes are blocked."
+        );
       }
       if (saveConflictRef.current) {
         throw new Error(
-          "A newer server copy exists. Download a backup, then reload before editing.",
+          "A newer server copy exists. Download a backup, then reload before editing."
         );
       }
       const next =
@@ -155,7 +163,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               ...currentRef.current,
               revision: result.workspace.revision,
             };
-            setWorkspace((current) => ({
+            setWorkspace(current => ({
               ...current,
               revision: result.workspace.revision,
             }));
@@ -169,7 +177,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             setSaveConflict(true);
           }
           setUnsaved(true);
-          setError(cause instanceof Error ? cause.message : "Changes could not be saved");
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Changes could not be saved"
+          );
           throw cause;
         } finally {
           pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
@@ -180,11 +192,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const queuedSave = saveChainRef.current.then(save, save);
       saveChainRef.current = queuedSave.then(
         () => undefined,
-        () => undefined,
+        () => undefined
       );
       return queuedSave;
     },
-    [],
+    []
   );
 
   const adoptWorkspace = useCallback((next: WorkspaceDocument) => {
@@ -220,7 +232,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       updateWorkspace,
       adoptWorkspace,
       refresh,
-    ],
+    ]
   );
 
   const downloadBackup = useCallback(() => {
@@ -243,7 +255,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
           <section className="w-full max-w-lg rounded-2xl border border-border bg-surface p-7 shadow-card">
             <p className="mono-eyebrow text-primary">Workspace protected</p>
-            <h1 className="mt-3 text-2xl font-semibold">Your studio did not load.</h1>
+            <h1 className="mt-3 text-2xl font-semibold">
+              Your studio did not load.
+            </h1>
             <p className="mt-3 text-sm leading-relaxed text-foreground/60">
               {error ||
                 "REELassati blocked editing so an empty placeholder cannot overwrite your real workspace."}
@@ -288,9 +302,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               type="button"
               onClick={() => void refresh()}
               className={`rounded-lg px-3 py-2 text-xs font-medium ${
-                saveConflict
-                  ? "bg-primary text-white"
-                  : "border border-border"
+                saveConflict ? "bg-primary text-white" : "border border-border"
               }`}
             >
               {saveConflict ? "Reload server copy" : "Reload server copy"}

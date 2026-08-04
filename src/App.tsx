@@ -16,6 +16,9 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const EntryDemo = lazy(() => import("./pages/EntryDemo"));
 const Showcase = lazy(() => import("./pages/Showcase"));
 const TemplatesPage = lazy(() => import("./pages/TemplatesPage"));
+const AITransparency = lazy(() => import("./pages/AITransparency"));
+const ResponsibleUse = lazy(() => import("./pages/ResponsibleUse"));
+const ProvenanceDetector = lazy(() => import("./pages/ProvenanceDetector"));
 
 function RouteFallback() {
   return (
@@ -33,7 +36,11 @@ function StudioRoute() {
   return (
     <>
       <EntryAnimation />
-      <Suspense fallback={<div className="min-h-screen bg-background" aria-hidden="true" />}>
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-background" aria-hidden="true" />
+        }
+      >
         <WorkspaceProvider>
           <Dashboard />
         </WorkspaceProvider>
@@ -53,6 +60,9 @@ export default function App() {
           <Route path="/support" element={<Support />} />
           <Route path="/showcase" element={<Showcase />} />
           <Route path="/templates" element={<TemplatesPage />} />
+          <Route path="/ai-transparency" element={<AITransparency />} />
+          <Route path="/responsible-use" element={<ResponsibleUse />} />
+          <Route path="/provenance" element={<ProvenanceDetector />} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />

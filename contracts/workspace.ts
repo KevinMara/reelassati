@@ -1,3 +1,8 @@
+import type {
+  ContentProvenance,
+  PublicationComplianceReview,
+} from "./compliance";
+
 export type Platform =
   | "tiktok"
   | "instagram"
@@ -19,11 +24,18 @@ export interface CapabilityState {
   persistence: boolean;
   uploads: boolean;
   ai: boolean;
+  analysis: boolean;
   transcription: boolean;
   speech: boolean;
   videoGeneration: boolean;
   publishing: boolean;
   missing: string[];
+  modelRoutes: Array<{
+    purpose: "Text" | "Analysis" | "Transcription" | "Speech" | "Video";
+    provider: "Kimi Code" | "OpenRouter";
+    model: string;
+    mode: "official" | "owner-test";
+  }>;
 }
 
 export interface WorkspaceProfile {
@@ -62,6 +74,7 @@ export interface Asset {
   createdAt: string;
   variantGroupId?: string;
   parentAssetId?: string;
+  provenance?: ContentProvenance;
 }
 
 export interface TimelineClip {
@@ -110,6 +123,8 @@ export interface EditOperation {
   intensity: "light" | "balanced" | "aggressive";
   targetClipIds: string[];
   status: ChangeStatus;
+  provenance?: ContentProvenance;
+  reviewedAt?: string;
 }
 
 export interface QualitySignal {
@@ -127,6 +142,8 @@ export interface EditRevision {
   createdAt: string;
   clips: TimelineClip[];
   transcript: TranscriptSegment[];
+  /** Server-rehydrated provenance for the exact transcript snapshot. */
+  transcriptProvenance?: ContentProvenance;
 }
 
 export interface EditProject {
@@ -142,6 +159,11 @@ export interface EditProject {
   updatedAt: string;
   clips: TimelineClip[];
   transcript: TranscriptSegment[];
+  /**
+   * Server-owned provenance for the exact transcript segment projection.
+   * Browser workspace JSON is only a projection and is reconciled on save/load.
+   */
+  transcriptProvenance?: ContentProvenance;
   proposedChanges: EditOperation[];
   qualitySignals: QualitySignal[];
   revisions: EditRevision[];
@@ -162,6 +184,7 @@ export interface ScriptDraft {
   language: string;
   hookScore?: number;
   createdAt: string;
+  provenance?: ContentProvenance;
 }
 
 export interface PublishingAccount {
@@ -176,6 +199,8 @@ export interface PublishingAccount {
 export interface ScheduledPost {
   id: string;
   caption: string;
+  /** Exact disclosure/hashtag/provenance-bearing payload sent to the provider. */
+  outgoingContent?: string;
   hashtags: string[];
   mediaAssetId?: string;
   accountIds: string[];
@@ -189,6 +214,7 @@ export interface ScheduledPost {
   publishedUrls?: string[];
   failureReason?: string;
   createdAt: string;
+  complianceReview?: PublicationComplianceReview;
 }
 
 export interface Goal {
@@ -222,6 +248,7 @@ export interface GenerationJob {
   error?: string;
   createdAt: string;
   updatedAt: string;
+  provenance?: ContentProvenance;
 }
 
 export interface WorkspaceDocument {

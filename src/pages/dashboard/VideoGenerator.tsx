@@ -21,8 +21,12 @@ import type {
   WorkspaceEvent,
 } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
-import { getTemplateById, VIDEO_PROMPT_TEMPLATES } from "@/lib/videoPromptTemplates";
+import {
+  getTemplateById,
+  VIDEO_PROMPT_TEMPLATES,
+} from "@/lib/videoPromptTemplates";
 import { useWorkspace } from "@/providers/workspace";
+import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 
 const RATIOS = [
   { id: "9:16" as const, name: "9:16", description: "Reels, TikTok, Shorts" },
@@ -94,7 +98,9 @@ function buildScene(direction: PromptDirection) {
     direction.location ? `Location: ${direction.location.trim()}.` : "",
     direction.camera ? `Camera direction: ${direction.camera.trim()}.` : "",
     direction.mood ? `Mood and lighting: ${direction.mood.trim()}.` : "",
-    direction.dialogue ? `Spoken dialogue: "${direction.dialogue.trim()}".` : "",
+    direction.dialogue
+      ? `Spoken dialogue: "${direction.dialogue.trim()}".`
+      : "",
     direction.sound ? `Sound direction: ${direction.sound.trim()}.` : "",
     direction.avoid ? `Avoid: ${direction.avoid.trim()}.` : "",
   ]
@@ -103,13 +109,13 @@ function buildScene(direction: PromptDirection) {
 }
 
 function upsertJob(jobs: GenerationJob[], job: GenerationJob) {
-  return [job, ...jobs.filter((candidate) => candidate.id !== job.id)];
+  return [job, ...jobs.filter(candidate => candidate.id !== job.id)];
 }
 
 function createEvent(
   type: WorkspaceEvent["type"],
   label: string,
-  detail: string,
+  detail: string
 ): WorkspaceEvent {
   return {
     id: crypto.randomUUID(),
@@ -123,7 +129,7 @@ function createEvent(
 export default function VideoGenerator() {
   const { workspace, capabilities, loading, updateWorkspace } = useWorkspace();
   const [selectedTemplate, setSelectedTemplate] = useState(
-    VIDEO_PROMPT_TEMPLATES[0]?.id ?? "",
+    VIDEO_PROMPT_TEMPLATES[0]?.id ?? ""
   );
   const [direction, setDirection] = useState<PromptDirection>(EMPTY_DIRECTION);
   const [ratio, setRatio] = useState<"16:9" | "9:16" | "1:1">("9:16");
@@ -133,6 +139,11 @@ export default function VideoGenerator() {
   const [firstFrameUrl, setFirstFrameUrl] = useState("");
   const [lastFrameUrl, setLastFrameUrl] = useState("");
   const [showReferences, setShowReferences] = useState(false);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [referenceContainsRealPerson, setReferenceContainsRealPerson] =
+    useState(false);
+  const [realPersonConsentConfirmed, setRealPersonConsentConfirmed] =
+    useState(false);
   const [job, setJob] = useState<GenerationJob | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [resultAsset, setResultAsset] = useState<Asset | null>(null);
@@ -177,23 +188,22 @@ export default function VideoGenerator() {
   }, [direction]);
 
   const durationConflict = mentionedDurations.some(
-    (mentioned) => mentioned !== duration,
+    mentioned => mentioned !== duration
   );
   const firstFrameError = validatePublicHttpsUrl(firstFrameUrl);
   const lastFrameError = validatePublicHttpsUrl(lastFrameUrl);
   const videoReady = capabilities.videoGeneration;
-  const videoMissing = capabilities.missing.filter((item) =>
-    item.includes("OPENROUTER"),
+  const videoMissing = capabilities.missing.filter(item =>
+    item.includes("OPENROUTER")
   );
   const estimatedCost = duration * PUBLIC_STARTING_RATE_USD;
 
   useEffect(() => {
     if (loading || activeJobId || job) return;
     const resumable = workspace.jobs.find(
-      (candidate) =>
+      candidate =>
         candidate.type === "video" &&
-        (candidate.status === "pending" ||
-          candidate.status === "in_progress"),
+        (candidate.status === "pending" || candidate.status === "in_progress")
     );
     if (!resumable) return;
     const timer = window.setTimeout(() => {
@@ -214,17 +224,20 @@ export default function VideoGenerator() {
         if (cancelled) return;
         setJob(result.job);
 
-        if (result.job.status === "completed" || result.job.status === "failed") {
+        if (
+          result.job.status === "completed" ||
+          result.job.status === "failed"
+        ) {
           setActiveJobId(null);
           if (result.asset) setResultAsset(result.asset);
-          await updateWorkspace((current) => ({
+          await updateWorkspace(current => ({
             ...current,
             jobs: upsertJob(current.jobs, result.job),
             assets: result.asset
               ? [
                   result.asset,
                   ...current.assets.filter(
-                    (candidate) => candidate.id !== result.asset?.id,
+                    candidate => candidate.id !== result.asset?.id
                   ),
                 ]
               : current.assets,
@@ -237,7 +250,7 @@ export default function VideoGenerator() {
                 result.asset?.name ??
                   result.job.error ??
                   template?.name ??
-                  "Video generation",
+                  "Video generation"
               ),
               ...current.activity,
             ].slice(0, 100),
@@ -252,7 +265,7 @@ export default function VideoGenerator() {
         setError(
           cause instanceof Error
             ? cause.message
-            : "The video job status could not be checked.",
+            : "The video job status could not be checked."
         );
       }
     };
@@ -264,13 +277,23 @@ export default function VideoGenerator() {
     };
   }, [activeJobId, template?.name, updateWorkspace]);
 
+  const invalidateRightsAttestations = () => {
+    setRightsConfirmed(false);
+    setRealPersonConsentConfirmed(false);
+    requestIdRef.current = null;
+  };
+
   const updateDirection = (field: keyof PromptDirection, value: string) => {
-    setDirection((current) => ({ ...current, [field]: value }));
+    if (direction[field] === value) return;
+    setDirection(current => ({ ...current, [field]: value }));
+    invalidateRightsAttestations();
   };
 
   const selectTemplate = (id: string) => {
+    if (id === selectedTemplate) return;
     const next = getTemplateById(id);
     setSelectedTemplate(id);
+    invalidateRightsAttestations();
     if (next) {
       setRatio(next.defaultRatio);
       setDuration(next.defaultDuration);
@@ -283,7 +306,9 @@ export default function VideoGenerator() {
       !videoReady ||
       submitting ||
       firstFrameError ||
-      lastFrameError
+      lastFrameError ||
+      !rightsConfirmed ||
+      (referenceContainsRealPerson && !realPersonConsentConfirmed)
     ) {
       return;
     }
@@ -305,24 +330,31 @@ export default function VideoGenerator() {
         firstFrameUrl: firstFrameUrl.trim() || undefined,
         lastFrameUrl: lastFrameUrl.trim() || undefined,
         projectId: workspace.projects[0]?.id,
+        rightsConfirmed,
+        referenceContainsRealPerson,
+        realPersonConsentConfirmed,
       });
       setJob(result.job);
       setActiveJobId(result.job.id);
       requestIdRef.current = null;
-      await updateWorkspace((current) => ({
+      await updateWorkspace(current => ({
         ...current,
         jobs: upsertJob(current.jobs, result.job),
         activity: [
           createEvent(
             "generation",
             "Video generation started",
-            `${template?.name ?? "Custom style"} · ${duration}s · ${ratio}`,
+            `${template?.name ?? "Custom style"} · ${duration}s · ${ratio}`
           ),
           ...current.activity,
         ].slice(0, 100),
       }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Video generation could not start.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Video generation could not start."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -335,7 +367,9 @@ export default function VideoGenerator() {
       setPromptCopied(true);
       window.setTimeout(() => setPromptCopied(false), 1800);
     } catch {
-      setError("Clipboard access is blocked. Select the prompt preview and copy it manually.");
+      setError(
+        "Clipboard access is blocked. Select the prompt preview and copy it manually."
+      );
     }
   };
 
@@ -345,8 +379,8 @@ export default function VideoGenerator() {
         <p className="mono-eyebrow mb-2 text-primary">AI Video Studio</p>
         <h1 className="text-3xl font-semibold">Prompt Director</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          Turn a loose idea into a production-ready Kling prompt, then follow the
-          real generation job from request to saved asset.
+          Turn a loose idea into a production-ready Kling prompt, then follow
+          the real generation job from request to saved asset.
         </p>
       </div>
 
@@ -357,10 +391,13 @@ export default function VideoGenerator() {
         >
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
-            <p className="text-sm font-medium">Video generation is not configured</p>
+            <p className="text-sm font-medium">
+              Video generation is not configured
+            </p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/55">
-              Add the server-side video provider credential to enable generation.
-              Prompt design remains available while setup is incomplete.
+              Add the server-side video provider credential to enable
+              generation. Prompt design remains available while setup is
+              incomplete.
             </p>
             {videoMissing.length > 0 ? (
               <p className="mt-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
@@ -382,7 +419,7 @@ export default function VideoGenerator() {
               </span>
             </div>
             <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">
-              {VIDEO_PROMPT_TEMPLATES.map((item) => (
+              {VIDEO_PROMPT_TEMPLATES.map(item => (
                 <button
                   key={item.id}
                   type="button"
@@ -419,11 +456,15 @@ export default function VideoGenerator() {
                 Aspect ratio
               </legend>
               <div className="grid grid-cols-3 gap-2">
-                {RATIOS.map((item) => (
+                {RATIOS.map(item => (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setRatio(item.id)}
+                    onClick={() => {
+                      if (item.id === ratio) return;
+                      setRatio(item.id);
+                      invalidateRightsAttestations();
+                    }}
                     aria-pressed={ratio === item.id}
                     title={item.description}
                     className={`rounded-lg border px-2 py-2.5 text-center transition-colors ${
@@ -432,23 +473,33 @@ export default function VideoGenerator() {
                         : "border-border bg-background hover:border-primary/35"
                     }`}
                   >
-                    <span className="block text-sm font-medium">{item.name}</span>
+                    <span className="block text-sm font-medium">
+                      {item.name}
+                    </span>
                   </button>
                 ))}
               </div>
             </fieldset>
 
             <div className="mt-4">
-              <label className="mb-2 block text-xs font-medium text-foreground/55" htmlFor="video-duration">
+              <label
+                className="mb-2 block text-xs font-medium text-foreground/55"
+                htmlFor="video-duration"
+              >
                 Duration
               </label>
               <select
                 id="video-duration"
                 value={duration}
-                onChange={(event) => setDuration(Number(event.target.value))}
+                onChange={event => {
+                  const nextDuration = Number(event.target.value);
+                  if (nextDuration === duration) return;
+                  setDuration(nextDuration);
+                  invalidateRightsAttestations();
+                }}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
               >
-                {DURATIONS.map((seconds) => (
+                {DURATIONS.map(seconds => (
                   <option key={seconds} value={seconds}>
                     {seconds} seconds
                   </option>
@@ -457,7 +508,7 @@ export default function VideoGenerator() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
-              {(["720p", "1080p"] as const).map((value) => (
+              {(["720p", "1080p"] as const).map(value => (
                 <button
                   type="button"
                   key={value}
@@ -477,7 +528,10 @@ export default function VideoGenerator() {
             <button
               type="button"
               aria-pressed={generateAudio}
-              onClick={() => setGenerateAudio((current) => !current)}
+              onClick={() => {
+                setGenerateAudio(current => !current);
+                invalidateRightsAttestations();
+              }}
               className="mt-4 flex w-full items-center gap-3 rounded-lg border border-border bg-background p-3 text-left"
             >
               <span
@@ -497,7 +551,9 @@ export default function VideoGenerator() {
                   Native audio
                 </span>
                 <span className="mt-0.5 block text-[11px] text-foreground/40">
-                  {generateAudio ? "Requested with the video" : "Silent output requested"}
+                  {generateAudio
+                    ? "Requested with the video"
+                    : "Silent output requested"}
                 </span>
               </span>
             </button>
@@ -510,7 +566,8 @@ export default function VideoGenerator() {
               <div>
                 <p className="text-sm font-medium">Scene direction</p>
                 <p className="mt-1 text-xs text-foreground/45">
-                  Be concrete. The selected style adds camera and production language.
+                  Be concrete. The selected style adds camera and production
+                  language.
                 </p>
               </div>
               <WandSparkles className="h-5 w-5 text-primary" />
@@ -518,97 +575,137 @@ export default function VideoGenerator() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-2 block text-xs font-medium" htmlFor="director-subject">
+                <label
+                  className="mb-2 block text-xs font-medium"
+                  htmlFor="director-subject"
+                >
                   Subject
                 </label>
                 <input
                   id="director-subject"
                   value={direction.subject}
-                  onChange={(event) => updateDirection("subject", event.target.value)}
+                  onChange={event =>
+                    updateDirection("subject", event.target.value)
+                  }
                   placeholder="A ceramic artist in her late twenties"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium" htmlFor="director-action">
+                <label
+                  className="mb-2 block text-xs font-medium"
+                  htmlFor="director-action"
+                >
                   Action
                 </label>
                 <input
                   id="director-action"
                   value={direction.action}
-                  onChange={(event) => updateDirection("action", event.target.value)}
+                  onChange={event =>
+                    updateDirection("action", event.target.value)
+                  }
                   placeholder="Glazes a finished cup, then reveals it"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium" htmlFor="director-location">
+                <label
+                  className="mb-2 block text-xs font-medium"
+                  htmlFor="director-location"
+                >
                   Location
                 </label>
                 <input
                   id="director-location"
                   value={direction.location}
-                  onChange={(event) => updateDirection("location", event.target.value)}
+                  onChange={event =>
+                    updateDirection("location", event.target.value)
+                  }
                   placeholder="A sunlit working studio"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium" htmlFor="director-camera">
+                <label
+                  className="mb-2 block text-xs font-medium"
+                  htmlFor="director-camera"
+                >
                   Camera movement
                 </label>
                 <input
                   id="director-camera"
                   value={direction.camera}
-                  onChange={(event) => updateDirection("camera", event.target.value)}
+                  onChange={event =>
+                    updateDirection("camera", event.target.value)
+                  }
                   placeholder="Slow push-in, then a macro detail"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium" htmlFor="director-mood">
+                <label
+                  className="mb-2 block text-xs font-medium"
+                  htmlFor="director-mood"
+                >
                   Mood and light
                 </label>
                 <input
                   id="director-mood"
                   value={direction.mood}
-                  onChange={(event) => updateDirection("mood", event.target.value)}
+                  onChange={event =>
+                    updateDirection("mood", event.target.value)
+                  }
                   placeholder="Warm morning light, tactile and calm"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium" htmlFor="director-dialogue">
+                <label
+                  className="mb-2 block text-xs font-medium"
+                  htmlFor="director-dialogue"
+                >
                   Dialogue
                 </label>
                 <input
                   id="director-dialogue"
                   value={direction.dialogue}
-                  onChange={(event) => updateDirection("dialogue", event.target.value)}
+                  onChange={event =>
+                    updateDirection("dialogue", event.target.value)
+                  }
                   placeholder="The detail that makes every cup different."
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium" htmlFor="director-sound">
+                <label
+                  className="mb-2 block text-xs font-medium"
+                  htmlFor="director-sound"
+                >
                   Sound
                 </label>
                 <input
                   id="director-sound"
                   value={direction.sound}
-                  onChange={(event) => updateDirection("sound", event.target.value)}
+                  onChange={event =>
+                    updateDirection("sound", event.target.value)
+                  }
                   placeholder="Brush on clay, room tone, no music"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium" htmlFor="director-avoid">
+                <label
+                  className="mb-2 block text-xs font-medium"
+                  htmlFor="director-avoid"
+                >
                   Avoid
                 </label>
                 <input
                   id="director-avoid"
                   value={direction.avoid}
-                  onChange={(event) => updateDirection("avoid", event.target.value)}
+                  onChange={event =>
+                    updateDirection("avoid", event.target.value)
+                  }
                   placeholder="Extra fingers, warped cup, logos"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
@@ -619,27 +716,33 @@ export default function VideoGenerator() {
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                 <p>
-                  Your direction mentions {mentionedDurations.join(", ")} seconds,
-                  but output is set to {duration} seconds. The output control is sent
-                  to the provider; align the wording to avoid contradictory motion.
+                  Your direction mentions {mentionedDurations.join(", ")}{" "}
+                  seconds, but output is set to {duration} seconds. The output
+                  control is sent to the provider; align the wording to avoid
+                  contradictory motion.
                 </p>
               </div>
             ) : null}
 
             <button
               type="button"
-              onClick={() => setShowReferences((current) => !current)}
+              onClick={() => setShowReferences(current => !current)}
               aria-expanded={showReferences}
               className="mt-5 flex items-center gap-2 text-xs font-medium text-primary"
             >
               <ImageIcon className="h-3.5 w-3.5" />
-              {showReferences ? "Hide reference frames" : "Add reference frames"}
+              {showReferences
+                ? "Hide reference frames"
+                : "Add reference frames"}
             </button>
 
             {showReferences ? (
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-xs font-medium" htmlFor="first-frame-url">
+                  <label
+                    className="mb-2 block text-xs font-medium"
+                    htmlFor="first-frame-url"
+                  >
                     First frame URL
                   </label>
                   <input
@@ -647,16 +750,25 @@ export default function VideoGenerator() {
                     type="url"
                     inputMode="url"
                     value={firstFrameUrl}
-                    onChange={(event) => setFirstFrameUrl(event.target.value)}
+                    onChange={event => {
+                      if (event.target.value === firstFrameUrl) return;
+                      setFirstFrameUrl(event.target.value);
+                      invalidateRightsAttestations();
+                    }}
                     placeholder="https://cdn.example.com/frame.jpg"
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   />
                   {firstFrameError ? (
-                    <p className="mt-1 text-[11px] text-red-500">{firstFrameError}</p>
+                    <p className="mt-1 text-[11px] text-red-500">
+                      {firstFrameError}
+                    </p>
                   ) : null}
                 </div>
                 <div>
-                  <label className="mb-2 block text-xs font-medium" htmlFor="last-frame-url">
+                  <label
+                    className="mb-2 block text-xs font-medium"
+                    htmlFor="last-frame-url"
+                  >
                     Last frame URL
                   </label>
                   <input
@@ -664,17 +776,24 @@ export default function VideoGenerator() {
                     type="url"
                     inputMode="url"
                     value={lastFrameUrl}
-                    onChange={(event) => setLastFrameUrl(event.target.value)}
+                    onChange={event => {
+                      if (event.target.value === lastFrameUrl) return;
+                      setLastFrameUrl(event.target.value);
+                      invalidateRightsAttestations();
+                    }}
                     placeholder="https://cdn.example.com/frame.jpg"
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   />
                   {lastFrameError ? (
-                    <p className="mt-1 text-[11px] text-red-500">{lastFrameError}</p>
+                    <p className="mt-1 text-[11px] text-red-500">
+                      {lastFrameError}
+                    </p>
                   ) : null}
                 </div>
                 <p className="sm:col-span-2 text-[11px] text-foreground/40">
-                  Only public HTTPS image URLs are accepted. Browser blob URLs and
-                  local network addresses cannot be reached by the video provider.
+                  Only public HTTPS image URLs are accepted. Browser blob URLs
+                  and local network addresses cannot be reached by the video
+                  provider.
                 </p>
               </div>
             ) : null}
@@ -731,8 +850,8 @@ export default function VideoGenerator() {
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
               Estimate uses the public starting rate of $
-              {PUBLIC_STARTING_RATE_USD.toFixed(3)} per second. The provider invoice
-              is authoritative and can vary by output settings.
+              {PUBLIC_STARTING_RATE_USD.toFixed(3)} per second. The provider
+              invoice is authoritative and can vary by output settings.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-lg border border-primary/10 bg-background/70 p-2.5">
@@ -748,6 +867,50 @@ export default function VideoGenerator() {
                 </span>
               </div>
             </div>
+            <div className="mt-4 space-y-2 rounded-lg border border-primary/15 bg-background/70 p-3 text-xs leading-relaxed">
+              <label className="flex items-start gap-2 text-foreground/65">
+                <input
+                  type="checkbox"
+                  checked={rightsConfirmed}
+                  onChange={event => setRightsConfirmed(event.target.checked)}
+                  className="mt-0.5 accent-primary"
+                />
+                <span>
+                  I may use the prompt, brands, references, faces and voices in
+                  this generation.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-foreground/65">
+                <input
+                  type="checkbox"
+                  checked={referenceContainsRealPerson}
+                  onChange={event => {
+                    setReferenceContainsRealPerson(event.target.checked);
+                    invalidateRightsAttestations();
+                  }}
+                  className="mt-0.5 accent-primary"
+                />
+                <span>
+                  The prompt or a reference depicts an identifiable real person
+                  or imitates their voice.
+                </span>
+              </label>
+              {referenceContainsRealPerson ? (
+                <label className="flex items-start gap-2 text-foreground/65">
+                  <input
+                    type="checkbox"
+                    checked={realPersonConsentConfirmed}
+                    onChange={event =>
+                      setRealPersonConsentConfirmed(event.target.checked)
+                    }
+                    className="mt-0.5 accent-primary"
+                  />
+                  <span>
+                    I hold documented consent or another verified legal basis.
+                  </span>
+                </label>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={() => void handleGenerate()}
@@ -757,7 +920,9 @@ export default function VideoGenerator() {
                 submitting ||
                 Boolean(activeJobId) ||
                 Boolean(firstFrameError) ||
-                Boolean(lastFrameError)
+                Boolean(lastFrameError) ||
+                !rightsConfirmed ||
+                (referenceContainsRealPerson && !realPersonConsentConfirmed)
               }
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
             >
@@ -811,7 +976,9 @@ export default function VideoGenerator() {
                   className={`h-full rounded-full transition-[width] duration-500 ${
                     job.status === "failed" ? "bg-red-500" : "bg-primary"
                   }`}
-                  style={{ width: `${Math.max(4, Math.min(100, job.progress))}%` }}
+                  style={{
+                    width: `${Math.max(4, Math.min(100, job.progress))}%`,
+                  }}
                 />
               </div>
               <div className="mt-2 flex justify-between text-[11px] text-foreground/40">
@@ -827,8 +994,8 @@ export default function VideoGenerator() {
               <MonitorUp className="h-6 w-6 text-primary/45" />
               <p className="mt-3 text-sm font-medium">Real job tracking</p>
               <p className="mt-1 text-xs leading-relaxed text-foreground/45">
-                After submission, this panel polls the provider-backed job and shows
-                its returned progress. No simulated completion state.
+                After submission, this panel polls the provider-backed job and
+                shows its returned progress. No simulated completion state.
               </p>
             </section>
           )}
@@ -845,6 +1012,7 @@ export default function VideoGenerator() {
                   Saved
                 </span>
               </div>
+              <AiProvenanceBadge provenance={resultAsset.provenance} />
               <div
                 className={`overflow-hidden rounded-lg bg-black ${
                   ratio === "9:16"

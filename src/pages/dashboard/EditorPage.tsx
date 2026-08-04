@@ -54,23 +54,28 @@ import type {
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
+import type { ContentProvenance } from "@contracts/compliance";
+import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 
 const PROJECT_TEMPLATES = [
   {
     name: "Blank vertical edit",
-    description: "A clean 9:16 timeline with every decision under your control.",
+    description:
+      "A clean 9:16 timeline with every decision under your control.",
     template: "blank",
     icon: Layers3,
   },
   {
     name: "Talking-head cut",
-    description: "Dialogue-first pacing with room for captions and supporting shots.",
+    description:
+      "Dialogue-first pacing with room for captions and supporting shots.",
     template: "talking-head",
     icon: Mic2,
   },
   {
     name: "Hook and proof",
-    description: "Structure product footage around an opening claim and visual proof.",
+    description:
+      "Structure product footage around an opening claim and visual proof.",
     template: "hook-and-proof",
     icon: WandSparkles,
   },
@@ -120,6 +125,9 @@ function snapshotProject(project: EditProject, label: string): EditRevision {
     createdAt: new Date().toISOString(),
     clips: project.clips.map(clip => ({ ...clip })),
     transcript: project.transcript.map(segment => ({ ...segment })),
+    ...(project.transcriptProvenance
+      ? { transcriptProvenance: project.transcriptProvenance }
+      : {}),
   };
 }
 
@@ -128,10 +136,7 @@ function compactRevisions(revisions: EditRevision[]) {
 }
 
 function getProjectDuration(clips: TimelineClip[], minimum = 15) {
-  return Math.max(
-    minimum,
-    ...clips.map(clip => clip.start + clip.duration),
-  );
+  return Math.max(minimum, ...clips.map(clip => clip.start + clip.duration));
 }
 
 function getAssetKind(file: File): Asset["kind"] {
@@ -147,7 +152,7 @@ function readMediaDuration(file: File): Promise<number | undefined> {
 
   return new Promise(resolve => {
     const media = document.createElement(
-      file.type.startsWith("audio/") ? "audio" : "video",
+      file.type.startsWith("audio/") ? "audio" : "video"
     );
     const objectUrl = URL.createObjectURL(file);
     const finish = (duration?: number) => {
@@ -210,7 +215,8 @@ function deriveQualitySignals(project: EditProject): QualitySignal[] {
     signals.push({
       id: "preflight-no-transcript",
       label: "Captions not prepared",
-      detail: "Add or transcribe dialogue, then review every line before delivery.",
+      detail:
+        "Add or transcribe dialogue, then review every line before delivery.",
       start: 0,
       end: duration,
       level: "attention",
@@ -223,7 +229,7 @@ function deriveQualitySignals(project: EditProject): QualitySignal[] {
       clip.inPoint < 0 ||
       clip.outPoint <= clip.inPoint ||
       clip.duration > clip.outPoint - clip.inPoint + 0.01 ||
-      clip.start < 0,
+      clip.start < 0
   );
   if (invalidClip) {
     signals.push({
@@ -252,14 +258,18 @@ function deriveQualitySignals(project: EditProject): QualitySignal[] {
 
 function projectWithApprovedOperation(
   project: EditProject,
-  operation: EditOperation,
+  operation: EditOperation
 ) {
   return {
     ...project,
     proposedChanges: project.proposedChanges.map(change =>
       change.id === operation.id
-        ? { ...change, status: "accepted" as const }
-        : change,
+        ? {
+            ...change,
+            status: "accepted" as const,
+            reviewedAt: new Date().toISOString(),
+          }
+        : change
     ),
   };
 }
@@ -273,17 +283,25 @@ export default function EditorPage() {
     error: workspaceError,
     updateWorkspace,
   } = useWorkspace();
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null
+  );
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [rightPanel, setRightPanel] = useState<
     "inspect" | "transcript" | "assistant" | "preflight"
   >("inspect");
   const [clipDraft, setClipDraft] = useState<TimelineClip | null>(null);
-  const [transcriptDraft, setTranscriptDraft] = useState<TranscriptSegment[]>([]);
+  const [transcriptDraft, setTranscriptDraft] = useState<TranscriptSegment[]>(
+    []
+  );
   const [titleDraft, setTitleDraft] = useState("");
   const [command, setCommand] = useState("");
   const [commandSummary, setCommandSummary] = useState("");
+  const [commandProvenance, setCommandProvenance] =
+    useState<ContentProvenance | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
+  const [transcriptionProvenance, setTranscriptionProvenance] =
+    useState<ContentProvenance | null>(null);
   const [rangeStart, setRangeStart] = useState(0);
   const [rangeEnd, setRangeEnd] = useState(5);
   const [playhead, setPlayhead] = useState(0);
@@ -298,11 +316,11 @@ export default function EditorPage() {
 
   const project = useMemo(
     () => workspace.projects.find(item => item.id === selectedProjectId),
-    [selectedProjectId, workspace.projects],
+    [selectedProjectId, workspace.projects]
   );
   const selectedClip = useMemo(
     () => project?.clips.find(clip => clip.id === selectedClipId),
-    [project?.clips, selectedClipId],
+    [project?.clips, selectedClipId]
   );
   const previewAsset = useMemo(() => {
     const assetId = selectedClip?.assetId ?? project?.activeAssetId;
@@ -313,10 +331,10 @@ export default function EditorPage() {
       project
         ? [...project.qualitySignals, ...deriveQualitySignals(project)].filter(
             (signal, index, all) =>
-              all.findIndex(candidate => candidate.id === signal.id) === index,
+              all.findIndex(candidate => candidate.id === signal.id) === index
           )
         : [],
-    [project],
+    [project]
   );
 
   const openProject = (item: EditProject) => {
@@ -327,6 +345,9 @@ export default function EditorPage() {
     setRangeStart(item.playhead);
     setRangeEnd(Math.min(item.duration, item.playhead + 5));
     setTranscriptDraft(item.transcript.map(segment => ({ ...segment })));
+    setCommandSummary("");
+    setCommandProvenance(null);
+    setTranscriptionProvenance(item.transcriptProvenance ?? null);
     setRevisionCursor(item.revisions.length - 1);
     setSelectedClipId(firstClip?.id ?? null);
     setClipDraft(firstClip ? { ...firstClip } : null);
@@ -352,8 +373,8 @@ export default function EditorPage() {
     const title =
       template === "blank"
         ? "Untitled short"
-        : PROJECT_TEMPLATES.find(item => item.template === template)?.name ??
-          "Untitled short";
+        : (PROJECT_TEMPLATES.find(item => item.template === template)?.name ??
+          "Untitled short");
     const base: EditProject = {
       id: createId("project"),
       title,
@@ -397,7 +418,9 @@ export default function EditorPage() {
       return nextProject.id;
     } catch (cause) {
       setLocalError(
-        cause instanceof Error ? cause.message : "The project could not be created.",
+        cause instanceof Error
+          ? cause.message
+          : "The project could not be created."
       );
       return null;
     } finally {
@@ -406,12 +429,10 @@ export default function EditorPage() {
   };
 
   const patchProject = async (
-    patch:
-      | Partial<EditProject>
-      | ((currentProject: EditProject) => EditProject),
+    patch: Partial<EditProject> | ((currentProject: EditProject) => EditProject)
   ) => {
     if (!project) return;
-    await updateWorkspace(current => ({
+    return updateWorkspace(current => ({
       ...current,
       projects: current.projects.map(item => {
         if (item.id !== project.id) return item;
@@ -424,10 +445,10 @@ export default function EditorPage() {
 
   const commitProject = async (
     label: string,
-    transform: (currentProject: EditProject) => EditProject,
+    transform: (currentProject: EditProject) => EditProject
   ) => {
     if (!project) return;
-    await updateWorkspace(current => ({
+    return updateWorkspace(current => ({
       ...current,
       projects: current.projects.map(item => {
         if (item.id !== project.id) return item;
@@ -448,7 +469,7 @@ export default function EditorPage() {
           ...transformed,
           duration: getProjectDuration(
             transformed.clips,
-            Math.max(15, transformed.duration),
+            Math.max(15, transformed.duration)
           ),
           updatedAt: new Date().toISOString(),
         };
@@ -464,7 +485,7 @@ export default function EditorPage() {
 
   const addUploadedFiles = async (
     files: File[],
-    targetProjectId?: string | null,
+    targetProjectId?: string | null
   ) => {
     let projectId = targetProjectId ?? selectedProjectId;
     if (!projectId) {
@@ -481,7 +502,7 @@ export default function EditorPage() {
         const uploaded = await platformApi.uploadAsset(
           file,
           kind,
-          setUploadProgress,
+          setUploadProgress
         );
         const asset = {
           ...uploaded,
@@ -493,7 +514,7 @@ export default function EditorPage() {
           if (!target) return current;
           const start = target.clips.reduce(
             (latest, clip) => Math.max(latest, clip.start + clip.duration),
-            0,
+            0
           );
           const duration =
             asset.duration && asset.duration > 0
@@ -537,10 +558,12 @@ export default function EditorPage() {
           return {
             ...current,
             assets: current.assets.some(item => item.id === asset.id)
-              ? current.assets.map(item => (item.id === asset.id ? asset : item))
+              ? current.assets.map(item =>
+                  item.id === asset.id ? asset : item
+                )
               : [asset, ...current.assets],
             projects: current.projects.map(item =>
-              item.id === projectId ? { ...updatedProject, revisions } : item,
+              item.id === projectId ? { ...updatedProject, revisions } : item
             ),
             activity: [
               {
@@ -557,7 +580,9 @@ export default function EditorPage() {
       }
     } catch (cause) {
       setLocalError(
-        cause instanceof Error ? cause.message : "The media could not be uploaded.",
+        cause instanceof Error
+          ? cause.message
+          : "The media could not be uploaded."
       );
     } finally {
       setUploadProgress(null);
@@ -573,10 +598,10 @@ export default function EditorPage() {
 
   const acceptDroppedMedia = (files: File[]) => {
     const mediaFiles = files.filter(
-      (file) =>
+      file =>
         file.type.startsWith("video/") ||
         file.type.startsWith("image/") ||
-        file.type.startsWith("audio/"),
+        file.type.startsWith("audio/")
     );
     if (mediaFiles.length === 0) {
       setLocalError("Drop video, image, or audio files in this section.");
@@ -616,7 +641,7 @@ export default function EditorPage() {
               inPoint: safeIn,
               outPoint: safeOut,
             }
-          : clip,
+          : clip
       ),
     }));
   };
@@ -624,8 +649,13 @@ export default function EditorPage() {
   const splitSelectedClip = async () => {
     if (!selectedClip || selectedClip.locked) return;
     const relativeSplit = playhead - selectedClip.start;
-    if (relativeSplit <= 0.15 || relativeSplit >= selectedClip.duration - 0.15) {
-      setLocalError("Place the playhead inside the selected clip before splitting.");
+    if (
+      relativeSplit <= 0.15 ||
+      relativeSplit >= selectedClip.duration - 0.15
+    ) {
+      setLocalError(
+        "Place the playhead inside the selected clip before splitting."
+      );
       return;
     }
     const rightId = createId("clip");
@@ -707,12 +737,12 @@ export default function EditorPage() {
         clips: current.clips.map(clip =>
           clip.id === selectedClip.id
             ? { ...clip, [property]: !clip[property] }
-            : clip,
+            : clip
         ),
-      }),
+      })
     );
     setClipDraft(current =>
-      current ? { ...current, [property]: !current[property] } : current,
+      current ? { ...current, [property]: !current[property] } : current
     );
   };
 
@@ -728,7 +758,11 @@ export default function EditorPage() {
       duration: getProjectDuration(revision.clips, 15),
     }));
     setRevisionCursor(nextCursor);
-    const restoredClip = revision.clips.find(clip => clip.id === selectedClipId);
+    setTranscriptDraft(revision.transcript.map(segment => ({ ...segment })));
+    setTranscriptionProvenance(revision.transcriptProvenance ?? null);
+    const restoredClip = revision.clips.find(
+      clip => clip.id === selectedClipId
+    );
     setClipDraft(restoredClip ? { ...restoredClip } : null);
   };
 
@@ -744,7 +778,11 @@ export default function EditorPage() {
       duration: getProjectDuration(revision.clips, 15),
     }));
     setRevisionCursor(nextCursor);
-    const restoredClip = revision.clips.find(clip => clip.id === selectedClipId);
+    setTranscriptDraft(revision.transcript.map(segment => ({ ...segment })));
+    setTranscriptionProvenance(revision.transcriptProvenance ?? null);
+    const restoredClip = revision.clips.find(
+      clip => clip.id === selectedClipId
+    );
     setClipDraft(restoredClip ? { ...restoredClip } : null);
   };
 
@@ -753,6 +791,7 @@ export default function EditorPage() {
     setBusyAction("command");
     setCommandError(null);
     setCommandSummary("");
+    setCommandProvenance(null);
     try {
       const result = await platformApi.generateEditPlan({
         project,
@@ -763,14 +802,26 @@ export default function EditorPage() {
           end: Math.max(rangeStart, rangeEnd),
         },
       });
-      await patchProject({
-        proposedChanges: result.changes,
+      await patchProject(current => ({
+        ...current,
+        proposedChanges: [
+          ...current.proposedChanges.filter(
+            change => change.status !== "proposed"
+          ),
+          ...result.changes.map(change => ({
+            ...change,
+            provenance: change.provenance ?? result.provenance,
+          })),
+        ].slice(-240),
         lastCommand: command.trim(),
-      });
+      }));
       setCommandSummary(result.summary);
+      setCommandProvenance(result.provenance);
     } catch (cause) {
       setCommandError(
-        cause instanceof Error ? cause.message : "The edit plan could not be generated.",
+        cause instanceof Error
+          ? cause.message
+          : "The edit plan could not be generated."
       );
     } finally {
       setBusyAction(null);
@@ -779,7 +830,7 @@ export default function EditorPage() {
 
   const acceptOperation = async (operation: EditOperation) => {
     await commitProject(`Approved decision: ${operation.label}`, current =>
-      projectWithApprovedOperation(current, operation),
+      projectWithApprovedOperation(current, operation)
     );
   };
 
@@ -787,13 +838,19 @@ export default function EditorPage() {
     await patchProject(current => ({
       ...current,
       proposedChanges: current.proposedChanges.map(change =>
-        change.id === operation.id ? { ...change, status: "rejected" } : change,
+        change.id === operation.id
+          ? {
+              ...change,
+              status: "rejected",
+              reviewedAt: new Date().toISOString(),
+            }
+          : change
       ),
     }));
   };
 
   const saveTranscript = async () => {
-    await commitProject("Transcript updated", current => ({
+    const saved = await commitProject("Transcript updated", current => ({
       ...current,
       transcript: transcriptDraft
         .filter(segment => segment.text.trim())
@@ -804,25 +861,53 @@ export default function EditorPage() {
           text: segment.text.trim(),
         })),
     }));
+    const canonical = saved?.projects.find(
+      candidate => candidate.id === project?.id
+    );
+    if (canonical) {
+      setTranscriptDraft(canonical.transcript.map(segment => ({ ...segment })));
+      setTranscriptionProvenance(canonical.transcriptProvenance ?? null);
+    }
+  };
+
+  const mutateTranscript = (
+    updater: (current: TranscriptSegment[]) => TranscriptSegment[]
+  ) => {
+    setTranscriptionProvenance(null);
+    setTranscriptDraft(updater);
   };
 
   const transcribeActiveAsset = async () => {
-    if (!previewAsset) return;
+    if (!previewAsset || !project) return;
     setBusyAction("transcribe");
     setLocalError(null);
     try {
       const result = await platformApi.transcribe(
         previewAsset.id,
         workspace.profile.contentLanguage,
+        project.id
       );
       setTranscriptDraft(result.segments);
-      await commitProject("Media transcribed", current => ({
+      setTranscriptionProvenance(result.provenance);
+      const saved = await commitProject("Media transcribed", current => ({
         ...current,
         transcript: result.segments,
+        transcriptProvenance: result.provenance,
       }));
+      const canonical = saved?.projects.find(
+        candidate => candidate.id === project.id
+      );
+      if (canonical) {
+        setTranscriptDraft(
+          canonical.transcript.map(segment => ({ ...segment }))
+        );
+        setTranscriptionProvenance(canonical.transcriptProvenance ?? null);
+      }
     } catch (cause) {
       setLocalError(
-        cause instanceof Error ? cause.message : "The media could not be transcribed.",
+        cause instanceof Error
+          ? cause.message
+          : "The media could not be transcribed."
       );
     } finally {
       setBusyAction(null);
@@ -830,7 +915,7 @@ export default function EditorPage() {
   };
 
   const addTranscriptSegment = () => {
-    setTranscriptDraft(current => [
+    mutateTranscript(current => [
       ...current,
       {
         id: createId("segment"),
@@ -847,7 +932,7 @@ export default function EditorPage() {
     const next = clamp(
       ((event.clientX - bounds.left) / bounds.width) * project.duration,
       0,
-      project.duration,
+      project.duration
     );
     setPlayhead(next);
   };
@@ -856,42 +941,30 @@ export default function EditorPage() {
     if (project) void patchProject({ playhead });
   };
 
-  const downloadEditBrief = () => {
+  const downloadEditBrief = async () => {
     if (!project) return;
-    const payload = {
-      schema: "reelassati-edit-brief/v1",
-      generatedAt: new Date().toISOString(),
-      note: "This is an edit decision list, not a rendered video.",
-      project: {
-        id: project.id,
-        title: project.title,
-        platform: project.platform,
-        aspectRatio: project.aspectRatio,
-        duration: project.duration,
-        clips: project.clips,
-        transcript: project.transcript,
-        acceptedChanges: project.proposedChanges.filter(
-          change => change.status === "accepted",
-        ),
-      },
-      assets: workspace.assets
-        .filter(asset => project.clips.some(clip => clip.assetId === asset.id))
-        .map(asset => ({
-          id: asset.id,
-          name: asset.name,
-          kind: asset.kind,
-          duration: asset.duration,
-        })),
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: "application/json",
-    });
-    const href = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = href;
-    anchor.download = `${project.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-edit-brief.json`;
-    anchor.click();
-    URL.revokeObjectURL(href);
+    setBusyAction("export-brief");
+    setLocalError(null);
+    try {
+      const payload = await platformApi.editBrief(project.id);
+      const blob = new Blob([JSON.stringify(payload.brief, null, 2)], {
+        type: "application/json",
+      });
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = payload.filename;
+      anchor.click();
+      URL.revokeObjectURL(href);
+    } catch (cause) {
+      setLocalError(
+        cause instanceof Error
+          ? cause.message
+          : "The edit brief could not be prepared."
+      );
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   if (loading) {
@@ -915,8 +988,8 @@ export default function EditorPage() {
               Start with footage. Keep control of every cut.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/60">
-              Build on a real timeline, then use AI for inspectable changes you can
-              accept, reject, and undo.
+              Build on a real timeline, then use AI for inspectable changes you
+              can accept, reject, and undo.
             </p>
           </div>
           {workspace.projects.length > 0 && (
@@ -952,7 +1025,9 @@ export default function EditorPage() {
             )}
           </span>
           <span className="text-base font-medium">
-            {newEditDrop.isDragging ? "Drop files to start the edit" : "Upload footage to a new edit"}
+            {newEditDrop.isDragging
+              ? "Drop files to start the edit"
+              : "Upload footage to a new edit"}
           </span>
           <span className="mt-1 text-sm text-foreground/50">
             Drop video, image, or audio here, or click to choose.
@@ -1040,14 +1115,16 @@ export default function EditorPage() {
     },
     {
       label: "Valid clip bounds",
-      passed: !qualitySignals.some(signal => signal.id === "preflight-invalid-clip"),
+      passed: !qualitySignals.some(
+        signal => signal.id === "preflight-invalid-clip"
+      ),
       detail: "In/out points and durations",
     },
     {
       label: "Visual coverage",
       passed: !qualitySignals.some(
         signal =>
-          signal.id === "preflight-no-visual" || signal.id.startsWith("gap-"),
+          signal.id === "preflight-no-visual" || signal.id.startsWith("gap-")
       ),
       detail: "No empty frames across the cut",
     },
@@ -1087,7 +1164,8 @@ export default function EditorPage() {
             onChange={event => setTitleDraft(event.target.value)}
             onBlur={() => {
               const title = titleDraft.trim();
-              if (title && title !== project.title) void patchProject({ title });
+              if (title && title !== project.title)
+                void patchProject({ title });
             }}
             className="w-full border-0 bg-transparent p-0 text-xl font-semibold outline-none placeholder:text-foreground/35"
             aria-label="Project title"
@@ -1212,7 +1290,9 @@ export default function EditorPage() {
               {previewAsset?.kind === "audio" && (
                 <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center text-white">
                   <AudioLines className="mx-auto mb-5 h-10 w-10 text-[#A894FF]" />
-                  <p className="truncate text-sm font-medium">{previewAsset.name}</p>
+                  <p className="truncate text-sm font-medium">
+                    {previewAsset.name}
+                  </p>
                   <audio
                     key={previewAsset.id}
                     src={previewAsset.url}
@@ -1230,10 +1310,12 @@ export default function EditorPage() {
                   <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-[#A894FF]">
                     <Upload className="h-5 w-5" />
                   </span>
-                  <span className="font-medium">Bring your first shot onto the timeline</span>
+                  <span className="font-medium">
+                    Bring your first shot onto the timeline
+                  </span>
                   <span className="mt-1 text-sm leading-5 text-white/45">
-                    Upload source media. Nothing is cut or transformed without your
-                    approval.
+                    Upload source media. Nothing is cut or transformed without
+                    your approval.
                   </span>
                 </button>
               )}
@@ -1339,7 +1421,9 @@ export default function EditorPage() {
                   max={260}
                   step={20}
                   value={timelineZoom}
-                  onChange={event => setTimelineZoom(Number(event.target.value))}
+                  onChange={event =>
+                    setTimelineZoom(Number(event.target.value))
+                  }
                   className="h-1 w-20 accent-primary"
                   aria-label="Timeline zoom"
                 />
@@ -1384,7 +1468,7 @@ export default function EditorPage() {
                   </div>
                   {TRACKS.map(track => {
                     const clips = project.clips.filter(
-                      clip => clip.track === track.id,
+                      clip => clip.track === track.id
                     );
                     return (
                       <div
@@ -1416,18 +1500,23 @@ export default function EditorPage() {
                                 left: `${(clip.start / project.duration) * 100}%`,
                                 width: `${Math.max(
                                   (clip.duration / project.duration) * 100,
-                                  1.25,
+                                  1.25
                                 )}%`,
-                                backgroundColor: clip.color || TRACK_COLORS[clip.track],
+                                backgroundColor:
+                                  clip.color || TRACK_COLORS[clip.track],
                                 opacity: clip.muted ? 0.55 : 1,
                               }}
                               title={`${clip.label}, ${formatTime(clip.start)} to ${formatTime(
-                                clip.start + clip.duration,
+                                clip.start + clip.duration
                               )}`}
                             >
                               <span className="flex items-center gap-1 truncate">
-                                {clip.locked && <Lock className="h-2.5 w-2.5 shrink-0" />}
-                                {clip.muted && <VolumeX className="h-2.5 w-2.5 shrink-0" />}
+                                {clip.locked && (
+                                  <Lock className="h-2.5 w-2.5 shrink-0" />
+                                )}
+                                {clip.muted && (
+                                  <VolumeX className="h-2.5 w-2.5 shrink-0" />
+                                )}
                                 <span className="truncate">{clip.label}</span>
                               </span>
                               <span className="mt-0.5 block truncate font-mono text-[8px] text-white/65">
@@ -1459,7 +1548,7 @@ export default function EditorPage() {
                       left: `${(signal.start / project.duration) * 100}%`,
                       width: `${Math.max(
                         ((signal.end - signal.start) / project.duration) * 100,
-                        1,
+                        1
                       )}%`,
                     }}
                     title={`${signal.label}: ${signal.detail}`}
@@ -1515,8 +1604,8 @@ export default function EditorPage() {
                     {selectedClip ? selectedClip.label : "Select a clip"}
                   </h2>
                   <p className="mt-1 text-xs leading-5 text-foreground/45">
-                    Range controls change the selected clip only. Apply creates a
-                    reversible revision.
+                    Range controls change the selected clip only. Apply creates
+                    a reversible revision.
                   </p>
                 </div>
 
@@ -1535,7 +1624,9 @@ export default function EditorPage() {
                         disabled={selectedClip?.locked}
                         onChange={event =>
                           setClipDraft(current =>
-                            current ? { ...current, label: event.target.value } : current,
+                            current
+                              ? { ...current, label: event.target.value }
+                              : current
                           )
                         }
                         className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
@@ -1556,7 +1647,7 @@ export default function EditorPage() {
                           max: Math.max(
                             clipDraft.outPoint - clipDraft.inPoint,
                             clipDraft.duration,
-                            1,
+                            1
                           ),
                         },
                         {
@@ -1571,14 +1662,16 @@ export default function EditorPage() {
                           min: clipDraft.inPoint + 0.2,
                           max: Math.max(
                             previewAsset?.duration ?? clipDraft.outPoint,
-                            clipDraft.inPoint + 0.2,
+                            clipDraft.inPoint + 0.2
                           ),
                         },
                       ] as const
                     ).map(control => (
                       <label key={control.key} className="block">
                         <span className="mb-1.5 flex items-center justify-between text-xs">
-                          <span className="text-foreground/50">{control.label}</span>
+                          <span className="text-foreground/50">
+                            {control.label}
+                          </span>
                           <span className="font-mono text-foreground/70">
                             {formatTime(clipDraft[control.key])}
                           </span>
@@ -1597,7 +1690,7 @@ export default function EditorPage() {
                                     ...current,
                                     [control.key]: Number(event.target.value),
                                   }
-                                : current,
+                                : current
                             )
                           }
                           className="h-1 w-full accent-primary disabled:opacity-40"
@@ -1649,8 +1742,12 @@ export default function EditorPage() {
               <div>
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
-                    <p className="mono-eyebrow text-primary">Editable transcript</p>
-                    <h2 className="mt-2 text-lg font-medium">Words are edit points</h2>
+                    <p className="mono-eyebrow text-primary">
+                      Editable transcript
+                    </p>
+                    <h2 className="mt-2 text-lg font-medium">
+                      Words are edit points
+                    </h2>
                   </div>
                   <button
                     type="button"
@@ -1678,6 +1775,15 @@ export default function EditorPage() {
                   </button>
                 )}
 
+                {transcriptionProvenance ? (
+                  <div className="mb-4">
+                    <AiProvenanceBadge
+                      provenance={transcriptionProvenance}
+                      compact
+                    />
+                  </div>
+                ) : null}
+
                 <div className="space-y-2">
                   {transcriptDraft.map((segment, index) => (
                     <div
@@ -1691,30 +1797,35 @@ export default function EditorPage() {
                           step={0.1}
                           value={segment.start}
                           onChange={event =>
-                            setTranscriptDraft(current =>
+                            mutateTranscript(current =>
                               current.map((item, itemIndex) =>
                                 itemIndex === index
-                                  ? { ...item, start: Number(event.target.value) }
-                                  : item,
-                              ),
+                                  ? {
+                                      ...item,
+                                      start: Number(event.target.value),
+                                    }
+                                  : item
+                              )
                             )
                           }
                           className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-[10px]"
                           aria-label={`Line ${index + 1} start`}
                         />
-                        <span className="text-[10px] text-foreground/30">to</span>
+                        <span className="text-[10px] text-foreground/30">
+                          to
+                        </span>
                         <input
                           type="number"
                           min={0}
                           step={0.1}
                           value={segment.end}
                           onChange={event =>
-                            setTranscriptDraft(current =>
+                            mutateTranscript(current =>
                               current.map((item, itemIndex) =>
                                 itemIndex === index
                                   ? { ...item, end: Number(event.target.value) }
-                                  : item,
-                              ),
+                                  : item
+                              )
                             )
                           }
                           className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-[10px]"
@@ -1723,8 +1834,8 @@ export default function EditorPage() {
                         <button
                           type="button"
                           onClick={() =>
-                            setTranscriptDraft(current =>
-                              current.filter(item => item.id !== segment.id),
+                            mutateTranscript(current =>
+                              current.filter(item => item.id !== segment.id)
                             )
                           }
                           className="ml-auto text-foreground/35 hover:text-destructive"
@@ -1738,12 +1849,12 @@ export default function EditorPage() {
                         rows={2}
                         placeholder="Type the spoken line"
                         onChange={event =>
-                          setTranscriptDraft(current =>
+                          mutateTranscript(current =>
                             current.map((item, itemIndex) =>
                               itemIndex === index
                                 ? { ...item, text: event.target.value }
-                                : item,
-                            ),
+                                : item
+                            )
                           )
                         }
                         className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-foreground/30"
@@ -1771,16 +1882,23 @@ export default function EditorPage() {
             {rightPanel === "assistant" && (
               <div>
                 <p className="mono-eyebrow text-primary">Accountable AI edit</p>
-                <h2 className="mt-2 text-lg font-medium">Describe the change</h2>
+                <h2 className="mt-2 text-lg font-medium">
+                  Describe the change
+                </h2>
                 <p className="mt-1 text-xs leading-5 text-foreground/45">
-                  The assistant proposes operations with a reason, confidence, and
-                  exact interval. You stay in control.
+                  The assistant proposes operations with a reason, confidence,
+                  and exact interval. You stay in control.
                 </p>
 
                 <div className="mt-4 rounded-xl border border-border bg-background/55 p-3">
                   <textarea
                     value={command}
-                    onChange={event => setCommand(event.target.value)}
+                    onChange={event => {
+                      setCommand(event.target.value);
+                      setCommandSummary("");
+                      setCommandProvenance(null);
+                      setCommandError(null);
+                    }}
                     rows={4}
                     placeholder="Tighten the pause after the hook, keep the product reveal locked, and make the captions calmer."
                     className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-foreground/30"
@@ -1796,7 +1914,9 @@ export default function EditorPage() {
                         max={project.duration}
                         step={0.1}
                         value={rangeStart}
-                        onChange={event => setRangeStart(Number(event.target.value))}
+                        onChange={event =>
+                          setRangeStart(Number(event.target.value))
+                        }
                         className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 font-mono text-xs"
                       />
                     </label>
@@ -1810,7 +1930,9 @@ export default function EditorPage() {
                         max={project.duration}
                         step={0.1}
                         value={rangeEnd}
-                        onChange={event => setRangeEnd(Number(event.target.value))}
+                        onChange={event =>
+                          setRangeEnd(Number(event.target.value))
+                        }
                         className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 font-mono text-xs"
                       />
                     </label>
@@ -1841,8 +1963,9 @@ export default function EditorPage() {
 
                 {!capabilities.ai && (
                   <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-foreground/60">
-                    AI planning is not connected yet. Timeline editing, revisions,
-                    transcript work, and edit-brief export remain available.
+                    AI planning is not connected yet. Timeline editing,
+                    revisions, transcript work, and edit-brief export remain
+                    available.
                   </div>
                 )}
                 {commandError && (
@@ -1853,6 +1976,12 @@ export default function EditorPage() {
                 {commandSummary && (
                   <div className="mt-3 rounded-lg border border-primary/15 bg-primary/5 p-3 text-xs leading-5 text-foreground/70">
                     {commandSummary}
+                    <div className="mt-2">
+                      <AiProvenanceBadge
+                        provenance={commandProvenance || undefined}
+                        compact
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -1874,7 +2003,9 @@ export default function EditorPage() {
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-medium">{change.label}</p>
+                            <p className="text-sm font-medium">
+                              {change.label}
+                            </p>
                             <span className="rounded bg-surface px-1.5 py-0.5 font-mono text-[9px] uppercase text-foreground/45">
                               {change.intensity}
                             </span>
@@ -1884,9 +2015,18 @@ export default function EditorPage() {
                           </p>
                           <div className="mt-2 flex items-center gap-3 font-mono text-[9px] text-foreground/40">
                             <span>
-                              {formatTime(change.start)}–{formatTime(change.end)}
+                              {formatTime(change.start)}–
+                              {formatTime(change.end)}
                             </span>
-                            <span>{Math.round(change.confidence * 100)}% confidence</span>
+                            <span>
+                              {Math.round(change.confidence * 100)}% confidence
+                            </span>
+                          </div>
+                          <div className="mt-2">
+                            <AiProvenanceBadge
+                              provenance={change.provenance}
+                              compact
+                            />
                           </div>
                         </div>
                       </div>
@@ -1923,15 +2063,16 @@ export default function EditorPage() {
                   ))}
                   {project.proposedChanges.length === 0 && (
                     <p className="rounded-xl border border-dashed border-border p-5 text-center text-xs leading-5 text-foreground/40">
-                      No pending AI changes. Your manual timeline remains untouched.
+                      No pending AI changes. Your manual timeline remains
+                      untouched.
                     </p>
                   )}
                 </div>
                 <p className="mt-4 text-[10px] leading-4 text-foreground/35">
-                  Approval records the decision in the edit brief. AI plans never
-                  mutate media automatically; make the deterministic timeline
-                  change manually after checking the named interval and target
-                  clips.
+                  Approval records the decision in the edit brief. AI plans
+                  never mutate media automatically; make the deterministic
+                  timeline change manually after checking the named interval and
+                  target clips.
                 </p>
               </div>
             )}
@@ -1939,7 +2080,9 @@ export default function EditorPage() {
             {rightPanel === "preflight" && (
               <div>
                 <p className="mono-eyebrow text-primary">Preflight</p>
-                <h2 className="mt-2 text-lg font-medium">Know what needs attention</h2>
+                <h2 className="mt-2 text-lg font-medium">
+                  Know what needs attention
+                </h2>
                 <p className="mt-1 text-xs leading-5 text-foreground/45">
                   These are structural checks from the current timeline, not
                   invented performance predictions.
@@ -1968,7 +2111,9 @@ export default function EditorPage() {
 
                 <div className="mt-6">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-medium">Timeline signals</span>
+                    <span className="text-xs font-medium">
+                      Timeline signals
+                    </span>
                     <CircleGauge className="h-4 w-4 text-foreground/35" />
                   </div>
                   <div className="space-y-2">
@@ -1984,7 +2129,9 @@ export default function EditorPage() {
                         className="w-full rounded-xl border border-border p-3 text-left hover:bg-background/60"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium">{signal.label}</span>
+                          <span className="text-xs font-medium">
+                            {signal.label}
+                          </span>
                           <span
                             className={`h-2 w-2 rounded-full ${
                               signal.level === "risk"
@@ -2065,7 +2212,8 @@ export default function EditorPage() {
                   value={project.aspectRatio}
                   onChange={event =>
                     void patchProject({
-                      aspectRatio: event.target.value as EditProject["aspectRatio"],
+                      aspectRatio: event.target
+                        .value as EditProject["aspectRatio"],
                     })
                   }
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -2101,26 +2249,35 @@ export default function EditorPage() {
                   <MoreHorizontal className="h-3.5 w-3.5 text-destructive" />
                   Final video renderer
                 </span>
-                <span className="text-[10px] text-destructive">Not connected</span>
+                <span className="text-[10px] text-destructive">
+                  Not connected
+                </span>
               </div>
             </div>
 
             <div className="mt-5 rounded-xl border border-border bg-background/55 p-4">
               <p className="text-xs font-medium">What this action creates</p>
               <p className="mt-1 text-xs leading-5 text-foreground/50">
-                A JSON edit brief containing the real timeline, transcript, asset
-                references, and accepted AI decisions. It does not claim to render
-                an MP4.
+                A JSON edit brief containing the real timeline, transcript,
+                asset references, and accepted AI decisions. It does not claim
+                to render an MP4.
               </p>
             </div>
 
             <button
               type="button"
-              onClick={downloadEditBrief}
+              onClick={() => void downloadEditBrief()}
+              disabled={busyAction === "export-brief"}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
             >
-              <Download className="h-4 w-4" />
-              Download edit brief
+              {busyAction === "export-brief" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {busyAction === "export-brief"
+                ? "Preparing marked brief"
+                : "Download edit brief"}
             </button>
             <p className="mt-3 flex items-center justify-center gap-1.5 text-[10px] text-foreground/40">
               <Clock3 className="h-3 w-3" />

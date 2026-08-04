@@ -9,6 +9,11 @@ import type {
   ScriptDraft,
   WorkspaceDocument,
 } from "@contracts/workspace";
+import type {
+  ComplianceStatus,
+  ContentProvenance,
+  ProvenanceDetectionResult,
+} from "@contracts/compliance";
 
 interface ApiErrorBody {
   error?: string;
@@ -84,11 +89,58 @@ export interface ReferralStats {
   referrals: ReferralClaim[];
 }
 
+export interface ProvenanceDetectionInput {
+  text?: string;
+  file?: File;
+  token?: string;
+  sha256?: string;
+}
+
 export const platformApi = {
   session: () => requestJson<SessionResponse>("/api/session"),
 
   capabilities: () =>
     requestJson<{ capabilities: CapabilityState }>("/api/capabilities"),
+
+  complianceStatus: () =>
+    requestJson<{ status: ComplianceStatus }>("/api/compliance/status"),
+
+  saveOperatorCompliance: (input: {
+    legalName: string;
+    entityType: "individual" | "company" | "other";
+    releaseStatus: "private-testing" | "closed-beta" | "public";
+    firstEuAvailabilityDate: string;
+    creativeScopeConfirmed: true;
+  }) =>
+    requestJson<{ status: ComplianceStatus }>("/api/compliance/operator", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
+  acknowledgeAiLiteracy: () =>
+    requestJson<{ status: ComplianceStatus }>("/api/compliance/ai-literacy", {
+      method: "POST",
+      body: JSON.stringify({ acknowledged: true }),
+    }),
+
+  detectProvenance: (input: ProvenanceDetectionInput) => {
+    if (input.file) {
+      const form = new FormData();
+      form.append("file", input.file);
+      return requestJson<ProvenanceDetectionResult>("/api/provenance/detect", {
+        method: "POST",
+        body: form,
+      });
+    }
+    return requestJson<ProvenanceDetectionResult>("/api/provenance/detect", {
+      method: "POST",
+      body: JSON.stringify({
+        ...(input.text ? { text: input.text } : {}),
+        ...(input.token ? { token: input.token } : {}),
+        ...(input.sha256 ? { sha256: input.sha256 } : {}),
+      }),
+    });
+  },
 
   workspace: () =>
     requestJson<{
@@ -102,8 +154,12 @@ export const platformApi = {
       body: JSON.stringify({ workspace }),
     }),
 
-  referralStats: () =>
-    requestJson<ReferralStats>("/api/referrals"),
+  editBrief: (projectId: string) =>
+    requestJson<{ filename: string; brief: Record<string, unknown> }>(
+      `/api/projects/${encodeURIComponent(projectId)}/edit-brief`
+    ),
+
+  referralStats: () => requestJson<ReferralStats>("/api/referrals"),
 
   claimReferral: (code: string) =>
     requestJson<{
@@ -158,18 +214,20 @@ export const platformApi = {
     selectedClipIds: string[];
     range?: { start: number; end: number };
   }) =>
-    requestJson<{ changes: EditOperation[]; summary: string }>(
-      "/api/ai/edit-plan",
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      }
-    ),
+    requestJson<{
+      changes: EditOperation[];
+      summary: string;
+      provenance: ContentProvenance;
+    }>("/api/ai/edit-plan", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
 
   analyzeVideo: (input: {
     assetId?: string;
     publicUrl?: string;
     platform: string;
+    sourceRightsConfirmed: boolean;
   }) =>
     requestJson<{
       summary: string;
@@ -182,24 +240,27 @@ export const platformApi = {
         note: string;
       }>;
       changes: EditOperation[];
+      provenance: ContentProvenance;
     }>("/api/ai/analyze", {
       method: "POST",
       body: JSON.stringify(input),
     }),
 
-  transcribe: (assetId: string, language?: string) =>
-    requestJson<{ transcript: string; segments: EditProject["transcript"] }>(
-      "/api/ai/transcribe",
-      {
-        method: "POST",
-        body: JSON.stringify({ assetId, language }),
-      }
-    ),
+  transcribe: (assetId: string, language?: string, projectId?: string) =>
+    requestJson<{
+      transcript: string;
+      segments: EditProject["transcript"];
+      provenance: ContentProvenance;
+    }>("/api/ai/transcribe", {
+      method: "POST",
+      body: JSON.stringify({ assetId, language, projectId }),
+    }),
 
   synthesizeSpeech: async (input: {
     text: string;
     voice: string;
     projectId?: string;
+    rightsConfirmed: true;
   }): Promise<Asset> => {
     const result = await requestJson<{ asset: Asset }>("/api/ai/speech", {
       method: "POST",
@@ -218,6 +279,9 @@ export const platformApi = {
     firstFrameUrl?: string;
     lastFrameUrl?: string;
     projectId?: string;
+    rightsConfirmed: true;
+    referenceContainsRealPerson: boolean;
+    realPersonConsentConfirmed: boolean;
   }) =>
     requestJson<{ job: GenerationJob }>("/api/video/jobs", {
       method: "POST",

@@ -1,4 +1,10 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const workspaceState = sqliteTable("workspace_state", {
   ownerEmail: text("owner_email").primaryKey().notNull(),
@@ -70,6 +76,100 @@ export const publishingIntents = sqliteTable(
     ),
   ]
 );
+
+/** EU-AI-02 — Server-owned provenance. No application delete/update route exists. */
+export const aiProvenanceRecords = sqliteTable(
+  "ai_provenance_records",
+  {
+    id: text("id").primaryKey().notNull(),
+    publicToken: text("public_token").notNull().unique(),
+    ownerEmail: text("owner_email").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    origin: text("origin").notNull(),
+    operation: text("operation").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    policyVersion: text("policy_version").notNull(),
+    signingKeyId: text("signing_key_id").notNull(),
+    markingMethod: text("marking_method").notNull(),
+    markingStatus: text("marking_status").notNull(),
+    contentSha256: text("content_sha256"),
+    metadataJson: text("metadata_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull(),
+    deletedAt: text("deleted_at"),
+  },
+  table => [
+    index("ai_provenance_owner_created_idx").on(
+      table.ownerEmail,
+      table.createdAt
+    ),
+    uniqueIndex("ai_provenance_owner_entity_unique").on(
+      table.ownerEmail,
+      table.entityType,
+      table.entityId
+    ),
+    index("ai_provenance_sha256_idx").on(table.contentSha256),
+  ]
+);
+
+/** EU-AI-03 — Durable trace for every provider-backed AI invocation. */
+export const aiInvocations = sqliteTable(
+  "ai_invocations",
+  {
+    id: text("id").primaryKey().notNull(),
+    ownerEmail: text("owner_email").notNull(),
+    purpose: text("purpose").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    policyVersion: text("policy_version").notNull(),
+    inputSha256: text("input_sha256").notNull(),
+    outputSha256: text("output_sha256"),
+    status: text("status").notNull(),
+    errorCode: text("error_code"),
+    createdAt: text("created_at").notNull(),
+    completedAt: text("completed_at"),
+  },
+  table => [
+    index("ai_invocations_owner_created_idx").on(
+      table.ownerEmail,
+      table.createdAt
+    ),
+  ]
+);
+
+/** EU-AI-10 — Append-only evidence events; excludes raw prompts and media. */
+export const complianceEvents = sqliteTable(
+  "compliance_events",
+  {
+    id: text("id").primaryKey().notNull(),
+    ownerEmail: text("owner_email"),
+    eventType: text("event_type").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    policyVersion: text("policy_version").notNull(),
+    detailsJson: text("details_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull(),
+  },
+  table => [
+    index("compliance_events_owner_created_idx").on(
+      table.ownerEmail,
+      table.createdAt
+    ),
+  ]
+);
+
+/** EU-AI-11 — Operator facts and Article 4 literacy evidence. */
+export const operatorCompliance = sqliteTable("operator_compliance", {
+  ownerEmail: text("owner_email").primaryKey().notNull(),
+  legalName: text("legal_name"),
+  entityType: text("entity_type"),
+  releaseStatus: text("release_status"),
+  firstEuAvailabilityDate: text("first_eu_availability_date"),
+  creativeScopeConfirmedAt: text("creative_scope_confirmed_at"),
+  aiLiteracyAcknowledgedAt: text("ai_literacy_acknowledged_at"),
+  updatedAt: text("updated_at").notNull(),
+});
 
 export const zernioProfiles = sqliteTable("zernio_profiles", {
   ownerEmail: text("owner_email").primaryKey().notNull(),

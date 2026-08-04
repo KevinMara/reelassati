@@ -20,6 +20,8 @@ import type {
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { WRITING_LANGUAGES } from "@/lib/languages";
+import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { copyTextWithProvenance } from "@/lib/provenance";
 
 const PLATFORMS: Array<{ value: Platform; label: string }> = [
   { value: "tiktok", label: "TikTok" },
@@ -46,8 +48,10 @@ const HOOK_PATTERNS = [
   {
     id: "contrarian",
     name: "Contrarian reset",
-    pattern: "Most people believe [common belief]. Here is what actually works for [topic].",
-    intent: "Challenge an assumption, then earn attention with a specific alternative.",
+    pattern:
+      "Most people believe [common belief]. Here is what actually works for [topic].",
+    intent:
+      "Challenge an assumption, then earn attention with a specific alternative.",
   },
   {
     id: "specific-result",
@@ -58,13 +62,15 @@ const HOOK_PATTERNS = [
   {
     id: "costly-mistake",
     name: "Costly mistake",
-    pattern: "If you are trying to [goal], stop doing [mistake] before your next attempt.",
+    pattern:
+      "If you are trying to [goal], stop doing [mistake] before your next attempt.",
     intent: "Make the risk concrete without manufacturing urgency.",
   },
   {
     id: "open-loop",
     name: "Open loop",
-    pattern: "The last step is why [topic] finally worked, but the first two make it possible.",
+    pattern:
+      "The last step is why [topic] finally worked, but the first two make it possible.",
     intent: "Promise a useful payoff and give the viewer a reason to stay.",
   },
   {
@@ -90,7 +96,7 @@ function composeFullScript(draft: ScriptDraft) {
 function createEvent(
   type: WorkspaceEvent["type"],
   label: string,
-  detail: string,
+  detail: string
 ): WorkspaceEvent {
   return {
     id: crypto.randomUUID(),
@@ -109,10 +115,12 @@ export default function ScriptGenerator() {
   const [tone, setTone] = useState<(typeof TONES)[number]>("energetic");
   const [duration, setDuration] = useState<(typeof DURATIONS)[number]>(30);
   const [language, setLanguage] = useState(
-    workspace.profile.contentLanguage || "en",
+    workspace.profile.contentLanguage || "en"
   );
   const [hookDirection, setHookDirection] = useState("");
-  const [generatedScript, setGeneratedScript] = useState<ScriptDraft | null>(null);
+  const [generatedScript, setGeneratedScript] = useState<ScriptDraft | null>(
+    null
+  );
   const [generating, setGenerating] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [copied, setCopied] = useState(false);
@@ -120,28 +128,32 @@ export default function ScriptGenerator() {
   const [error, setError] = useState<string | null>(null);
 
   const aiReady = capabilities.ai;
-  const aiMissing = capabilities.missing.filter((item) =>
-    item.includes("OPENROUTER"),
+  const aiMissing = capabilities.missing.filter(item =>
+    item.includes("OPENROUTER")
   );
 
   const saveScript = async (script: ScriptDraft, activityLabel: string) => {
     setSaveState("saving");
     try {
-      await updateWorkspace((current) => ({
+      const savedWorkspace = await updateWorkspace(current => ({
         ...current,
         scripts: [
           script,
-          ...current.scripts.filter((candidate) => candidate.id !== script.id),
+          ...current.scripts.filter(candidate => candidate.id !== script.id),
         ],
         activity: [
           createEvent(
             "script",
             activityLabel,
-            `${script.title} · ${script.platform} · ${script.duration}s`,
+            `${script.title} · ${script.platform} · ${script.duration}s`
           ),
           ...current.activity,
         ].slice(0, 100),
       }));
+      const canonical = savedWorkspace.scripts.find(
+        candidate => candidate.id === script.id
+      );
+      if (canonical) setGeneratedScript(canonical);
       setSaveState("saved");
     } catch (cause) {
       setSaveState("error");
@@ -182,7 +194,11 @@ export default function ScriptGenerator() {
       setGeneratedScript(script);
       await saveScript(script, "Script generated");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The script could not be generated.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The script could not be generated."
+      );
     } finally {
       setGenerating(false);
     }
@@ -190,12 +206,16 @@ export default function ScriptGenerator() {
 
   const updateDraft = (
     field: "title" | "hook" | "body" | "cta",
-    value: string,
+    value: string
   ) => {
-    setGeneratedScript((current) => {
+    setGeneratedScript(current => {
       if (!current) return current;
       const next = { ...current, [field]: value };
-      return { ...next, fullScript: composeFullScript(next) };
+      return {
+        ...next,
+        fullScript: composeFullScript(next),
+        provenance: undefined,
+      };
     });
     setSaveState("idle");
   };
@@ -206,7 +226,9 @@ export default function ScriptGenerator() {
     try {
       await saveScript(generatedScript, "Script updated");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The edits could not be saved.");
+      setError(
+        cause instanceof Error ? cause.message : "The edits could not be saved."
+      );
     }
   };
 
@@ -214,11 +236,16 @@ export default function ScriptGenerator() {
     if (!generatedScript) return;
     setError(null);
     try {
-      await navigator.clipboard.writeText(generatedScript.fullScript);
+      await copyTextWithProvenance(
+        generatedScript.fullScript,
+        generatedScript.provenance
+      );
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      setError("Clipboard access is blocked. Select the script text and copy it manually.");
+      setError(
+        "Clipboard access is blocked. Select the script text and copy it manually."
+      );
     }
   };
 
@@ -240,10 +267,12 @@ export default function ScriptGenerator() {
         >
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
-            <p className="text-sm font-medium">Script generation needs AI setup</p>
+            <p className="text-sm font-medium">
+              Script generation needs AI setup
+            </p>
             <p className="mt-1 text-xs text-foreground/55">
-              Connect the server-side AI provider before generating. Your prompts
-              are never sent directly from the browser.
+              Connect the server-side AI provider before generating. Your
+              prompts are never sent directly from the browser.
             </p>
             {aiMissing.length > 0 ? (
               <p className="mt-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
@@ -257,13 +286,16 @@ export default function ScriptGenerator() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
         <div className="space-y-5">
           <section className="rounded-xl border border-border bg-surface p-6">
-            <label className="mb-2 block text-sm font-medium" htmlFor="script-topic">
+            <label
+              className="mb-2 block text-sm font-medium"
+              htmlFor="script-topic"
+            >
               Topic, product, or argument
             </label>
             <textarea
               id="script-topic"
               value={topic}
-              onChange={(event) => setTopic(event.target.value)}
+              onChange={event => setTopic(event.target.value)}
               placeholder="Example: Why creators should edit for retention before adding effects"
               rows={3}
               maxLength={1200}
@@ -272,16 +304,21 @@ export default function ScriptGenerator() {
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-medium" htmlFor="script-platform">
+                <label
+                  className="mb-2 block text-sm font-medium"
+                  htmlFor="script-platform"
+                >
                   Platform
                 </label>
                 <select
                   id="script-platform"
                   value={platform}
-                  onChange={(event) => setPlatform(event.target.value as Platform)}
+                  onChange={event =>
+                    setPlatform(event.target.value as Platform)
+                  }
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 >
-                  {PLATFORMS.map((item) => (
+                  {PLATFORMS.map(item => (
                     <option key={item.value} value={item.value}>
                       {item.label}
                     </option>
@@ -289,18 +326,21 @@ export default function ScriptGenerator() {
                 </select>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium" htmlFor="script-tone">
+                <label
+                  className="mb-2 block text-sm font-medium"
+                  htmlFor="script-tone"
+                >
                   Tone
                 </label>
                 <select
                   id="script-tone"
                   value={tone}
-                  onChange={(event) =>
+                  onChange={event =>
                     setTone(event.target.value as (typeof TONES)[number])
                   }
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm capitalize"
                 >
-                  {TONES.map((item) => (
+                  {TONES.map(item => (
                     <option key={item} value={item}>
                       {item}
                     </option>
@@ -311,9 +351,11 @@ export default function ScriptGenerator() {
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <fieldset>
-                <legend className="mb-2 text-sm font-medium">Target length</legend>
+                <legend className="mb-2 text-sm font-medium">
+                  Target length
+                </legend>
                 <div className="flex gap-2">
-                  {DURATIONS.map((seconds) => (
+                  {DURATIONS.map(seconds => (
                     <button
                       key={seconds}
                       type="button"
@@ -331,16 +373,19 @@ export default function ScriptGenerator() {
                 </div>
               </fieldset>
               <div>
-                <label className="mb-2 block text-sm font-medium" htmlFor="script-language">
+                <label
+                  className="mb-2 block text-sm font-medium"
+                  htmlFor="script-language"
+                >
                   Language
                 </label>
                 <select
                   id="script-language"
                   value={language}
-                  onChange={(event) => setLanguage(event.target.value)}
+                  onChange={event => setLanguage(event.target.value)}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 >
-                  {WRITING_LANGUAGES.map((item) => (
+                  {WRITING_LANGUAGES.map(item => (
                     <option key={item.code} value={item.code}>
                       {item.label}
                     </option>
@@ -353,12 +398,13 @@ export default function ScriptGenerator() {
               className="mb-2 mt-4 block text-sm font-medium"
               htmlFor="hook-direction"
             >
-              Hook direction <span className="font-normal text-foreground/40">(optional)</span>
+              Hook direction{" "}
+              <span className="font-normal text-foreground/40">(optional)</span>
             </label>
             <textarea
               id="hook-direction"
               value={hookDirection}
-              onChange={(event) => setHookDirection(event.target.value)}
+              onChange={event => setHookDirection(event.target.value)}
               placeholder="Choose a pattern below or write the opening logic yourself."
               rows={3}
               className="w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -393,7 +439,7 @@ export default function ScriptGenerator() {
           <section className="rounded-xl border border-border bg-surface p-6">
             <button
               type="button"
-              onClick={() => setShowHooks((current) => !current)}
+              onClick={() => setShowHooks(current => !current)}
               aria-expanded={showHooks}
               className="flex w-full items-center justify-between text-left"
             >
@@ -415,7 +461,7 @@ export default function ScriptGenerator() {
                   className="overflow-hidden"
                 >
                   <div className="mt-4 space-y-2">
-                    {HOOK_PATTERNS.map((hook) => (
+                    {HOOK_PATTERNS.map(hook => (
                       <button
                         key={hook.id}
                         type="button"
@@ -433,8 +479,8 @@ export default function ScriptGenerator() {
                     ))}
                   </div>
                   <p className="mt-3 text-[11px] leading-relaxed text-foreground/40">
-                    These are writing structures, not performance guarantees. Edit
-                    the wording to match your proof, audience, and offer.
+                    These are writing structures, not performance guarantees.
+                    Edit the wording to match your proof, audience, and offer.
                   </p>
                 </motion.div>
               ) : null}
@@ -460,13 +506,20 @@ export default function ScriptGenerator() {
                       <input
                         aria-label="Script title"
                         value={generatedScript.title}
-                        onChange={(event) => updateDraft("title", event.target.value)}
+                        onChange={event =>
+                          updateDraft("title", event.target.value)
+                        }
                         className="w-full border-0 bg-transparent p-0 font-medium outline-none"
                       />
                       <p className="mt-1 text-xs text-foreground/45">
-                        {generatedScript.duration}s · {generatedScript.platform} ·{" "}
-                        {generatedScript.language.toUpperCase()}
+                        {generatedScript.duration}s · {generatedScript.platform}{" "}
+                        · {generatedScript.language.toUpperCase()}
                       </p>
+                      <div className="mt-2">
+                        <AiProvenanceBadge
+                          provenance={generatedScript.provenance}
+                        />
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -514,7 +567,9 @@ export default function ScriptGenerator() {
                     <textarea
                       id="generated-hook"
                       value={generatedScript.hook}
-                      onChange={(event) => updateDraft("hook", event.target.value)}
+                      onChange={event =>
+                        updateDraft("hook", event.target.value)
+                      }
                       rows={3}
                       className="w-full resize-none border-0 bg-transparent p-0 text-lg font-semibold outline-none"
                     />
@@ -529,7 +584,9 @@ export default function ScriptGenerator() {
                     <textarea
                       id="generated-body"
                       value={generatedScript.body}
-                      onChange={(event) => updateDraft("body", event.target.value)}
+                      onChange={event =>
+                        updateDraft("body", event.target.value)
+                      }
                       rows={10}
                       className="w-full resize-y border-0 bg-transparent p-0 text-sm leading-relaxed outline-none"
                     />
@@ -544,7 +601,7 @@ export default function ScriptGenerator() {
                     <textarea
                       id="generated-cta"
                       value={generatedScript.cta}
-                      onChange={(event) => updateDraft("cta", event.target.value)}
+                      onChange={event => updateDraft("cta", event.target.value)}
                       rows={2}
                       className="w-full resize-none border-0 bg-transparent p-0 text-sm font-medium outline-none"
                     />
@@ -557,7 +614,9 @@ export default function ScriptGenerator() {
                   disabled={saveState === "saving" || saving}
                   className="mt-4 w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
                 >
-                  {saveState === "saving" || saving ? "Saving edits" : "Save edits"}
+                  {saveState === "saving" || saving
+                    ? "Saving edits"
+                    : "Save edits"}
                 </button>
               </motion.section>
             ) : (
@@ -574,8 +633,8 @@ export default function ScriptGenerator() {
                   Direct the opening. Generate the draft.
                 </h2>
                 <p className="mt-2 max-w-sm text-sm text-foreground/45">
-                  The result stays editable and is stored in your content workspace,
-                  ready for the editor or Prompt Director.
+                  The result stays editable and is stored in your content
+                  workspace, ready for the editor or Prompt Director.
                 </p>
               </motion.section>
             )}
@@ -588,7 +647,7 @@ export default function ScriptGenerator() {
                 <h2 className="text-sm font-medium">Recent drafts</h2>
               </div>
               <div className="space-y-2">
-                {workspace.scripts.slice(0, 4).map((script) => (
+                {workspace.scripts.slice(0, 4).map(script => (
                   <button
                     type="button"
                     key={script.id}

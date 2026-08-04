@@ -47,6 +47,16 @@ The original Node/PostgreSQL API is retained as historical source while the
 Sites deployment uses the Worker-native API. New product work should target
 `sites/server.ts`, `contracts/workspace.ts`, and `src/lib/platform-api.ts`.
 
+## Compliance governance
+
+The durable EU AI Act control matrix, protected architecture invariants,
+provider register, change-review checklist, and incident runbook are indexed in
+[`docs/compliance/README.md`](docs/compliance/README.md). Read that index before
+changing any AI, export, publishing, upload, navigation, or Studio-entry flow.
+These records define controls and open release gates; they are not evidence that
+the current source or deployment is certified, fully compliant, or publicly
+launch-ready.
+
 ## Hosted variables
 
 Required for AI creation:
@@ -66,7 +76,36 @@ KIMI_CODE_MODEL=k3-256k
 
 This switch does not replace OpenRouter globally. Analysis, transcription,
 speech, and video generation continue to use their configured OpenRouter
-models. Leave `KIMI_TEST_MODE` disabled for the official product route.
+models. `KIMI_TEST_OWNER_EMAIL` must identify the single test owner. Leave
+`KIMI_TEST_MODE` disabled for the official product route.
+
+Required for platform-owned AI provenance and operator authorization:
+
+```text
+AI_PROVENANCE_SIGNING_KEY
+AI_PROVENANCE_SIGNING_KEY_ID
+COMPLIANCE_OPERATOR_OWNER_EMAIL
+```
+
+Keep historical verification material in
+`AI_PROVENANCE_VERIFICATION_KEYS_JSON` when rotating the active signing key;
+otherwise older legitimate marks become unverifiable. Never expose any signing
+or verification key to client code.
+
+The public-release checkpoint also reads the following evidence statuses:
+
+```text
+AI_MARKING_VALIDATION_STATUS
+AI_PROVIDER_EVIDENCE_STATUS
+AI_LEGAL_REVIEW_STATUS
+AI_INCIDENT_OPERATIONS_STATUS
+AI_PROVENANCE_LIFECYCLE_STATUS
+```
+
+Treat each as `pending` until the corresponding evidence package has actually
+been reviewed and approved. Do not set a status to `verified` merely to remove
+a UI blocker; the required evidence and accountable reviewer are defined in
+`docs/compliance/CONTROL_MATRIX.md` and `docs/compliance/README.md`.
 
 Required for social publishing:
 

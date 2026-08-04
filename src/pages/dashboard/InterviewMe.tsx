@@ -14,6 +14,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { Platform, ScriptDraft } from "@contracts/workspace";
 import { platformApi, PlatformApiError } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { copyTextWithProvenance } from "@/lib/provenance";
 
 interface InterviewQuestion {
   id: string;
@@ -50,9 +52,9 @@ export default function InterviewMe() {
   const [topic, setTopic] = useState("");
   const [niche, setNiche] = useState("");
   const [platform, setPlatform] = useState<Platform>("tiktok");
-  const [step, setStep] = useState<"setup" | "interview" | "generating" | "done">(
-    "setup",
-  );
+  const [step, setStep] = useState<
+    "setup" | "interview" | "generating" | "done"
+  >("setup");
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [script, setScript] = useState<ScriptDraft | null>(null);
@@ -78,7 +80,8 @@ export default function InterviewMe() {
       {
         id: "moment",
         eyebrow: "The proof",
-        prompt: "Describe one specific moment, result or mistake that changed your mind.",
+        prompt:
+          "Describe one specific moment, result or mistake that changed your mind.",
         guidance:
           "Use an observable detail: a number, a scene, a decision or a consequence.",
       },
@@ -92,9 +95,9 @@ export default function InterviewMe() {
       {
         id: "voice",
         eyebrow: "The point of view",
-        prompt: "What would you say that a generic creator would be afraid to say?",
-        guidance:
-          "Give the script a defensible opinion and your actual voice.",
+        prompt:
+          "What would you say that a generic creator would be afraid to say?",
+        guidance: "Give the script a defensible opinion and your actual voice.",
       },
       {
         id: "action",
@@ -104,7 +107,7 @@ export default function InterviewMe() {
           "Choose one outcome: try, save, comment, follow or visit—never all of them.",
       },
     ],
-    [topic],
+    [topic]
   );
 
   const currentQuestion = questions[questionIndex];
@@ -122,7 +125,7 @@ export default function InterviewMe() {
   const generateScript = async () => {
     if (!capabilities.ai) {
       setError(
-        "AI generation is not configured. Your interview answers remain on this screen; configure the server-side OpenRouter key before generating.",
+        "AI generation is not configured. Your interview answers remain on this screen; configure the server-side OpenRouter key before generating."
       );
       return;
     }
@@ -132,7 +135,7 @@ export default function InterviewMe() {
     const interviewContext = questions
       .map(
         (question, index) =>
-          `${index + 1}. ${question.prompt}\nAnswer: ${answers[question.id]?.trim() || "(not answered)"}`,
+          `${index + 1}. ${question.prompt}\nAnswer: ${answers[question.id]?.trim() || "(not answered)"}`
       )
       .join("\n\n");
     try {
@@ -152,11 +155,11 @@ export default function InterviewMe() {
         brandVoice: workspace.brandKit.voice || undefined,
       });
 
-      await updateWorkspace((current) => ({
+      await updateWorkspace(current => ({
         ...current,
         scripts: [
           result.script,
-          ...current.scripts.filter((item) => item.id !== result.script.id),
+          ...current.scripts.filter(item => item.id !== result.script.id),
         ],
         activity: [
           {
@@ -183,17 +186,19 @@ export default function InterviewMe() {
       await generateScript();
       return;
     }
-    setQuestionIndex((current) => current + 1);
+    setQuestionIndex(current => current + 1);
   };
 
   const copyScript = async () => {
     if (!script) return;
     try {
-      await navigator.clipboard.writeText(script.fullScript);
+      await copyTextWithProvenance(script.fullScript, script.provenance);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      setError("Clipboard access was blocked. Select the script and copy it manually.");
+      setError(
+        "Clipboard access was blocked. Select the script and copy it manually."
+      );
     }
   };
 
@@ -216,6 +221,9 @@ export default function InterviewMe() {
         <p className="mt-2 max-w-2xl text-foreground/60">
           Answer a focused editorial interview, then turn your own evidence into
           one production-ready short-form script.
+        </p>
+        <p className="mt-3 inline-flex rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs text-primary">
+          AI writes the final draft only after your guided answers are complete.
         </p>
       </div>
 
@@ -247,43 +255,52 @@ export default function InterviewMe() {
           >
             <div className="space-y-5">
               <div>
-                <label htmlFor="interview-topic" className="mb-2 block text-sm font-medium">
+                <label
+                  htmlFor="interview-topic"
+                  className="mb-2 block text-sm font-medium"
+                >
                   What should this short be about?
                 </label>
                 <input
                   id="interview-topic"
                   value={topic}
-                  onChange={(event) => setTopic(event.target.value)}
+                  onChange={event => setTopic(event.target.value)}
                   placeholder="The lesson I learned after launching too early…"
                   className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="interview-niche" className="mb-2 block text-sm font-medium">
+                  <label
+                    htmlFor="interview-niche"
+                    className="mb-2 block text-sm font-medium"
+                  >
                     Niche
                   </label>
                   <input
                     id="interview-niche"
                     value={niche}
-                    onChange={(event) => setNiche(event.target.value)}
+                    onChange={event => setNiche(event.target.value)}
                     placeholder="Design, fitness, business…"
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm"
                   />
                 </div>
                 <div>
-                  <label htmlFor="interview-platform" className="mb-2 block text-sm font-medium">
+                  <label
+                    htmlFor="interview-platform"
+                    className="mb-2 block text-sm font-medium"
+                  >
                     Destination
                   </label>
                   <select
                     id="interview-platform"
                     value={platform}
-                    onChange={(event) =>
+                    onChange={event =>
                       setPlatform(event.target.value as Platform)
                     }
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm"
                   >
-                    {PLATFORM_OPTIONS.map((option) => (
+                    {PLATFORM_OPTIONS.map(option => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -315,7 +332,9 @@ export default function InterviewMe() {
               <span>
                 Question {questionIndex + 1} of {questions.length}
               </span>
-              <span>{Math.round(((questionIndex + 1) / questions.length) * 100)}%</span>
+              <span>
+                {Math.round(((questionIndex + 1) / questions.length) * 100)}%
+              </span>
             </div>
             <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-surface">
               <div
@@ -340,8 +359,8 @@ export default function InterviewMe() {
               <textarea
                 autoFocus
                 value={currentAnswer}
-                onChange={(event) =>
-                  setAnswers((current) => ({
+                onChange={event =>
+                  setAnswers(current => ({
                     ...current,
                     [currentQuestion.id]: event.target.value,
                   }))
@@ -357,7 +376,7 @@ export default function InterviewMe() {
                   onClick={() =>
                     questionIndex === 0
                       ? setStep("setup")
-                      : setQuestionIndex((current) => current - 1)
+                      : setQuestionIndex(current => current - 1)
                   }
                   className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-background"
                 >
@@ -419,6 +438,9 @@ export default function InterviewMe() {
                     {script.platform}
                   </span>
                   <h2 className="mt-3 text-xl font-semibold">{script.title}</h2>
+                  <div className="mt-2">
+                    <AiProvenanceBadge provenance={script.provenance} />
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -437,7 +459,9 @@ export default function InterviewMe() {
               <div className="space-y-5">
                 <div>
                   <p className="mono-eyebrow mb-2 text-primary">Hook</p>
-                  <p className="text-base font-medium leading-relaxed">{script.hook}</p>
+                  <p className="text-base font-medium leading-relaxed">
+                    {script.hook}
+                  </p>
                 </div>
                 <div>
                   <p className="mono-eyebrow mb-2 text-primary">Body</p>
@@ -446,7 +470,9 @@ export default function InterviewMe() {
                   </p>
                 </div>
                 <div>
-                  <p className="mono-eyebrow mb-2 text-primary">Call to action</p>
+                  <p className="mono-eyebrow mb-2 text-primary">
+                    Call to action
+                  </p>
                   <p className="text-sm font-medium">{script.cta}</p>
                 </div>
               </div>

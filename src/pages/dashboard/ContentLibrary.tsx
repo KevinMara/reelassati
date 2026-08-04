@@ -24,6 +24,8 @@ import type { Asset, AssetKind, ScriptDraft } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
+import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { copyTextWithProvenance } from "@/lib/provenance";
 
 type LibraryFilter = "all" | AssetKind;
 
@@ -64,7 +66,11 @@ const KIND_META: Record<
     icon: ImageIcon,
     color: "bg-emerald-500/10 text-emerald-500",
   },
-  audio: { label: "Audio", icon: Music, color: "bg-purple-500/10 text-purple-500" },
+  audio: {
+    label: "Audio",
+    icon: Music,
+    color: "bg-purple-500/10 text-purple-500",
+  },
   script: {
     label: "Script",
     icon: FileText,
@@ -106,13 +112,8 @@ function AssetPreview({ asset }: { asset: Asset }) {
 }
 
 export default function ContentLibrary() {
-  const {
-    workspace,
-    capabilities,
-    updateWorkspace,
-    loading,
-    saving,
-  } = useWorkspace();
+  const { workspace, capabilities, updateWorkspace, loading, saving } =
+    useWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filter, setFilter] = useState<LibraryFilter>("all");
@@ -129,33 +130,29 @@ export default function ContentLibrary() {
   const items = useMemo<LibraryItem[]>(
     () =>
       [
-        ...workspace.assets.map(
-          (asset): LibraryItem => ({
-            id: `asset-${asset.id}`,
-            source: "asset",
-            title: asset.name,
-            kind: asset.kind,
-            createdAt: asset.createdAt,
-            asset,
-          }),
-        ),
-        ...workspace.scripts.map(
-          (script): LibraryItem => ({
-            id: `script-${script.id}`,
-            source: "script",
-            title: script.title,
-            kind: "script",
-            createdAt: script.createdAt,
-            script,
-          }),
-        ),
+        ...workspace.assets.map((asset): LibraryItem => ({
+          id: `asset-${asset.id}`,
+          source: "asset",
+          title: asset.name,
+          kind: asset.kind,
+          createdAt: asset.createdAt,
+          asset,
+        })),
+        ...workspace.scripts.map((script): LibraryItem => ({
+          id: `script-${script.id}`,
+          source: "script",
+          title: script.title,
+          kind: "script",
+          createdAt: script.createdAt,
+          script,
+        })),
       ].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
-    [workspace.assets, workspace.scripts],
+    [workspace.assets, workspace.scripts]
   );
 
   const filteredItems = useMemo(
     () =>
-      items.filter((item) => {
+      items.filter(item => {
         if (filter !== "all" && item.kind !== filter) return false;
         return (
           !deferredSearch ||
@@ -163,7 +160,7 @@ export default function ContentLibrary() {
           item.kind.includes(deferredSearch)
         );
       }),
-    [deferredSearch, filter, items],
+    [deferredSearch, filter, items]
   );
 
   const uploadSelectedFile = async (file: File | undefined) => {
@@ -173,12 +170,16 @@ export default function ContentLibrary() {
     setUploadProgress(0);
     setNotice(null);
     try {
-      const asset = await platformApi.uploadAsset(file, undefined, setUploadProgress);
-      await updateWorkspace((current) => ({
+      const asset = await platformApi.uploadAsset(
+        file,
+        undefined,
+        setUploadProgress
+      );
+      await updateWorkspace(current => ({
         ...current,
         assets: [
           asset,
-          ...current.assets.filter((existing) => existing.id !== asset.id),
+          ...current.assets.filter(existing => existing.id !== asset.id),
         ],
         activity: [
           {
@@ -191,7 +192,10 @@ export default function ContentLibrary() {
           ...current.activity,
         ].slice(0, 100),
       }));
-      setNotice({ tone: "success", message: `${asset.name} is ready in your library.` });
+      setNotice({
+        tone: "success",
+        message: `${asset.name} is ready in your library.`,
+      });
     } catch (cause) {
       setNotice({
         tone: "error",
@@ -211,7 +215,7 @@ export default function ContentLibrary() {
 
   const { isDragging, dropZoneProps } = useFileDropZone({
     disabled: uploading || !capabilities.uploads,
-    onFiles: (files) => void uploadSelectedFile(files[0]),
+    onFiles: files => void uploadSelectedFile(files[0]),
   });
 
   const deleteItem = async (item: LibraryItem) => {
@@ -221,34 +225,39 @@ export default function ContentLibrary() {
     try {
       if (item.source === "asset") {
         await platformApi.deleteAsset(item.asset.id);
-        await updateWorkspace((current) => ({
+        await updateWorkspace(current => ({
           ...current,
-          assets: current.assets.filter((asset) => asset.id !== item.asset.id),
-          projects: current.projects.map((project) => ({
+          assets: current.assets.filter(asset => asset.id !== item.asset.id),
+          projects: current.projects.map(project => ({
             ...project,
             activeAssetId:
               project.activeAssetId === item.asset.id
                 ? undefined
                 : project.activeAssetId,
-            clips: project.clips.filter((clip) => clip.assetId !== item.asset.id),
+            clips: project.clips.filter(clip => clip.assetId !== item.asset.id),
           })),
-          posts: current.posts.map((post) =>
+          posts: current.posts.map(post =>
             post.mediaAssetId === item.asset.id
               ? { ...post, mediaAssetId: undefined }
-              : post,
+              : post
           ),
         }));
       } else {
-        await updateWorkspace((current) => ({
+        await updateWorkspace(current => ({
           ...current,
-          scripts: current.scripts.filter((script) => script.id !== item.script.id),
+          scripts: current.scripts.filter(
+            script => script.id !== item.script.id
+          ),
         }));
       }
       setNotice({ tone: "success", message: `${item.title} was deleted.` });
     } catch (cause) {
       setNotice({
         tone: "error",
-        message: cause instanceof Error ? cause.message : "The item could not be deleted.",
+        message:
+          cause instanceof Error
+            ? cause.message
+            : "The item could not be deleted.",
       });
     } finally {
       setDeletingId(null);
@@ -277,8 +286,8 @@ export default function ContentLibrary() {
           <p className="mono-eyebrow mb-2 text-primary">Private media system</p>
           <h1 className="text-3xl font-semibold">Content Library</h1>
           <p className="mt-2 max-w-2xl text-sm text-foreground/55">
-            Your uploaded footage, generated media, exports, and saved scripts—nothing
-            staged or fabricated.
+            Your uploaded footage, generated media, exports, and saved
+            scripts—nothing staged or fabricated.
           </p>
         </div>
         <div>
@@ -335,13 +344,13 @@ export default function ContentLibrary() {
           <input
             type="search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={event => setSearch(event.target.value)}
             placeholder="Search by name or type"
             className="w-full rounded-lg border border-border bg-surface py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/30"
           />
         </label>
         <div className="flex flex-wrap gap-1" aria-label="Filter library">
-          {FILTERS.map((option) => (
+          {FILTERS.map(option => (
             <button
               key={option.value}
               type="button"
@@ -391,7 +400,9 @@ export default function ContentLibrary() {
         <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-14 text-center">
           <FileText className="mx-auto h-7 w-7 text-primary" />
           <h2 className="mt-4 font-medium">
-            {items.length ? "No matching content" : "Your reusable library starts here"}
+            {items.length
+              ? "No matching content"
+              : "Your reusable library starts here"}
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-sm text-foreground/50">
             {items.length
@@ -415,20 +426,22 @@ export default function ContentLibrary() {
               : "space-y-3"
           }
         >
-          {filteredItems.map((item) => {
+          {filteredItems.map(item => {
             const meta = KIND_META[item.kind];
             const Icon = meta.icon;
             const isDeleting = deletingId === item.id;
             return (
               <article
                 key={item.id}
-                className={`overflow-hidden rounded-xl border border-border bg-surface transition-shadow hover:shadow-card-hover ${
+                className={`relative overflow-visible rounded-xl border border-border bg-surface transition-shadow focus-within:z-30 hover:shadow-card-hover ${
                   viewMode === "list" ? "flex items-center gap-4 p-4" : ""
                 }`}
               >
                 <div
                   className={`flex shrink-0 items-center justify-center overflow-hidden bg-background ${
-                    viewMode === "grid" ? "aspect-video w-full" : "h-14 w-20 rounded-lg"
+                    viewMode === "grid"
+                      ? "aspect-video w-full rounded-t-xl"
+                      : "h-14 w-20 rounded-lg"
                   }`}
                 >
                   {item.source === "asset" ? (
@@ -445,13 +458,28 @@ export default function ContentLibrary() {
                       >
                         {meta.label}
                       </span>
-                      <h2 className="mt-2 truncate text-sm font-medium" title={item.title}>
+                      <h2
+                        className="mt-2 truncate text-sm font-medium"
+                        title={item.title}
+                      >
                         {item.title}
                       </h2>
                       <p className="mt-1 text-xs text-foreground/45">
                         {new Date(item.createdAt).toLocaleDateString()}
-                        {item.source === "asset" ? ` · ${formatBytes(item.asset.size)}` : ""}
+                        {item.source === "asset"
+                          ? ` · ${formatBytes(item.asset.size)}`
+                          : ""}
                       </p>
+                      <div className="mt-2">
+                        <AiProvenanceBadge
+                          provenance={
+                            item.source === "asset"
+                              ? item.asset.provenance
+                              : item.script.provenance
+                          }
+                          compact
+                        />
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -475,7 +503,7 @@ export default function ContentLibrary() {
                         rel="noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-hover"
                       >
-                        Open original <ExternalLink className="h-3 w-3" />
+                        Open asset <ExternalLink className="h-3 w-3" />
                       </a>
                     ) : (
                       <details className="text-xs">
@@ -485,6 +513,18 @@ export default function ContentLibrary() {
                         <p className="mt-3 whitespace-pre-wrap rounded-lg bg-background p-3 leading-relaxed text-foreground/65">
                           {item.script.fullScript}
                         </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void copyTextWithProvenance(
+                              item.script.fullScript,
+                              item.script.provenance
+                            )
+                          }
+                          className="mt-2 text-[11px] font-medium text-primary hover:underline"
+                        >
+                          Copy with origin record
+                        </button>
                       </details>
                     )}
                   </div>
