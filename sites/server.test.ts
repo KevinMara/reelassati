@@ -169,6 +169,86 @@ function createStatefulD1Stub() {
   };
 }
 
+function createReferralD1Stub() {
+  const claim = {
+    id: "claim-1",
+    referral_code: "REEL-ABC123",
+    referrer_email: "referrer@example.com",
+    referred_email: "buyer@example.com",
+    status: "pending" as "pending" | "verified",
+    credits_awarded: 0,
+    value_cents: 0,
+    qualified_at: null as string | null,
+    payment_event_id: null as string | null,
+    plan_id: null as string | null,
+    created_at: "2026-08-06T00:00:00.000Z",
+  };
+  const prepare = (query: string) => {
+    let bindings: unknown[] = [];
+    const statement = {
+      bind: (...values: unknown[]) => {
+        bindings = values;
+        return statement;
+      },
+      run: async () => {
+        if (/UPDATE referral_claims\s+SET status = 'verified'/i.test(query)) {
+          if (claim.status === "verified") {
+            return { success: true, meta: { changes: 0 } };
+          }
+          claim.status = "verified";
+          claim.credits_awarded = Number(bindings[0]);
+          claim.value_cents = Number(bindings[1]);
+          claim.qualified_at = String(bindings[2]);
+          claim.payment_event_id = String(bindings[3]);
+          claim.plan_id = String(bindings[4]);
+        }
+        return { success: true, meta: { changes: 1 } };
+      },
+      first: async () => {
+        if (/FROM referral_claims\s+WHERE referred_email = \?/i.test(query)) {
+          return bindings[0] === claim.referred_email ? { ...claim } : null;
+        }
+        if (/FROM referral_claims WHERE id = \?/i.test(query)) {
+          return bindings[0] === claim.id ? { ...claim } : null;
+        }
+        return null;
+      },
+      all: async () => ({ success: true, results: [], meta: {} }),
+      raw: async () => [],
+    };
+    return statement;
+  };
+  return {
+    claim,
+    database: {
+      prepare,
+      batch: async (statements: Array<{ run(): Promise<unknown> }>) =>
+        Promise.all(statements.map(statement => statement.run())),
+      exec: async () => ({ count: 0, duration: 0 }),
+    },
+  };
+}
+
+async function referralSignature(rawBody: string, secret: string) {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const digest = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`${timestamp},${rawBody}`)
+  );
+  const signature = Array.from(new Uint8Array(digest), byte =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+  return `t=${timestamp},v1=${signature}`;
+}
+
 const env = {
   ASSETS: {
     fetch: async () => new Response("not found", { status: 404 }),
@@ -246,6 +326,68 @@ describe("Sites worker", () => {
     expect(await response.json()).toEqual({
       ok: true,
       storage: { d1: true, r2: true },
+    });
+  });
+
+  it("qualifies referral rewards only from a signed, idempotent billing event", async () => {
+    const secret = "billing-webhook-secret-at-least-24-characters";
+    const rawBody = JSON.stringify({
+      type: "paid_plan_purchased",
+      eventId: "payment-event-123",
+      customerEmail: "buyer@example.com",
+      planId: "creator-pro",
+      paymentStatus: "paid",
+    });
+    const referral = createReferralD1Stub();
+    const request = (signature: string) =>
+      new Request("https://studio.example/api/referrals/billing-webhook", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-reelassati-signature": signature,
+        },
+        body: rawBody,
+      });
+    const referralEnv = {
+      ...env,
+      DB: referral.database,
+      REFERRAL_BILLING_WEBHOOK_SECRET: secret,
+    };
+
+    const rejected = await worker.fetch(
+      request("t=0,v1=invalid"),
+      referralEnv as never
+    );
+    expect(rejected.status).toBe(401);
+    expect(referral.claim.status).toBe("pending");
+
+    const accepted = await worker.fetch(
+      request(await referralSignature(rawBody, secret)),
+      referralEnv as never
+    );
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toMatchObject({
+      verified: true,
+      alreadyQualified: false,
+      creditsAwarded: 500,
+    });
+    expect(referral.claim).toMatchObject({
+      status: "verified",
+      credits_awarded: 500,
+      value_cents: 500,
+      payment_event_id: "payment-event-123",
+      plan_id: "creator-pro",
+    });
+
+    const replay = await worker.fetch(
+      request(await referralSignature(rawBody, secret)),
+      referralEnv as never
+    );
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      verified: true,
+      alreadyQualified: true,
+      creditsAwarded: 500,
     });
   });
 

@@ -4,6 +4,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Logo } from "@/components/Logo";
 import {
   Link,
+  Navigate,
   useNavigate,
   useLocation,
   Routes,
@@ -44,30 +45,61 @@ import {
   Radio,
   type LucideIcon,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace";
 import { platformApi } from "@/lib/platform-api";
 import type { ComplianceStatus } from "@contracts/compliance";
 
-// Dashboard pages
-import ScriptGenerator from "./dashboard/ScriptGenerator";
-import VideoAnalyzer from "./dashboard/VideoAnalyzer";
-import EditorPage from "./dashboard/EditorPage";
-import PublisherPage from "./dashboard/PublisherPage";
-import AnalyticsPage from "./dashboard/AnalyticsPage";
-import ContentLibrary from "./dashboard/ContentLibrary";
-import ClientsPage from "./dashboard/ClientsPage";
-import CalendarPage from "./dashboard/CalendarPage";
-import SocialHub from "./dashboard/SocialHub";
-import SettingsPage from "./dashboard/SettingsPage";
-import TrendsPage from "./dashboard/TrendsPage";
-import VideoGenerator from "./dashboard/VideoGenerator";
-import VoiceNotes from "./dashboard/VoiceNotes";
-import InterviewMe from "./dashboard/InterviewMe";
-import GoalTracker from "./dashboard/GoalTracker";
-import CoachingPage from "./dashboard/CoachingPage";
-import ReferralPage from "./dashboard/ReferralPage";
+function formatActivityTime(timestamp: string, now: number): string {
+  const time = new Date(timestamp).getTime();
+  if (!Number.isFinite(time)) return "Unknown time";
+  const days = Math.round((time - now) / 86_400_000);
+  if (Math.abs(days) <= 30) {
+    return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(
+      days,
+      "day"
+    );
+  }
+  return new Date(time).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year:
+      new Date(time).getFullYear() === new Date(now).getFullYear()
+        ? undefined
+        : "numeric",
+  });
+}
+
+const ScriptGenerator = lazy(() => import("./dashboard/ScriptGenerator"));
+const VideoAnalyzer = lazy(() => import("./dashboard/VideoAnalyzer"));
+const EditorPage = lazy(() => import("./dashboard/EditorPage"));
+const PublisherPage = lazy(() => import("./dashboard/PublisherPage"));
+const AnalyticsPage = lazy(() => import("./dashboard/AnalyticsPage"));
+const ContentLibrary = lazy(() => import("./dashboard/ContentLibrary"));
+const ClientsPage = lazy(() => import("./dashboard/ClientsPage"));
+const CalendarPage = lazy(() => import("./dashboard/CalendarPage"));
+const SocialHub = lazy(() => import("./dashboard/SocialHub"));
+const SettingsPage = lazy(() => import("./dashboard/SettingsPage"));
+const TrendsPage = lazy(() => import("./dashboard/TrendsPage"));
+const VideoGenerator = lazy(() => import("./dashboard/VideoGenerator"));
+const VoiceNotes = lazy(() => import("./dashboard/VoiceNotes"));
+const InterviewMe = lazy(() => import("./dashboard/InterviewMe"));
+const GoalTracker = lazy(() => import("./dashboard/GoalTracker"));
+const CoachingPage = lazy(() => import("./dashboard/CoachingPage"));
+const ReferralPage = lazy(() => import("./dashboard/ReferralPage"));
+
+function StudioPageFallback() {
+  return (
+    <div
+      className="flex min-h-[55vh] items-center justify-center"
+      role="status"
+      aria-label="Loading Studio tool"
+    >
+      <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    </div>
+  );
+}
 
 // ── Dashboard Home ──
 function DashboardHome() {
@@ -251,7 +283,10 @@ function DashboardHome() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Recent Activity */}
-        <div className="lg:col-span-2 bg-surface border border-border rounded-xl p-6">
+        <div
+          id="recent-activity"
+          className="scroll-mt-20 lg:col-span-2 bg-surface border border-border rounded-xl p-6"
+        >
           <h2 className="font-medium mb-4">Recent Activity</h2>
           <div className="space-y-3">
             {recentActivity.length ? (
@@ -270,18 +305,7 @@ function DashboardHome() {
                     </p>
                   </div>
                   <span className="text-xs text-foreground/30">
-                    {new Intl.RelativeTimeFormat(undefined, {
-                      numeric: "auto",
-                    }).format(
-                      Math.max(
-                        -30,
-                        Math.round(
-                          (new Date(item.createdAt).getTime() - now) /
-                            86_400_000
-                        )
-                      ),
-                      "day"
-                    )}
+                    {formatActivityTime(item.createdAt, now)}
                   </span>
                 </div>
               ))
@@ -753,7 +777,9 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background text-foreground flex">
       {/* Mobile overlay */}
       {mobileOpen && (
-        <div
+        <button
+          type="button"
+          aria-label="Close navigation"
           className="fixed inset-0 bg-black/40 z-40 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
@@ -772,7 +798,10 @@ export default function Dashboard() {
             <Logo collapsed={collapsed} />
           </Link>
           <button
+            type="button"
             onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+            aria-expanded={!collapsed}
             className="hidden lg:flex p-1.5 rounded-md text-foreground/40 hover:text-foreground"
           >
             {collapsed ? (
@@ -782,7 +811,9 @@ export default function Dashboard() {
             )}
           </button>
           <button
+            type="button"
             onClick={() => setMobileOpen(false)}
+            aria-label="Close navigation"
             className="lg:hidden p-1.5"
           >
             <X className="h-4 w-4" />
@@ -792,7 +823,11 @@ export default function Dashboard() {
         <div className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
           {navItems.map((item, i) =>
             item.separator ? (
-              <div key={`sep-${i}`} className="border-t border-border my-2" />
+              <div
+                key={`sep-${i}`}
+                role="separator"
+                className="border-t border-border my-2"
+              />
             ) : (
               <SidebarItem
                 key={item.to}
@@ -811,6 +846,7 @@ export default function Dashboard() {
 
         <div className="shrink-0 border-t border-border p-3">
           <button
+            type="button"
             onClick={logout}
             className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors w-full"
           >
@@ -824,6 +860,7 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-30 flex items-center px-4 gap-3">
           <button
+            type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation"
             className="lg:hidden p-2 -ml-2"
@@ -835,19 +872,26 @@ export default function Dashboard() {
           </span>
           <div className="flex-1" />
           <Link
-            to="/dashboard/library"
+            to="/dashboard/library?focus=search"
             className="hidden sm:flex items-center gap-1 h-9 px-3 rounded-md border border-border bg-surface text-xs text-foreground/50 hover:text-foreground"
           >
             <Search className="h-3.5 w-3.5 mr-1" /> Find assets
           </Link>
           <Link
-            to="/dashboard"
+            to="/dashboard#recent-activity"
             aria-label="Recent activity"
             className="p-2 text-foreground/70"
           >
             <Bell className="h-[18px] w-[18px]" />
           </Link>
-          <button onClick={toggleTheme} className="p-2 text-foreground/70">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={
+              theme === "light" ? "Use dark theme" : "Use light theme"
+            }
+            className="p-2 text-foreground/70"
+          >
             {theme === "light" ? (
               <Moon className="h-4 w-4" />
             ) : (
@@ -855,7 +899,13 @@ export default function Dashboard() {
             )}
           </button>
           <button
+            type="button"
             onClick={toggleLang}
+            aria-label={
+              i18n.language === "it"
+                ? "Switch to English"
+                : "Passa all’italiano"
+            }
             className="flex items-center gap-1 text-xs text-foreground/50"
           >
             <Globe className="h-3.5 w-3.5" />{" "}
@@ -864,27 +914,30 @@ export default function Dashboard() {
         </header>
 
         <main className="flex-1 p-6 lg:p-10 w-full">
-          <Routes>
-            <Route path="/" element={<DashboardHome />} />
-            <Route path="/analyze" element={<VideoAnalyzer />} />
-            <Route path="/script" element={<ScriptGenerator />} />
-            <Route path="/video" element={<VideoGenerator />} />
-            <Route path="/edit" element={<EditorPage />} />
-            <Route path="/publish" element={<PublisherPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/library" element={<ContentLibrary />} />
-            <Route path="/clients" element={<ClientsPage />} />
-            <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/social" element={<SocialHub />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/trends" element={<TrendsPage />} />
-            <Route path="/voice" element={<VoiceNotes />} />
-            <Route path="/interview" element={<InterviewMe />} />
-            <Route path="/goals" element={<GoalTracker />} />
-            <Route path="/coaching" element={<CoachingPage />} />
-            <Route path="/referral" element={<ReferralPage />} />
-            <Route path="/status" element={<StudioStatus />} />
-          </Routes>
+          <Suspense fallback={<StudioPageFallback />}>
+            <Routes>
+              <Route path="/" element={<DashboardHome />} />
+              <Route path="/analyze" element={<VideoAnalyzer />} />
+              <Route path="/script" element={<ScriptGenerator />} />
+              <Route path="/video" element={<VideoGenerator />} />
+              <Route path="/edit" element={<EditorPage />} />
+              <Route path="/publish" element={<PublisherPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/library" element={<ContentLibrary />} />
+              <Route path="/clients" element={<ClientsPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/social" element={<SocialHub />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/trends" element={<TrendsPage />} />
+              <Route path="/voice" element={<VoiceNotes />} />
+              <Route path="/interview" element={<InterviewMe />} />
+              <Route path="/goals" element={<GoalTracker />} />
+              <Route path="/coaching" element={<CoachingPage />} />
+              <Route path="/referral" element={<ReferralPage />} />
+              <Route path="/status" element={<StudioStatus />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </div>
@@ -907,6 +960,8 @@ function SidebarItem({
   return (
     <Link
       to={to}
+      aria-label={collapsed ? label : undefined}
+      title={collapsed ? label : undefined}
       className={cn(
         "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
         active
@@ -914,7 +969,7 @@ function SidebarItem({
           : "text-foreground/70 hover:text-foreground hover:bg-foreground/[0.04]"
       )}
     >
-      <Icon className="h-[18px] w-[18px] shrink-0" />
+      <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );

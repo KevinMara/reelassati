@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { WorkspaceProvider } from "@/providers/workspace";
 import { ReferralCapture } from "@/components/ReferralCapture";
@@ -49,10 +49,47 @@ function StudioRoute() {
   );
 }
 
+function ScrollManager() {
+  const { hash, pathname } = useLocation();
+
+  useEffect(() => {
+    let retryTimer = 0;
+    let retry = 0;
+    const scroll = () => {
+      if (!hash) {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        return;
+      }
+      const id = decodeURIComponent(hash.slice(1));
+      const target = document.getElementById(id);
+      if (target) {
+        target.scrollIntoView({
+          block: "start",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+            .matches
+            ? "auto"
+            : "smooth",
+        });
+        return;
+      }
+      // Lazy routes may still be resolving after code and workspace data load.
+      if (retry < 40) {
+        retry += 1;
+        retryTimer = window.setTimeout(scroll, 50);
+      }
+    };
+    retryTimer = window.setTimeout(scroll, 0);
+    return () => window.clearTimeout(retryTimer);
+  }, [hash, pathname]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <ReferralCapture />
+      <ScrollManager />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -70,7 +107,7 @@ export default function App() {
           <Route path="/dashboard" element={<StudioRoute />} />
           <Route path="/dashboard/*" element={<StudioRoute />} />
           <Route path="/entry" element={<EntryDemo />} />
-          <Route path="*" element={<Home />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </AuthProvider>

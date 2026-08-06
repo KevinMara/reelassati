@@ -222,6 +222,7 @@ Current surfaces to preserve:
 - Voice Studio: audio upload section;
 - Analyze: video upload section;
 - Library: video/audio/image upload section.
+- Public Provenance Detector: supported media/document inspection section.
 
 Any new file input creates a checklist trigger: define its local drop surface,
 accepted types, disabled/busy state, feedback, error path, accessibility, and
@@ -401,3 +402,62 @@ Do not “solve” compliance by:
   animation as collateral damage from compliance work;
 - claiming that passing tests, a successful deployment, code comments, or this
   documentation proves legal compliance.
+
+## H. General functional integrity
+
+### `INV-FUNC-001` — A visible control performs its stated action
+
+- Buttons, links, filters, transport controls, refresh actions, copy/share
+  actions, downloads, destructive actions, and route shortcuts must not be
+  decorative or silently no-op.
+- The editor transport controls the actual selected audio/video element. Play,
+  pause, native media controls, playhead sliders, clip in-point, speed, mute and
+  volume must stay synchronized.
+- A control that depends on an unavailable provider or renderer is disabled or
+  labelled as unavailable. It must not fabricate success, progress, analytics,
+  billing, publishing, generation, or export completion.
+- Destructive actions require clear scope and confirmation where an accidental
+  click would permanently remove user work.
+
+### `INV-FUNC-002` — Failures remain visible and recoverable
+
+- Asynchronous workspace mutations must catch and present failures. An
+  unhandled rejected promise must not leave the interface looking saved.
+- Optimistic workspace state remains marked unsaved until the authoritative
+  revision is accepted. Conflict reload, backup and retry paths remain
+  available.
+- Reloading the authoritative workspace clears stale optimistic/conflict state
+  and invalidates older local mutation callbacks.
+- API clients reject HTML/SPA fallbacks, malformed success bodies and network
+  failures with a bounded, user-facing error rather than parsing them as data.
+- Downloads attach the temporary anchor before activation and revoke object
+  URLs after the browser has consumed the click.
+
+### `INV-FUNC-003` — Navigation, theme and accessibility are state-consistent
+
+- Unknown public and Studio routes use explicit safe redirects; lazy hash
+  targets are retried for a bounded period and header shortcuts land on/focus
+  the control they name.
+- Theme state is shared between all mounted controls, synchronized across tabs,
+  follows system changes only when no explicit preference exists, and is
+  applied before first paint.
+- Native buttons specify their type. Icon-only controls have accessible names;
+  overlays, dialogs and timeline controls retain keyboard/focus behavior.
+- Audio/video previews expose names and a caption, transcript or truthful
+  missing-alternative status. Accessibility text must describe real available
+  content, not invent captions.
+
+### `INV-FUNC-004` — External rewards and provider states fail honestly
+
+- Referral claims may be stored during private beta, but credits become
+  verified only after a current, signed, time-bounded and idempotent billing
+  event for the referred account.
+- When billing verification is not configured, the interface says rewards are
+  pending and never presents them as earned or available.
+- Provider capability flags and runtime route facts come from the Worker. A
+  missing external credential disables the affected action without weakening
+  unrelated local/manual work.
+
+Evidence: `src/functional-regressions.test.ts`, endpoint and integrity tests,
+`docs/qa/FUNCTIONAL_AUDIT_2026-08-07.md`, production build output, and the
+release-specific evidence record.

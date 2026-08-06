@@ -45,8 +45,20 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const responseText = await response.text();
+  const isJson = contentType.includes("json");
+  let parsed: unknown;
+  if (isJson && responseText) {
+    try {
+      parsed = JSON.parse(responseText);
+    } catch {
+      parsed = undefined;
+    }
+  }
+
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as ApiErrorBody;
+    const body = (parsed ?? {}) as ApiErrorBody;
     throw new PlatformApiError(
       body.error || body.message || `Request failed (${response.status})`,
       response.status,
@@ -54,7 +66,87 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
 
-  return response.json() as Promise<T>;
+  if (!isJson || parsed === undefined) {
+    throw new PlatformApiError(
+      "The server returned an unexpected response. Reload the page and try again.",
+      response.status
+    );
+  }
+
+  return parsed as T;
+}
+
+function uploadForm<T>(
+  path: string,
+  form: FormData,
+  onProgress?: (percent: number) => void
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", path);
+    request.withCredentials = true;
+    request.responseType = "text";
+    onProgress?.(0);
+
+    request.upload.onprogress = event => {
+      if (!event.lengthComputable || event.total <= 0) return;
+      onProgress?.(
+        Math.max(
+          0,
+          Math.min(99, Math.round((event.loaded / event.total) * 100))
+        )
+      );
+    };
+
+    request.onerror = () => {
+      reject(
+        new PlatformApiError(
+          "The upload could not reach the server. Check your connection and try again.",
+          0
+        )
+      );
+    };
+    request.onabort = () => {
+      reject(new PlatformApiError("The upload was cancelled.", 0));
+    };
+    request.onload = () => {
+      const contentType =
+        request.getResponseHeader("content-type")?.toLowerCase() ?? "";
+      let body: unknown;
+      if (contentType.includes("json") && request.responseText) {
+        try {
+          body = JSON.parse(request.responseText);
+        } catch {
+          body = undefined;
+        }
+      }
+      if (request.status < 200 || request.status >= 300) {
+        const errorBody = (body ?? {}) as ApiErrorBody;
+        reject(
+          new PlatformApiError(
+            errorBody.error ||
+              errorBody.message ||
+              `Upload failed (${request.status || "network error"})`,
+            request.status,
+            errorBody.missing
+          )
+        );
+        return;
+      }
+      if (body === undefined) {
+        reject(
+          new PlatformApiError(
+            "The server returned an unexpected upload response. Reload the page and try again.",
+            request.status
+          )
+        );
+        return;
+      }
+      onProgress?.(100);
+      resolve(body as T);
+    };
+    request.send(form);
+  });
 }
 
 export interface SessionResponse {
@@ -86,6 +178,7 @@ export interface ReferralStats {
   dollarValue: string;
   rewardCredits: number;
   rewardDollarValue: string;
+  billingVerificationConfigured: boolean;
   referrals: ReferralClaim[];
 }
 
@@ -178,15 +271,14 @@ export const platformApi = {
     kind?: Asset["kind"],
     onProgress?: (percent: number) => void
   ): Promise<Asset> => {
-    onProgress?.(5);
     const form = new FormData();
     form.append("file", file);
     if (kind) form.append("kind", kind);
-    const response = await requestJson<{ asset: Asset }>("/api/assets", {
-      method: "POST",
-      body: form,
-    });
-    onProgress?.(100);
+    const response = await uploadForm<{ asset: Asset }>(
+      "/api/assets",
+      form,
+      onProgress
+    );
     return response.asset;
   },
 

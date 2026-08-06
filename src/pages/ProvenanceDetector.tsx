@@ -14,6 +14,7 @@ import { useSearchParams } from "react-router-dom";
 import { PublicComplianceShell } from "@/components/compliance/PublicComplianceShell";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
 import { platformApi, PlatformApiError } from "@/lib/platform-api";
+import { validateFileSelection } from "@/lib/file-validation";
 import type { ProvenanceDetectionResult } from "@contracts/compliance";
 
 type Language = "en" | "it";
@@ -257,13 +258,26 @@ export default function ProvenanceDetector() {
     setError(null);
   };
 
+  const acceptDetectorFiles = (files: File[]) => {
+    const selection = validateFileSelection(files, {
+      language,
+      purpose: "provenance",
+    });
+    if (selection.error) {
+      setResult(null);
+      setError(selection.error);
+      return;
+    }
+    chooseFile(selection.files[0]);
+  };
+
   const { isDragging, dropZoneProps } = useFileDropZone({
     disabled: checking,
-    onFiles: files => chooseFile(files[0] ?? null),
+    onFiles: acceptDetectorFiles,
   });
 
   const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => {
-    chooseFile(event.target.files?.[0] ?? null);
+    acceptDetectorFiles(Array.from(event.target.files ?? []));
     event.target.value = "";
   };
 
@@ -398,6 +412,7 @@ export default function ProvenanceDetector() {
                 accept="image/*,video/*,audio/*,application/json,text/plain,.md"
                 className="sr-only"
                 onChange={handleFileInput}
+                aria-label={copy.fileLabel}
               />
               <button
                 type="button"

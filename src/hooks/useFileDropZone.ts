@@ -18,7 +18,7 @@ export function useFileDropZone({
   };
 
   return {
-    isDragging,
+    isDragging: disabled ? false : isDragging,
     dropZoneProps: {
       onDragEnter: (event: DragEvent<HTMLElement>) => {
         stopDrag(event);
@@ -28,7 +28,9 @@ export function useFileDropZone({
       },
       onDragOver: (event: DragEvent<HTMLElement>) => {
         stopDrag(event);
-        if (disabled) {
+        if (disabled || !event.dataTransfer.types.includes("Files")) {
+          dragDepth.current = 0;
+          if (isDragging) setIsDragging(false);
           event.dataTransfer.dropEffect = "none";
           return;
         }
@@ -36,7 +38,6 @@ export function useFileDropZone({
       },
       onDragLeave: (event: DragEvent<HTMLElement>) => {
         stopDrag(event);
-        if (disabled) return;
         dragDepth.current = Math.max(0, dragDepth.current - 1);
         if (dragDepth.current === 0) setIsDragging(false);
       },

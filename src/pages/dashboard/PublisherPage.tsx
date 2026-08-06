@@ -639,11 +639,32 @@ export default function PublisherPage() {
   };
 
   const deleteDraft = async (id: string) => {
-    await updateWorkspace(current => ({
-      ...current,
-      posts: current.posts.filter(post => post.id !== id),
-    }));
-    if (editingId === id) resetComposer();
+    const draft = workspace.posts.find(post => post.id === id);
+    if (
+      !draft ||
+      !window.confirm(
+        `Delete this draft?\n\n${draft.caption.slice(0, 120) || "Untitled publication"}`
+      )
+    ) {
+      return;
+    }
+    setNotice(null);
+    try {
+      await updateWorkspace(current => ({
+        ...current,
+        posts: current.posts.filter(post => post.id !== id),
+      }));
+      if (editingId === id) resetComposer();
+      setNotice({ tone: "success", message: "Draft deleted." });
+    } catch (cause) {
+      setNotice({
+        tone: "error",
+        message:
+          cause instanceof Error
+            ? cause.message
+            : "The draft could not be deleted.",
+      });
+    }
   };
 
   const busy = Boolean(submitting) || saving;

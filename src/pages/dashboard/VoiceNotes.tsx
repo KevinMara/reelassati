@@ -30,6 +30,7 @@ import {
 } from "@contracts/compliance";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { copyTextWithProvenance } from "@/lib/provenance";
+import { validateFileSelection } from "@/lib/file-validation";
 
 type BusyAction = "upload" | "transcribe" | "script" | "speech" | null;
 
@@ -96,19 +97,19 @@ export default function VoiceNotes() {
     invalidateVoiceAttestation();
   };
 
+  const acceptAudioFiles = (files: File[]) => {
+    const selection = validateFileSelection(files, { purpose: "audio" });
+    if (selection.error) {
+      setError(selection.error);
+      return;
+    }
+    setError(null);
+    selectAudioFile(selection.files[0]);
+  };
+
   const { isDragging, dropZoneProps } = useFileDropZone({
     disabled: !capabilities.uploads || Boolean(busyAction),
-    onFiles: files => {
-      const audioFile = files.find(candidate =>
-        candidate.type.startsWith("audio/")
-      );
-      if (!audioFile) {
-        setError("Drop an audio file in this section.");
-        return;
-      }
-      setError(null);
-      selectAudioFile(audioFile);
-    },
+    onFiles: acceptAudioFiles,
   });
 
   const audioAssets = useMemo(
@@ -363,9 +364,13 @@ export default function VoiceNotes() {
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-medium">Source voice note</h2>
-                <p className="mt-1 text-xs text-foreground/45">
+                <p
+                  id="voice-source-description"
+                  className="mt-1 text-xs text-foreground/45"
+                >
                   The uploaded workspace asset—not a local blob URL—is sent for
-                  transcription.
+                  transcription. Use Transcribe below to create its text
+                  alternative.
                 </p>
               </div>
               <Mic className="h-5 w-5 text-primary" />
@@ -391,7 +396,8 @@ export default function VoiceNotes() {
               accept="audio/*"
               className="hidden"
               onChange={event => {
-                selectAudioFile(event.target.files?.[0] ?? null);
+                acceptAudioFiles(Array.from(event.target.files ?? []));
+                event.target.value = "";
               }}
             />
             <button
@@ -453,6 +459,8 @@ export default function VoiceNotes() {
                   src={sourceAsset.url}
                   controls
                   preload="metadata"
+                  aria-label={`Voice-note preview: ${sourceAsset.name}`}
+                  aria-describedby="voice-source-description"
                   className="mt-3 w-full"
                 />
               </div>
@@ -653,8 +661,13 @@ export default function VoiceNotes() {
                   src={speechAsset.url}
                   controls
                   preload="metadata"
+                  aria-label={`Generated speech preview: ${speechAsset.name}`}
+                  aria-describedby="generated-speech-transcript"
                   className="mt-3 w-full"
                 />
+                <p id="generated-speech-transcript" className="sr-only">
+                  Spoken text: {speechText}
+                </p>
               </motion.div>
             ) : null}
           </section>

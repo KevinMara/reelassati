@@ -1,10 +1,10 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ChangeEvent,
-  type MouseEvent,
 } from "react";
 import {
   AlertCircle,
@@ -56,6 +56,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
 import type { ContentProvenance } from "@contracts/compliance";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { validateFileSelection } from "@/lib/file-validation";
 
 const PROJECT_TEMPLATES = [
   {
@@ -107,15 +108,36 @@ function createId(prefix: string) {
   return `${prefix}-${random}`;
 }
 
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(Math.max(value, minimum), maximum);
-}
-
 function formatTime(seconds: number) {
   const safeSeconds = Math.max(0, seconds);
   const minutes = Math.floor(safeSeconds / 60);
   const remainder = safeSeconds - minutes * 60;
   return `${minutes}:${remainder.toFixed(1).padStart(4, "0")}`;
+}
+
+function formatVttTime(seconds: number) {
+  const milliseconds = Math.max(0, Math.round(seconds * 1000));
+  const hours = Math.floor(milliseconds / 3_600_000);
+  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
+  const remainder = (milliseconds % 60_000) / 1000;
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}:${remainder.toFixed(3).padStart(6, "0")}`;
+}
+
+function transcriptTrack(segments: TranscriptSegment[]): string | null {
+  const cues = segments
+    .filter(segment => segment.text.trim())
+    .map(
+      (segment, index) =>
+        `${index + 1}\n${formatVttTime(segment.start)} --> ${formatVttTime(
+          Math.max(segment.end, segment.start + 0.1)
+        )}\n${segment.text.replaceAll("-->", "→").trim()}`
+    );
+  if (cues.length === 0) return null;
+  return `data:text/vtt;charset=utf-8,${encodeURIComponent(
+    `WEBVTT\n\n${cues.join("\n\n")}\n`
+  )}`;
 }
 
 function snapshotProject(project: EditProject, label: string): EditRevision {
@@ -137,6 +159,10 @@ function compactRevisions(revisions: EditRevision[]) {
 
 function getProjectDuration(clips: TimelineClip[], minimum = 15) {
   return Math.max(minimum, ...clips.map(clip => clip.start + clip.duration));
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function getAssetKind(file: File): Asset["kind"] {
@@ -313,6 +339,7 @@ export default function EditorPage() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaPreviewRef = useRef<HTMLMediaElement | null>(null);
 
   const project = useMemo(
     () => workspace.projects.find(item => item.id === selectedProjectId),
@@ -326,6 +353,62 @@ export default function EditorPage() {
     const assetId = selectedClip?.assetId ?? project?.activeAssetId;
     return workspace.assets.find(asset => asset.id === assetId);
   }, [project?.activeAssetId, selectedClip?.assetId, workspace.assets]);
+  const mediaTimeForPlayhead = useCallback(
+    (timelineTime: number) => {
+      if (!selectedClip) return Math.max(0, timelineTime);
+      const speed = Math.max(0.1, selectedClip.speed ?? 1);
+      const relativeTime = Math.min(
+        selectedClip.duration,
+        Math.max(0, timelineTime - selectedClip.start)
+      );
+      return Math.min(
+        selectedClip.outPoint,
+        selectedClip.inPoint + relativeTime * speed
+      );
+    },
+    [selectedClip]
+  );
+  const playheadForMediaTime = useCallback(
+    (mediaTime: number) => {
+      if (!project) return 0;
+      if (!selectedClip) return clamp(mediaTime, 0, project.duration);
+      const speed = Math.max(0.1, selectedClip.speed ?? 1);
+      return clamp(
+        selectedClip.start + (mediaTime - selectedClip.inPoint) / speed,
+        selectedClip.start,
+        Math.min(project.duration, selectedClip.start + selectedClip.duration)
+      );
+    },
+    [project, selectedClip]
+  );
+  const configurePreviewMedia = useCallback(
+    (media: HTMLMediaElement) => {
+      media.playbackRate = Math.max(0.1, selectedClip?.speed ?? 1);
+      media.muted = selectedClip?.muted ?? false;
+      media.volume = clamp((selectedClip?.volume ?? 100) / 100, 0, 1);
+    },
+    [selectedClip]
+  );
+  const seekTimeline = useCallback(
+    (nextTime: number) => {
+      const duration = project?.duration ?? 0;
+      const boundedTime = clamp(nextTime, 0, duration);
+      setPlayhead(boundedTime);
+      const media = mediaPreviewRef.current;
+      if (media && Number.isFinite(media.duration)) {
+        media.currentTime = clamp(
+          mediaTimeForPlayhead(boundedTime),
+          0,
+          media.duration
+        );
+      }
+    },
+    [mediaTimeForPlayhead, project?.duration]
+  );
+  const captionTrackUrl = useMemo(
+    () => transcriptTrack(transcriptDraft),
+    [transcriptDraft]
+  );
   const qualitySignals = useMemo(
     () =>
       project
@@ -354,7 +437,18 @@ export default function EditorPage() {
   };
 
   useEffect(() => {
+    const media = mediaPreviewRef.current;
+    if (media) configurePreviewMedia(media);
+  }, [configurePreviewMedia, previewAsset?.id]);
+
+  useEffect(() => {
     if (!playing || !project) return;
+    if (
+      mediaPreviewRef.current &&
+      (previewAsset?.kind === "video" || previewAsset?.kind === "audio")
+    ) {
+      return;
+    }
     const interval = window.setInterval(() => {
       setPlayhead(current => {
         const next = current + 0.1;
@@ -366,7 +460,37 @@ export default function EditorPage() {
       });
     }, 100);
     return () => window.clearInterval(interval);
-  }, [playing, project]);
+  }, [playing, previewAsset?.kind, project]);
+
+  const toggleTimelinePlayback = async () => {
+    const media = mediaPreviewRef.current;
+    if (playing) {
+      media?.pause();
+      setPlaying(false);
+      return;
+    }
+
+    const startTime = playhead >= (project?.duration ?? 0) ? 0 : playhead;
+    seekTimeline(startTime);
+    if (!media) {
+      setPlaying(true);
+      return;
+    }
+
+    configurePreviewMedia(media);
+    try {
+      await media.play();
+      setPlaying(true);
+      setLocalError(null);
+    } catch (cause) {
+      setPlaying(false);
+      setLocalError(
+        cause instanceof Error
+          ? cause.message
+          : "The media preview could not start."
+      );
+    }
+  };
 
   const createProject = async (template: string) => {
     const now = new Date().toISOString();
@@ -483,6 +607,19 @@ export default function EditorPage() {
     }));
   };
 
+  const saveProjectChange = async <Result,>(
+    action: () => Promise<Result>,
+    fallback: string
+  ): Promise<Result | undefined> => {
+    setLocalError(null);
+    try {
+      return await action();
+    } catch (cause) {
+      setLocalError(cause instanceof Error ? cause.message : fallback);
+      return undefined;
+    }
+  };
+
   const addUploadedFiles = async (
     files: File[],
     targetProjectId?: string | null
@@ -593,35 +730,33 @@ export default function EditorPage() {
   const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (files.length > 0) void addUploadedFiles(files);
+    acceptMediaFiles(files);
   };
 
-  const acceptDroppedMedia = (files: File[]) => {
-    const mediaFiles = files.filter(
-      file =>
-        file.type.startsWith("video/") ||
-        file.type.startsWith("image/") ||
-        file.type.startsWith("audio/")
-    );
-    if (mediaFiles.length === 0) {
-      setLocalError("Drop video, image, or audio files in this section.");
+  const acceptMediaFiles = (files: File[]) => {
+    const selection = validateFileSelection(files, {
+      multiple: true,
+      purpose: "media",
+    });
+    if (selection.error) {
+      setLocalError(selection.error);
       return;
     }
     setLocalError(null);
-    void addUploadedFiles(mediaFiles);
+    void addUploadedFiles(selection.files);
   };
 
   const newEditDrop = useFileDropZone({
-    disabled: busyAction === "upload",
-    onFiles: acceptDroppedMedia,
+    disabled: Boolean(busyAction),
+    onFiles: acceptMediaFiles,
   });
   const previewDrop = useFileDropZone({
-    disabled: busyAction === "upload",
-    onFiles: acceptDroppedMedia,
+    disabled: Boolean(busyAction),
+    onFiles: acceptMediaFiles,
   });
   const timelineDrop = useFileDropZone({
-    disabled: busyAction === "upload",
-    onFiles: acceptDroppedMedia,
+    disabled: Boolean(busyAction),
+    onFiles: acceptMediaFiles,
   });
 
   const applyClipDraft = async () => {
@@ -630,20 +765,24 @@ export default function EditorPage() {
     const safeDuration = Math.max(0.2, clipDraft.duration);
     const safeIn = Math.max(0, clipDraft.inPoint);
     const safeOut = Math.max(safeIn + 0.2, clipDraft.outPoint);
-    await commitProject("Clip timing adjusted", current => ({
-      ...current,
-      clips: current.clips.map(clip =>
-        clip.id === clipDraft.id
-          ? {
-              ...clipDraft,
-              start: safeStart,
-              duration: safeDuration,
-              inPoint: safeIn,
-              outPoint: safeOut,
-            }
-          : clip
-      ),
-    }));
+    await saveProjectChange(
+      () =>
+        commitProject("Clip timing adjusted", current => ({
+          ...current,
+          clips: current.clips.map(clip =>
+            clip.id === clipDraft.id
+              ? {
+                  ...clipDraft,
+                  start: safeStart,
+                  duration: safeDuration,
+                  inPoint: safeIn,
+                  outPoint: safeOut,
+                }
+              : clip
+          ),
+        })),
+      "Clip timing could not be saved."
+    );
   };
 
   const splitSelectedClip = async () => {
@@ -659,26 +798,31 @@ export default function EditorPage() {
       return;
     }
     const rightId = createId("clip");
-    await commitProject("Clip split", current => ({
-      ...current,
-      clips: current.clips.flatMap(clip => {
-        if (clip.id !== selectedClip.id) return [clip];
-        const left = {
-          ...clip,
-          duration: relativeSplit,
-          outPoint: clip.inPoint + relativeSplit,
-        };
-        const right = {
-          ...clip,
-          id: rightId,
-          label: `${clip.label} · B`,
-          start: playhead,
-          duration: clip.duration - relativeSplit,
-          inPoint: clip.inPoint + relativeSplit,
-        };
-        return [left, right];
-      }),
-    }));
+    const saved = await saveProjectChange(
+      () =>
+        commitProject("Clip split", current => ({
+          ...current,
+          clips: current.clips.flatMap(clip => {
+            if (clip.id !== selectedClip.id) return [clip];
+            const left = {
+              ...clip,
+              duration: relativeSplit,
+              outPoint: clip.inPoint + relativeSplit,
+            };
+            const right = {
+              ...clip,
+              id: rightId,
+              label: `${clip.label} · B`,
+              start: playhead,
+              duration: clip.duration - relativeSplit,
+              inPoint: clip.inPoint + relativeSplit,
+            };
+            return [left, right];
+          }),
+        })),
+      "The clip could not be split."
+    );
+    if (!saved) return;
     setSelectedClipId(rightId);
     setClipDraft({
       ...selectedClip,
@@ -700,47 +844,62 @@ export default function EditorPage() {
       start: selectedClip.start + selectedClip.duration,
       locked: false,
     };
-    await commitProject("Clip duplicated", current => ({
-      ...current,
-      clips: [...current.clips, duplicate],
-    }));
+    const saved = await saveProjectChange(
+      () =>
+        commitProject("Clip duplicated", current => ({
+          ...current,
+          clips: [...current.clips, duplicate],
+        })),
+      "The clip could not be duplicated."
+    );
+    if (!saved) return;
     setSelectedClipId(duplicate.id);
     setClipDraft({ ...duplicate });
   };
 
   const deleteSelectedClip = async () => {
     if (!selectedClip || selectedClip.locked) return;
-    await commitProject("Clip deleted", current => ({
-      ...current,
-      clips: current.clips.filter(clip => clip.id !== selectedClip.id),
-      activeAssetId:
-        current.activeAssetId === selectedClip.assetId
-          ? current.clips.find(clip => clip.id !== selectedClip.id)?.assetId
-          : current.activeAssetId,
-    }));
+    const saved = await saveProjectChange(
+      () =>
+        commitProject("Clip deleted", current => ({
+          ...current,
+          clips: current.clips.filter(clip => clip.id !== selectedClip.id),
+          activeAssetId:
+            current.activeAssetId === selectedClip.assetId
+              ? current.clips.find(clip => clip.id !== selectedClip.id)?.assetId
+              : current.activeAssetId,
+        })),
+      "The clip could not be deleted."
+    );
+    if (!saved) return;
     setSelectedClipId(null);
     setClipDraft(null);
   };
 
   const toggleClipProperty = async (property: "locked" | "muted") => {
     if (!selectedClip) return;
-    await commitProject(
-      property === "locked"
-        ? selectedClip.locked
-          ? "Clip unlocked"
-          : "Clip locked"
-        : selectedClip.muted
-          ? "Clip unmuted"
-          : "Clip muted",
-      current => ({
-        ...current,
-        clips: current.clips.map(clip =>
-          clip.id === selectedClip.id
-            ? { ...clip, [property]: !clip[property] }
-            : clip
+    const saved = await saveProjectChange(
+      () =>
+        commitProject(
+          property === "locked"
+            ? selectedClip.locked
+              ? "Clip unlocked"
+              : "Clip locked"
+            : selectedClip.muted
+              ? "Clip unmuted"
+              : "Clip muted",
+          current => ({
+            ...current,
+            clips: current.clips.map(clip =>
+              clip.id === selectedClip.id
+                ? { ...clip, [property]: !clip[property] }
+                : clip
+            ),
+          })
         ),
-      })
+      "The clip setting could not be saved."
     );
+    if (!saved) return;
     setClipDraft(current =>
       current ? { ...current, [property]: !current[property] } : current
     );
@@ -751,12 +910,17 @@ export default function EditorPage() {
     const nextCursor = revisionCursor - 1;
     const revision = project.revisions[nextCursor];
     if (!revision) return;
-    await patchProject(current => ({
-      ...current,
-      clips: revision.clips.map(clip => ({ ...clip })),
-      transcript: revision.transcript.map(segment => ({ ...segment })),
-      duration: getProjectDuration(revision.clips, 15),
-    }));
+    const saved = await saveProjectChange(
+      () =>
+        patchProject(current => ({
+          ...current,
+          clips: revision.clips.map(clip => ({ ...clip })),
+          transcript: revision.transcript.map(segment => ({ ...segment })),
+          duration: getProjectDuration(revision.clips, 15),
+        })),
+      "Undo could not be saved."
+    );
+    if (!saved) return;
     setRevisionCursor(nextCursor);
     setTranscriptDraft(revision.transcript.map(segment => ({ ...segment })));
     setTranscriptionProvenance(revision.transcriptProvenance ?? null);
@@ -771,12 +935,17 @@ export default function EditorPage() {
     const nextCursor = revisionCursor + 1;
     const revision = project.revisions[nextCursor];
     if (!revision) return;
-    await patchProject(current => ({
-      ...current,
-      clips: revision.clips.map(clip => ({ ...clip })),
-      transcript: revision.transcript.map(segment => ({ ...segment })),
-      duration: getProjectDuration(revision.clips, 15),
-    }));
+    const saved = await saveProjectChange(
+      () =>
+        patchProject(current => ({
+          ...current,
+          clips: revision.clips.map(clip => ({ ...clip })),
+          transcript: revision.transcript.map(segment => ({ ...segment })),
+          duration: getProjectDuration(revision.clips, 15),
+        })),
+      "Redo could not be saved."
+    );
+    if (!saved) return;
     setRevisionCursor(nextCursor);
     setTranscriptDraft(revision.transcript.map(segment => ({ ...segment })));
     setTranscriptionProvenance(revision.transcriptProvenance ?? null);
@@ -829,38 +998,50 @@ export default function EditorPage() {
   };
 
   const acceptOperation = async (operation: EditOperation) => {
-    await commitProject(`Approved decision: ${operation.label}`, current =>
-      projectWithApprovedOperation(current, operation)
+    await saveProjectChange(
+      () =>
+        commitProject(`Approved decision: ${operation.label}`, current =>
+          projectWithApprovedOperation(current, operation)
+        ),
+      "The approved edit decision could not be saved."
     );
   };
 
   const rejectOperation = async (operation: EditOperation) => {
-    await patchProject(current => ({
-      ...current,
-      proposedChanges: current.proposedChanges.map(change =>
-        change.id === operation.id
-          ? {
-              ...change,
-              status: "rejected",
-              reviewedAt: new Date().toISOString(),
-            }
-          : change
-      ),
-    }));
+    await saveProjectChange(
+      () =>
+        patchProject(current => ({
+          ...current,
+          proposedChanges: current.proposedChanges.map(change =>
+            change.id === operation.id
+              ? {
+                  ...change,
+                  status: "rejected",
+                  reviewedAt: new Date().toISOString(),
+                }
+              : change
+          ),
+        })),
+      "The rejected edit decision could not be saved."
+    );
   };
 
   const saveTranscript = async () => {
-    const saved = await commitProject("Transcript updated", current => ({
-      ...current,
-      transcript: transcriptDraft
-        .filter(segment => segment.text.trim())
-        .map(segment => ({
-          ...segment,
-          start: Math.max(0, segment.start),
-          end: Math.max(segment.start + 0.1, segment.end),
-          text: segment.text.trim(),
+    const saved = await saveProjectChange(
+      () =>
+        commitProject("Transcript updated", current => ({
+          ...current,
+          transcript: transcriptDraft
+            .filter(segment => segment.text.trim())
+            .map(segment => ({
+              ...segment,
+              start: Math.max(0, segment.start),
+              end: Math.max(segment.start + 0.1, segment.end),
+              text: segment.text.trim(),
+            })),
         })),
-    }));
+      "The transcript revision could not be saved."
+    );
     const canonical = saved?.projects.find(
       candidate => candidate.id === project?.id
     );
@@ -926,19 +1107,13 @@ export default function EditorPage() {
     ]);
   };
 
-  const handleTimelineClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (!project) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const next = clamp(
-      ((event.clientX - bounds.left) / bounds.width) * project.duration,
-      0,
-      project.duration
-    );
-    setPlayhead(next);
-  };
-
   const persistPlayhead = () => {
-    if (project) void patchProject({ playhead });
+    if (project) {
+      void saveProjectChange(
+        () => patchProject({ playhead }),
+        "The playhead position could not be saved."
+      );
+    }
   };
 
   const downloadEditBrief = async () => {
@@ -954,8 +1129,10 @@ export default function EditorPage() {
       const anchor = document.createElement("a");
       anchor.href = href;
       anchor.download = payload.filename;
+      document.body.append(anchor);
       anchor.click();
-      URL.revokeObjectURL(href);
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(href), 0);
     } catch (cause) {
       setLocalError(
         cause instanceof Error
@@ -1011,6 +1188,7 @@ export default function EditorPage() {
           type="button"
           {...newEditDrop.dropZoneProps}
           onClick={() => fileInputRef.current?.click()}
+          disabled={Boolean(busyAction)}
           className={`group mb-8 flex w-full flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-12 text-center transition-all ${
             newEditDrop.isDragging
               ? "scale-[1.005] border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
@@ -1165,7 +1343,10 @@ export default function EditorPage() {
             onBlur={() => {
               const title = titleDraft.trim();
               if (title && title !== project.title)
-                void patchProject({ title });
+                void saveProjectChange(
+                  () => patchProject({ title }),
+                  "The project title could not be saved."
+                );
             }}
             className="w-full border-0 bg-transparent p-0 text-xl font-semibold outline-none placeholder:text-foreground/35"
             aria-label="Project title"
@@ -1263,8 +1444,27 @@ export default function EditorPage() {
               {previewAsset?.kind === "video" && (
                 <video
                   key={previewAsset.id}
+                  ref={element => {
+                    mediaPreviewRef.current = element;
+                  }}
                   src={previewAsset.url}
                   controls
+                  onLoadedMetadata={event => {
+                    configurePreviewMedia(event.currentTarget);
+                    seekTimeline(playhead);
+                  }}
+                  onPlay={() => setPlaying(true)}
+                  onPause={() => setPlaying(false)}
+                  onEnded={() => setPlaying(false)}
+                  onTimeUpdate={event =>
+                    setPlayhead(
+                      playheadForMediaTime(event.currentTarget.currentTime)
+                    )
+                  }
+                  aria-label={`Video preview: ${previewAsset.name}`}
+                  aria-describedby={
+                    captionTrackUrl ? undefined : "editor-caption-status"
+                  }
                   className={`max-h-[470px] max-w-full bg-black object-contain ${
                     project.aspectRatio === "9:16"
                       ? "aspect-[9/16] rounded-xl"
@@ -1272,7 +1472,16 @@ export default function EditorPage() {
                         ? "aspect-square rounded-xl"
                         : "aspect-video rounded-xl"
                   }`}
-                />
+                >
+                  {captionTrackUrl ? (
+                    <track
+                      kind="captions"
+                      src={captionTrackUrl}
+                      label="Project captions"
+                      default
+                    />
+                  ) : null}
+                </video>
               )}
               {previewAsset?.kind === "image" && (
                 <img
@@ -1295,17 +1504,43 @@ export default function EditorPage() {
                   </p>
                   <audio
                     key={previewAsset.id}
+                    ref={element => {
+                      mediaPreviewRef.current = element;
+                    }}
                     src={previewAsset.url}
                     controls
+                    onLoadedMetadata={event => {
+                      configurePreviewMedia(event.currentTarget);
+                      seekTimeline(playhead);
+                    }}
+                    onPlay={() => setPlaying(true)}
+                    onPause={() => setPlaying(false)}
+                    onEnded={() => setPlaying(false)}
+                    onTimeUpdate={event =>
+                      setPlayhead(
+                        playheadForMediaTime(event.currentTarget.currentTime)
+                      )
+                    }
+                    aria-label={`Audio preview: ${previewAsset.name}`}
+                    aria-describedby="editor-audio-alternative"
                     className="mt-5 w-full"
                   />
+                  <p id="editor-audio-alternative" className="sr-only">
+                    {transcriptDraft.some(segment => segment.text.trim())
+                      ? `Transcript: ${transcriptDraft
+                          .map(segment => segment.text.trim())
+                          .filter(Boolean)
+                          .join(" ")}`
+                      : "No transcript is available yet. Use the transcription tool to create a text alternative."}
+                  </p>
                 </div>
               )}
               {!previewAsset && (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex max-w-sm flex-col items-center text-center text-white"
+                  disabled={Boolean(busyAction)}
+                  className="flex max-w-sm flex-col items-center text-center text-white disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-[#A894FF]">
                     <Upload className="h-5 w-5" />
@@ -1319,14 +1554,17 @@ export default function EditorPage() {
                   </span>
                 </button>
               )}
+              {!captionTrackUrl && previewAsset?.kind === "video" ? (
+                <p id="editor-caption-status" className="sr-only">
+                  No caption track is available yet. Use the transcript panel to
+                  create and review captions.
+                </p>
+              ) : null}
             </div>
             <div className="flex items-center justify-center gap-3 border-t border-white/10 bg-black/30 px-4 py-2.5 text-white">
               <button
                 type="button"
-                onClick={() => {
-                  if (playhead >= project.duration) setPlayhead(0);
-                  setPlaying(current => !current);
-                }}
+                onClick={() => void toggleTimelinePlayback()}
                 className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/15"
                 aria-label={playing ? "Pause timeline" : "Play timeline"}
               >
@@ -1345,7 +1583,7 @@ export default function EditorPage() {
                 max={project.duration}
                 step={0.05}
                 value={playhead}
-                onChange={event => setPlayhead(Number(event.target.value))}
+                onChange={event => seekTimeline(Number(event.target.value))}
                 onPointerUp={persistPlayhead}
                 className="h-1 w-full max-w-md accent-[#8A76EA]"
                 aria-label="Playhead"
@@ -1368,7 +1606,8 @@ export default function EditorPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background"
+                disabled={Boolean(busyAction)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {busyAction === "upload" ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1453,9 +1692,32 @@ export default function EditorPage() {
                         {index * 5}s
                       </span>
                     ))}
+                    <input
+                      type="range"
+                      min={0}
+                      max={project.duration}
+                      step={0.05}
+                      value={playhead}
+                      onChange={event =>
+                        seekTimeline(Number(event.currentTarget.value))
+                      }
+                      onPointerUp={event =>
+                        void saveProjectChange(
+                          () =>
+                            patchProject({
+                              playhead: Number(event.currentTarget.value),
+                            }),
+                          "The playhead position could not be saved."
+                        )
+                      }
+                      onBlur={persistPlayhead}
+                      aria-label="Timeline playhead"
+                      aria-valuetext={formatTime(playhead)}
+                      className="absolute inset-x-2 bottom-0 z-10 h-1 w-[calc(100%_-_1rem)] cursor-col-resize accent-primary opacity-35 transition-opacity hover:opacity-100 focus:opacity-100"
+                    />
                   </div>
                 </div>
-                <div className="relative" onClick={handleTimelineClick}>
+                <div className="relative">
                   <div className="pointer-events-none absolute bottom-0 left-[92px] right-0 top-0 z-20">
                     <div
                       className="absolute bottom-0 top-0 w-px bg-primary"
@@ -1667,7 +1929,12 @@ export default function EditorPage() {
                         },
                       ] as const
                     ).map(control => (
-                      <label key={control.key} className="block">
+                      <label
+                        key={control.key}
+                        htmlFor={`clip-${control.key}`}
+                        aria-label={control.label}
+                        className="block"
+                      >
                         <span className="mb-1.5 flex items-center justify-between text-xs">
                           <span className="text-foreground/50">
                             {control.label}
@@ -1677,6 +1944,7 @@ export default function EditorPage() {
                           </span>
                         </span>
                         <input
+                          id={`clip-${control.key}`}
                           type="range"
                           min={control.min}
                           max={control.max}
@@ -2191,9 +2459,14 @@ export default function EditorPage() {
                 <select
                   value={project.platform}
                   onChange={event =>
-                    void patchProject({
-                      platform: event.target.value as EditProject["platform"],
-                    })
+                    void saveProjectChange(
+                      () =>
+                        patchProject({
+                          platform: event.target
+                            .value as EditProject["platform"],
+                        }),
+                      "The target platform could not be saved."
+                    )
                   }
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 >
@@ -2211,10 +2484,14 @@ export default function EditorPage() {
                 <select
                   value={project.aspectRatio}
                   onChange={event =>
-                    void patchProject({
-                      aspectRatio: event.target
-                        .value as EditProject["aspectRatio"],
-                    })
+                    void saveProjectChange(
+                      () =>
+                        patchProject({
+                          aspectRatio: event.target
+                            .value as EditProject["aspectRatio"],
+                        }),
+                      "The aspect ratio could not be saved."
+                    )
                   }
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 >

@@ -11,6 +11,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import EntryAnimation from "@/components/entry/EntryAnimation";
+import { Link } from "react-router-dom";
+import { previewTheme, restoreThemePreference } from "@/hooks/useTheme";
 import { Logo } from "@/components/Logo";
 
 function StudioUnderlay() {
@@ -47,7 +49,9 @@ function StudioUnderlay() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center border-b border-border bg-background/90 px-6">
-          <span className="mono-eyebrow text-foreground/45">Editing Studio</span>
+          <span className="mono-eyebrow text-foreground/45">
+            Editing Studio
+          </span>
           <div className="flex-1" />
           <Search className="mr-5 h-4 w-4 text-foreground/40" />
           <Bell className="h-4 w-4 text-foreground/40" />
@@ -65,10 +69,13 @@ function StudioUnderlay() {
                   A reviewable short-form timeline, ready for your footage.
                 </p>
               </div>
-              <button className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground sm:flex">
+              <Link
+                to="/dashboard/edit"
+                className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground sm:flex"
+              >
                 <Sparkles className="h-4 w-4" />
                 Assist this cut
-              </button>
+              </Link>
             </div>
 
             <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
@@ -121,11 +128,13 @@ export default function EntryDemo() {
   const [done, setDone] = useState(false);
 
   useLayoutEffect(() => {
-    const requestedTheme = new URLSearchParams(window.location.search).get("theme");
+    const requestedTheme = new URLSearchParams(window.location.search).get(
+      "theme"
+    );
     if (requestedTheme !== "dark" && requestedTheme !== "light") return;
 
-    document.documentElement.classList.toggle("dark", requestedTheme === "dark");
-    document.documentElement.classList.toggle("light", requestedTheme === "light");
+    previewTheme(requestedTheme);
+    return restoreThemePreference;
   }, []);
 
   // Clear sessionStorage so animation always plays on this demo page
@@ -135,20 +144,17 @@ export default function EntryDemo() {
 
   const handleReplay = useCallback(() => {
     setDone(false);
-    setKey((k) => k + 1);
+    setKey(k => k + 1);
   }, []);
 
   return (
     <div className="relative w-screen h-screen">
       <StudioUnderlay />
-      <EntryAnimation
-        key={key}
-        force
-        onComplete={() => setDone(true)}
-      />
+      <EntryAnimation key={key} force onComplete={() => setDone(true)} />
       {done && (
         <div className="absolute bottom-6 right-6 z-50">
           <button
+            type="button"
             onClick={handleReplay}
             className="rounded-full border border-border bg-surface/90 px-5 py-2.5 text-sm font-medium shadow-card backdrop-blur hover:bg-surface"
           >

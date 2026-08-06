@@ -53,7 +53,10 @@ function createId(prefix: string) {
 
 function progressFor(goal: Goal) {
   if (goal.target <= 0) return 0;
-  return Math.min(100, Math.max(0, Math.round((goal.current / goal.target) * 100)));
+  return Math.min(
+    100,
+    Math.max(0, Math.round((goal.current / goal.target) * 100))
+  );
 }
 
 export default function GoalTracker() {
@@ -64,27 +67,33 @@ export default function GoalTracker() {
   const [target, setTarget] = useState("");
   const [deadline, setDeadline] = useState("");
   const [platform, setPlatform] = useState<Platform | "">("");
-  const [progressInputs, setProgressInputs] = useState<Record<string, string>>({});
+  const [progressInputs, setProgressInputs] = useState<Record<string, string>>(
+    {}
+  );
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const activeGoals = useMemo(
-    () => workspace.goals.filter((goal) => goal.current < goal.target),
-    [workspace.goals],
+    () => workspace.goals.filter(goal => goal.current < goal.target),
+    [workspace.goals]
   );
   const achievedGoals = useMemo(
-    () => workspace.goals.filter((goal) => goal.current >= goal.target),
-    [workspace.goals],
+    () => workspace.goals.filter(goal => goal.current >= goal.target),
+    [workspace.goals]
   );
   const averageProgress = useMemo(() => {
     if (workspace.goals.length === 0) return 0;
     return Math.round(
       workspace.goals.reduce((sum, goal) => sum + progressFor(goal), 0) /
-        workspace.goals.length,
+        workspace.goals.length
     );
   }, [workspace.goals]);
 
   const createGoal = async () => {
     const numericTarget = Number(target);
-    if (!Number.isFinite(numericTarget) || numericTarget <= 0) return;
+    if (!Number.isFinite(numericTarget) || numericTarget <= 0) {
+      setActionError("Enter a target greater than zero.");
+      return;
+    }
     const now = new Date().toISOString();
     const goal: Goal = {
       id: createId("goal"),
@@ -96,56 +105,85 @@ export default function GoalTracker() {
       platform: platform || undefined,
       createdAt: now,
     };
-    await updateWorkspace((current) => ({
-      ...current,
-      goals: [goal, ...current.goals],
-      activity: [
-        {
-          id: createId("event"),
-          type: "goal" as const,
-          label: "Goal created",
-          detail: `${goal.label}: ${goal.target.toLocaleString()} ${METRIC_META[goal.metric].unit}`,
-          createdAt: now,
-        },
-        ...current.activity,
-      ].slice(0, 100),
-    }));
-    setLabel("");
-    setMetric("followers");
-    setTarget("");
-    setDeadline("");
-    setPlatform("");
-    setShowAdd(false);
+    setActionError(null);
+    try {
+      await updateWorkspace(current => ({
+        ...current,
+        goals: [goal, ...current.goals],
+        activity: [
+          {
+            id: createId("event"),
+            type: "goal" as const,
+            label: "Goal created",
+            detail: `${goal.label}: ${goal.target.toLocaleString()} ${METRIC_META[goal.metric].unit}`,
+            createdAt: now,
+          },
+          ...current.activity,
+        ].slice(0, 100),
+      }));
+      setLabel("");
+      setMetric("followers");
+      setTarget("");
+      setDeadline("");
+      setPlatform("");
+      setShowAdd(false);
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error ? cause.message : "The goal could not be saved."
+      );
+    }
   };
 
   const updateProgress = async (goal: Goal) => {
     const value = Number(progressInputs[goal.id]);
-    if (!Number.isFinite(value) || value < 0) return;
-    await updateWorkspace((current) => ({
-      ...current,
-      goals: current.goals.map((item) =>
-        item.id === goal.id ? { ...item, current: value } : item,
-      ),
-      activity: [
-        {
-          id: createId("event"),
-          type: "goal" as const,
-          label: value >= goal.target ? "Goal achieved" : "Goal progress updated",
-          detail: `${goal.label}: ${value.toLocaleString()} of ${goal.target.toLocaleString()}`,
-          createdAt: new Date().toISOString(),
-        },
-        ...current.activity,
-      ].slice(0, 100),
-    }));
-    setProgressInputs((current) => ({ ...current, [goal.id]: "" }));
+    if (!Number.isFinite(value) || value < 0) {
+      setActionError("Progress must be zero or a positive number.");
+      return;
+    }
+    setActionError(null);
+    try {
+      await updateWorkspace(current => ({
+        ...current,
+        goals: current.goals.map(item =>
+          item.id === goal.id ? { ...item, current: value } : item
+        ),
+        activity: [
+          {
+            id: createId("event"),
+            type: "goal" as const,
+            label:
+              value >= goal.target ? "Goal achieved" : "Goal progress updated",
+            detail: `${goal.label}: ${value.toLocaleString()} of ${goal.target.toLocaleString()}`,
+            createdAt: new Date().toISOString(),
+          },
+          ...current.activity,
+        ].slice(0, 100),
+      }));
+      setProgressInputs(current => ({ ...current, [goal.id]: "" }));
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error
+          ? cause.message
+          : "Goal progress could not be saved."
+      );
+    }
   };
 
   const deleteGoal = async (goal: Goal) => {
     if (!window.confirm(`Delete “${goal.label}”?`)) return;
-    await updateWorkspace((current) => ({
-      ...current,
-      goals: current.goals.filter((item) => item.id !== goal.id),
-    }));
+    setActionError(null);
+    try {
+      await updateWorkspace(current => ({
+        ...current,
+        goals: current.goals.filter(item => item.id !== goal.id),
+      }));
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error
+          ? cause.message
+          : "The goal could not be deleted."
+      );
+    }
   };
 
   const renderGoal = (goal: Goal, achieved: boolean) => {
@@ -218,16 +256,17 @@ export default function GoalTracker() {
             min="0"
             step={goal.metric === "engagement" ? "0.1" : "1"}
             value={progressInputs[goal.id] ?? ""}
-            onChange={(event) =>
-              setProgressInputs((current) => ({
+            onChange={event =>
+              setProgressInputs(current => ({
                 ...current,
                 [goal.id]: event.target.value,
               }))
             }
-            onKeyDown={(event) => {
+            onKeyDown={event => {
               if (event.key === "Enter") void updateProgress(goal);
             }}
             placeholder={`Current ${meta.unit}`}
+            aria-label={`Current progress for ${goal.label} in ${meta.unit}`}
             className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs"
           />
           <button
@@ -255,12 +294,13 @@ export default function GoalTracker() {
           <p className="mono-eyebrow mb-2 text-primary">Progress system</p>
           <h1 className="text-3xl font-semibold">Goal Tracker</h1>
           <p className="mt-2 text-foreground/60">
-            Set measurable targets and update them from verified performance data.
+            Set measurable targets and update them from verified performance
+            data.
           </p>
         </div>
         <button
           type="button"
-          onClick={() => setShowAdd((current) => !current)}
+          onClick={() => setShowAdd(current => !current)}
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
         >
           <Plus className="h-4 w-4" />
@@ -268,9 +308,12 @@ export default function GoalTracker() {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-500">
-          {error}
+      {(actionError || error) && (
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-500"
+        >
+          {actionError || error}
         </div>
       )}
 
@@ -302,25 +345,31 @@ export default function GoalTracker() {
           <h2 className="mb-4 font-medium">Create a measurable goal</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div className="lg:col-span-2">
-              <label htmlFor="goal-label" className="mb-1.5 block text-xs font-medium">
+              <label
+                htmlFor="goal-label"
+                className="mb-1.5 block text-xs font-medium"
+              >
                 Goal name
               </label>
               <input
                 id="goal-label"
                 value={label}
-                onChange={(event) => setLabel(event.target.value)}
+                onChange={event => setLabel(event.target.value)}
                 placeholder="Reach the first 10K"
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label htmlFor="goal-metric" className="mb-1.5 block text-xs font-medium">
+              <label
+                htmlFor="goal-metric"
+                className="mb-1.5 block text-xs font-medium"
+              >
                 Metric
               </label>
               <select
                 id="goal-metric"
                 value={metric}
-                onChange={(event) =>
+                onChange={event =>
                   setMetric(event.target.value as Goal["metric"])
                 }
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -333,7 +382,10 @@ export default function GoalTracker() {
               </select>
             </div>
             <div>
-              <label htmlFor="goal-target" className="mb-1.5 block text-xs font-medium">
+              <label
+                htmlFor="goal-target"
+                className="mb-1.5 block text-xs font-medium"
+              >
                 Target
               </label>
               <input
@@ -342,36 +394,42 @@ export default function GoalTracker() {
                 min="0"
                 step={metric === "engagement" ? "0.1" : "1"}
                 value={target}
-                onChange={(event) => setTarget(event.target.value)}
+                onChange={event => setTarget(event.target.value)}
                 placeholder="10000"
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label htmlFor="goal-deadline" className="mb-1.5 block text-xs font-medium">
+              <label
+                htmlFor="goal-deadline"
+                className="mb-1.5 block text-xs font-medium"
+              >
                 Deadline
               </label>
               <input
                 id="goal-deadline"
                 type="date"
                 value={deadline}
-                onChange={(event) => setDeadline(event.target.value)}
+                onChange={event => setDeadline(event.target.value)}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               />
             </div>
             <div className="lg:col-span-2">
-              <label htmlFor="goal-platform" className="mb-1.5 block text-xs font-medium">
+              <label
+                htmlFor="goal-platform"
+                className="mb-1.5 block text-xs font-medium"
+              >
                 Platform
               </label>
               <select
                 id="goal-platform"
                 value={platform}
-                onChange={(event) =>
+                onChange={event =>
                   setPlatform(event.target.value as Platform | "")
                 }
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
-                {PLATFORM_OPTIONS.map((option) => (
+                {PLATFORM_OPTIONS.map(option => (
                   <option key={option.value || "all"} value={option.value}>
                     {option.label}
                   </option>
@@ -401,11 +459,13 @@ export default function GoalTracker() {
       )}
 
       <section className="space-y-3">
-        {activeGoals.map((goal) => renderGoal(goal, false))}
+        {activeGoals.map(goal => renderGoal(goal, false))}
         {activeGoals.length === 0 && (
           <div className="rounded-xl border border-dashed border-border py-14 text-center text-foreground/40">
             <TrendingUp className="mx-auto mb-2 h-8 w-8" />
-            <p className="text-sm">No active goals. Set the next measurable win.</p>
+            <p className="text-sm">
+              No active goals. Set the next measurable win.
+            </p>
           </div>
         )}
       </section>
@@ -416,7 +476,7 @@ export default function GoalTracker() {
             Achieved
           </h2>
           <div className="space-y-3">
-            {achievedGoals.map((goal) => renderGoal(goal, true))}
+            {achievedGoals.map(goal => renderGoal(goal, true))}
           </div>
         </section>
       )}

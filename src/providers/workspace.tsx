@@ -39,7 +39,7 @@ interface WorkspaceContextValue {
       WorkspaceDocument | ((current: WorkspaceDocument) => WorkspaceDocument)
   ) => Promise<WorkspaceDocument>;
   adoptWorkspace: (workspace: WorkspaceDocument) => void;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<boolean>;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -69,10 +69,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [workspace]);
 
   const refresh = useCallback(async () => {
+    let succeeded = false;
     setLoading(true);
     setError(null);
     try {
       const result = await platformApi.workspace();
+      mutationRef.current += 1;
       setWorkspace(result.workspace);
       currentRef.current = result.workspace;
       serverRevisionRef.current = result.workspace.revision;
@@ -81,6 +83,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       saveConflictRef.current = false;
       setReady(true);
       setSaveConflict(false);
+      setUnsaved(false);
+      succeeded = true;
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Could not load the workspace"
@@ -88,6 +92,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
+    return succeeded;
   }, []);
 
   useEffect(() => {
@@ -245,8 +250,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     link.download = `reelassati-workspace-backup-${new Date()
       .toISOString()
       .slice(0, 10)}.json`;
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }, []);
 
   return (

@@ -46,7 +46,7 @@ export default function ClientsPage() {
   } | null>(null);
   const draft = useMemo(
     () => ({ ...workspace.brandKit, ...edits }),
-    [edits, workspace.brandKit],
+    [edits, workspace.brandKit]
   );
   const dirty = Object.keys(edits).length > 0;
 
@@ -63,9 +63,9 @@ export default function ClientsPage() {
 
   const updateDraft = <Key extends keyof BrandKit>(
     key: Key,
-    value: BrandKit[Key],
+    value: BrandKit[Key]
   ) => {
-    setEdits((current) => ({ ...current, [key]: value }));
+    setEdits(current => ({ ...current, [key]: value }));
     setNotice(null);
   };
 
@@ -96,7 +96,7 @@ export default function ClientsPage() {
         safeZone: Math.min(25, Math.max(0, draft.safeZone)),
         audioDucking: Math.min(100, Math.max(0, draft.audioDucking)),
       };
-      await updateWorkspace((current) => ({ ...current, brandKit: next }));
+      await updateWorkspace(current => ({ ...current, brandKit: next }));
       setEdits({});
       setNotice({
         tone: "success",
@@ -105,7 +105,10 @@ export default function ClientsPage() {
     } catch (cause) {
       setNotice({
         tone: "error",
-        message: cause instanceof Error ? cause.message : "Brand DNA could not be saved.",
+        message:
+          cause instanceof Error
+            ? cause.message
+            : "Brand DNA could not be saved.",
       });
     }
   };
@@ -122,16 +125,22 @@ export default function ClientsPage() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">Reusable creative memory</p>
+          <p className="mono-eyebrow mb-2 text-primary">
+            Reusable creative memory
+          </p>
           <h1 className="text-3xl font-semibold">Brand DNA</h1>
           <p className="mt-2 max-w-2xl text-sm text-foreground/55">
-            One truthful source of creative constraints for this workspace. Multi-brand
-            client workspaces are not simulated here.
+            One truthful source of creative constraints for this workspace.
+            Multi-brand client workspaces are not simulated here.
           </p>
         </div>
         <div className="rounded-xl border border-border bg-surface px-4 py-3 text-right">
-          <p className="mono-eyebrow text-[10px] text-foreground/45">Definition depth</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">{readiness}%</p>
+          <p className="mono-eyebrow text-[10px] text-foreground/45">
+            Definition depth
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">
+            {readiness}%
+          </p>
         </div>
       </div>
 
@@ -144,7 +153,9 @@ export default function ClientsPage() {
               : "border-emerald-500/20 bg-emerald-500/5 text-emerald-600"
           }`}
         >
-          {notice.tone === "success" ? <CheckCircle2 className="h-4 w-4" /> : null}
+          {notice.tone === "success" ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : null}
           {notice.message}
         </div>
       ) : null}
@@ -164,7 +175,7 @@ export default function ClientsPage() {
                 <span className="mb-1.5 block font-medium">Brand name</span>
                 <input
                   value={draft.name}
-                  onChange={(event) => updateDraft("name", event.target.value)}
+                  onChange={event => updateDraft("name", event.target.value)}
                   className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="Your public-facing brand"
                   required
@@ -174,20 +185,25 @@ export default function ClientsPage() {
                 <span className="mb-1.5 block font-medium">Voice rules</span>
                 <textarea
                   value={draft.voice}
-                  onChange={(event) => updateDraft("voice", event.target.value)}
+                  onChange={event => updateDraft("voice", event.target.value)}
                   rows={4}
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="How the brand speaks, phrases it avoids, energy level, point of view, and proof style"
                 />
                 <span className="mt-1.5 block text-xs text-foreground/45">
-                  Be concrete enough that an editor can reject an off-brand line.
+                  Be concrete enough that an editor can reject an off-brand
+                  line.
                 </span>
               </label>
               <label className="text-sm">
-                <span className="mb-1.5 block font-medium">Audience tension</span>
+                <span className="mb-1.5 block font-medium">
+                  Audience tension
+                </span>
                 <textarea
                   value={draft.audience}
-                  onChange={(event) => updateDraft("audience", event.target.value)}
+                  onChange={event =>
+                    updateDraft("audience", event.target.value)
+                  }
                   rows={4}
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="Who this is for, what they already believe, and what problem creates urgency"
@@ -212,15 +228,18 @@ export default function ClientsPage() {
                         ? draft.primaryColor
                         : "#6F5AD8"
                     }
-                    onChange={(event) =>
-                      updateDraft("primaryColor", event.target.value.toUpperCase())
+                    onChange={event =>
+                      updateDraft(
+                        "primaryColor",
+                        event.target.value.toUpperCase()
+                      )
                     }
                     className="h-10 w-12 rounded-lg border border-border bg-background p-1"
                     aria-label="Choose primary color"
                   />
                   <input
                     value={draft.primaryColor}
-                    onChange={(event) =>
+                    onChange={event =>
                       updateDraft("primaryColor", event.target.value)
                     }
                     className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs uppercase"
@@ -238,15 +257,18 @@ export default function ClientsPage() {
                         ? draft.accentColor
                         : "#D8FF4F"
                     }
-                    onChange={(event) =>
-                      updateDraft("accentColor", event.target.value.toUpperCase())
+                    onChange={event =>
+                      updateDraft(
+                        "accentColor",
+                        event.target.value.toUpperCase()
+                      )
                     }
                     className="h-10 w-12 rounded-lg border border-border bg-background p-1"
                     aria-label="Choose accent color"
                   />
                   <input
                     value={draft.accentColor}
-                    onChange={(event) =>
+                    onChange={event =>
                       updateDraft("accentColor", event.target.value)
                     }
                     className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs uppercase"
@@ -260,7 +282,7 @@ export default function ClientsPage() {
                 </span>
                 <input
                   value={draft.font}
-                  onChange={(event) => updateDraft("font", event.target.value)}
+                  onChange={event => updateDraft("font", event.target.value)}
                   className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                   placeholder="Geist"
                 />
@@ -274,7 +296,7 @@ export default function ClientsPage() {
               <h2 className="font-medium">Editing defaults</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              {CAPTION_PRESETS.map((preset) => (
+              {CAPTION_PRESETS.map(preset => (
                 <button
                   key={preset.value}
                   type="button"
@@ -287,7 +309,9 @@ export default function ClientsPage() {
                   }`}
                 >
                   <Captions className="h-4 w-4 text-primary" />
-                  <span className="mt-3 block text-sm font-medium">{preset.label}</span>
+                  <span className="mt-3 block text-sm font-medium">
+                    {preset.label}
+                  </span>
                   <span className="mt-1 block text-xs leading-relaxed text-foreground/45">
                     {preset.detail}
                   </span>
@@ -295,23 +319,34 @@ export default function ClientsPage() {
               ))}
             </div>
             <div className="mt-5 grid gap-5 sm:grid-cols-2">
-              <label className="text-sm">
+              <label
+                htmlFor="client-safe-zone"
+                aria-label="Safe-zone inset"
+                className="text-sm"
+              >
                 <span className="mb-2 flex items-center justify-between">
                   <span className="font-medium">Safe-zone inset</span>
-                  <span className="font-mono text-xs text-primary">{draft.safeZone}%</span>
+                  <span className="font-mono text-xs text-primary">
+                    {draft.safeZone}%
+                  </span>
                 </span>
                 <input
+                  id="client-safe-zone"
                   type="range"
                   min="0"
                   max="25"
                   value={draft.safeZone}
-                  onChange={(event) =>
+                  onChange={event =>
                     updateDraft("safeZone", Number(event.target.value))
                   }
                   className="w-full accent-primary"
                 />
               </label>
-              <label className="text-sm">
+              <label
+                htmlFor="client-audio-ducking"
+                aria-label="Voice ducking"
+                className="text-sm"
+              >
                 <span className="mb-2 flex items-center justify-between">
                   <span className="flex items-center gap-1.5 font-medium">
                     <Volume2 className="h-3.5 w-3.5" /> Voice ducking
@@ -321,11 +356,12 @@ export default function ClientsPage() {
                   </span>
                 </span>
                 <input
+                  id="client-audio-ducking"
                   type="range"
                   min="0"
                   max="100"
                   value={draft.audioDucking}
-                  onChange={(event) =>
+                  onChange={event =>
                     updateDraft("audioDucking", Number(event.target.value))
                   }
                   className="w-full accent-primary"
@@ -401,19 +437,25 @@ export default function ClientsPage() {
                   <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
                     Projects
                   </dt>
-                  <dd className="mt-1 font-semibold">{workspace.projects.length}</dd>
+                  <dd className="mt-1 font-semibold">
+                    {workspace.projects.length}
+                  </dd>
                 </div>
                 <div className="rounded-lg bg-background p-3">
                   <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
                     Assets
                   </dt>
-                  <dd className="mt-1 font-semibold">{workspace.assets.length}</dd>
+                  <dd className="mt-1 font-semibold">
+                    {workspace.assets.length}
+                  </dd>
                 </div>
                 <div className="rounded-lg bg-background p-3">
                   <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
                     Scripts
                   </dt>
-                  <dd className="mt-1 font-semibold">{workspace.scripts.length}</dd>
+                  <dd className="mt-1 font-semibold">
+                    {workspace.scripts.length}
+                  </dd>
                 </div>
               </dl>
             </div>

@@ -33,8 +33,12 @@ export default function Login() {
         </Link>
         <div className="h-4 w-px bg-border" />
         <button
+          type="button"
           onClick={() =>
             i18n.changeLanguage(i18n.language === "it" ? "en" : "it")
+          }
+          aria-label={
+            i18n.language === "it" ? "Switch to English" : "Passa all’italiano"
           }
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
@@ -42,6 +46,7 @@ export default function Login() {
           {i18n.language === "it" ? "IT" : "EN"}
         </button>
         <button
+          type="button"
           onClick={toggleTheme}
           aria-label="Toggle theme"
           className="text-muted-foreground hover:text-foreground"
@@ -84,6 +89,7 @@ export default function Login() {
           ) : null}
 
           <button
+            type="button"
             onClick={continueToStudio}
             disabled={loading}
             className="mt-6 w-full h-11 rounded-pill bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-50 flex items-center justify-center gap-2 font-medium"

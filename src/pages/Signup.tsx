@@ -26,15 +26,19 @@ export default function Signup() {
         </Link>
         <div className="h-4 w-px bg-border" />
         <button
+          type="button"
           onClick={() =>
             i18n.changeLanguage(i18n.language === "it" ? "en" : "it")
+          }
+          aria-label={
+            i18n.language === "it" ? "Switch to English" : "Passa all’italiano"
           }
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <Globe className="h-3.5 w-3.5" />
           {i18n.language === "it" ? "IT" : "EN"}
         </button>
-        <button onClick={toggleTheme} aria-label="Toggle theme">
+        <button type="button" onClick={toggleTheme} aria-label="Toggle theme">
           {theme === "light" ? (
             <Moon className="h-4 w-4" />
           ) : (
@@ -78,6 +82,7 @@ export default function Signup() {
           ) : null}
 
           <button
+            type="button"
             onClick={createWorkspace}
             disabled={loading}
             className="mt-7 w-full h-11 rounded-pill bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-50 flex items-center justify-center gap-2 font-medium"

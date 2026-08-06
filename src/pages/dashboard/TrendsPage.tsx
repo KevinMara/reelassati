@@ -50,26 +50,26 @@ export default function TrendsPage() {
   const hypotheses = useMemo(
     () =>
       workspace.scripts
-        .filter((script) => script.tone === HYPOTHESIS_TONE)
-        .filter((script) => filter === "all" || script.platform === filter)
+        .filter(script => script.tone === HYPOTHESIS_TONE)
+        .filter(script => filter === "all" || script.platform === filter)
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
-    [filter, workspace.scripts],
+    [filter, workspace.scripts]
   );
 
   const sourceMaterials = useMemo(() => {
     const scripts = workspace.scripts
-      .filter((script) => script.tone !== HYPOTHESIS_TONE)
-      .map((script) => ({
+      .filter(script => script.tone !== HYPOTHESIS_TONE)
+      .map(script => ({
         id: `script-${script.id}`,
         type: "Script",
         title: script.title,
         platform: script.platform,
         hook: script.hook,
         evidence: `Workspace script created ${new Date(
-          script.createdAt,
+          script.createdAt
         ).toLocaleDateString()}.`,
       }));
-    const projects = workspace.projects.map((project) => ({
+    const projects = workspace.projects.map(project => ({
       id: `project-${project.id}`,
       type: "Edit project",
       title: project.title,
@@ -100,7 +100,9 @@ export default function TrendsPage() {
       !evidence.trim() ||
       !successSignal.trim()
     ) {
-      setNotice("Define the idea, opening, evidence, and pass signal before saving.");
+      setNotice(
+        "Define the idea, opening, evidence, and pass signal before saving."
+      );
       return;
     }
     const now = new Date().toISOString();
@@ -123,7 +125,7 @@ export default function TrendsPage() {
       createdAt: now,
     };
     try {
-      await updateWorkspace((current) => ({
+      await updateWorkspace(current => ({
         ...current,
         scripts: [hypothesis, ...current.scripts],
         activity: [
@@ -141,7 +143,9 @@ export default function TrendsPage() {
       setNotice("Hypothesis saved to this workspace.");
     } catch (cause) {
       setNotice(
-        cause instanceof Error ? cause.message : "The hypothesis could not be saved.",
+        cause instanceof Error
+          ? cause.message
+          : "The hypothesis could not be saved."
       );
     }
   };
@@ -157,27 +161,40 @@ export default function TrendsPage() {
 
   const deleteHypothesis = async (hypothesis: ScriptDraft) => {
     if (!window.confirm(`Delete the hypothesis “${hypothesis.title}”?`)) return;
-    await updateWorkspace((current) => ({
-      ...current,
-      scripts: current.scripts.filter((script) => script.id !== hypothesis.id),
-    }));
+    setNotice(null);
+    try {
+      await updateWorkspace(current => ({
+        ...current,
+        scripts: current.scripts.filter(script => script.id !== hypothesis.id),
+      }));
+      setNotice("Hypothesis deleted.");
+    } catch (cause) {
+      setNotice(
+        cause instanceof Error
+          ? cause.message
+          : "The hypothesis could not be deleted."
+      );
+    }
   };
 
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">Evidence before imitation</p>
+          <p className="mono-eyebrow mb-2 text-primary">
+            Evidence before imitation
+          </p>
           <h1 className="text-3xl font-semibold">Trend Workbench</h1>
           <p className="mt-2 max-w-2xl text-sm text-foreground/55">
-            Turn a real observation into a testable format hypothesis. REELassati does
-            not claim that a hard-coded feed is live trend intelligence.
+            Turn a real observation into a testable format hypothesis.
+            REELassati does not claim that a hard-coded feed is live trend
+            intelligence.
           </p>
         </div>
         <button
           type="button"
           onClick={() => {
-            setShowForm((current) => !current);
+            setShowForm(current => !current);
             setNotice(null);
           }}
           className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover"
@@ -194,10 +211,15 @@ export default function TrendsPage() {
           ["03", "Define", "Choose the real signal that would count as a win."],
           ["04", "Produce", "Build controlled variants in the editor."],
         ].map(([step, label, detail]) => (
-          <div key={step} className="rounded-xl border border-border bg-surface p-4">
+          <div
+            key={step}
+            className="rounded-xl border border-border bg-surface p-4"
+          >
             <p className="font-mono text-[10px] text-primary">{step}</p>
             <p className="mt-2 text-sm font-medium">{label}</p>
-            <p className="mt-1 text-xs leading-relaxed text-foreground/45">{detail}</p>
+            <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+              {detail}
+            </p>
           </div>
         ))}
       </div>
@@ -225,26 +247,30 @@ export default function TrendsPage() {
               <span className="mb-1.5 block font-medium">Format idea</span>
               <input
                 value={title}
-                onChange={(event) => setTitle(event.target.value)}
+                onChange={event => setTitle(event.target.value)}
                 placeholder="Example: Result first, process second"
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
             <label className="text-sm sm:col-span-2">
-              <span className="mb-1.5 block font-medium">Opening line or first frame</span>
+              <span className="mb-1.5 block font-medium">
+                Opening line or first frame
+              </span>
               <textarea
                 value={hook}
-                onChange={(event) => setHook(event.target.value)}
+                onChange={event => setHook(event.target.value)}
                 rows={2}
                 placeholder="Write the concrete opening you will test"
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1.5 block font-medium">Observed evidence</span>
+              <span className="mb-1.5 block font-medium">
+                Observed evidence
+              </span>
               <textarea
                 value={evidence}
-                onChange={(event) => setEvidence(event.target.value)}
+                onChange={event => setEvidence(event.target.value)}
                 rows={4}
                 placeholder="Source, repeated pattern, audience comment, or result you personally observed"
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
@@ -254,7 +280,7 @@ export default function TrendsPage() {
               <span className="mb-1.5 block font-medium">Pass signal</span>
               <textarea
                 value={successSignal}
-                onChange={(event) => setSuccessSignal(event.target.value)}
+                onChange={event => setSuccessSignal(event.target.value)}
                 rows={4}
                 placeholder="Example: Higher 3-second hold than the current baseline"
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
@@ -264,10 +290,10 @@ export default function TrendsPage() {
               <span className="mb-1.5 block font-medium">Platform</span>
               <select
                 value={platform}
-                onChange={(event) => setPlatform(event.target.value as Platform)}
+                onChange={event => setPlatform(event.target.value as Platform)}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
               >
-                {PLATFORMS.map((option) => (
+                {PLATFORMS.map(option => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -278,10 +304,10 @@ export default function TrendsPage() {
               <span className="mb-1.5 block font-medium">Target duration</span>
               <select
                 value={duration}
-                onChange={(event) => setDuration(Number(event.target.value))}
+                onChange={event => setDuration(Number(event.target.value))}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
               >
-                {[15, 20, 30, 45, 60].map((seconds) => (
+                {[15, 20, 30, 45, 60].map(seconds => (
                   <option key={seconds} value={seconds}>
                     {seconds} seconds
                   </option>
@@ -312,14 +338,14 @@ export default function TrendsPage() {
             </div>
             <select
               value={filter}
-              onChange={(event) =>
+              onChange={event =>
                 setFilter(event.target.value as "all" | Platform)
               }
               className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
               aria-label="Filter hypotheses by platform"
             >
               <option value="all">All platforms</option>
-              {PLATFORMS.map((option) => (
+              {PLATFORMS.map(option => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -328,7 +354,7 @@ export default function TrendsPage() {
           </div>
           {hypotheses.length ? (
             <div className="space-y-4">
-              {hypotheses.map((hypothesis) => (
+              {hypotheses.map(hypothesis => (
                 <article
                   key={hypothesis.id}
                   className="rounded-xl border border-border bg-surface p-5"
@@ -337,7 +363,7 @@ export default function TrendsPage() {
                     <div>
                       <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-primary">
                         {PLATFORMS.find(
-                          (option) => option.value === hypothesis.platform,
+                          option => option.value === hypothesis.platform
                         )?.label || hypothesis.platform}
                       </span>
                       <h3 className="mt-3 font-medium">{hypothesis.title}</h3>
@@ -410,7 +436,7 @@ export default function TrendsPage() {
           </div>
           {sourceMaterials.length ? (
             <div className="space-y-3">
-              {sourceMaterials.map((source) => (
+              {sourceMaterials.map(source => (
                 <button
                   key={source.id}
                   type="button"
@@ -420,7 +446,9 @@ export default function TrendsPage() {
                   <span className="text-[10px] uppercase tracking-wide text-foreground/40">
                     {source.type}
                   </span>
-                  <span className="mt-1 block text-sm font-medium">{source.title}</span>
+                  <span className="mt-1 block text-sm font-medium">
+                    {source.title}
+                  </span>
                   <span className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
                     Use as starting point
                     <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
@@ -432,8 +460,8 @@ export default function TrendsPage() {
             <div className="rounded-xl border border-dashed border-border bg-surface p-6">
               <p className="text-sm font-medium">No source material yet</p>
               <p className="mt-1 text-xs leading-relaxed text-foreground/45">
-                Scripts and edit projects will appear here as real inputs for future
-                tests.
+                Scripts and edit projects will appear here as real inputs for
+                future tests.
               </p>
             </div>
           )}

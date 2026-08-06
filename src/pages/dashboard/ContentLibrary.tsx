@@ -1,11 +1,12 @@
 import {
   useDeferredValue,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type ChangeEvent,
 } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   ExternalLink,
@@ -26,6 +27,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { copyTextWithProvenance } from "@/lib/provenance";
+import { validateFileSelection } from "@/lib/file-validation";
 
 type LibraryFilter = "all" | AssetKind;
 
@@ -115,6 +117,10 @@ export default function ContentLibrary() {
   const { workspace, capabilities, updateWorkspace, loading, saving } =
     useWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+  const focusSearch = searchParams.get("focus") === "search";
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [search, setSearch] = useState("");
@@ -126,6 +132,14 @@ export default function ContentLibrary() {
     tone: "success" | "error";
     message: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (!focusSearch) return;
+    searchInputRef.current?.focus();
+    const nextParams = new URLSearchParams(searchParamsKey);
+    nextParams.delete("focus");
+    setSearchParams(nextParams, { replace: true });
+  }, [focusSearch, searchParamsKey, setSearchParams]);
 
   const items = useMemo<LibraryItem[]>(
     () =>
@@ -208,14 +222,23 @@ export default function ContentLibrary() {
   };
 
   const uploadFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    void uploadSelectedFile(file);
+    acceptMediaFiles(files);
+  };
+
+  const acceptMediaFiles = (files: File[]) => {
+    const selection = validateFileSelection(files, { purpose: "media" });
+    if (selection.error) {
+      setNotice({ tone: "error", message: selection.error });
+      return;
+    }
+    void uploadSelectedFile(selection.files[0]);
   };
 
   const { isDragging, dropZoneProps } = useFileDropZone({
     disabled: uploading || !capabilities.uploads,
-    onFiles: files => void uploadSelectedFile(files[0]),
+    onFiles: acceptMediaFiles,
   });
 
   const deleteItem = async (item: LibraryItem) => {
@@ -264,6 +287,25 @@ export default function ContentLibrary() {
     }
   };
 
+  const copyLibraryScript = async (
+    item: Extract<LibraryItem, { source: "script" }>
+  ) => {
+    setNotice(null);
+    try {
+      await copyTextWithProvenance(
+        item.script.fullScript,
+        item.script.provenance
+      );
+      setNotice({ tone: "success", message: `${item.title} was copied.` });
+    } catch {
+      setNotice({
+        tone: "error",
+        message:
+          "Copying was blocked by the browser. Select the script and copy it manually.",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[45vh] items-center justify-center">
@@ -274,15 +316,15 @@ export default function ContentLibrary() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div
-          {...dropZoneProps}
-          className={`rounded-xl border border-dashed p-2 transition-all ${
-            isDragging
-              ? "border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
-              : "border-transparent"
-          }`}
-        >
+      <div
+        {...dropZoneProps}
+        className={`mb-8 flex flex-wrap items-start justify-between gap-4 rounded-xl border border-dashed p-2 transition-all ${
+          isDragging
+            ? "border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+            : "border-transparent"
+        }`}
+      >
+        <div>
           <p className="mono-eyebrow mb-2 text-primary">Private media system</p>
           <h1 className="text-3xl font-semibold">Content Library</h1>
           <p className="mt-2 max-w-2xl text-sm text-foreground/55">
@@ -342,6 +384,7 @@ export default function ContentLibrary() {
           <span className="sr-only">Search library</span>
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
           <input
+            ref={searchInputRef}
             type="search"
             value={search}
             onChange={event => setSearch(event.target.value)}
@@ -515,12 +558,7 @@ export default function ContentLibrary() {
                         </p>
                         <button
                           type="button"
-                          onClick={() =>
-                            void copyTextWithProvenance(
-                              item.script.fullScript,
-                              item.script.provenance
-                            )
-                          }
+                          onClick={() => void copyLibraryScript(item)}
                           className="mt-2 text-[11px] font-medium text-primary hover:underline"
                         >
                           Copy with origin record

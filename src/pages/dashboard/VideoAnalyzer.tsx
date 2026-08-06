@@ -25,6 +25,7 @@ import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { validateFileSelection } from "@/lib/file-validation";
 
 type AnalysisResult = Awaited<ReturnType<typeof platformApi.analyzeVideo>>;
 type SourceMode = "upload" | "url";
@@ -137,19 +138,19 @@ export default function VideoAnalyzer() {
     invalidateSourceAuthorization();
   };
 
+  const acceptVideoFiles = (files: File[]) => {
+    const selection = validateFileSelection(files, { purpose: "video" });
+    if (selection.error) {
+      setError(selection.error);
+      return;
+    }
+    setError(null);
+    selectVideoFile(selection.files[0]);
+  };
+
   const { isDragging, dropZoneProps } = useFileDropZone({
     disabled: !capabilities.uploads || sourceMode !== "upload" || analyzing,
-    onFiles: files => {
-      const videoFile = files.find(candidate =>
-        candidate.type.startsWith("video/")
-      );
-      if (!videoFile) {
-        setError("Drop a video file in this section.");
-        return;
-      }
-      setError(null);
-      selectVideoFile(videoFile);
-    },
+    onFiles: acceptVideoFiles,
   });
 
   const videoAssets = useMemo(
@@ -402,14 +403,15 @@ export default function VideoAnalyzer() {
                 accept="video/*"
                 className="hidden"
                 onChange={event => {
-                  selectVideoFile(event.target.files?.[0] ?? null);
+                  acceptVideoFiles(Array.from(event.target.files ?? []));
+                  event.target.value = "";
                 }}
               />
               <button
                 type="button"
                 {...dropZoneProps}
                 onClick={() => fileInputRef.current?.click()}
-                disabled={!capabilities.uploads}
+                disabled={!capabilities.uploads || analyzing}
                 className={`flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed p-5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
                   isDragging
                     ? "scale-[1.01] border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"

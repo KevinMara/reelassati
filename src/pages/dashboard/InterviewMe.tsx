@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -60,6 +60,7 @@ export default function InterviewMe() {
   const [script, setScript] = useState<ScriptDraft | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const questionHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const questions = useMemo<InterviewQuestion[]>(
     () => [
@@ -112,6 +113,14 @@ export default function InterviewMe() {
 
   const currentQuestion = questions[questionIndex];
   const currentAnswer = answers[currentQuestion?.id] || "";
+
+  useEffect(() => {
+    if (step !== "interview") return;
+    const frame = window.requestAnimationFrame(() =>
+      questionHeadingRef.current?.focus()
+    );
+    return () => window.cancelAnimationFrame(frame);
+  }, [questionIndex, step]);
 
   const startInterview = () => {
     if (!topic.trim()) return;
@@ -349,15 +358,22 @@ export default function InterviewMe() {
               <p className="mono-eyebrow mb-3 text-primary">
                 {currentQuestion.eyebrow}
               </p>
-              <h2 className="text-xl font-semibold leading-snug">
+              <h2
+                ref={questionHeadingRef}
+                tabIndex={-1}
+                className="text-xl font-semibold leading-snug outline-none"
+              >
                 {currentQuestion.prompt}
               </h2>
               <div className="mt-4 flex items-start gap-2 rounded-lg bg-primary/5 p-3 text-xs leading-relaxed text-foreground/55">
                 <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
                 {currentQuestion.guidance}
               </div>
+              <label htmlFor="interview-answer" className="sr-only">
+                Your answer to: {currentQuestion.prompt}
+              </label>
               <textarea
-                autoFocus
+                id="interview-answer"
                 value={currentAnswer}
                 onChange={event =>
                   setAnswers(current => ({

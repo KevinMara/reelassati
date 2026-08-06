@@ -31,6 +31,7 @@ import {
   embedMediaProvenanceMarker,
   inspectMediaProvenanceMarker,
 } from "./media-provenance";
+import { MAX_AI_MEDIA_BYTES, MAX_UPLOAD_BYTES } from "../contracts/uploads";
 
 type AssetBinding = {
   fetch(request: Request): Promise<Response>;
@@ -98,6 +99,7 @@ type SitesEnvironment = {
   OPENROUTER_TTS_VOICE?: string;
   OPENROUTER_VIDEO_MODEL?: string;
   OPENROUTER_WEBHOOK_SECRET?: string;
+  REFERRAL_BILLING_WEBHOOK_SECRET?: string;
   ZERNIO_API_KEY?: string;
   AI_PROVENANCE_SIGNING_KEY?: string;
   AI_PROVENANCE_SIGNING_KEY_ID?: string;
@@ -210,8 +212,6 @@ const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const KIMI_CODE_BASE = "https://api.kimi.com/coding/v1";
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 const MAX_WORKSPACE_BYTES = 2_000_000;
-const MAX_UPLOAD_BYTES = 64 * 1024 * 1024;
-const MAX_AI_MEDIA_BYTES = 24 * 1024 * 1024;
 const REFERRAL_REWARD_CREDITS = 500;
 const REFERRAL_REWARD_CENTS = 500;
 const ALLOWED_UPLOAD_PREFIXES = ["video/", "audio/", "image/"];
@@ -298,7 +298,11 @@ function getUser(request: Request): AuthenticatedUser | null {
   }
 
   const hostname = new URL(request.url).hostname;
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "terminal.local"
+  ) {
     return {
       email: "local.creator@reelassati.dev",
       name: "Local Creator",
@@ -1441,6 +1445,24 @@ async function getWorkspace(
       ...(saved.parentAssetId ? { parentAssetId: saved.parentAssetId } : {}),
     };
   });
+  const availableAssetIds = new Set(workspace.assets.map(asset => asset.id));
+  workspace.projects = workspace.projects.map(project => ({
+    ...project,
+    activeAssetId:
+      project.activeAssetId && availableAssetIds.has(project.activeAssetId)
+        ? project.activeAssetId
+        : undefined,
+    clips: project.clips.filter(
+      clip => !clip.assetId || availableAssetIds.has(clip.assetId)
+    ),
+  }));
+  workspace.posts = workspace.posts.map(post => ({
+    ...post,
+    mediaAssetId:
+      post.mediaAssetId && availableAssetIds.has(post.mediaAssetId)
+        ? post.mediaAssetId
+        : undefined,
+  }));
   workspace.jobs = await listOwnerJobs(env, user);
   return workspace;
 }
@@ -3353,6 +3375,14 @@ async function verifyOpenRouterWebhook(
     byte.toString(16).padStart(2, "0")
   ).join("");
   return constantTimeEqual(signature.toLowerCase(), expected);
+}
+
+async function verifyReferralBillingWebhook(
+  rawBody: string,
+  signatureHeader: string | null,
+  secret: string
+): Promise<boolean> {
+  return verifyOpenRouterWebhook(rawBody, signatureHeader, secret);
 }
 
 function audioFormat(contentType: string, filename: string): string {
@@ -6352,6 +6382,157 @@ function maskReferralEmail(email: string): string {
   return `${visible}${local.length > 2 ? "•••" : "•"}@${domain}`;
 }
 
+function referralBillingWebhookSecret(env: SitesEnvironment): string | null {
+  const secret = stringValue(env.REFERRAL_BILLING_WEBHOOK_SECRET);
+  return secret.length >= 24 ? secret : null;
+}
+
+async function handleReferralBillingWebhook(
+  request: Request,
+  env: SitesEnvironment
+): Promise<Response> {
+  const secret = referralBillingWebhookSecret(env);
+  if (request.method !== "POST" || !secret) {
+    return errorResponse("Webhook unavailable", 404);
+  }
+
+  const rawBody = new TextDecoder().decode(
+    await readBoundedBody(request, MAX_WORKSPACE_BYTES)
+  );
+  const signatureValid = await verifyReferralBillingWebhook(
+    rawBody,
+    request.headers.get("x-reelassati-signature"),
+    secret
+  );
+  if (!signatureValid) {
+    return errorResponse("Webhook signature is invalid", 401);
+  }
+
+  let input: {
+    type?: string;
+    eventId?: string;
+    customerEmail?: string;
+    planId?: string;
+    paymentStatus?: string;
+  };
+  try {
+    input = JSON.parse(rawBody) as typeof input;
+  } catch {
+    return errorResponse("Webhook body is invalid");
+  }
+
+  const eventId = stringValue(input.eventId).trim();
+  const customerEmail = normalizedConfiguredEmail(input.customerEmail);
+  const planId = stringValue(input.planId).trim();
+  if (
+    input.type !== "paid_plan_purchased" ||
+    input.paymentStatus !== "paid" ||
+    !/^[A-Za-z0-9._:-]{6,200}$/.test(eventId) ||
+    !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customerEmail) ||
+    !planId ||
+    planId.length > 120
+  ) {
+    return errorResponse("Webhook purchase event is invalid");
+  }
+
+  await initializeSchema(env);
+  const claim = await env.DB.prepare(
+    `
+      SELECT id, referral_code, referrer_email, referred_email,
+             status, credits_awarded, value_cents, qualified_at,
+             payment_event_id, plan_id, created_at
+      FROM referral_claims
+      WHERE referred_email = ?
+    `
+  )
+    .bind(customerEmail)
+    .first<ReferralClaimRow>();
+  if (!claim) {
+    return errorResponse("No referral claim matches this purchaser", 409);
+  }
+  if (claim.status === "verified") {
+    return json({
+      success: true,
+      verified: true,
+      alreadyQualified: true,
+      creditsAwarded: claim.credits_awarded,
+    });
+  }
+
+  const qualifiedAt = new Date().toISOString();
+  let result: D1Result;
+  try {
+    const [qualificationResult] = await env.DB.batch([
+      env.DB.prepare(
+        `
+          UPDATE referral_claims
+          SET status = 'verified', credits_awarded = ?, value_cents = ?,
+              qualified_at = ?, payment_event_id = ?, plan_id = ?
+          WHERE id = ? AND status = 'pending' AND payment_event_id IS NULL
+        `
+      ).bind(
+        REFERRAL_REWARD_CREDITS,
+        REFERRAL_REWARD_CENTS,
+        qualifiedAt,
+        eventId,
+        planId,
+        claim.id
+      ),
+      env.DB.prepare(
+        `
+          INSERT INTO compliance_events
+            (id, owner_email, event_type, entity_type, entity_id,
+             policy_version, details_json, created_at)
+          SELECT ?, ?, 'referral.reward-qualified', 'referral-claim', ?, ?, ?, ?
+          FROM referral_claims
+          WHERE id = ? AND payment_event_id = ? AND qualified_at = ?
+        `
+      ).bind(
+        `referral-qualified:${eventId}`,
+        claim.referrer_email,
+        claim.id,
+        AI_COMPLIANCE_POLICY_VERSION,
+        JSON.stringify({
+          paymentEventId: eventId,
+          planId,
+          creditsAwarded: REFERRAL_REWARD_CREDITS,
+          valueCents: REFERRAL_REWARD_CENTS,
+        }),
+        qualifiedAt,
+        claim.id,
+        eventId,
+        qualifiedAt
+      ),
+    ]);
+    result = qualificationResult;
+  } catch {
+    return errorResponse("This billing event has already been processed", 409);
+  }
+  if ((result.meta?.changes || 0) !== 1) {
+    const raced = await env.DB.prepare(
+      "SELECT status, credits_awarded FROM referral_claims WHERE id = ?"
+    )
+      .bind(claim.id)
+      .first<Pick<ReferralClaimRow, "status" | "credits_awarded">>();
+    if (raced?.status === "verified") {
+      return json({
+        success: true,
+        verified: true,
+        alreadyQualified: true,
+        creditsAwarded: raced.credits_awarded,
+      });
+    }
+    return errorResponse("The referral could not be qualified", 409);
+  }
+
+  return json({
+    success: true,
+    verified: true,
+    alreadyQualified: false,
+    creditsAwarded: REFERRAL_REWARD_CREDITS,
+  });
+}
+
 async function ensureReferralCode(
   env: SitesEnvironment,
   user: AuthenticatedUser
@@ -6391,41 +6572,57 @@ async function referralStats(
   url: URL
 ): Promise<Response> {
   const referralCode = await ensureReferralCode(env, user);
-  const result = await env.DB.prepare(
-    `
-      SELECT id, referral_code, referrer_email, referred_email,
-             status, credits_awarded, value_cents, qualified_at,
-             payment_event_id, plan_id, created_at
-      FROM referral_claims
-      WHERE referrer_email = ?
-      ORDER BY created_at DESC
-      LIMIT 100
-    `
-  )
-    .bind(user.email)
-    .all<ReferralClaimRow>();
-  const verifiedClaims = result.results.filter(
-    claim => claim.status === "verified"
-  );
-  const creditsEarned = verifiedClaims.reduce(
-    (sum, claim) => sum + Math.max(0, claim.credits_awarded),
-    0
-  );
-  const valueCents = verifiedClaims.reduce(
-    (sum, claim) => sum + Math.max(0, claim.value_cents),
-    0
-  );
+  const [result, totals] = await Promise.all([
+    env.DB.prepare(
+      `
+        SELECT id, referral_code, referrer_email, referred_email,
+               status, credits_awarded, value_cents, qualified_at,
+               payment_event_id, plan_id, created_at
+        FROM referral_claims
+        WHERE referrer_email = ?
+        ORDER BY created_at DESC
+        LIMIT 100
+      `
+    )
+      .bind(user.email)
+      .all<ReferralClaimRow>(),
+    env.DB.prepare(
+      `
+        SELECT
+          SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) AS completed,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+          SUM(CASE WHEN status = 'verified' THEN credits_awarded ELSE 0 END)
+            AS credits_earned,
+          SUM(CASE WHEN status = 'verified' THEN value_cents ELSE 0 END)
+            AS value_cents
+        FROM referral_claims
+        WHERE referrer_email = ?
+      `
+    )
+      .bind(user.email)
+      .first<{
+        completed: number | null;
+        pending: number | null;
+        credits_earned: number | null;
+        value_cents: number | null;
+      }>(),
+  ]);
+  const completedReferrals = Math.max(0, Number(totals?.completed) || 0);
+  const pendingReferrals = Math.max(0, Number(totals?.pending) || 0);
+  const creditsEarned = Math.max(0, Number(totals?.credits_earned) || 0);
+  const valueCents = Math.max(0, Number(totals?.value_cents) || 0);
   const shareUrl = new URL("/", url.origin);
   shareUrl.searchParams.set("ref", referralCode.code);
   return json({
     code: referralCode.code,
     shareUrl: shareUrl.toString(),
-    completedReferrals: verifiedClaims.length,
-    pendingReferrals: result.results.length - verifiedClaims.length,
+    completedReferrals,
+    pendingReferrals,
     creditsEarned,
     dollarValue: referralDollarValue(valueCents),
     rewardCredits: REFERRAL_REWARD_CREDITS,
     rewardDollarValue: referralDollarValue(REFERRAL_REWARD_CENTS),
+    billingVerificationConfigured: Boolean(referralBillingWebhookSecret(env)),
     referrals: result.results.map(claim => ({
       id: claim.id,
       referredDisplay: maskReferralEmail(claim.referred_email),
@@ -6938,6 +7135,10 @@ async function handleApi(
 
   if (url.pathname === "/api/video/webhook") {
     return handleVideoWebhook(request, env, url);
+  }
+
+  if (url.pathname === "/api/referrals/billing-webhook") {
+    return handleReferralBillingWebhook(request, env);
   }
 
   if (url.pathname.startsWith("/api/provenance/")) {

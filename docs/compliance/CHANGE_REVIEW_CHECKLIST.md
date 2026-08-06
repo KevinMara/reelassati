@@ -332,11 +332,27 @@ Register/evidence revision:
 
 - [ ] Every file picker has a corresponding local drop surface.
 - [ ] Picker and drop share validation/upload behavior.
-- [ ] Edit, Voice Studio, Analyze, and Library drop surfaces still work.
+- [ ] Edit, Voice Studio, Analyze, Library, and public Provenance Detector drop
+      surfaces still work.
 - [ ] Accepted/invalid/mixed/oversize/busy/nested drag cases pass.
 - [ ] Client filtering did not replace server MIME/active-content/size/owner
       enforcement.
 - [ ] Keyboard, touch, light/dark and accessible feedback pass.
+
+### Functional integrity — `INV-FUNC-001` to `INV-FUNC-004`
+
+- [ ] Every added/changed visible control performs its stated action and has a
+      success, disabled/busy, empty and failure state where applicable.
+- [ ] Async workspace mutations surface failures and preserve backup, retry and
+      revision-conflict recovery.
+- [ ] Editor transport/native media synchronization, downloads, clipboard
+      fallback, route/hash shortcuts and theme synchronization pass.
+- [ ] Native button types, names/labels, focus, keyboard input, media
+      alternatives and reduced-motion behavior pass.
+- [ ] External provider, publishing, billing, analytics and rendering states do
+      not imply configuration or success that the server cannot verify.
+- [ ] `src/functional-regressions.test.ts` and the dated QA audit were updated
+      for any changed invariant.
 
 Protected-behavior evidence:
 

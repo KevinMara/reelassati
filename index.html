@@ -27,9 +27,13 @@
       // SPA redirect handler
       (function() {
         var savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'dark' || savedTheme === 'light') {
-          document.documentElement.classList.add(savedTheme);
-        }
+        var initialTheme = savedTheme === 'dark' || savedTheme === 'light'
+          ? savedTheme
+          : window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light';
+        document.documentElement.classList.add(initialTheme);
+        document.documentElement.style.colorScheme = initialTheme;
         var params = new URLSearchParams(window.location.search);
         var redirect = params.get('redirect');
         if (redirect) {

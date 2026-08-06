@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   Check,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/videoPromptTemplates";
 import { useWorkspace } from "@/providers/workspace";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { writeClipboardText } from "@/lib/clipboard";
 
 const RATIOS = [
   { id: "9:16" as const, name: "9:16", description: "Reels, TikTok, Shorts" },
@@ -128,12 +130,26 @@ function createEvent(
 
 export default function VideoGenerator() {
   const { workspace, capabilities, loading, updateWorkspace } = useWorkspace();
-  const [selectedTemplate, setSelectedTemplate] = useState(
-    VIDEO_PROMPT_TEMPLATES[0]?.id ?? ""
+  const [searchParams] = useSearchParams();
+  const requestedTemplate = getTemplateById(
+    searchParams.get("template")?.trim() ?? ""
   );
-  const [direction, setDirection] = useState<PromptDirection>(EMPTY_DIRECTION);
-  const [ratio, setRatio] = useState<"16:9" | "9:16" | "1:1">("9:16");
-  const [duration, setDuration] = useState(5);
+  const initialTemplate = requestedTemplate ?? VIDEO_PROMPT_TEMPLATES[0];
+  const initialSubject =
+    searchParams.get("subject")?.trim().slice(0, 1200) ?? "";
+  const [selectedTemplate, setSelectedTemplate] = useState(
+    initialTemplate?.id ?? ""
+  );
+  const [direction, setDirection] = useState<PromptDirection>(() => ({
+    ...EMPTY_DIRECTION,
+    subject: initialSubject,
+  }));
+  const [ratio, setRatio] = useState<"16:9" | "9:16" | "1:1">(
+    initialTemplate?.defaultRatio ?? "9:16"
+  );
+  const [duration, setDuration] = useState(
+    initialTemplate?.defaultDuration ?? 5
+  );
   const [resolution, setResolution] = useState<"720p" | "1080p">("720p");
   const [generateAudio, setGenerateAudio] = useState(true);
   const [firstFrameUrl, setFirstFrameUrl] = useState("");
@@ -363,7 +379,7 @@ export default function VideoGenerator() {
   const copyPrompt = async () => {
     if (!enhancedPrompt) return;
     try {
-      await navigator.clipboard.writeText(enhancedPrompt);
+      await writeClipboardText(enhancedPrompt);
       setPromptCopied(true);
       window.setTimeout(() => setPromptCopied(false), 1800);
     } catch {
@@ -1026,9 +1042,18 @@ export default function VideoGenerator() {
                   src={resultAsset.url}
                   controls
                   preload="metadata"
+                  aria-label={`Generated video preview: ${resultAsset.name}`}
+                  aria-describedby="generated-video-caption-status"
                   className="h-full w-full object-contain"
                 />
               </div>
+              <p
+                id="generated-video-caption-status"
+                className="mt-2 text-[11px] leading-relaxed text-foreground/45"
+              >
+                Caption track not added yet. Open the asset in Edit to create
+                and review captions before delivery.
+              </p>
               <a
                 href={resultAsset.url}
                 download={resultAsset.name}

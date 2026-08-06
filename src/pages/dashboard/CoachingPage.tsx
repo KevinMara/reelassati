@@ -26,37 +26,39 @@ function isWithin(timestamp: string | undefined, start: number) {
 function buildReport(workspace: WorkspaceDocument) {
   const now = Date.now();
   const weekStart = now - 7 * DAY;
-  const projectsTouched = workspace.projects.filter((project) =>
-    isWithin(project.updatedAt, weekStart),
+  const projectsTouched = workspace.projects.filter(project =>
+    isWithin(project.updatedAt, weekStart)
   );
-  const postsCreated = workspace.posts.filter((post) =>
-    isWithin(post.createdAt, weekStart),
+  const postsCreated = workspace.posts.filter(post =>
+    isWithin(post.createdAt, weekStart)
   );
   const postsPublished = workspace.posts.filter(
-    (post) =>
+    post =>
       post.status === "published" &&
       (isWithin(post.publishedAt, weekStart) ||
-        (!post.publishedAt && isWithin(post.createdAt, weekStart))),
+        (!post.publishedAt && isWithin(post.createdAt, weekStart)))
   );
-  const draftPosts = workspace.posts.filter((post) => post.status === "draft");
+  const draftPosts = workspace.posts.filter(post => post.status === "draft");
   const scheduledPosts = workspace.posts.filter(
-    (post) =>
+    post =>
       post.status === "scheduled" &&
       Boolean(post.scheduledAt) &&
-      new Date(post.scheduledAt!).getTime() > now,
+      new Date(post.scheduledAt!).getTime() > now
   );
-  const activeGoals = workspace.goals.filter((goal) => goal.current < goal.target);
-  const events = workspace.activity.filter((event) =>
-    isWithin(event.createdAt, weekStart),
+  const activeGoals = workspace.goals.filter(
+    goal => goal.current < goal.target
+  );
+  const events = workspace.activity.filter(event =>
+    isWithin(event.createdAt, weekStart)
   );
   const editingProjects = workspace.projects.filter(
-    (project) =>
+    project =>
       project.status === "draft" ||
       project.status === "editing" ||
-      project.status === "review",
+      project.status === "review"
   );
   const connectedAccounts = workspace.accounts.filter(
-    (account) => account.status === "connected",
+    account => account.status === "connected"
   );
 
   const evidence = [
@@ -69,43 +71,43 @@ function buildReport(workspace: WorkspaceDocument) {
   const recommendations: string[] = [];
   if (workspace.projects.length === 0) {
     recommendations.push(
-      "Start one editing project and define the intended platform before generating variants.",
+      "Start one editing project and define the intended platform before generating variants."
     );
   } else if (editingProjects.length > 0) {
     recommendations.push(
-      `Move one of the ${editingProjects.length} open edit${editingProjects.length === 1 ? "" : "s"} to review or export before starting another.`,
+      `Move one of the ${editingProjects.length} open edit${editingProjects.length === 1 ? "" : "s"} to review or export before starting another.`
     );
   }
   if (draftPosts.length > 0) {
     recommendations.push(
-      `Resolve the ${draftPosts.length} saved publication draft${draftPosts.length === 1 ? "" : "s"}: schedule, publish, or delete each one.`,
+      `Resolve the ${draftPosts.length} saved publication draft${draftPosts.length === 1 ? "" : "s"}: schedule, publish, or delete each one.`
     );
   }
   if (connectedAccounts.length === 0) {
     recommendations.push(
-      "Connect a verified destination in Social Hub before building a publishing cadence.",
+      "Connect a verified destination in Social Hub before building a publishing cadence."
     );
   } else if (postsPublished.length === 0 && scheduledPosts.length === 0) {
     recommendations.push(
-      "Choose one finished asset and schedule a real publication; there is no confirmed shipment this week.",
+      "Choose one finished asset and schedule a real publication; there is no confirmed shipment this week."
     );
   }
   if (activeGoals.length === 0) {
     recommendations.push(
-      "Create one measurable goal so next week’s review can compare progress against a declared target.",
+      "Create one measurable goal so next week’s review can compare progress against a declared target."
     );
   } else {
     const nearest = [...activeGoals].sort(
       (left, right) =>
-        left.target - left.current - (right.target - right.current),
+        left.target - left.current - (right.target - right.current)
     )[0];
     recommendations.push(
-      `Prioritize “${nearest.label}”; it is at ${Math.round((nearest.current / nearest.target) * 100)}% of target.`,
+      `Prioritize “${nearest.label}”; it is at ${Math.round((nearest.current / nearest.target) * 100)}% of target.`
     );
   }
   if (recommendations.length === 0) {
     recommendations.push(
-      "The workflow is moving. Keep the next cycle narrow: one edit, one review, one measured publication.",
+      "The workflow is moving. Keep the next cycle narrow: one edit, one review, one measured publication."
     );
   }
 
@@ -121,9 +123,33 @@ function buildReport(workspace: WorkspaceDocument) {
 }
 
 export default function CoachingPage() {
-  const { workspace } = useWorkspace();
+  const { workspace, refresh, saving } = useWorkspace();
   const [refreshedAt, setRefreshedAt] = useState(() => new Date());
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const report = useMemo(() => buildReport(workspace), [workspace]);
+
+  const refreshReview = async () => {
+    if (refreshing || saving) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const refreshed = await refresh();
+      if (!refreshed) {
+        setRefreshError("The latest workspace data could not be loaded.");
+        return;
+      }
+      setRefreshedAt(new Date());
+    } catch (cause) {
+      setRefreshError(
+        cause instanceof Error
+          ? cause.message
+          : "The workspace review could not be refreshed."
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -138,18 +164,36 @@ export default function CoachingPage() {
         </div>
         <button
           type="button"
-          onClick={() => setRefreshedAt(new Date())}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium hover:border-primary/40"
+          onClick={() => void refreshReview()}
+          disabled={refreshing || saving}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <RefreshCw className="h-4 w-4" />
-          Refresh review
+          <RefreshCw
+            className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+          />
+          {refreshing
+            ? "Refreshing"
+            : saving
+              ? "Waiting for save"
+              : "Refresh review"}
         </button>
       </div>
+
+      {refreshError ? (
+        <p
+          role="alert"
+          className="mb-5 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          {refreshError}
+        </p>
+      ) : null}
 
       <div className="mb-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <div>
-          <p className="text-sm font-medium">Workspace evidence, not synthetic analytics</p>
+          <p className="text-sm font-medium">
+            Workspace evidence, not synthetic analytics
+          </p>
           <p className="mt-1 text-xs leading-relaxed text-foreground/55">
             REELassati does not yet have verified reach, watch-time or retention
             data in this workspace, so this report will not fabricate views,
@@ -177,12 +221,16 @@ export default function CoachingPage() {
           <div className="rounded-xl border border-border bg-surface p-4">
             <Activity className="mb-3 h-4 w-4 text-blue-500" />
             <p className="text-2xl font-semibold">{report.postsCreated}</p>
-            <p className="text-xs text-foreground/50">Publication records · 7d</p>
+            <p className="text-xs text-foreground/50">
+              Publication records · 7d
+            </p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
             <CheckCircle2 className="mb-3 h-4 w-4 text-emerald-500" />
             <p className="text-2xl font-semibold">{report.postsPublished}</p>
-            <p className="text-xs text-foreground/50">Confirmed published · 7d</p>
+            <p className="text-xs text-foreground/50">
+              Confirmed published · 7d
+            </p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
             <Target className="mb-3 h-4 w-4 text-orange-500" />
@@ -197,13 +245,15 @@ export default function CoachingPage() {
             What the workspace proves
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {report.evidence.map((item) => (
+            {report.evidence.map(item => (
               <div
                 key={item}
                 className="flex items-start gap-3 rounded-lg bg-background p-3"
               >
                 <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <p className="text-sm leading-relaxed text-foreground/70">{item}</p>
+                <p className="text-sm leading-relaxed text-foreground/70">
+                  {item}
+                </p>
               </div>
             ))}
           </div>

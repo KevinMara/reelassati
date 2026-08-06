@@ -161,21 +161,12 @@ function FooterCol({
       <ul className="space-y-3">
         {items.map(item => (
           <li key={`${title}-${item.label}`}>
-            {item.to.includes("#") ? (
-              <a
-                href={item.to}
-                className="text-sm text-foreground/75 transition-colors hover:text-foreground"
-              >
-                {item.label}
-              </a>
-            ) : (
-              <Link
-                to={item.to}
-                className="text-sm text-foreground/75 transition-colors hover:text-foreground"
-              >
-                {item.label}
-              </Link>
-            )}
+            <Link
+              to={item.to}
+              className="text-sm text-foreground/75 transition-colors hover:text-foreground"
+            >
+              {item.label}
+            </Link>
           </li>
         ))}
       </ul>

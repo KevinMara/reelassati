@@ -10,11 +10,9 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-import {
-  platformApi,
-  type ReferralStats,
-} from "@/lib/platform-api";
+import { platformApi, type ReferralStats } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { writeClipboardText } from "@/lib/clipboard";
 
 export default function ReferralPage() {
   const { workspace } = useWorkspace();
@@ -35,7 +33,7 @@ export default function ReferralPage() {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Referral details could not be loaded.",
+          : "Referral details could not be loaded."
       );
     } finally {
       setLoading(false);
@@ -46,7 +44,7 @@ export default function ReferralPage() {
     let active = true;
     void platformApi
       .referralStats()
-      .then((result) => {
+      .then(result => {
         if (active) setStats(result);
       })
       .catch((cause: unknown) => {
@@ -54,7 +52,7 @@ export default function ReferralPage() {
         setError(
           cause instanceof Error
             ? cause.message
-            : "Referral details could not be loaded.",
+            : "Referral details could not be loaded."
         );
       })
       .finally(() => {
@@ -65,25 +63,46 @@ export default function ReferralPage() {
     };
   }, []);
 
+  const billingReady = stats?.billingVerificationConfigured === true;
   const totalCredits = workspace.profile.credits + (stats?.creditsEarned ?? 0);
 
   const copyValue = async (kind: "link" | "code", value: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopied(kind);
-    window.setTimeout(() => setCopied(null), 1800);
+    setError(null);
+    try {
+      await writeClipboardText(value);
+      setCopied(kind);
+      window.setTimeout(() => setCopied(null), 1800);
+      return true;
+    } catch {
+      setError(
+        "Copying was blocked by the browser. Select the value and copy it manually."
+      );
+      return false;
+    }
   };
 
   const share = async () => {
     if (!stats) return;
-    if (navigator.share) {
-      await navigator.share({
-        title: "REELassati",
-        text: `Join REELassati with my creator link. I earn ${stats.rewardCredits} credits (${stats.rewardDollarValue} of product value) after you buy a paid plan.`,
-        url: stats.shareUrl,
-      });
-      return;
+    setError(null);
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "REELassati",
+          text: billingReady
+            ? `Join REELassati with my creator link. I earn ${stats.rewardCredits} credits (${stats.rewardDollarValue} of product value) after you buy a paid plan.`
+            : "Join REELassati with my creator link.",
+          url: stats.shareUrl,
+        });
+        return;
+      }
+      const copiedLink = await copyValue("link", stats.shareUrl);
+      if (copiedLink) setNotice("Referral link copied and ready to share.");
+    } catch (cause) {
+      if (cause instanceof Error && cause.name === "AbortError") return;
+      setError(
+        "The share panel could not open. Copy the referral link instead."
+      );
     }
-    await copyValue("link", stats.shareUrl);
   };
 
   const applyCode = async () => {
@@ -97,13 +116,21 @@ export default function ReferralPage() {
         result.alreadyClaimed
           ? result.status === "verified"
             ? "This paid referral has already been verified."
-            : "This referral is already attached to your account and is waiting for a paid-plan purchase."
-          : "Referral saved. The creator earns 500 credits only after you successfully buy a paid plan.",
+            : billingReady
+              ? "This referral is already attached to your account and is waiting for a paid-plan purchase."
+              : "This referral is already attached. Reward verification will begin when billing is activated."
+          : billingReady
+            ? "Referral saved. The creator earns 500 credits only after you successfully buy a paid plan."
+            : "Referral saved. No reward can be issued until billing verification is activated."
       );
       setClaimCode("");
       await loadStats();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The code could not be applied.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The code could not be applied."
+      );
     } finally {
       setClaiming(false);
     }
@@ -113,10 +140,13 @@ export default function ReferralPage() {
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
         <p className="mono-eyebrow mb-2 text-primary">Creator rewards</p>
-        <h1 className="text-3xl font-semibold">Refer creators. Earn studio credits.</h1>
+        <h1 className="text-3xl font-semibold">
+          Refer creators. Earn studio credits.
+        </h1>
         <p className="mt-2 max-w-2xl text-foreground/60">
-          Earn 500 credits—$5.00 of REELassati product value—when a referred
-          creator successfully buys a paid plan. Link visits and sign-ups do not count.
+          {billingReady
+            ? "Earn 500 credits—$5.00 of REELassati product value—when a referred creator successfully buys a paid plan. Link visits and sign-ups do not count."
+            : "Share a creator link and keep referrals attached during private beta. Rewards remain pending until paid plans and signed billing verification are active."}
         </p>
       </div>
 
@@ -125,19 +155,31 @@ export default function ReferralPage() {
           icon={Users}
           label="Successful referrals"
           value={loading ? "—" : String(stats?.completedReferrals ?? 0)}
-          detail="Only confirmed paid-plan purchases count."
+          detail={
+            billingReady
+              ? "Only confirmed paid-plan purchases count."
+              : "Billing verification is not active yet."
+          }
         />
         <Metric
           icon={Link2}
           label="Pending referrals"
           value={loading ? "—" : String(stats?.pendingReferrals ?? 0)}
-          detail="Linked accounts that have not bought a paid plan."
+          detail={
+            billingReady
+              ? "Linked accounts that have not bought a paid plan."
+              : "Linked accounts retained for future verification."
+          }
         />
         <Metric
           icon={Coins}
           label="Available credits"
           value={totalCredits.toLocaleString()}
-          detail={`${stats?.creditsEarned.toLocaleString() ?? 0} earned through referrals.`}
+          detail={
+            billingReady
+              ? `${stats?.creditsEarned.toLocaleString() ?? 0} earned through referrals.`
+              : "No referral credits can be issued during private beta."
+          }
           tone="emerald"
         />
         <Metric
@@ -172,7 +214,7 @@ export default function ReferralPage() {
               <input
                 readOnly
                 value={stats.shareUrl}
-                onFocus={(event) => event.currentTarget.select()}
+                onFocus={event => event.currentTarget.select()}
                 aria-label="Referral link"
                 className="min-w-0 flex-1 rounded-lg border border-border bg-background px-4 py-3 text-sm"
               />
@@ -181,7 +223,11 @@ export default function ReferralPage() {
                 onClick={() => void copyValue("link", stats.shareUrl)}
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-3 text-sm font-medium hover:border-primary/50"
               >
-                {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copied === "link" ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
                 {copied === "link" ? "Copied" : "Copy"}
               </button>
               <button
@@ -198,7 +244,11 @@ export default function ReferralPage() {
               className="inline-flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 font-mono text-xs text-primary"
             >
               {stats.code}
-              {copied === "code" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied === "code" ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
             </button>
           </div>
         ) : null}
@@ -208,13 +258,17 @@ export default function ReferralPage() {
         <section className="rounded-xl border border-border bg-surface p-6">
           <h2 className="font-medium">Reward history</h2>
           <p className="mt-1 text-xs text-foreground/45">
-            Paid-plan purchases verified by the billing system.
+            {billingReady
+              ? "Paid-plan purchases verified by the billing system."
+              : "Claims are saved; qualification remains locked until billing is connected."}
           </p>
           <div className="mt-5 divide-y divide-border">
             {stats?.referrals.length ? (
-              stats.referrals.map((referral) => (
+              stats.referrals.map(referral => (
                 <div key={referral.id} className="flex items-center gap-3 py-4">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-full ${referral.status === "verified" ? "bg-emerald-500/10" : "bg-primary/10"}`}>
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full ${referral.status === "verified" ? "bg-emerald-500/10" : "bg-primary/10"}`}
+                  >
                     {referral.status === "verified" ? (
                       <Check className="h-4 w-4 text-emerald-500" />
                     ) : (
@@ -222,7 +276,9 @@ export default function ReferralPage() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{referral.referredDisplay}</p>
+                    <p className="truncate text-sm font-medium">
+                      {referral.referredDisplay}
+                    </p>
                     <p className="text-xs text-foreground/40">
                       {referral.status === "verified"
                         ? `Paid plan verified ${new Date(referral.qualifiedAt ?? referral.createdAt).toLocaleDateString()}`
@@ -230,10 +286,16 @@ export default function ReferralPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className={`text-sm font-semibold ${referral.status === "verified" ? "text-emerald-500" : "text-foreground/40"}`}>
-                      {referral.status === "verified" ? `+${referral.creditsAwarded}` : "Pending"}
+                    <p
+                      className={`text-sm font-semibold ${referral.status === "verified" ? "text-emerald-500" : "text-foreground/40"}`}
+                    >
+                      {referral.status === "verified"
+                        ? `+${referral.creditsAwarded}`
+                        : "Pending"}
                     </p>
-                    <p className="text-xs text-foreground/40">{referral.dollarValue}</p>
+                    <p className="text-xs text-foreground/40">
+                      {referral.dollarValue}
+                    </p>
                   </div>
                 </div>
               ))
@@ -248,11 +310,13 @@ export default function ReferralPage() {
         <section className="h-fit rounded-xl border border-border bg-surface p-6">
           <h2 className="font-medium">Have a creator code?</h2>
           <p className="mt-1 text-xs leading-relaxed text-foreground/45">
-            Attach it once. The reward unlocks only after your first successful paid-plan purchase.
+            {billingReady
+              ? "Attach it once. The reward unlocks only after your first successful paid-plan purchase."
+              : "Attach it once. It remains pending until signed billing verification is available."}
           </p>
           <input
             value={claimCode}
-            onChange={(event) => setClaimCode(event.target.value.toUpperCase())}
+            onChange={event => setClaimCode(event.target.value.toUpperCase())}
             placeholder="REEL-XXXXXXXX"
             className="mt-4 w-full rounded-lg border border-border bg-background px-4 py-3 font-mono text-sm uppercase"
           />
@@ -262,17 +326,26 @@ export default function ReferralPage() {
             disabled={!claimCode.trim() || claiming}
             className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-3 text-sm font-medium text-background disabled:opacity-45"
           >
-            {claiming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
+            {claiming ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Gift className="h-4 w-4" />
+            )}
             Apply code
           </button>
-          {notice ? <p className="mt-3 text-xs text-emerald-500">{notice}</p> : null}
-          {error ? <p className="mt-3 text-xs text-destructive">{error}</p> : null}
+          {notice ? (
+            <p className="mt-3 text-xs text-emerald-500">{notice}</p>
+          ) : null}
+          {error ? (
+            <p className="mt-3 text-xs text-destructive">{error}</p>
+          ) : null}
           <div className="mt-5 flex gap-2 border-t border-border pt-4">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
             <p className="text-[11px] leading-relaxed text-foreground/40">
               Credits pay for REELassati usage. The dollar amount communicates
               equivalent product value; it is not cash or a withdrawal balance.
-              Opening a link, creating an account, or using the app never triggers a reward.
+              Opening a link, creating an account, or using the app never
+              triggers a reward.
             </p>
           </div>
         </section>
@@ -301,9 +374,13 @@ function Metric({
         ? "text-primary"
         : "text-foreground/60";
   return (
-    <div className={`rounded-xl border bg-surface p-5 ${tone === "primary" ? "border-primary/20" : "border-border"}`}>
+    <div
+      className={`rounded-xl border bg-surface p-5 ${tone === "primary" ? "border-primary/20" : "border-border"}`}
+    >
       <Icon className={`mb-3 h-5 w-5 ${iconClass}`} />
-      <p className={`text-3xl font-semibold ${tone === "primary" ? "text-primary" : ""}`}>
+      <p
+        className={`text-3xl font-semibold ${tone === "primary" ? "text-primary" : ""}`}
+      >
         {value}
       </p>
       <p className="text-sm text-foreground/50">{label}</p>
