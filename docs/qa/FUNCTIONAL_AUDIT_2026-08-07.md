@@ -226,9 +226,9 @@ At the final pre-deployment gate for this audit:
 - protected entry timing, navigation, drop zones and provider routing:
   regression-protected and unchanged.
 
-The production build, diff/format gate, Sites checkpoint and authoritative
-owner-only deployment are recorded in the release-specific evidence file after
-they complete.
+The production build, diff/format gate, source checkpoint and authoritative
+owner-only deployment all passed. Exact release evidence is recorded in
+`docs/compliance/releases/2026-08-07-owner-only-functional-audit.md`.
 
 The following cannot honestly be declared universally proven by local tests:
 
