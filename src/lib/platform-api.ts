@@ -166,6 +166,7 @@ async function uploadForm<T>(
 
 export interface SessionResponse {
   user: {
+    id: string;
     email: string;
     name: string;
     role: "member";

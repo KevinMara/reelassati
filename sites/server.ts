@@ -7567,7 +7567,12 @@ async function handleApi(
     request.method === "GET"
   ) {
     return json({
-      user: { email: user.email, name: user.name, role: "member" },
+      user: {
+        id: user.email,
+        email: user.email,
+        name: user.name,
+        role: "member",
+      },
       capabilities: capabilities(env, user),
     });
   }

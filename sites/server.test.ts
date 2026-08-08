@@ -403,12 +403,13 @@ describe("Sites worker", () => {
       env as never
     );
     const body = (await response.json()) as {
-      user: { email: string; name: string };
+      user: { id: string; email: string; name: string };
       capabilities: { missing: string[] };
     };
 
     expect(response.status).toBe(200);
     expect(body.user).toEqual({
+      id: "creator@example.com",
       email: "creator@example.com",
       name: "Ada Creator",
       role: "member",

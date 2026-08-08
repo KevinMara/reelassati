@@ -31,6 +31,7 @@ import {
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { copyTextWithProvenance } from "@/lib/provenance";
 import { validateFileSelection } from "@/lib/file-validation";
+import posthog from "@/lib/posthog";
 
 type BusyAction = "upload" | "transcribe" | "script" | "speech" | null;
 
@@ -174,6 +175,7 @@ export default function VoiceNotes() {
     setBusyAction("transcribe");
     setError(null);
     setGeneratedScript(null);
+    const transcriptionSource = sourceAsset ? "existing_asset" : "uploaded_file";
     try {
       const asset = await uploadSelectedFile();
       const result = await platformApi.transcribe(
@@ -185,6 +187,11 @@ export default function VoiceNotes() {
       setSpeechText(withoutTextProvenanceMarker(result.transcript));
       invalidateVoiceAttestation();
       setSegmentCount(result.segments.length);
+      posthog?.capture("voice_note_transcribed", {
+        source: transcriptionSource,
+        language: language === "auto" ? "auto" : language,
+        segment_count: result.segments.length,
+      });
       await updateWorkspace(current => ({
         ...current,
         activity: [

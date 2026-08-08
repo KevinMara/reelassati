@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { useAuth } from "@/hooks/useAuth";
+import posthog from "@/lib/posthog";
 
 export default function Signup() {
   const { t } = useTranslation();
@@ -22,7 +23,16 @@ export default function Signup() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const result = await signup({ name, email, password });
-    if (result.signedIn) navigate("/dashboard", { replace: true });
+    if (result.signedIn) {
+      posthog?.capture("workspace_creation_opened", {
+        confirmation_required: false,
+      });
+      navigate("/dashboard", { replace: true });
+    } else if (result.confirmationRequired) {
+      posthog?.capture("workspace_creation_opened", {
+        confirmation_required: true,
+      });
+    }
     setConfirmationSent(result.confirmationRequired);
   };
 

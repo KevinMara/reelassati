@@ -29,6 +29,7 @@ import {
 import { useWorkspace } from "@/providers/workspace";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { writeClipboardText } from "@/lib/clipboard";
+import posthog from "@/lib/posthog";
 
 const RATIOS = [
   { id: "9:16" as const, name: "9:16", description: "Reels, TikTok, Shorts" },
@@ -353,6 +354,14 @@ export default function VideoGenerator() {
       setJob(result.job);
       setActiveJobId(result.job.id);
       requestIdRef.current = null;
+      posthog?.capture("video_generation_started", {
+        template_id: selectedTemplate || "custom",
+        aspect_ratio: ratio,
+        duration_seconds: duration,
+        resolution,
+        generate_audio: generateAudio,
+        has_reference_frames: Boolean(firstFrameUrl.trim() || lastFrameUrl.trim()),
+      });
       await updateWorkspace(current => ({
         ...current,
         jobs: upsertJob(current.jobs, result.job),
