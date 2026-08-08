@@ -75,7 +75,7 @@ export default function SocialHub() {
         JSON.stringify(accountFingerprint(result.accounts)) !==
         JSON.stringify(accountFingerprint(workspace.accounts))
       ) {
-        await updateWorkspace((current) => ({
+        await updateWorkspace(current => ({
           ...current,
           accounts: result.accounts,
         }));
@@ -100,10 +100,10 @@ export default function SocialHub() {
     () =>
       new Set(
         workspace.accounts
-          .filter((account) => account.status === "connected")
-          .map((account) => account.platform),
+          .filter(account => account.status === "connected")
+          .map(account => account.platform)
       ),
-    [workspace.accounts],
+    [workspace.accounts]
   );
 
   const handleConnect = async (platform: Platform) => {
@@ -124,9 +124,9 @@ export default function SocialHub() {
     setError("");
     try {
       await platformApi.disconnectPublishingAccount(account.id);
-      await updateWorkspace((current) => ({
+      await updateWorkspace(current => ({
         ...current,
-        accounts: current.accounts.filter((item) => item.id !== account.id),
+        accounts: current.accounts.filter(item => item.id !== account.id),
       }));
     } catch (cause) {
       setError(errorMessage(cause));
@@ -196,7 +196,7 @@ export default function SocialHub() {
           <p className="text-3xl font-semibold">
             {
               workspace.accounts.filter(
-                (account) => account.status === "connected",
+                account => account.status === "connected"
               ).length
             }
           </p>
@@ -225,7 +225,7 @@ export default function SocialHub() {
             Connected destinations
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {workspace.accounts.map((account) => {
+            {workspace.accounts.map(account => {
               const meta = PLATFORM_META[account.platform];
               return (
                 <motion.article
@@ -287,7 +287,7 @@ export default function SocialHub() {
           Add a destination
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {CONNECTABLE_PLATFORMS.map((platform) => {
+          {CONNECTABLE_PLATFORMS.map(platform => {
             const meta = PLATFORM_META[platform];
             const alreadyConnected = connectedPlatforms.has(platform);
             return (

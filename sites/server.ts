@@ -110,6 +110,8 @@ type SitesEnvironment = {
   AI_INCIDENT_OPERATIONS_STATUS?: string;
   AI_PROVENANCE_LIFECYCLE_STATUS?: string;
   COMPLIANCE_OPERATOR_OWNER_EMAIL?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
 };
 
 interface AuthenticatedUser {
@@ -287,7 +289,44 @@ function nameFromEmail(email: string): string {
     .join(" ");
 }
 
-function getUser(request: Request): AuthenticatedUser | null {
+async function getUser(
+  request: Request,
+  env: SitesEnvironment
+): Promise<AuthenticatedUser | null> {
+  const authorization = request.headers.get("authorization")?.trim();
+  if (
+    authorization?.startsWith("Bearer ") &&
+    env.SUPABASE_URL &&
+    env.SUPABASE_PUBLISHABLE_KEY
+  ) {
+    const response = await fetch(
+      `${env.SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`,
+      {
+        headers: {
+          apikey: env.SUPABASE_PUBLISHABLE_KEY,
+          Authorization: authorization,
+        },
+      }
+    );
+    if (response.ok) {
+      const payload = (await response.json()) as {
+        email?: string;
+        user_metadata?: { full_name?: string; name?: string };
+      };
+      const verifiedEmail = payload.email?.trim().toLowerCase();
+      if (verifiedEmail) {
+        return {
+          email: verifiedEmail,
+          name:
+            payload.user_metadata?.full_name?.trim() ||
+            payload.user_metadata?.name?.trim() ||
+            nameFromEmail(verifiedEmail),
+        };
+      }
+    }
+    return null;
+  }
+
   const email = request.headers
     .get("oai-authenticated-user-email")
     ?.trim()
@@ -7133,6 +7172,14 @@ async function handleApi(
     });
   }
 
+  if (url.pathname === "/api/localization" && request.method === "GET") {
+    const country =
+      (request as Request & { cf?: { country?: string } }).cf?.country
+        ?.trim()
+        .toUpperCase() || null;
+    return json({ country });
+  }
+
   if (url.pathname === "/api/video/webhook") {
     return handleVideoWebhook(request, env, url);
   }
@@ -7145,12 +7192,9 @@ async function handleApi(
     return handlePublicProvenance(request, env, url);
   }
 
-  const user = getUser(request);
+  const user = await getUser(request, env);
   if (!user) {
-    return errorResponse(
-      "Open this private studio from your authenticated ChatGPT workspace",
-      401
-    );
+    return errorResponse("Sign in to access this workspace", 401);
   }
 
   if (
@@ -7158,7 +7202,7 @@ async function handleApi(
     request.method === "GET"
   ) {
     return json({
-      user: { email: user.email, name: user.name, role: "owner" },
+      user: { email: user.email, name: user.name, role: "member" },
       capabilities: capabilities(env, user),
     });
   }
@@ -7256,17 +7300,55 @@ function withSecurityHeaders(response: Response): Response {
   });
 }
 
+const PUBLIC_APP_ORIGINS = new Set([
+  "https://reelassati.app",
+  "https://www.reelassati.app",
+  "https://reelassati.vercel.app",
+  "https://reelassati.kevinbiz.chatgpt.site",
+]);
+
+function withCors(response: Response, request: Request): Response {
+  const origin = request.headers.get("origin");
+  const allowed =
+    origin &&
+    (PUBLIC_APP_ORIGINS.has(origin) ||
+      origin.startsWith("http://localhost:") ||
+      origin.startsWith("http://127.0.0.1:"));
+  if (!allowed) return response;
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+  );
+  headers.set("Access-Control-Max-Age", "86400");
+  headers.append("Vary", "Origin");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function apiResponse(response: Response, request: Request): Response {
+  return withCors(withSecurityHeaders(response), request);
+}
+
 export default {
   async fetch(request: Request, env: SitesEnvironment): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api/")) {
+      if (request.method === "OPTIONS") {
+        return apiResponse(new Response(null, { status: 204 }), request);
+      }
       try {
-        return withSecurityHeaders(await handleApi(request, env, url));
+        return apiResponse(await handleApi(request, env, url), request);
       } catch (cause) {
-        if (cause instanceof Response) return withSecurityHeaders(cause);
+        if (cause instanceof Response) return apiResponse(cause, request);
         const reference = crypto.randomUUID();
-        const user = getUser(request);
+        const user = await getUser(request, env);
         console.error("Unhandled REELassati request failure", {
           reference,
           method: request.method,
@@ -7290,14 +7372,15 @@ export default {
             )
             .catch(() => undefined);
         }
-        return withSecurityHeaders(
+        return apiResponse(
           json(
             {
               error: "Unexpected server error",
               reference,
             },
             500
-          )
+          ),
+          request
         );
       }
     }

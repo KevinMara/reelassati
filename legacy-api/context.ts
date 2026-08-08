@@ -8,7 +8,7 @@ export type TrpcContext = {
 };
 
 export async function createContext(
-  opts: FetchCreateContextFnOptions,
+  opts: FetchCreateContextFnOptions
 ): Promise<TrpcContext> {
   // Try JWT from Authorization header first
   const authHeader = opts.req.headers.get("authorization");

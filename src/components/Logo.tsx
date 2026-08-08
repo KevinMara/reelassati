@@ -7,7 +7,12 @@ interface LogoProps {
   collapsed?: boolean;
 }
 
-export function Logo({ className, size = "md", glyphOnly = false, collapsed = false }: LogoProps) {
+export function Logo({
+  className,
+  size = "md",
+  glyphOnly = false,
+  collapsed = false,
+}: LogoProps) {
   const wordSize =
     size === "sm" ? "text-base" : size === "lg" ? "text-2xl" : "text-lg";
   const glyphPx = size === "sm" ? 22 : size === "lg" ? 38 : 30;
@@ -19,7 +24,12 @@ export function Logo({ className, size = "md", glyphOnly = false, collapsed = fa
     >
       <ReelassatiGlyph size={glyphPx} />
       {!glyphOnly && !collapsed && (
-        <span className={cn("flex items-baseline leading-none tracking-tight", wordSize)}>
+        <span
+          className={cn(
+            "flex items-baseline leading-none tracking-tight",
+            wordSize
+          )}
+        >
           <span className="font-bold uppercase tracking-[0.02em]">REEL</span>
           <span
             className="font-serif italic font-normal text-foreground -ml-[0.04em]"
@@ -34,9 +44,7 @@ export function Logo({ className, size = "md", glyphOnly = false, collapsed = fa
 }
 
 function ReelassatiGlyph({ size = 22 }: { size?: number }) {
-  return (
-    <ThemedLogoMark size={size} />
-  );
+  return <ThemedLogoMark size={size} />;
 }
 
 export function ThemedLogoMark({

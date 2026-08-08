@@ -5,21 +5,20 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function OAuthSuccess() {
   const navigate = useNavigate();
-  const { enterStudio, error } = useAuth();
+  const { user, loading, error } = useAuth();
 
   useEffect(() => {
-    void enterStudio().then(ok => {
-      navigate(ok ? "/dashboard" : "/auth/login", { replace: true });
-    });
-  }, [enterStudio, navigate]);
+    if (loading) return;
+    navigate(user ? "/dashboard" : "/auth/login", { replace: true });
+  }, [loading, navigate, user]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background text-foreground">
       <Logo size="md" />
       <div className="mt-6 flex flex-col items-center gap-3">
-        <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         <p className="text-sm text-muted-foreground">
-          {error || "Verifying your studio session…"}
+          {error || "Securing your session…"}
         </p>
       </div>
     </div>

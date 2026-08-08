@@ -246,7 +246,7 @@ function PlanCard({
 
   return (
     <article
-      className={`relative flex h-full flex-col overflow-hidden rounded-2xl border p-6 shadow-card transition-transform duration-300 hover:-translate-y-1 hover:shadow-card-hover ${plan.featured ? "border-primary/45 bg-primary/[0.05]" : "border-border bg-surface"}`}
+      className={`relative flex h-full flex-col overflow-hidden rounded-2xl border p-6 shadow-card transition-all duration-300 [transform-style:preserve-3d] hover:-translate-y-1 hover:[transform:perspective(1000px)_rotateX(1deg)_translateY(-4px)] hover:shadow-card-hover ${plan.featured ? "border-primary/45 bg-primary/[0.05]" : "border-border bg-surface"}`}
     >
       {plan.featured && (
         <div

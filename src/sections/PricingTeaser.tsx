@@ -60,7 +60,7 @@ export function PricingTeaser() {
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
                 <Link
-                  to="/dashboard/edit"
+                  to="/auth/signup"
                   className="inline-flex items-center rounded-pill border border-border px-5 py-3 text-sm font-medium text-foreground/70 transition-colors hover:border-primary/30 hover:text-foreground"
                 >
                   {isItalian ? "Apri lo Studio" : "Open the Studio"}

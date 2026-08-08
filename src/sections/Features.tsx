@@ -166,10 +166,15 @@ export function Features() {
               <motion.article
                 key={feature.title}
                 variants={fadeUp}
-                whileHover={reduceMotion ? undefined : { y: -4 }}
+                whileHover={
+                  reduceMotion
+                    ? undefined
+                    : { y: -5, rotateX: 1.2, rotateY: -1.2, scale: 1.008 }
+                }
                 transition={{ type: "spring", stiffness: 200, damping: 24 }}
-                className="group relative rounded-lg border border-border bg-surface p-7 shadow-card transition-shadow duration-300 hover:shadow-card-hover"
+                className="group relative overflow-hidden rounded-lg border border-border bg-surface p-7 shadow-card transition-shadow duration-300 [transform-style:preserve-3d] hover:shadow-card-hover"
               >
+                <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-primary/0 blur-2xl transition-colors duration-500 group-hover:bg-primary/10" />
                 <div className="mb-5 flex items-center justify-between gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <Icon

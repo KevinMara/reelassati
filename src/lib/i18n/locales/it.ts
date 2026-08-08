@@ -115,7 +115,8 @@ export default {
   "auth.login.title": "Bentornato.",
   "auth.login.subtitle": "Continua dove avevi lasciato.",
   "auth.signup.title": "Iniziamo.",
-  "auth.signup.subtitle": "Continua con la sessione autenticata del sito.",
+  "auth.signup.subtitle":
+    "Il tuo workspace creativo, i progetti e i media in un account sicuro.",
   "auth.forgot.title": "Resetta password",
   "auth.forgot.subtitle": "Ti invieremo un link di reset",
   "auth.forgot.sent": "Controlla la tua inbox per il link di reset.",

@@ -17,23 +17,83 @@ import {
 
 // ── Enums ────────────────────────────────────────────────────────────────────
 export const roleEnum = pgEnum("role", ["admin", "editor", "client"]);
-export const subscriptionEnum = pgEnum("subscription", ["free", "pro", "agency"]);
+export const subscriptionEnum = pgEnum("subscription", [
+  "free",
+  "pro",
+  "agency",
+]);
 export const platformEnum = pgEnum("platform", [
-  "tiktok", "instagram", "youtube", "x", "facebook", "linkedin",
-  "pinterest", "snapchat", "spotify", "threads", "reddit", "bluesky",
-  "telegram", "discord",
+  "tiktok",
+  "instagram",
+  "youtube",
+  "x",
+  "facebook",
+  "linkedin",
+  "pinterest",
+  "snapchat",
+  "spotify",
+  "threads",
+  "reddit",
+  "bluesky",
+  "telegram",
+  "discord",
 ]);
 export const statusEnum = pgEnum("status", ["active", "paused", "archived"]);
-export const connectionStatusEnum = pgEnum("connection_status", ["connected", "expired", "disconnected"]);
-export const contentTypeEnum = pgEnum("content_type", ["video", "script", "image", "audio", "template", "avatar"]);
-export const contentStatusEnum = pgEnum("content_status", ["draft", "review", "approved", "scheduled", "published", "archived"]);
-export const contentFormatEnum = pgEnum("content_format", ["slideshow", "wall_of_text", "hook_demo", "green_screen", "ugc", "meme", "reel", "short", "carousel", "story"]);
-export const scheduleStatusEnum = pgEnum("schedule_status", ["pending", "processing", "published", "failed", "cancelled"]);
-export const aiJobTypeEnum = pgEnum("ai_job_type", [
-  "script_generate", "video_analyze", "video_edit", "avatar_generate",
-  "caption_generate", "image_generate", "voice_synthesize",
+export const connectionStatusEnum = pgEnum("connection_status", [
+  "connected",
+  "expired",
+  "disconnected",
 ]);
-export const aiJobStatusEnum = pgEnum("ai_job_status", ["queued", "processing", "completed", "failed"]);
+export const contentTypeEnum = pgEnum("content_type", [
+  "video",
+  "script",
+  "image",
+  "audio",
+  "template",
+  "avatar",
+]);
+export const contentStatusEnum = pgEnum("content_status", [
+  "draft",
+  "review",
+  "approved",
+  "scheduled",
+  "published",
+  "archived",
+]);
+export const contentFormatEnum = pgEnum("content_format", [
+  "slideshow",
+  "wall_of_text",
+  "hook_demo",
+  "green_screen",
+  "ugc",
+  "meme",
+  "reel",
+  "short",
+  "carousel",
+  "story",
+]);
+export const scheduleStatusEnum = pgEnum("schedule_status", [
+  "pending",
+  "processing",
+  "published",
+  "failed",
+  "cancelled",
+]);
+export const aiJobTypeEnum = pgEnum("ai_job_type", [
+  "script_generate",
+  "video_analyze",
+  "video_edit",
+  "avatar_generate",
+  "caption_generate",
+  "image_generate",
+  "voice_synthesize",
+]);
+export const aiJobStatusEnum = pgEnum("ai_job_status", [
+  "queued",
+  "processing",
+  "completed",
+  "failed",
+]);
 
 // ── Users ────────────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
@@ -42,7 +102,9 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   password: varchar("password", { length: 255 }),
   googleId: varchar("google_id", { length: 255 }).unique(),
-  authProvider: pgEnum("auth_provider", ["local", "google"])("auth_provider").notNull().default("local"),
+  authProvider: pgEnum("auth_provider", ["local", "google"])("auth_provider")
+    .notNull()
+    .default("local"),
   avatar: varchar("avatar", { length: 500 }),
   role: roleEnum("role").notNull().default("editor"),
   subscription: subscriptionEnum("subscription").notNull().default("free"),
@@ -126,7 +188,11 @@ export const scripts = pgTable("scripts", {
   language: varchar("language", { length: 10 }),
   hookScore: integer("hook_score"),
   aiGenerated: boolean("ai_generated").default(false),
-  status: pgEnum("script_status", ["draft", "review", "approved", "archived"])("status").notNull().default("draft"),
+  status: pgEnum("script_status", ["draft", "review", "approved", "archived"])(
+    "status"
+  )
+    .notNull()
+    .default("draft"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -232,12 +298,22 @@ export const goals = pgTable("goals", {
   id: serial("id").primaryKey(),
   userId: bigint("user_id", { mode: "number" }).notNull(),
   clientId: bigint("client_id", { mode: "number" }),
-  type: pgEnum("goal_type", ["followers", "posts", "engagement", "views", "revenue"])("type").notNull(),
+  type: pgEnum("goal_type", [
+    "followers",
+    "posts",
+    "engagement",
+    "views",
+    "revenue",
+  ])("type").notNull(),
   platform: platformEnum("platform"),
   targetValue: integer("target_value").notNull(),
   currentValue: integer("current_value").default(0),
   deadline: timestamp("deadline"),
-  status: pgEnum("goal_status", ["active", "achieved", "expired", "paused"])("status").notNull().default("active"),
+  status: pgEnum("goal_status", ["active", "achieved", "expired", "paused"])(
+    "status"
+  )
+    .notNull()
+    .default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -250,7 +326,11 @@ export const referrals = pgTable("referrals", {
   referrerUserId: bigint("referrer_user_id", { mode: "number" }).notNull(),
   referredUserId: bigint("referred_user_id", { mode: "number" }),
   referralCode: varchar("referral_code", { length: 50 }).notNull().unique(),
-  status: pgEnum("referral_status", ["pending", "completed", "rewarded"])("status").notNull().default("pending"),
+  status: pgEnum("referral_status", ["pending", "completed", "rewarded"])(
+    "status"
+  )
+    .notNull()
+    .default("pending"),
   creditsEarned: integer("credits_earned").default(0),
   dollarValue: varchar("dollar_value", { length: 20 }).default("$0.00"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -271,7 +351,15 @@ export const voiceNotes = pgTable("voice_notes", {
   language: varchar("language", { length: 10 }),
   duration: integer("duration"),
   generatedScripts: json("generated_scripts"),
-  status: pgEnum("voice_status", ["uploaded", "transcribing", "transcribed", "generating", "completed"])("status").notNull().default("uploaded"),
+  status: pgEnum("voice_status", [
+    "uploaded",
+    "transcribing",
+    "transcribed",
+    "generating",
+    "completed",
+  ])("status")
+    .notNull()
+    .default("uploaded"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -288,7 +376,13 @@ export const interviewSessions = pgTable("interview_sessions", {
   questions: json("questions"),
   answers: json("answers"),
   generatedContent: json("generated_content"),
-  status: pgEnum("interview_status", ["in_progress", "completed", "generating"])("status").notNull().default("in_progress"),
+  status: pgEnum("interview_status", [
+    "in_progress",
+    "completed",
+    "generating",
+  ])("status")
+    .notNull()
+    .default("in_progress"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

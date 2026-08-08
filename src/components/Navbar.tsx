@@ -1,16 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Globe, Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Sun, X } from "lucide-react";
 import { Logo } from "./Logo";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
+import { LanguagePicker } from "@/components/LanguagePicker";
+import { useAuth } from "@/hooks/useAuth";
 
 export function Navbar() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { user, loading: authLoading } = useAuth();
   const isItalian = i18n.resolvedLanguage?.startsWith("it");
 
   useEffect(() => {
@@ -29,17 +32,15 @@ export function Navbar() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [open]);
 
-  const toggleLang = () => {
-    void i18n.changeLanguage(isItalian ? "en" : "it");
-  };
-
   const labels = {
-    capabilities: isItalian ? "Funzioni" : "Capabilities",
+    capabilities: t("nav.features"),
     examples: isItalian ? "Esempi" : "Walkthroughs",
     presets: isItalian ? "Preset" : "Presets",
-    access: isItalian ? "Prezzi" : "Pricing",
-    support: isItalian ? "Supporto" : "Support",
-    studio: isItalian ? "Apri lo Studio" : "Open Studio",
+    access: t("nav.pricing"),
+    support: t("nav.support"),
+    studio: t("nav.start_free"),
+    login: t("nav.login"),
+    signup: t("nav.signup"),
   };
 
   return (
@@ -72,15 +73,7 @@ export function Navbar() {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
-          <button
-            type="button"
-            onClick={toggleLang}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            aria-label={isItalian ? "Passa all’inglese" : "Switch to Italian"}
-          >
-            <Globe className="h-3.5 w-3.5" aria-hidden />{" "}
-            {isItalian ? "IT" : "EN"}
-          </button>
+          <LanguagePicker compact />
           <button
             type="button"
             onClick={toggleTheme}
@@ -102,12 +95,29 @@ export function Navbar() {
             )}
           </button>
           <span className="mx-1 h-5 w-px bg-border" aria-hidden />
-          <Link
-            to="/dashboard/edit"
-            className="inline-flex h-9 items-center rounded-pill bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
-          >
-            {labels.studio}
-          </Link>
+          {!authLoading && user ? (
+            <Link
+              to="/dashboard"
+              className="inline-flex h-9 items-center rounded-pill bg-primary px-4 text-sm font-medium text-primary-foreground transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+            >
+              {labels.studio}
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/auth/login"
+                className="inline-flex h-9 items-center rounded-pill px-3 text-sm font-medium text-foreground/75 hover:text-foreground"
+              >
+                {labels.login}
+              </Link>
+              <Link
+                to="/auth/signup"
+                className="inline-flex h-9 items-center rounded-pill bg-primary px-4 text-sm font-medium text-primary-foreground shadow-[0_10px_25px_-14px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+              >
+                {labels.signup}
+              </Link>
+            </>
+          )}
         </div>
 
         <button
@@ -162,14 +172,7 @@ export function Navbar() {
           </MobileLink>
           <div className="my-3 h-px bg-border" />
           <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={toggleLang}
-              className="flex items-center gap-1 text-sm text-muted-foreground"
-            >
-              <Globe className="h-3.5 w-3.5" aria-hidden />{" "}
-              {isItalian ? "IT" : "EN"}
-            </button>
+            <LanguagePicker />
             <button
               type="button"
               onClick={toggleTheme}
@@ -191,13 +194,32 @@ export function Navbar() {
               )}
             </button>
           </div>
-          <Link
-            to="/dashboard/edit"
-            onClick={() => setOpen(false)}
-            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-pill bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
-          >
-            {labels.studio}
-          </Link>
+          {!authLoading && user ? (
+            <Link
+              to="/dashboard"
+              onClick={() => setOpen(false)}
+              className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-pill bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+            >
+              {labels.studio}
+            </Link>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link
+                to="/auth/login"
+                onClick={() => setOpen(false)}
+                className="inline-flex h-11 items-center justify-center rounded-pill border border-border text-sm font-medium"
+              >
+                {labels.login}
+              </Link>
+              <Link
+                to="/auth/signup"
+                onClick={() => setOpen(false)}
+                className="inline-flex h-11 items-center justify-center rounded-pill bg-primary text-sm font-medium text-primary-foreground"
+              >
+                {labels.signup}
+              </Link>
+            </div>
+          )}
         </nav>
       </div>
     </header>

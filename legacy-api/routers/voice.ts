@@ -10,40 +10,51 @@ export const voiceRouter = createRouter({
   list: publicQuery.query(async ({ ctx }) => {
     if (!ctx.session?.userId) return [];
     const db = getDb();
-    return db.select().from(voiceNotes)
+    return db
+      .select()
+      .from(voiceNotes)
       .where(eq(voiceNotes.userId, Number(ctx.session.userId)))
       .orderBy(voiceNotes.createdAt);
   }),
 
   // ── Transcribe audio ───────────────────────────────────────────────────────
   transcribe: publicQuery
-    .input(z.object({
-      id: z.number(),
-      audioUrl: z.string(),
-      language: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        id: z.number(),
+        audioUrl: z.string(),
+        language: z.string().optional(),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       if (!ctx.session?.userId) throw new Error("Not authenticated");
       if (!isConfigured()) throw new Error("OpenRouter not configured");
 
       const db = getDb();
-      await db.update(voiceNotes).set({ status: "transcribing" })
+      await db
+        .update(voiceNotes)
+        .set({ status: "transcribing" })
         .where(eq(voiceNotes.id, input.id));
 
       const result = await transcribeAudio(input.audioUrl, input.language);
 
       if (!result) {
-        await db.update(voiceNotes).set({ status: "uploaded" })
+        await db
+          .update(voiceNotes)
+          .set({ status: "uploaded" })
           .where(eq(voiceNotes.id, input.id));
         throw new Error("Transcription failed");
       }
 
-      await db.update(voiceNotes).set({
-        transcription: result.text,
-        segments: result.segments as any,
-        language: input.language,
-        status: "transcribed",
-      }).where(eq(voiceNotes.id, input.id));
+      await db
+        .update(voiceNotes)
+        .set({
+          transcription: result.text,
+          segments: result.segments as any,
+          language: input.language,
+          status: "transcribed",
+        })
+        .where(eq(voiceNotes.id, input.id));
 
       return { text: result.text, segments: result.segments };
     }),
@@ -54,11 +65,16 @@ export const voiceRouter = createRouter({
     .mutation(async ({ input, ctx }) => {
       if (!ctx.session?.userId) throw new Error("Not authenticated");
       const db = getDb();
-      const note = await db.select().from(voiceNotes)
-        .where(eq(voiceNotes.id, input.id)).limit(1);
+      const note = await db
+        .select()
+        .from(voiceNotes)
+        .where(eq(voiceNotes.id, input.id))
+        .limit(1);
       if (!note[0]?.transcription) throw new Error("No transcription found");
 
-      await db.update(voiceNotes).set({ status: "generating" })
+      await db
+        .update(voiceNotes)
+        .set({ status: "generating" })
         .where(eq(voiceNotes.id, input.id));
 
       // Use Kimi to generate scripts from transcription
@@ -71,26 +87,40 @@ Return ONLY JSON in this format:
 [{"hook":"...","body":"...","cta":"...","platform":"tiktok"},{"hook":"...","body":"...","cta":"...","platform":"instagram"},{"hook":"...","body":"...","cta":"...","platform":"youtube"}]`;
 
       const response = await chatCompletion([
-        { role: "system", content: "You are a social media content expert. Create viral short-form scripts." },
+        {
+          role: "system",
+          content:
+            "You are a social media content expert. Create viral short-form scripts.",
+        },
         { role: "user", content: prompt },
       ]);
 
       let scripts: any[] = [];
       try {
         if (response) scripts = JSON.parse(response);
-      } catch { /* ignore parse errors */ }
+      } catch {
+        /* ignore parse errors */
+      }
 
       // Fallback if parsing fails
       if (!scripts.length) {
         scripts = [
-          { hook: note[0].transcription.substring(0, 100) + "...", body: note[0].transcription, cta: "Follow for more!", platform: "tiktok" },
+          {
+            hook: note[0].transcription.substring(0, 100) + "...",
+            body: note[0].transcription,
+            cta: "Follow for more!",
+            platform: "tiktok",
+          },
         ];
       }
 
-      await db.update(voiceNotes).set({
-        generatedScripts: scripts as any,
-        status: "completed",
-      }).where(eq(voiceNotes.id, input.id));
+      await db
+        .update(voiceNotes)
+        .set({
+          generatedScripts: scripts as any,
+          status: "completed",
+        })
+        .where(eq(voiceNotes.id, input.id));
 
       return { scripts };
     }),

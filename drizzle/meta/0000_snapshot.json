@@ -68,17 +68,12 @@
       "indexes": {
         "assets_r2_key_unique": {
           "name": "assets_r2_key_unique",
-          "columns": [
-            "r2_key"
-          ],
+          "columns": ["r2_key"],
           "isUnique": true
         },
         "assets_owner_created_idx": {
           "name": "assets_owner_created_idx",
-          "columns": [
-            "owner_email",
-            "created_at"
-          ],
+          "columns": ["owner_email", "created_at"],
           "isUnique": false
         }
       },
@@ -179,10 +174,7 @@
       "indexes": {
         "generation_jobs_owner_created_idx": {
           "name": "generation_jobs_owner_created_idx",
-          "columns": [
-            "owner_email",
-            "created_at"
-          ],
+          "columns": ["owner_email", "created_at"],
           "isUnique": false
         }
       },
@@ -250,9 +242,7 @@
       "indexes": {
         "zernio_profiles_profile_id_unique": {
           "name": "zernio_profiles_profile_id_unique",
-          "columns": [
-            "profile_id"
-          ],
+          "columns": ["profile_id"],
           "isUnique": true
         }
       },

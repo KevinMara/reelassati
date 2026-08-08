@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { CONTENT_LANGUAGES, WRITING_LANGUAGES, languageLabel } from "./languages";
+import {
+  CONTENT_LANGUAGES,
+  WRITING_LANGUAGES,
+  languageLabel,
+} from "./languages";
 
 describe("language catalog", () => {
   it("offers a broad, duplicate-free writing catalog", () => {
-    const codes = WRITING_LANGUAGES.map((language) => language.code);
+    const codes = WRITING_LANGUAGES.map(language => language.code);
     expect(codes.length).toBeGreaterThanOrEqual(50);
     expect(new Set(codes).size).toBe(codes.length);
     expect(codes).not.toContain("auto");

@@ -38,7 +38,11 @@ export type ZernioPlatform =
   | "whatsapp"
   | "discord";
 
-export const ZERNIO_PLATFORMS: { id: ZernioPlatform; name: string; posting: boolean }[] = [
+export const ZERNIO_PLATFORMS: {
+  id: ZernioPlatform;
+  name: string;
+  posting: boolean;
+}[] = [
   { id: "tiktok", name: "TikTok", posting: true },
   { id: "instagram", name: "Instagram", posting: true },
   { id: "youtube", name: "YouTube", posting: true },
@@ -61,7 +65,7 @@ export const ZERNIO_PLATFORMS: { id: ZernioPlatform; name: string; posting: bool
 export async function initiateConnect(
   platform: ZernioPlatform,
   redirectUri: string,
-  state?: string,
+  state?: string
 ): Promise<{ authUrl: string; requestId: string } | null> {
   try {
     const res = await fetch(`${ZERNIO_BASE_URL}/accounts/connect`, {
@@ -80,7 +84,7 @@ export async function initiateConnect(
 // Exchange the callback code for a permanent Zernio account ID
 export async function handleCallback(
   requestId: string,
-  code: string,
+  code: string
 ): Promise<{
   accountId: string;
   platform: ZernioPlatform;
@@ -105,10 +109,13 @@ export async function handleCallback(
 // ── Disconnect Account ───────────────────────────────────────────────────────
 export async function disconnectAccount(accountId: string): Promise<boolean> {
   try {
-    const res = await fetch(`${ZERNIO_BASE_URL}/accounts/${accountId}/disconnect`, {
-      method: "POST",
-      headers: headers(),
-    });
+    const res = await fetch(
+      `${ZERNIO_BASE_URL}/accounts/${accountId}/disconnect`,
+      {
+        method: "POST",
+        headers: headers(),
+      }
+    );
     return res.ok;
   } catch {
     return false;
@@ -181,9 +188,7 @@ export async function schedulePost(params: {
 }
 
 // ── Get Post Status ──────────────────────────────────────────────────────────
-export async function getPostStatus(
-  postId: string,
-): Promise<{
+export async function getPostStatus(postId: string): Promise<{
   postId: string;
   status: "published" | "scheduled" | "pending_review" | "failed";
   platformPostUrl?: string;

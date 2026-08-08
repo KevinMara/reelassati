@@ -18,7 +18,11 @@ export function ReferralCapture() {
       .finally(() => {
         if (!active) return;
         url.searchParams.delete("ref");
-        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        window.history.replaceState(
+          {},
+          "",
+          `${url.pathname}${url.search}${url.hash}`
+        );
       });
     return () => {
       active = false;

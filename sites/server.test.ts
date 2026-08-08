@@ -411,10 +411,58 @@ describe("Sites worker", () => {
     expect(body.user).toEqual({
       email: "creator@example.com",
       name: "Ada Creator",
-      role: "owner",
+      role: "member",
     });
     expect(body.capabilities.missing).toContain("OPENROUTER_API_KEY");
     expect(body.capabilities.missing).toContain("ZERNIO_API_KEY");
+  });
+
+  it("verifies a Supabase bearer session before returning workspace identity", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async request => {
+      expect(String(request)).toBe("https://auth.example/auth/v1/user");
+      return Response.json({
+        email: "member@example.com",
+        user_metadata: { full_name: "Public Member" },
+      });
+    }) as typeof fetch;
+
+    try {
+      const response = await worker.fetch(
+        new Request("https://studio.example/api/session", {
+          headers: { Authorization: "Bearer verified-token" },
+        }),
+        {
+          ...env,
+          SUPABASE_URL: "https://auth.example",
+          SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
+        } as never
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        user: {
+          email: "member@example.com",
+          name: "Public Member",
+          role: "member",
+        },
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("returns edge country localization before authentication and permits public app CORS", async () => {
+    const request = new Request("https://studio.example/api/localization", {
+      headers: { Origin: "https://reelassati.app" },
+    });
+    Object.defineProperty(request, "cf", { value: { country: "IT" } });
+    const response = await worker.fetch(request, env as never);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ country: "IT" });
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "https://reelassati.app"
+    );
   });
 
   it("rejects unauthenticated hosted API requests", async () => {

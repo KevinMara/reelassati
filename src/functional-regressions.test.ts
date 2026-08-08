@@ -131,19 +131,21 @@ describe("platform-wide functional invariants", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("hands Vercel Studio routes to the authenticated Sites runtime", () => {
+  it("uses public SaaS authentication and sends bearer tokens to the product API", () => {
     const app = source("./App.tsx");
     const auth = source("./hooks/useAuth.tsx");
     const runtime = source("./lib/runtime.ts");
+    const api = source("./lib/platform-api.ts");
 
     expect(runtime).toContain('hostname.endsWith(".vercel.app")');
     expect(runtime).toContain('"https://reelassati.kevinbiz.chatgpt.site"');
-    expect(runtime).toContain("VITE_OWNER_STUDIO_ORIGIN");
-    expect(app).toContain("<VercelStudioRedirect />");
-    expect(app).toContain(
-      "`${location.pathname}${location.search}${location.hash}`"
+    expect(runtime).toContain("VITE_PLATFORM_API_ORIGIN");
+    expect(app).toContain('<Navigate to="/auth/login" replace />');
+    expect(auth).toContain("signInWithPassword");
+    expect(auth).toContain("signInWithOAuth");
+    expect(api).toContain(
+      "Authorization: `Bearer ${data.session.access_token}`"
     );
-    expect(auth).toContain("window.location.assign(ownerStudioUrl())");
   });
 
   it("rejects HTML fallbacks and reports real upload progress", () => {

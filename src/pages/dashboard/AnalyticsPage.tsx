@@ -28,33 +28,38 @@ export default function AnalyticsPage() {
   const publishedPosts = useMemo(
     () =>
       workspace.posts.filter(
-        (post) => post.status === "published" || Boolean(post.publishedAt),
+        post => post.status === "published" || Boolean(post.publishedAt)
       ),
-    [workspace.posts],
+    [workspace.posts]
   );
   const scheduledPosts = useMemo(
-    () => workspace.posts.filter((post) => post.status === "scheduled"),
-    [workspace.posts],
+    () => workspace.posts.filter(post => post.status === "scheduled"),
+    [workspace.posts]
   );
   const activeProjects = useMemo(
     () =>
       workspace.projects.filter(
-        (project) =>
+        project =>
           project.status === "editing" ||
           project.status === "review" ||
-          project.status === "draft",
+          project.status === "draft"
       ),
-    [workspace.projects],
+    [workspace.projects]
   );
   const readyAssets = useMemo(
-    () => workspace.assets.filter((asset) => asset.status === "ready"),
-    [workspace.assets],
+    () => workspace.assets.filter(asset => asset.status === "ready"),
+    [workspace.assets]
   );
 
   const platformRows = useMemo(() => {
     const totals = new Map<
       Platform,
-      { platform: Platform; drafts: number; scheduled: number; published: number }
+      {
+        platform: Platform;
+        drafts: number;
+        scheduled: number;
+        published: number;
+      }
     >();
     for (const post of workspace.posts) {
       for (const platform of post.platforms) {
@@ -75,7 +80,7 @@ export default function AnalyticsPage() {
         right.published +
         right.scheduled +
         right.drafts -
-        (left.published + left.scheduled + left.drafts),
+        (left.published + left.scheduled + left.drafts)
     );
   }, [workspace.posts]);
 
@@ -84,11 +89,11 @@ export default function AnalyticsPage() {
       [...publishedPosts]
         .sort((left, right) =>
           (right.publishedAt || right.createdAt).localeCompare(
-            left.publishedAt || left.createdAt,
-          ),
+            left.publishedAt || left.createdAt
+          )
         )
         .slice(0, 8),
-    [publishedPosts],
+    [publishedPosts]
   );
 
   if (loading) {
@@ -128,13 +133,13 @@ export default function AnalyticsPage() {
         <p className="mono-eyebrow mb-2 text-primary">Measured workspace</p>
         <h1 className="text-3xl font-semibold">Analytics</h1>
         <p className="mt-2 max-w-2xl text-sm text-foreground/55">
-          Production and publication facts currently stored in REELassati. Reach,
-          retention, and engagement are never estimated.
+          Production and publication facts currently stored in REELassati.
+          Reach, retention, and engagement are never estimated.
         </p>
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((kpi) => (
+        {kpis.map(kpi => (
           <article
             key={kpi.label}
             className="rounded-xl border border-border bg-surface p-5"
@@ -182,11 +187,13 @@ export default function AnalyticsPage() {
               </p>
               <h2 className="mt-1 font-medium">Posts by platform</h2>
             </div>
-            <span className="text-xs text-foreground/40">Workspace records only</span>
+            <span className="text-xs text-foreground/40">
+              Workspace records only
+            </span>
           </div>
           {platformRows.length ? (
             <div className="space-y-3">
-              {platformRows.map((row) => {
+              {platformRows.map(row => {
                 const total = row.drafts + row.scheduled + row.published;
                 return (
                   <div
@@ -206,19 +213,25 @@ export default function AnalyticsPage() {
                         <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
                           Draft
                         </dt>
-                        <dd className="mt-1 text-sm font-semibold">{row.drafts}</dd>
+                        <dd className="mt-1 text-sm font-semibold">
+                          {row.drafts}
+                        </dd>
                       </div>
                       <div>
                         <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
                           Scheduled
                         </dt>
-                        <dd className="mt-1 text-sm font-semibold">{row.scheduled}</dd>
+                        <dd className="mt-1 text-sm font-semibold">
+                          {row.scheduled}
+                        </dd>
                       </div>
                       <div>
                         <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
                           Published
                         </dt>
-                        <dd className="mt-1 text-sm font-semibold">{row.published}</dd>
+                        <dd className="mt-1 text-sm font-semibold">
+                          {row.published}
+                        </dd>
                       </div>
                     </dl>
                   </div>
@@ -227,9 +240,12 @@ export default function AnalyticsPage() {
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-border p-8 text-center">
-              <p className="text-sm font-medium">No platform distribution data yet</p>
+              <p className="text-sm font-medium">
+                No platform distribution data yet
+              </p>
               <p className="mt-1 text-xs text-foreground/45">
-                Saving a draft with a connected account will create the first record.
+                Saving a draft with a connected account will create the first
+                record.
               </p>
             </div>
           )}
@@ -244,7 +260,7 @@ export default function AnalyticsPage() {
           </div>
           {publicationHistory.length ? (
             <div className="space-y-3">
-              {publicationHistory.map((post) => (
+              {publicationHistory.map(post => (
                 <article
                   key={post.id}
                   className="rounded-lg border border-border bg-background p-4"
@@ -254,12 +270,13 @@ export default function AnalyticsPage() {
                   </p>
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-foreground/45">
                     <span>
-                      {post.platforms.map((platform) => PLATFORM_LABELS[platform]).join(", ") ||
-                        "No platform recorded"}
+                      {post.platforms
+                        .map(platform => PLATFORM_LABELS[platform])
+                        .join(", ") || "No platform recorded"}
                     </span>
                     <time dateTime={post.publishedAt || post.createdAt}>
                       {new Date(
-                        post.publishedAt || post.createdAt,
+                        post.publishedAt || post.createdAt
                       ).toLocaleDateString()}
                     </time>
                   </div>
@@ -268,7 +285,9 @@ export default function AnalyticsPage() {
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-border p-8 text-center">
-              <p className="text-sm font-medium">Nothing has been recorded as published</p>
+              <p className="text-sm font-medium">
+                Nothing has been recorded as published
+              </p>
               <p className="mt-1 text-xs text-foreground/45">
                 Publishing history will appear after a real distribution action.
               </p>

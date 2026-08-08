@@ -95,10 +95,7 @@
       "indexes": {
         "ai_invocations_owner_created_idx": {
           "name": "ai_invocations_owner_created_idx",
-          "columns": [
-            "owner_email",
-            "created_at"
-          ],
+          "columns": ["owner_email", "created_at"],
           "isUnique": false
         }
       },
@@ -234,33 +231,22 @@
       "indexes": {
         "ai_provenance_records_public_token_unique": {
           "name": "ai_provenance_records_public_token_unique",
-          "columns": [
-            "public_token"
-          ],
+          "columns": ["public_token"],
           "isUnique": true
         },
         "ai_provenance_owner_created_idx": {
           "name": "ai_provenance_owner_created_idx",
-          "columns": [
-            "owner_email",
-            "created_at"
-          ],
+          "columns": ["owner_email", "created_at"],
           "isUnique": false
         },
         "ai_provenance_owner_entity_unique": {
           "name": "ai_provenance_owner_entity_unique",
-          "columns": [
-            "owner_email",
-            "entity_type",
-            "entity_id"
-          ],
+          "columns": ["owner_email", "entity_type", "entity_id"],
           "isUnique": true
         },
         "ai_provenance_sha256_idx": {
           "name": "ai_provenance_sha256_idx",
-          "columns": [
-            "content_sha256"
-          ],
+          "columns": ["content_sha256"],
           "isUnique": false
         }
       },
@@ -333,17 +319,12 @@
       "indexes": {
         "assets_r2_key_unique": {
           "name": "assets_r2_key_unique",
-          "columns": [
-            "r2_key"
-          ],
+          "columns": ["r2_key"],
           "isUnique": true
         },
         "assets_owner_created_idx": {
           "name": "assets_owner_created_idx",
-          "columns": [
-            "owner_email",
-            "created_at"
-          ],
+          "columns": ["owner_email", "created_at"],
           "isUnique": false
         }
       },
@@ -416,10 +397,7 @@
       "indexes": {
         "compliance_events_owner_created_idx": {
           "name": "compliance_events_owner_created_idx",
-          "columns": [
-            "owner_email",
-            "created_at"
-          ],
+          "columns": ["owner_email", "created_at"],
           "isUnique": false
         }
       },
@@ -527,10 +505,7 @@
       "indexes": {
         "generation_jobs_owner_created_idx": {
           "name": "generation_jobs_owner_created_idx",
-          "columns": [
-            "owner_email",
-            "created_at"
-          ],
+          "columns": ["owner_email", "created_at"],
           "isUnique": false
         }
       },
@@ -683,10 +658,7 @@
       "indexes": {
         "publishing_intents_owner_created_idx": {
           "name": "publishing_intents_owner_created_idx",
-          "columns": [
-            "owner_email",
-            "created_at"
-          ],
+          "columns": ["owner_email", "created_at"],
           "isUnique": false
         }
       },
@@ -782,24 +754,17 @@
       "indexes": {
         "referral_claims_referred_email_unique": {
           "name": "referral_claims_referred_email_unique",
-          "columns": [
-            "referred_email"
-          ],
+          "columns": ["referred_email"],
           "isUnique": true
         },
         "referral_claims_payment_event_id_unique": {
           "name": "referral_claims_payment_event_id_unique",
-          "columns": [
-            "payment_event_id"
-          ],
+          "columns": ["payment_event_id"],
           "isUnique": true
         },
         "referral_claims_referrer_created_idx": {
           "name": "referral_claims_referrer_created_idx",
-          "columns": [
-            "referrer_email",
-            "created_at"
-          ],
+          "columns": ["referrer_email", "created_at"],
           "isUnique": false
         }
       },
@@ -836,9 +801,7 @@
       "indexes": {
         "referral_codes_code_unique": {
           "name": "referral_codes_code_unique",
-          "columns": [
-            "code"
-          ],
+          "columns": ["code"],
           "isUnique": true
         }
       },
@@ -914,9 +877,7 @@
       "indexes": {
         "zernio_profiles_profile_id_unique": {
           "name": "zernio_profiles_profile_id_unique",
-          "columns": [
-            "profile_id"
-          ],
+          "columns": ["profile_id"],
           "isUnique": true
         }
       },

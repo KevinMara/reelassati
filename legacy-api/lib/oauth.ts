@@ -145,7 +145,11 @@ export async function findOrCreateGoogleUser(googleUser: {
       })
       .where(eq(users.id, existingByEmail[0].id));
 
-    return { ...existingByEmail[0], googleId: googleUser.id, authProvider: "google" as const };
+    return {
+      ...existingByEmail[0],
+      googleId: googleUser.id,
+      authProvider: "google" as const,
+    };
   }
 
   // Create new user

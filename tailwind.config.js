@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     container: {
       center: true,
@@ -15,9 +15,18 @@ module.exports = {
         mono: ["Geist Mono", "ui-monospace", "monospace"],
       },
       fontSize: {
-        "display-xl": ["clamp(3.5rem, 8vw + 1rem, 7rem)", { lineHeight: "1.02", letterSpacing: "-0.028em" }],
-        "display-lg": ["clamp(2.5rem, 5vw + 0.5rem, 4.5rem)", { lineHeight: "1.05", letterSpacing: "-0.024em" }],
-        "display-md": ["clamp(2rem, 3.5vw + 0.5rem, 3rem)", { lineHeight: "1.08", letterSpacing: "-0.02em" }],
+        "display-xl": [
+          "clamp(3.5rem, 8vw + 1rem, 7rem)",
+          { lineHeight: "1.02", letterSpacing: "-0.028em" },
+        ],
+        "display-lg": [
+          "clamp(2.5rem, 5vw + 0.5rem, 4.5rem)",
+          { lineHeight: "1.05", letterSpacing: "-0.024em" },
+        ],
+        "display-md": [
+          "clamp(2rem, 3.5vw + 0.5rem, 3rem)",
+          { lineHeight: "1.08", letterSpacing: "-0.02em" },
+        ],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -90,8 +99,16 @@ module.exports = {
           to: { height: "0" },
         },
         "fade-up": {
-          "0%": { opacity: "0", transform: "translateY(12px)", filter: "blur(4px)" },
-          "100%": { opacity: "1", transform: "translateY(0)", filter: "blur(0)" },
+          "0%": {
+            opacity: "0",
+            transform: "translateY(12px)",
+            filter: "blur(4px)",
+          },
+          "100%": {
+            opacity: "1",
+            transform: "translateY(0)",
+            filter: "blur(0)",
+          },
         },
         marquee: {
           "0%": { transform: "translateX(0)" },
@@ -112,4 +129,4 @@ module.exports = {
     },
   },
   plugins: [require("tailwindcss-animate")],
-}
+};

@@ -1,97 +1,142 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Check, Globe, Moon, Sparkles, Sun } from "lucide-react";
-import { Logo } from "@/components/Logo";
-import { useAuth } from "@/hooks/useAuth";
-import { useTheme } from "@/hooks/useTheme";
+import { ArrowRight, Check, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Signup() {
-  const { i18n } = useTranslation();
-  const { theme, toggleTheme } = useTheme();
-  const { enterStudio, loading, error } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const [attempted, setAttempted] = useState(false);
+  const { user, signup, loading, error, clearError } = useAuth();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
-  const createWorkspace = async () => {
-    setAttempted(true);
-    if (await enterStudio()) navigate("/dashboard");
+  useEffect(() => {
+    if (user) navigate("/dashboard", { replace: true });
+  }, [navigate, user]);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const result = await signup({ name, email, password });
+    if (result.signedIn) navigate("/dashboard", { replace: true });
+    setConfirmationSent(result.confirmationRequired);
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <nav className="flex items-center justify-center gap-4 py-6">
-        <Link to="/" aria-label="REELassati home">
-          <Logo size="md" />
-        </Link>
-        <div className="h-4 w-px bg-border" />
-        <button
-          type="button"
-          onClick={() =>
-            i18n.changeLanguage(i18n.language === "it" ? "en" : "it")
-          }
-          aria-label={
-            i18n.language === "it" ? "Switch to English" : "Passa all’italiano"
-          }
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <Globe className="h-3.5 w-3.5" />
-          {i18n.language === "it" ? "IT" : "EN"}
-        </button>
-        <button type="button" onClick={toggleTheme} aria-label="Toggle theme">
-          {theme === "light" ? (
-            <Moon className="h-4 w-4" />
-          ) : (
-            <Sun className="h-4 w-4" />
-          )}
-        </button>
-      </nav>
+    <AuthShell>
+      <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary-wash text-primary shadow-[inset_0_1px_rgba(255,255,255,0.25),0_12px_35px_-18px_hsl(var(--primary))]">
+        <Sparkles className="h-5 w-5" />
+      </div>
+      <p className="mono-eyebrow mb-2 text-primary">YOUR CREATOR WORKSPACE</p>
+      <h1 className="text-3xl font-semibold tracking-tight">
+        {t("auth.signup.title")}
+      </h1>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        {t("auth.signup.subtitle")}
+      </p>
 
-      <main className="flex-1 flex items-center justify-center px-4 pb-16">
-        <section className="w-full max-w-lg bg-surface border border-border rounded-2xl p-7 shadow-card">
-          <div className="h-11 w-11 rounded-xl bg-primary-wash text-primary flex items-center justify-center mb-6">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          <p className="mono-eyebrow text-primary mb-2">
-            Your creator workspace
+      {confirmationSent ? (
+        <div className="mt-7 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-5">
+          <Check className="mb-3 h-5 w-5 text-emerald-500" />
+          <p className="font-medium">Check your email</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            We sent a secure confirmation link to {email}.
           </p>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Start with a studio, not another blank tool
-          </h1>
-          <p className="text-sm text-muted-foreground leading-relaxed mt-3">
-            Your private workspace is created from your authenticated identity,
-            then projects, edits, assets, and publishing state stay server-side.
-          </p>
-
-          <div className="grid sm:grid-cols-2 gap-3 mt-6">
-            {[
-              "Editing-first timeline",
-              "Reviewable AI changes",
-              "Durable media library",
-              "Versioned project state",
-            ].map(item => (
-              <div key={item} className="flex items-center gap-2 text-sm">
-                <Check className="h-4 w-4 text-primary" />
-                {item}
-              </div>
-            ))}
-          </div>
-
-          {attempted && error ? (
-            <p className="mt-4 text-sm text-destructive">{error}</p>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={createWorkspace}
-            disabled={loading}
-            className="mt-7 w-full h-11 rounded-pill bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
+          <Link
+            to="/auth/login"
+            className="mt-4 inline-flex text-sm font-medium text-primary"
           >
-            {loading ? "Preparing workspace…" : "Create my workspace"}
-            {!loading ? <ArrowRight className="h-4 w-4" /> : null}
-          </button>
-        </section>
-      </main>
-    </div>
+            {t("auth.back_to_login")}
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="mt-7">
+            <SocialAuthButtons />
+          </div>
+          <form onSubmit={submit} className="space-y-4">
+            <label className="block text-sm font-medium">
+              {t("auth.name")}
+              <input
+                type="text"
+                autoComplete="name"
+                required
+                value={name}
+                onChange={event => {
+                  clearError();
+                  setName(event.target.value);
+                }}
+                className="mt-2 h-11 w-full rounded-xl border border-border bg-background/70 px-3 outline-none transition focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
+                placeholder={t("auth.placeholder_name")}
+              />
+            </label>
+            <label className="block text-sm font-medium">
+              {t("auth.email")}
+              <input
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={event => {
+                  clearError();
+                  setEmail(event.target.value);
+                }}
+                className="mt-2 h-11 w-full rounded-xl border border-border bg-background/70 px-3 outline-none transition focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
+                placeholder={t("auth.placeholder_email")}
+              />
+            </label>
+            <label className="block text-sm font-medium">
+              {t("auth.password")}
+              <input
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={password}
+                onChange={event => {
+                  clearError();
+                  setPassword(event.target.value);
+                }}
+                className="mt-2 h-11 w-full rounded-xl border border-border bg-background/70 px-3 outline-none transition focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
+                placeholder="At least 8 characters"
+              />
+            </label>
+            {error ? (
+              <p
+                role="alert"
+                className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {error}
+              </p>
+            ) : null}
+            <button
+              type="submit"
+              disabled={loading}
+              className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-medium text-primary-foreground shadow-[0_14px_30px_-16px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:opacity-50"
+            >
+              {loading ? "Creating account…" : t("auth.signup_btn")}
+              {!loading ? (
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              ) : null}
+            </button>
+          </form>
+        </>
+      )}
+      {!confirmationSent ? (
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          {t("auth.has_account")}{" "}
+          <Link
+            to="/auth/login"
+            className="font-medium text-primary hover:text-primary-hover"
+          >
+            {t("auth.login_btn")}
+          </Link>
+        </p>
+      ) : null}
+    </AuthShell>
   );
 }

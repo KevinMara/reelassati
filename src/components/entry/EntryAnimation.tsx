@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { motion } from "framer-motion";
 import { SESSION_KEY } from "./entry-constants";
 import "./entry-animation.css";
@@ -60,7 +66,7 @@ function AnimatedMark() {
         ease: [0.22, 1, 0.36, 1],
       }}
     >
-      {slices.map((slice) => (
+      {slices.map(slice => (
         <motion.div
           key={slice.name}
           className={`entry-mark-slice entry-mark-slice-${slice.name}`}
@@ -148,14 +154,14 @@ export default function EntryAnimation({
   onComplete,
 }: EntryAnimationProps) {
   const [phase, setPhase] = useState<"ready" | "playing" | "done">(() =>
-    force || !hasEntryPlayed() ? "ready" : "done",
+    force || !hasEntryPlayed() ? "ready" : "done"
   );
   const [isBackdropFading, setIsBackdropFading] = useState(false);
   const [isLockupFading, setIsLockupFading] = useState(false);
   const [reducedMotion] = useState(
     () =>
       typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
   const onCompleteRef = useRef(onComplete);
   const initiallyCompleteRef = useRef(phase === "done");
@@ -206,11 +212,11 @@ export default function EntryAnimation({
     if (phase !== "playing" || reducedMotion) return;
     const backdropTimer = window.setTimeout(
       () => setIsBackdropFading(true),
-      BACKDROP_FADE_START_MS,
+      BACKDROP_FADE_START_MS
     );
     const lockupTimer = window.setTimeout(
       () => setIsLockupFading(true),
-      LOCKUP_FADE_START_MS,
+      LOCKUP_FADE_START_MS
     );
     return () => {
       window.clearTimeout(backdropTimer);
@@ -240,11 +246,7 @@ export default function EntryAnimation({
   }
 
   return (
-    <motion.div
-      role="status"
-      aria-live="polite"
-      className="entry-anim-overlay"
-    >
+    <motion.div role="status" aria-live="polite" className="entry-anim-overlay">
       <motion.div
         className="entry-anim-backdrop"
         initial={{ opacity: 1 }}

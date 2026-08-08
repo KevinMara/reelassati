@@ -14,6 +14,8 @@ import type {
   ContentProvenance,
   ProvenanceDetectionResult,
 } from "@contracts/compliance";
+import { supabase } from "@/lib/supabase/client";
+import { platformApiUrl } from "@/lib/runtime";
 
 interface ApiErrorBody {
   error?: string;
@@ -34,13 +36,16 @@ export class PlatformApiError extends Error {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    credentials: "include",
+  const { data } = await supabase.auth.getSession();
+  const response = await fetch(platformApiUrl(path), {
     ...init,
     headers: {
       ...(init?.body instanceof FormData
         ? {}
         : { "Content-Type": "application/json" }),
+      ...(data.session?.access_token
+        ? { Authorization: `Bearer ${data.session.access_token}` }
+        : {}),
       ...init?.headers,
     },
   });
@@ -76,15 +81,21 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return parsed as T;
 }
 
-function uploadForm<T>(
+async function uploadForm<T>(
   path: string,
   form: FormData,
   onProgress?: (percent: number) => void
 ): Promise<T> {
+  const { data } = await supabase.auth.getSession();
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.open("POST", path);
-    request.withCredentials = true;
+    request.open("POST", platformApiUrl(path));
+    if (data.session?.access_token) {
+      request.setRequestHeader(
+        "Authorization",
+        `Bearer ${data.session.access_token}`
+      );
+    }
     request.responseType = "text";
     onProgress?.(0);
 
@@ -153,7 +164,7 @@ export interface SessionResponse {
   user: {
     email: string;
     name: string;
-    role: "owner";
+    role: "member";
   };
   capabilities: CapabilityState;
 }

@@ -18,7 +18,9 @@ export const referralRouter = createRouter({
   myCode: publicQuery.query(async ({ ctx }) => {
     if (!ctx.session?.userId) return null;
     const db = getDb();
-    const existing = await db.select().from(referrals)
+    const existing = await db
+      .select()
+      .from(referrals)
       .where(eq(referrals.referrerUserId, Number(ctx.session.userId)))
       .limit(1);
     if (existing[0]) return { code: existing[0].referralCode };
@@ -33,12 +35,25 @@ export const referralRouter = createRouter({
 
   // ── Get referral stats ─────────────────────────────────────────────────────
   stats: publicQuery.query(async ({ ctx }) => {
-    if (!ctx.session?.userId) return { totalReferrals: 0, creditsEarned: 0, dollarValue: "$0.00", referrals: [] };
+    if (!ctx.session?.userId)
+      return {
+        totalReferrals: 0,
+        creditsEarned: 0,
+        dollarValue: "$0.00",
+        referrals: [],
+      };
     const db = getDb();
-    const all = await db.select().from(referrals)
+    const all = await db
+      .select()
+      .from(referrals)
       .where(eq(referrals.referrerUserId, Number(ctx.session.userId)));
-    const completed = all.filter((r) => r.status === "completed" || r.status === "rewarded");
-    const totalCredits = completed.reduce((sum, r) => sum + (r.creditsEarned || 0), 0);
+    const completed = all.filter(
+      r => r.status === "completed" || r.status === "rewarded"
+    );
+    const totalCredits = completed.reduce(
+      (sum, r) => sum + (r.creditsEarned || 0),
+      0
+    );
     return {
       totalReferrals: all.length,
       completedReferrals: completed.length,
@@ -53,25 +68,35 @@ export const referralRouter = createRouter({
     .input(z.object({ code: z.string(), userId: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
-      const ref = await db.select().from(referrals)
+      const ref = await db
+        .select()
+        .from(referrals)
         .where(eq(referrals.referralCode, input.code))
         .limit(1);
       if (!ref[0]) throw new Error("Invalid referral code");
       if (ref[0].status !== "pending") throw new Error("Code already used");
 
-      await db.update(referrals).set({
-        referredUserId: input.userId,
-        status: "completed",
-        creditsEarned: REFERRAL_CREDITS,
-        dollarValue: "$" + REFERRAL_DOLLAR_VALUE,
-        completedAt: new Date(),
-      }).where(eq(referrals.id, ref[0].id));
+      await db
+        .update(referrals)
+        .set({
+          referredUserId: input.userId,
+          status: "completed",
+          creditsEarned: REFERRAL_CREDITS,
+          dollarValue: "$" + REFERRAL_DOLLAR_VALUE,
+          completedAt: new Date(),
+        })
+        .where(eq(referrals.id, ref[0].id));
 
       // Add credits to referrer
-      await db.update(users)
+      await db
+        .update(users)
         .set({ credits: (users.credits || 0) + REFERRAL_CREDITS })
         .where(eq(users.id, ref[0].referrerUserId));
 
-      return { success: true, creditsEarned: REFERRAL_CREDITS, dollarValue: "$" + REFERRAL_DOLLAR_VALUE };
+      return {
+        success: true,
+        creditsEarned: REFERRAL_CREDITS,
+        dollarValue: "$" + REFERRAL_DOLLAR_VALUE,
+      };
     }),
 });

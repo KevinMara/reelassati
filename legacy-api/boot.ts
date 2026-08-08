@@ -23,14 +23,14 @@ app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Initiate Google OAuth — return the auth URL for the frontend
-app.get("/api/auth/google", (c) => {
+app.get("/api/auth/google", c => {
   const redirectUri = `${new URL(c.req.url).origin}/api/auth/google/callback`;
   const authUrl = getGoogleAuthUrl(redirectUri);
   return c.json({ authUrl });
 });
 
 // Google OAuth callback
-app.get("/api/auth/google/callback", async (c) => {
+app.get("/api/auth/google/callback", async c => {
   const code = c.req.query("code");
   const error = c.req.query("error");
   const origin = new URL(c.req.url).origin;
@@ -74,7 +74,7 @@ app.get("/api/auth/google/callback", async (c) => {
 });
 
 // Verify token endpoint (used by frontend to validate)
-app.get("/api/auth/me", async (c) => {
+app.get("/api/auth/me", async c => {
   const token =
     getCookie(c, "auth_token") ||
     c.req.header("authorization")?.replace("Bearer ", "");
@@ -114,7 +114,7 @@ app.get("/api/auth/me", async (c) => {
 });
 
 // Logout — clear cookie
-app.post("/api/auth/logout", (c) => {
+app.post("/api/auth/logout", c => {
   setCookie(c, "auth_token", "", {
     httpOnly: true,
     secure: env.isProduction,
@@ -132,7 +132,7 @@ app.post("/api/auth/logout", (c) => {
 // authorizes REELassati. Zernio handles the token exchange; we just need to
 // store the resulting account ID in our database.
 
-app.get("/api/zernio/callback", async (c) => {
+app.get("/api/zernio/callback", async c => {
   const code = c.req.query("code");
   const requestId = c.req.query("request_id");
   const error = c.req.query("error");
@@ -162,8 +162,8 @@ app.get("/api/zernio/callback", async (c) => {
       .where(
         and(
           eq(platformConnections.userId, Number(userId)),
-          eq(platformConnections.zernioAccountId, result.accountId),
-        ),
+          eq(platformConnections.zernioAccountId, result.accountId)
+        )
       )
       .limit(1);
 
@@ -203,7 +203,7 @@ app.get("/api/zernio/callback", async (c) => {
 // tRPC Handler
 // ═══════════════════════════════════════════════════════════════════════════════
 
-app.use("/api/trpc/*", async (c) => {
+app.use("/api/trpc/*", async c => {
   return fetchRequestHandler({
     endpoint: "/api/trpc",
     req: c.req.raw,
@@ -212,7 +212,7 @@ app.use("/api/trpc/*", async (c) => {
   });
 });
 
-app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
+app.all("/api/*", c => c.json({ error: "Not Found" }, 404));
 
 export default app;
 

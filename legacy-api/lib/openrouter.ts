@@ -56,7 +56,7 @@ export interface VideoGenerationResult {
 }
 
 export async function generateVideo(
-  params: VideoGenerationParams,
+  params: VideoGenerationParams
 ): Promise<VideoGenerationResult | null> {
   try {
     const model = PRIMARY_VIDEO_MODEL;
@@ -132,7 +132,7 @@ export async function generateVideo(
 }
 
 export async function checkVideoStatus(
-  jobId: string,
+  jobId: string
 ): Promise<VideoGenerationResult | null> {
   try {
     const res = await fetch(`${OPENROUTER_BASE}/video/generations/${jobId}`, {
@@ -168,7 +168,7 @@ function estimateVideoCost(duration: number, withAudio: boolean): number {
 
 export async function transcribeAudio(
   audioUrl: string,
-  language?: string,
+  language?: string
 ): Promise<{
   text: string;
   segments: { start: number; end: number; text: string }[];
@@ -218,7 +218,7 @@ export interface TTSParams {
 }
 
 export async function synthesizeSpeech(
-  params: TTSParams,
+  params: TTSParams
 ): Promise<{ audioUrl: string; duration: number } | null> {
   try {
     const res = await fetch(`${OPENROUTER_BASE}/audio/speech`, {
@@ -252,7 +252,7 @@ export async function synthesizeSpeech(
 
 export async function chatCompletion(
   messages: { role: "system" | "user" | "assistant"; content: string }[],
-  options?: { temperature?: number; maxTokens?: number },
+  options?: { temperature?: number; maxTokens?: number }
 ): Promise<string | null> {
   try {
     const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {

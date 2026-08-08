@@ -60,12 +60,12 @@ export const CONTENT_LANGUAGES = [
 ] as const;
 
 export const WRITING_LANGUAGES = CONTENT_LANGUAGES.filter(
-  (language) => language.code !== "auto",
+  language => language.code !== "auto"
 );
 
 export function languageLabel(code: string) {
   return (
-    CONTENT_LANGUAGES.find((language) => language.code === code)?.label ??
+    CONTENT_LANGUAGES.find(language => language.code === code)?.label ??
     code.toUpperCase()
   );
 }

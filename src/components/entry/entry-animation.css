@@ -53,7 +53,9 @@
   --entry-gap: clamp(16px, 2.1vw, 28px);
   --entry-mark-start-x: calc((var(--entry-word-width) + var(--entry-gap)) / 2);
   position: relative;
-  width: calc(var(--entry-mark-size) + var(--entry-gap) + var(--entry-word-width));
+  width: calc(
+    var(--entry-mark-size) + var(--entry-gap) + var(--entry-word-width)
+  );
   height: var(--entry-mark-size);
 }
 

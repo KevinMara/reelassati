@@ -2,9 +2,17 @@ import { createRouter, publicQuery } from "./middleware";
 import { z } from "zod";
 import { getDb } from "./queries/connection";
 import {
-  users, clients, scripts, contentLibrary, templates,
-  publishingSchedule, analytics, trendingContent, aiJobs,
-  platformConnections, brandKits,
+  users,
+  clients,
+  scripts,
+  contentLibrary,
+  templates,
+  publishingSchedule,
+  analytics,
+  trendingContent,
+  aiJobs,
+  platformConnections,
+  brandKits,
 } from "@db/schema";
 import { eq, desc, and, sql, like, inArray } from "drizzle-orm";
 import { videoRouter } from "./routers/video";
@@ -24,40 +32,64 @@ export const appRouter = createRouter({
     me: publicQuery.query(async ({ ctx }) => {
       if (!ctx.session?.userId) return null;
       const db = getDb();
-      const user = await db.select().from(users).where(eq(users.id, Number(ctx.session.userId))).limit(1);
+      const user = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, Number(ctx.session.userId)))
+        .limit(1);
       return user[0] || null;
     }),
 
     update: publicQuery
-      .input(z.object({
-        name: z.string().optional(),
-        email: z.string().email().optional(),
-        language: z.string().optional(),
-        avatar: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          name: z.string().optional(),
+          email: z.string().email().optional(),
+          language: z.string().optional(),
+          avatar: z.string().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
-        await db.update(users).set(input).where(eq(users.id, Number(ctx.session.userId)));
+        await db
+          .update(users)
+          .set(input)
+          .where(eq(users.id, Number(ctx.session.userId)));
         return { success: true };
       }),
 
     stats: publicQuery.query(async ({ ctx }) => {
       if (!ctx.session?.userId) return null;
       const db = getDb();
-      const [contentCount, scriptCount, clientCount, publishedCount] = await Promise.all([
-        db.select({ count: sql<number>`count(*)` }).from(contentLibrary).where(eq(contentLibrary.userId, Number(ctx.session.userId))),
-        db.select({ count: sql<number>`count(*)` }).from(scripts).where(eq(scripts.userId, Number(ctx.session.userId))),
-        db.select({ count: sql<number>`count(*)` }).from(clients).where(eq(clients.userId, Number(ctx.session.userId))),
-        db.select({ count: sql<number>`count(*)` }).from(publishingSchedule)
-          .where(and(
-            eq(publishingSchedule.userId, Number(ctx.session.userId)),
-            eq(publishingSchedule.status, "published")
-          )),
-      ]);
+      const [contentCount, scriptCount, clientCount, publishedCount] =
+        await Promise.all([
+          db
+            .select({ count: sql<number>`count(*)` })
+            .from(contentLibrary)
+            .where(eq(contentLibrary.userId, Number(ctx.session.userId))),
+          db
+            .select({ count: sql<number>`count(*)` })
+            .from(scripts)
+            .where(eq(scripts.userId, Number(ctx.session.userId))),
+          db
+            .select({ count: sql<number>`count(*)` })
+            .from(clients)
+            .where(eq(clients.userId, Number(ctx.session.userId))),
+          db
+            .select({ count: sql<number>`count(*)` })
+            .from(publishingSchedule)
+            .where(
+              and(
+                eq(publishingSchedule.userId, Number(ctx.session.userId)),
+                eq(publishingSchedule.status, "published")
+              )
+            ),
+        ]);
 
       // Get total views
-      const viewsData = await db.select({ total: sql<number>`COALESCE(SUM(views), 0)` })
+      const viewsData = await db
+        .select({ total: sql<number>`COALESCE(SUM(views), 0)` })
         .from(analytics)
         .where(eq(analytics.userId, Number(ctx.session.userId)));
 
@@ -78,29 +110,42 @@ export const appRouter = createRouter({
     list: publicQuery.query(async ({ ctx }) => {
       if (!ctx.session?.userId) return [];
       const db = getDb();
-      return db.select().from(clients)
+      return db
+        .select()
+        .from(clients)
         .where(eq(clients.userId, Number(ctx.session.userId)))
         .orderBy(desc(clients.createdAt));
     }),
 
-    get: publicQuery.input(z.object({ id: z.number() })).query(async ({ input, ctx }) => {
-      if (!ctx.session?.userId) return null;
-      const db = getDb();
-      const result = await db.select().from(clients)
-        .where(and(eq(clients.id, input.id), eq(clients.userId, Number(ctx.session.userId))))
-        .limit(1);
-      return result[0] || null;
-    }),
+    get: publicQuery
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (!ctx.session?.userId) return null;
+        const db = getDb();
+        const result = await db
+          .select()
+          .from(clients)
+          .where(
+            and(
+              eq(clients.id, input.id),
+              eq(clients.userId, Number(ctx.session.userId))
+            )
+          )
+          .limit(1);
+        return result[0] || null;
+      }),
 
     create: publicQuery
-      .input(z.object({
-        name: z.string().min(1),
-        brand: z.string().optional(),
-        niche: z.string().optional(),
-        targetAudience: z.string().optional(),
-        brandVoice: z.string().optional(),
-        guidelines: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          name: z.string().min(1),
+          brand: z.string().optional(),
+          niche: z.string().optional(),
+          targetAudience: z.string().optional(),
+          brandVoice: z.string().optional(),
+          guidelines: z.string().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
@@ -112,16 +157,18 @@ export const appRouter = createRouter({
       }),
 
     update: publicQuery
-      .input(z.object({
-        id: z.number(),
-        name: z.string().optional(),
-        brand: z.string().optional(),
-        niche: z.string().optional(),
-        targetAudience: z.string().optional(),
-        brandVoice: z.string().optional(),
-        guidelines: z.string().optional(),
-        status: z.enum(["active", "paused", "archived"]).optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          brand: z.string().optional(),
+          niche: z.string().optional(),
+          targetAudience: z.string().optional(),
+          brandVoice: z.string().optional(),
+          guidelines: z.string().optional(),
+          status: z.enum(["active", "paused", "archived"]).optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
@@ -130,12 +177,14 @@ export const appRouter = createRouter({
         return { success: true };
       }),
 
-    delete: publicQuery.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
-      if (!ctx.session?.userId) throw new Error("Not authenticated");
-      const db = getDb();
-      await db.delete(clients).where(eq(clients.id, input.id));
-      return { success: true };
-    }),
+    delete: publicQuery
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.session?.userId) throw new Error("Not authenticated");
+        const db = getDb();
+        await db.delete(clients).where(eq(clients.id, input.id));
+        return { success: true };
+      }),
   }),
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -145,34 +194,56 @@ export const appRouter = createRouter({
     list: publicQuery.query(async ({ ctx }) => {
       if (!ctx.session?.userId) return [];
       const db = getDb();
-      return db.select().from(scripts)
+      return db
+        .select()
+        .from(scripts)
         .where(eq(scripts.userId, Number(ctx.session.userId)))
         .orderBy(desc(scripts.createdAt));
     }),
 
-    get: publicQuery.input(z.object({ id: z.number() })).query(async ({ input, ctx }) => {
-      if (!ctx.session?.userId) return null;
-      const db = getDb();
-      const result = await db.select().from(scripts)
-        .where(and(eq(scripts.id, input.id), eq(scripts.userId, Number(ctx.session.userId))))
-        .limit(1);
-      return result[0] || null;
-    }),
+    get: publicQuery
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (!ctx.session?.userId) return null;
+        const db = getDb();
+        const result = await db
+          .select()
+          .from(scripts)
+          .where(
+            and(
+              eq(scripts.id, input.id),
+              eq(scripts.userId, Number(ctx.session.userId))
+            )
+          )
+          .limit(1);
+        return result[0] || null;
+      }),
 
     create: publicQuery
-      .input(z.object({
-        title: z.string().min(1),
-        hook: z.string().optional(),
-        body: z.string().optional(),
-        cta: z.string().optional(),
-        fullScript: z.string().optional(),
-        targetPlatform: z.enum(["tiktok", "instagram", "youtube", "x", "facebook", "linkedin"]).optional(),
-        tone: z.string().optional(),
-        duration: z.number().optional(),
-        language: z.string().optional(),
-        clientId: z.number().optional(),
-        aiGenerated: z.boolean().optional(),
-      }))
+      .input(
+        z.object({
+          title: z.string().min(1),
+          hook: z.string().optional(),
+          body: z.string().optional(),
+          cta: z.string().optional(),
+          fullScript: z.string().optional(),
+          targetPlatform: z
+            .enum([
+              "tiktok",
+              "instagram",
+              "youtube",
+              "x",
+              "facebook",
+              "linkedin",
+            ])
+            .optional(),
+          tone: z.string().optional(),
+          duration: z.number().optional(),
+          language: z.string().optional(),
+          clientId: z.number().optional(),
+          aiGenerated: z.boolean().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
@@ -184,15 +255,19 @@ export const appRouter = createRouter({
       }),
 
     update: publicQuery
-      .input(z.object({
-        id: z.number(),
-        title: z.string().optional(),
-        hook: z.string().optional(),
-        body: z.string().optional(),
-        cta: z.string().optional(),
-        fullScript: z.string().optional(),
-        status: z.enum(["draft", "review", "approved", "archived"]).optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          title: z.string().optional(),
+          hook: z.string().optional(),
+          body: z.string().optional(),
+          cta: z.string().optional(),
+          fullScript: z.string().optional(),
+          status: z
+            .enum(["draft", "review", "approved", "archived"])
+            .optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
@@ -201,22 +276,33 @@ export const appRouter = createRouter({
         return { success: true };
       }),
 
-    delete: publicQuery.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
-      if (!ctx.session?.userId) throw new Error("Not authenticated");
-      const db = getDb();
-      await db.delete(scripts).where(eq(scripts.id, input.id));
-      return { success: true };
-    }),
+    delete: publicQuery
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.session?.userId) throw new Error("Not authenticated");
+        const db = getDb();
+        await db.delete(scripts).where(eq(scripts.id, input.id));
+        return { success: true };
+      }),
 
     generate: publicQuery
-      .input(z.object({
-        topic: z.string().min(1),
-        platform: z.enum(["tiktok", "instagram", "youtube", "x", "facebook", "linkedin"]),
-        tone: z.string().default("energetic"),
-        duration: z.number().default(30),
-        language: z.string().default("en"),
-        clientId: z.number().optional(),
-      }))
+      .input(
+        z.object({
+          topic: z.string().min(1),
+          platform: z.enum([
+            "tiktok",
+            "instagram",
+            "youtube",
+            "x",
+            "facebook",
+            "linkedin",
+          ]),
+          tone: z.string().default("energetic"),
+          duration: z.number().default(30),
+          language: z.string().default("en"),
+          clientId: z.number().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
 
@@ -256,7 +342,10 @@ export const appRouter = createRouter({
         return {
           id: Number(result[0].insertId),
           title: `${input.topic} — ${input.platform}`,
-          hook, body, cta, fullScript,
+          hook,
+          body,
+          cta,
+          fullScript,
           hookScore: Math.floor(Math.random() * 30) + 70,
         };
       }),
@@ -269,21 +358,45 @@ export const appRouter = createRouter({
     list: publicQuery.query(async ({ ctx }) => {
       if (!ctx.session?.userId) return [];
       const db = getDb();
-      return db.select().from(contentLibrary)
+      return db
+        .select()
+        .from(contentLibrary)
         .where(eq(contentLibrary.userId, Number(ctx.session.userId)))
         .orderBy(desc(contentLibrary.createdAt));
     }),
 
     create: publicQuery
-      .input(z.object({
-        title: z.string().min(1),
-        type: z.enum(["video", "script", "image", "audio", "template", "avatar"]),
-        description: z.string().optional(),
-        url: z.string().optional(),
-        tags: z.array(z.string()).optional(),
-        format: z.enum(["slideshow", "wall_of_text", "hook_demo", "green_screen", "ugc", "meme", "reel", "short", "carousel", "story"]).optional(),
-        clientId: z.number().optional(),
-      }))
+      .input(
+        z.object({
+          title: z.string().min(1),
+          type: z.enum([
+            "video",
+            "script",
+            "image",
+            "audio",
+            "template",
+            "avatar",
+          ]),
+          description: z.string().optional(),
+          url: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+          format: z
+            .enum([
+              "slideshow",
+              "wall_of_text",
+              "hook_demo",
+              "green_screen",
+              "ugc",
+              "meme",
+              "reel",
+              "short",
+              "carousel",
+              "story",
+            ])
+            .optional(),
+          clientId: z.number().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
@@ -295,12 +408,14 @@ export const appRouter = createRouter({
         return { id: Number(result[0].insertId), ...input };
       }),
 
-    delete: publicQuery.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
-      if (!ctx.session?.userId) throw new Error("Not authenticated");
-      const db = getDb();
-      await db.delete(contentLibrary).where(eq(contentLibrary.id, input.id));
-      return { success: true };
-    }),
+    delete: publicQuery
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.session?.userId) throw new Error("Not authenticated");
+        const db = getDb();
+        await db.delete(contentLibrary).where(eq(contentLibrary.id, input.id));
+        return { success: true };
+      }),
   }),
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -312,10 +427,15 @@ export const appRouter = createRouter({
       return db.select().from(templates).orderBy(desc(templates.usageCount));
     }),
 
-    byNiche: publicQuery.input(z.object({ niche: z.string() })).query(async ({ input }) => {
-      const db = getDb();
-      return db.select().from(templates).where(like(templates.niche, `%${input.niche}%`));
-    }),
+    byNiche: publicQuery
+      .input(z.object({ niche: z.string() }))
+      .query(async ({ input }) => {
+        const db = getDb();
+        return db
+          .select()
+          .from(templates)
+          .where(like(templates.niche, `%${input.niche}%`));
+      }),
   }),
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -325,20 +445,34 @@ export const appRouter = createRouter({
     list: publicQuery.query(async ({ ctx }) => {
       if (!ctx.session?.userId) return [];
       const db = getDb();
-      return db.select().from(publishingSchedule)
+      return db
+        .select()
+        .from(publishingSchedule)
         .where(eq(publishingSchedule.userId, Number(ctx.session.userId)))
         .orderBy(desc(publishingSchedule.scheduledAt));
     }),
 
     create: publicQuery
-      .input(z.object({
-        contentId: z.number(),
-        platform: z.enum(["tiktok", "instagram", "youtube", "x", "facebook", "linkedin", "pinterest", "snapchat", "spotify"]),
-        scheduledAt: z.string(),
-        caption: z.string().optional(),
-        hashtags: z.string().optional(),
-        clientId: z.number().optional(),
-      }))
+      .input(
+        z.object({
+          contentId: z.number(),
+          platform: z.enum([
+            "tiktok",
+            "instagram",
+            "youtube",
+            "x",
+            "facebook",
+            "linkedin",
+            "pinterest",
+            "snapchat",
+            "spotify",
+          ]),
+          scheduledAt: z.string(),
+          caption: z.string().optional(),
+          hashtags: z.string().optional(),
+          clientId: z.number().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
@@ -351,26 +485,38 @@ export const appRouter = createRouter({
       }),
 
     update: publicQuery
-      .input(z.object({
-        id: z.number(),
-        status: z.enum(["pending", "processing", "published", "failed", "cancelled"]).optional(),
-        scheduledAt: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          status: z
+            .enum(["pending", "processing", "published", "failed", "cancelled"])
+            .optional(),
+          scheduledAt: z.string().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
         const { id, ...data } = input;
-        if (data.scheduledAt) data.scheduledAt = new Date(data.scheduledAt) as any;
-        await db.update(publishingSchedule).set(data).where(eq(publishingSchedule.id, id));
+        if (data.scheduledAt)
+          data.scheduledAt = new Date(data.scheduledAt) as any;
+        await db
+          .update(publishingSchedule)
+          .set(data)
+          .where(eq(publishingSchedule.id, id));
         return { success: true };
       }),
 
-    delete: publicQuery.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
-      if (!ctx.session?.userId) throw new Error("Not authenticated");
-      const db = getDb();
-      await db.delete(publishingSchedule).where(eq(publishingSchedule.id, input.id));
-      return { success: true };
-    }),
+    delete: publicQuery
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.session?.userId) throw new Error("Not authenticated");
+        const db = getDb();
+        await db
+          .delete(publishingSchedule)
+          .where(eq(publishingSchedule.id, input.id));
+        return { success: true };
+      }),
   }),
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -378,17 +524,24 @@ export const appRouter = createRouter({
   // ═══════════════════════════════════════════════════════════════════════════
   analytics: createRouter({
     overview: publicQuery.query(async ({ ctx }) => {
-      if (!ctx.session?.userId) return { views: 0, likes: 0, comments: 0, shares: 0, engagement: "0%" };
+      if (!ctx.session?.userId)
+        return { views: 0, likes: 0, comments: 0, shares: 0, engagement: "0%" };
       const db = getDb();
-      const result = await db.select({
-        totalViews: sql<number>`COALESCE(SUM(views), 0)`,
-        totalLikes: sql<number>`COALESCE(SUM(likes), 0)`,
-        totalComments: sql<number>`COALESCE(SUM(comments), 0)`,
-        totalShares: sql<number>`COALESCE(SUM(shares), 0)`,
-      }).from(analytics).where(eq(analytics.userId, Number(ctx.session.userId)));
+      const result = await db
+        .select({
+          totalViews: sql<number>`COALESCE(SUM(views), 0)`,
+          totalLikes: sql<number>`COALESCE(SUM(likes), 0)`,
+          totalComments: sql<number>`COALESCE(SUM(comments), 0)`,
+          totalShares: sql<number>`COALESCE(SUM(shares), 0)`,
+        })
+        .from(analytics)
+        .where(eq(analytics.userId, Number(ctx.session.userId)));
 
       const data = result[0];
-      const totalEngagement = (data?.totalLikes || 0) + (data?.totalComments || 0) + (data?.totalShares || 0);
+      const totalEngagement =
+        (data?.totalLikes || 0) +
+        (data?.totalComments || 0) +
+        (data?.totalShares || 0);
       const views = data?.totalViews || 1;
 
       return {
@@ -403,25 +556,39 @@ export const appRouter = createRouter({
     byPlatform: publicQuery.query(async ({ ctx }) => {
       if (!ctx.session?.userId) return [];
       const db = getDb();
-      return db.select({
-        platform: analytics.platform,
-        totalViews: sql<number>`COALESCE(SUM(views), 0)`,
-        totalLikes: sql<number>`COALESCE(SUM(likes), 0)`,
-        totalComments: sql<number>`COALESCE(SUM(comments), 0)`,
-      }).from(analytics)
+      return db
+        .select({
+          platform: analytics.platform,
+          totalViews: sql<number>`COALESCE(SUM(views), 0)`,
+          totalLikes: sql<number>`COALESCE(SUM(likes), 0)`,
+          totalComments: sql<number>`COALESCE(SUM(comments), 0)`,
+        })
+        .from(analytics)
         .where(eq(analytics.userId, Number(ctx.session.userId)))
         .groupBy(analytics.platform);
     }),
 
     record: publicQuery
-      .input(z.object({
-        contentId: z.number(),
-        platform: z.enum(["tiktok", "instagram", "youtube", "x", "facebook", "linkedin", "pinterest", "snapchat", "spotify"]),
-        views: z.number().default(0),
-        likes: z.number().default(0),
-        comments: z.number().default(0),
-        shares: z.number().default(0),
-      }))
+      .input(
+        z.object({
+          contentId: z.number(),
+          platform: z.enum([
+            "tiktok",
+            "instagram",
+            "youtube",
+            "x",
+            "facebook",
+            "linkedin",
+            "pinterest",
+            "snapchat",
+            "spotify",
+          ]),
+          views: z.number().default(0),
+          likes: z.number().default(0),
+          comments: z.number().default(0),
+          shares: z.number().default(0),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
@@ -439,30 +606,47 @@ export const appRouter = createRouter({
   trending: createRouter({
     list: publicQuery.query(async () => {
       const db = getDb();
-      return db.select().from(trendingContent)
+      return db
+        .select()
+        .from(trendingContent)
         .where(eq(trendingContent.isActive, true))
         .orderBy(desc(trendingContent.views))
         .limit(50);
     }),
 
-    byNiche: publicQuery.input(z.object({ niche: z.string() })).query(async ({ input }) => {
-      const db = getDb();
-      return db.select().from(trendingContent)
-        .where(and(eq(trendingContent.isActive, true), like(trendingContent.niche, `%${input.niche}%`)))
-        .orderBy(desc(trendingContent.views))
-        .limit(20);
-    }),
+    byNiche: publicQuery
+      .input(z.object({ niche: z.string() }))
+      .query(async ({ input }) => {
+        const db = getDb();
+        return db
+          .select()
+          .from(trendingContent)
+          .where(
+            and(
+              eq(trendingContent.isActive, true),
+              like(trendingContent.niche, `%${input.niche}%`)
+            )
+          )
+          .orderBy(desc(trendingContent.views))
+          .limit(20);
+      }),
 
-    byFormat: publicQuery.input(z.object({ format: z.string() })).query(async ({ input }) => {
-      const db = getDb();
-      return db.select().from(trendingContent)
-        .where(and(
-          eq(trendingContent.isActive, true),
-          eq(trendingContent.format, input.format as any)
-        ))
-        .orderBy(desc(trendingContent.views))
-        .limit(20);
-    }),
+    byFormat: publicQuery
+      .input(z.object({ format: z.string() }))
+      .query(async ({ input }) => {
+        const db = getDb();
+        return db
+          .select()
+          .from(trendingContent)
+          .where(
+            and(
+              eq(trendingContent.isActive, true),
+              eq(trendingContent.format, input.format as any)
+            )
+          )
+          .orderBy(desc(trendingContent.views))
+          .limit(20);
+      }),
   }),
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -472,17 +656,29 @@ export const appRouter = createRouter({
     list: publicQuery.query(async ({ ctx }) => {
       if (!ctx.session?.userId) return [];
       const db = getDb();
-      return db.select().from(aiJobs)
+      return db
+        .select()
+        .from(aiJobs)
         .where(eq(aiJobs.userId, Number(ctx.session.userId)))
         .orderBy(desc(aiJobs.createdAt));
     }),
 
     create: publicQuery
-      .input(z.object({
-        type: z.enum(["script_generate", "video_analyze", "video_edit", "avatar_generate", "caption_generate", "image_generate", "voice_synthesize"]),
-        input: z.record(z.any()).optional(),
-        creditsUsed: z.number().default(0),
-      }))
+      .input(
+        z.object({
+          type: z.enum([
+            "script_generate",
+            "video_analyze",
+            "video_edit",
+            "avatar_generate",
+            "caption_generate",
+            "image_generate",
+            "voice_synthesize",
+          ]),
+          input: z.record(z.any()).optional(),
+          creditsUsed: z.number().default(0),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
@@ -496,12 +692,16 @@ export const appRouter = createRouter({
       }),
 
     update: publicQuery
-      .input(z.object({
-        id: z.number(),
-        status: z.enum(["queued", "processing", "completed", "failed"]).optional(),
-        output: z.record(z.any()).optional(),
-        errorMessage: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          status: z
+            .enum(["queued", "processing", "completed", "failed"])
+            .optional(),
+          output: z.record(z.any()).optional(),
+          errorMessage: z.string().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
@@ -524,59 +724,86 @@ export const appRouter = createRouter({
       return db.select().from(platformConnections);
     }),
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // VIDEO GENERATION (OpenRouter — Kling v3.0)
-  // ═══════════════════════════════════════════════════════════════════════════════
-  video: videoRouter,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // VIDEO GENERATION (OpenRouter — Kling v3.0)
+    // ═══════════════════════════════════════════════════════════════════════════════
+    video: videoRouter,
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // VOICE NOTES — Audio → Transcription → Scripts
-  // ═══════════════════════════════════════════════════════════════════════════════
-  voice: voiceRouter,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // VOICE NOTES — Audio → Transcription → Scripts
+    // ═══════════════════════════════════════════════════════════════════════════════
+    voice: voiceRouter,
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // INTERVIEW ME — AI Interviews → Content
-  // ═══════════════════════════════════════════════════════════════════════════════
-  interview: interviewRouter,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // INTERVIEW ME — AI Interviews → Content
+    // ═══════════════════════════════════════════════════════════════════════════════
+    interview: interviewRouter,
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // GOALS — Follower & Content Target Tracking
-  // ═══════════════════════════════════════════════════════════════════════════════
-  goals: goalsRouter,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // GOALS — Follower & Content Target Tracking
+    // ═══════════════════════════════════════════════════════════════════════════════
+    goals: goalsRouter,
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // COACHING — Weekly Performance Digest
-  // ═══════════════════════════════════════════════════════════════════════════════
-  coaching: coachingRouter,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // COACHING — Weekly Performance Digest
+    // ═══════════════════════════════════════════════════════════════════════════════
+    coaching: coachingRouter,
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // REFERRALS — Credit-based Affiliate System
-  // ═══════════════════════════════════════════════════════════════════════════════
-  referral: referralRouter,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // REFERRALS — Credit-based Affiliate System
+    // ═══════════════════════════════════════════════════════════════════════════════
+    referral: referralRouter,
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // PLATFORM CONNECTIONS (Zernio-Powered)
-  // ═══════════════════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PLATFORM CONNECTIONS (Zernio-Powered)
+    // ═══════════════════════════════════════════════════════════════════════════════
     // ── DEPRECATED: Old connect endpoint (replaced by Zernio flow) ───────────
     connect: publicQuery
-      .input(z.object({
-        clientId: z.number(),
-        platform: z.enum(["tiktok", "instagram", "youtube", "x", "facebook", "linkedin", "pinterest", "snapchat", "spotify"]),
-        accountName: z.string(),
-      }))
+      .input(
+        z.object({
+          clientId: z.number(),
+          platform: z.enum([
+            "tiktok",
+            "instagram",
+            "youtube",
+            "x",
+            "facebook",
+            "linkedin",
+            "pinterest",
+            "snapchat",
+            "spotify",
+          ]),
+          accountName: z.string(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
-        return { success: true, message: "Use initiateConnect + Zernio OAuth flow" };
+        return {
+          success: true,
+          message: "Use initiateConnect + Zernio OAuth flow",
+        };
       }),
 
     // ── Step 1: Initiate Zernio OAuth connection ─────────────────────────────
     initiateConnect: publicQuery
-      .input(z.object({
-        platform: z.enum([
-          "tiktok", "instagram", "youtube", "x", "facebook", "linkedin",
-          "pinterest", "threads", "reddit", "bluesky", "telegram", "discord",
-        ]),
-      }))
+      .input(
+        z.object({
+          platform: z.enum([
+            "tiktok",
+            "instagram",
+            "youtube",
+            "x",
+            "facebook",
+            "linkedin",
+            "pinterest",
+            "threads",
+            "reddit",
+            "bluesky",
+            "telegram",
+            "discord",
+          ]),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const { initiateConnect, isConfigured } = await import("./lib/zernio");
@@ -584,7 +811,11 @@ export const appRouter = createRouter({
 
         const redirectUri = `${process.env.VITE_APP_URL || "http://localhost:3000"}/api/zernio/callback`;
         const state = String(ctx.session.userId);
-        const result = await initiateConnect(input.platform as any, redirectUri, state);
+        const result = await initiateConnect(
+          input.platform as any,
+          redirectUri,
+          state
+        );
         if (!result) throw new Error("Failed to initiate connection");
         return { authUrl: result.authUrl, requestId: result.requestId };
       }),
@@ -595,7 +826,9 @@ export const appRouter = createRouter({
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
-        const conn = await db.select().from(platformConnections)
+        const conn = await db
+          .select()
+          .from(platformConnections)
           .where(eq(platformConnections.id, input.id))
           .limit(1);
         if (!conn[0]) throw new Error("Connection not found");
@@ -603,7 +836,8 @@ export const appRouter = createRouter({
           const { disconnectAccount } = await import("./lib/zernio");
           await disconnectAccount(conn[0].zernioAccountId);
         }
-        await db.update(platformConnections)
+        await db
+          .update(platformConnections)
           .set({ status: "disconnected" })
           .where(eq(platformConnections.id, input.id));
         return { success: true };
@@ -611,20 +845,25 @@ export const appRouter = createRouter({
 
     // ── Publish content via Zernio ───────────────────────────────────────────
     publish: publicQuery
-      .input(z.object({
-        accountId: z.number(),
-        content: z.string().min(1),
-        mediaUrl: z.string().optional(),
-        mediaUrls: z.array(z.string()).optional(),
-        hashtags: z.array(z.string()).optional(),
-      }))
+      .input(
+        z.object({
+          accountId: z.number(),
+          content: z.string().min(1),
+          mediaUrl: z.string().optional(),
+          mediaUrls: z.array(z.string()).optional(),
+          hashtags: z.array(z.string()).optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
-        const conn = await db.select().from(platformConnections)
+        const conn = await db
+          .select()
+          .from(platformConnections)
           .where(eq(platformConnections.id, input.accountId))
           .limit(1);
-        if (!conn[0] || !conn[0].zernioAccountId) throw new Error("Account not connected via Zernio");
+        if (!conn[0] || !conn[0].zernioAccountId)
+          throw new Error("Account not connected via Zernio");
 
         const { publishPost, isConfigured } = await import("./lib/zernio");
         if (!isConfigured()) throw new Error("Zernio API key not configured");
@@ -642,27 +881,35 @@ export const appRouter = createRouter({
           clientId: conn[0].clientId,
           platform: conn[0].platform,
           contentId: 0,
-          views: 0, likes: 0, comments: 0, shares: 0,
+          views: 0,
+          likes: 0,
+          comments: 0,
+          shares: 0,
         });
         return result;
       }),
 
     // ── Schedule content via Zernio ──────────────────────────────────────────
     schedule: publicQuery
-      .input(z.object({
-        accountId: z.number(),
-        content: z.string().min(1),
-        mediaUrl: z.string().optional(),
-        hashtags: z.array(z.string()).optional(),
-        scheduledAt: z.string(),
-      }))
+      .input(
+        z.object({
+          accountId: z.number(),
+          content: z.string().min(1),
+          mediaUrl: z.string().optional(),
+          hashtags: z.array(z.string()).optional(),
+          scheduledAt: z.string(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         if (!ctx.session?.userId) throw new Error("Not authenticated");
         const db = getDb();
-        const conn = await db.select().from(platformConnections)
+        const conn = await db
+          .select()
+          .from(platformConnections)
           .where(eq(platformConnections.id, input.accountId))
           .limit(1);
-        if (!conn[0] || !conn[0].zernioAccountId) throw new Error("Account not connected via Zernio");
+        if (!conn[0] || !conn[0].zernioAccountId)
+          throw new Error("Account not connected via Zernio");
 
         const { schedulePost, isConfigured } = await import("./lib/zernio");
         if (!isConfigured()) throw new Error("Zernio API key not configured");
@@ -689,17 +936,29 @@ export const appRouter = createRouter({
 
     // ── Pull analytics via Zernio ────────────────────────────────────────────
     pullAnalytics: publicQuery
-      .input(z.object({ accountId: z.number(), startDate: z.string().optional(), endDate: z.string().optional() }))
+      .input(
+        z.object({
+          accountId: z.number(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        })
+      )
       .query(async ({ input, ctx }) => {
         if (!ctx.session?.userId) return null;
         const db = getDb();
-        const conn = await db.select().from(platformConnections)
+        const conn = await db
+          .select()
+          .from(platformConnections)
           .where(eq(platformConnections.id, input.accountId))
           .limit(1);
         if (!conn[0] || !conn[0].zernioAccountId) return null;
         const { getAnalytics, isConfigured } = await import("./lib/zernio");
         if (!isConfigured()) return null;
-        return getAnalytics({ accountId: conn[0].zernioAccountId, startDate: input.startDate, endDate: input.endDate });
+        return getAnalytics({
+          accountId: conn[0].zernioAccountId,
+          startDate: input.startDate,
+          endDate: input.endDate,
+        });
       }),
   }),
 });

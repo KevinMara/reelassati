@@ -51,16 +51,13 @@ const COMMON_TIMEZONES = [
 
 export default function SettingsPage() {
   const { i18n } = useTranslation();
-  const {
-    workspace,
-    capabilities,
-    updateWorkspace,
-    loading,
-    saving,
-  } = useWorkspace();
+  const { workspace, capabilities, updateWorkspace, loading, saving } =
+    useWorkspace();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>("profile");
-  const [profileEdits, setProfileEdits] = useState<Partial<WorkspaceProfile>>({});
+  const [profileEdits, setProfileEdits] = useState<Partial<WorkspaceProfile>>(
+    {}
+  );
   const [brandEdits, setBrandEdits] = useState<Partial<BrandKit>>({});
   const [notice, setNotice] = useState<{
     tone: "success" | "error";
@@ -68,33 +65,36 @@ export default function SettingsPage() {
   } | null>(null);
   const profileDraft = useMemo(
     () => ({ ...workspace.profile, ...profileEdits }),
-    [profileEdits, workspace.profile],
+    [profileEdits, workspace.profile]
   );
   const brandDraft = useMemo(
     () => ({ ...workspace.brandKit, ...brandEdits }),
-    [brandEdits, workspace.brandKit],
+    [brandEdits, workspace.brandKit]
   );
   const profileDirty = Object.keys(profileEdits).length > 0;
   const brandDirty = Object.keys(brandEdits).length > 0;
 
   const timezones = useMemo(
-    () => Array.from(new Set([profileDraft.timezone, ...COMMON_TIMEZONES])).filter(Boolean),
-    [profileDraft.timezone],
+    () =>
+      Array.from(new Set([profileDraft.timezone, ...COMMON_TIMEZONES])).filter(
+        Boolean
+      ),
+    [profileDraft.timezone]
   );
 
   const setProfileField = <Key extends keyof WorkspaceProfile>(
     key: Key,
-    value: WorkspaceProfile[Key],
+    value: WorkspaceProfile[Key]
   ) => {
-    setProfileEdits((current) => ({ ...current, [key]: value }));
+    setProfileEdits(current => ({ ...current, [key]: value }));
     setNotice(null);
   };
 
   const setBrandField = <Key extends keyof BrandKit>(
     key: Key,
-    value: BrandKit[Key],
+    value: BrandKit[Key]
   ) => {
-    setBrandEdits((current) => ({ ...current, [key]: value }));
+    setBrandEdits(current => ({ ...current, [key]: value }));
     setNotice(null);
   };
 
@@ -114,14 +114,17 @@ export default function SettingsPage() {
         workspaceName: profileDraft.workspaceName.trim(),
         email: workspace.profile.email,
       };
-      await updateWorkspace((current) => ({ ...current, profile: next }));
+      await updateWorkspace(current => ({ ...current, profile: next }));
       await i18n.changeLanguage(next.language);
       setProfileEdits({});
       setNotice({ tone: "success", message: "Studio profile saved." });
     } catch (cause) {
       setNotice({
         tone: "error",
-        message: cause instanceof Error ? cause.message : "Profile could not be saved.",
+        message:
+          cause instanceof Error
+            ? cause.message
+            : "Profile could not be saved.",
       });
     }
   };
@@ -142,14 +145,16 @@ export default function SettingsPage() {
         safeZone: Math.max(0, Math.min(25, brandDraft.safeZone)),
         audioDucking: Math.max(0, Math.min(100, brandDraft.audioDucking)),
       };
-      await updateWorkspace((current) => ({ ...current, brandKit: next }));
+      await updateWorkspace(current => ({ ...current, brandKit: next }));
       setBrandEdits({});
       setNotice({ tone: "success", message: "Brand defaults saved." });
     } catch (cause) {
       setNotice({
         tone: "error",
         message:
-          cause instanceof Error ? cause.message : "Brand defaults could not be saved.",
+          cause instanceof Error
+            ? cause.message
+            : "Brand defaults could not be saved.",
       });
     }
   };
@@ -226,14 +231,19 @@ export default function SettingsPage() {
               : "border-emerald-500/20 bg-emerald-500/5 text-emerald-600"
           }`}
         >
-          {notice.tone === "success" ? <CheckCircle2 className="h-4 w-4" /> : null}
+          {notice.tone === "success" ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : null}
           {notice.message}
         </div>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <nav className="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Settings">
-          {TABS.map((tab) => (
+        <nav
+          className="flex gap-1 overflow-x-auto lg:flex-col"
+          aria-label="Settings"
+        >
+          {TABS.map(tab => (
             <button
               key={tab.id}
               type="button"
@@ -263,7 +273,8 @@ export default function SettingsPage() {
               <div>
                 <h2 className="text-lg font-medium">Studio profile</h2>
                 <p className="mt-1 text-sm text-foreground/50">
-                  The owner email comes from the authenticated private site session.
+                  The owner email comes from the authenticated private site
+                  session.
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -271,7 +282,9 @@ export default function SettingsPage() {
                   <span className="mb-1.5 block font-medium">Your name</span>
                   <input
                     value={profileDraft.name}
-                    onChange={(event) => setProfileField("name", event.target.value)}
+                    onChange={event =>
+                      setProfileField("name", event.target.value)
+                    }
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                     required
                   />
@@ -280,7 +293,7 @@ export default function SettingsPage() {
                   <span className="mb-1.5 block font-medium">Studio name</span>
                   <input
                     value={profileDraft.workspaceName}
-                    onChange={(event) =>
+                    onChange={event =>
                       setProfileField("workspaceName", event.target.value)
                     }
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
@@ -296,13 +309,15 @@ export default function SettingsPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">Interface language</span>
+                  <span className="mb-1.5 block font-medium">
+                    Interface language
+                  </span>
                   <select
                     value={profileDraft.language}
-                    onChange={(event) =>
+                    onChange={event =>
                       setProfileField(
                         "language",
-                        event.target.value as WorkspaceProfile["language"],
+                        event.target.value as WorkspaceProfile["language"]
                       )
                     }
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
@@ -317,12 +332,12 @@ export default function SettingsPage() {
                   </span>
                   <select
                     value={profileDraft.contentLanguage}
-                    onChange={(event) =>
+                    onChange={event =>
                       setProfileField("contentLanguage", event.target.value)
                     }
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                   >
-                    {WRITING_LANGUAGES.map((language) => (
+                    {WRITING_LANGUAGES.map(language => (
                       <option key={language.code} value={language.code}>
                         {language.label}
                       </option>
@@ -330,15 +345,17 @@ export default function SettingsPage() {
                   </select>
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">Publishing timezone</span>
+                  <span className="mb-1.5 block font-medium">
+                    Publishing timezone
+                  </span>
                   <select
                     value={profileDraft.timezone}
-                    onChange={(event) =>
+                    onChange={event =>
                       setProfileField("timezone", event.target.value)
                     }
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                   >
-                    {timezones.map((timezone) => (
+                    {timezones.map(timezone => (
                       <option key={timezone} value={timezone}>
                         {timezone}
                       </option>
@@ -348,7 +365,9 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-center justify-between border-t border-border pt-5">
                 <span className="text-xs text-foreground/45">
-                  {profileDirty ? "Unsaved profile changes" : "Profile is saved"}
+                  {profileDirty
+                    ? "Unsaved profile changes"
+                    : "Profile is saved"}
                 </span>
                 <button
                   type="submit"
@@ -374,7 +393,8 @@ export default function SettingsPage() {
               <div>
                 <h2 className="text-lg font-medium">Brand defaults</h2>
                 <p className="mt-1 text-sm text-foreground/50">
-                  These constraints are reusable across scripts, AI plans, and edits.
+                  These constraints are reusable across scripts, AI plans, and
+                  edits.
                 </p>
               </div>
               <div className="grid gap-4">
@@ -382,7 +402,9 @@ export default function SettingsPage() {
                   <span className="mb-1.5 block font-medium">Brand name</span>
                   <input
                     value={brandDraft.name}
-                    onChange={(event) => setBrandField("name", event.target.value)}
+                    onChange={event =>
+                      setBrandField("name", event.target.value)
+                    }
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                     required
                   />
@@ -391,7 +413,9 @@ export default function SettingsPage() {
                   <span className="mb-1.5 block font-medium">Voice rules</span>
                   <textarea
                     value={brandDraft.voice}
-                    onChange={(event) => setBrandField("voice", event.target.value)}
+                    onChange={event =>
+                      setBrandField("voice", event.target.value)
+                    }
                     rows={4}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                     placeholder="Specific language, energy, point of view, and phrases to avoid"
@@ -401,7 +425,7 @@ export default function SettingsPage() {
                   <span className="mb-1.5 block font-medium">Audience</span>
                   <textarea
                     value={brandDraft.audience}
-                    onChange={(event) =>
+                    onChange={event =>
                       setBrandField("audience", event.target.value)
                     }
                     rows={4}
@@ -414,18 +438,22 @@ export default function SettingsPage() {
                     <span className="mb-1.5 block font-medium">Typeface</span>
                     <input
                       value={brandDraft.font}
-                      onChange={(event) => setBrandField("font", event.target.value)}
+                      onChange={event =>
+                        setBrandField("font", event.target.value)
+                      }
                       className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                     />
                   </label>
                   <label className="text-sm">
-                    <span className="mb-1.5 block font-medium">Caption preset</span>
+                    <span className="mb-1.5 block font-medium">
+                      Caption preset
+                    </span>
                     <select
                       value={brandDraft.captionPreset}
-                      onChange={(event) =>
+                      onChange={event =>
                         setBrandField(
                           "captionPreset",
-                          event.target.value as BrandKit["captionPreset"],
+                          event.target.value as BrandKit["captionPreset"]
                         )
                       }
                       className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
@@ -436,22 +464,26 @@ export default function SettingsPage() {
                     </select>
                   </label>
                   <label className="text-sm">
-                    <span className="mb-1.5 block font-medium">Primary color</span>
+                    <span className="mb-1.5 block font-medium">
+                      Primary color
+                    </span>
                     <input
                       type="color"
                       value={brandDraft.primaryColor}
-                      onChange={(event) =>
+                      onChange={event =>
                         setBrandField("primaryColor", event.target.value)
                       }
                       className="h-11 w-full rounded-lg border border-border bg-background p-1"
                     />
                   </label>
                   <label className="text-sm">
-                    <span className="mb-1.5 block font-medium">Accent color</span>
+                    <span className="mb-1.5 block font-medium">
+                      Accent color
+                    </span>
                     <input
                       type="color"
                       value={brandDraft.accentColor}
-                      onChange={(event) =>
+                      onChange={event =>
                         setBrandField("accentColor", event.target.value)
                       }
                       className="h-11 w-full rounded-lg border border-border bg-background p-1"
@@ -466,7 +498,7 @@ export default function SettingsPage() {
                       min="0"
                       max="25"
                       value={brandDraft.safeZone}
-                      onChange={(event) =>
+                      onChange={event =>
                         setBrandField("safeZone", Number(event.target.value))
                       }
                       className="w-full accent-primary"
@@ -481,8 +513,11 @@ export default function SettingsPage() {
                       min="0"
                       max="100"
                       value={brandDraft.audioDucking}
-                      onChange={(event) =>
-                        setBrandField("audioDucking", Number(event.target.value))
+                      onChange={event =>
+                        setBrandField(
+                          "audioDucking",
+                          Number(event.target.value)
+                        )
                       }
                       className="w-full accent-primary"
                     />
@@ -559,8 +594,8 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium">Language and timezone</p>
                 </div>
                 <p className="mt-1 text-xs text-foreground/45">
-                  Edit these under Studio profile so interface and publishing settings
-                  stay in one saved record.
+                  Edit these under Studio profile so interface and publishing
+                  settings stay in one saved record.
                 </p>
               </div>
             </section>
@@ -570,7 +605,9 @@ export default function SettingsPage() {
             <section className="rounded-xl border border-border bg-surface p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-medium">Configured capabilities</h2>
+                  <h2 className="text-lg font-medium">
+                    Configured capabilities
+                  </h2>
                   <p className="mt-1 text-sm text-foreground/50">
                     These checks confirm deployed bindings and keys are present.
                     The first real request verifies each external service.
@@ -584,7 +621,7 @@ export default function SettingsPage() {
                 </Link>
               </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {capabilityRows.map((row) => (
+                {capabilityRows.map(row => (
                   <article
                     key={row.label}
                     className="rounded-xl border border-border bg-background p-4"

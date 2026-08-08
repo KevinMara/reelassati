@@ -45,7 +45,7 @@ function dateKey(value: string, timeZone: string) {
     day: "2-digit",
   }).formatToParts(new Date(value));
   const valueFor = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value || "";
+    parts.find(part => part.type === type)?.value || "";
   return `${valueFor("year")}-${valueFor("month")}-${valueFor("day")}`;
 }
 
@@ -89,14 +89,15 @@ export default function CalendarPage() {
 
   const datedPosts = useMemo(
     () =>
-      workspace.posts.filter((post) => {
+      workspace.posts.filter(post => {
         if (!postDate(post)) return false;
-        if (statusFilter !== "all" && post.status !== statusFilter) return false;
+        if (statusFilter !== "all" && post.status !== statusFilter)
+          return false;
         return (
           platformFilter === "all" || post.platforms.includes(platformFilter)
         );
       }),
-    [platformFilter, statusFilter, workspace.posts],
+    [platformFilter, statusFilter, workspace.posts]
   );
 
   const postsByDate = useMemo(() => {
@@ -109,7 +110,7 @@ export default function CalendarPage() {
     }
     for (const posts of map.values()) {
       posts.sort((left, right) =>
-        (postDate(left) || "").localeCompare(postDate(right) || ""),
+        (postDate(left) || "").localeCompare(postDate(right) || "")
       );
     }
     return map;
@@ -118,24 +119,24 @@ export default function CalendarPage() {
   const availablePlatforms = useMemo(
     () =>
       Array.from(
-        new Set(workspace.posts.flatMap((post) => post.platforms)),
+        new Set(workspace.posts.flatMap(post => post.platforms))
       ).sort(),
-    [workspace.posts],
+    [workspace.posts]
   );
 
   const selectedPosts = selectedDate ? postsByDate.get(selectedDate) || [] : [];
   const upcoming = useMemo(
     () =>
       datedPosts
-        .filter((post) => {
+        .filter(post => {
           const value = postDate(post);
           return value ? new Date(value).getTime() >= openedAt : false;
         })
         .sort((left, right) =>
-          (postDate(left) || "").localeCompare(postDate(right) || ""),
+          (postDate(left) || "").localeCompare(postDate(right) || "")
         )
         .slice(0, 5),
-    [datedPosts, openedAt],
+    [datedPosts, openedAt]
   );
 
   const getDateKey = (day: number) =>
@@ -171,9 +172,9 @@ export default function CalendarPage() {
       <div className="mb-5 flex flex-wrap gap-2">
         <select
           value={statusFilter}
-          onChange={(event) =>
+          onChange={event =>
             setStatusFilter(
-              event.target.value as "all" | ScheduledPost["status"],
+              event.target.value as "all" | ScheduledPost["status"]
             )
           }
           className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium"
@@ -188,14 +189,14 @@ export default function CalendarPage() {
         </select>
         <select
           value={platformFilter}
-          onChange={(event) =>
+          onChange={event =>
             setPlatformFilter(event.target.value as "all" | Platform)
           }
           className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium"
           aria-label="Filter by platform"
         >
           <option value="all">All platforms</option>
-          {availablePlatforms.map((platform) => (
+          {availablePlatforms.map(platform => (
             <option key={platform} value={platform}>
               {PLATFORM_META[platform].label}
             </option>
@@ -225,7 +226,9 @@ export default function CalendarPage() {
                 type="button"
                 onClick={() => {
                   const now = new Date();
-                  setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
+                  setCurrentDate(
+                    new Date(now.getFullYear(), now.getMonth(), 1)
+                  );
                   setSelectedDate(todayKey);
                 }}
                 className="rounded-lg px-3 py-2 text-xs font-medium hover:bg-background"
@@ -244,7 +247,7 @@ export default function CalendarPage() {
           </div>
 
           <div className="grid grid-cols-7 gap-1">
-            {DAYS.map((day) => (
+            {DAYS.map(day => (
               <div
                 key={day}
                 className="py-2 text-center text-[10px] uppercase tracking-wider text-foreground/40 sm:text-xs"
@@ -284,14 +287,15 @@ export default function CalendarPage() {
                   </span>
                   {posts.length ? (
                     <div className="mt-2 space-y-1">
-                      {posts.slice(0, 2).map((post) => (
+                      {posts.slice(0, 2).map(post => (
                         <div
                           key={post.id}
                           className="flex items-center gap-1 rounded bg-background/80 px-1.5 py-1"
                         >
                           <span
                             className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                              PLATFORM_META[post.platforms[0] || "instagram"].dot
+                              PLATFORM_META[post.platforms[0] || "instagram"]
+                                .dot
                             }`}
                           />
                           <span className="hidden truncate text-[9px] text-foreground/60 sm:block">
@@ -319,7 +323,7 @@ export default function CalendarPage() {
                 {selectedDate
                   ? new Date(`${selectedDate}T12:00:00`).toLocaleDateString(
                       undefined,
-                      { weekday: "long", month: "long", day: "numeric" },
+                      { weekday: "long", month: "long", day: "numeric" }
                     )
                   : "Upcoming queue"}
               </h2>
@@ -327,7 +331,7 @@ export default function CalendarPage() {
             </div>
             {(selectedDate ? selectedPosts : upcoming).length ? (
               <div className="space-y-3">
-                {(selectedDate ? selectedPosts : upcoming).map((post) => {
+                {(selectedDate ? selectedPosts : upcoming).map(post => {
                   const value = postDate(post);
                   return (
                     <article
@@ -335,7 +339,7 @@ export default function CalendarPage() {
                       className="rounded-lg border border-border bg-background p-3"
                     >
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {post.platforms.map((platform) => (
+                        {post.platforms.map(platform => (
                           <span
                             key={platform}
                             className="inline-flex items-center gap-1 text-[10px] font-medium text-foreground/55"
@@ -347,7 +351,9 @@ export default function CalendarPage() {
                           </span>
                         ))}
                       </div>
-                      <p className="mt-2 text-sm font-medium">{postTitle(post)}</p>
+                      <p className="mt-2 text-sm font-medium">
+                        {postTitle(post)}
+                      </p>
                       <div className="mt-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wide">
                         <span
                           className={

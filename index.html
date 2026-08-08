@@ -22,30 +22,36 @@
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&display=swap"
+      rel="stylesheet"
+    />
     <script>
       // SPA redirect handler
-      (function() {
-        var savedTheme = localStorage.getItem('theme');
-        var initialTheme = savedTheme === 'dark' || savedTheme === 'light'
-          ? savedTheme
-          : window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? 'dark'
-            : 'light';
+      (function () {
+        var savedTheme = localStorage.getItem("theme");
+        var initialTheme =
+          savedTheme === "dark" || savedTheme === "light"
+            ? savedTheme
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
         document.documentElement.classList.add(initialTheme);
         document.documentElement.style.colorScheme = initialTheme;
         var params = new URLSearchParams(window.location.search);
-        var redirect = params.get('redirect');
+        var redirect = params.get("redirect");
         if (redirect) {
           window.history.replaceState(null, null, redirect);
         }
         if (/^#\/dashboard(?:\/|$)/.test(window.location.hash)) {
-          document.documentElement.classList.add('entry-route-pending');
+          document.documentElement.classList.add("entry-route-pending");
         }
       })();
     </script>
     <style>
-      #entry-boot-screen { display: none; }
+      #entry-boot-screen {
+        display: none;
+      }
       .entry-route-pending #entry-boot-screen {
         position: fixed;
         inset: 0;
@@ -54,10 +60,16 @@
         background: #fafafa;
       }
       @media (prefers-color-scheme: dark) {
-        .entry-route-pending #entry-boot-screen { background: #0a0a0f; }
+        .entry-route-pending #entry-boot-screen {
+          background: #0a0a0f;
+        }
       }
-      .entry-route-pending.light #entry-boot-screen { background: #fafafa; }
-      .entry-route-pending.dark #entry-boot-screen { background: #0a0a0f; }
+      .entry-route-pending.light #entry-boot-screen {
+        background: #fafafa;
+      }
+      .entry-route-pending.dark #entry-boot-screen {
+        background: #0a0a0f;
+      }
     </style>
   </head>
   <body>
