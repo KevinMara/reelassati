@@ -24,9 +24,9 @@ const COPY = {
     intro:
       "REELassati combines manual production tools with reviewable AI assistance. This page identifies the current model routes, the information sent when you invoke them, and the controls that remain with you.",
     updated: "Updated 4 August 2026",
-    statusTitle: "Private checkpoint status",
+    statusTitle: "Current product behavior",
     statusBody:
-      "This describes the current private product checkpoint; it is not a certification or a public-release claim. The responsible legal operator and complete contact details are still awaiting confirmation and will be published before public access is enabled.",
+      "This page describes the product routes currently implemented. Provider-dependent actions remain unavailable until a connection is configured, and an interface state is never presented as evidence that a provider call occurred.",
     registerEyebrow: "System register",
     registerTitle: "What uses a model",
     registerIntro:
@@ -58,9 +58,9 @@ const COPY = {
     intro:
       "REELassati unisce strumenti di produzione manuali e assistenza AI revisionabile. Questa pagina identifica i percorsi modello attuali, le informazioni inviate quando li attivi e i controlli che restano nelle tue mani.",
     updated: "Aggiornato il 4 agosto 2026",
-    statusTitle: "Stato del checkpoint privato",
+    statusTitle: "Comportamento attuale del prodotto",
     statusBody:
-      "Questa pagina descrive il checkpoint privato attuale; non è una certificazione né una dichiarazione di rilascio pubblico. L’operatore legale responsabile e i recapiti completi sono ancora da confermare e saranno pubblicati prima di abilitare l’accesso pubblico.",
+      "Questa pagina descrive i percorsi di prodotto attualmente implementati. Le azioni che dipendono da un provider restano indisponibili finché non viene configurata una connessione e nessuno stato dell’interfaccia viene presentato come prova di una chiamata provider.",
     registerEyebrow: "Registro dei sistemi",
     registerTitle: "Cosa usa un modello",
     registerIntro:

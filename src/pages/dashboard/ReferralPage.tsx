@@ -146,7 +146,7 @@ export default function ReferralPage() {
         <p className="mt-2 max-w-2xl text-foreground/60">
           {billingReady
             ? "Earn 500 credits—$5.00 of REELassati product value—when a referred creator successfully buys a paid plan. Link visits and sign-ups do not count."
-            : "Share a creator link and keep referrals attached during private beta. Rewards remain pending until paid plans and signed billing verification are active."}
+            : "Share a creator link and keep referrals attached. Rewards activate after paid-plan billing and signed purchase verification are connected."}
         </p>
       </div>
 
@@ -178,7 +178,7 @@ export default function ReferralPage() {
           detail={
             billingReady
               ? `${stats?.creditsEarned.toLocaleString() ?? 0} earned through referrals.`
-              : "No referral credits can be issued during private beta."
+              : "Referral credits activate with verified paid-plan billing."
           }
           tone="emerald"
         />

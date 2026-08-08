@@ -5,37 +5,59 @@ import { useTranslation } from "react-i18next";
 export function PricingTeaser() {
   const { i18n } = useTranslation();
   const isItalian = i18n.resolvedLanguage?.startsWith("it");
-  const included = isItalian
-    ? ["Studio di montaggio e workspace", "Anteprime e piani locali", "Connessioni esterne solo se configurate"]
-    : ["Editing Studio and workspace", "Local previews and plans", "External providers only when configured"];
+  const plans = [
+    {
+      name: "Creator",
+      price: 29,
+      scale: isItalian
+        ? "1 brand · 2 account social"
+        : "1 brand · 2 social accounts",
+    },
+    {
+      name: "Pro",
+      price: 79,
+      scale: isItalian
+        ? "3 brand · 6 account social"
+        : "3 brands · 6 social accounts",
+    },
+    {
+      name: "Studio",
+      price: 179,
+      scale: isItalian
+        ? "10 brand · 12 account social"
+        : "10 brands · 12 social accounts",
+    },
+  ];
 
   return (
     <section className="border-t border-border bg-surface/40 py-24 md:py-36">
       <div className="container-page">
         <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-card">
-          <div className="grid lg:grid-cols-[1.15fr_.85fr]">
+          <div className="grid lg:grid-cols-[.9fr_1.1fr]">
             <div className="p-8 md:p-12">
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="mono-eyebrow text-primary">{isItalian ? "Accesso" : "Access"}</p>
-                <span className="rounded-pill bg-primary/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-primary">
-                  {isItalian ? "Checkpoint privato" : "Private checkpoint"}
-                </span>
-              </div>
+              <p className="mono-eyebrow text-primary">
+                {isItalian ? "Prezzi" : "Pricing"}
+              </p>
               <h2 className="mt-5 text-display-md font-semibold">
-                {isItalian ? "Costruiamo il prodotto prima" : "Build the product first"}{" "}
-                <span className="serif-accent">{isItalian ? "del listino." : "of the price table."}</span>
+                {isItalian ? "Parti da creator." : "Start as a creator."}{" "}
+                <span className="serif-accent">
+                  {isItalian
+                    ? "Scala senza cambiare sistema."
+                    : "Scale without changing systems."}
+                </span>
               </h2>
               <p className="mt-6 max-w-2xl text-lg leading-relaxed text-foreground/70">
                 {isItalian
-                  ? "REELassati è in beta privata. Non c’è un checkout pubblico e non presentiamo piani finti: la pagina prezzi mostra esattamente cosa è disponibile ora e cosa richiede configurazione."
-                  : "REELassati is in private beta. There is no public checkout and no pretend plan table: the pricing page shows exactly what is available now and what still requires configuration."}
+                  ? "Lo Studio completo è incluso in ogni piano. Paghi per la scala del workspace, non per sbloccare gli strumenti essenziali."
+                  : "The complete Studio is included in every plan. You pay for workspace scale—not to unlock the essential tools."}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   to="/pricing"
                   className="inline-flex items-center gap-2 rounded-pill bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
                 >
-                  {isItalian ? "Vedi lo stato beta" : "See beta access"} <ArrowRight className="h-4 w-4" aria-hidden />
+                  {isItalian ? "Confronta i piani" : "Compare plans"}{" "}
+                  <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
                 <Link
                   to="/dashboard/edit"
@@ -46,22 +68,38 @@ export function PricingTeaser() {
               </div>
             </div>
 
-            <div className="border-t border-border bg-surface p-8 md:p-10 lg:border-l lg:border-t-0">
-              <p className="mono-eyebrow text-foreground/45">{isItalian ? "Questo checkpoint include" : "This checkpoint includes"}</p>
-              <ul className="mt-6 space-y-4">
-                {included.map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-foreground/70">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Check className="h-3 w-3" aria-hidden />
-                    </span>
-                    {item}
-                  </li>
+            <div className="border-t border-border bg-surface p-6 md:p-8 lg:border-l lg:border-t-0">
+              <div className="grid h-full gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                {plans.map((plan, index) => (
+                  <Link
+                    key={plan.name}
+                    to="/pricing"
+                    className={`group flex items-center justify-between gap-4 rounded-xl border p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-card ${index === 1 ? "border-primary/30 bg-primary/[0.05]" : "border-border bg-background"}`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Check className="h-3 w-3" aria-hidden />
+                        </span>
+                        <p className="text-sm font-semibold">{plan.name}</p>
+                      </div>
+                      <p className="mt-2 text-xs text-foreground/45">
+                        {plan.scale}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-semibold">€{plan.price}</p>
+                      <p className="text-[10px] text-foreground/40">
+                        /{isItalian ? "mese" : "month"}
+                      </p>
+                    </div>
+                  </Link>
                 ))}
-              </ul>
-              <p className="mt-8 border-t border-border pt-5 text-xs leading-relaxed text-foreground/45">
+              </div>
+              <p className="mt-5 text-xs leading-relaxed text-foreground/45">
                 {isItalian
-                  ? "Eventuali prezzi futuri saranno mostrati prima di qualsiasi addebito. Questo checkpoint non avvia pagamenti."
-                  : "Any future pricing will be shown before a charge can occur. This checkpoint does not initiate payments."}
+                  ? "Uso di modelli e generazione video addebitato separatamente dal provider collegato."
+                  : "Model and video-generation usage is billed separately by the connected provider."}
               </p>
             </div>
           </div>

@@ -24,7 +24,8 @@ export default {
   "hero.eyebrow": "Editing-first short-form studio",
   "hero.title": "Direct every cut.",
   "hero.accent": "Accelerate everything else.",
-  "hero.body": "Build a reviewable short-form edit while keeping precise control of timing, captions, generated shots, and versions.",
+  "hero.body":
+    "Build a reviewable short-form edit while keeping precise control of timing, captions, generated shots, and versions.",
   "hero.start_free": "Open Studio",
   "hero.view_pricing": "Explore the product",
   "hero.chip": "Reviewable edit plan",
@@ -48,17 +49,23 @@ export default {
   "features.accent": "one quiet place.",
   "features.sub": "Six specialist tools, not a generic wizard.",
   "features.neural_analyzer": "Video Review",
-  "features.neural_analyzer_desc": "Evidence-focused notes and reviewable edit suggestions, never predicted views.",
+  "features.neural_analyzer_desc":
+    "Evidence-focused notes and reviewable edit suggestions, never predicted views.",
   "features.script_engineering": "Script Studio",
-  "features.script_engineering_desc": "Shootable hooks, bodies, and calls to action shaped by your brief and Brand DNA.",
+  "features.script_engineering_desc":
+    "Shootable hooks, bodies, and calls to action shaped by your brief and Brand DNA.",
   "features.auto_editor": "Editing Studio",
-  "features.auto_editor_desc": "Manual timeline control with accountable AI change plans and versions.",
+  "features.auto_editor_desc":
+    "Manual timeline control with accountable AI change plans and versions.",
   "features.smart_publisher": "Publisher",
-  "features.smart_publisher_desc": "Draft, schedule, and submit through connected accounts when publishing is configured.",
+  "features.smart_publisher_desc":
+    "Draft, schedule, and submit through connected accounts when publishing is configured.",
   "features.analytics_loop": "Workspace Evidence",
-  "features.analytics_loop_desc": "Inspect only the projects and publication facts the workspace actually records.",
+  "features.analytics_loop_desc":
+    "Inspect only the projects and publication facts the workspace actually records.",
   "features.multi_client": "Multi-client",
-  "features.multi_client_desc": "Each brand with its own voice, accounts, and patterns. Never crossed.",
+  "features.multi_client_desc":
+    "Each brand with its own voice, accounts, and patterns. Never crossed.",
 
   // How it works
   "how.eyebrow": "How it works",
@@ -68,22 +75,25 @@ export default {
   "how.upload": "Upload",
   "how.upload_desc": "Drag the raw footage or describe a content goal.",
   "how.review": "Review",
-  "how.review_desc": "The studio proposes the cuts. Approve or refine in one click.",
+  "how.review_desc":
+    "The studio proposes the cuts. Approve or refine in one click.",
   "how.publish": "Publish",
-  "how.publish_desc": "Submit through connected destinations when the publishing provider is configured.",
+  "how.publish_desc":
+    "Submit through connected destinations when the publishing provider is configured.",
 
   // Platforms
   "platforms.eyebrow": "Integrations",
   "platforms.lead": "Connect your",
   "platforms.accent": "favorite platforms.",
-  "platforms.sub": "Connection and publishing readiness are shown live—no pretend integration badges.",
+  "platforms.sub":
+    "Connection and publishing readiness are shown live—no pretend integration badges.",
 
   // Pricing teaser
   "pricing.eyebrow": "Pricing",
-  "pricing.lead": "Private beta,",
-  "pricing.accent": "no fake checkout.",
-  "pricing.sub": "The current checkpoint has no public billing flow.",
-  "pricing.view": "View beta access",
+  "pricing.lead": "Creator to studio,",
+  "pricing.accent": "one complete system.",
+  "pricing.sub": "Choose the workspace scale that matches your operation.",
+  "pricing.view": "Compare plans",
 
   // Footer
   "footer.tagline": "The AI studio for short-form. Calm, precise, Italian.",
@@ -129,16 +139,18 @@ export default {
 
   // Pricing page
   "pricing.title": "Pricing",
-  "pricing.coming_soon": "Private checkpoint access",
+  "pricing.coming_soon": "Studio access",
 
   // Support page
   "support.title": "Support",
-  "support.sub": "We're here to help. Choose the support channel that works best for you.",
+  "support.sub":
+    "We're here to help. Choose the support channel that works best for you.",
   "support.docs_title": "Documentation",
   "support.docs_desc": "Browse our comprehensive guides and API documentation.",
   "support.docs_action": "View docs",
   "support.community_title": "Community",
-  "support.community_desc": "Join our community of creators and get help from peers.",
+  "support.community_desc":
+    "Join our community of creators and get help from peers.",
   "support.community_action": "Join community",
   "support.email_title": "Email Support",
   "support.email_desc": "Reach out to our team for personalized assistance.",
@@ -155,21 +167,28 @@ export default {
   "dash.inizia_da_qui": "Start from here",
   "dash.aggiungi_cliente": "Add your first client",
   "dash.analizza_video": "Analyze a video",
-  "dash.analizza_video_desc": "Inspect hook, pacing, and concrete edit opportunities.",
+  "dash.analizza_video_desc":
+    "Inspect hook, pacing, and concrete edit opportunities.",
   "dash.scrivi_script": "Write a script",
-  "dash.scrivi_script_desc": "Build a shootable draft from your brief and Brand DNA.",
+  "dash.scrivi_script_desc":
+    "Build a shootable draft from your brief and Brand DNA.",
   "dash.monta_girato": "Edit the footage",
-  "dash.monta_girato_desc": "Edit real footage with manual and reviewable assisted changes.",
+  "dash.monta_girato_desc":
+    "Edit real footage with manual and reviewable assisted changes.",
   "dash.pubblica_bozza": "Publish a draft",
-  "dash.pubblica_bozza_desc": "Save a draft or submit through configured destinations.",
+  "dash.pubblica_bozza_desc":
+    "Save a draft or submit through configured destinations.",
   "dash.job_attivi": "Active jobs",
   "dash.nessun_job": "No active jobs",
   "dash.onboarding_title": "Welcome to Reelassati.",
-  "dash.onboarding_desc": "Let's start slow. Three steps to turn on the studio.",
+  "dash.onboarding_desc":
+    "Let's start slow. Three steps to turn on the studio.",
   "dash.onboarding_1": "Add your first client",
   "dash.onboarding_1_sub": "The brand, the voice, the channels.",
   "dash.onboarding_2": "Connect a social account",
-  "dash.onboarding_2_sub": "Connect through the configured publishing provider.",
+  "dash.onboarding_2_sub":
+    "Connect through the configured publishing provider.",
   "dash.onboarding_3": "Try the analyzer",
-  "dash.onboarding_3_sub": "Upload a video and review evidence-based edit notes.",
+  "dash.onboarding_3_sub":
+    "Upload a video and review evidence-based edit notes.",
 } as const;

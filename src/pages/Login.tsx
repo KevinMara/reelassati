@@ -69,8 +69,8 @@ export default function Login() {
             Continue to your editing workspace
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed mt-3">
-            This checkpoint uses your authenticated ChatGPT workspace identity.
-            REELassati never stores a password in the browser.
+            This Studio uses your authenticated workspace identity. REELassati
+            never stores a password in the browser.
           </p>
 
           <div className="mt-6 rounded-xl bg-surface-recessed p-4 space-y-3">

@@ -253,7 +253,7 @@ describe("platform-wide functional invariants", () => {
     const server = source("../sites/server.ts");
     expect(referral).toContain("billingVerificationConfigured");
     expect(referral).toContain(
-      "No referral credits can be issued during private beta."
+      "Referral credits activate with verified paid-plan billing."
     );
     expect(server).toContain("REFERRAL_BILLING_WEBHOOK_SECRET");
     expect(server).toContain('request.headers.get("x-reelassati-signature")');

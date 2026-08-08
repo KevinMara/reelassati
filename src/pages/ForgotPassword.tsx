@@ -14,8 +14,8 @@ export default function ForgotPassword() {
           No REELassati password to reset
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed mt-3">
-          This private checkpoint uses your authenticated ChatGPT workspace
-          session, so no password is stored by the app.
+          This Studio uses your authenticated workspace session, so no password
+          is stored by the app.
         </p>
         <Link
           to="/auth/login"

@@ -62,7 +62,7 @@ const COPY = {
     truthfulBody:
       "Provenance can help identify origin and processing history. It does not prove that the content is accurate, lawful, authorized, or safe to publish.",
     unavailable:
-      "The verification service is not active in this checkpoint yet. Your input was not classified locally and no result was invented.",
+      "The verification service is not connected yet. Your input was not classified locally and no result was invented.",
     genericError: "The provenance evidence could not be inspected.",
   },
   it: {
@@ -94,7 +94,7 @@ const COPY = {
     truthfulBody:
       "La provenienza può aiutare a identificare origine e cronologia di elaborazione. Non prova che il contenuto sia accurato, lecito, autorizzato o sicuro da pubblicare.",
     unavailable:
-      "Il servizio di verifica non è ancora attivo in questo checkpoint. Il tuo input non è stato classificato localmente e non è stato inventato alcun risultato.",
+      "Il servizio di verifica non è ancora collegato. Il tuo input non è stato classificato localmente e non è stato inventato alcun risultato.",
     genericError:
       "Non è stato possibile ispezionare l’evidenza di provenienza.",
   },

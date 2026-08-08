@@ -609,8 +609,8 @@ function StudioStatus() {
                 }
                 className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
               >
-                <option value="private-testing">Private testing</option>
-                <option value="closed-beta">Closed client beta</option>
+                <option value="private-testing">Internal access</option>
+                <option value="closed-beta">Invite-only access</option>
                 <option value="public">Publicly usable</option>
               </select>
             </div>

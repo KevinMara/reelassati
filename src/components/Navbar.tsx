@@ -37,10 +37,9 @@ export function Navbar() {
     capabilities: isItalian ? "Funzioni" : "Capabilities",
     examples: isItalian ? "Esempi" : "Walkthroughs",
     presets: isItalian ? "Preset" : "Presets",
-    access: isItalian ? "Accesso" : "Access",
+    access: isItalian ? "Prezzi" : "Pricing",
     support: isItalian ? "Supporto" : "Support",
     studio: isItalian ? "Apri lo Studio" : "Open Studio",
-    beta: isItalian ? "Beta privata" : "Private beta",
   };
 
   return (
@@ -57,9 +56,6 @@ export function Navbar() {
           <Link to="/" className="shrink-0" aria-label="REELassati home">
             <Logo size="md" />
           </Link>
-          <span className="hidden rounded-pill bg-primary/10 px-2 py-1 font-mono text-[8px] uppercase tracking-wider text-primary sm:inline-flex">
-            {labels.beta}
-          </span>
         </div>
 
         <nav

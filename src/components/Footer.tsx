@@ -26,8 +26,8 @@ export function Footer() {
             </p>
             <span className="mt-7 inline-flex rounded-pill bg-primary/10 px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-primary">
               {isItalian
-                ? "Checkpoint beta privato"
-                : "Private beta checkpoint"}
+                ? "Montaggio preciso · AI revisionabile"
+                : "Precise editing · Reviewable AI"}
             </span>
           </div>
 
@@ -41,7 +41,7 @@ export function Footer() {
               { label: isItalian ? "Esempi" : "Walkthroughs", to: "/showcase" },
               { label: "Prompt Director", to: "/templates" },
               {
-                label: isItalian ? "Accesso beta" : "Beta access",
+                label: isItalian ? "Prezzi" : "Pricing",
                 to: "/pricing",
               },
             ]}
