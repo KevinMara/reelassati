@@ -30,6 +30,7 @@ import {
   type PublicationComplianceReview,
   type RightsBasis,
 } from "@contracts/compliance";
+import posthog from "@/lib/posthog";
 
 const PLATFORM_META: Record<Platform, { label: string; badge: string }> = {
   tiktok: { label: "TikTok", badge: "bg-black text-white" },
@@ -465,6 +466,10 @@ export default function PublisherPage() {
     setNotice(null);
     try {
       await persistPost(buildPost("draft"));
+      posthog?.capture("publication_draft_saved", {
+        has_media: Boolean(mediaAssetId),
+        destination_count: selectedAccounts.length,
+      });
       setNotice({ tone: "success", message: "Draft saved to your workspace." });
       resetComposer();
     } catch (cause) {
@@ -569,6 +574,14 @@ export default function PublisherPage() {
                 ? `Scheduled for ${new Date(result.post.scheduledAt || scheduledAt!).toLocaleString()}.`
                 : "The provider accepted the schedule request and is still confirming its state."),
       });
+      if (result.post.status !== "failed") {
+        posthog?.capture("publication_submitted", {
+          submission_type: publishNow ? "publish_now" : "schedule",
+          destination_count: selectedAccounts.length,
+          platform_count: new Set(result.post.platforms).size,
+          has_media: Boolean(mediaAssetId),
+        });
+      }
       if (result.workspace && result.post.status !== "failed") resetComposer();
     } catch (cause) {
       setNotice({

@@ -22,6 +22,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { WRITING_LANGUAGES } from "@/lib/languages";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { copyTextWithProvenance } from "@/lib/provenance";
+import posthog from "@/lib/posthog";
 
 const PLATFORMS: Array<{ value: Platform; label: string }> = [
   { value: "tiktok", label: "TikTok" },
@@ -193,6 +194,13 @@ export default function ScriptGenerator() {
       });
       setGeneratedScript(script);
       await saveScript(script, "Script generated");
+      posthog?.capture("script_generated", {
+        platform,
+        tone,
+        duration_seconds: duration,
+        language,
+        used_hook_direction: Boolean(hookDirection.trim()),
+      });
     } catch (cause) {
       setError(
         cause instanceof Error

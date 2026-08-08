@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { platformApi } from "@/lib/platform-api";
+import posthog from "@/lib/posthog";
 import { isVercelClientDeployment, ownerStudioUrl } from "@/lib/runtime";
 
 interface AuthUser {
@@ -45,12 +46,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const session = await platformApi.session();
-      setUser({
-        id: session.user.email,
+      const user = {
+        id: session.user.id,
         email: session.user.email,
         name: session.user.name,
-        role: "owner",
+        role: "owner" as const,
+      };
+      posthog?.identify(user.id, {
+        email: user.email,
+        name: user.name,
+        role: user.role,
       });
+      setUser(user);
       return true;
     } catch (cause) {
       setUser(null);
@@ -75,12 +82,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .session()
       .then(session => {
         if (!active) return;
-        setUser({
-          id: session.user.email,
+        const user = {
+          id: session.user.id,
           email: session.user.email,
           name: session.user.name,
-          role: "owner",
+          role: "owner" as const,
+        };
+        posthog?.identify(user.id, {
+          email: user.email,
+          name: user.name,
+          role: user.role,
         });
+        setUser(user);
       })
       .catch((cause: unknown) => {
         if (!active) return;
@@ -100,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    posthog?.reset();
     setUser(null);
     window.location.assign("/");
   }, []);

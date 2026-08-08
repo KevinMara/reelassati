@@ -12,6 +12,7 @@ import {
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import posthog from "@/lib/posthog";
 
 export default function Login() {
   const { i18n } = useTranslation();
@@ -22,7 +23,10 @@ export default function Login() {
 
   const continueToStudio = async () => {
     setAttempted(true);
-    if (await enterStudio()) navigate("/dashboard");
+    if (await enterStudio()) {
+      posthog?.capture("studio_access_opened");
+      navigate("/dashboard");
+    }
   };
 
   return (

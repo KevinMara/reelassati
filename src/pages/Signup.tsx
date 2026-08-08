@@ -5,6 +5,7 @@ import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useTranslation } from "react-i18next";
+import posthog from "@/lib/posthog";
 
 export default function Signup() {
   const { i18n } = useTranslation();
@@ -15,7 +16,10 @@ export default function Signup() {
 
   const createWorkspace = async () => {
     setAttempted(true);
-    if (await enterStudio()) navigate("/dashboard");
+    if (await enterStudio()) {
+      posthog?.capture("workspace_creation_opened");
+      navigate("/dashboard");
+    }
   };
 
   return (

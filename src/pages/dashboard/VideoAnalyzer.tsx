@@ -26,6 +26,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { validateFileSelection } from "@/lib/file-validation";
+import posthog from "@/lib/posthog";
 
 type AnalysisResult = Awaited<ReturnType<typeof platformApi.analyzeVideo>>;
 type SourceMode = "upload" | "url";
@@ -214,6 +215,12 @@ export default function VideoAnalyzer() {
         sourceRightsConfirmed: analysisAuthorized,
       });
       setResult(analysis);
+      posthog?.capture("video_analysis_completed", {
+        source_type: sourceMode,
+        platform,
+        proposed_changes_count: analysis.changes.length,
+        retention_segments_count: analysis.retention.length,
+      });
       await updateWorkspace(current => ({
         ...current,
         activity: [
