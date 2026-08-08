@@ -24,6 +24,16 @@ export const supportedLanguages = [
   ["ko", "한국어"],
   ["zh", "简体中文"],
   ["vi", "Tiếng Việt"],
+  ["da", "Dansk"],
+  ["sv", "Svenska"],
+  ["no", "Norsk"],
+  ["fi", "Suomi"],
+  ["cs", "Čeština"],
+  ["hu", "Magyar"],
+  ["el", "Ελληνικά"],
+  ["he", "עברית"],
+  ["id", "Bahasa Indonesia"],
+  ["th", "ไทย"],
 ] as const;
 
 export type SupportedLanguage = (typeof supportedLanguages)[number][0];
@@ -62,6 +72,16 @@ const countryLanguages: Record<string, SupportedLanguage> = {
   CN: "zh",
   SG: "zh",
   VN: "vi",
+  DK: "da",
+  SE: "sv",
+  NO: "no",
+  FI: "fi",
+  CZ: "cs",
+  HU: "hu",
+  GR: "el",
+  IL: "he",
+  ID: "id",
+  TH: "th",
 };
 
 function normalizeLanguage(value?: string | null): SupportedLanguage | null {
@@ -97,7 +117,9 @@ async function locationLanguage(): Promise<SupportedLanguage | null> {
 
 function applyDocumentLanguage(language: string) {
   document.documentElement.lang = language;
-  document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+  document.documentElement.dir = ["ar", "he"].includes(language)
+    ? "rtl"
+    : "ltr";
 }
 
 export async function initializeI18n() {
