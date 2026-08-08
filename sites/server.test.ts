@@ -465,6 +465,16 @@ describe("Sites worker", () => {
     );
   });
 
+  it("accepts CDN country headers when runtime geolocation metadata is absent", async () => {
+    const response = await worker.fetch(
+      new Request("https://studio.example/api/localization", {
+        headers: { "cf-ipcountry": "fr" },
+      }),
+      env as never
+    );
+    expect(await response.json()).toEqual({ country: "FR" });
+  });
+
   it("rejects unauthenticated hosted API requests", async () => {
     const response = await worker.fetch(
       new Request("https://studio.example/api/workspace"),

@@ -7174,9 +7174,14 @@ async function handleApi(
 
   if (url.pathname === "/api/localization" && request.method === "GET") {
     const country =
+      request.headers.get("cf-ipcountry")?.trim().toUpperCase() ||
+      request.headers.get("x-vercel-ip-country")?.trim().toUpperCase() ||
+      request.headers.get("cloudfront-viewer-country")?.trim().toUpperCase() ||
+      request.headers.get("x-country-code")?.trim().toUpperCase() ||
       (request as Request & { cf?: { country?: string } }).cf?.country
         ?.trim()
-        .toUpperCase() || null;
+        .toUpperCase() ||
+      null;
     return json({ country });
   }
 
