@@ -9,7 +9,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 export default defineConfig([
   globalIgnores([
     "dist",
-    "api/**",
+    "legacy-api/**",
     "db/migrations/**",
     "db/schema.ts",
     "db/seed.ts",

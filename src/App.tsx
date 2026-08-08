@@ -4,6 +4,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { WorkspaceProvider } from "@/providers/workspace";
 import { ReferralCapture } from "@/components/ReferralCapture";
 import EntryAnimation from "@/components/entry/EntryAnimation";
+import { isVercelClientDeployment, ownerStudioUrl } from "@/lib/runtime";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -32,7 +33,27 @@ function RouteFallback() {
   );
 }
 
+function VercelStudioRedirect() {
+  const location = useLocation();
+
+  useEffect(() => {
+    window.location.replace(
+      ownerStudioUrl(`${location.pathname}${location.search}${location.hash}`)
+    );
+  }, [location.hash, location.pathname, location.search]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <p className="text-sm text-muted-foreground" role="status">
+        Opening your private REELassati Studio…
+      </p>
+    </div>
+  );
+}
+
 function StudioRoute() {
+  if (isVercelClientDeployment()) return <VercelStudioRedirect />;
+
   return (
     <>
       <EntryAnimation />

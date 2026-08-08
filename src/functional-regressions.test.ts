@@ -105,6 +105,47 @@ describe("platform-wide functional invariants", () => {
     }
   });
 
+  it("keeps the Vercel client deploy free of accidental legacy functions", () => {
+    const vercel = JSON.parse(source("../vercel.json")) as {
+      buildCommand?: string;
+      outputDirectory?: string;
+      rewrites?: Array<{ source?: string; destination?: string }>;
+    };
+    const packageJson = JSON.parse(source("../package.json")) as {
+      scripts?: Record<string, string>;
+    };
+
+    expect(vercel.buildCommand).toBe("npm run build:client");
+    expect(vercel.outputDirectory).toBe("dist/client");
+    expect(packageJson.scripts?.["build:client"]).toBe("vite build");
+    expect(vercel.rewrites).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ destination: "/api/$1" }),
+      ])
+    );
+    expect(() =>
+      readdirSync(new URL("../api", import.meta.url).pathname)
+    ).toThrow();
+    expect(
+      readdirSync(new URL("../legacy-api", import.meta.url).pathname).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("hands Vercel Studio routes to the authenticated Sites runtime", () => {
+    const app = source("./App.tsx");
+    const auth = source("./hooks/useAuth.tsx");
+    const runtime = source("./lib/runtime.ts");
+
+    expect(runtime).toContain('hostname.endsWith(".vercel.app")');
+    expect(runtime).toContain('"https://reelassati.kevinbiz.chatgpt.site"');
+    expect(runtime).toContain("VITE_OWNER_STUDIO_ORIGIN");
+    expect(app).toContain("<VercelStudioRedirect />");
+    expect(app).toContain(
+      "`${location.pathname}${location.search}${location.hash}`"
+    );
+    expect(auth).toContain("window.location.assign(ownerStudioUrl())");
+  });
+
   it("rejects HTML fallbacks and reports real upload progress", () => {
     const api = source("./lib/platform-api.ts");
     expect(api).toContain('contentType.includes("json")');

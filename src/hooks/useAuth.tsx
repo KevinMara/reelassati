@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { platformApi } from "@/lib/platform-api";
+import { isVercelClientDeployment, ownerStudioUrl } from "@/lib/runtime";
 
 interface AuthUser {
   id: string;
@@ -31,10 +32,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !isVercelClientDeployment());
   const [error, setError] = useState<string | null>(null);
 
   const enterStudio = useCallback(async () => {
+    if (isVercelClientDeployment()) {
+      window.location.assign(ownerStudioUrl());
+      return false;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -51,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "The authenticated studio session is unavailable",
+          : "The authenticated studio session is unavailable"
       );
       return false;
     } finally {
@@ -60,10 +66,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (isVercelClientDeployment()) {
+      return;
+    }
+
     let active = true;
     platformApi
       .session()
-      .then((session) => {
+      .then(session => {
         if (!active) return;
         setUser({
           id: session.user.email,
@@ -78,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(
           cause instanceof Error
             ? cause.message
-            : "The authenticated studio session is unavailable",
+            : "The authenticated studio session is unavailable"
         );
       })
       .finally(() => {
@@ -105,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       googleLogin: enterStudio,
       logout,
     }),
-    [user, loading, error, enterStudio, logout],
+    [user, loading, error, enterStudio, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -43,7 +43,8 @@ product reports the exact missing capability.
   conflicts back to the original post, and refreshes scheduled, published,
   partial, and failed provider states.
 
-The original Node/PostgreSQL API is retained as historical source while the
+The original Node/PostgreSQL API is retained in `legacy-api/` as historical
+source, outside Vercel's reserved root `api/` function directory, while the
 Sites deployment uses the Worker-native API. New product work should target
 `sites/server.ts`, `contracts/workspace.ts`, and `src/lib/platform-api.ts`.
 
