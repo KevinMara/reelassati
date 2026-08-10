@@ -3166,7 +3166,13 @@ async function chatJson(
               role: "system",
               content: `${system}\n\nREELassati policy ${AI_COMPLIANCE_POLICY_VERSION}: work only on REELassati product support or creative and marketing production. Do not perform biometric identification or categorisation, emotion inference, social scoring, or decisions/recommendations determining access to employment, education, credit, insurance, medical care, legal services, law enforcement, migration or public benefits. Do not generate child sexual abuse material, sexual exploitation, or non-consensual intimate content. Do not target or manipulate voters or democratic participation. Do not fabricate a real person's endorsement, consent, credentials, evidence or results. Never use manipulative or exploitative techniques likely to cause significant harm.`,
             },
-            { role: "user", content: userContent },
+            {
+              role: "user",
+              content:
+                typeof userContent === "string"
+                  ? userContent
+                  : JSON.stringify(userContent),
+            },
           ],
           ...(requireJsonMode
             ? { response_format: { type: "json_object" } }

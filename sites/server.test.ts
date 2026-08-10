@@ -509,6 +509,10 @@ describe("Sites worker", () => {
       expect(providerUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
       expect(providerBody.model).toBe("moonshotai/kimi-k2.5");
       expect(providerBody).not.toHaveProperty("response_format");
+      expect(
+        (providerBody.messages as Array<{ role: string; content: unknown }>)[1]
+          .content
+      ).toBeTypeOf("string");
     } finally {
       globalThis.fetch = originalFetch;
     }
