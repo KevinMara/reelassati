@@ -143,9 +143,12 @@ describe("platform-wide functional invariants", () => {
         expect.objectContaining({ destination: "/api/$1" }),
       ])
     );
-    expect(() =>
+    expect(
       readdirSync(new URL("../api", import.meta.url).pathname)
-    ).toThrow();
+    ).toEqual(["support.ts"]);
+    expect(source("../api/support.ts")).toContain(
+      "export default { fetch: handleSupport }"
+    );
     expect(
       readdirSync(new URL("../legacy-api", import.meta.url).pathname).length
     ).toBeGreaterThan(0);

@@ -7485,13 +7485,17 @@ async function handleSupport(
         description: stringValue(draftValue.description).trim().slice(0, 8000),
       }
     : null;
-  let ticket: Awaited<ReturnType<typeof createSupportTicket>> | null = null;
-  if (
+  const autoCreateTicket = Boolean(
     user &&
     ticketDraft &&
     explicitlyRequestsTicket(latest.content) &&
     ticketDraft.subject.length >= 4 &&
     ticketDraft.description.length >= 10
+  );
+  let ticket: Awaited<ReturnType<typeof createSupportTicket>> | null = null;
+  if (
+    autoCreateTicket &&
+    request.headers.get("x-support-ticket-owner") !== "vercel"
   ) {
     ticket = await createSupportTicket(env, user, {
       ...ticketDraft,
@@ -7507,6 +7511,7 @@ async function handleSupport(
     suggestedActions: actions,
     ticketDraft: ticket ? null : ticketDraft,
     ticket,
+    autoCreateTicket: autoCreateTicket && !ticket,
     supportEmail: SUPPORT_EMAIL,
   });
 }

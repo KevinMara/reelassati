@@ -35,9 +35,13 @@ export class PlatformApiError extends Error {
   }
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+async function requestJson<T>(
+  path: string,
+  init?: RequestInit,
+  direct = false
+): Promise<T> {
   const { data } = await supabase.auth.getSession();
-  const response = await fetch(platformApiUrl(path), {
+  const response = await fetch(direct ? path : platformApiUrl(path), {
     ...init,
     headers: {
       ...(init?.body instanceof FormData
@@ -228,6 +232,20 @@ export interface SupportChatResponse {
   supportEmail: string;
 }
 
+function supportRequestJson<T>(
+  action: "chat" | "ticket",
+  input: object
+): Promise<T> {
+  return requestJson<T>(
+    "/api/support",
+    {
+      method: "POST",
+      body: JSON.stringify({ action, ...input }),
+    },
+    true
+  );
+}
+
 export const platformApi = {
   session: () => requestJson<SessionResponse>("/api/session"),
 
@@ -256,20 +274,32 @@ export const platformApi = {
     }),
 
   supportChat: (messages: SupportMessage[]) =>
-    requestJson<SupportChatResponse>("/api/support/chat", {
-      method: "POST",
-      body: JSON.stringify({ messages }),
-    }),
+    typeof window !== "undefined" &&
+    !window.location.hostname.endsWith(".chatgpt.site") &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1" &&
+    window.location.hostname !== "terminal.local"
+      ? supportRequestJson<SupportChatResponse>("chat", { messages })
+      : requestJson<SupportChatResponse>("/api/support/chat", {
+          method: "POST",
+          body: JSON.stringify({ messages }),
+        }),
 
   createSupportTicket: (input: SupportTicketDraft & {
     email?: string;
     name?: string;
     conversation?: SupportMessage[];
   }) =>
-    requestJson<{ ticket: SupportTicketResult }>("/api/support/tickets", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
+    typeof window !== "undefined" &&
+    !window.location.hostname.endsWith(".chatgpt.site") &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1" &&
+    window.location.hostname !== "terminal.local"
+      ? supportRequestJson<{ ticket: SupportTicketResult }>("ticket", input)
+      : requestJson<{ ticket: SupportTicketResult }>("/api/support/tickets", {
+          method: "POST",
+          body: JSON.stringify(input),
+        }),
 
   detectProvenance: (input: ProvenanceDetectionInput) => {
     if (input.file) {
