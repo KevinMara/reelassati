@@ -45,7 +45,7 @@ public-release approval, or proof of behavior on every browser and device.
   that final renderer output is not available.
 - Added modal focus/Escape/scroll behavior, explicit button types, semantic
   ranges, accessible control names and repository-wide JSX accessibility lint.
-- Repaired referral claims so private-beta billing is not represented as live;
+- Repaired referral claims so unverified billing is not represented as live;
   qualification now requires a signed, recent, idempotent server webhook and
   remains unavailable without real billing configuration.
 
@@ -149,7 +149,7 @@ smoke checks rather than being falsely reported as completed.
 - Check Showcase modal keyboard behavior, mobile navigation, collapsed sidebar,
   theme synchronization in two tabs and system-theme fallback.
 - Verify Refer & Earn creates/copies/claims a code but labels rewards pending and
-  does not claim that private-beta billing is active.
+  does not claim that unverified billing is active.
 - Repeat the provider and provenance smoke checks from the version 30 release
   record using owned test material only.
 

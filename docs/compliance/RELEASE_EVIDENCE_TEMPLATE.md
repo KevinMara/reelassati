@@ -12,7 +12,7 @@ control is not “verified” merely because its checkbox is completed.
 
 - Evidence record ID:
 - Product release / Sites version:
-- Deployment ID and audience (`owner-only`, `closed beta`, or `public`):
+- Deployment ID and audience (`owner-only`, `restricted`, or `public`):
 - Source commit SHA:
 - Compliance policy version:
 - Deployment time (UTC):
@@ -104,7 +104,7 @@ matrix says it is a release gate.
 - Non-AI-law gaps:
 - Allowed audience for this release:
 - Public publishing enabled? If yes, exact evidence authorizing it:
-- Release decision (`blocked`, `owner-only`, `closed beta`, `public`):
+- Release decision (`blocked`, `owner-only`, `restricted`, `public`):
 - Decision rationale:
 
 ## 8. Post-deployment verification

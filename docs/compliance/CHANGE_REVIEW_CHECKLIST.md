@@ -71,7 +71,7 @@ Check every applicable item:
 ## 2. Scope and role assessment — `GOV-001` to `GOV-005`
 
 - [ ] Confirmed the exact legal operator; no identity was invented.
-- [ ] Confirmed release status: private testing, closed beta, or public.
+- [ ] Confirmed release status and audience; production releases use public.
 - [ ] Confirmed intended purpose remains creative/marketing-only.
 - [ ] Tested that the change does not enable emotion/biometric inference, social
       scoring, high-impact decisions about people, medical/legal/law-enforcement/

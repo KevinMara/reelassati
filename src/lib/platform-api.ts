@@ -200,6 +200,34 @@ export interface ProvenanceDetectionInput {
   sha256?: string;
 }
 
+export interface SupportMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface SupportTicketDraft {
+  category: string;
+  priority: string;
+  subject: string;
+  description: string;
+}
+
+export interface SupportTicketResult {
+  id: string;
+  emailStatus: "sent" | "failed" | "configuration_required" | string;
+  supportEmail: string;
+}
+
+export interface SupportChatResponse {
+  reply: string;
+  resolved: boolean;
+  needsHuman: boolean;
+  suggestedActions: string[];
+  ticketDraft: SupportTicketDraft | null;
+  ticket: SupportTicketResult | null;
+  supportEmail: string;
+}
+
 export const platformApi = {
   session: () => requestJson<SessionResponse>("/api/session"),
 
@@ -212,7 +240,7 @@ export const platformApi = {
   saveOperatorCompliance: (input: {
     legalName: string;
     entityType: "individual" | "company" | "other";
-    releaseStatus: "private-testing" | "closed-beta" | "public";
+    releaseStatus: "public";
     firstEuAvailabilityDate: string;
     creativeScopeConfirmed: true;
   }) =>
@@ -225,6 +253,22 @@ export const platformApi = {
     requestJson<{ status: ComplianceStatus }>("/api/compliance/ai-literacy", {
       method: "POST",
       body: JSON.stringify({ acknowledged: true }),
+    }),
+
+  supportChat: (messages: SupportMessage[]) =>
+    requestJson<SupportChatResponse>("/api/support/chat", {
+      method: "POST",
+      body: JSON.stringify({ messages }),
+    }),
+
+  createSupportTicket: (input: SupportTicketDraft & {
+    email?: string;
+    name?: string;
+    conversation?: SupportMessage[];
+  }) =>
+    requestJson<{ ticket: SupportTicketResult }>("/api/support/tickets", {
+      method: "POST",
+      body: JSON.stringify(input),
     }),
 
   detectProvenance: (input: ProvenanceDetectionInput) => {

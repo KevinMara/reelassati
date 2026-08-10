@@ -73,10 +73,10 @@ export function Footer() {
               },
               {
                 label: isItalian ? "Guida rapida" : "Quick start",
-                to: "/support",
+                to: "/contact",
               },
-              { label: "FAQ", to: "/support#faq" },
-              { label: isItalian ? "Contatto" : "Contact", to: "/support" },
+              { label: isItalian ? "Assistente" : "Support assistant", to: "/contact" },
+              { label: isItalian ? "Contatto" : "Contact", to: "/contact" },
             ]}
           />
         </div>

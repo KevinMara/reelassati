@@ -449,7 +449,7 @@ Do not “solve” compliance by:
 
 ### `INV-FUNC-004` — External rewards and provider states fail honestly
 
-- Referral claims may be stored during private beta, but credits become
+- Referral claims may be stored before billing verification, but credits become
   verified only after a current, signed, time-bounded and idempotent billing
   event for the referred account.
 - When billing verification is not configured, the interface says rewards are

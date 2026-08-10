@@ -100,7 +100,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/pricing" element={<Pricing />} />
-          <Route path="/support" element={<Support />} />
+          <Route path="/contact" element={<Support />} />
+          <Route path="/support" element={<Navigate to="/contact" replace />} />
           <Route path="/showcase" element={<Showcase />} />
           <Route path="/templates" element={<TemplatesPage />} />
           <Route path="/ai-transparency" element={<AITransparency />} />

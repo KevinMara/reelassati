@@ -112,6 +112,9 @@ type SitesEnvironment = {
   COMPLIANCE_OPERATOR_OWNER_EMAIL?: string;
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
+  RESEND_API_KEY?: string;
+  SUPPORT_EMAIL_TO?: string;
+  SUPPORT_EMAIL_FROM?: string;
 };
 
 interface AuthenticatedUser {
@@ -159,6 +162,21 @@ interface PublishingIntentRow {
   updated_at: string;
 }
 
+interface SupportMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface SupportTicketInput {
+  email?: string;
+  name?: string;
+  category?: string;
+  priority?: string;
+  subject?: string;
+  description?: string;
+  conversation?: SupportMessage[];
+}
+
 interface ProvenanceRow {
   id: string;
   public_token: string;
@@ -183,7 +201,7 @@ interface OperatorComplianceRow {
   owner_email: string;
   legal_name: string | null;
   entity_type: string | null;
-  release_status: "private-testing" | "closed-beta" | "public" | null;
+  release_status: "public" | null;
   first_eu_availability_date: string | null;
   creative_scope_confirmed_at: string | null;
   ai_literacy_acknowledged_at: string | null;
@@ -613,6 +631,39 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
       env.DB.prepare(
         "CREATE INDEX IF NOT EXISTS referral_claims_referrer_created_idx ON referral_claims (referrer_email, created_at)"
       ),
+      env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS support_tickets (
+            id TEXT PRIMARY KEY NOT NULL,
+            requester_email TEXT NOT NULL,
+            requester_name TEXT,
+            authenticated_owner_email TEXT,
+            category TEXT NOT NULL,
+            priority TEXT NOT NULL DEFAULT 'normal',
+            subject TEXT NOT NULL,
+            description TEXT NOT NULL,
+            conversation_json TEXT NOT NULL DEFAULT '[]',
+            ai_summary TEXT,
+            status TEXT NOT NULL DEFAULT 'open',
+            email_status TEXT NOT NULL DEFAULT 'pending',
+            provider_message_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        `),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS support_tickets_email_created_idx ON support_tickets (requester_email, created_at)"
+      ),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS support_tickets_status_created_idx ON support_tickets (status, created_at)"
+      ),
+      env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS support_rate_limits (
+            key TEXT PRIMARY KEY NOT NULL,
+            request_count INTEGER NOT NULL DEFAULT 0,
+            window_started_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        `),
     ])
       .then(async () => {
         const columns = await env.DB.prepare(
@@ -3112,7 +3163,7 @@ async function chatJson(
           messages: [
             {
               role: "system",
-              content: `${system}\n\nREELassati policy ${AI_COMPLIANCE_POLICY_VERSION}: work only on creative and marketing production. Do not perform biometric identification or categorisation, emotion inference, social scoring, or decisions/recommendations determining access to employment, education, credit, insurance, medical care, legal services, law enforcement, migration or public benefits. Do not generate child sexual abuse material, sexual exploitation, or non-consensual intimate content. Do not target or manipulate voters or democratic participation. Do not fabricate a real person's endorsement, consent, credentials, evidence or results. Never use manipulative or exploitative techniques likely to cause significant harm.`,
+              content: `${system}\n\nREELassati policy ${AI_COMPLIANCE_POLICY_VERSION}: work only on REELassati product support or creative and marketing production. Do not perform biometric identification or categorisation, emotion inference, social scoring, or decisions/recommendations determining access to employment, education, credit, insurance, medical care, legal services, law enforcement, migration or public benefits. Do not generate child sexual abuse material, sexual exploitation, or non-consensual intimate content. Do not target or manipulate voters or democratic participation. Do not fabricate a real person's endorsement, consent, credentials, evidence or results. Never use manipulative or exploitative techniques likely to cause significant harm.`,
             },
             { role: "user", content: userContent },
           ],
@@ -7068,7 +7119,7 @@ async function handleCompliance(
     if (!["individual", "company", "other"].includes(entityType)) {
       return errorResponse("Choose the operator type");
     }
-    if (!["private-testing", "closed-beta", "public"].includes(releaseStatus)) {
+    if (releaseStatus !== "public") {
       return errorResponse("Choose the current release status");
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(firstEuAvailabilityDate)) {
@@ -7160,6 +7211,296 @@ async function handleCompliance(
   return errorResponse("Compliance route not found", 404);
 }
 
+const SUPPORT_EMAIL = "reelassati@gmail.com";
+const SUPPORT_CATEGORIES = new Set([
+  "account",
+  "billing",
+  "studio",
+  "generation",
+  "publishing",
+  "privacy",
+  "bug",
+  "other",
+]);
+const SUPPORT_PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
+
+function supportMessages(value: unknown): SupportMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(-10)
+    .map(item => {
+      if (!recordValue(item)) return null;
+      const role = item.role === "assistant" ? "assistant" : "user";
+      const content = stringValue(item.content).trim().slice(0, 2400);
+      return content ? { role, content } : null;
+    })
+    .filter((item): item is SupportMessage => Boolean(item));
+}
+
+function supportCategory(value: unknown): string {
+  const category = stringValue(value).trim().toLowerCase();
+  return SUPPORT_CATEGORIES.has(category) ? category : "other";
+}
+
+function supportPriority(value: unknown): string {
+  const priority = stringValue(value).trim().toLowerCase();
+  return SUPPORT_PRIORITIES.has(priority) ? priority : "normal";
+}
+
+function validSupportEmail(value: unknown): string | null {
+  const email = stringValue(value).trim().toLowerCase().slice(0, 254);
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : null;
+}
+
+function htmlEscape(value: string): string {
+  return value.replace(/[&<>"']/g, character => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[character];
+  });
+}
+
+async function supportRateLimit(
+  request: Request,
+  env: SitesEnvironment,
+  user: AuthenticatedUser | null
+): Promise<boolean> {
+  await initializeSchema(env);
+  const ip =
+    request.headers.get("cf-connecting-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown";
+  const hour = new Date().toISOString().slice(0, 13);
+  const identity = user?.email || ip;
+  const key = await sha256Hex(`support:${hour}:${identity}`);
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT INTO support_rate_limits
+       (key, request_count, window_started_at, updated_at)
+     VALUES (?, 1, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET
+       request_count = request_count + 1,
+       updated_at = excluded.updated_at`
+  )
+    .bind(key, now, now)
+    .run();
+  const row = await env.DB.prepare(
+    "SELECT request_count FROM support_rate_limits WHERE key = ?"
+  )
+    .bind(key)
+    .first<{ request_count: number }>();
+  return Number(row?.request_count || 0) <= (user ? 60 : 25);
+}
+
+async function sendSupportEmail(
+  env: SitesEnvironment,
+  ticket: {
+    id: string;
+    email: string;
+    name: string;
+    category: string;
+    priority: string;
+    subject: string;
+    description: string;
+    conversation: SupportMessage[];
+  }
+): Promise<{ status: string; providerMessageId: string | null }> {
+  if (!env.RESEND_API_KEY) {
+    return { status: "configuration_required", providerMessageId: null };
+  }
+  const destination = validSupportEmail(env.SUPPORT_EMAIL_TO) || SUPPORT_EMAIL;
+  const from =
+    stringValue(env.SUPPORT_EMAIL_FROM).trim() ||
+    "REELassati Support <support@reelassati.app>";
+  const transcript = ticket.conversation
+    .map(
+      message =>
+        `<p><strong>${message.role === "user" ? "Customer" : "Assistant"}:</strong> ${htmlEscape(message.content)}</p>`
+    )
+    .join("");
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `support-ticket-${ticket.id}`,
+      },
+      body: JSON.stringify({
+        from,
+        to: [destination],
+        reply_to: ticket.email,
+        subject: `[${ticket.priority.toUpperCase()}] ${ticket.id} · ${ticket.subject}`,
+        html: `<h1>REELassati support ticket</h1><p><strong>ID:</strong> ${ticket.id}</p><p><strong>Customer:</strong> ${htmlEscape(ticket.name)} &lt;${htmlEscape(ticket.email)}&gt;</p><p><strong>Category:</strong> ${htmlEscape(ticket.category)}</p><p><strong>Priority:</strong> ${htmlEscape(ticket.priority)}</p><h2>${htmlEscape(ticket.subject)}</h2><p>${htmlEscape(ticket.description).replace(/\n/g, "<br>")}</p>${transcript ? `<hr><h3>Conversation</h3>${transcript}` : ""}`,
+      }),
+    });
+    if (!response.ok) return { status: "failed", providerMessageId: null };
+    const payload = (await response.json()) as { id?: unknown };
+    const id = stringValue(payload.id).slice(0, 160) || null;
+    return { status: "sent", providerMessageId: id };
+  } catch {
+    return { status: "failed", providerMessageId: null };
+  }
+}
+
+async function createSupportTicket(
+  env: SitesEnvironment,
+  user: AuthenticatedUser | null,
+  input: SupportTicketInput
+): Promise<{
+  id: string;
+  emailStatus: string;
+  supportEmail: string;
+}> {
+  await initializeSchema(env);
+  const email = user?.email || validSupportEmail(input.email);
+  if (!email) {
+    throw errorResponse("Add a valid email so support can reply");
+  }
+  const name = (user?.name || stringValue(input.name).trim() || "Customer").slice(
+    0,
+    120
+  );
+  const category = supportCategory(input.category);
+  const priority = supportPriority(input.priority);
+  const subject = stringValue(input.subject).trim().slice(0, 180);
+  const description = stringValue(input.description).trim().slice(0, 8000);
+  const conversation = supportMessages(input.conversation);
+  if (subject.length < 4) throw errorResponse("Add a short ticket subject");
+  if (description.length < 10) {
+    throw errorResponse("Describe what happened and what you expected");
+  }
+  const id = `RA-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  const now = new Date().toISOString();
+  const summary = `${category}: ${subject}. ${description}`.slice(0, 1200);
+  await env.DB.prepare(
+    `INSERT INTO support_tickets
+       (id, requester_email, requester_name, authenticated_owner_email,
+        category, priority, subject, description, conversation_json,
+        ai_summary, status, email_status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', 'pending', ?, ?)`
+  )
+    .bind(
+      id,
+      email,
+      name,
+      user?.email || null,
+      category,
+      priority,
+      subject,
+      description,
+      JSON.stringify(conversation),
+      summary,
+      now,
+      now
+    )
+    .run();
+  const delivery = await sendSupportEmail(env, {
+    id,
+    email,
+    name,
+    category,
+    priority,
+    subject,
+    description,
+    conversation,
+  });
+  await env.DB.prepare(
+    `UPDATE support_tickets
+     SET email_status = ?, provider_message_id = ?, updated_at = ?
+     WHERE id = ?`
+  )
+    .bind(delivery.status, delivery.providerMessageId, new Date().toISOString(), id)
+    .run();
+  return { id, emailStatus: delivery.status, supportEmail: SUPPORT_EMAIL };
+}
+
+function explicitlyRequestsTicket(message: string): boolean {
+  return /(?:\b(?:open|create|raise|file|submit|send)\b.{0,28}\b(?:ticket|support request)\b)|(?:\b(?:apri|crea|invia)\b.{0,28}\b(?:ticket|richiesta di supporto)\b)/i.test(
+    message
+  );
+}
+
+async function handleSupport(
+  request: Request,
+  env: SitesEnvironment,
+  url: URL
+): Promise<Response> {
+  if (request.method !== "POST") return errorResponse("Method not allowed", 405);
+  const user = await getUser(request, env);
+  if (!(await supportRateLimit(request, env, user))) {
+    return errorResponse("Support is receiving too many requests from this connection. Try again in an hour or email reelassati@gmail.com.", 429);
+  }
+  if (url.pathname === "/api/support/tickets") {
+    const input = await parseJsonBody<SupportTicketInput>(request);
+    return json({ ticket: await createSupportTicket(env, user, input) }, 201);
+  }
+  if (url.pathname !== "/api/support/chat") {
+    return errorResponse("Support route not found", 404);
+  }
+  const input = await parseJsonBody<{ messages?: unknown }>(request);
+  const messages = supportMessages(input.messages);
+  const latest = [...messages].reverse().find(message => message.role === "user");
+  if (!latest) return errorResponse("Write a question for the support assistant");
+  const aiUser = user || {
+    email: "anonymous-support@reelassati.app",
+    name: "Public visitor",
+  };
+  const { output } = await chatJson(
+    env,
+    aiUser,
+    "support-assistance",
+    `You are REELassati Support, the official product support assistant. Be precise, calm, concise and exceptionally useful. Diagnose account access, uploads, Studio editing, AI generation, provider configuration, publishing, billing, privacy, referrals, and common browser issues. Give numbered actions when troubleshooting. Never claim to inspect an account, payment, file, provider status, or server log unless the supplied conversation contains that fact. Never request passwords, API keys, card data, authentication codes, private tokens, or full identity documents. For account-specific, billing, security, privacy, repeated technical failures, lost data, or anything you cannot resolve confidently, recommend a human ticket and mention reelassati@gmail.com. Return strict JSON with: reply (string), resolved (boolean), needsHuman (boolean), suggestedActions (array of up to 4 strings), and ticketDraft (null or an object with category, priority, subject, description). Set ticketDraft whenever escalation would help. If the user explicitly asks to open/create/send a ticket, make ticketDraft complete from the available facts. Available categories: account, billing, studio, generation, publishing, privacy, bug, other. Available priorities: low, normal, high, urgent. Do not say an email or ticket was sent; the server reports that separately.`,
+    { messages, supportEmail: SUPPORT_EMAIL },
+    env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5"
+  );
+  const reply = stringValue(output.reply).trim().slice(0, 5000);
+  const actions = Array.isArray(output.suggestedActions)
+    ? output.suggestedActions
+        .map(action => stringValue(action).trim().slice(0, 300))
+        .filter(Boolean)
+        .slice(0, 4)
+    : [];
+  const draftValue = recordValue(output.ticketDraft);
+  const ticketDraft = draftValue
+    ? {
+        category: supportCategory(draftValue.category),
+        priority: supportPriority(draftValue.priority),
+        subject: stringValue(draftValue.subject).trim().slice(0, 180),
+        description: stringValue(draftValue.description).trim().slice(0, 8000),
+      }
+    : null;
+  let ticket: Awaited<ReturnType<typeof createSupportTicket>> | null = null;
+  if (
+    user &&
+    ticketDraft &&
+    explicitlyRequestsTicket(latest.content) &&
+    ticketDraft.subject.length >= 4 &&
+    ticketDraft.description.length >= 10
+  ) {
+    ticket = await createSupportTicket(env, user, {
+      ...ticketDraft,
+      conversation: messages,
+    });
+  }
+  return json({
+    reply:
+      reply ||
+      `I could not complete that answer. Try once more or email ${SUPPORT_EMAIL}.`,
+    resolved: output.resolved === true,
+    needsHuman: output.needsHuman === true,
+    suggestedActions: actions,
+    ticketDraft: ticket ? null : ticketDraft,
+    ticket,
+    supportEmail: SUPPORT_EMAIL,
+  });
+}
+
 async function handleApi(
   request: Request,
   env: SitesEnvironment,
@@ -7183,6 +7524,10 @@ async function handleApi(
         .toUpperCase() ||
       null;
     return json({ country });
+  }
+
+  if (url.pathname.startsWith("/api/support/")) {
+    return handleSupport(request, env, url);
   }
 
   if (url.pathname === "/api/video/webhook") {

@@ -263,7 +263,7 @@ export default function ResponsibleUse() {
           </p>
           <div className="mt-6 flex flex-wrap gap-4">
             <Link
-              to="/support"
+              to="/contact"
               className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-hover"
             >
               {copy.reportAction} <ArrowRight className="h-4 w-4" aria-hidden />

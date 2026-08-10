@@ -29,6 +29,7 @@ export type AiOperation =
   | "transcription"
   | "speech-synthesis"
   | "video-generation"
+  | "support-assistance"
   | "publication-marking";
 
 export type MarkingStatus = "not-required" | "pending" | "verified" | "failed";
@@ -121,7 +122,7 @@ export interface ComplianceStatus {
   operatorIdentityConfigured: boolean;
   operatorName?: string;
   operatorEntityType?: "individual" | "company" | "other";
-  releaseStatus?: "private-testing" | "closed-beta" | "public";
+  releaseStatus?: "public";
   firstEuAvailabilityDate?: string;
   creativeScopeConfirmed: boolean;
   aiLiteracyAcknowledgedAt?: string;

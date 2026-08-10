@@ -128,7 +128,7 @@ without its separately configured provider credential.
 
 1. Confirm the exact legal operator name, legal form and public contact.
 2. Confirm the first EU placing-on-the-market/put-into-service date and whether
-   the product is private testing, closed beta or public.
+   the product audience and public-release status.
 3. Confirm that the intended use remains permanently restricted to creative and
    marketing production; reassess if any high-impact people decision is added.
 4. Complete and approve each provider evidence package, including contractual,
