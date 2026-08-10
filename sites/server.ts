@@ -3111,7 +3111,8 @@ async function chatJson(
   purpose: AiOperation,
   system: string,
   userContent: unknown,
-  model?: string
+  model?: string,
+  requireJsonMode = true
 ): Promise<{
   output: Record<string, unknown>;
   invocation: AiInvocationContext;
@@ -3167,7 +3168,9 @@ async function chatJson(
             },
             { role: "user", content: userContent },
           ],
-          response_format: { type: "json_object" },
+          ...(requireJsonMode
+            ? { response_format: { type: "json_object" } }
+            : {}),
           temperature: 0.45,
         }),
       }
@@ -7457,7 +7460,8 @@ async function handleSupport(
     "support-assistance",
     `You are REELassati Support, the official product support assistant. Be precise, calm, concise and exceptionally useful. Diagnose account access, uploads, Studio editing, AI generation, provider configuration, publishing, billing, privacy, referrals, and common browser issues. Give numbered actions when troubleshooting. Never claim to inspect an account, payment, file, provider status, or server log unless the supplied conversation contains that fact. Never request passwords, API keys, card data, authentication codes, private tokens, or full identity documents. For account-specific, billing, security, privacy, repeated technical failures, lost data, or anything you cannot resolve confidently, recommend a human ticket and mention reelassati@gmail.com. Return strict JSON with: reply (string), resolved (boolean), needsHuman (boolean), suggestedActions (array of up to 4 strings), and ticketDraft (null or an object with category, priority, subject, description). Set ticketDraft whenever escalation would help. If the user explicitly asks to open/create/send a ticket, make ticketDraft complete from the available facts. Available categories: account, billing, studio, generation, publishing, privacy, bug, other. Available priorities: low, normal, high, urgent. Do not say an email or ticket was sent; the server reports that separately.`,
     { messages, supportEmail: SUPPORT_EMAIL },
-    env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5"
+    env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5",
+    false
   );
   const reply = stringValue(output.reply).trim().slice(0, 5000);
   const actions = Array.isArray(output.suggestedActions)
