@@ -205,3 +205,41 @@ export const referralClaims = sqliteTable(
     ),
   ]
 );
+
+export const supportTickets = sqliteTable(
+  "support_tickets",
+  {
+    id: text("id").primaryKey().notNull(),
+    requesterEmail: text("requester_email").notNull(),
+    requesterName: text("requester_name"),
+    authenticatedOwnerEmail: text("authenticated_owner_email"),
+    category: text("category").notNull(),
+    priority: text("priority").notNull().default("normal"),
+    subject: text("subject").notNull(),
+    description: text("description").notNull(),
+    conversationJson: text("conversation_json").notNull().default("[]"),
+    aiSummary: text("ai_summary"),
+    status: text("status").notNull().default("open"),
+    emailStatus: text("email_status").notNull().default("pending"),
+    providerMessageId: text("provider_message_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  table => [
+    index("support_tickets_email_created_idx").on(
+      table.requesterEmail,
+      table.createdAt
+    ),
+    index("support_tickets_status_created_idx").on(
+      table.status,
+      table.createdAt
+    ),
+  ]
+);
+
+export const supportRateLimits = sqliteTable("support_rate_limits", {
+  key: text("key").primaryKey().notNull(),
+  requestCount: integer("request_count").notNull().default(0),
+  windowStartedAt: text("window_started_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

@@ -37,7 +37,7 @@ export function Navbar() {
     examples: isItalian ? "Esempi" : "Walkthroughs",
     presets: isItalian ? "Preset" : "Presets",
     access: t("nav.pricing"),
-    support: t("nav.support"),
+    contact: isItalian ? "Contatti" : "Contact",
     studio: t("nav.start_free"),
     login: t("nav.login"),
     signup: t("nav.signup"),
@@ -69,7 +69,7 @@ export function Navbar() {
           <NavItem to="/showcase">{labels.examples}</NavItem>
           <NavItem to="/templates">{labels.presets}</NavItem>
           <NavItem to="/pricing">{labels.access}</NavItem>
-          <NavItem to="/support">{labels.support}</NavItem>
+          <NavItem to="/contact">{labels.contact}</NavItem>
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
@@ -167,8 +167,8 @@ export function Navbar() {
           <MobileLink to="/pricing" onNavigate={() => setOpen(false)}>
             {labels.access}
           </MobileLink>
-          <MobileLink to="/support" onNavigate={() => setOpen(false)}>
-            {labels.support}
+          <MobileLink to="/contact" onNavigate={() => setOpen(false)}>
+            {labels.contact}
           </MobileLink>
           <div className="my-3 h-px bg-border" />
           <div className="flex items-center justify-between">

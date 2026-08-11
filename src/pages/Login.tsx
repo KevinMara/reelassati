@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { useAuth } from "@/hooks/useAuth";
+import posthog from "@/lib/posthog";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -19,7 +20,10 @@ export default function Login() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (await login(email, password)) navigate("/dashboard", { replace: true });
+    if (await login(email, password)) {
+      posthog?.capture("studio_access_opened");
+      navigate("/dashboard", { replace: true });
+    }
   };
 
   return (

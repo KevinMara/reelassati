@@ -403,12 +403,13 @@ describe("Sites worker", () => {
       env as never
     );
     const body = (await response.json()) as {
-      user: { email: string; name: string };
+      user: { id: string; email: string; name: string };
       capabilities: { missing: string[] };
     };
 
     expect(response.status).toBe(200);
     expect(body.user).toEqual({
+      id: "creator@example.com",
       email: "creator@example.com",
       name: "Ada Creator",
       role: "member",
@@ -463,6 +464,114 @@ describe("Sites worker", () => {
     expect(response.headers.get("access-control-allow-origin")).toBe(
       "https://reelassati.app"
     );
+  });
+
+  it("provides public Kimi-powered support without requiring an account", async () => {
+    const originalFetch = globalThis.fetch;
+    let providerUrl = "";
+    let providerBody: Record<string, unknown> = {};
+    globalThis.fetch = async (input, init) => {
+      providerUrl = String(input);
+      providerBody = JSON.parse(String(init?.body || "{}"));
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                reply: "Open Settings and reconnect the publishing account.",
+                resolved: false,
+                needsHuman: false,
+                suggestedActions: ["Open Settings", "Reconnect the account"],
+                ticketDraft: null,
+              }),
+            },
+          },
+        ],
+      });
+    };
+
+    try {
+      const response = await worker.fetch(
+        new Request("https://studio.example/api/support/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: "Publishing is disconnected" }],
+          }),
+        }),
+        { ...env, OPENROUTER_API_KEY: "test-openrouter-key" } as never
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        reply: "Open Settings and reconnect the publishing account.",
+        suggestedActions: ["Open Settings", "Reconnect the account"],
+        supportEmail: "reelassati@gmail.com",
+      });
+      expect(providerUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
+      expect(providerBody.model).toBe("moonshotai/kimi-k2.5");
+      expect(providerBody).not.toHaveProperty("response_format");
+      expect(
+        (providerBody.messages as Array<{ role: string; content: unknown }>)[1]
+          .content
+      ).toBeTypeOf("string");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("creates a public support ticket and sends an idempotent support email", async () => {
+    const originalFetch = globalThis.fetch;
+    let emailRequest: { url: string; headers: Headers; body: Record<string, unknown> } | null = null;
+    globalThis.fetch = async (input, init) => {
+      emailRequest = {
+        url: String(input),
+        headers: new Headers(init?.headers),
+        body: JSON.parse(String(init?.body || "{}")),
+      };
+      return Response.json({ id: "email_123" });
+    };
+
+    try {
+      const response = await worker.fetch(
+        new Request("https://studio.example/api/support/tickets", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            email: "customer@example.com",
+            name: "Customer",
+            category: "bug",
+            priority: "high",
+            subject: "Editor export is stuck",
+            description: "The export remains at zero percent after a retry.",
+            conversation: [
+              { role: "user", content: "My editor export is stuck." },
+            ],
+          }),
+        }),
+        { ...env, RESEND_API_KEY: "re_test_key" } as never
+      );
+      expect(response.status).toBe(201);
+      expect(await response.json()).toMatchObject({
+        ticket: {
+          id: expect.stringMatching(/^RA-\d{8}-[A-F0-9]{8}$/),
+          emailStatus: "sent",
+          supportEmail: "reelassati@gmail.com",
+        },
+      });
+      expect(emailRequest?.url).toBe("https://api.resend.com/emails");
+      expect(emailRequest?.headers.get("authorization")).toBe(
+        "Bearer re_test_key"
+      );
+      expect(emailRequest?.headers.get("idempotency-key")).toMatch(
+        /^support-ticket-RA-/
+      );
+      expect(emailRequest?.body).toMatchObject({
+        to: ["reelassati@gmail.com"],
+        reply_to: "customer@example.com",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it("accepts CDN country headers when runtime geolocation metadata is absent", async () => {
@@ -863,7 +972,7 @@ describe("Sites worker", () => {
         body: JSON.stringify({
           legalName: "Example Operator",
           entityType: "individual",
-          releaseStatus: "private-testing",
+          releaseStatus: "public",
           firstEuAvailabilityDate: "2026-08-04",
           creativeScopeConfirmed: true,
         }),
@@ -908,7 +1017,7 @@ describe("Sites worker", () => {
         body: JSON.stringify({
           legalName: "Example Operator",
           entityType: "individual",
-          releaseStatus: "private-testing",
+          releaseStatus: "public",
           firstEuAvailabilityDate: "2099-01-01",
           creativeScopeConfirmed: true,
         }),

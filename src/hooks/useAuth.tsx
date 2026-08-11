@@ -13,6 +13,7 @@ import {
   supabasePublishableKey,
   supabaseUrl,
 } from "@/lib/supabase/client";
+import posthog from "@/lib/posthog";
 
 export type SocialProvider = "google" | "apple" | "github";
 
@@ -60,6 +61,15 @@ function mapUser(user: User | null): AuthUser | null {
       fallbackName,
     role: "member",
   };
+}
+
+function identifyAnalyticsUser(user: AuthUser | null) {
+  if (!user) return;
+  posthog?.identify(user.id, {
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  });
 }
 
 function authRedirect(path = "/auth/oauth-success") {
@@ -110,7 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void Promise.all([supabase.auth.getSession(), configuredProviders()]).then(
       ([{ data }, providers]) => {
         if (!active) return;
-        setUser(mapUser(data.session?.user ?? null));
+        const mappedUser = mapUser(data.session?.user ?? null);
+        identifyAnalyticsUser(mappedUser);
+        setUser(mappedUser);
         setAvailableProviders(providers);
         setLoading(false);
       }
@@ -118,7 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
-      setUser(mapUser(session?.user ?? null));
+      const mappedUser = mapUser(session?.user ?? null);
+      identifyAnalyticsUser(mappedUser);
+      setUser(mappedUser);
       setLoading(false);
     });
     return () => {
@@ -140,7 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       );
       if (authError) throw authError;
-      setUser(mapUser(data.user));
+      const mappedUser = mapUser(data.user);
+      identifyAnalyticsUser(mappedUser);
+      setUser(mappedUser);
       return Boolean(data.session);
     } catch (cause) {
       setError(readableError(cause));
@@ -164,7 +180,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
         if (authError) throw authError;
-        setUser(mapUser(data.user));
+        const mappedUser = mapUser(data.user);
+        identifyAnalyticsUser(mappedUser);
+        setUser(mappedUser);
         return {
           signedIn: Boolean(data.session),
           confirmationRequired: Boolean(data.user && !data.session),
@@ -232,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     setError(null);
     await supabase.auth.signOut();
+    posthog?.reset();
     setUser(null);
   }, []);
 

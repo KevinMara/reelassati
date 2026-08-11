@@ -3,6 +3,11 @@
   "buildCommand": "npm run build:client",
   "outputDirectory": "dist/client",
   "framework": "vite",
+  "functions": {
+    "api/support.ts": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api/).*)",

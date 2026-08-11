@@ -377,9 +377,6 @@ function StudioStatus() {
   const [entityType, setEntityType] = useState<
     "individual" | "company" | "other"
   >("individual");
-  const [releaseStatus, setReleaseStatus] = useState<
-    "private-testing" | "closed-beta" | "public"
-  >("private-testing");
   const [firstEuAvailabilityDate, setFirstEuAvailabilityDate] = useState("");
   const [creativeScopeConfirmed, setCreativeScopeConfirmed] = useState(false);
   const [complianceNotice, setComplianceNotice] = useState("");
@@ -393,7 +390,6 @@ function StudioStatus() {
         setCompliance(status);
         setLegalName(status.operatorName || "");
         if (status.operatorEntityType) setEntityType(status.operatorEntityType);
-        if (status.releaseStatus) setReleaseStatus(status.releaseStatus);
         setFirstEuAvailabilityDate(status.firstEuAvailabilityDate || "");
         setCreativeScopeConfirmed(status.creativeScopeConfirmed);
       })
@@ -424,7 +420,7 @@ function StudioStatus() {
       const { status } = await platformApi.saveOperatorCompliance({
         legalName: legalName.trim(),
         entityType,
-        releaseStatus,
+        releaseStatus: "public",
         firstEuAvailabilityDate,
         creativeScopeConfirmed: true,
       });
@@ -602,17 +598,9 @@ function StudioStatus() {
                 <option value="company">Company</option>
                 <option value="other">Other entity</option>
               </select>
-              <select
-                value={releaseStatus}
-                onChange={event =>
-                  setReleaseStatus(event.target.value as typeof releaseStatus)
-                }
-                className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
-              >
-                <option value="private-testing">Internal access</option>
-                <option value="closed-beta">Invite-only access</option>
-                <option value="public">Publicly usable</option>
-              </select>
+              <div className="flex items-center rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs font-medium text-emerald-600">
+                Public platform
+              </div>
             </div>
             <label className="mt-3 block text-xs text-foreground/55">
               First EU availability or put-into-service date
@@ -666,9 +654,7 @@ function StudioStatus() {
               contractors need role-appropriate measures of their own.
             </p>
             <ul className="mt-3 space-y-2 text-xs text-foreground/65">
-              <li>
-                • Kimi test routing never replaces explicit OpenRouter models.
-              </li>
+              <li>• Each AI task uses its recorded production model route.</li>
               <li>
                 • Generated output needs verified provenance before release.
               </li>
@@ -704,11 +690,6 @@ function StudioStatus() {
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium">{route.purpose}</p>
-                {route.mode === "owner-test" ? (
-                  <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-amber-600">
-                    owner test
-                  </span>
-                ) : null}
               </div>
               <p className="mt-1 text-[11px] leading-relaxed text-foreground/45">
                 {route.model} · {route.provider}

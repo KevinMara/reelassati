@@ -28,6 +28,7 @@ import { useFileDropZone } from "@/hooks/useFileDropZone";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { copyTextWithProvenance } from "@/lib/provenance";
 import { validateFileSelection } from "@/lib/file-validation";
+import posthog from "@/lib/posthog";
 
 type LibraryFilter = "all" | AssetKind;
 
@@ -206,6 +207,10 @@ export default function ContentLibrary() {
           ...current.activity,
         ].slice(0, 100),
       }));
+      posthog?.capture("asset_uploaded", {
+        asset_kind: asset.kind,
+        asset_size_bytes: asset.size,
+      });
       setNotice({
         tone: "success",
         message: `${asset.name} is ready in your library.`,

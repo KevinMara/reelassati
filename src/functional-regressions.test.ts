@@ -94,6 +94,7 @@ describe("platform-wide functional invariants", () => {
         "publishing",
         "referrals",
         "session",
+        "support",
         "video",
         "workspace",
       ])
@@ -103,6 +104,25 @@ describe("platform-wide functional invariants", () => {
         family === "projects" ? "const editBriefMatch" : `/api/${family}`
       );
     }
+  });
+
+  it("keeps the official contact flow public, durable, and free of product beta language", () => {
+    const app = source("./App.tsx");
+    const navbar = source("./components/Navbar.tsx");
+    const contact = source("./pages/Support.tsx");
+    const api = source("./lib/platform-api.ts");
+    const server = source("../sites/server.ts");
+    const compliance = source("../contracts/compliance.ts");
+    const publicProductSource = [app, navbar, contact, api, server, compliance].join("\n");
+
+    expect(app).toContain('<Route path="/contact" element={<Support />} />');
+    expect(navbar).toContain('<NavItem to="/contact">');
+    expect(contact).toContain("REELassati Support");
+    expect(contact).toContain("reelassati@gmail.com");
+    expect(api).toContain('requestJson<SupportChatResponse>("/api/support/chat"');
+    expect(server).toContain("CREATE TABLE IF NOT EXISTS support_tickets");
+    expect(server).toContain('"moonshotai/kimi-k2.5"');
+    expect(publicProductSource).not.toMatch(/\bbeta\b|closed-beta|private-testing/i);
   });
 
   it("keeps the Vercel client deploy free of accidental legacy functions", () => {
@@ -123,9 +143,12 @@ describe("platform-wide functional invariants", () => {
         expect.objectContaining({ destination: "/api/$1" }),
       ])
     );
-    expect(() =>
+    expect(
       readdirSync(new URL("../api", import.meta.url).pathname)
-    ).toThrow();
+    ).toEqual(["support.ts"]);
+    expect(source("../api/support.ts")).toContain(
+      "export default { fetch: handleSupport }"
+    );
     expect(
       readdirSync(new URL("../legacy-api", import.meta.url).pathname).length
     ).toBeGreaterThan(0);

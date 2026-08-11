@@ -6,6 +6,35 @@ afterEach(() => {
 });
 
 describe("platform API transport", () => {
+  it("keeps public-domain support requests on the Vercel function", async () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "www.reelassati.app" },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        ticket: {
+          id: "RA-1",
+          emailStatus: "sent",
+          supportEmail: "reelassati@gmail.com",
+        },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await platformApi.createSupportTicket({
+      category: "other",
+      priority: "normal",
+      subject: "Need human help",
+      description: "This request needs a human response.",
+      email: "customer@example.com",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/support",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
   it("turns an HTML SPA fallback into a clear controlled error", async () => {
     vi.stubGlobal(
       "fetch",
