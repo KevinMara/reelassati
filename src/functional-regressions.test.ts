@@ -113,16 +113,30 @@ describe("platform-wide functional invariants", () => {
     const api = source("./lib/platform-api.ts");
     const server = source("../sites/server.ts");
     const compliance = source("../contracts/compliance.ts");
-    const publicProductSource = [app, navbar, contact, api, server, compliance].join("\n");
+    const publicProductSource = [
+      app,
+      navbar,
+      contact,
+      api,
+      server,
+      compliance,
+    ].join("\n");
 
     expect(app).toContain('<Route path="/contact" element={<Support />} />');
     expect(navbar).toContain('<NavItem to="/contact">');
     expect(contact).toContain("REELassati Support");
     expect(contact).toContain("reelassati@gmail.com");
-    expect(api).toContain('requestJson<SupportChatResponse>("/api/support/chat"');
+    expect(contact).toContain("https://mail.google.com/mail/");
+    expect(contact).toContain("setTicketDraft(result.ticketDraft ?? null)");
+    expect(contact).toContain("action.message");
+    expect(api).toContain(
+      'requestJson<SupportChatResponse>("/api/support/chat"'
+    );
     expect(server).toContain("CREATE TABLE IF NOT EXISTS support_tickets");
     expect(server).toContain('"moonshotai/kimi-k2.5"');
-    expect(publicProductSource).not.toMatch(/\bbeta\b|closed-beta|private-testing/i);
+    expect(publicProductSource).not.toMatch(
+      /\bbeta\b|closed-beta|private-testing/i
+    );
   });
 
   it("keeps the Vercel client deploy free of accidental legacy functions", () => {
@@ -143,9 +157,9 @@ describe("platform-wide functional invariants", () => {
         expect.objectContaining({ destination: "/api/$1" }),
       ])
     );
-    expect(
-      readdirSync(new URL("../api", import.meta.url).pathname)
-    ).toEqual(["support.ts"]);
+    expect(readdirSync(new URL("../api", import.meta.url).pathname)).toEqual([
+      "support.ts",
+    ]);
     expect(source("../api/support.ts")).toContain(
       "export default { fetch: handleSupport }"
     );

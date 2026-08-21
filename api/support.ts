@@ -264,7 +264,9 @@ async function createTicket(
     user?.user_metadata?.full_name || user?.user_metadata?.name
   );
   const name = (
-    metadataName || stringValue(input.name).trim() || "Customer"
+    metadataName ||
+    stringValue(input.name).trim() ||
+    "Customer"
   ).slice(0, 120);
   const requestedCategory = stringValue(input.category).trim().toLowerCase();
   const category = SUPPORT_CATEGORIES.has(requestedCategory)
@@ -336,7 +338,7 @@ async function proxySupportChat(
       "X-Support-Ticket-Owner": "vercel",
       ...(authorization ? { Authorization: authorization } : {}),
     },
-    body: JSON.stringify({ messages: body.messages }),
+    body: JSON.stringify({ messages: body.messages, locale: body.locale }),
   });
   const payload = (await upstream.json().catch(() => null)) as
     | (Record<string, unknown> & {
@@ -396,7 +398,10 @@ export async function handleSupport(request: Request): Promise<Response> {
   const config = runtimeConfig();
   if (!config) {
     return json(
-      { error: "Support configuration is incomplete.", supportEmail: SUPPORT_EMAIL },
+      {
+        error: "Support configuration is incomplete.",
+        supportEmail: SUPPORT_EMAIL,
+      },
       503
     );
   }

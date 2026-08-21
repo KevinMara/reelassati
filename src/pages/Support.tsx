@@ -19,6 +19,7 @@ import { Footer } from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import {
   platformApi,
+  type SupportAction,
   type SupportMessage,
   type SupportTicketDraft,
   type SupportTicketResult,
@@ -26,6 +27,9 @@ import {
 import { cn } from "@/lib/utils";
 
 const SUPPORT_EMAIL = "reelassati@gmail.com";
+const SUPPORT_GMAIL_URL = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+  SUPPORT_EMAIL
+)}&su=${encodeURIComponent("REELassati support")}`;
 
 const starterPrompts = [
   "I can't access my account",
@@ -48,8 +52,10 @@ export default function Support() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [actions, setActions] = useState<string[]>([]);
-  const [ticketDraft, setTicketDraft] = useState<SupportTicketDraft | null>(null);
+  const [actions, setActions] = useState<SupportAction[]>([]);
+  const [ticketDraft, setTicketDraft] = useState<SupportTicketDraft | null>(
+    null
+  );
   const [ticket, setTicket] = useState<SupportTicketResult | null>(null);
   const [email, setEmail] = useState(user?.email || "");
   const [name, setName] = useState(user?.name || "");
@@ -71,16 +77,21 @@ export default function Support() {
     setError("");
     setActions([]);
     try {
-      const result = await platformApi.supportChat(nextMessages.slice(-10));
+      const result = await platformApi.supportChat(
+        nextMessages.slice(-10),
+        i18n.resolvedLanguage
+      );
       setMessages(current => [
         ...current,
         { role: "assistant", content: result.reply },
       ]);
       setActions(result.suggestedActions || []);
-      if (result.ticketDraft) setTicketDraft(result.ticketDraft);
       if (result.ticket) {
         setTicket(result.ticket);
         setTicketDraft(null);
+        setActions([]);
+      } else {
+        setTicketDraft(result.ticketDraft ?? null);
       }
     } catch (cause) {
       setError(
@@ -152,7 +163,9 @@ export default function Support() {
                     <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface bg-emerald-500" />
                   </span>
                   <div>
-                    <h2 className="text-sm font-semibold">REELassati Support</h2>
+                    <h2 className="text-sm font-semibold">
+                      REELassati Support
+                    </h2>
                     <p className="text-[11px] text-foreground/45">
                       {isItalian
                         ? "Assistente AI · Escalation umana"
@@ -170,7 +183,10 @@ export default function Support() {
                 aria-live="polite"
               >
                 {visibleMessages.map((message, index) => (
-                  <ChatBubble key={`${message.role}-${index}`} message={message} />
+                  <ChatBubble
+                    key={`${message.role}-${index}`}
+                    message={message}
+                  />
                 ))}
                 {busy ? (
                   <div className="flex items-start gap-2.5">
@@ -192,12 +208,13 @@ export default function Support() {
                   <div className="ml-9 grid gap-2 sm:grid-cols-2">
                     {actions.map(action => (
                       <button
-                        key={action}
+                        key={`${action.label}-${action.message}`}
                         type="button"
-                        onClick={() => void sendMessage(action)}
+                        onClick={() => void sendMessage(action.message)}
                         className="rounded-xl border border-primary/15 bg-primary/[0.035] px-3 py-2 text-left text-xs leading-relaxed text-foreground/70 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground"
+                        aria-label={`Reply: ${action.label}`}
                       >
-                        {action}
+                        {action.label}
                       </button>
                     ))}
                   </div>
@@ -207,7 +224,10 @@ export default function Support() {
               {error ? (
                 <div className="mx-3 mb-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-xs text-destructive sm:mx-5">
                   {error} You can always email{" "}
-                  <a className="font-semibold underline" href={`mailto:${SUPPORT_EMAIL}`}>
+                  <a
+                    className="font-semibold underline"
+                    href={`mailto:${SUPPORT_EMAIL}`}
+                  >
                     {SUPPORT_EMAIL}
                   </a>
                   .
@@ -233,7 +253,9 @@ export default function Support() {
                   <textarea
                     ref={inputRef}
                     value={input}
-                    onChange={event => setInput(event.target.value.slice(0, 2400))}
+                    onChange={event =>
+                      setInput(event.target.value.slice(0, 2400))
+                    }
                     onKeyDown={event => {
                       if (event.key === "Enter" && !event.shiftKey) {
                         event.preventDefault();
@@ -256,7 +278,11 @@ export default function Support() {
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[0_10px_26px_-12px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:translate-y-0 disabled:opacity-40"
                     aria-label="Send message"
                   >
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+                    {busy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ArrowUp className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
                 <p className="mt-2 px-1 text-[10px] text-foreground/35">
@@ -295,9 +321,18 @@ export default function Support() {
                       : "The assistant diagnoses the issue, gives concrete steps, and prepares a contextual, prioritized ticket when needed."}
                   </p>
                   <ul className="mt-4 space-y-3 text-xs text-foreground/60">
-                    <Feature icon={MessageCircleMore} text="Immediate guided troubleshooting" />
-                    <Feature icon={TicketCheck} text="One-step ticket escalation" />
-                    <Feature icon={ShieldCheck} text="No sensitive credentials requested" />
+                    <Feature
+                      icon={MessageCircleMore}
+                      text="Immediate guided troubleshooting"
+                    />
+                    <Feature
+                      icon={TicketCheck}
+                      text="One-step ticket escalation"
+                    />
+                    <Feature
+                      icon={ShieldCheck}
+                      text="No sensitive credentials requested"
+                    />
                   </ul>
                 </div>
               )}
@@ -309,17 +344,21 @@ export default function Support() {
                     {isItalian ? "Supporto umano" : "Human support"}
                   </p>
                 </div>
-                <h2 className="mt-3 text-base font-semibold">{SUPPORT_EMAIL}</h2>
+                <h2 className="mt-3 text-base font-semibold">
+                  {SUPPORT_EMAIL}
+                </h2>
                 <p className="mt-2 text-xs leading-relaxed text-foreground/50">
                   {isItalian
                     ? "Per richieste complesse, account, pagamenti, privacy o problemi persistenti."
                     : "For complex requests, accounts, billing, privacy, or persistent technical problems."}
                 </p>
                 <a
-                  href={`mailto:${SUPPORT_EMAIL}?subject=REELassati%20support`}
+                  href={SUPPORT_GMAIL_URL}
+                  target="_blank"
+                  rel="noreferrer"
                   className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-hover"
                 >
-                  {isItalian ? "Invia un’email" : "Send an email"}
+                  {isItalian ? "Apri l’email" : "Open email composer"}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
@@ -335,7 +374,9 @@ export default function Support() {
 function ChatBubble({ message }: { message: SupportMessage }) {
   const assistant = message.role === "assistant";
   return (
-    <div className={cn("flex items-start gap-2.5", !assistant && "justify-end")}>
+    <div
+      className={cn("flex items-start gap-2.5", !assistant && "justify-end")}
+    >
       {assistant ? (
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Bot className="h-3.5 w-3.5" />
@@ -360,7 +401,13 @@ function ChatBubble({ message }: { message: SupportMessage }) {
   );
 }
 
-function Feature({ icon: Icon, text }: { icon: typeof LifeBuoy; text: string }) {
+function Feature({
+  icon: Icon,
+  text,
+}: {
+  icon: typeof LifeBuoy;
+  text: string;
+}) {
   return (
     <li className="flex items-center gap-2.5">
       <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground/[0.04] text-primary">
@@ -391,7 +438,10 @@ function TicketForm({
   onSubmit: (event: FormEvent) => void;
 }) {
   return (
-    <form onSubmit={onSubmit} className="rounded-2xl border border-primary/20 bg-surface p-5 shadow-[0_18px_55px_-38px_hsl(var(--primary))]">
+    <form
+      onSubmit={onSubmit}
+      className="rounded-2xl border border-primary/20 bg-surface p-5 shadow-[0_18px_55px_-38px_hsl(var(--primary))]"
+    >
       <div className="flex items-center justify-between gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <TicketCheck className="h-4 w-4" />
@@ -402,11 +452,14 @@ function TicketForm({
       </div>
       <h2 className="mt-4 text-lg font-semibold">Ticket ready</h2>
       <p className="mt-2 text-xs leading-relaxed text-foreground/50">
-        The assistant prepared this escalation from your conversation. Review and send it to human support.
+        The assistant prepared this escalation from your conversation. Review
+        and send it to human support.
       </p>
       <div className="mt-4 rounded-xl border border-border bg-background p-3">
         <p className="text-xs font-semibold">{draft.subject}</p>
-        <p className="mt-2 line-clamp-5 text-[11px] leading-relaxed text-foreground/50">{draft.description}</p>
+        <p className="mt-2 line-clamp-5 text-[11px] leading-relaxed text-foreground/50">
+          {draft.description}
+        </p>
       </div>
       {!signedIn ? (
         <div className="mt-3 space-y-2">
@@ -432,7 +485,11 @@ function TicketForm({
         disabled={busy || (!signedIn && !email.trim())}
         className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary text-xs font-medium text-primary-foreground transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:translate-y-0 disabled:opacity-45"
       >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <TicketCheck className="h-4 w-4" />}
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <TicketCheck className="h-4 w-4" />
+        )}
         Create support ticket
       </button>
     </form>
@@ -447,7 +504,8 @@ function TicketSuccess({ ticket }: { ticket: SupportTicketResult }) {
       </span>
       <h2 className="mt-4 text-lg font-semibold">Ticket created</h2>
       <p className="mt-2 text-xs leading-relaxed text-foreground/55">
-        Reference <strong className="text-foreground">{ticket.id}</strong>. Keep this ID for any follow-up.
+        Reference <strong className="text-foreground">{ticket.id}</strong>. Keep
+        this ID for any follow-up.
       </p>
       <p className="mt-3 rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-[11px] text-foreground/55">
         {ticket.emailStatus === "sent"

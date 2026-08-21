@@ -223,11 +223,16 @@ export interface SupportTicketResult {
   supportEmail: string;
 }
 
+export interface SupportAction {
+  label: string;
+  message: string;
+}
+
 export interface SupportChatResponse {
   reply: string;
   resolved: boolean;
   needsHuman: boolean;
-  suggestedActions: string[];
+  suggestedActions: SupportAction[];
   ticketDraft: SupportTicketDraft | null;
   ticket: SupportTicketResult | null;
   supportEmail: string;
@@ -274,23 +279,25 @@ export const platformApi = {
       body: JSON.stringify({ acknowledged: true }),
     }),
 
-  supportChat: (messages: SupportMessage[]) =>
+  supportChat: (messages: SupportMessage[], locale?: string) =>
     typeof window !== "undefined" &&
     !window.location.hostname.endsWith(".chatgpt.site") &&
     window.location.hostname !== "localhost" &&
     window.location.hostname !== "127.0.0.1" &&
     window.location.hostname !== "terminal.local"
-      ? supportRequestJson<SupportChatResponse>("chat", { messages })
+      ? supportRequestJson<SupportChatResponse>("chat", { messages, locale })
       : requestJson<SupportChatResponse>("/api/support/chat", {
           method: "POST",
-          body: JSON.stringify({ messages }),
+          body: JSON.stringify({ messages, locale }),
         }),
 
-  createSupportTicket: (input: SupportTicketDraft & {
-    email?: string;
-    name?: string;
-    conversation?: SupportMessage[];
-  }) =>
+  createSupportTicket: (
+    input: SupportTicketDraft & {
+      email?: string;
+      name?: string;
+      conversation?: SupportMessage[];
+    }
+  ) =>
     typeof window !== "undefined" &&
     !window.location.hostname.endsWith(".chatgpt.site") &&
     window.location.hostname !== "localhost" &&

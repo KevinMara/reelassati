@@ -481,7 +481,17 @@ describe("Sites worker", () => {
                 reply: "Open Settings and reconnect the publishing account.",
                 resolved: false,
                 needsHuman: false,
-                suggestedActions: ["Open Settings", "Reconnect the account"],
+                suggestedActions: [
+                  {
+                    label: "I found Settings",
+                    message:
+                      "I found Settings and I’m ready for the next step.",
+                  },
+                  {
+                    label: "I can’t find it",
+                    message: "I can’t find the publishing settings.",
+                  },
+                ],
                 ticketDraft: null,
               }),
             },
@@ -504,7 +514,16 @@ describe("Sites worker", () => {
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
         reply: "Open Settings and reconnect the publishing account.",
-        suggestedActions: ["Open Settings", "Reconnect the account"],
+        suggestedActions: [
+          {
+            label: "I found Settings",
+            message: "I found Settings and I’m ready for the next step.",
+          },
+          {
+            label: "I can’t find it",
+            message: "I can’t find the publishing settings.",
+          },
+        ],
         supportEmail: "reelassati@gmail.com",
       });
       expect(providerUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
@@ -519,9 +538,99 @@ describe("Sites worker", () => {
     }
   });
 
+  it("answers pricing before escalation and returns choices as real user replies", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      throw new Error(
+        "The deterministic pricing guide must not call a provider"
+      );
+    };
+
+    try {
+      const response = await worker.fetch(
+        new Request("https://studio.example/api/support/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            locale: "en",
+            messages: [
+              {
+                role: "user",
+                content: "Can I talk to the sales team about pricing?",
+              },
+            ],
+          }),
+        }),
+        env as never
+      );
+
+      expect(response.status).toBe(200);
+      const payload = await response.json();
+      expect(payload).toMatchObject({
+        needsHuman: false,
+        ticketDraft: null,
+      });
+      expect(payload.reply).toContain("Creator is €29/month");
+      expect(payload.suggestedActions).toEqual(
+        expect.arrayContaining([
+          {
+            label: "Solo creator",
+            message:
+              "I’m one creator and need up to 2 connected social accounts.",
+          },
+          {
+            label: "Compare every plan",
+            message: "Show me the full monthly and annual pricing comparison.",
+          },
+        ])
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("prepares but does not silently send a sales ticket after confirmation", async () => {
+    const response = await worker.fetch(
+      new Request("https://studio.example/api/support/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          locale: "en",
+          messages: [
+            { role: "user", content: "I need pricing for one creator." },
+            {
+              role: "assistant",
+              content: "Creator is available monthly or annually.",
+            },
+            {
+              role: "user",
+              content: "Confirm and route this to the billing team.",
+            },
+          ],
+        }),
+      }),
+      env as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      needsHuman: true,
+      ticket: null,
+      autoCreateTicket: false,
+      ticketDraft: {
+        category: "billing",
+        subject: "Pricing and sales conversation",
+      },
+    });
+  });
+
   it("creates a public support ticket and sends an idempotent support email", async () => {
     const originalFetch = globalThis.fetch;
-    let emailRequest: { url: string; headers: Headers; body: Record<string, unknown> } | null = null;
+    let emailRequest: {
+      url: string;
+      headers: Headers;
+      body: Record<string, unknown>;
+    } | null = null;
     globalThis.fetch = async (input, init) => {
       emailRequest = {
         url: String(input),

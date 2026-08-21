@@ -167,6 +167,11 @@ interface SupportMessage {
   content: string;
 }
 
+interface SupportAction {
+  label: string;
+  message: string;
+}
+
 interface SupportTicketInput {
   email?: string;
   name?: string;
@@ -7233,6 +7238,332 @@ const SUPPORT_CATEGORIES = new Set([
 ]);
 const SUPPORT_PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
 
+const SUPPORT_SYSTEM_PROMPT = `You are REELassati Support, the official product support assistant. Your job is to solve the user's problem inside the conversation whenever safe and possible, not to dispose of the conversation by escalating it.
+
+OFFICIAL PRODUCT KNOWLEDGE
+- Public routes: pricing at /pricing; login at /auth/login; signup at /auth/signup; password recovery at /auth/forgot-password; support at /contact.
+- Pricing: Creator is EUR 29 monthly or EUR 288 annually (EUR 24/month equivalent) for 1 brand workspace and 2 connected social accounts. Pro is EUR 79 monthly or EUR 804 annually (EUR 67/month equivalent) for 3 brand workspaces and 6 connected social accounts. Studio is EUR 179 monthly or EUR 1,824 annually (EUR 152/month equivalent) for 10 brand workspaces and 12 connected social accounts. The complete Studio is included in every plan. Model and video-generation usage is billed separately by the connected provider.
+- Account access: users can sign up, log in, request a password-reset email, and set a new password from the reset link. A reset link may be expired or already used; request a fresh one and use only the newest email. Never ask for passwords, verification codes, OAuth secrets, private tokens, card data, or identity documents.
+- Uploads: hosted workspace uploads accept video, audio, and image files up to 64 MB. Direct AI video analysis and audio transcription require the relevant media to be below 24 MB. If a file is too large, instruct the user to trim or compress it, then retry with a new upload.
+- Studio: users can create projects; trim, split, move, delete, caption, adjust pacing, add B-roll/audio/style suggestions, lock clips, and review AI edit plans before applying changes. AI recommendations are proposals, not proof that an edit was applied.
+- AI tools: Script, AI Video, Video Analyzer, Voice Studio, Interview Me, Trends, Weekly Coach, and Prompt Director depend on the configured AI provider. For a provider failure, preserve the displayed reference, retry once unchanged, then gather the tool, exact error, file type/size, browser, and last successful step.
+- Publishing: users connect supported social accounts in Social Hub/Settings and publish or schedule from Publisher. Supported platforms include Instagram, TikTok, YouTube, Facebook, LinkedIn, Pinterest, Threads, and X/Twitter when the publishing integration is configured. A caption and a connected account are required. Never claim a post is live until the UI/provider reports published.
+- Workspace areas also include Calendar, Analytics, Clients, Content Library, Referrals, Settings, and Studio Status.
+- Common browser recovery: preserve work first; reload once; sign out and back in for session errors; disable a blocking extension for the site; allow pop-ups only when an OAuth window was blocked; try a current Chrome, Edge, Firefox, or Safari build; do not tell the user to clear all browser data before less destructive steps.
+
+CONVERSATION RULES
+1. Directly answer the user's question first. Ask at most one focused follow-up question per response.
+2. Use the supplied conversation as state. A clicked choice is a user answer. Never respond as though the assistant itself selected or lacks a preference.
+3. For troubleshooting, provide one small numbered sequence, then ask what happened. Do not repeat steps the conversation says were already tried.
+4. Pricing and sales questions are answerable from the official pricing above. Give the relevant facts and narrow the plan before offering human sales. Do not create a billing ticket merely because pricing was mentioned.
+5. Set needsHuman and ticketDraft only when the user explicitly asks for a person/ticket, an authenticated account/payment/privacy/security action is required, data may be lost, or at least two reasonable troubleshooting rounds failed. Otherwise keep ticketDraft null.
+6. A ticket draft is not a sent ticket. Say that the user must review and submit it in the ticket panel. Never claim an email or ticket was sent; the server reports that separately.
+7. Do not claim to inspect an account, payment, file, provider status, deployment, or log unless the conversation supplies that fact.
+8. Reply in the requested locale. If uncertain, use the language of the latest user message.
+
+CHOICE BUTTON RULES
+- suggestedActions must be an array of no more than four objects: {"label":"short visible choice","message":"exact user reply sent when clicked"}.
+- The message must be written from the user's perspective, normally beginning with “I”, “My”, “Yes”, or “No” (or the natural equivalent in the reply language).
+- Buttons are answers to your one follow-up question, never instructions to the user or assistant. Never output actions such as “Reply with…”, “Tell me…”, “Include…”, “Select…”, or “Confirm and route…”.
+- Example: {"label":"Annual billing","message":"I prefer annual billing."}.
+
+Return strict JSON with reply (string), resolved (boolean), needsHuman (boolean), suggestedActions (array described above), and ticketDraft (null or {category, priority, subject, description}). Available categories: account, billing, studio, generation, publishing, privacy, bug, other. Available priorities: low, normal, high, urgent.`;
+
+function supportActions(value: unknown): SupportAction[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(action => {
+      const record = recordValue(action);
+      if (record) {
+        const label = stringValue(record.label).trim().slice(0, 80);
+        const message = stringValue(record.message).trim().slice(0, 300);
+        if (
+          !label ||
+          !message ||
+          /^(?:reply|tell|provide|include|choose|select|enter|type|specify|let me know|open|try|reconnect|go|check|click|tap|use|rispondi|dimmi|inserisci|scegli|seleziona|apri|prova|ricollega|vai|controlla|clicca|tocca|usa)\b/i.test(
+            message
+          )
+        ) {
+          return null;
+        }
+        return { label, message };
+      }
+      const legacy = stringValue(action).trim().slice(0, 300);
+      if (
+        !legacy ||
+        /^(?:reply|tell|provide|include|choose|select|enter|type|specify|let me know|open|try|reconnect|go|check|click|tap|use|rispondi|dimmi|inserisci|scegli|seleziona|apri|prova|ricollega|vai|controlla|clicca|tocca|usa)\b/i.test(
+          legacy
+        )
+      ) {
+        return null;
+      }
+      return { label: legacy.slice(0, 80), message: legacy };
+    })
+    .filter((action): action is SupportAction => Boolean(action))
+    .slice(0, 4);
+}
+
+function pricingPlanFromConversation(
+  messages: SupportMessage[]
+): "Creator" | "Pro" | "Studio" | null {
+  const conversation = messages
+    .filter(message => message.role === "user")
+    .map(message => message.content)
+    .join(" ");
+  if (
+    /\b(?:studio plan|agency|agenc(?:y|ies)|10 brands?|12 (?:connected )?social)\b/i.test(
+      conversation
+    )
+  ) {
+    return "Studio";
+  }
+  if (
+    /\b(?:pro plan|small team|3 brands?|6 (?:connected )?social)\b/i.test(
+      conversation
+    )
+  ) {
+    return "Pro";
+  }
+  if (
+    /\b(?:creator plan|one creator|solo creator|1 brand|2 (?:connected )?social)\b/i.test(
+      conversation
+    )
+  ) {
+    return "Creator";
+  }
+  return null;
+}
+
+function pricingTermFromConversation(
+  messages: SupportMessage[]
+): "monthly" | "annual" | null {
+  const latestPreference = [...messages]
+    .reverse()
+    .find(
+      message =>
+        message.role === "user" &&
+        /\b(?:monthly|annual|mensile|annuale)\b/i.test(message.content)
+    );
+  if (!latestPreference) return null;
+  return /\b(?:annual|annuale)\b/i.test(latestPreference.content)
+    ? "annual"
+    : "monthly";
+}
+
+function guidedPricingSupport(
+  messages: SupportMessage[],
+  locale: string
+): Record<string, unknown> | null {
+  const userMessages = messages.filter(message => message.role === "user");
+  const latest = userMessages.at(-1)?.content || "";
+  const previous = userMessages.slice(0, -1);
+  const pricingPattern =
+    /\b(?:pricing|prices?|cost|plans?|sales|contract|monthly|annual|prezzi?|costo|piani?|vendite|contratto|mensile|annuale)\b/i;
+  const hasPricingContext = userMessages.some(message =>
+    pricingPattern.test(message.content)
+  );
+  if (!hasPricingContext) return null;
+
+  const italian =
+    locale.toLowerCase().startsWith("it") ||
+    /\b(?:prezzi?|piani?|annuale|mensile)\b/i.test(latest);
+  const priorPricingContext = previous.some(message =>
+    pricingPattern.test(message.content)
+  );
+  const asksForHuman =
+    /\b(?:human|person|sales (?:team|person)|talk to sales|contact sales|persona|umano|team vendite|parlare con)\b/i.test(
+      latest
+    );
+  const confirmsTicket =
+    /\b(?:create|open|send|submit|confirm|route|forward|crea|apri|invia|conferma|inoltra)\b.{0,45}\b(?:ticket|billing|sales|support|vendite|fatturazione|supporto)\b/i.test(
+      latest
+    );
+  const plan = pricingPlanFromConversation(messages);
+  const term = pricingTermFromConversation(messages);
+
+  if ((asksForHuman && priorPricingContext) || confirmsTicket) {
+    const preference =
+      [plan, term].filter(Boolean).join(" · ") || "not selected yet";
+    return {
+      reply: italian
+        ? "Ho preparato una bozza completa per il team commerciale. Controlla i dati nel pannello ticket e inviala: finché non premi il pulsante, non viene inoltrato nulla."
+        : "I prepared a complete draft for the sales team. Review your details in the ticket panel and submit it; nothing is routed until you use that button.",
+      resolved: false,
+      needsHuman: true,
+      suggestedActions: [
+        italian
+          ? {
+              label: "Continua qui",
+              message: "Preferisco continuare qui senza inviare il ticket.",
+            }
+          : {
+              label: "Keep helping me here",
+              message: "I prefer to continue here without sending the ticket.",
+            },
+      ],
+      ticketDraft: {
+        category: "billing",
+        priority: "normal",
+        subject: "Pricing and sales conversation",
+        description: `The customer would like a sales conversation about REELassati pricing. Current preference: ${preference}. Please follow up with plan fit, billing terms, and any remaining commercial requirements.`,
+      },
+    };
+  }
+
+  const rates = {
+    Creator: {
+      monthly: 29,
+      annualMonthly: 24,
+      annualTotal: 288,
+      scale: "1 brand workspace and 2 connected social accounts",
+    },
+    Pro: {
+      monthly: 79,
+      annualMonthly: 67,
+      annualTotal: 804,
+      scale: "3 brand workspaces and 6 connected social accounts",
+    },
+    Studio: {
+      monthly: 179,
+      annualMonthly: 152,
+      annualTotal: 1824,
+      scale: "10 brand workspaces and 12 connected social accounts",
+    },
+  } as const;
+
+  if (plan) {
+    const rate = rates[plan];
+    return {
+      reply: italian
+        ? `${plan} include ${rate.scale}. Costa €${rate.monthly}/mese oppure €${rate.annualTotal}/anno (€${rate.annualMonthly}/mese equivalente). Lo Studio completo è incluso; l’uso dei modelli e della generazione video viene addebitato separatamente dal provider collegato. Quale fatturazione preferisci?`
+        : `${plan} includes ${rate.scale}. It costs €${rate.monthly}/month or €${rate.annualTotal}/year (€${rate.annualMonthly}/month equivalent). The complete Studio is included; model and video-generation usage is billed separately by the connected provider. Which billing term do you prefer?`,
+      resolved: false,
+      needsHuman: false,
+      suggestedActions: italian
+        ? [
+            {
+              label: "Mensile",
+              message: "Preferisco la fatturazione mensile.",
+            },
+            {
+              label: "Annuale",
+              message: "Preferisco la fatturazione annuale.",
+            },
+            {
+              label: "Parla con vendite",
+              message: "Vorrei parlare con una persona del team vendite.",
+            },
+          ]
+        : [
+            { label: "Monthly billing", message: "I prefer monthly billing." },
+            { label: "Annual billing", message: "I prefer annual billing." },
+            {
+              label: "Talk to sales",
+              message: "I want a human sales conversation.",
+            },
+          ],
+      ticketDraft: null,
+    };
+  }
+
+  if (
+    term ||
+    /\b(?:compare|comparison|every plan|all plans|confronta|tutti i piani)\b/i.test(
+      latest
+    )
+  ) {
+    return {
+      reply: italian
+        ? "Con fatturazione mensile: Creator €29, Pro €79, Studio €179. Con fatturazione annuale: Creator €288 (€24/mese equivalente), Pro €804 (€67/mese), Studio €1.824 (€152/mese). Lo Studio completo è incluso in ogni piano; cambia la scala del workspace. Quale profilo ti descrive meglio?"
+        : "Monthly: Creator €29, Pro €79, Studio €179. Annual: Creator €288 (€24/month equivalent), Pro €804 (€67/month), Studio €1,824 (€152/month). Every plan includes the complete Studio; workspace scale is what changes. Which profile fits you?",
+      resolved: false,
+      needsHuman: false,
+      suggestedActions: italian
+        ? [
+            {
+              label: "Creator singolo",
+              message:
+                "Sono un creator singolo e mi servono fino a 2 account social collegati.",
+            },
+            {
+              label: "Piccolo team",
+              message: "Gestisco fino a 3 brand e 6 account social collegati.",
+            },
+            {
+              label: "Agenzia",
+              message: "Gestisco un’agenzia o un portfolio clienti.",
+            },
+          ]
+        : [
+            {
+              label: "Solo creator",
+              message:
+                "I’m one creator and need up to 2 connected social accounts.",
+            },
+            {
+              label: "Small team",
+              message:
+                "I manage up to 3 brands and 6 connected social accounts.",
+            },
+            {
+              label: "Agency / clients",
+              message: "I manage an agency or client portfolio.",
+            },
+          ],
+      ticketDraft: null,
+    };
+  }
+
+  return {
+    reply: italian
+      ? "Certo. Prima di coinvolgere il team vendite posso darti subito prezzi e piano adatto: Creator €29/mese, Pro €79/mese, Studio €179/mese, con sconto annuale fino al 17%. Lo Studio completo è incluso in ogni piano; cambia la scala. Quale profilo ti descrive meglio?"
+      : "Yes. Before involving sales, here are the useful facts: Creator is €29/month, Pro €79/month, and Studio €179/month, with annual savings up to 17%. Every plan includes the complete Studio; workspace scale is what changes. Which profile fits you?",
+    resolved: false,
+    needsHuman: false,
+    suggestedActions: italian
+      ? [
+          {
+            label: "Creator singolo",
+            message:
+              "Sono un creator singolo e mi servono fino a 2 account social collegati.",
+          },
+          {
+            label: "Piccolo team",
+            message: "Gestisco fino a 3 brand e 6 account social collegati.",
+          },
+          {
+            label: "Agenzia",
+            message: "Gestisco un’agenzia o un portfolio clienti.",
+          },
+          {
+            label: "Confronta i piani",
+            message:
+              "Mostrami il confronto completo tra prezzi mensili e annuali.",
+          },
+        ]
+      : [
+          {
+            label: "Solo creator",
+            message:
+              "I’m one creator and need up to 2 connected social accounts.",
+          },
+          {
+            label: "Small team",
+            message: "I manage up to 3 brands and 6 connected social accounts.",
+          },
+          {
+            label: "Agency / clients",
+            message: "I manage an agency or client portfolio.",
+          },
+          {
+            label: "Compare every plan",
+            message: "Show me the full monthly and annual pricing comparison.",
+          },
+        ],
+    ticketDraft: null,
+  };
+}
+
 function supportMessages(value: unknown): SupportMessage[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -7371,10 +7702,11 @@ async function createSupportTicket(
   if (!email) {
     throw errorResponse("Add a valid email so support can reply");
   }
-  const name = (user?.name || stringValue(input.name).trim() || "Customer").slice(
-    0,
-    120
-  );
+  const name = (
+    user?.name ||
+    stringValue(input.name).trim() ||
+    "Customer"
+  ).slice(0, 120);
   const category = supportCategory(input.category);
   const priority = supportPriority(input.priority);
   const subject = stringValue(input.subject).trim().slice(0, 180);
@@ -7424,13 +7756,18 @@ async function createSupportTicket(
      SET email_status = ?, provider_message_id = ?, updated_at = ?
      WHERE id = ?`
   )
-    .bind(delivery.status, delivery.providerMessageId, new Date().toISOString(), id)
+    .bind(
+      delivery.status,
+      delivery.providerMessageId,
+      new Date().toISOString(),
+      id
+    )
     .run();
   return { id, emailStatus: delivery.status, supportEmail: SUPPORT_EMAIL };
 }
 
 function explicitlyRequestsTicket(message: string): boolean {
-  return /(?:\b(?:open|create|raise|file|submit|send)\b.{0,28}\b(?:ticket|support request)\b)|(?:\b(?:apri|crea|invia)\b.{0,28}\b(?:ticket|richiesta di supporto)\b)/i.test(
+  return /(?:\b(?:open|create|raise|file|submit|send|confirm|route|forward)\b.{0,45}\b(?:ticket|support request|billing team|sales team)\b)|(?:\b(?:apri|crea|invia|conferma|inoltra)\b.{0,45}\b(?:ticket|richiesta di supporto|team vendite|fatturazione)\b)/i.test(
     message
   );
 }
@@ -7440,10 +7777,14 @@ async function handleSupport(
   env: SitesEnvironment,
   url: URL
 ): Promise<Response> {
-  if (request.method !== "POST") return errorResponse("Method not allowed", 405);
+  if (request.method !== "POST")
+    return errorResponse("Method not allowed", 405);
   const user = await getUser(request, env);
   if (!(await supportRateLimit(request, env, user))) {
-    return errorResponse("Support is receiving too many requests from this connection. Try again in an hour or email reelassati@gmail.com.", 429);
+    return errorResponse(
+      "Support is receiving too many requests from this connection. Try again in an hour or email reelassati@gmail.com.",
+      429
+    );
   }
   if (url.pathname === "/api/support/tickets") {
     const input = await parseJsonBody<SupportTicketInput>(request);
@@ -7452,32 +7793,51 @@ async function handleSupport(
   if (url.pathname !== "/api/support/chat") {
     return errorResponse("Support route not found", 404);
   }
-  const input = await parseJsonBody<{ messages?: unknown }>(request);
+  const input = await parseJsonBody<{ messages?: unknown; locale?: unknown }>(
+    request
+  );
   const messages = supportMessages(input.messages);
-  const latest = [...messages].reverse().find(message => message.role === "user");
-  if (!latest) return errorResponse("Write a question for the support assistant");
+  const latest = [...messages]
+    .reverse()
+    .find(message => message.role === "user");
+  if (!latest)
+    return errorResponse("Write a question for the support assistant");
+  const locale = stringValue(input.locale).slice(0, 24) || "en";
   const aiUser = user || {
     email: "anonymous-support@reelassati.app",
     name: "Public visitor",
   };
-  const { output } = await chatJson(
-    env,
-    aiUser,
-    "support-assistance",
-    `You are REELassati Support, the official product support assistant. Be precise, calm, concise and exceptionally useful. Diagnose account access, uploads, Studio editing, AI generation, provider configuration, publishing, billing, privacy, referrals, and common browser issues. Give numbered actions when troubleshooting. Never claim to inspect an account, payment, file, provider status, or server log unless the supplied conversation contains that fact. Never request passwords, API keys, card data, authentication codes, private tokens, or full identity documents. For account-specific, billing, security, privacy, repeated technical failures, lost data, or anything you cannot resolve confidently, recommend a human ticket and mention reelassati@gmail.com. Return strict JSON with: reply (string), resolved (boolean), needsHuman (boolean), suggestedActions (array of up to 4 strings), and ticketDraft (null or an object with category, priority, subject, description). Set ticketDraft whenever escalation would help. If the user explicitly asks to open/create/send a ticket, make ticketDraft complete from the available facts. Available categories: account, billing, studio, generation, publishing, privacy, bug, other. Available priorities: low, normal, high, urgent. Do not say an email or ticket was sent; the server reports that separately.`,
-    { messages, supportEmail: SUPPORT_EMAIL },
-    env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5",
-    false
-  );
+  const repeatedFailureSignals = messages.filter(
+    message =>
+      message.role === "user" &&
+      /\b(?:still|again|same|already tried|did not work|didn't work|not working|failed again|ancora|già provato|non ha funzionato|stesso errore)\b/i.test(
+        message.content
+      )
+  ).length;
+  const guidedOutput = guidedPricingSupport(messages, locale);
+  const output =
+    guidedOutput ||
+    (
+      await chatJson(
+        env,
+        aiUser,
+        "support-assistance",
+        SUPPORT_SYSTEM_PROMPT,
+        {
+          locale,
+          repeatedFailureSignals,
+          authenticatedUser: Boolean(user),
+          messages,
+          supportEmail: SUPPORT_EMAIL,
+        },
+        env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5",
+        false
+      )
+    ).output;
   const reply = stringValue(output.reply).trim().slice(0, 5000);
-  const actions = Array.isArray(output.suggestedActions)
-    ? output.suggestedActions
-        .map(action => stringValue(action).trim().slice(0, 300))
-        .filter(Boolean)
-        .slice(0, 4)
-    : [];
+  const actions = supportActions(output.suggestedActions);
   const draftValue = recordValue(output.ticketDraft);
-  const ticketDraft = draftValue
+  const draftCandidate = draftValue
     ? {
         category: supportCategory(draftValue.category),
         priority: supportPriority(draftValue.priority),
@@ -7485,6 +7845,12 @@ async function handleSupport(
         description: stringValue(draftValue.description).trim().slice(0, 8000),
       }
     : null;
+  const ticketDraft =
+    draftCandidate &&
+    draftCandidate.subject.length >= 4 &&
+    draftCandidate.description.length >= 10
+      ? draftCandidate
+      : null;
   const autoCreateTicket = Boolean(
     user &&
     ticketDraft &&
