@@ -34,6 +34,7 @@ interface AuthContextValue {
   loading: boolean;
   error: string | null;
   availableProviders: SocialProvider[];
+  recoverySession: boolean;
   clearError: () => void;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (input: {
@@ -73,11 +74,36 @@ function identifyAnalyticsUser(user: AuthUser | null) {
 }
 
 function authRedirect(path = "/auth/oauth-success") {
-  return `${window.location.origin}/#${path}`;
+  const configuredOrigin = import.meta.env.VITE_AUTH_REDIRECT_ORIGIN?.trim();
+  const hostname = window.location.hostname.toLowerCase();
+  const productionOrigin =
+    hostname === "reelassati.app" ||
+    hostname === "www.reelassati.app" ||
+    hostname.endsWith(".vercel.app")
+      ? "https://www.reelassati.app"
+      : window.location.origin;
+
+  let origin = productionOrigin;
+  if (configuredOrigin) {
+    try {
+      origin = new URL(configuredOrigin).origin;
+    } catch {
+      // Ignore an invalid build-time override and retain the safe origin.
+    }
+  }
+
+  return `${origin}/#${path}`;
 }
 
 function readableError(cause: unknown) {
   if (!(cause instanceof Error)) return "Authentication is unavailable";
+  if (
+    /failed to fetch|networkerror|network request failed|load failed/i.test(
+      cause.message
+    )
+  ) {
+    return "Account services are temporarily unavailable. Please try again in a moment.";
+  }
   if (/invalid login credentials/i.test(cause.message)) {
     return "The email or password is incorrect.";
   }
@@ -114,22 +140,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [availableProviders, setAvailableProviders] = useState<
     SocialProvider[]
   >([]);
+  const [recoverySession, setRecoverySession] = useState(false);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([supabase.auth.getSession(), configuredProviders()]).then(
-      ([{ data }, providers]) => {
-        if (!active) return;
-        const mappedUser = mapUser(data.session?.user ?? null);
+    void Promise.allSettled([
+      supabase.auth.getSession(),
+      configuredProviders(),
+    ]).then(([sessionResult, providersResult]) => {
+      if (!active) return;
+      if (sessionResult.status === "fulfilled") {
+        const mappedUser = mapUser(
+          sessionResult.value.data.session?.user ?? null
+        );
         identifyAnalyticsUser(mappedUser);
         setUser(mappedUser);
-        setAvailableProviders(providers);
-        setLoading(false);
       }
-    );
+      if (providersResult.status === "fulfilled") {
+        setAvailableProviders(providersResult.value);
+      }
+      setLoading(false);
+    });
 
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (!active) return;
+      if (event === "PASSWORD_RECOVERY") setRecoverySession(true);
+      if (event === "SIGNED_OUT") setRecoverySession(false);
       const mappedUser = mapUser(session?.user ?? null);
       identifyAnalyticsUser(mappedUser);
       setUser(mappedUser);
@@ -260,6 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       availableProviders,
+      recoverySession,
       clearError,
       login,
       signup,
@@ -273,6 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       availableProviders,
+      recoverySession,
       clearError,
       login,
       signup,

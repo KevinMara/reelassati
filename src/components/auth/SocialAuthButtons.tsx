@@ -15,7 +15,7 @@ export function SocialAuthButtons() {
 
   return (
     <>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {availableProviders.map(provider => (
           <button
             key={provider}
@@ -25,7 +25,10 @@ export function SocialAuthButtons() {
             className="group flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background/60 px-4 text-sm font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary-wash hover:shadow-md disabled:opacity-50"
           >
             {provider === "google" ? (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white font-semibold text-[#4285f4] shadow-sm">
+              <span
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-white font-bold text-[#4285f4] shadow-sm"
+                aria-hidden="true"
+              >
                 G
               </span>
             ) : provider === "apple" ? (

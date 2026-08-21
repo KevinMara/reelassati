@@ -166,6 +166,12 @@ describe("platform-wide functional invariants", () => {
     expect(app).toContain('<Navigate to="/auth/login" replace />');
     expect(auth).toContain("signInWithPassword");
     expect(auth).toContain("signInWithOAuth");
+    expect(auth).toContain("Promise.allSettled");
+    expect(auth).toContain('event === "PASSWORD_RECOVERY"');
+    expect(auth).toContain('"https://www.reelassati.app"');
+    expect(auth).toContain(
+      "Account services are temporarily unavailable. Please try again in a moment."
+    );
     expect(api).toContain(
       "Authorization: `Bearer ${data.session.access_token}`"
     );
