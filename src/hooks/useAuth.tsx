@@ -15,7 +15,7 @@ import {
 } from "@/lib/supabase/client";
 import posthog from "@/lib/posthog";
 
-export type SocialProvider = "google" | "apple" | "github";
+export type SocialProvider = "google" | "apple" | "azure" | "github";
 
 export interface AuthUser {
   id: string;
@@ -125,7 +125,7 @@ async function configuredProviders(): Promise<SocialProvider[]> {
     const settings = (await response.json()) as {
       external?: Record<string, boolean>;
     };
-    return (["google", "apple", "github"] as const).filter(
+    return (["google", "apple", "azure", "github"] as const).filter(
       provider => settings.external?.[provider]
     );
   } catch {

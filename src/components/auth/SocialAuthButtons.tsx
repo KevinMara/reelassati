@@ -10,6 +10,7 @@ export function SocialAuthButtons() {
   const labels: Record<SocialProvider, string> = {
     google: t("auth.google_login"),
     apple: "Continue with Apple",
+    azure: "Continue with Microsoft",
     github: "Continue with GitHub",
   };
 
@@ -33,6 +34,16 @@ export function SocialAuthButtons() {
               </span>
             ) : provider === "apple" ? (
               <Apple className="h-4 w-4" />
+            ) : provider === "azure" ? (
+              <span
+                className="grid h-4 w-4 grid-cols-2 gap-px"
+                aria-hidden="true"
+              >
+                <span className="bg-current" />
+                <span className="bg-current" />
+                <span className="bg-current" />
+                <span className="bg-current" />
+              </span>
             ) : (
               <Github className="h-4 w-4" />
             )}
