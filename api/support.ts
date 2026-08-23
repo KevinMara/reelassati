@@ -8,9 +8,21 @@ const SUPPORT_CATEGORIES = new Set([
   "publishing",
   "privacy",
   "bug",
+  "feedback",
   "other",
 ]);
 const SUPPORT_PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
+const FEEDBACK_STATUSES = new Set([
+  "open",
+  "in_progress",
+  "planned",
+  "resolved",
+  "closed",
+]);
+const DEFAULT_OWNER_EMAILS = new Set([
+  "reelassati@gmail.com",
+  "kevinmara200@gmail.com",
+]);
 
 interface SupportMessage {
   role: "user" | "assistant";
@@ -38,6 +50,21 @@ interface RuntimeConfig {
   serviceKey: string;
   publishableKey: string;
   resendKey: string;
+}
+
+interface FeedbackRow {
+  id: string;
+  requester_user_id: string | null;
+  requester_email: string;
+  requester_name: string | null;
+  category: "bug" | "feedback";
+  priority: string;
+  subject: string;
+  description: string;
+  status: string;
+  email_status: string;
+  created_at: string;
+  updated_at: string;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -130,6 +157,25 @@ async function authenticatedUser(
   const user = (await response.json()) as Partial<SupabaseUser>;
   if (!user.id || !user.email) throw new Error("INVALID_SESSION");
   return user as SupabaseUser;
+}
+
+function ownerEmails(): Set<string> {
+  const configured = (process.env.FEEDBACK_OWNER_EMAILS || "")
+    .split(",")
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set([...DEFAULT_OWNER_EMAILS, ...configured]);
+}
+
+async function requireOwner(
+  request: Request,
+  config: RuntimeConfig
+): Promise<SupabaseUser> {
+  const user = await authenticatedUser(request, config);
+  if (!user || !ownerEmails().has(user.email.trim().toLowerCase())) {
+    throw new Error("OWNER_REQUIRED");
+  }
+  return user;
 }
 
 async function sha256(value: string): Promise<string> {
@@ -362,12 +408,100 @@ async function proxySupportChat(
   return json(payload);
 }
 
+function feedbackRecord(row: FeedbackRow) {
+  return {
+    id: row.id,
+    requesterUserId: row.requester_user_id,
+    requesterEmail: row.requester_email,
+    requesterName: row.requester_name || "Customer",
+    type: row.category,
+    priority: row.priority,
+    subject: row.subject,
+    description: row.description,
+    status: row.status,
+    emailStatus: row.email_status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function listFeedback(
+  request: Request,
+  config: RuntimeConfig
+): Promise<Response> {
+  await requireOwner(request, config);
+  const query = new URLSearchParams({
+    category: "in.(bug,feedback)",
+    select:
+      "id,requester_user_id,requester_email,requester_name,category,priority,subject,description,status,email_status,created_at,updated_at",
+    order: "created_at.desc",
+    limit: "250",
+  });
+  const response = await fetch(
+    `${config.supabaseUrl}/rest/v1/support_tickets?${query.toString()}`,
+    {
+      headers: {
+        apikey: config.serviceKey,
+        Authorization: `Bearer ${config.serviceKey}`,
+      },
+    }
+  );
+  if (!response.ok) throw new Error("DATABASE_UNAVAILABLE");
+  const rows = (await response.json()) as FeedbackRow[];
+  return json({ owner: true, feedback: rows.map(feedbackRecord) });
+}
+
+async function updateFeedback(
+  request: Request,
+  config: RuntimeConfig,
+  body: Record<string, unknown>
+): Promise<Response> {
+  await requireOwner(request, config);
+  const id = stringValue(body.id).trim().slice(0, 80);
+  const status = stringValue(body.status).trim().toLowerCase();
+  const priority = stringValue(body.priority).trim().toLowerCase();
+  if (!/^RA-[A-Z0-9-]+$/.test(id)) throw new Error("INVALID_FEEDBACK_ID");
+  if (!FEEDBACK_STATUSES.has(status)) throw new Error("INVALID_STATUS");
+  if (!SUPPORT_PRIORITIES.has(priority)) throw new Error("INVALID_PRIORITY");
+
+  const query = new URLSearchParams({
+    id: `eq.${id}`,
+    category: "in.(bug,feedback)",
+  });
+  const response = await fetch(
+    `${config.supabaseUrl}/rest/v1/support_tickets?${query.toString()}`,
+    {
+      method: "PATCH",
+      headers: {
+        apikey: config.serviceKey,
+        Authorization: `Bearer ${config.serviceKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        status,
+        priority,
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  );
+  if (!response.ok) throw new Error("DATABASE_UNAVAILABLE");
+  const rows = (await response.json()) as FeedbackRow[];
+  if (!rows[0]) throw new Error("FEEDBACK_NOT_FOUND");
+  return json({ feedback: feedbackRecord(rows[0]) });
+}
+
 function errorResponse(error: unknown): Response {
   const code = error instanceof Error ? error.message : "UNKNOWN";
   const errors: Record<string, [string, number]> = {
     REQUEST_TOO_LARGE: ["The support request is too large.", 413],
     INVALID_BODY: ["Send a valid support request.", 400],
     INVALID_SESSION: ["Your session expired. Sign in again and retry.", 401],
+    OWNER_REQUIRED: ["This feedback inbox is restricted to the owner.", 403],
+    INVALID_FEEDBACK_ID: ["Choose a valid feedback report.", 400],
+    INVALID_STATUS: ["Choose a valid feedback status.", 400],
+    INVALID_PRIORITY: ["Choose a valid feedback priority.", 400],
+    FEEDBACK_NOT_FOUND: ["That feedback report was not found.", 404],
     RATE_LIMITED: [
       `Too many support requests. Try again in an hour or email ${SUPPORT_EMAIL}.`,
       429,
@@ -409,6 +543,12 @@ export async function handleSupport(request: Request): Promise<Response> {
     const body = await requestBody(request);
     if (body.action === "chat") {
       return await proxySupportChat(request, config, body);
+    }
+    if (body.action === "feedback_list") {
+      return await listFeedback(request, config);
+    }
+    if (body.action === "feedback_update") {
+      return await updateFeedback(request, config, body);
     }
     const ticket = await createTicket(request, config, body);
     return json({ ticket }, 201);

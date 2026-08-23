@@ -12,7 +12,9 @@ import {
   Sparkles,
   TicketCheck,
   UserRound,
+  MessageSquareWarning,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -361,6 +363,30 @@ export default function Support() {
                   {isItalian ? "Apri l’email" : "Open email composer"}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
+              </div>
+
+              <div className="rounded-2xl border border-primary/20 bg-primary/[0.045] p-5">
+                <div className="flex items-center gap-2 text-primary">
+                  <MessageSquareWarning className="h-4 w-4" />
+                  <p className="font-mono text-[10px] uppercase tracking-wider">
+                    {isItalian ? "Feedback prodotto" : "Product feedback"}
+                  </p>
+                </div>
+                <h2 className="mt-3 text-base font-semibold">
+                  {isItalian ? "Bug o idea?" : "Found a bug or have an idea?"}
+                </h2>
+                <p className="mt-2 text-xs leading-relaxed text-foreground/50">
+                  {isItalian
+                    ? "Invia un report strutturato direttamente alla coda del prodotto."
+                    : "Send a structured report directly to the product queue."}
+                </p>
+                <Link
+                  to="/feedback"
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-hover"
+                >
+                  {isItalian ? "Invia feedback" : "Send feedback"}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
               </div>
             </aside>
           </section>

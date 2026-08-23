@@ -238,8 +238,26 @@ export interface SupportChatResponse {
   supportEmail: string;
 }
 
+export type FeedbackStatus =
+  "open" | "in_progress" | "planned" | "resolved" | "closed";
+
+export interface FeedbackRecord {
+  id: string;
+  requesterUserId: string | null;
+  requesterEmail: string;
+  requesterName: string;
+  type: "bug" | "feedback";
+  priority: "low" | "normal" | "high" | "urgent";
+  subject: string;
+  description: string;
+  status: FeedbackStatus;
+  emailStatus: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function supportRequestJson<T>(
-  action: "chat" | "ticket",
+  action: "chat" | "ticket" | "feedback_list" | "feedback_update",
   input: object
 ): Promise<T> {
   return requestJson<T>(
@@ -308,6 +326,19 @@ export const platformApi = {
           method: "POST",
           body: JSON.stringify(input),
         }),
+
+  feedbackInbox: () =>
+    supportRequestJson<{ owner: true; feedback: FeedbackRecord[] }>(
+      "feedback_list",
+      {}
+    ),
+
+  updateFeedback: (input: {
+    id: string;
+    status: FeedbackStatus;
+    priority: FeedbackRecord["priority"];
+  }) =>
+    supportRequestJson<{ feedback: FeedbackRecord }>("feedback_update", input),
 
   detectProvenance: (input: ProvenanceDetectionInput) => {
     if (input.file) {

@@ -14,6 +14,7 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const UpdatePassword = lazy(() => import("./pages/UpdatePassword"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Support = lazy(() => import("./pages/Support"));
+const Feedback = lazy(() => import("./pages/Feedback"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const EntryDemo = lazy(() => import("./pages/EntryDemo"));
 const Showcase = lazy(() => import("./pages/Showcase"));
@@ -102,6 +103,7 @@ export default function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/contact" element={<Support />} />
           <Route path="/support" element={<Navigate to="/contact" replace />} />
+          <Route path="/feedback" element={<Feedback />} />
           <Route path="/showcase" element={<Showcase />} />
           <Route path="/templates" element={<TemplatesPage />} />
           <Route path="/ai-transparency" element={<AITransparency />} />

@@ -139,6 +139,26 @@ describe("platform-wide functional invariants", () => {
     );
   });
 
+  it("keeps product feedback public and the owner inbox protected by the server", () => {
+    const app = source("./App.tsx");
+    const dashboard = source("./pages/Dashboard.tsx");
+    const support = source("./pages/Support.tsx");
+    const feedback = source("./components/feedback/FeedbackCenter.tsx");
+    const api = source("./lib/platform-api.ts");
+    const server = source("../api/support.ts");
+
+    expect(app).toContain('<Route path="/feedback" element={<Feedback />} />');
+    expect(dashboard).toContain('to: "/dashboard/feedback"');
+    expect(support).toContain('to="/feedback"');
+    expect(feedback).toContain("Technical context (captured automatically)");
+    expect(feedback).toContain("Feedback inbox");
+    expect(api).toContain('"feedback_list"');
+    expect(api).toContain('"feedback_update"');
+    expect(server).toContain("requireOwner(request, config)");
+    expect(server).toContain("FEEDBACK_OWNER_EMAILS");
+    expect(server).toContain('category: "in.(bug,feedback)"');
+  });
+
   it("keeps the Vercel client deploy free of accidental legacy functions", () => {
     const vercel = JSON.parse(source("../vercel.json")) as {
       buildCommand?: string;

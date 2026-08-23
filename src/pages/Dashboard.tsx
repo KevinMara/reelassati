@@ -36,6 +36,7 @@ import {
   Film,
   Mic,
   MessageCircle,
+  MessageSquareWarning,
   Mail,
   Gift,
   Menu,
@@ -88,6 +89,7 @@ const InterviewMe = lazy(() => import("./dashboard/InterviewMe"));
 const GoalTracker = lazy(() => import("./dashboard/GoalTracker"));
 const CoachingPage = lazy(() => import("./dashboard/CoachingPage"));
 const ReferralPage = lazy(() => import("./dashboard/ReferralPage"));
+const FeedbackPage = lazy(() => import("./dashboard/FeedbackPage"));
 
 function StudioPageFallback() {
   return (
@@ -750,6 +752,11 @@ export default function Dashboard() {
     { icon: AtSign, label: t("nav.social"), to: "/dashboard/social" },
     { icon: Gift, label: "Refer & Earn", to: "/dashboard/referral" },
     { separator: true },
+    {
+      icon: MessageSquareWarning,
+      label: "Feedback & bugs",
+      to: "/dashboard/feedback",
+    },
     { icon: Settings, label: t("nav.settings"), to: "/dashboard/settings" },
     { icon: Shield, label: "Studio status", to: "/dashboard/status" },
   ];
@@ -915,6 +922,7 @@ export default function Dashboard() {
               <Route path="/goals" element={<GoalTracker />} />
               <Route path="/coaching" element={<CoachingPage />} />
               <Route path="/referral" element={<ReferralPage />} />
+              <Route path="/feedback" element={<FeedbackPage />} />
               <Route path="/status" element={<StudioStatus />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
