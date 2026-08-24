@@ -29,6 +29,7 @@ export type AiOperation =
   | "transcription"
   | "speech-synthesis"
   | "video-generation"
+  | "trend-research"
   | "support-assistance"
   | "publication-marking";
 

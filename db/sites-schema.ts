@@ -243,3 +243,44 @@ export const supportRateLimits = sqliteTable("support_rate_limits", {
   windowStartedAt: text("window_started_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const trendSnapshots = sqliteTable(
+  "trend_snapshots",
+  {
+    id: text("id").primaryKey().notNull(),
+    scopeKey: text("scope_key").notNull(),
+    payloadJson: text("payload_json").notNull(),
+    generatedAt: text("generated_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+  },
+  table => [
+    index("trend_snapshots_scope_expires_idx").on(
+      table.scopeKey,
+      table.expiresAt
+    ),
+  ]
+);
+
+export const trendResearchRuns = sqliteTable(
+  "trend_research_runs",
+  {
+    id: text("id").primaryKey().notNull(),
+    ownerEmail: text("owner_email").notNull(),
+    queryHash: text("query_hash").notNull(),
+    scopeJson: text("scope_json").notNull(),
+    payloadJson: text("payload_json").notNull(),
+    creditCost: integer("credit_cost").notNull().default(1),
+    createdAt: text("created_at").notNull(),
+  },
+  table => [
+    index("trend_research_owner_created_idx").on(
+      table.ownerEmail,
+      table.createdAt
+    ),
+    index("trend_research_owner_query_idx").on(
+      table.ownerEmail,
+      table.queryHash,
+      table.createdAt
+    ),
+  ]
+);

@@ -32,6 +32,13 @@ import {
   inspectMediaProvenanceMarker,
 } from "./media-provenance";
 import { MAX_AI_MEDIA_BYTES, MAX_UPLOAD_BYTES } from "../contracts/uploads";
+import type {
+  TrendEvidenceItem,
+  TrendFeedResponse,
+  TrendLifecycle,
+  TrendPlatform,
+  TrendScope,
+} from "../contracts/trends";
 
 type AssetBinding = {
   fetch(request: Request): Promise<Response>;
@@ -239,6 +246,10 @@ const ZERNIO_BASE = "https://zernio.com/api/v1";
 const MAX_WORKSPACE_BYTES = 2_000_000;
 const REFERRAL_REWARD_CREDITS = 500;
 const REFERRAL_REWARD_CENTS = 500;
+const TREND_RESEARCH_CREDIT_COST = 1;
+const TREND_STARTER_CREDITS = 3;
+const TREND_SHARED_TTL_MS = 12 * 60 * 60 * 1000;
+const TREND_PERSONAL_CACHE_MS = 6 * 60 * 60 * 1000;
 const ALLOWED_UPLOAD_PREFIXES = ["video/", "audio/", "image/"];
 const ACTIVE_UPLOAD_TYPES = new Set(["image/svg+xml"]);
 const ZERNIO_PLATFORMS = new Set([
@@ -669,6 +680,35 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
             updated_at TEXT NOT NULL
           )
         `),
+      env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS trend_snapshots (
+            id TEXT PRIMARY KEY NOT NULL,
+            scope_key TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            generated_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+          )
+        `),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS trend_snapshots_scope_expires_idx ON trend_snapshots (scope_key, expires_at)"
+      ),
+      env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS trend_research_runs (
+            id TEXT PRIMARY KEY NOT NULL,
+            owner_email TEXT NOT NULL,
+            query_hash TEXT NOT NULL,
+            scope_json TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            credit_cost INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL
+          )
+        `),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS trend_research_owner_created_idx ON trend_research_runs (owner_email, created_at)"
+      ),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS trend_research_owner_query_idx ON trend_research_runs (owner_email, query_hash, created_at)"
+      ),
     ])
       .then(async () => {
         const columns = await env.DB.prepare(
@@ -7882,6 +7922,497 @@ async function handleSupport(
   });
 }
 
+const TREND_PLATFORMS = new Set<TrendPlatform>([
+  "tiktok",
+  "instagram",
+  "youtube",
+]);
+const TREND_LIFECYCLES = new Set<TrendLifecycle>([
+  "seed",
+  "emerging",
+  "breakout",
+  "mainstream",
+  "saturated",
+  "decaying",
+]);
+
+interface TrendSnapshotRow {
+  payload_json: string;
+  generated_at: string;
+  expires_at: string;
+}
+
+interface TrendResearchRow {
+  payload_json: string;
+  created_at: string;
+}
+
+function trendPlatform(value: unknown): "all" | TrendPlatform {
+  const normalized = stringValue(value, "all").toLowerCase();
+  return TREND_PLATFORMS.has(normalized as TrendPlatform)
+    ? (normalized as TrendPlatform)
+    : "all";
+}
+
+function cleanTrendScope(value: unknown, fallbackLanguage = "en"): TrendScope {
+  const record = recordValue(value) || {};
+  return {
+    query: stringValue(record.query, "short-form content").slice(0, 140),
+    platform: trendPlatform(record.platform),
+    region: stringValue(record.region, "Global").slice(0, 60),
+    language: stringValue(record.language, fallbackLanguage).slice(0, 32),
+  };
+}
+
+function trendSourcePlatform(value: unknown): TrendPlatform | null {
+  const candidate = stringValue(value);
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "https:") return null;
+    const host = url.hostname.toLowerCase();
+    if (
+      (host === "tiktok.com" || host.endsWith(".tiktok.com")) &&
+      /^\/@[^/]+\/video\/\d+\/?$/.test(url.pathname)
+    ) {
+      return "tiktok";
+    }
+    if (
+      (host === "instagram.com" || host.endsWith(".instagram.com")) &&
+      /^\/reel\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)
+    ) {
+      return "instagram";
+    }
+    if (
+      (host === "youtube.com" || host.endsWith(".youtube.com")) &&
+      /^\/shorts\/[A-Za-z0-9_-]{6,}\/?$/.test(url.pathname)
+    ) {
+      return "youtube";
+    }
+    if (
+      (host === "youtu.be" || host.endsWith(".youtu.be")) &&
+      /^\/[A-Za-z0-9_-]{6,}\/?$/.test(url.pathname)
+    ) {
+      return "youtube";
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function nullableTrendMetric(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
+}
+
+function normalizeTrendItems(
+  value: unknown,
+  observedAt: string
+): TrendEvidenceItem[] {
+  const root = recordValue(value);
+  const candidates = Array.isArray(root?.trends) ? root.trends : [];
+  const seen = new Set<string>();
+  const trends: TrendEvidenceItem[] = [];
+  for (const candidateValue of candidates) {
+    const candidate = recordValue(candidateValue);
+    if (!candidate) continue;
+    const sourceUrl = stringValue(candidate.sourceUrl);
+    const detectedPlatform = trendSourcePlatform(sourceUrl);
+    if (!detectedPlatform || seen.has(sourceUrl)) continue;
+    const claimedPlatform = trendPlatform(candidate.platform);
+    if (claimedPlatform !== "all" && claimedPlatform !== detectedPlatform) {
+      continue;
+    }
+    const title = stringValue(candidate.title).slice(0, 160);
+    const creator = stringValue(candidate.creator).slice(0, 100);
+    const hook = stringValue(candidate.hook).slice(0, 280);
+    const pattern = stringValue(candidate.pattern).slice(0, 280);
+    const hypothesis = stringValue(candidate.hypothesis).slice(0, 500);
+    const adaptation = stringValue(candidate.adaptation).slice(0, 500);
+    const passSignal = stringValue(candidate.passSignal).slice(0, 300);
+    if (
+      !title ||
+      !creator ||
+      !hook ||
+      !pattern ||
+      !hypothesis ||
+      !adaptation ||
+      !passSignal
+    ) {
+      continue;
+    }
+    const lifecycleValue = stringValue(candidate.lifecycle).toLowerCase();
+    const lifecycle = TREND_LIFECYCLES.has(
+      lifecycleValue as TrendLifecycle
+    )
+      ? (lifecycleValue as TrendLifecycle)
+      : "emerging";
+    const metrics = recordValue(candidate.metrics) || {};
+    const evidence = Array.isArray(candidate.evidence)
+      ? candidate.evidence
+          .map(item => stringValue(item).slice(0, 260))
+          .filter(Boolean)
+          .slice(0, 4)
+      : [];
+    if (!evidence.length) continue;
+    const thumbnailCandidate = stringValue(candidate.thumbnailUrl);
+    const thumbnailUrl = isPublicHttpsUrl(thumbnailCandidate)
+      ? thumbnailCandidate
+      : null;
+    const publishedCandidate = stringValue(candidate.publishedAt);
+    const publishedAt = Number.isFinite(Date.parse(publishedCandidate))
+      ? new Date(publishedCandidate).toISOString()
+      : null;
+    const confidence = boundedNumber(candidate.confidence, 0.55, 0.15, 0.95);
+    seen.add(sourceUrl);
+    trends.push({
+      id: `trend_${crypto.randomUUID()}`,
+      platform: detectedPlatform,
+      title,
+      creator,
+      sourceUrl,
+      thumbnailUrl,
+      publishedAt,
+      observedAt,
+      niche: stringValue(candidate.niche, "General").slice(0, 80),
+      region: stringValue(candidate.region, "Global").slice(0, 60),
+      language: stringValue(candidate.language, "Unknown").slice(0, 32),
+      hook,
+      pattern,
+      lifecycle,
+      confidence,
+      metrics: {
+        views: nullableTrendMetric(metrics.views),
+        likes: nullableTrendMetric(metrics.likes),
+        comments: nullableTrendMetric(metrics.comments),
+        shares: nullableTrendMetric(metrics.shares),
+      },
+      evidence,
+      hypothesis,
+      adaptation,
+      passSignal,
+    });
+    if (trends.length >= 12) break;
+  }
+  return trends;
+}
+
+async function trendAvailableCredits(
+  env: SitesEnvironment,
+  user: AuthenticatedUser
+): Promise<number> {
+  const workspace = await getWorkspace(env, user);
+  const referral = await env.DB.prepare(
+    `
+      SELECT COALESCE(SUM(credits_awarded), 0) AS credits
+      FROM referral_claims
+      WHERE referrer_email = ? AND status = 'verified'
+    `
+  )
+    .bind(user.email)
+    .first<{ credits: number | null }>();
+  const spent = await env.DB.prepare(
+    `
+      SELECT COALESCE(SUM(credit_cost), 0) AS credits
+      FROM trend_research_runs
+      WHERE owner_email = ?
+    `
+  )
+    .bind(user.email)
+    .first<{ credits: number | null }>();
+  return Math.max(
+    0,
+    Math.floor(Number(workspace.profile.credits) || 0) +
+      Math.floor(Number(referral?.credits) || 0) +
+      TREND_STARTER_CREDITS -
+      Math.floor(Number(spent?.credits) || 0)
+  );
+}
+
+async function researchTrendSources(
+  env: SitesEnvironment,
+  user: AuthenticatedUser,
+  scope: TrendScope
+): Promise<{ trends: TrendEvidenceItem[]; generatedAt: string }> {
+  if (!env.OPENROUTER_API_KEY) {
+    throw new Response(
+      JSON.stringify({
+        error: "Live trend research needs the existing OpenRouter connection",
+        missing: ["OPENROUTER_API_KEY"],
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  const generatedAt = new Date().toISOString();
+  const selectedModel =
+    env.OPENROUTER_ANALYSIS_MODEL ||
+    env.OPENROUTER_TEXT_MODEL ||
+    "openai/gpt-5-mini";
+  const invocation = await beginAiInvocation(
+    env,
+    user,
+    "trend-research",
+    "OpenRouter",
+    selectedModel,
+    scope
+  );
+  try {
+    const platformInstruction =
+      scope.platform === "all"
+        ? "TikTok, Instagram Reels, and YouTube Shorts"
+        : scope.platform === "youtube"
+          ? "YouTube Shorts"
+          : scope.platform === "instagram"
+            ? "Instagram Reels"
+            : "TikTok";
+    const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+      method: "POST",
+      headers: openRouterHeaders(env),
+      body: JSON.stringify({
+        model: selectedModel,
+        messages: [
+          {
+            role: "system",
+            content: `You are REELassati's evidence-first short-form trend researcher. Search the live web and return JSON only with one key, trends, containing 6-12 current individual videos. Use direct canonical video URLs only: TikTok /@creator/video/ID, Instagram /reel/CODE, or YouTube /shorts/ID. Never invent URLs, creators, dates, engagement metrics, or evidence. Use null for every metric that is not explicitly present in a search source. Separate observed evidence from hypotheses. Prefer videos from the last 14 days; an older video is allowed only when the sources show that it is currently resurfacing. Each item requires: platform, title, creator, sourceUrl, thumbnailUrl or null, publishedAt ISO string or null, niche, region, language, hook, pattern, lifecycle (seed|emerging|breakout|mainstream|saturated|decaying), confidence from 0 to 1, metrics with views/likes/comments/shares as number or null, evidence as 1-4 short factual observations, hypothesis, adaptation, and passSignal. Do not claim causation from view counts. Do not reproduce captions at length.`,
+          },
+          {
+            role: "user",
+            content: `Find current ${platformInstruction} evidence for the topic or niche "${scope.query}". Audience region: ${scope.region}. Content language: ${scope.language}. Return diverse creators and practical patterns a creator can test.`,
+          },
+        ],
+        plugins: [
+          { id: "web", engine: "exa", max_results: 10 },
+          { id: "response-healing" },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+      }),
+    });
+    if (!response.ok) {
+      await failAiInvocation(env, invocation, `provider_${response.status}`);
+      await providerError(response, "OpenRouter");
+    }
+    const output = parseModelJson(await response.json());
+    const trends = normalizeTrendItems(output, generatedAt).filter(item =>
+      scope.platform === "all" ? true : item.platform === scope.platform
+    );
+    if (trends.length < 2) {
+      throw new Error(
+        "The live search did not return enough verifiable individual video links"
+      );
+    }
+    await completeAiInvocation(env, invocation, {
+      scope,
+      resultCount: trends.length,
+      sourceUrls: trends.map(item => item.sourceUrl),
+    });
+    return { trends, generatedAt };
+  } catch (cause) {
+    await failAiInvocation(env, invocation, "provider_or_validation_failure");
+    throw cause;
+  }
+}
+
+function trendResponse(input: {
+  trends: TrendEvidenceItem[];
+  generatedAt: string;
+  nextRefreshAt: string;
+  freshness: "live" | "cached";
+  scope: TrendScope;
+  creditCost: number;
+  availableCredits: number;
+  cacheNote: string;
+}): TrendFeedResponse {
+  return {
+    ...input,
+    starterCredits: TREND_STARTER_CREDITS,
+  };
+}
+
+async function handleTrends(
+  request: Request,
+  env: SitesEnvironment,
+  user: AuthenticatedUser
+): Promise<Response> {
+  await initializeSchema(env);
+  const workspace = await getWorkspace(env, user);
+  const language = stringValue(workspace.profile.contentLanguage, "en");
+  const availableCredits = await trendAvailableCredits(env, user);
+
+  if (request.method === "GET") {
+    const scope = cleanTrendScope(
+      {
+        query: "short-form creator and business content",
+        platform: "all",
+        region: "Global",
+        language,
+      },
+      language
+    );
+    const scopeKey = `shared:${scope.platform}:${scope.region}:${scope.language}`;
+    const now = new Date().toISOString();
+    const cached = await env.DB.prepare(
+      `
+        SELECT payload_json, generated_at, expires_at
+        FROM trend_snapshots
+        WHERE scope_key = ? AND expires_at > ?
+        ORDER BY generated_at DESC
+        LIMIT 1
+      `
+    )
+      .bind(scopeKey, now)
+      .first<TrendSnapshotRow>();
+    if (cached) {
+      try {
+        const trends = JSON.parse(cached.payload_json) as TrendEvidenceItem[];
+        return json(
+          trendResponse({
+            trends,
+            generatedAt: cached.generated_at,
+            nextRefreshAt: cached.expires_at,
+            freshness: "cached",
+            scope,
+            creditCost: 0,
+            availableCredits,
+            cacheNote:
+              "Shared evidence is reused for every creator and never spends personal credits.",
+          })
+        );
+      } catch {
+        // A malformed cache entry is ignored and replaced by a grounded refresh.
+      }
+    }
+    const result = await researchTrendSources(env, user, scope);
+    const expiresAt = new Date(
+      Date.parse(result.generatedAt) + TREND_SHARED_TTL_MS
+    ).toISOString();
+    await env.DB.prepare(
+      `
+        INSERT INTO trend_snapshots
+          (id, scope_key, payload_json, generated_at, expires_at)
+        VALUES (?, ?, ?, ?, ?)
+      `
+    )
+      .bind(
+        crypto.randomUUID(),
+        scopeKey,
+        JSON.stringify(result.trends),
+        result.generatedAt,
+        expiresAt
+      )
+      .run();
+    return json(
+      trendResponse({
+        trends: result.trends,
+        generatedAt: result.generatedAt,
+        nextRefreshAt: expiresAt,
+        freshness: "live",
+        scope,
+        creditCost: 0,
+        availableCredits,
+        cacheNote:
+          "Fresh shared evidence collected without spending personal credits.",
+      })
+    );
+  }
+
+  if (request.method !== "POST") {
+    return errorResponse("Method not allowed", 405);
+  }
+  const body = await parseJsonBody<{ scope?: unknown }>(request);
+  const scope = cleanTrendScope(body.scope, language);
+  if (scope.query.length < 2) {
+    return errorResponse("Describe a niche, topic, product, or audience first");
+  }
+  const scopeJson = JSON.stringify(scope);
+  const queryHash = await sha256Hex(scopeJson);
+  const cacheSince = new Date(
+    Date.now() - TREND_PERSONAL_CACHE_MS
+  ).toISOString();
+  const cached = await env.DB.prepare(
+    `
+      SELECT payload_json, created_at
+      FROM trend_research_runs
+      WHERE owner_email = ? AND query_hash = ? AND created_at >= ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `
+  )
+    .bind(user.email, queryHash, cacheSince)
+    .first<TrendResearchRow>();
+  if (cached) {
+    try {
+      const trends = JSON.parse(cached.payload_json) as TrendEvidenceItem[];
+      return json(
+        trendResponse({
+          trends,
+          generatedAt: cached.created_at,
+          nextRefreshAt: new Date(
+            Date.parse(cached.created_at) + TREND_PERSONAL_CACHE_MS
+          ).toISOString(),
+          freshness: "cached",
+          scope,
+          creditCost: 0,
+          availableCredits,
+          cacheNote:
+            "This identical research was already available, so no credit was charged.",
+        })
+      );
+    } catch {
+      // Ignore a malformed cached response and perform a fresh verified search.
+    }
+  }
+  if (availableCredits < TREND_RESEARCH_CREDIT_COST) {
+    return json(
+      {
+        error:
+          "You need 1 research credit for a fresh personalized trend scan. The shared trend feed remains free.",
+        availableCredits,
+      },
+      402
+    );
+  }
+  const result = await researchTrendSources(env, user, scope);
+  const runId = crypto.randomUUID();
+  await env.DB.prepare(
+    `
+      INSERT INTO trend_research_runs
+        (id, owner_email, query_hash, scope_json, payload_json, credit_cost, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+  )
+    .bind(
+      runId,
+      user.email,
+      queryHash,
+      scopeJson,
+      JSON.stringify(result.trends),
+      TREND_RESEARCH_CREDIT_COST,
+      result.generatedAt
+    )
+    .run();
+  return json(
+    trendResponse({
+      trends: result.trends,
+      generatedAt: result.generatedAt,
+      nextRefreshAt: new Date(
+        Date.parse(result.generatedAt) + TREND_PERSONAL_CACHE_MS
+      ).toISOString(),
+      freshness: "live",
+      scope,
+      creditCost: TREND_RESEARCH_CREDIT_COST,
+      availableCredits: Math.max(
+        0,
+        availableCredits - TREND_RESEARCH_CREDIT_COST
+      ),
+      cacheNote:
+        "Fresh personalized research completed. Repeating the same scan within 6 hours is free.",
+    })
+  );
+}
+
 async function handleApi(
   request: Request,
   env: SitesEnvironment,
@@ -7961,6 +8492,10 @@ async function handleApi(
 
   if (url.pathname.startsWith("/api/compliance/")) {
     return handleCompliance(request, env, user, url);
+  }
+
+  if (url.pathname === "/api/trends") {
+    return handleTrends(request, env, user);
   }
 
   if (url.pathname === "/api/workspace") {

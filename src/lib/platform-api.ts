@@ -14,6 +14,7 @@ import type {
   ContentProvenance,
   ProvenanceDetectionResult,
 } from "@contracts/compliance";
+import type { TrendFeedResponse, TrendScope } from "@contracts/trends";
 import { supabase } from "@/lib/supabase/client";
 import { platformApiUrl } from "@/lib/runtime";
 
@@ -275,6 +276,14 @@ export const platformApi = {
 
   capabilities: () =>
     requestJson<{ capabilities: CapabilityState }>("/api/capabilities"),
+
+  trendFeed: () => requestJson<TrendFeedResponse>("/api/trends"),
+
+  researchTrends: (scope: TrendScope) =>
+    requestJson<TrendFeedResponse>("/api/trends", {
+      method: "POST",
+      body: JSON.stringify({ scope }),
+    }),
 
   complianceStatus: () =>
     requestJson<{ status: ComplianceStatus }>("/api/compliance/status"),
