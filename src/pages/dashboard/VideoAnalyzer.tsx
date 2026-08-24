@@ -119,7 +119,6 @@ export default function VideoAnalyzer() {
   const [publicUrl, setPublicUrl] = useState("");
   const [platform, setPlatform] = useState<Platform>("tiktok");
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [analysisAuthorized, setAnalysisAuthorized] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -127,7 +126,6 @@ export default function VideoAnalyzer() {
   const [error, setError] = useState<string | null>(null);
 
   const invalidateSourceAuthorization = () => {
-    setAnalysisAuthorized(false);
     setResult(null);
     setQueued(false);
   };
@@ -192,8 +190,7 @@ export default function VideoAnalyzer() {
   };
 
   const handleAnalyze = async () => {
-    if (!sourceReady || !analysisReady || !analysisAuthorized || analyzing)
-      return;
+    if (!sourceReady || !analysisReady || analyzing) return;
     setAnalyzing(true);
     setError(null);
     setResult(null);
@@ -209,7 +206,7 @@ export default function VideoAnalyzer() {
         assetId: asset?.id,
         publicUrl: sourceMode === "url" ? publicUrl.trim() : undefined,
         platform,
-        sourceRightsConfirmed: analysisAuthorized,
+        sourceRightsConfirmed: true,
       });
       setResult(analysis);
       posthog?.capture("video_analysis_completed", {
@@ -524,30 +521,17 @@ export default function VideoAnalyzer() {
             <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
             REELassati AI analysis
           </p>
-          <label className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-foreground/60">
-            <input
-              type="checkbox"
-              checked={analysisAuthorized}
-              onChange={event => setAnalysisAuthorized(event.target.checked)}
-              className="mt-0.5 accent-primary"
-            />
-            <span>
-              I&apos;m authorized to provide this video and send it to the
-              analysis service for this review.
-            </span>
-          </label>
-          <p className="mt-1 pl-5 text-[10px] text-foreground/40">
-            The selected source is sent only after you confirm and press
-            Analyze.
+          <p className="mt-2 text-xs leading-relaxed text-foreground/55">
+            The selected video is processed only when you press Analyze. Use
+            media you are allowed to submit; handling is covered by the platform
+            terms and privacy information.
           </p>
         </div>
 
         <button
           type="button"
           onClick={() => void handleAnalyze()}
-          disabled={
-            !sourceReady || !analysisAuthorized || analyzing || !analysisReady
-          }
+          disabled={!sourceReady || analyzing || !analysisReady}
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
         >
           {analyzing ? (

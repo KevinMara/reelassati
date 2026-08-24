@@ -19,6 +19,7 @@ import {
   Film,
   Image as ImageIcon,
   Layers3,
+  Library,
   Loader2,
   Lock,
   Maximize2,
@@ -338,6 +339,7 @@ export default function EditorPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaPreviewRef = useRef<HTMLMediaElement | null>(null);
 
@@ -620,6 +622,83 @@ export default function EditorPage() {
     }
   };
 
+  const addAssetToTimeline = async (
+    asset: Asset,
+    targetProjectId: string,
+    activityLabel: string
+  ) => {
+    await updateWorkspace(current => {
+      const target = current.projects.find(item => item.id === targetProjectId);
+      if (!target) return current;
+      const start = target.clips.reduce(
+        (latest, clip) => Math.max(latest, clip.start + clip.duration),
+        0
+      );
+      const duration =
+        asset.duration && asset.duration > 0
+          ? asset.duration
+          : asset.kind === "image"
+            ? 3
+            : 5;
+      const track: TrackKind =
+        asset.kind === "audio"
+          ? "audio"
+          : asset.kind === "image"
+            ? "overlay"
+            : "video";
+      const clip: TimelineClip = {
+        id: createId("clip"),
+        assetId: asset.id,
+        track,
+        label: asset.name,
+        start,
+        duration,
+        inPoint: 0,
+        outPoint: duration,
+        locked: false,
+        muted: false,
+        speed: 1,
+        volume: 100,
+        color: TRACK_COLORS[track],
+      };
+      const clips = [...target.clips, clip];
+      const updatedProject = {
+        ...target,
+        clips,
+        activeAssetId: asset.id,
+        duration: getProjectDuration(clips, target.duration),
+        updatedAt: new Date().toISOString(),
+      };
+      const revisions = compactRevisions([
+        ...target.revisions,
+        snapshotProject(updatedProject, `Added ${asset.name}`),
+      ]);
+      setRevisionCursor(revisions.length - 1);
+      setSelectedClipId(clip.id);
+      setClipDraft({ ...clip });
+
+      return {
+        ...current,
+        assets: current.assets.some(item => item.id === asset.id)
+          ? current.assets.map(item => (item.id === asset.id ? asset : item))
+          : [asset, ...current.assets],
+        projects: current.projects.map(item =>
+          item.id === targetProjectId ? { ...updatedProject, revisions } : item
+        ),
+        activity: [
+          {
+            id: createId("event"),
+            type: "project" as const,
+            label: activityLabel,
+            detail: asset.name,
+            createdAt: new Date().toISOString(),
+          },
+          ...current.activity,
+        ],
+      };
+    });
+  };
+
   const addUploadedFiles = async (
     files: File[],
     targetProjectId?: string | null
@@ -646,74 +725,7 @@ export default function EditorPage() {
           duration: uploaded.duration ?? detectedDuration,
         };
 
-        await updateWorkspace(current => {
-          const target = current.projects.find(item => item.id === projectId);
-          if (!target) return current;
-          const start = target.clips.reduce(
-            (latest, clip) => Math.max(latest, clip.start + clip.duration),
-            0
-          );
-          const duration =
-            asset.duration && asset.duration > 0
-              ? asset.duration
-              : kind === "image"
-                ? 3
-                : 5;
-          const track: TrackKind =
-            kind === "audio" ? "audio" : kind === "image" ? "overlay" : "video";
-          const clip: TimelineClip = {
-            id: createId("clip"),
-            assetId: asset.id,
-            track,
-            label: asset.name,
-            start,
-            duration,
-            inPoint: 0,
-            outPoint: duration,
-            locked: false,
-            muted: false,
-            speed: 1,
-            volume: 100,
-            color: TRACK_COLORS[track],
-          };
-          const clips = [...target.clips, clip];
-          const updatedProject = {
-            ...target,
-            clips,
-            activeAssetId: asset.id,
-            duration: getProjectDuration(clips, target.duration),
-            updatedAt: new Date().toISOString(),
-          };
-          const revisions = compactRevisions([
-            ...target.revisions,
-            snapshotProject(updatedProject, `Added ${asset.name}`),
-          ]);
-          setRevisionCursor(revisions.length - 1);
-          setSelectedClipId(clip.id);
-          setClipDraft({ ...clip });
-
-          return {
-            ...current,
-            assets: current.assets.some(item => item.id === asset.id)
-              ? current.assets.map(item =>
-                  item.id === asset.id ? asset : item
-                )
-              : [asset, ...current.assets],
-            projects: current.projects.map(item =>
-              item.id === projectId ? { ...updatedProject, revisions } : item
-            ),
-            activity: [
-              {
-                id: createId("event"),
-                type: "upload",
-                label: "Media uploaded",
-                detail: asset.name,
-                createdAt: new Date().toISOString(),
-              },
-              ...current.activity,
-            ],
-          };
-        });
+        await addAssetToTimeline(asset, projectId, "Media uploaded and added");
       }
     } catch (cause) {
       setLocalError(
@@ -1605,6 +1617,15 @@ export default function EditorPage() {
             <div className="flex flex-wrap items-center gap-1 border-b border-border p-2">
               <button
                 type="button"
+                onClick={() => setLibraryOpen(current => !current)}
+                disabled={Boolean(busyAction)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <Library className="h-3.5 w-3.5" />
+                Add from library
+              </button>
+              <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={Boolean(busyAction)}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
@@ -1612,9 +1633,9 @@ export default function EditorPage() {
                 {busyAction === "upload" ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Plus className="h-3.5 w-3.5" />
+                  <Upload className="h-3.5 w-3.5" />
                 )}
-                Add media
+                Upload
               </button>
               <span className="hidden text-[11px] text-foreground/40 sm:inline">
                 or drop files in this timeline
@@ -1668,6 +1689,79 @@ export default function EditorPage() {
                 />
               </div>
             </div>
+
+            {libraryOpen ? (
+              <div className="border-b border-border bg-background/55 p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium">
+                      Connected media library
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-foreground/40">
+                      Generated and uploaded video, images, and audio are ready
+                      to place on the timeline.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLibraryOpen(false)}
+                    aria-label="Close media library"
+                    className="rounded-md p-1.5 hover:bg-surface"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                {workspace.assets.some(asset =>
+                  ["video", "image", "audio"].includes(asset.kind)
+                ) ? (
+                  <div className="grid max-h-52 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
+                    {workspace.assets
+                      .filter(asset =>
+                        ["video", "image", "audio"].includes(asset.kind)
+                      )
+                      .map(asset => {
+                        const Icon =
+                          asset.kind === "image"
+                            ? ImageIcon
+                            : asset.kind === "audio"
+                              ? Music2
+                              : Film;
+                        return (
+                          <button
+                            key={asset.id}
+                            type="button"
+                            onClick={() => {
+                              void addAssetToTimeline(
+                                asset,
+                                project.id,
+                                "Library media added"
+                              );
+                              setLibraryOpen(false);
+                            }}
+                            className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface p-2.5 text-left hover:border-primary/40"
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                              <Icon className="h-4 w-4 text-primary" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-medium">
+                                {asset.name}
+                              </span>
+                              <span className="block text-[10px] capitalize text-foreground/40">
+                                {asset.kind}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-foreground/45">
+                    No media yet. Upload a file or generate one from Create.
+                  </p>
+                )}
+              </div>
+            ) : null}
 
             <div className="overflow-x-auto">
               <div

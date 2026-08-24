@@ -420,6 +420,12 @@ export const platformApi = {
       method: "DELETE",
     }),
 
+  renameAsset: (id: string, name: string) =>
+    requestJson<{ asset: Asset }>(`/api/assets/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+
   generateScript: (input: {
     topic: string;
     platform: string;
@@ -484,6 +490,7 @@ export const platformApi = {
   synthesizeSpeech: async (input: {
     text: string;
     voice: string;
+    assetName?: string;
     projectId?: string;
     rightsConfirmed: true;
   }): Promise<Asset> => {
@@ -494,8 +501,25 @@ export const platformApi = {
     return result.asset;
   },
 
+  generateImage: async (input: {
+    prompt: string;
+    assetName: string;
+    aspectRatio: "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
+    resolution: "1K" | "2K";
+    rightsConfirmed: true;
+    referenceContainsRealPerson: boolean;
+    realPersonConsentConfirmed: boolean;
+  }): Promise<Asset> => {
+    const result = await requestJson<{ asset: Asset }>("/api/ai/image", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return result.asset;
+  },
+
   createVideo: (input: {
     requestId: string;
+    assetName: string;
     prompt: string;
     duration: number;
     aspectRatio: "9:16" | "16:9" | "1:1";

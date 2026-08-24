@@ -76,6 +76,9 @@ export default function VoiceNotes() {
   );
   const [speechText, setSpeechText] = useState("");
   const [voiceId, setVoiceId] = useState("English_Graceful_Lady");
+  const [speechAssetName, setSpeechAssetName] = useState(
+    "Untitled voice track"
+  );
   const [speechAsset, setSpeechAsset] = useState<Asset | null>(null);
   const [voiceRightsConfirmed, setVoiceRightsConfirmed] = useState(false);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
@@ -143,7 +146,9 @@ export default function VoiceNotes() {
       "audio",
       setUploadProgress
     );
-    const asset = title.trim() ? { ...uploaded, name: title.trim() } : uploaded;
+    const asset = title.trim()
+      ? (await platformApi.renameAsset(uploaded.id, title.trim())).asset
+      : uploaded;
     setSourceAsset(asset);
     await saveAsset(asset, "Voice note uploaded");
     return asset;
@@ -280,6 +285,7 @@ export default function VoiceNotes() {
       const asset = await platformApi.synthesizeSpeech({
         text: speechText.trim(),
         voice: voiceId.trim(),
+        assetName: speechAssetName.trim(),
         projectId: workspace.projects[0]?.id,
         rightsConfirmed: voiceRightsConfirmed,
       });
@@ -564,6 +570,20 @@ export default function VoiceNotes() {
             </div>
             <label
               className="mb-2 block text-xs font-medium"
+              htmlFor="speech-asset-name"
+            >
+              Audio name
+            </label>
+            <input
+              id="speech-asset-name"
+              value={speechAssetName}
+              maxLength={110}
+              onChange={event => setSpeechAssetName(event.target.value)}
+              placeholder="Launch voice-over — final"
+              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+            />
+            <label
+              className="mb-2 block text-xs font-medium"
               htmlFor="speech-copy"
             >
               Copy to speak
@@ -626,6 +646,7 @@ export default function VoiceNotes() {
               disabled={
                 !speechText.trim() ||
                 !voiceId.trim() ||
+                !speechAssetName.trim() ||
                 !voiceRightsConfirmed ||
                 Boolean(busyAction) ||
                 !capabilities.speech

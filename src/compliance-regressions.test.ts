@@ -31,8 +31,6 @@ describe("protected product and compliance invariants", () => {
       "/dashboard",
       "/dashboard/trends",
       "/dashboard/script",
-      "/dashboard/video",
-      "/dashboard/voice",
       "/dashboard/edit",
       "/dashboard/analyze",
       "/dashboard/publish",
@@ -49,6 +47,13 @@ describe("protected product and compliance invariants", () => {
     ]);
     const navEntries = navBlock.slice(navBlock.indexOf("> = ["));
     expect((navEntries.match(/separator: true/g) || []).length).toBe(3);
+    expect(navEntries).toContain('{ group: "create" }');
+    expect(dashboard).toContain('label="Video"');
+    expect(dashboard).toContain('to="/dashboard/video"');
+    expect(dashboard).toContain('label="Images"');
+    expect(dashboard).toContain('to="/dashboard/image"');
+    expect(dashboard).toContain('label="Audio"');
+    expect(dashboard).toContain('to="/dashboard/voice"');
     expect(dashboard).toContain(
       '<Navigate to="/dashboard/script?mode=interview" replace />'
     );

@@ -45,6 +45,21 @@ describe("embedded media provenance", () => {
     );
   });
 
+  it("adds and reversibly detects a PNG text marker", () => {
+    const original = new Uint8Array([
+      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96,
+      130,
+    ]).buffer;
+    const marked = embedMediaProvenanceMarker(original, "image/png", token);
+    expect(marked?.method).toBe("png-text-chunk");
+
+    const inspected = inspectMediaProvenanceMarker(marked!.bytes);
+    expect(inspected?.token).toBe(token);
+    expect(new Uint8Array(inspected!.unmarkedBytes)).toEqual(
+      new Uint8Array(original)
+    );
+  });
+
   it("refuses unsupported generated formats instead of pretending they are marked", () => {
     expect(
       embedMediaProvenanceMarker(

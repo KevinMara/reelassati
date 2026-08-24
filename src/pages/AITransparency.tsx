@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Eye,
   FileSearch,
+  Images,
   LockKeyhole,
   Radio,
   UserCheck,
@@ -23,7 +24,7 @@ const COPY = {
     title: "Clear about where AI works—and where it does not.",
     intro:
       "REELassati combines manual production tools with reviewable AI assistance. This page identifies where AI is used, the information sent when you invoke it, and the controls that remain with you.",
-    updated: "Updated 4 August 2026",
+    updated: "Updated 24 August 2026",
     statusTitle: "Current product behavior",
     statusBody:
       "This page describes the product routes currently implemented. Managed AI actions remain unavailable until the service is ready, and an interface state is never presented as evidence that generation occurred.",
@@ -57,7 +58,7 @@ const COPY = {
     title: "Chiaro dove lavora l’AI—e dove non lavora.",
     intro:
       "REELassati unisce strumenti di produzione manuali e assistenza AI revisionabile. Questa pagina identifica dove viene usata l’AI, le informazioni inviate quando la attivi e i controlli che restano nelle tue mani.",
-    updated: "Aggiornato il 4 agosto 2026",
+    updated: "Aggiornato il 24 agosto 2026",
     statusTitle: "Comportamento attuale del prodotto",
     statusBody:
       "Questa pagina descrive i percorsi di prodotto attualmente implementati. Le azioni AI gestite restano indisponibili finché il servizio non è pronto e nessuno stato dell’interfaccia viene presentato come prova di una generazione.",
@@ -116,6 +117,14 @@ const SYSTEMS = {
       icon: Radio,
     },
     {
+      title: "Image generation",
+      provider: "REELassati AI",
+      detail:
+        "Creates a named image from a directed prompt and stores the marked output in the private media library.",
+      input: "The prompt, aspect ratio, resolution, and rights confirmations.",
+      icon: Images,
+    },
+    {
       title: "Video generation",
       provider: "REELassati AI",
       detail:
@@ -151,6 +160,14 @@ const SYSTEMS = {
       input:
         "Audio/video selezionato per la trascrizione, oppure copy e ID voce per la sintesi.",
       icon: Radio,
+    },
+    {
+      title: "Generazione immagini",
+      provider: "REELassati AI",
+      detail:
+        "Crea un’immagine nominata da un prompt e salva l’output marcato nella libreria multimediale privata.",
+      input: "Prompt, proporzioni, risoluzione e conferme relative ai diritti.",
+      icon: Images,
     },
     {
       title: "Generazione video",

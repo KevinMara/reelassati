@@ -16,6 +16,7 @@ import {
   List,
   Loader2,
   Music,
+  Pencil,
   Search,
   Trash2,
   Upload,
@@ -129,6 +130,7 @@ export default function ContentLibrary() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{
     tone: "success" | "error";
     message: string;
@@ -289,6 +291,41 @@ export default function ContentLibrary() {
       });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const renameAsset = async (
+    item: Extract<LibraryItem, { source: "asset" }>
+  ) => {
+    const nextName = window.prompt("Name this asset", item.asset.name)?.trim();
+    if (!nextName || nextName === item.asset.name) return;
+    setRenamingId(item.id);
+    setNotice(null);
+    try {
+      const { asset } = await platformApi.renameAsset(item.asset.id, nextName);
+      await updateWorkspace(current => ({
+        ...current,
+        assets: current.assets.map(candidate =>
+          candidate.id === asset.id ? { ...candidate, ...asset } : candidate
+        ),
+        projects: current.projects.map(project => ({
+          ...project,
+          clips: project.clips.map(clip =>
+            clip.assetId === asset.id ? { ...clip, label: asset.name } : clip
+          ),
+        })),
+      }));
+      setNotice({ tone: "success", message: `Renamed to ${asset.name}.` });
+    } catch (cause) {
+      setNotice({
+        tone: "error",
+        message:
+          cause instanceof Error
+            ? cause.message
+            : "The asset could not be renamed.",
+      });
+    } finally {
+      setRenamingId(null);
     }
   };
 
@@ -478,6 +515,7 @@ export default function ContentLibrary() {
             const meta = KIND_META[item.kind];
             const Icon = meta.icon;
             const isDeleting = deletingId === item.id;
+            const isRenaming = renamingId === item.id;
             return (
               <article
                 key={item.id}
@@ -529,19 +567,36 @@ export default function ContentLibrary() {
                         />
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void deleteItem(item)}
-                      disabled={isDeleting || saving}
-                      aria-label={`Delete ${item.title}`}
-                      className="rounded-md p-1.5 text-foreground/35 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
-                    >
-                      {isDeleting ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      {item.source === "asset" ? (
+                        <button
+                          type="button"
+                          onClick={() => void renameAsset(item)}
+                          disabled={isRenaming || saving}
+                          aria-label={`Rename ${item.title}`}
+                          className="rounded-md p-1.5 text-foreground/35 transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-40"
+                        >
+                          {isRenaming ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Pencil className="h-4 w-4" />
+                          )}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => void deleteItem(item)}
+                        disabled={isDeleting || saving}
+                        aria-label={`Delete ${item.title}`}
+                        className="rounded-md p-1.5 text-foreground/35 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <div className="mt-4">
                     {item.source === "asset" ? (

@@ -139,6 +139,7 @@ export default function VideoGenerator() {
   const [selectedTemplate, setSelectedTemplate] = useState(
     initialTemplate?.id ?? ""
   );
+  const [assetName, setAssetName] = useState("Untitled video");
   const [direction, setDirection] = useState<PromptDirection>(() => ({
     ...EMPTY_DIRECTION,
     subject: initialSubject,
@@ -364,6 +365,7 @@ export default function VideoGenerator() {
       requestIdRef.current = requestId;
       const result = await platformApi.createVideo({
         requestId,
+        assetName: assetName.trim(),
         prompt: enhancedPrompt,
         duration,
         aspectRatio: ratio,
@@ -501,6 +503,21 @@ export default function VideoGenerator() {
               <SlidersHorizontal className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-medium">Output controls</h2>
             </div>
+
+            <label
+              className="mb-2 block text-xs font-medium text-foreground/55"
+              htmlFor="video-asset-name"
+            >
+              Video name
+            </label>
+            <input
+              id="video-asset-name"
+              value={assetName}
+              maxLength={110}
+              onChange={event => setAssetName(event.target.value)}
+              placeholder="Summer launch — clip 01"
+              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+            />
 
             <fieldset>
               <legend className="mb-2 text-xs font-medium text-foreground/55">
@@ -1047,6 +1064,7 @@ export default function VideoGenerator() {
               onClick={() => void handleGenerate()}
               disabled={
                 !scene ||
+                !assetName.trim() ||
                 !videoReady ||
                 submitting ||
                 Boolean(activeJobId) ||

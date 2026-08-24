@@ -306,6 +306,39 @@ describe("platform-wide functional invariants", () => {
     expect(video).not.toContain("Real job tracking");
   });
 
+  it("keeps named image, video, and audio creation connected to Library and Edit", () => {
+    const dashboard = source("./pages/Dashboard.tsx");
+    const image = source("./pages/dashboard/ImageGenerator.tsx");
+    const video = source("./pages/dashboard/VideoGenerator.tsx");
+    const voice = source("./pages/dashboard/VoiceNotes.tsx");
+    const editor = source("./pages/dashboard/EditorPage.tsx");
+    const library = source("./pages/dashboard/ContentLibrary.tsx");
+    const api = source("./lib/platform-api.ts");
+    const server = source("../sites/server.ts");
+
+    expect(dashboard).toContain('path="/image"');
+    expect(dashboard).toContain("creator-tools-navigation");
+    expect(image).toContain("Image name");
+    expect(image).toContain("platformApi.generateImage");
+    expect(video).toContain("Video name");
+    expect(voice).toContain("Audio name");
+    expect(editor).toContain("Connected media library");
+    expect(editor).toContain("addAssetToTimeline");
+    expect(library).toContain("platformApi.renameAsset");
+    expect(api).toContain('"/api/ai/image"');
+    expect(server).toContain('url.pathname === "/api/ai/image"');
+    expect(server).toContain("OPENROUTER_IMAGE_MODEL");
+  });
+
+  it("uses a non-blocking analysis privacy notice instead of repeated consent", () => {
+    const analyzer = source("./pages/dashboard/VideoAnalyzer.tsx");
+    const signup = source("./pages/Signup.tsx");
+    expect(analyzer).not.toContain("analysisAuthorized");
+    expect(analyzer).not.toContain("I'm authorized to provide this video");
+    expect(analyzer).toMatch(/platform\s+terms and privacy information/);
+    expect(signup).toContain("By continuing, you agree");
+  });
+
   it("keeps the editor transport connected to the actual media preview", () => {
     const editor = source("./pages/dashboard/EditorPage.tsx");
     expect(editor).toContain("mediaPreviewRef");

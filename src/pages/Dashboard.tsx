@@ -32,8 +32,10 @@ import {
   LogOut,
   X,
   ChevronRight,
+  ChevronDown,
   Flame,
   Film,
+  Images,
   Mic,
   MessageSquareWarning,
   Mail,
@@ -43,6 +45,7 @@ import {
   HardDrive,
   BrainCircuit,
   Radio,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -83,6 +86,7 @@ const SocialHub = lazy(() => import("./dashboard/SocialHub"));
 const SettingsPage = lazy(() => import("./dashboard/SettingsPage"));
 const TrendsPage = lazy(() => import("./dashboard/TrendsPage"));
 const VideoGenerator = lazy(() => import("./dashboard/VideoGenerator"));
+const ImageGenerator = lazy(() => import("./dashboard/ImageGenerator"));
 const VoiceNotes = lazy(() => import("./dashboard/VoiceNotes"));
 const GoalTracker = lazy(() => import("./dashboard/GoalTracker"));
 const CoachingPage = lazy(() => import("./dashboard/CoachingPage"));
@@ -176,6 +180,12 @@ function DashboardHome() {
       desc: "Direct a new clip or continue a scene with timed beats and native audio.",
       icon: Film,
       to: "/dashboard/video",
+    },
+    {
+      title: "Generate a campaign image",
+      desc: "Create a named visual and send it straight to your Library or timeline.",
+      icon: Images,
+      to: "/dashboard/image",
     },
     {
       title: t("dash.pubblica_bozza"),
@@ -710,6 +720,11 @@ export default function Dashboard() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(() =>
+    ["/dashboard/video", "/dashboard/image", "/dashboard/voice"].some(route =>
+      location.pathname.startsWith(route)
+    )
+  );
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth/login");
@@ -728,13 +743,13 @@ export default function Dashboard() {
 
   const navItems: Array<
     | { separator: true }
+    | { group: "create"; separator?: false }
     | { icon: LucideIcon; label: string; to: string; separator?: false }
   > = [
     { icon: LayoutDashboard, label: t("nav.dashboard"), to: "/dashboard" },
     { icon: Flame, label: "Trends", to: "/dashboard/trends" },
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
-    { icon: Film, label: "AI Video", to: "/dashboard/video" },
-    { icon: Mic, label: "Voice Studio", to: "/dashboard/voice" },
+    { group: "create" },
     { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
     { icon: Search, label: t("nav.analyze"), to: "/dashboard/analyze" },
     { icon: Send, label: t("nav.publish"), to: "/dashboard/publish" },
@@ -812,6 +827,69 @@ export default function Dashboard() {
                 role="separator"
                 className="border-t border-border my-2"
               />
+            ) : "group" in item ? (
+              <div key={item.group}>
+                <button
+                  type="button"
+                  aria-expanded={createOpen && !collapsed}
+                  aria-controls="creator-tools-navigation"
+                  onClick={() => {
+                    if (collapsed) {
+                      setCollapsed(false);
+                      setCreateOpen(true);
+                      return;
+                    }
+                    setCreateOpen(current => !current);
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                    path.startsWith("/dashboard/video") ||
+                      path.startsWith("/dashboard/image") ||
+                      path.startsWith("/dashboard/voice")
+                      ? "bg-primary/10 font-medium text-primary"
+                      : "text-foreground/70 hover:bg-foreground/[0.04] hover:text-foreground"
+                  )}
+                  title={collapsed ? "Create" : undefined}
+                >
+                  <Sparkles className="h-[18px] w-[18px] shrink-0" />
+                  {!collapsed ? (
+                    <>
+                      <span className="flex-1 text-left">Create</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 transition-transform",
+                          createOpen && "rotate-180"
+                        )}
+                      />
+                    </>
+                  ) : null}
+                </button>
+                {createOpen && !collapsed ? (
+                  <div
+                    id="creator-tools-navigation"
+                    className="ml-4 mt-1 space-y-0.5 border-l border-border pl-2"
+                  >
+                    <SidebarItem
+                      icon={Film}
+                      label="Video"
+                      to="/dashboard/video"
+                      active={path.startsWith("/dashboard/video")}
+                    />
+                    <SidebarItem
+                      icon={Images}
+                      label="Images"
+                      to="/dashboard/image"
+                      active={path.startsWith("/dashboard/image")}
+                    />
+                    <SidebarItem
+                      icon={Mic}
+                      label="Audio"
+                      to="/dashboard/voice"
+                      active={path.startsWith("/dashboard/voice")}
+                    />
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <SidebarItem
                 key={item.to}
@@ -904,6 +982,7 @@ export default function Dashboard() {
               <Route path="/analyze" element={<VideoAnalyzer />} />
               <Route path="/script" element={<ScriptGenerator />} />
               <Route path="/video" element={<VideoGenerator />} />
+              <Route path="/image" element={<ImageGenerator />} />
               <Route path="/edit" element={<EditorPage />} />
               <Route path="/publish" element={<PublisherPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />

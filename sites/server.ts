@@ -104,6 +104,7 @@ type SitesEnvironment = {
   OPENROUTER_STT_MODEL?: string;
   OPENROUTER_TTS_MODEL?: string;
   OPENROUTER_TTS_VOICE?: string;
+  OPENROUTER_IMAGE_MODEL?: string;
   OPENROUTER_VIDEO_MODEL?: string;
   OPENROUTER_CONTINUITY_VIDEO_MODEL?: string;
   OPENROUTER_WEBHOOK_SECRET?: string;
@@ -437,6 +438,9 @@ function capabilities(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
     speech: Boolean(env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady),
+    imageGeneration: Boolean(
+      env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
+    ),
     videoGeneration: Boolean(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
@@ -447,6 +451,7 @@ function capabilities(
       { purpose: "Analysis" },
       { purpose: "Transcription" },
       { purpose: "Speech" },
+      { purpose: "Image" },
       { purpose: "Video" },
     ],
   };
@@ -2601,6 +2606,26 @@ function sanitizeFilename(name: string): string {
   );
 }
 
+function generatedAssetName(
+  requested: unknown,
+  fallbackBase: string,
+  extension: string
+): string {
+  const clean = Array.from(stringValue(requested, fallbackBase), character => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127 ? " " : character;
+  })
+    .join("")
+    .replace(/[\\/]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 110);
+  const base = clean || fallbackBase;
+  return base.toLowerCase().endsWith(`.${extension.toLowerCase()}`)
+    ? base
+    : `${base}.${extension}`;
+}
+
 function isPublicHttpsUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
@@ -3885,6 +3910,21 @@ async function handleAssets(
     return json({ ok: true });
   }
 
+  if (request.method === "PATCH") {
+    const input = await parseJsonBody<{ name?: string }>(request);
+    const name = generatedAssetName(
+      input.name,
+      row.name.replace(/\.[^.]+$/, "") || "asset",
+      row.name.includes(".") ? row.name.split(".").pop() || "bin" : "bin"
+    );
+    await env.DB.prepare(
+      "UPDATE assets SET name = ? WHERE id = ? AND owner_email = ?"
+    )
+      .bind(name, id, user.email)
+      .run();
+    return json({ asset: rowToAsset({ ...row, name }) });
+  }
+
   if (request.method !== "GET" && request.method !== "HEAD") {
     return errorResponse("Method not allowed", 405);
   }
@@ -4007,6 +4047,179 @@ async function handleAi(
 ): Promise<Response> {
   if (request.method !== "POST")
     return errorResponse("Method not allowed", 405);
+
+  if (url.pathname === "/api/ai/image") {
+    if (!env.OPENROUTER_API_KEY) {
+      return errorResponse("Image generation is temporarily unavailable", 503);
+    }
+    const input = await parseJsonBody<{
+      prompt?: string;
+      assetName?: string;
+      aspectRatio?: string;
+      resolution?: string;
+      rightsConfirmed?: boolean;
+      referenceContainsRealPerson?: boolean;
+      realPersonConsentConfirmed?: boolean;
+    }>(request);
+    const prompt = stringValue(input.prompt);
+    if (!prompt) return errorResponse("Describe the image to generate");
+    if (prompt.length > 4_000) {
+      return errorResponse("Image prompts are limited to 4,000 characters");
+    }
+    assertProvenanceConfigured(env);
+    if (input.rightsConfirmed !== true) {
+      return errorResponse(
+        "Confirm that you may use the prompt, brands and likenesses before generating an image",
+        422
+      );
+    }
+    if (
+      input.referenceContainsRealPerson === true &&
+      input.realPersonConsentConfirmed !== true
+    ) {
+      return errorResponse(
+        "A prompt depicting an identifiable real person requires documented consent or another verified legal basis",
+        422
+      );
+    }
+    await assertAllowedCreativeUse(env, user, prompt);
+
+    const aspectRatio = ["1:1", "4:3", "3:4", "16:9", "9:16"].includes(
+      stringValue(input.aspectRatio)
+    )
+      ? stringValue(input.aspectRatio)
+      : "1:1";
+    const resolution = input.resolution === "2K" ? "2K" : "1K";
+    const model = env.OPENROUTER_IMAGE_MODEL || "qwen/qwen-image-3-pro";
+    const assetId = crypto.randomUUID();
+    const assetName = generatedAssetName(
+      input.assetName,
+      `Generated image ${new Date().toLocaleDateString("en-GB")}`,
+      "png"
+    );
+    const r2Key = `users/${encodeURIComponent(user.email)}/generated/${assetId}.png`;
+    const invocation = await beginAiInvocation(
+      env,
+      user,
+      "image-generation",
+      "OpenRouter",
+      model,
+      { prompt, aspectRatio, resolution, rightsConfirmed: true }
+    );
+    let provenance: ContentProvenance | null = null;
+    try {
+      const response = await fetch(`${OPENROUTER_BASE}/images`, {
+        method: "POST",
+        headers: openRouterHeaders(env),
+        body: JSON.stringify({
+          model,
+          prompt,
+          n: 1,
+          aspect_ratio: aspectRatio,
+          resolution,
+          quality: "high",
+          output_format: "png",
+        }),
+      });
+      if (!response.ok) await providerError(response, "OpenRouter");
+      const payload = (await response.json()) as {
+        data?: Array<{ b64_json?: string; media_type?: string }>;
+      };
+      const encoded = stringValue(payload.data?.[0]?.b64_json).replace(
+        /^data:image\/png;base64,/i,
+        ""
+      );
+      if (!encoded || encoded.length > 28_000_000) {
+        throw new Error("Image generation returned an invalid image");
+      }
+      const binary = atob(encoded);
+      const imageBytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        imageBytes[index] = binary.charCodeAt(index);
+      }
+      if (
+        imageBytes.byteLength < 8 ||
+        ![137, 80, 78, 71, 13, 10, 26, 10].every(
+          (byte, index) => imageBytes[index] === byte
+        )
+      ) {
+        throw new Error("Image generation did not return a valid PNG");
+      }
+      provenance = await createProvenanceRecord(env, user, {
+        entityType: "asset",
+        entityId: assetId,
+        origin: "ai-generated",
+        operation: "image-generation",
+        provider: invocation.provider,
+        model: invocation.model,
+        content: imageBytes,
+        embeddedMediaMarker: true,
+        metadata: {
+          invocationId: invocation.id,
+          aspectRatio,
+          resolution,
+          rightsAttested: true,
+          referenceContainsRealPerson:
+            input.referenceContainsRealPerson === true,
+          realPersonConsentAttested: input.realPersonConsentConfirmed === true,
+        },
+      });
+      const markedImage = embedMediaProvenanceMarker(
+        imageBytes.buffer,
+        "image/png",
+        provenance.marking.publicToken || ""
+      );
+      if (!markedImage) throw new Error("Image output marking failed");
+      await env.BUCKET.put(r2Key, markedImage.bytes, {
+        httpMetadata: { contentType: "image/png" },
+        customMetadata: {
+          owner: user.email,
+          source: "reelassati-image",
+          provenanceToken: provenance.marking.publicToken || "",
+          policyVersion: AI_COMPLIANCE_POLICY_VERSION,
+          embeddedMarking: markedImage.method,
+        },
+      });
+      const stored = await env.BUCKET.get(r2Key);
+      if (!stored) throw new Error("Generated image storage is missing");
+      const verifiedProvenance = await finalizeEmbeddedProvenance(
+        env,
+        user,
+        provenance,
+        await stored.arrayBuffer()
+      );
+      const asset = await insertAssetRecord(env, user, {
+        id: assetId,
+        name: assetName,
+        kind: "image",
+        contentType: "image/png",
+        size: markedImage.bytes.byteLength,
+        r2Key,
+      });
+      await completeAiInvocation(env, invocation, await sha256Hex(imageBytes));
+      return json({ asset: { ...asset, provenance: verifiedProvenance } }, 201);
+    } catch (cause) {
+      await env.BUCKET.delete(r2Key).catch(() => undefined);
+      await env.DB.prepare(
+        "DELETE FROM assets WHERE id = ? AND owner_email = ?"
+      )
+        .bind(assetId, user.email)
+        .run()
+        .catch(() => undefined);
+      if (provenance) {
+        await failProvenanceRecord(
+          env,
+          user,
+          provenance.recordId,
+          "asset",
+          assetId,
+          "image-output-rollback"
+        ).catch(() => undefined);
+      }
+      await failAiInvocation(env, invocation, "image_generation_failure");
+      throw cause;
+    }
+  }
 
   if (url.pathname === "/api/ai/script") {
     const input = await parseJsonBody<{
@@ -4415,6 +4628,7 @@ async function handleAi(
     const input = await parseJsonBody<{
       text?: string;
       voice?: string;
+      assetName?: string;
       projectId?: string;
       rightsConfirmed?: boolean;
     }>(request);
@@ -4562,7 +4776,11 @@ async function handleAi(
     try {
       asset = await insertAssetRecord(env, user, {
         id: assetId,
-        name: `Voice take ${new Date().toLocaleDateString("en-GB")}.mp3`,
+        name: generatedAssetName(
+          input.assetName,
+          `Voice take ${new Date().toLocaleDateString("en-GB")}`,
+          "mp3"
+        ),
         kind: "audio",
         contentType: "audio/mpeg",
         size: markedSpeech.bytes.byteLength,
@@ -4622,6 +4840,7 @@ async function handleVideoJobs(
   if (request.method === "POST" && !id) {
     const input = await parseJsonBody<{
       requestId?: string;
+      assetName?: string;
       prompt?: string;
       duration?: number;
       aspectRatio?: string;
@@ -4641,6 +4860,11 @@ async function handleVideoJobs(
     }
     const requestedPrompt = stringValue(input.prompt);
     if (!requestedPrompt) return errorResponse("Describe the clip to generate");
+    const assetName = generatedAssetName(
+      input.assetName,
+      `Generated clip ${new Date().toLocaleDateString("en-GB")}`,
+      "mp4"
+    );
     assertProvenanceConfigured(env);
     if (input.rightsConfirmed !== true) {
       return errorResponse(
@@ -4823,6 +5047,7 @@ async function handleVideoJobs(
           sourceAssetId: sourceAssetId || undefined,
           rootScenePrompt,
           requestedPrompt,
+          assetName,
         }),
         now,
         now
@@ -4863,6 +5088,7 @@ async function handleVideoJobs(
         sourceAssetId: sourceAssetId || null,
         rootScenePrompt,
         requestedPrompt,
+        assetName,
         rightsConfirmed: true,
         referenceContainsRealPerson: input.referenceContainsRealPerson === true,
         realPersonConsentConfirmed: input.realPersonConsentConfirmed === true,
@@ -4947,6 +5173,7 @@ async function handleVideoJobs(
           sourceAssetId: sourceAssetId || undefined,
           rootScenePrompt,
           requestedPrompt,
+          assetName,
           firstFrameUrl: firstFrameUrl || undefined,
           lastFrameUrl: lastFrameUrl || undefined,
           rightsConfirmed: true,
@@ -5158,7 +5385,11 @@ async function handleVideoJobs(
           if (!asset) {
             asset = await ensureGeneratedAssetRecord(env, user, {
               id: assetId,
-              name: `Generated clip ${new Date().toLocaleDateString("en-GB")}.mp4`,
+              name: generatedAssetName(
+                jobPayload.assetName,
+                `Generated clip ${new Date().toLocaleDateString("en-GB")}`,
+                "mp4"
+              ),
               contentType: "video/mp4",
               size: markedVideo.bytes.byteLength,
               r2Key,

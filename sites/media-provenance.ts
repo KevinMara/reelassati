@@ -10,7 +10,7 @@ const ID3_OWNER = encoder.encode("com.reelassati.provenance");
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,96}$/;
 
 export type EmbeddedMediaMarkingMethod =
-  "mp4-uuid-box" | "mp3-id3v2-private-frame";
+  "mp4-uuid-box" | "mp3-id3v2-private-frame" | "png-text-chunk";
 
 export interface EmbeddedMediaMark {
   bytes: ArrayBuffer;
@@ -46,6 +46,63 @@ function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
     left.byteLength === right.byteLength &&
     left.every((value, index) => value === right[index])
   );
+}
+
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function isPng(bytes: Uint8Array, contentType: string): boolean {
+  const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  return (
+    contentType.toLowerCase() === "image/png" &&
+    bytes.byteLength >= signature.byteLength &&
+    equalBytes(bytes.slice(0, signature.byteLength), signature)
+  );
+}
+
+function embedPng(bytes: Uint8Array, token: string): EmbeddedMediaMark | null {
+  const marker = encoder.encode(
+    `reelassati\0${AI_BINARY_MARKER_PREFIX}${token}`
+  );
+  const chunk = new Uint8Array(12 + marker.byteLength);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, marker.byteLength, false);
+  chunk.set(encoder.encode("tEXt"), 4);
+  chunk.set(marker, 8);
+  view.setUint32(
+    8 + marker.byteLength,
+    crc32(chunk.slice(4, 8 + marker.byteLength)),
+    false
+  );
+
+  let offset = 8;
+  while (offset + 12 <= bytes.byteLength) {
+    const length = new DataView(
+      bytes.buffer,
+      bytes.byteOffset + offset,
+      4
+    ).getUint32(0, false);
+    const end = offset + 12 + length;
+    if (end > bytes.byteLength) return null;
+    if (decoder.decode(bytes.slice(offset + 4, offset + 8)) === "IEND") {
+      return {
+        bytes: arrayBuffer(
+          concatBytes(bytes.slice(0, offset), chunk, bytes.slice(offset))
+        ),
+        method: "png-text-chunk",
+      };
+    }
+    offset = end;
+  }
+  return null;
 }
 
 function syncSafeBytes(value: number): Uint8Array {
@@ -141,6 +198,47 @@ export function embedMediaProvenanceMarker(
   const bytes = new Uint8Array(value);
   if (isMp4(bytes, contentType)) return embedMp4(bytes, token);
   if (isMp3(bytes, contentType)) return embedMp3(bytes, token);
+  if (isPng(bytes, contentType)) return embedPng(bytes, token);
+  return null;
+}
+
+function inspectPng(bytes: Uint8Array): InspectedMediaMark | null {
+  const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (
+    bytes.byteLength < signature.byteLength ||
+    !equalBytes(bytes.slice(0, signature.byteLength), signature)
+  ) {
+    return null;
+  }
+  const prefix = `reelassati\0${AI_BINARY_MARKER_PREFIX}`;
+  let offset = 8;
+  while (offset + 12 <= bytes.byteLength) {
+    const length = new DataView(
+      bytes.buffer,
+      bytes.byteOffset + offset,
+      4
+    ).getUint32(0, false);
+    const end = offset + 12 + length;
+    if (end > bytes.byteLength) return null;
+    const type = decoder.decode(bytes.slice(offset + 4, offset + 8));
+    if (type === "tEXt") {
+      const value = decoder.decode(
+        bytes.slice(offset + 8, offset + 8 + length)
+      );
+      if (value.startsWith(prefix)) {
+        const token = value.slice(prefix.length).trim();
+        if (!TOKEN_PATTERN.test(token)) return null;
+        return {
+          token,
+          unmarkedBytes: arrayBuffer(
+            concatBytes(bytes.slice(0, offset), bytes.slice(end))
+          ),
+          method: "png-text-chunk",
+        };
+      }
+    }
+    offset = end;
+  }
   return null;
 }
 
@@ -251,5 +349,5 @@ export function inspectMediaProvenanceMarker(
   value: ArrayBuffer
 ): InspectedMediaMark | null {
   const bytes = new Uint8Array(value);
-  return inspectMp4(bytes) || inspectMp3(bytes);
+  return inspectMp4(bytes) || inspectMp3(bytes) || inspectPng(bytes);
 }

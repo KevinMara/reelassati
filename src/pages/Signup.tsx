@@ -134,6 +134,23 @@ export default function Signup() {
               ) : null}
             </button>
           </form>
+          <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground">
+            By continuing, you agree to REELassati&apos;s{" "}
+            <Link
+              to="/responsible-use"
+              className="text-primary hover:underline"
+            >
+              Responsible Use terms
+            </Link>{" "}
+            and acknowledge its{" "}
+            <Link
+              to="/ai-transparency"
+              className="text-primary hover:underline"
+            >
+              AI and privacy information
+            </Link>
+            .
+          </p>
         </>
       )}
       {!confirmationSent ? (

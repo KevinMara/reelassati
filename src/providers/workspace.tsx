@@ -22,6 +22,7 @@ const EMPTY_CAPABILITIES: CapabilityState = {
   analysis: false,
   transcription: false,
   speech: false,
+  imageGeneration: false,
   videoGeneration: false,
   publishing: false,
   missing: [],

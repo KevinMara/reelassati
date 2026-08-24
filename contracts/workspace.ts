@@ -27,11 +27,13 @@ export interface CapabilityState {
   analysis: boolean;
   transcription: boolean;
   speech: boolean;
+  imageGeneration: boolean;
   videoGeneration: boolean;
   publishing: boolean;
   missing: string[];
   modelRoutes: Array<{
-    purpose: "Text" | "Analysis" | "Transcription" | "Speech" | "Video";
+    purpose:
+      "Text" | "Analysis" | "Transcription" | "Speech" | "Image" | "Video";
   }>;
 }
 

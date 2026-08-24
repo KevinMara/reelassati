@@ -28,6 +28,7 @@ export type AiOperation =
   | "video-analysis"
   | "transcription"
   | "speech-synthesis"
+  | "image-generation"
   | "video-generation"
   | "trend-research"
   | "support-assistance"
