@@ -8891,7 +8891,7 @@ async function researchTrendSources(
               messages: [
                 {
                   role: "system",
-                  content: `You are REELassati's evidence-first short-form trend researcher. You must use the provided web search tool before answering. ${directUrlInstructions[searchPlatform]} Never return search pages, profiles, articles, or compilations. Report only findings supported by the search results and include each direct individual-video URL. Never invent URLs, creators, dates, metrics, or evidence. Prefer evidence from the last 14 days; older videos are allowed only when the sources show current resurfacing. Keep observations separate from hypotheses.`,
+                  content: `You are REELassati's evidence-first short-form trend researcher. You must use the provided web search tool before answering. ${directUrlInstructions[searchPlatform]} Never return search pages, profiles, articles, or compilations. Report only findings supported by the search results and include each direct individual-video URL. Never invent URLs, creators, dates, metrics, or evidence. Prefer evidence from the last 14 days; older videos are allowed only when the sources show current resurfacing. Keep observations separate from hypotheses. Return JSON only with one key, trends. Each trend needs: platform, title, creator, sourceUrl, hook, pattern, evidence as an array, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics, thumbnailUrl, and publishedAt. Use null for unknown metrics, thumbnailUrl, and publishedAt.`,
                 },
                 {
                   role: "user",
@@ -8918,7 +8918,7 @@ async function researchTrendSources(
                 allow_fallbacks: true,
                 require_parameters: true,
               },
-              max_tokens: 1_000,
+              max_tokens: 1_400,
               temperature: 0.1,
             }),
             signal: AbortSignal.timeout(75_000),
@@ -8974,46 +8974,16 @@ async function researchTrendSources(
       );
     }
 
-    failureCode = "structure_request_failure";
-    const structureResponse = await fetch(
-      `${OPENROUTER_BASE}/chat/completions`,
-      {
-        method: "POST",
-        headers: openRouterHeaders(env),
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            {
-              role: "system",
-              content: `You structure verified short-form research into REELassati trend cards. Return JSON only with one key, trends. Use only the supplied verified source URLs and never alter or invent a URL. Never invent creators, dates, metrics, or factual evidence. Use null for every metric not present in the research. Separate observed evidence from hypotheses. Each item requires: platform, title, creator, sourceUrl, thumbnailUrl or null, publishedAt ISO string or null, niche, region, language, hook, pattern, lifecycle (seed|emerging|breakout|mainstream|saturated|decaying), confidence from 0 to 1, metrics with views/likes/comments/shares as number or null, evidence as 1-4 short factual observations, hypothesis, adaptation, and passSignal. Do not claim causation from view counts.`,
-            },
-            {
-              role: "user",
-              content: `Brief:\n${taskInstruction}\n\nVerified search citations:\n${JSON.stringify(citations)}\n\nResearch notes:\n${searchPayloads
-                .map(payload => extractTextContent(payload))
-                .join("\n\n")
-                .slice(0, 8_000)}`,
-            },
-          ],
-          plugins: [{ id: "response-healing" }],
-          provider: {
-            allow_fallbacks: true,
-            require_parameters: true,
-          },
-          response_format: { type: "json_object" },
-          max_tokens: 3_600,
-          temperature: 0.1,
-        }),
-        signal: AbortSignal.timeout(90_000),
+    failureCode = "invalid_search_analysis";
+    const candidates = searchPayloads.flatMap(payload => {
+      try {
+        const parsed = parseModelJson(payload);
+        return Array.isArray(parsed.trends) ? parsed.trends : [];
+      } catch {
+        return [];
       }
-    );
-    if (!structureResponse.ok) {
-      failureCode = `structure_provider_${structureResponse.status}`;
-      await providerError(structureResponse, "OpenRouter");
-    }
-    failureCode = "invalid_structured_payload";
-    const output = parseModelJson(await structureResponse.json());
-    const groundedOutput = groundTrendOutput(output, citations);
+    });
+    const groundedOutput = groundTrendOutput({ trends: candidates }, citations);
     const trends = normalizeTrendItems(groundedOutput, generatedAt).filter(
       item =>
         scope.platform === "all" ? true : item.platform === scope.platform
