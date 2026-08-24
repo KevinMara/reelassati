@@ -329,6 +329,18 @@ describe("Sites worker", () => {
     });
   });
 
+  it("rejects unsigned weekly trend refresh requests", async () => {
+    const response = await worker.fetch(
+      new Request("https://studio.example/api/internal/trends/weekly"),
+      env as never
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Unauthorized",
+    });
+  });
+
   it("qualifies referral rewards only from a signed, idempotent billing event", async () => {
     const secret = "billing-webhook-secret-at-least-24-characters";
     const rawBody = JSON.stringify({

@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Beaker,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   ExternalLink,
   Eye,
@@ -33,7 +34,9 @@ import type { Platform, ScriptDraft } from "@contracts/workspace";
 import type {
   TrendEvidenceItem,
   TrendFeedResponse,
+  TrendContentType,
   TrendLifecycle,
+  TrendObjective,
   TrendPlatform,
   TrendScope,
 } from "@contracts/trends";
@@ -61,6 +64,27 @@ const TREND_PLATFORM_OPTIONS: Array<{
   { value: "tiktok", label: "TikTok" },
   { value: "instagram", label: "Instagram Reels" },
   { value: "youtube", label: "YouTube Shorts" },
+];
+
+const CONTENT_TYPE_OPTIONS: Array<{
+  value: TrendContentType;
+  label: string;
+}> = [
+  { value: "overall", label: "All content formats" },
+  { value: "creator-led", label: "Creator-led" },
+  { value: "product-demo", label: "Product / demo" },
+  { value: "educational", label: "Educational" },
+  { value: "faceless", label: "Faceless" },
+  { value: "ugc", label: "UGC" },
+  { value: "storytelling", label: "Storytelling" },
+];
+
+const OBJECTIVE_OPTIONS: Array<{ value: TrendObjective; label: string }> = [
+  { value: "overall", label: "Overall performance" },
+  { value: "reach", label: "Reach" },
+  { value: "engagement", label: "Engagement" },
+  { value: "retention", label: "Retention" },
+  { value: "conversion", label: "Conversion" },
 ];
 
 const LIFECYCLE_LABELS: Record<TrendLifecycle, string> = {
@@ -195,19 +219,30 @@ function Metric({
 
 export default function TrendsPage() {
   const { workspace, updateWorkspace, saving } = useWorkspace();
-  const [feed, setFeed] = useState<TrendFeedResponse | null>(null);
+  const [weeklyFeed, setWeeklyFeed] = useState<TrendFeedResponse | null>(null);
+  const [customFeed, setCustomFeed] = useState<TrendFeedResponse | null>(null);
+  const [activeFeedKind, setActiveFeedKind] = useState<"weekly" | "custom">(
+    "weekly"
+  );
   const [feedLoading, setFeedLoading] = useState(true);
   const [researching, setResearching] = useState(false);
-  const [feedError, setFeedError] = useState<string | null>(null);
+  const [showResearch, setShowResearch] = useState(false);
+  const [weeklyError, setWeeklyError] = useState<string | null>(null);
+  const [researchError, setResearchError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [researchPlatform, setResearchPlatform] =
-    useState<"all" | TrendPlatform>("all");
+  const [researchPlatform, setResearchPlatform] = useState<
+    "all" | TrendPlatform
+  >("all");
+  const [contentType, setContentType] = useState<TrendContentType>("overall");
+  const [objective, setObjective] = useState<TrendObjective>("overall");
   const [region, setRegion] = useState("Global");
   const [researchLanguage, setResearchLanguage] = useState("");
-  const [platformFilter, setPlatformFilter] =
-    useState<"all" | TrendPlatform>("all");
-  const [lifecycleFilter, setLifecycleFilter] =
-    useState<"all" | TrendLifecycle>("all");
+  const [platformFilter, setPlatformFilter] = useState<"all" | TrendPlatform>(
+    "all"
+  );
+  const [lifecycleFilter, setLifecycleFilter] = useState<
+    "all" | TrendLifecycle
+  >("all");
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [hook, setHook] = useState("");
@@ -218,16 +253,16 @@ export default function TrendsPage() {
   const [filter, setFilter] = useState<"all" | Platform>("all");
   const [notice, setNotice] = useState<string | null>(null);
 
-  const loadSharedFeed = async () => {
+  const loadWeeklyFeed = async () => {
     setFeedLoading(true);
-    setFeedError(null);
+    setWeeklyError(null);
     try {
-      setFeed(await platformApi.trendFeed());
+      setWeeklyFeed(await platformApi.trendFeed());
     } catch (cause) {
-      setFeedError(
+      setWeeklyError(
         cause instanceof Error
           ? cause.message
-          : "Live trend evidence could not be loaded."
+          : "The weekly trend update could not be loaded."
       );
     } finally {
       setFeedLoading(false);
@@ -240,14 +275,14 @@ export default function TrendsPage() {
       .trendFeed()
       .then(result => {
         if (!active) return;
-        setFeed(result);
+        setWeeklyFeed(result);
       })
       .catch((cause: unknown) => {
         if (!active) return;
-        setFeedError(
+        setWeeklyError(
           cause instanceof Error
             ? cause.message
-            : "Live trend evidence could not be loaded."
+            : "The weekly trend update could not be loaded."
         );
       })
       .finally(() => {
@@ -258,14 +293,19 @@ export default function TrendsPage() {
     };
   }, []);
 
+  const activeFeed =
+    activeFeedKind === "custom" && customFeed ? customFeed : weeklyFeed;
+  const availableCredits =
+    customFeed?.availableCredits ?? weeklyFeed?.availableCredits;
+
   const visibleTrends = useMemo(
     () =>
-      (feed?.trends || []).filter(
+      (activeFeed?.trends || []).filter(
         trend =>
           (platformFilter === "all" || trend.platform === platformFilter) &&
           (lifecycleFilter === "all" || trend.lifecycle === lifecycleFilter)
       ),
-    [feed?.trends, lifecycleFilter, platformFilter]
+    [activeFeed?.trends, lifecycleFilter, platformFilter]
   );
 
   const hypotheses = useMemo(
@@ -393,7 +433,9 @@ export default function TrendsPage() {
     setSuccessSignal(trend.passSignal);
     setPlatform(trend.platform);
     setShowForm(true);
-    setNotice("Evidence copied into a testable hypothesis. Review before saving.");
+    setNotice(
+      "Evidence copied into a testable hypothesis. Review before saving."
+    );
     window.requestAnimationFrame(() =>
       document
         .getElementById("trend-hypothesis-form")
@@ -422,28 +464,27 @@ export default function TrendsPage() {
   const runResearch = async (event: FormEvent) => {
     event.preventDefault();
     const scope: TrendScope = {
-      query: query.trim(),
+      query: query.trim() || "overall short-form content",
       platform: researchPlatform,
+      contentType,
+      objective,
       region: region.trim() || "Global",
       language:
         researchLanguage.trim() || workspace.profile.contentLanguage || "en",
     };
-    if (scope.query.length < 2) {
-      setFeedError("Describe the niche, topic, product, or audience first.");
-      return;
-    }
     setResearching(true);
-    setFeedError(null);
+    setResearchError(null);
     try {
       const result = await platformApi.researchTrends(scope);
-      setFeed(result);
+      setCustomFeed(result);
+      setActiveFeedKind("custom");
       setPlatformFilter("all");
       setLifecycleFilter("all");
     } catch (cause) {
-      setFeedError(
+      setResearchError(
         cause instanceof Error
           ? cause.message
-          : "The fresh trend scan could not be completed."
+          : "The custom trend research could not be completed. No credits were used."
       );
     } finally {
       setResearching(false);
@@ -455,7 +496,9 @@ export default function TrendsPage() {
       <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <p className="mono-eyebrow text-primary">Live evidence workbench</p>
+            <p className="mono-eyebrow text-primary">
+              Weekly format intelligence
+            </p>
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               Source-linked videos
@@ -463,9 +506,9 @@ export default function TrendsPage() {
           </div>
           <h1 className="text-3xl font-semibold">Trends</h1>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-foreground/55">
-            Watch real TikToks, Reels, and Shorts, inspect the observed signal,
-            then turn the AI interpretation into a controlled test—not a viral
-            promise.
+            REELassati updates the strongest cross-platform formats every week.
+            Watch the source videos, inspect the evidence, or run a separate
+            credit-based research for your exact brief.
           </p>
         </div>
         <button
@@ -481,131 +524,246 @@ export default function TrendsPage() {
         </button>
       </div>
 
-      <form
-        onSubmit={runResearch}
-        className="mb-6 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.09] via-surface to-surface"
+      <button
+        type="button"
+        aria-expanded={showResearch}
+        aria-controls="custom-trend-research"
+        onClick={() => {
+          setShowResearch(current => !current);
+          setResearchError(null);
+        }}
+        className="mb-3 flex w-full items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 text-left transition-colors hover:border-primary/25"
       >
-        <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Search className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-medium">Research your niche</h2>
-              <span className="rounded-full bg-background px-2 py-1 text-[10px] text-foreground/50">
-                1 credit only when fresh results succeed
-              </span>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.6fr)_1fr_0.8fr_0.65fr]">
-              <label className="text-xs">
-                <span className="mb-1.5 block text-foreground/50">
-                  Niche, topic, product, or audience
-                </span>
-                <input
-                  value={query}
-                  onChange={event => setQuery(event.target.value)}
-                  placeholder="Example: AI tools for small businesses"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </label>
-              <label className="text-xs">
-                <span className="mb-1.5 block text-foreground/50">Platform</span>
-                <select
-                  value={researchPlatform}
-                  onChange={event =>
-                    setResearchPlatform(
-                      event.target.value as "all" | TrendPlatform
-                    )
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                >
-                  {TREND_PLATFORM_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-xs">
-                <span className="mb-1.5 block text-foreground/50">Region</span>
-                <input
-                  value={region}
-                  onChange={event => setRegion(event.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </label>
-              <label className="text-xs">
-                <span className="mb-1.5 block text-foreground/50">Language</span>
-                <input
-                  value={
-                    researchLanguage || workspace.profile.contentLanguage || "en"
-                  }
-                  onChange={event => setResearchLanguage(event.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </label>
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={researching}
-            className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-wait disabled:opacity-55"
-          >
-            {researching ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <Zap className="h-4 w-4" />
-            )}
-            {researching ? "Researching sources…" : "Run fresh research"}
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/35 px-5 py-3 text-[11px] text-foreground/45">
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-            Repeating an identical scan within 6 hours costs 0 credits.
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Search className="h-4 w-4" />
+        </span>
+        <span className="flex-1">
+          <span className="block text-sm font-medium">Custom research</span>
+          <span className="block text-xs text-foreground/45">
+            Choose topic, platform, format, objective, market, and language · 1
+            credit
           </span>
-          <span className="font-medium text-foreground/65">
-            {feed?.availableCredits ?? "—"} research credits available
-          </span>
-        </div>
-      </form>
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-foreground/40 transition-transform ${showResearch ? "rotate-180" : ""}`}
+        />
+      </button>
 
-      {feedError ? (
+      {showResearch ? (
+        <form
+          id="custom-trend-research"
+          onSubmit={runResearch}
+          className="mb-6 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.09] via-surface to-surface"
+        >
+          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Search className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-medium">Custom trend research</h2>
+                <span className="rounded-full bg-background px-2 py-1 text-[10px] text-foreground/50">
+                  1 credit per completed research
+                </span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <label className="text-xs">
+                  <span className="mb-1.5 block text-foreground/50">
+                    Topic, niche, product, or audience
+                  </span>
+                  <input
+                    value={query}
+                    onChange={event => setQuery(event.target.value)}
+                    placeholder="Leave blank for an overall scan"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+                <label className="text-xs">
+                  <span className="mb-1.5 block text-foreground/50">
+                    Platform
+                  </span>
+                  <select
+                    value={researchPlatform}
+                    onChange={event =>
+                      setResearchPlatform(
+                        event.target.value as "all" | TrendPlatform
+                      )
+                    }
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  >
+                    {TREND_PLATFORM_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs">
+                  <span className="mb-1.5 block text-foreground/50">
+                    Content type
+                  </span>
+                  <select
+                    value={contentType}
+                    onChange={event =>
+                      setContentType(event.target.value as TrendContentType)
+                    }
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  >
+                    {CONTENT_TYPE_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs">
+                  <span className="mb-1.5 block text-foreground/50">
+                    Performance objective
+                  </span>
+                  <select
+                    value={objective}
+                    onChange={event =>
+                      setObjective(event.target.value as TrendObjective)
+                    }
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  >
+                    {OBJECTIVE_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs">
+                  <span className="mb-1.5 block text-foreground/50">
+                    Region
+                  </span>
+                  <input
+                    value={region}
+                    onChange={event => setRegion(event.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+                <label className="text-xs">
+                  <span className="mb-1.5 block text-foreground/50">
+                    Language
+                  </span>
+                  <input
+                    value={
+                      researchLanguage ||
+                      workspace.profile.contentLanguage ||
+                      "en"
+                    }
+                    onChange={event => setResearchLanguage(event.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={researching}
+              className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-wait disabled:opacity-55"
+            >
+              {researching ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+              {researching ? "Researching sources…" : "Research with 1 credit"}
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/35 px-5 py-3 text-[11px] text-foreground/45">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              Every custom request uses 1 credit after verified results succeed.
+            </span>
+            <span className="font-medium text-foreground/65">
+              {availableCredits ?? "—"} credits available
+            </span>
+          </div>
+        </form>
+      ) : null}
+
+      {researchError ? (
         <div
           role="alert"
-          className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/[0.08] px-4 py-3 text-sm text-red-400"
+          className="mb-5 rounded-xl border border-red-500/20 bg-red-500/[0.08] px-4 py-3 text-sm text-red-400"
         >
-          <span>{feedError}</span>
+          {researchError}
+        </div>
+      ) : null}
+
+      {weeklyError ? (
+        <div
+          role="alert"
+          className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-4 py-3 text-sm text-amber-500"
+        >
+          <span>{weeklyError}</span>
           <button
             type="button"
-            onClick={() => void loadSharedFeed()}
+            onClick={() => void loadWeeklyFeed()}
             className="inline-flex items-center gap-1.5 font-medium text-foreground/70 hover:text-foreground"
           >
-            <RefreshCw className="h-3.5 w-3.5" /> Reload free feed
+            <RefreshCw className="h-3.5 w-3.5" /> Retry weekly update
           </button>
         </div>
       ) : null}
 
       <section className="mb-12" aria-labelledby="trend-evidence-heading">
+        <div className="mb-4 inline-flex rounded-lg border border-border bg-surface p-1">
+          <button
+            type="button"
+            onClick={() => setActiveFeedKind("weekly")}
+            className={`rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+              activeFeedKind === "weekly"
+                ? "bg-primary text-white shadow-sm"
+                : "text-foreground/55 hover:text-foreground"
+            }`}
+          >
+            Platform weekly
+          </button>
+          {customFeed ? (
+            <button
+              type="button"
+              onClick={() => setActiveFeedKind("custom")}
+              className={`rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                activeFeedKind === "custom"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-foreground/55 hover:text-foreground"
+              }`}
+            >
+              Your latest research
+            </button>
+          ) : null}
+        </div>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="mono-eyebrow text-[10px] text-foreground/45">
                 Actual videos · observed evidence · explicit hypotheses
               </p>
-              {feed ? (
+              {activeFeed ? (
                 <span className="rounded-full border border-border bg-surface px-2 py-1 text-[10px] text-foreground/45">
-                  {feed.freshness === "live" ? "Fresh scan" : "Cached scan"}
+                  {activeFeed.kind === "weekly"
+                    ? activeFeed.status === "preparing"
+                      ? "Preparing"
+                      : "Updated weekly"
+                    : "Credit research"}
                 </span>
               ) : null}
             </div>
             <h2 id="trend-evidence-heading" className="mt-1 font-medium">
-              {feed?.scope.query &&
-              feed.scope.query !== "short-form creator and business content"
-                ? `Evidence for “${feed.scope.query}”`
-                : "Shared trend evidence"}
+              {activeFeed?.kind === "custom"
+                ? `Research for “${activeFeed.scope.query}”`
+                : "This week’s strongest formats"}
             </h2>
-            {feed ? (
+            {activeFeed?.status === "ready" ? (
               <p className="mt-1 text-xs text-foreground/40">
-                Checked {new Date(feed.generatedAt).toLocaleString()} · {feed.cacheNote}
+                Updated {new Date(activeFeed.generatedAt).toLocaleString()} ·{" "}
+                {activeFeed.cacheNote}
+              </p>
+            ) : activeFeed?.status === "preparing" ? (
+              <p className="mt-1 text-xs text-foreground/40">
+                The first weekly format update is being prepared automatically.
               </p>
             ) : null}
           </div>
@@ -627,9 +785,7 @@ export default function TrendsPage() {
             <select
               value={lifecycleFilter}
               onChange={event =>
-                setLifecycleFilter(
-                  event.target.value as "all" | TrendLifecycle
-                )
+                setLifecycleFilter(event.target.value as "all" | TrendLifecycle)
               }
               className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
               aria-label="Filter trend evidence by lifecycle"
@@ -644,7 +800,7 @@ export default function TrendsPage() {
           </div>
         </div>
 
-        {feedLoading ? (
+        {feedLoading && activeFeedKind === "weekly" ? (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map(index => (
               <div
@@ -702,7 +858,8 @@ export default function TrendsPage() {
 
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-foreground/45">
                     <span className="inline-flex items-center gap-1">
-                      <Clock3 className="h-3 w-3" /> {relativeTime(trend.publishedAt)}
+                      <Clock3 className="h-3 w-3" />{" "}
+                      {relativeTime(trend.publishedAt)}
                     </span>
                     <Metric
                       icon={<Eye className="h-3 w-3" />}
@@ -753,7 +910,9 @@ export default function TrendsPage() {
                       {trend.hypothesis}
                     </p>
                     <p className="mt-2 text-xs leading-relaxed text-foreground/45">
-                      <span className="font-medium text-foreground/65">Test:</span>{" "}
+                      <span className="font-medium text-foreground/65">
+                        Test:
+                      </span>{" "}
                       {trend.adaptation}
                     </p>
                   </div>
@@ -763,7 +922,8 @@ export default function TrendsPage() {
                     onClick={() => prefillFromTrend(trend)}
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-medium text-white hover:bg-primary-hover"
                   >
-                    <FlaskConical className="h-3.5 w-3.5" /> Turn into hypothesis
+                    <FlaskConical className="h-3.5 w-3.5" /> Turn into
+                    hypothesis
                   </button>
                 </div>
               </article>
@@ -772,10 +932,15 @@ export default function TrendsPage() {
         ) : (
           <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center">
             <Search className="mx-auto h-7 w-7 text-primary" />
-            <h3 className="mt-3 text-sm font-medium">No matching evidence</h3>
+            <h3 className="mt-3 text-sm font-medium">
+              {activeFeed?.status === "preparing"
+                ? "Weekly update in preparation"
+                : "No matching evidence"}
+            </h3>
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-foreground/45">
-              Change the free filters, reload the shared feed, or run a focused
-              scan. REELassati does not fill empty states with fabricated trends.
+              {activeFeed?.status === "preparing"
+                ? "REELassati updates this feed internally; no action or credits are required from you."
+                : "Change the display filters or run a custom credit-based research. REELassati does not fill empty states with fabricated trends."}
             </p>
           </div>
         )}
@@ -788,7 +953,10 @@ export default function TrendsPage() {
           ["03", "Define", "Choose what would count as a real win."],
           ["04", "Produce", "Build controlled variants in the Studio."],
         ].map(([step, label, detail]) => (
-          <div key={step} className="rounded-xl border border-border bg-surface p-4">
+          <div
+            key={step}
+            className="rounded-xl border border-border bg-surface p-4"
+          >
             <p className="font-mono text-[10px] text-primary">{step}</p>
             <p className="mt-2 text-sm font-medium">{label}</p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/45">

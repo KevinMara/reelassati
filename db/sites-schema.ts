@@ -284,3 +284,11 @@ export const trendResearchRuns = sqliteTable(
     ),
   ]
 );
+
+export const trendRefreshState = sqliteTable("trend_refresh_state", {
+  refreshKey: text("refresh_key").primaryKey().notNull(),
+  leaseExpiresAt: text("lease_expires_at").notNull(),
+  lastStartedAt: text("last_started_at").notNull(),
+  lastCompletedAt: text("last_completed_at"),
+  lastError: text("last_error"),
+});

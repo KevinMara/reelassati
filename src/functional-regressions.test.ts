@@ -179,6 +179,7 @@ describe("platform-wide functional invariants", () => {
     );
     expect(readdirSync(new URL("../api", import.meta.url).pathname)).toEqual([
       "support.ts",
+      "trends-weekly.ts",
     ]);
     expect(source("../api/support.ts")).toContain(
       "export default { fetch: handleSupport }"
@@ -186,6 +187,30 @@ describe("platform-wide functional invariants", () => {
     expect(
       readdirSync(new URL("../legacy-api", import.meta.url).pathname).length
     ).toBeGreaterThan(0);
+    expect(vercel).toMatchObject({
+      crons: [{ path: "/api/trends-weekly", schedule: "0 5 * * 1" }],
+    });
+  });
+
+  it("keeps weekly trends internal and charges every completed custom research", () => {
+    const trends = source("./pages/dashboard/TrendsPage.tsx");
+    const server = source("../sites/server.ts");
+    const cron = source("../api/trends-weekly.ts");
+
+    expect(trends).toContain("Platform weekly");
+    expect(trends).toContain("1 credit per completed research");
+    expect(trends).toContain("All content formats");
+    expect(trends).toContain("Overall performance");
+    expect(trends).not.toMatch(/reload free|0 credits|identical scan/i);
+    expect(server).toContain("reserveTrendResearchCredit");
+    expect(server).toContain('"moonshotai/kimi-k2.5"');
+    expect(server).toContain("TREND_WEEKLY_TTL_MS");
+    expect(server).toMatch(
+      /Math\.floor\(Number\(referral\?\.credits\).*\|\| 0\)\s*-\s*Math\.floor\(Number\(spent\?\.credits\)/s
+    );
+    expect(server).not.toContain("TREND_STARTER_CREDITS");
+    expect(server).not.toContain("TREND_PERSONAL_CACHE_MS");
+    expect(cron).toContain("/api/internal/trends/weekly");
   });
 
   it("uses public SaaS authentication and sends bearer tokens to the product API", () => {

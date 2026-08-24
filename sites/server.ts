@@ -35,10 +35,13 @@ import { MAX_AI_MEDIA_BYTES, MAX_UPLOAD_BYTES } from "../contracts/uploads";
 import type {
   TrendEvidenceItem,
   TrendFeedResponse,
+  TrendContentType,
   TrendLifecycle,
+  TrendObjective,
   TrendPlatform,
   TrendScope,
 } from "../contracts/trends";
+import { createRemoteJWKSet, decodeJwt, jwtVerify } from "jose";
 
 type AssetBinding = {
   fetch(request: Request): Promise<Response>;
@@ -105,6 +108,7 @@ type SitesEnvironment = {
   OPENROUTER_TTS_MODEL?: string;
   OPENROUTER_TTS_VOICE?: string;
   OPENROUTER_IMAGE_MODEL?: string;
+  OPENROUTER_TREND_MODEL?: string;
   OPENROUTER_VIDEO_MODEL?: string;
   OPENROUTER_CONTINUITY_VIDEO_MODEL?: string;
   OPENROUTER_WEBHOOK_SECRET?: string;
@@ -249,9 +253,23 @@ const MAX_WORKSPACE_BYTES = 2_000_000;
 const REFERRAL_REWARD_CREDITS = 500;
 const REFERRAL_REWARD_CENTS = 500;
 const TREND_RESEARCH_CREDIT_COST = 1;
-const TREND_STARTER_CREDITS = 3;
-const TREND_SHARED_TTL_MS = 12 * 60 * 60 * 1000;
-const TREND_PERSONAL_CACHE_MS = 6 * 60 * 60 * 1000;
+const TREND_WEEKLY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const TREND_REFRESH_LEASE_MS = 10 * 60 * 1000;
+const TREND_WEEKLY_SCOPE_KEY = "weekly:global:cross-platform";
+const TREND_SYSTEM_OWNER: AuthenticatedUser = {
+  email: "trend-system@reelassati.app",
+  name: "REELassati Trends",
+};
+const VERCEL_TREND_PROJECT_ID = "prj_oMk2WHi81HNBQBU1AACAKMwFiycP";
+const VERCEL_TREND_TEAM_SLUG = "kevinmaras-projects";
+const VERCEL_TREND_ISSUERS = new Set([
+  "https://oidc.vercel.com",
+  `https://oidc.vercel.com/${VERCEL_TREND_TEAM_SLUG}`,
+]);
+const vercelTrendJwks = new Map<
+  string,
+  ReturnType<typeof createRemoteJWKSet>
+>();
 const ALLOWED_UPLOAD_PREFIXES = ["video/", "audio/", "image/"];
 const ACTIVE_UPLOAD_TYPES = new Set(["image/svg+xml"]);
 const ZERNIO_PLATFORMS = new Set([
@@ -690,6 +708,15 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
       env.DB.prepare(
         "CREATE INDEX IF NOT EXISTS trend_research_owner_query_idx ON trend_research_runs (owner_email, query_hash, created_at)"
       ),
+      env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS trend_refresh_state (
+            refresh_key TEXT PRIMARY KEY NOT NULL,
+            lease_expires_at TEXT NOT NULL,
+            last_started_at TEXT NOT NULL,
+            last_completed_at TEXT,
+            last_error TEXT
+          )
+        `),
     ])
       .then(async () => {
         const columns = await env.DB.prepare(
@@ -8375,16 +8402,27 @@ const TREND_LIFECYCLES = new Set<TrendLifecycle>([
   "saturated",
   "decaying",
 ]);
+const TREND_CONTENT_TYPES = new Set<TrendContentType>([
+  "overall",
+  "creator-led",
+  "product-demo",
+  "educational",
+  "faceless",
+  "ugc",
+  "storytelling",
+]);
+const TREND_OBJECTIVES = new Set<TrendObjective>([
+  "overall",
+  "reach",
+  "engagement",
+  "retention",
+  "conversion",
+]);
 
 interface TrendSnapshotRow {
   payload_json: string;
   generated_at: string;
   expires_at: string;
-}
-
-interface TrendResearchRow {
-  payload_json: string;
-  created_at: string;
 }
 
 function trendPlatform(value: unknown): "all" | TrendPlatform {
@@ -8394,11 +8432,27 @@ function trendPlatform(value: unknown): "all" | TrendPlatform {
     : "all";
 }
 
+function trendContentType(value: unknown): TrendContentType {
+  const normalized = stringValue(value, "overall").toLowerCase();
+  return TREND_CONTENT_TYPES.has(normalized as TrendContentType)
+    ? (normalized as TrendContentType)
+    : "overall";
+}
+
+function trendObjective(value: unknown): TrendObjective {
+  const normalized = stringValue(value, "overall").toLowerCase();
+  return TREND_OBJECTIVES.has(normalized as TrendObjective)
+    ? (normalized as TrendObjective)
+    : "overall";
+}
+
 function cleanTrendScope(value: unknown, fallbackLanguage = "en"): TrendScope {
   const record = recordValue(value) || {};
   return {
     query: stringValue(record.query, "short-form content").slice(0, 140),
     platform: trendPlatform(record.platform),
+    contentType: trendContentType(record.contentType),
+    objective: trendObjective(record.objective),
     region: stringValue(record.region, "Global").slice(0, 60),
     language: stringValue(record.language, fallbackLanguage).slice(0, 32),
   };
@@ -8563,8 +8617,7 @@ async function trendAvailableCredits(
   return Math.max(
     0,
     Math.floor(Number(workspace.profile.credits) || 0) +
-      Math.floor(Number(referral?.credits) || 0) +
-      TREND_STARTER_CREDITS -
+      Math.floor(Number(referral?.credits) || 0) -
       Math.floor(Number(spent?.credits) || 0)
   );
 }
@@ -8572,7 +8625,8 @@ async function trendAvailableCredits(
 async function researchTrendSources(
   env: SitesEnvironment,
   user: AuthenticatedUser,
-  scope: TrendScope
+  scope: TrendScope,
+  mode: "weekly" | "custom"
 ): Promise<{ trends: TrendEvidenceItem[]; generatedAt: string }> {
   if (!env.OPENROUTER_API_KEY) {
     throw new Response(
@@ -8584,17 +8638,14 @@ async function researchTrendSources(
     );
   }
   const generatedAt = new Date().toISOString();
-  const selectedModel =
-    env.OPENROUTER_ANALYSIS_MODEL ||
-    env.OPENROUTER_TEXT_MODEL ||
-    "openai/gpt-5-mini";
+  const selectedModel = env.OPENROUTER_TREND_MODEL || "moonshotai/kimi-k2.5";
   const invocation = await beginAiInvocation(
     env,
     user,
     "trend-research",
     "OpenRouter",
     selectedModel,
-    scope
+    { mode, scope }
   );
   try {
     const platformInstruction =
@@ -8605,6 +8656,18 @@ async function researchTrendSources(
           : scope.platform === "instagram"
             ? "Instagram Reels"
             : "TikTok";
+    const contentTypeInstruction =
+      scope.contentType === "overall"
+        ? "all relevant short-form content types"
+        : scope.contentType;
+    const objectiveInstruction =
+      scope.objective === "overall"
+        ? "overall demonstrated performance"
+        : scope.objective;
+    const taskInstruction =
+      mode === "weekly"
+        ? `Identify 4-6 distinct short-form FORMAT PATTERNS performing strongly across ${platformInstruction} right now. Select formats with evidence beyond a single isolated creator where the search sources permit it. For each format, provide one canonical representative video URL and explain only the observable evidence. Prioritize format diversity and practical transferability over returning many near-duplicate videos.`
+        : `Find 4-8 current ${platformInstruction} videos that answer this paid custom brief. Topic or niche: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. Return diverse creators and practical patterns the creator can test.`;
     const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: "POST",
       headers: openRouterHeaders(env),
@@ -8613,19 +8676,20 @@ async function researchTrendSources(
         messages: [
           {
             role: "system",
-            content: `You are REELassati's evidence-first short-form trend researcher. Search the live web and return JSON only with one key, trends, containing 6-12 current individual videos. Use direct canonical video URLs only: TikTok /@creator/video/ID, Instagram /reel/CODE, or YouTube /shorts/ID. Never invent URLs, creators, dates, engagement metrics, or evidence. Use null for every metric that is not explicitly present in a search source. Separate observed evidence from hypotheses. Prefer videos from the last 14 days; an older video is allowed only when the sources show that it is currently resurfacing. Each item requires: platform, title, creator, sourceUrl, thumbnailUrl or null, publishedAt ISO string or null, niche, region, language, hook, pattern, lifecycle (seed|emerging|breakout|mainstream|saturated|decaying), confidence from 0 to 1, metrics with views/likes/comments/shares as number or null, evidence as 1-4 short factual observations, hypothesis, adaptation, and passSignal. Do not claim causation from view counts. Do not reproduce captions at length.`,
+            content: `You are REELassati's evidence-first short-form trend researcher. Use live web search and return JSON only with one key, trends. Use direct canonical video URLs only: TikTok /@creator/video/ID, Instagram /reel/CODE, or YouTube /shorts/ID. Never invent URLs, creators, dates, engagement metrics, or evidence. Use null for every metric that is not explicitly present in a search source. Separate observed evidence from hypotheses. Prefer evidence from the last 14 days; older videos are allowed only when sources show current resurfacing. Each item requires: platform, title, creator, sourceUrl, thumbnailUrl or null, publishedAt ISO string or null, niche, region, language, hook, pattern, lifecycle (seed|emerging|breakout|mainstream|saturated|decaying), confidence from 0 to 1, metrics with views/likes/comments/shares as number or null, evidence as 1-4 short factual observations, hypothesis, adaptation, and passSignal. Do not claim causation from view counts. Do not reproduce captions at length.`,
           },
           {
             role: "user",
-            content: `Find current ${platformInstruction} evidence for the topic or niche "${scope.query}". Audience region: ${scope.region}. Content language: ${scope.language}. Return diverse creators and practical patterns a creator can test.`,
+            content: taskInstruction,
           },
         ],
         plugins: [
-          { id: "web", engine: "exa", max_results: 10 },
+          { id: "web", engine: "exa", max_results: mode === "weekly" ? 8 : 10 },
           { id: "response-healing" },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.2,
+        max_tokens: 4_500,
+        temperature: 0.15,
       }),
     });
     if (!response.ok) {
@@ -8637,8 +8701,14 @@ async function researchTrendSources(
       scope.platform === "all" ? true : item.platform === scope.platform
     );
     if (trends.length < 2) {
-      throw new Error(
-        "The live search did not return enough verifiable individual video links"
+      throw json(
+        {
+          error:
+            mode === "weekly"
+              ? "The weekly update could not verify enough current source videos."
+              : "The research could not verify enough current source videos. No credits were used.",
+        },
+        502
       );
     }
     await completeAiInvocation(env, invocation, {
@@ -8649,7 +8719,16 @@ async function researchTrendSources(
     return { trends, generatedAt };
   } catch (cause) {
     await failAiInvocation(env, invocation, "provider_or_validation_failure");
-    throw cause;
+    if (cause instanceof Response) throw cause;
+    throw json(
+      {
+        error:
+          mode === "weekly"
+            ? "The weekly trend update could not be completed."
+            : "The custom research could not be completed. No credits were used.",
+      },
+      502
+    );
   }
 }
 
@@ -8658,15 +8737,240 @@ function trendResponse(input: {
   generatedAt: string;
   nextRefreshAt: string;
   freshness: "live" | "cached";
+  kind: "weekly" | "custom";
+  status: "ready" | "preparing";
   scope: TrendScope;
   creditCost: number;
   availableCredits: number;
   cacheNote: string;
 }): TrendFeedResponse {
-  return {
-    ...input,
-    starterCredits: TREND_STARTER_CREDITS,
-  };
+  return input;
+}
+
+function weeklyTrendScope(): TrendScope {
+  return cleanTrendScope({
+    query: "overall short-form content",
+    platform: "all",
+    contentType: "overall",
+    objective: "overall",
+    region: "Global",
+    language: "en",
+  });
+}
+
+async function latestWeeklyTrendSnapshot(
+  env: SitesEnvironment
+): Promise<TrendSnapshotRow | null> {
+  return env.DB.prepare(
+    `
+      SELECT payload_json, generated_at, expires_at
+      FROM trend_snapshots
+      WHERE scope_key = ?
+      ORDER BY generated_at DESC
+      LIMIT 1
+    `
+  )
+    .bind(TREND_WEEKLY_SCOPE_KEY)
+    .first<TrendSnapshotRow>();
+}
+
+async function refreshWeeklyTrendFeed(env: SitesEnvironment): Promise<{
+  refreshed: boolean;
+  reason?: "current" | "in_progress";
+  generatedAt?: string;
+  nextRefreshAt?: string;
+  resultCount?: number;
+}> {
+  await initializeSchema(env);
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const current = await latestWeeklyTrendSnapshot(env);
+  if (current && Date.parse(current.expires_at) > now.getTime()) {
+    return {
+      refreshed: false,
+      reason: "current",
+      generatedAt: current.generated_at,
+      nextRefreshAt: current.expires_at,
+    };
+  }
+
+  const leaseExpiresAt = new Date(
+    now.getTime() + TREND_REFRESH_LEASE_MS
+  ).toISOString();
+  const lease = await env.DB.prepare(
+    `
+      INSERT INTO trend_refresh_state
+        (refresh_key, lease_expires_at, last_started_at, last_completed_at, last_error)
+      VALUES (?, ?, ?, NULL, NULL)
+      ON CONFLICT(refresh_key) DO UPDATE SET
+        lease_expires_at = excluded.lease_expires_at,
+        last_started_at = excluded.last_started_at,
+        last_error = NULL
+      WHERE trend_refresh_state.lease_expires_at <= ?
+    `
+  )
+    .bind(TREND_WEEKLY_SCOPE_KEY, leaseExpiresAt, nowIso, nowIso)
+    .run();
+  if ((lease.meta?.changes || 0) !== 1) {
+    return { refreshed: false, reason: "in_progress" };
+  }
+
+  try {
+    const result = await researchTrendSources(
+      env,
+      TREND_SYSTEM_OWNER,
+      weeklyTrendScope(),
+      "weekly"
+    );
+    const nextRefreshAt = new Date(
+      Date.parse(result.generatedAt) + TREND_WEEKLY_TTL_MS
+    ).toISOString();
+    await env.DB.batch([
+      env.DB.prepare(
+        `
+          INSERT INTO trend_snapshots
+            (id, scope_key, payload_json, generated_at, expires_at)
+          VALUES (?, ?, ?, ?, ?)
+        `
+      ).bind(
+        crypto.randomUUID(),
+        TREND_WEEKLY_SCOPE_KEY,
+        JSON.stringify(result.trends),
+        result.generatedAt,
+        nextRefreshAt
+      ),
+      env.DB.prepare(
+        `
+          UPDATE trend_refresh_state
+          SET lease_expires_at = ?, last_completed_at = ?, last_error = NULL
+          WHERE refresh_key = ?
+        `
+      ).bind(result.generatedAt, result.generatedAt, TREND_WEEKLY_SCOPE_KEY),
+      env.DB.prepare(
+        `
+          DELETE FROM trend_snapshots
+          WHERE scope_key = ? AND generated_at < ?
+        `
+      ).bind(
+        TREND_WEEKLY_SCOPE_KEY,
+        new Date(Date.parse(result.generatedAt) - 56 * 86_400_000).toISOString()
+      ),
+    ]);
+    return {
+      refreshed: true,
+      generatedAt: result.generatedAt,
+      nextRefreshAt,
+      resultCount: result.trends.length,
+    };
+  } catch (cause) {
+    const failedAt = new Date().toISOString();
+    await env.DB.prepare(
+      `
+        UPDATE trend_refresh_state
+        SET lease_expires_at = ?, last_error = ?
+        WHERE refresh_key = ?
+      `
+    )
+      .bind(failedAt, "provider_or_validation_failure", TREND_WEEKLY_SCOPE_KEY)
+      .run()
+      .catch(() => undefined);
+    throw cause;
+  }
+}
+
+async function handleWeeklyTrendRefresh(
+  request: Request,
+  env: SitesEnvironment
+): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "POST") {
+    return errorResponse("Method not allowed", 405);
+  }
+  const authorization = request.headers.get("authorization") || "";
+  const token = authorization.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : "";
+  if (!token) return errorResponse("Unauthorized", 401);
+  try {
+    const issuer = stringValue(decodeJwt(token).iss);
+    if (!VERCEL_TREND_ISSUERS.has(issuer)) {
+      return errorResponse("Unauthorized", 401);
+    }
+    let jwks = vercelTrendJwks.get(issuer);
+    if (!jwks) {
+      jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks`));
+      vercelTrendJwks.set(issuer, jwks);
+    }
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer,
+      audience: `https://vercel.com/${VERCEL_TREND_TEAM_SLUG}`,
+      subject: `owner:${VERCEL_TREND_TEAM_SLUG}:project:reelassati:environment:production`,
+    });
+    if (
+      payload.project_id !== VERCEL_TREND_PROJECT_ID ||
+      payload.environment !== "production"
+    ) {
+      return errorResponse("Unauthorized", 401);
+    }
+  } catch {
+    return errorResponse("Unauthorized", 401);
+  }
+  try {
+    const result = await refreshWeeklyTrendFeed(env);
+    return json(result, result.reason === "in_progress" ? 202 : 200);
+  } catch (cause) {
+    if (cause instanceof Response) return cause;
+    return errorResponse("The weekly trend update could not be completed", 502);
+  }
+}
+
+async function reserveTrendResearchCredit(
+  env: SitesEnvironment,
+  user: AuthenticatedUser,
+  scopeJson: string,
+  queryHash: string
+): Promise<{ id: string; createdAt: string } | null> {
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const reservation = await env.DB.prepare(
+    `
+      INSERT INTO trend_research_runs
+        (id, owner_email, query_hash, scope_json, payload_json, credit_cost, created_at)
+      SELECT ?, ?, ?, ?, '[]', ?, ?
+      WHERE (
+        COALESCE(
+          CAST(json_extract(
+            (SELECT document FROM workspace_state WHERE owner_email = ?),
+            '$.profile.credits'
+          ) AS INTEGER),
+          0
+        )
+        + COALESCE((
+          SELECT SUM(credits_awarded)
+          FROM referral_claims
+          WHERE referrer_email = ? AND status = 'verified'
+        ), 0)
+        - COALESCE((
+          SELECT SUM(credit_cost)
+          FROM trend_research_runs
+          WHERE owner_email = ?
+        ), 0)
+      ) >= ?
+    `
+  )
+    .bind(
+      id,
+      user.email,
+      queryHash,
+      scopeJson,
+      TREND_RESEARCH_CREDIT_COST,
+      createdAt,
+      user.email,
+      user.email,
+      user.email,
+      TREND_RESEARCH_CREDIT_COST
+    )
+    .run();
+  return (reservation.meta?.changes || 0) === 1 ? { id, createdAt } : null;
 }
 
 async function handleTrends(
@@ -8680,28 +8984,8 @@ async function handleTrends(
   const availableCredits = await trendAvailableCredits(env, user);
 
   if (request.method === "GET") {
-    const scope = cleanTrendScope(
-      {
-        query: "short-form creator and business content",
-        platform: "all",
-        region: "Global",
-        language,
-      },
-      language
-    );
-    const scopeKey = `shared:${scope.platform}:${scope.region}:${scope.language}`;
-    const now = new Date().toISOString();
-    const cached = await env.DB.prepare(
-      `
-        SELECT payload_json, generated_at, expires_at
-        FROM trend_snapshots
-        WHERE scope_key = ? AND expires_at > ?
-        ORDER BY generated_at DESC
-        LIMIT 1
-      `
-    )
-      .bind(scopeKey, now)
-      .first<TrendSnapshotRow>();
+    const scope = weeklyTrendScope();
+    const cached = await latestWeeklyTrendSnapshot(env);
     if (cached) {
       try {
         const trends = JSON.parse(cached.payload_json) as TrendEvidenceItem[];
@@ -8711,47 +8995,31 @@ async function handleTrends(
             generatedAt: cached.generated_at,
             nextRefreshAt: cached.expires_at,
             freshness: "cached",
+            kind: "weekly",
+            status: "ready",
             scope,
             creditCost: 0,
             availableCredits,
             cacheNote:
-              "Shared evidence is reused for every creator and never spends personal credits.",
+              "Curated automatically across TikTok, Reels, and Shorts.",
           })
         );
       } catch {
-        // A malformed cache entry is ignored and replaced by a grounded refresh.
+        // A malformed weekly snapshot never triggers user-initiated research.
       }
     }
-    const result = await researchTrendSources(env, user, scope);
-    const expiresAt = new Date(
-      Date.parse(result.generatedAt) + TREND_SHARED_TTL_MS
-    ).toISOString();
-    await env.DB.prepare(
-      `
-        INSERT INTO trend_snapshots
-          (id, scope_key, payload_json, generated_at, expires_at)
-        VALUES (?, ?, ?, ?, ?)
-      `
-    )
-      .bind(
-        crypto.randomUUID(),
-        scopeKey,
-        JSON.stringify(result.trends),
-        result.generatedAt,
-        expiresAt
-      )
-      .run();
     return json(
       trendResponse({
-        trends: result.trends,
-        generatedAt: result.generatedAt,
-        nextRefreshAt: expiresAt,
-        freshness: "live",
+        trends: [],
+        generatedAt: "",
+        nextRefreshAt: new Date().toISOString(),
+        freshness: "cached",
+        kind: "weekly",
+        status: "preparing",
         scope,
         creditCost: 0,
         availableCredits,
-        cacheNote:
-          "Fresh shared evidence collected without spending personal credits.",
+        cacheNote: "The weekly update runs internally.",
       })
     );
   }
@@ -8766,87 +9034,70 @@ async function handleTrends(
   }
   const scopeJson = JSON.stringify(scope);
   const queryHash = await sha256Hex(scopeJson);
-  const cacheSince = new Date(
-    Date.now() - TREND_PERSONAL_CACHE_MS
-  ).toISOString();
-  const cached = await env.DB.prepare(
-    `
-      SELECT payload_json, created_at
-      FROM trend_research_runs
-      WHERE owner_email = ? AND query_hash = ? AND created_at >= ?
-      ORDER BY created_at DESC
-      LIMIT 1
-    `
-  )
-    .bind(user.email, queryHash, cacheSince)
-    .first<TrendResearchRow>();
-  if (cached) {
-    try {
-      const trends = JSON.parse(cached.payload_json) as TrendEvidenceItem[];
-      return json(
-        trendResponse({
-          trends,
-          generatedAt: cached.created_at,
-          nextRefreshAt: new Date(
-            Date.parse(cached.created_at) + TREND_PERSONAL_CACHE_MS
-          ).toISOString(),
-          freshness: "cached",
-          scope,
-          creditCost: 0,
-          availableCredits,
-          cacheNote:
-            "This identical research was already available, so no credit was charged.",
-        })
-      );
-    } catch {
-      // Ignore a malformed cached response and perform a fresh verified search.
-    }
-  }
-  if (availableCredits < TREND_RESEARCH_CREDIT_COST) {
+  const reservation = await reserveTrendResearchCredit(
+    env,
+    user,
+    scopeJson,
+    queryHash
+  );
+  if (!reservation) {
     return json(
       {
         error:
-          "You need 1 research credit for a fresh personalized trend scan. The shared trend feed remains free.",
-        availableCredits,
+          "You need 1 credit for custom trend research. The platform weekly formats remain available.",
+        availableCredits: await trendAvailableCredits(env, user),
       },
       402
     );
   }
-  const result = await researchTrendSources(env, user, scope);
-  const runId = crypto.randomUUID();
-  await env.DB.prepare(
-    `
-      INSERT INTO trend_research_runs
-        (id, owner_email, query_hash, scope_json, payload_json, credit_cost, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `
-  )
-    .bind(
-      runId,
-      user.email,
-      queryHash,
-      scopeJson,
-      JSON.stringify(result.trends),
-      TREND_RESEARCH_CREDIT_COST,
-      result.generatedAt
+  let result: Awaited<ReturnType<typeof researchTrendSources>>;
+  try {
+    result = await researchTrendSources(env, user, scope, "custom");
+    const finalized = await env.DB.prepare(
+      `
+        UPDATE trend_research_runs
+        SET payload_json = ?, created_at = ?
+        WHERE id = ? AND owner_email = ?
+      `
     )
-    .run();
+      .bind(
+        JSON.stringify(result.trends),
+        result.generatedAt,
+        reservation.id,
+        user.email
+      )
+      .run();
+    if ((finalized.meta?.changes || 0) !== 1) {
+      throw errorResponse(
+        "The custom research could not be saved. No credits were used.",
+        500
+      );
+    }
+  } catch (cause) {
+    await env.DB.prepare(
+      "DELETE FROM trend_research_runs WHERE id = ? AND owner_email = ?"
+    )
+      .bind(reservation.id, user.email)
+      .run()
+      .catch(() => undefined);
+    if (cause instanceof Response) return cause;
+    return errorResponse(
+      "The custom research could not be completed. No credits were used.",
+      502
+    );
+  }
   return json(
     trendResponse({
       trends: result.trends,
       generatedAt: result.generatedAt,
-      nextRefreshAt: new Date(
-        Date.parse(result.generatedAt) + TREND_PERSONAL_CACHE_MS
-      ).toISOString(),
+      nextRefreshAt: result.generatedAt,
       freshness: "live",
+      kind: "custom",
+      status: "ready",
       scope,
       creditCost: TREND_RESEARCH_CREDIT_COST,
-      availableCredits: Math.max(
-        0,
-        availableCredits - TREND_RESEARCH_CREDIT_COST
-      ),
-      cacheNote:
-        "Fresh personalized research completed. Repeating the same scan within 6 hours is free.",
+      availableCredits: await trendAvailableCredits(env, user),
+      cacheNote: "1 credit used for this completed custom research.",
     })
   );
 }
@@ -8874,6 +9125,10 @@ async function handleApi(
         .toUpperCase() ||
       null;
     return json({ country });
+  }
+
+  if (url.pathname === "/api/internal/trends/weekly") {
+    return handleWeeklyTrendRefresh(request, env);
   }
 
   if (url.pathname.startsWith("/api/support/")) {
@@ -8937,7 +9192,17 @@ async function handleApi(
   }
 
   if (url.pathname === "/api/trends") {
-    return handleTrends(request, env, user);
+    try {
+      return await handleTrends(request, env, user);
+    } catch (cause) {
+      if (cause instanceof Response) throw cause;
+      return errorResponse(
+        request.method === "POST"
+          ? "Custom trend research is temporarily unavailable. No credits were used."
+          : "The weekly trend update is temporarily unavailable.",
+        503
+      );
+    }
   }
 
   if (url.pathname === "/api/workspace") {
@@ -9111,6 +9376,19 @@ export default {
     const indexUrl = new URL("/index.html", url);
     return withSecurityHeaders(
       await env.ASSETS.fetch(new Request(indexUrl, request))
+    );
+  },
+  async scheduled(
+    _controller: unknown,
+    env: SitesEnvironment,
+    ctx: { waitUntil(promise: Promise<unknown>): void }
+  ): Promise<void> {
+    ctx.waitUntil(
+      refreshWeeklyTrendFeed(env).catch(cause => {
+        console.error("Weekly trend refresh failed", {
+          errorType: cause instanceof Error ? cause.name : typeof cause,
+        });
+      })
     );
   },
 };

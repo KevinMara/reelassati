@@ -1,12 +1,19 @@
 export type TrendPlatform = "tiktok" | "instagram" | "youtube";
 
 export type TrendLifecycle =
-  | "seed"
-  | "emerging"
-  | "breakout"
-  | "mainstream"
-  | "saturated"
-  | "decaying";
+  "seed" | "emerging" | "breakout" | "mainstream" | "saturated" | "decaying";
+
+export type TrendContentType =
+  | "overall"
+  | "creator-led"
+  | "product-demo"
+  | "educational"
+  | "faceless"
+  | "ugc"
+  | "storytelling";
+
+export type TrendObjective =
+  "overall" | "reach" | "engagement" | "retention" | "conversion";
 
 export interface TrendMetrics {
   views: number | null;
@@ -41,6 +48,8 @@ export interface TrendEvidenceItem {
 export interface TrendScope {
   query: string;
   platform: "all" | TrendPlatform;
+  contentType: TrendContentType;
+  objective: TrendObjective;
   region: string;
   language: string;
 }
@@ -50,10 +59,10 @@ export interface TrendFeedResponse {
   generatedAt: string;
   nextRefreshAt: string;
   freshness: "live" | "cached";
+  kind: "weekly" | "custom";
+  status: "ready" | "preparing";
   scope: TrendScope;
   creditCost: number;
   availableCredits: number;
-  starterCredits: number;
   cacheNote: string;
 }
-

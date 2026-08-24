@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handleSupport } from "../api/support";
+import { handleWeeklyTrendCron } from "../api/trends-weekly";
 
 const originalEnvironment = { ...process.env };
 
@@ -287,5 +288,50 @@ describe("Vercel support function", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: "This feedback inbox is restricted to the owner.",
     });
+  });
+});
+
+describe("Vercel weekly trends scheduler", () => {
+  it("calls the idempotent platform refresh endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ refreshed: true, resultCount: 5 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await handleWeeklyTrendCron(
+      new Request("https://www.reelassati.app/api/trends-weekly", {
+        headers: {
+          "user-agent": "vercel-cron/1.0",
+          "x-vercel-oidc-token": "signed-oidc-token",
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://reelassati.kevinbiz.chatgpt.site/api/internal/trends/weekly",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer signed-oidc-token",
+        }),
+      })
+    );
+  });
+
+  it("rejects a request that is not a signed Vercel cron invocation", async () => {
+    const response = await handleWeeklyTrendCron(
+      new Request("https://www.reelassati.app/api/trends-weekly")
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it("does not accept interactive mutation methods", async () => {
+    const response = await handleWeeklyTrendCron(
+      new Request("https://www.reelassati.app/api/trends-weekly", {
+        method: "POST",
+      })
+    );
+    expect(response.status).toBe(405);
   });
 });

@@ -270,10 +270,11 @@ nested-element, keyboard, touch, and server-rejection cases.
 
 ### `INV-MODEL-002` — Explicit non-Kimi routes stay on OpenRouter
 
-Analysis, transcription, speech, and video generation remain explicit
+Analysis, trend research, transcription, speech, and video generation remain explicit
 OpenRouter routes even when Kimi test mode is enabled:
 
 - analysis: `OPENROUTER_ANALYSIS_MODEL`;
+- trend research: `OPENROUTER_TREND_MODEL`, defaulting to Kimi with grounded web search;
 - transcription: `OPENROUTER_STT_MODEL`;
 - speech: `OPENROUTER_TTS_MODEL` plus configured voice;
 - video generation: `OPENROUTER_VIDEO_MODEL`.
