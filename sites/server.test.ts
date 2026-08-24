@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import worker, {
   appendReleaseDisclosure,
+  groundTrendOutput,
   jobFromRow,
   normalizeTrendSource,
   publicationReviewFromInput,
@@ -376,6 +377,45 @@ describe("Sites worker", () => {
         content: "Direct video URL returned in the grounded research notes.",
       },
     ]);
+  });
+
+  it("pins formatted cards to verified sources and fills safe card fields", () => {
+    expect(
+      groundTrendOutput(
+        {
+          trends: [
+            { title: "Observed format", sourceUrl: "https://fake.test" },
+          ],
+        },
+        [
+          {
+            platform: "tiktok",
+            sourceUrl: "https://www.tiktok.com/@verified/video/1234567890",
+            title: "Verified example",
+            content: "Verified source observation.",
+          },
+          {
+            platform: "youtube",
+            sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
+            title: "Second example",
+            content: "Second verified observation.",
+          },
+        ]
+      )
+    ).toMatchObject({
+      trends: [
+        {
+          sourceUrl: "https://www.tiktok.com/@verified/video/1234567890",
+          creator: "verified",
+          evidence: ["Verified source observation."],
+        },
+        {
+          sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
+          creator: "Source creator",
+          evidence: ["Second verified observation."],
+        },
+      ],
+    });
   });
 
   it("serves the SPA entry for the production root route", async () => {

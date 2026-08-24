@@ -8615,6 +8615,78 @@ async function verifyTrendCitation(
   }
 }
 
+export function groundTrendOutput(
+  value: unknown,
+  citations: TrendSearchCitation[]
+): Record<string, unknown> {
+  const root = recordValue(value);
+  const candidates = Array.isArray(root?.trends) ? root.trends : [];
+  const allowedSources = new Map(
+    citations.map(citation => [citation.sourceUrl, citation] as const)
+  );
+  const targetCount = Math.min(6, citations.length);
+  const cardCount = Math.max(candidates.length, targetCount);
+  const trends: Record<string, unknown>[] = [];
+  for (let index = 0; index < cardCount; index += 1) {
+    const candidate = recordValue(candidates[index]) || {};
+    const candidateSource = normalizeTrendSource(
+      candidate.sourceUrl || candidate.url
+    );
+    const citation =
+      (candidateSource
+        ? allowedSources.get(candidateSource.sourceUrl)
+        : undefined) || citations[index % citations.length];
+    if (!citation) continue;
+    const title = stringValue(
+      candidate.title,
+      citation.title || `${citation.platform} short-form example`
+    ).slice(0, 160);
+    const pattern = stringValue(
+      candidate.pattern,
+      stringValue(candidate.hook, title)
+    ).slice(0, 280);
+    const hook = stringValue(candidate.hook, pattern).slice(0, 280);
+    const creatorFromUrl =
+      citation.platform === "tiktok"
+        ? new URL(citation.sourceUrl).pathname.match(/^\/@([^/]+)/)?.[1] || ""
+        : "";
+    const evidence =
+      Array.isArray(candidate.evidence) && candidate.evidence.length
+        ? candidate.evidence
+        : citation.content
+          ? [citation.content]
+          : [
+              "Direct individual video verified during the current platform search.",
+            ];
+    trends.push({
+      ...candidate,
+      platform: citation.platform,
+      sourceUrl: citation.sourceUrl,
+      title,
+      creator: stringValue(
+        candidate.creator || candidate.author || candidate.channel,
+        creatorFromUrl || "Source creator"
+      ).slice(0, 100),
+      hook,
+      pattern,
+      evidence,
+      hypothesis: stringValue(
+        candidate.hypothesis,
+        "Test whether this observed format transfers to your audience."
+      ),
+      adaptation: stringValue(
+        candidate.adaptation,
+        "Adapt the opening and structure to your own subject and brand."
+      ),
+      passSignal: stringValue(
+        candidate.passSignal,
+        "Compare retention and engagement with your recent baseline."
+      ),
+    });
+  }
+  return { trends };
+}
+
 function nullableTrendMetric(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -8916,8 +8988,10 @@ async function researchTrendSources(
     }
     failureCode = "invalid_structured_payload";
     const output = parseModelJson(await structureResponse.json());
-    const trends = normalizeTrendItems(output, generatedAt).filter(item =>
-      scope.platform === "all" ? true : item.platform === scope.platform
+    const groundedOutput = groundTrendOutput(output, citations);
+    const trends = normalizeTrendItems(groundedOutput, generatedAt).filter(
+      item =>
+        scope.platform === "all" ? true : item.platform === scope.platform
     );
     if (trends.length < 2) {
       failureCode = `insufficient_verified_sources_${trends.length}`;
