@@ -51,8 +51,8 @@ const FEATURES: Record<"en" | "it", Feature[]> = {
     {
       title: "Selected-range generation",
       description:
-        "Keep the edit that works, select only the weak beat, and direct a replacement shot. Provider actions remain explicitly connection-gated.",
-      status: "Provider-gated",
+        "Keep the edit that works, select only the weak beat, and direct a replacement shot. Generation stays explicitly user-triggered.",
+      status: "Credit-based",
       icon: Film,
     },
     {
@@ -95,8 +95,8 @@ const FEATURES: Record<"en" | "it", Feature[]> = {
     {
       title: "Generazione sull’intervallo",
       description:
-        "Mantieni ciò che funziona, seleziona solo il beat debole e dirigi una scena sostitutiva. Le azioni provider richiedono una connessione configurata.",
-      status: "Provider richiesto",
+        "Mantieni ciò che funziona, seleziona solo il beat debole e dirigi una scena sostitutiva. La generazione parte solo su richiesta esplicita.",
+      status: "A crediti",
       icon: Film,
     },
     {

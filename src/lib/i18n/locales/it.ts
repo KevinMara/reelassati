@@ -78,7 +78,7 @@ export default {
   "how.review_desc": "Lo studio propone i tagli. Approva o raffina in un clic.",
   "how.publish": "Pubblica",
   "how.publish_desc":
-    "Invia alle destinazioni collegate quando il provider di pubblicazione è configurato.",
+    "Invia alle destinazioni collegate quando la pubblicazione è pronta.",
 
   // Platforms
   "platforms.eyebrow": "Integrazioni",
@@ -188,7 +188,7 @@ export default {
   "dash.onboarding_1_sub": "Il brand, la voce, i canali.",
   "dash.onboarding_2": "Collega un account social",
   "dash.onboarding_2_sub":
-    "Collega gli account tramite il provider configurato.",
+    "Collega gli account tramite il servizio di pubblicazione gestito.",
   "dash.onboarding_3": "Prova l'analizzatore",
   "dash.onboarding_3_sub":
     "Carica un video e revisiona note di montaggio basate su evidenze.",

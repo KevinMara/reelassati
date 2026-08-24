@@ -116,7 +116,8 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
   };
 
   useEffect(() => {
-    void loadInbox();
+    const frame = window.requestAnimationFrame(() => void loadInbox());
+    return () => window.cancelAnimationFrame(frame);
     // The owner inbox is loaded once for the authenticated page session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInbox, user?.id]);

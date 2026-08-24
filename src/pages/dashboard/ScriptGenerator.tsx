@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { lazy, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   Check,
@@ -23,6 +24,8 @@ import { WRITING_LANGUAGES } from "@/lib/languages";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { copyTextWithProvenance } from "@/lib/provenance";
 import posthog from "@/lib/posthog";
+
+const InterviewMe = lazy(() => import("./InterviewMe"));
 
 const PLATFORMS: Array<{ value: Platform; label: string }> = [
   { value: "tiktok", label: "TikTok" },
@@ -108,7 +111,7 @@ function createEvent(
   };
 }
 
-export default function ScriptGenerator() {
+function DirectScriptGenerator() {
   const { workspace, capabilities, loading, saving, updateWorkspace } =
     useWorkspace();
   const [topic, setTopic] = useState("");
@@ -129,9 +132,6 @@ export default function ScriptGenerator() {
   const [error, setError] = useState<string | null>(null);
 
   const aiReady = capabilities.ai;
-  const aiMissing = capabilities.missing.filter(item =>
-    item.includes("OPENROUTER")
-  );
 
   const saveScript = async (script: ScriptDraft, activityLabel: string) => {
     setSaveState("saving");
@@ -279,14 +279,9 @@ export default function ScriptGenerator() {
               Script generation needs AI setup
             </p>
             <p className="mt-1 text-xs text-foreground/55">
-              Connect the server-side AI provider before generating. Your
-              prompts are never sent directly from the browser.
+              Script generation is temporarily unavailable. Your prompts stay in
+              the browser until you choose Generate.
             </p>
-            {aiMissing.length > 0 ? (
-              <p className="mt-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
-                Missing: {aiMissing.join(", ")}
-              </p>
-            ) : null}
           </div>
         </div>
       ) : null}
@@ -682,6 +677,62 @@ export default function ScriptGenerator() {
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+export default function ScriptGenerator() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeMode =
+    searchParams.get("mode") === "interview" ? "interview" : "generator";
+
+  const selectMode = (mode: "generator" | "interview") => {
+    const next = new URLSearchParams(searchParams);
+    if (mode === "interview") next.set("mode", "interview");
+    else next.delete("mode");
+    setSearchParams(next, { replace: true });
+  };
+
+  return (
+    <div>
+      <div
+        className="mx-auto mb-8 flex max-w-6xl rounded-xl border border-border bg-surface p-1.5"
+        role="tablist"
+        aria-label="Script creation mode"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeMode === "generator"}
+          onClick={() => selectMode("generator")}
+          className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
+            activeMode === "generator"
+              ? "bg-primary text-white shadow-sm"
+              : "text-foreground/55 hover:bg-background hover:text-foreground"
+          }`}
+        >
+          Write from a brief
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeMode === "interview"}
+          onClick={() => selectMode("interview")}
+          className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
+            activeMode === "interview"
+              ? "bg-primary text-white shadow-sm"
+              : "text-foreground/55 hover:bg-background hover:text-foreground"
+          }`}
+        >
+          Interview me
+        </button>
+      </div>
+
+      {activeMode === "interview" ? (
+        <InterviewMe embedded />
+      ) : (
+        <DirectScriptGenerator />
+      )}
     </div>
   );
 }

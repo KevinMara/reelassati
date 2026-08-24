@@ -503,6 +503,7 @@ export const platformApi = {
     generateAudio: boolean;
     firstFrameUrl?: string;
     lastFrameUrl?: string;
+    continuitySourceJobId?: string;
     projectId?: string;
     rightsConfirmed: true;
     referenceContainsRealPerson: boolean;

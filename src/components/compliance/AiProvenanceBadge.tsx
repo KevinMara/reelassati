@@ -40,10 +40,8 @@ export function AiProvenanceBadge({
         <dl className="mt-3 grid grid-cols-[78px_1fr] gap-x-3 gap-y-2 text-[11px]">
           <dt className="text-foreground/40">Workflow</dt>
           <dd>{provenance.operation.replace(/-/g, " ")}</dd>
-          <dt className="text-foreground/40">Provider</dt>
-          <dd className="break-words">{provenance.provider}</dd>
-          <dt className="text-foreground/40">Model</dt>
-          <dd className="break-words">{provenance.model}</dd>
+          <dt className="text-foreground/40">System</dt>
+          <dd>REELassati AI</dd>
           <dt className="text-foreground/40">Created</dt>
           <dd>{new Date(provenance.generatedAt).toLocaleString()}</dd>
           <dt className="text-foreground/40">Mark</dt>

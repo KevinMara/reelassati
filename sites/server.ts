@@ -105,6 +105,7 @@ type SitesEnvironment = {
   OPENROUTER_TTS_MODEL?: string;
   OPENROUTER_TTS_VOICE?: string;
   OPENROUTER_VIDEO_MODEL?: string;
+  OPENROUTER_CONTINUITY_VIDEO_MODEL?: string;
   OPENROUTER_WEBHOOK_SECRET?: string;
   REFERRAL_BILLING_WEBHOOK_SECRET?: string;
   ZERNIO_API_KEY?: string;
@@ -414,12 +415,14 @@ function capabilities(
   const provenanceReady = Boolean(
     env.AI_PROVENANCE_SIGNING_KEY && env.AI_PROVENANCE_SIGNING_KEY.length >= 24
   );
-  if (useKimiSubscription && !env.KIMI_CODE_API_KEY) {
-    missing.push("KIMI_CODE_API_KEY");
+  if (
+    !env.OPENROUTER_API_KEY ||
+    (useKimiSubscription && !env.KIMI_CODE_API_KEY)
+  ) {
+    missing.push("AI_SERVICE");
   }
-  if (!env.OPENROUTER_API_KEY) missing.push("OPENROUTER_API_KEY");
-  if (!env.ZERNIO_API_KEY) missing.push("ZERNIO_API_KEY");
-  if (!provenanceReady) missing.push("AI_PROVENANCE_SIGNING_KEY");
+  if (!env.ZERNIO_API_KEY) missing.push("PUBLISHING_SERVICE");
+  if (!provenanceReady) missing.push("OUTPUT_MARKING");
 
   return {
     persistence: Boolean(env.DB),
@@ -440,38 +443,11 @@ function capabilities(
     publishing: Boolean(env.ZERNIO_API_KEY),
     missing,
     modelRoutes: [
-      {
-        purpose: "Text",
-        provider: useKimiSubscription ? "Kimi Code" : "OpenRouter",
-        model: useKimiSubscription
-          ? env.KIMI_CODE_MODEL || "k3-256k"
-          : env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5",
-        mode: useKimiSubscription ? "owner-test" : "official",
-      },
-      {
-        purpose: "Analysis",
-        provider: "OpenRouter",
-        model: env.OPENROUTER_ANALYSIS_MODEL || "google/gemini-2.5-flash",
-        mode: "official",
-      },
-      {
-        purpose: "Transcription",
-        provider: "OpenRouter",
-        model: env.OPENROUTER_STT_MODEL || "openai/whisper-large-v3-turbo",
-        mode: "official",
-      },
-      {
-        purpose: "Speech",
-        provider: "OpenRouter",
-        model: env.OPENROUTER_TTS_MODEL || "minimax/minimax-speech-02-hd",
-        mode: "official",
-      },
-      {
-        purpose: "Video",
-        provider: "OpenRouter",
-        model: env.OPENROUTER_VIDEO_MODEL || "kwaivgi/kling-v3.0-standard",
-        mode: "official",
-      },
+      { purpose: "Text" },
+      { purpose: "Analysis" },
+      { purpose: "Transcription" },
+      { purpose: "Speech" },
+      { purpose: "Video" },
     ],
   };
 }
@@ -1046,8 +1022,8 @@ function provenanceFromRow(row: ProvenanceRow): ContentProvenance {
     recordId: row.id,
     origin: row.origin,
     operation: row.operation,
-    provider: row.provider,
-    model: row.model,
+    provider: "REELassati",
+    model: "managed-ai",
     generatedAt: row.created_at,
     policyVersion: row.policy_version,
     marking: {
@@ -3104,7 +3080,8 @@ async function providerError(
   });
   const failure = json(
     {
-      error: `${provider} could not complete this request. Retry once; if it continues, contact support.`,
+      error:
+        "REELassati could not complete this request. Retry once; if it continues, contact support.",
       reference,
     },
     status
@@ -3175,9 +3152,7 @@ async function chatJson(
       : "OPENROUTER_API_KEY";
     throw new Response(
       JSON.stringify({
-        error: useKimiSubscription
-          ? "Kimi subscription test mode needs a Kimi Code API key"
-          : "AI is ready but needs a new OpenRouter key",
+        error: "REELassati AI is temporarily unavailable",
         missing: [missingKey],
       }),
       { status: 503, headers: { "Content-Type": "application/json" } }
@@ -3475,6 +3450,44 @@ async function videoWebhookToken(apiKey: string): Promise<string> {
   ).join("");
 }
 
+async function videoReferenceToken(
+  secret: string,
+  assetId: string,
+  expiresAt: number
+): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const digest = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(
+      `reelassati-video-reference-v1:${assetId}:${expiresAt}`
+    )
+  );
+  return Array.from(new Uint8Array(digest), byte =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+}
+
+async function signedVideoReferenceUrl(
+  env: SitesEnvironment,
+  origin: string,
+  assetId: string
+): Promise<string> {
+  const secret = env.OPENROUTER_API_KEY;
+  if (!secret) throw new Error("Video reference signing is unavailable");
+  const expiresAt = Math.floor(Date.now() / 1000) + 20 * 60;
+  const token = await videoReferenceToken(secret, assetId, expiresAt);
+  return `${origin}/api/video/reference/${encodeURIComponent(
+    assetId
+  )}?expires=${expiresAt}&token=${token}`;
+}
+
 function constantTimeEqual(left: string, right: string): boolean {
   if (left.length !== right.length) return false;
   let difference = 0;
@@ -3549,7 +3562,7 @@ async function zernioRequest(
   if (!env.ZERNIO_API_KEY) {
     throw new Response(
       JSON.stringify({
-        error: "Publishing is ready but needs a new Zernio key",
+        error: "Publishing is temporarily unavailable",
         missing: ["ZERNIO_API_KEY"],
       }),
       { status: 503, headers: { "Content-Type": "application/json" } }
@@ -3668,7 +3681,7 @@ async function ensureZernioProfile(
   const data = nestedData(payload);
   const profile = recordValue(data.profile) || data;
   const id = stringValue(profile._id || profile.id);
-  if (!id) throw new Error("Zernio did not return a profile id");
+  if (!id) throw new Error("The publishing service could not create a profile");
   await env.DB.prepare(
     `
     INSERT INTO zernio_profiles (owner_email, profile_id, created_at)
@@ -3720,9 +3733,8 @@ async function listZernioAccounts(
 }
 
 const SAFE_VIDEO_JOB_ERRORS = new Set([
-  "The provider rejected the generation request",
-  "OpenRouter did not return a job id",
-  "The provider did not confirm this registered request",
+  "Video generation could not start",
+  "Video generation could not be confirmed",
   "The generated output could not be marked and verified",
 ]);
 
@@ -3730,11 +3742,7 @@ function safeVideoJobError(value: string | null): string | undefined {
   const error = stringValue(value);
   if (!error) return undefined;
   if (SAFE_VIDEO_JOB_ERRORS.has(error)) return error;
-  if (
-    /^The video provider reported a generation failure\. Reference: [0-9a-f-]{36}\.$/i.test(
-      error
-    )
-  ) {
+  if (/^Video generation failed\. Reference: [0-9a-f-]{36}\.$/i.test(error)) {
     return error;
   }
   // Older rows may contain a provider-supplied message. Never return that
@@ -3743,11 +3751,19 @@ function safeVideoJobError(value: string | null): string | undefined {
 }
 
 export function jobFromRow(row: JobRow): GenerationJob {
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = recordValue(JSON.parse(row.payload)) || {};
+  } catch {
+    payload = {};
+  }
+  const parentJobId = stringValue(payload.parentJobId);
+  const sourceAssetId = stringValue(payload.sourceAssetId);
+  const rootJobId = stringValue(payload.rootJobId, row.id);
   return {
     id: row.id,
     type: "video",
     status: row.status,
-    providerJobId: row.provider_job_id || undefined,
     projectId: row.project_id || undefined,
     prompt: row.prompt || undefined,
     progress: row.progress,
@@ -3755,6 +3771,12 @@ export function jobFromRow(row: JobRow): GenerationJob {
     error: safeVideoJobError(row.error),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    continuity: {
+      mode: parentJobId ? "continue" : "new",
+      rootJobId,
+      ...(parentJobId ? { parentJobId } : {}),
+      ...(sourceAssetId ? { sourceAssetId } : {}),
+    },
   };
 }
 
@@ -4260,9 +4282,7 @@ async function handleAi(
 
   if (url.pathname === "/api/ai/transcribe") {
     if (!env.OPENROUTER_API_KEY) {
-      return errorResponse("Transcription needs a new OpenRouter key", 503, [
-        "OPENROUTER_API_KEY",
-      ]);
+      return errorResponse("Transcription is temporarily unavailable", 503);
     }
     const input = await parseJsonBody<{
       assetId?: string;
@@ -4390,9 +4410,7 @@ async function handleAi(
 
   if (url.pathname === "/api/ai/speech") {
     if (!env.OPENROUTER_API_KEY) {
-      return errorResponse("Voice generation needs a new OpenRouter key", 503, [
-        "OPENROUTER_API_KEY",
-      ]);
+      return errorResponse("Voice generation is temporarily unavailable", 503);
     }
     const input = await parseJsonBody<{
       text?: string;
@@ -4596,9 +4614,7 @@ async function handleVideoJobs(
   url: URL
 ): Promise<Response> {
   if (!env.OPENROUTER_API_KEY) {
-    return errorResponse("Video generation needs a new OpenRouter key", 503, [
-      "OPENROUTER_API_KEY",
-    ]);
+    return errorResponse("Video generation is temporarily unavailable", 503);
   }
   await initializeSchema(env);
   const id = url.pathname.split("/").filter(Boolean)[3];
@@ -4613,6 +4629,7 @@ async function handleVideoJobs(
       generateAudio?: boolean;
       firstFrameUrl?: string;
       lastFrameUrl?: string;
+      continuitySourceJobId?: string;
       projectId?: string;
       rightsConfirmed?: boolean;
       referenceContainsRealPerson?: boolean;
@@ -4622,8 +4639,8 @@ async function handleVideoJobs(
     if (!/^[A-Za-z0-9_-]{8,100}$/.test(requestId)) {
       return errorResponse("A stable video request id is required");
     }
-    const prompt = stringValue(input.prompt);
-    if (!prompt) return errorResponse("Describe the clip to generate");
+    const requestedPrompt = stringValue(input.prompt);
+    if (!requestedPrompt) return errorResponse("Describe the clip to generate");
     assertProvenanceConfigured(env);
     if (input.rightsConfirmed !== true) {
       return errorResponse(
@@ -4640,20 +4657,98 @@ async function handleVideoJobs(
         422
       );
     }
-    await assertAllowedCreativeUse(env, user, prompt, requestId);
-    const duration = boundedNumber(input.duration, 5, 3, 15);
+    await assertAllowedCreativeUse(env, user, requestedPrompt, requestId);
+    let duration = boundedNumber(input.duration, 5, 3, 15);
     const aspectRatio = ["9:16", "16:9", "1:1"].includes(
       stringValue(input.aspectRatio)
     )
       ? stringValue(input.aspectRatio)
       : "9:16";
     const resolution = input.resolution === "1080p" ? "1080p" : "720p";
+    const continuitySourceJobId = stringValue(input.continuitySourceJobId);
+    let parentJob: JobRow | null = null;
+    let parentPayload: Record<string, unknown> = {};
+    let sourceAssetId = "";
+    let continuityReferenceUrl = "";
+    if (continuitySourceJobId) {
+      parentJob = await env.DB.prepare(
+        "SELECT * FROM generation_jobs WHERE id = ? AND owner_email = ?"
+      )
+        .bind(continuitySourceJobId, user.email)
+        .first<JobRow>();
+      if (
+        !parentJob ||
+        parentJob.status !== "completed" ||
+        !parentJob.result_asset_id
+      ) {
+        return errorResponse(
+          "Choose a completed video from your workspace to continue",
+          422
+        );
+      }
+      try {
+        parentPayload = recordValue(JSON.parse(parentJob.payload)) || {};
+      } catch {
+        parentPayload = {};
+      }
+      sourceAssetId = parentJob.result_asset_id;
+      const sourceAsset = await getAssetRow(env, user, sourceAssetId);
+      if (!sourceAsset || !sourceAsset.content_type.startsWith("video/")) {
+        return errorResponse(
+          "The selected clip is no longer available for continuation",
+          422
+        );
+      }
+      continuityReferenceUrl = await signedVideoReferenceUrl(
+        env,
+        url.origin,
+        sourceAssetId
+      );
+      duration = Math.max(4, duration);
+    }
+
+    const rootJobId = parentJob
+      ? stringValue(parentPayload.rootJobId, parentJob.id)
+      : requestId;
+    const parentSeed = Number(parentPayload.continuitySeed);
+    const continuitySeed =
+      parentJob && Number.isInteger(parentSeed) && parentSeed > 0
+        ? parentSeed
+        : crypto.getRandomValues(new Uint32Array(1))[0] & 0x7fffffff || 1;
+    const rootScenePrompt = parentJob
+      ? stringValue(
+          parentPayload.rootScenePrompt,
+          parentJob.prompt || requestedPrompt
+        )
+      : requestedPrompt;
+    const previousDirection = parentJob
+      ? stringValue(parentPayload.requestedPrompt, parentJob.prompt || "")
+      : "";
+    const prompt = parentJob
+      ? [
+          "Continue directly from the selected previous clip.",
+          "Preserve the same subject identity, facial features, body proportions, wardrobe, props, environment, scene geography, color palette, lighting, lens treatment, camera language and audio character.",
+          "Begin from the previous clip's final scene state; do not reset or redesign it.",
+          `Original scene direction: ${rootScenePrompt}`,
+          previousDirection
+            ? `Previous clip direction: ${previousDirection}`
+            : "Use the previous clip itself as the continuity reference.",
+          `Next clip direction: ${requestedPrompt}`,
+        ].join(" ")
+      : requestedPrompt;
+
     const frameImages: Array<{
       type: "image_url";
       frame_type: "first_frame" | "last_frame";
       image_url: { url: string };
     }> = [];
-    const firstFrameUrl = stringValue(input.firstFrameUrl);
+    const inheritedFirstFrameUrl = stringValue(parentPayload.lastFrameUrl);
+    const firstFrameUrl = stringValue(
+      input.firstFrameUrl,
+      parentJob && isPublicHttpsUrl(inheritedFirstFrameUrl)
+        ? inheritedFirstFrameUrl
+        : ""
+    );
     const lastFrameUrl = stringValue(input.lastFrameUrl);
     if (firstFrameUrl) {
       if (!isPublicHttpsUrl(firstFrameUrl)) {
@@ -4679,6 +4774,14 @@ async function handleVideoJobs(
         image_url: { url: lastFrameUrl },
       });
     }
+    const inputReferences = continuityReferenceUrl
+      ? [
+          {
+            type: "video_url",
+            video_url: { url: continuityReferenceUrl },
+          },
+        ]
+      : [];
 
     const existing = await env.DB.prepare(
       "SELECT * FROM generation_jobs WHERE id = ?"
@@ -4714,6 +4817,12 @@ async function handleVideoJobs(
           generateAudio: input.generateAudio !== false,
           firstFrameUrl: firstFrameUrl || undefined,
           lastFrameUrl: lastFrameUrl || undefined,
+          continuitySeed,
+          rootJobId,
+          parentJobId: parentJob?.id || undefined,
+          sourceAssetId: sourceAssetId || undefined,
+          rootScenePrompt,
+          requestedPrompt,
         }),
         now,
         now
@@ -4731,8 +4840,9 @@ async function handleVideoJobs(
       return json({ job: jobFromRow(registered) }, 202);
     }
 
-    const selectedVideoModel =
-      env.OPENROUTER_VIDEO_MODEL || "kwaivgi/kling-v3.0-std";
+    const selectedVideoModel = parentJob
+      ? env.OPENROUTER_CONTINUITY_VIDEO_MODEL || "bytedance/seedance-2.0"
+      : env.OPENROUTER_VIDEO_MODEL || "kwaivgi/kling-v3.0-std";
     const invocation = await beginAiInvocation(
       env,
       user,
@@ -4747,6 +4857,12 @@ async function handleVideoJobs(
         generateAudio: input.generateAudio !== false,
         firstFrameUrl: firstFrameUrl || null,
         lastFrameUrl: lastFrameUrl || null,
+        continuityMode: parentJob ? "continue" : "new",
+        rootJobId,
+        parentJobId: parentJob?.id || null,
+        sourceAssetId: sourceAssetId || null,
+        rootScenePrompt,
+        requestedPrompt,
         rightsConfirmed: true,
         referenceContainsRealPerson: input.referenceContainsRealPerson === true,
         realPersonConsentConfirmed: input.realPersonConsentConfirmed === true,
@@ -4762,10 +4878,14 @@ async function handleVideoJobs(
         resolution,
         aspect_ratio: aspectRatio,
         generate_audio: input.generateAudio !== false,
+        seed: continuitySeed,
         callback_url: `${url.origin}/api/video/webhook?token=${encodeURIComponent(
           await videoWebhookToken(env.OPENROUTER_API_KEY)
         )}&requestId=${encodeURIComponent(requestId)}`,
         ...(frameImages.length ? { frame_images: frameImages } : {}),
+        ...(inputReferences.length
+          ? { input_references: inputReferences }
+          : {}),
       }),
     });
     if (!response.ok) {
@@ -4774,7 +4894,7 @@ async function handleVideoJobs(
         `
         UPDATE generation_jobs
         SET status = 'failed', progress = 100,
-            error = 'The provider rejected the generation request',
+            error = 'Video generation could not start',
             updated_at = ?
         WHERE id = ? AND owner_email = ? AND provider_job_id IS NULL
       `
@@ -4794,13 +4914,13 @@ async function handleVideoJobs(
         `
         UPDATE generation_jobs
         SET status = 'failed', progress = 100,
-            error = 'OpenRouter did not return a job id', updated_at = ?
+            error = 'Video generation could not be confirmed', updated_at = ?
         WHERE id = ? AND owner_email = ?
       `
       )
         .bind(new Date().toISOString(), requestId, user.email)
         .run();
-      return errorResponse("OpenRouter did not return a job id", 502);
+      return errorResponse("Video generation could not be confirmed", 502);
     }
     await env.DB.prepare(
       `
@@ -4821,6 +4941,14 @@ async function handleVideoJobs(
           pollingUrl: payload.polling_url,
           invocationId: invocation.id,
           model: selectedVideoModel,
+          continuitySeed,
+          rootJobId,
+          parentJobId: parentJob?.id || undefined,
+          sourceAssetId: sourceAssetId || undefined,
+          rootScenePrompt,
+          requestedPrompt,
+          firstFrameUrl: firstFrameUrl || undefined,
+          lastFrameUrl: lastFrameUrl || undefined,
           rightsConfirmed: true,
           referenceContainsRealPerson:
             input.referenceContainsRealPerson === true,
@@ -4859,7 +4987,7 @@ async function handleVideoJobs(
       `
       UPDATE generation_jobs
       SET status = 'failed', progress = 100,
-          error = 'The provider did not confirm this registered request',
+          error = 'Video generation could not be confirmed',
           updated_at = ?
       WHERE id = ? AND owner_email = ? AND provider_job_id IS NULL
     `
@@ -4977,6 +5105,9 @@ async function handleVideoJobs(
             metadata: {
               invocationId: stringValue(jobPayload.invocationId) || null,
               providerJobId: row.provider_job_id,
+              continuityRootJobId: stringValue(jobPayload.rootJobId) || row.id,
+              parentJobId: stringValue(jobPayload.parentJobId) || null,
+              sourceAssetId: stringValue(jobPayload.sourceAssetId) || null,
               rightsAttested: jobPayload.rightsConfirmed === true,
               referenceContainsRealPerson:
                 jobPayload.referenceContainsRealPerson === true,
@@ -5165,7 +5296,7 @@ async function handleVideoJobs(
       )
         .bind(
           clientProviderFailureMessage(
-            "The video provider reported a generation failure.",
+            "Video generation failed.",
             failureReference
           ),
           now,
@@ -5206,6 +5337,83 @@ async function handleVideoJobs(
   return json({
     job: jobFromRow(row as JobRow),
     ...(asset ? { asset: rowToAsset(asset, assetProvenance) } : {}),
+  });
+}
+
+async function handleVideoReference(
+  request: Request,
+  env: SitesEnvironment,
+  url: URL
+): Promise<Response> {
+  if (
+    (request.method !== "GET" && request.method !== "HEAD") ||
+    !env.OPENROUTER_API_KEY
+  ) {
+    return errorResponse("Reference unavailable", 404);
+  }
+  const assetId = decodeURIComponent(
+    url.pathname.split("/").filter(Boolean)[3] || ""
+  );
+  const expiresAt = Number(url.searchParams.get("expires") || "0");
+  const token = url.searchParams.get("token") || "";
+  const now = Math.floor(Date.now() / 1000);
+  if (
+    !assetId ||
+    !Number.isInteger(expiresAt) ||
+    expiresAt <= now ||
+    expiresAt > now + 25 * 60 ||
+    !/^[a-f0-9]{64}$/i.test(token)
+  ) {
+    return errorResponse("Reference unavailable", 404);
+  }
+  const expected = await videoReferenceToken(
+    env.OPENROUTER_API_KEY,
+    assetId,
+    expiresAt
+  );
+  if (!constantTimeEqual(token.toLowerCase(), expected)) {
+    return errorResponse("Reference unavailable", 404);
+  }
+
+  await initializeSchema(env);
+  const row = await env.DB.prepare("SELECT * FROM assets WHERE id = ?")
+    .bind(assetId)
+    .first<AssetRow>();
+  if (!row || !row.content_type.startsWith("video/")) {
+    return errorResponse("Reference unavailable", 404);
+  }
+  const object = await env.BUCKET.get(row.r2_key);
+  if (!object) return errorResponse("Reference unavailable", 404);
+
+  let body: ReadableStream | ArrayBuffer = object.body;
+  if (row.r2_key.includes("/generated/")) {
+    const owner = { email: row.owner_email, name: "Creator" };
+    const provenance = await provenanceByEntity(env, owner, "asset", row.id);
+    const structuralFailure = await generatedAssetStructuralFailure(
+      env,
+      owner,
+      provenance,
+      object
+    );
+    const bytes = structuralFailure ? null : await object.arrayBuffer();
+    const byteFailure =
+      !structuralFailure && bytes && provenance
+        ? await generatedAssetByteFailure(row, provenance, object, bytes)
+        : null;
+    if (structuralFailure || byteFailure || !bytes) {
+      return errorResponse("Reference unavailable", 404);
+    }
+    body = bytes;
+  }
+
+  return new Response(request.method === "HEAD" ? null : body, {
+    headers: {
+      "Content-Type": row.content_type,
+      "Content-Length": String(row.bytes),
+      "Cache-Control": `public, max-age=${Math.max(0, expiresAt - now)}`,
+      "Content-Disposition": `inline; filename="${sanitizeFilename(row.name)}"`,
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 }
 
@@ -5817,7 +6025,10 @@ async function handlePublishing(
     const data = nestedData(payload);
     const authUrl = stringValue(data.authUrl || data.url);
     if (!authUrl || !isPublicHttpsUrl(authUrl)) {
-      return errorResponse("Zernio did not return a safe connection URL", 502);
+      return errorResponse(
+        "The publishing service did not return a safe connection URL",
+        502
+      );
     }
     return json({ authUrl });
   }
@@ -5994,7 +6205,7 @@ async function handlePublishing(
             status: "publishing" as const,
           },
           warning:
-            "The provider outcome is still unconfirmed, so this durable intent is locked to prevent a duplicate publication. Verify the post in Zernio before replacing it.",
+            "The delivery outcome is still unconfirmed, so this request is locked to prevent a duplicate publication. Verify the post on the destination before replacing it.",
         },
         202
       );
@@ -6190,9 +6401,7 @@ async function handlePublishing(
                 ? "video"
                 : null;
             if (!mediaType) {
-              throw errorResponse(
-                "Zernio publishing accepts an image or video asset"
-              );
+              throw errorResponse("Publishing accepts an image or video asset");
             }
             if (
               !publishNow &&
@@ -6216,7 +6425,7 @@ async function handlePublishing(
             const publicUrl = stringValue(presignData.publicUrl);
             if (!isPublicHttpsUrl(uploadUrl) || !isPublicHttpsUrl(publicUrl)) {
               throw errorResponse(
-                "Zernio returned an invalid media upload URL",
+                "The publishing service returned an invalid media upload URL",
                 502
               );
             }
@@ -6272,7 +6481,7 @@ async function handlePublishing(
             });
             if (!uploadResponse.ok) {
               throw errorResponse(
-                "Zernio could not receive the selected media",
+                "The publishing service could not receive the selected media",
                 502
               );
             }
@@ -6437,7 +6646,7 @@ async function handlePublishing(
               : "Schedule request submitted",
       detail:
         acceptedStatus === "failed"
-          ? `Provider status: ${providerStatus || "failed"}`
+          ? `Delivery status: ${providerStatus || "failed"}`
           : selected.map(account => account.accountName).join(", "),
       createdAt: now,
     };
@@ -7282,11 +7491,11 @@ const SUPPORT_SYSTEM_PROMPT = `You are REELassati Support, the official product 
 
 OFFICIAL PRODUCT KNOWLEDGE
 - Public routes: pricing at /pricing; login at /auth/login; signup at /auth/signup; password recovery at /auth/forgot-password; support at /contact.
-- Pricing: Creator is EUR 29 monthly or EUR 288 annually (EUR 24/month equivalent) for 1 brand workspace and 2 connected social accounts. Pro is EUR 79 monthly or EUR 804 annually (EUR 67/month equivalent) for 3 brand workspaces and 6 connected social accounts. Studio is EUR 179 monthly or EUR 1,824 annually (EUR 152/month equivalent) for 10 brand workspaces and 12 connected social accounts. The complete Studio is included in every plan. Model and video-generation usage is billed separately by the connected provider.
+- Pricing: Creator is EUR 29 monthly or EUR 288 annually (EUR 24/month equivalent) for 1 brand workspace and 2 connected social accounts. Pro is EUR 79 monthly or EUR 804 annually (EUR 67/month equivalent) for 3 brand workspaces and 6 connected social accounts. Studio is EUR 179 monthly or EUR 1,824 annually (EUR 152/month equivalent) for 10 brand workspaces and 12 connected social accounts. The complete Studio is included in every plan. AI tools use REELassati credits inside the platform; never quote upstream model or provider prices.
 - Account access: users can sign up, log in, request a password-reset email, and set a new password from the reset link. A reset link may be expired or already used; request a fresh one and use only the newest email. Never ask for passwords, verification codes, OAuth secrets, private tokens, card data, or identity documents.
 - Uploads: hosted workspace uploads accept video, audio, and image files up to 64 MB. Direct AI video analysis and audio transcription require the relevant media to be below 24 MB. If a file is too large, instruct the user to trim or compress it, then retry with a new upload.
 - Studio: users can create projects; trim, split, move, delete, caption, adjust pacing, add B-roll/audio/style suggestions, lock clips, and review AI edit plans before applying changes. AI recommendations are proposals, not proof that an edit was applied.
-- AI tools: Script, AI Video, Video Analyzer, Voice Studio, Interview Me, Trends, Weekly Coach, and Prompt Director depend on the configured AI provider. For a provider failure, preserve the displayed reference, retry once unchanged, then gather the tool, exact error, file type/size, browser, and last successful step.
+- AI tools: Script, AI Video, Video Analyzer, Voice Studio, Interview Me, Trends, Weekly Coach, and Prompt Director use managed REELassati AI routes. Never reveal upstream providers, model names, internal job identifiers, or upstream prices. For an AI failure, preserve the displayed reference, retry once unchanged, then gather the tool, exact error, file type/size, browser, and last successful step.
 - Publishing: users connect supported social accounts in Social Hub/Settings and publish or schedule from Publisher. Supported platforms include Instagram, TikTok, YouTube, Facebook, LinkedIn, Pinterest, Threads, and X/Twitter when the publishing integration is configured. A caption and a connected account are required. Never claim a post is live until the UI/provider reports published.
 - Workspace areas also include Calendar, Analytics, Clients, Content Library, Referrals, Settings, and Studio Status.
 - Common browser recovery: preserve work first; reload once; sign out and back in for session errors; disable a blocking extension for the site; allow pop-ups only when an OAuth window was blocked; try a current Chrome, Edge, Firefox, or Safari build; do not tell the user to clear all browser data before less destructive steps.
@@ -7476,7 +7685,7 @@ function guidedPricingSupport(
     return {
       reply: italian
         ? `${plan} include ${rate.scale}. Costa €${rate.monthly}/mese oppure €${rate.annualTotal}/anno (€${rate.annualMonthly}/mese equivalente). Lo Studio completo è incluso; l’uso dei modelli e della generazione video viene addebitato separatamente dal provider collegato. Quale fatturazione preferisci?`
-        : `${plan} includes ${rate.scale}. It costs €${rate.monthly}/month or €${rate.annualTotal}/year (€${rate.annualMonthly}/month equivalent). The complete Studio is included; model and video-generation usage is billed separately by the connected provider. Which billing term do you prefer?`,
+        : `${plan} includes ${rate.scale}. It costs €${rate.monthly}/month or €${rate.annualTotal}/year (€${rate.annualMonthly}/month equivalent). The complete Studio is included; AI tools use REELassati credits inside the platform. Which billing term do you prefer?`,
       resolved: false,
       needsHuman: false,
       suggestedActions: italian
@@ -8044,9 +8253,7 @@ function normalizeTrendItems(
       continue;
     }
     const lifecycleValue = stringValue(candidate.lifecycle).toLowerCase();
-    const lifecycle = TREND_LIFECYCLES.has(
-      lifecycleValue as TrendLifecycle
-    )
+    const lifecycle = TREND_LIFECYCLES.has(lifecycleValue as TrendLifecycle)
       ? (lifecycleValue as TrendLifecycle)
       : "emerging";
     const metrics = recordValue(candidate.metrics) || {};
@@ -8139,7 +8346,7 @@ async function researchTrendSources(
   if (!env.OPENROUTER_API_KEY) {
     throw new Response(
       JSON.stringify({
-        error: "Live trend research needs the existing OpenRouter connection",
+        error: "Live trend research is temporarily unavailable",
         missing: ["OPENROUTER_API_KEY"],
       }),
       { status: 503, headers: { "Content-Type": "application/json" } }
@@ -8444,6 +8651,10 @@ async function handleApi(
 
   if (url.pathname === "/api/video/webhook") {
     return handleVideoWebhook(request, env, url);
+  }
+
+  if (url.pathname.startsWith("/api/video/reference/")) {
+    return handleVideoReference(request, env, url);
   }
 
   if (url.pathname === "/api/referrals/billing-webhook") {

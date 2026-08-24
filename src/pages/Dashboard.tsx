@@ -35,7 +35,6 @@ import {
   Flame,
   Film,
   Mic,
-  MessageCircle,
   MessageSquareWarning,
   Mail,
   Gift,
@@ -85,7 +84,6 @@ const SettingsPage = lazy(() => import("./dashboard/SettingsPage"));
 const TrendsPage = lazy(() => import("./dashboard/TrendsPage"));
 const VideoGenerator = lazy(() => import("./dashboard/VideoGenerator"));
 const VoiceNotes = lazy(() => import("./dashboard/VoiceNotes"));
-const InterviewMe = lazy(() => import("./dashboard/InterviewMe"));
 const GoalTracker = lazy(() => import("./dashboard/GoalTracker"));
 const CoachingPage = lazy(() => import("./dashboard/CoachingPage"));
 const ReferralPage = lazy(() => import("./dashboard/ReferralPage"));
@@ -148,7 +146,7 @@ function DashboardHome() {
         account => account.status === "connected"
       ).length,
       sub: capabilities.publishing
-        ? "Publishing provider configured"
+        ? "Publishing is connected"
         : "Publishing setup required",
       icon: AtSign,
     },
@@ -175,7 +173,7 @@ function DashboardHome() {
     },
     {
       title: "Generate a controlled shot",
-      desc: "Direct a Kling v3 Standard clip with timed beats and native audio.",
+      desc: "Direct a new clip or continue a scene with timed beats and native audio.",
       icon: Film,
       to: "/dashboard/video",
     },
@@ -470,13 +468,13 @@ function StudioStatus() {
       icon: HardDrive,
     },
     {
-      label: "Kimi + OpenRouter",
+      label: "REELassati AI",
       detail: "Scripts, edit plans, analysis, voice, and video",
       ready: capabilities.ai && capabilities.analysis,
       icon: BrainCircuit,
     },
     {
-      label: "Zernio publishing",
+      label: "Connected publishing",
       detail: "Account connection, scheduling, and posts",
       ready: capabilities.publishing,
       icon: Radio,
@@ -488,8 +486,7 @@ function StudioStatus() {
       <p className="mono-eyebrow text-primary mb-2">Production readiness</p>
       <h1 className="text-3xl font-semibold">Studio status</h1>
       <p className="text-foreground/60 mt-2">
-        Configuration presence for storage and providers; use a feature to
-        verify the full request path.
+        Availability for storage, generation, and connected publishing.
       </p>
       {error ? <p className="mt-5 text-sm text-destructive">{error}</p> : null}
       <div className="grid sm:grid-cols-2 gap-4 mt-8">
@@ -525,7 +522,7 @@ function StudioStatus() {
         </p>
         {capabilities.missing.length ? (
           <p className="text-xs text-foreground/45 mt-3">
-            Hosted variables still required: {capabilities.missing.join(", ")}
+            Some managed services still need setup.
           </p>
         ) : null}
       </div>
@@ -656,7 +653,7 @@ function StudioStatus() {
               contractors need role-appropriate measures of their own.
             </p>
             <ul className="mt-3 space-y-2 text-xs text-foreground/65">
-              <li>• Each AI task uses its recorded production model route.</li>
+              <li>• Each AI task uses a recorded managed production route.</li>
               <li>
                 • Generated output needs verified provenance before release.
               </li>
@@ -665,7 +662,7 @@ function StudioStatus() {
                 conditional disclosures.
               </li>
               <li>
-                • Provider output can be wrong; final claims remain under human
+                • AI output can be wrong; final claims remain under human
                 control.
               </li>
             </ul>
@@ -694,7 +691,7 @@ function StudioStatus() {
                 <p className="font-medium">{route.purpose}</p>
               </div>
               <p className="mt-1 text-[11px] leading-relaxed text-foreground/45">
-                {route.model} · {route.provider}
+                Managed by REELassati
               </p>
             </div>
           ))}
@@ -735,7 +732,6 @@ export default function Dashboard() {
   > = [
     { icon: LayoutDashboard, label: t("nav.dashboard"), to: "/dashboard" },
     { icon: Flame, label: "Trends", to: "/dashboard/trends" },
-    { icon: MessageCircle, label: "Interview Me", to: "/dashboard/interview" },
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
     { icon: Film, label: "AI Video", to: "/dashboard/video" },
     { icon: Mic, label: "Voice Studio", to: "/dashboard/voice" },
@@ -918,7 +914,12 @@ export default function Dashboard() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/trends" element={<TrendsPage />} />
               <Route path="/voice" element={<VoiceNotes />} />
-              <Route path="/interview" element={<InterviewMe />} />
+              <Route
+                path="/interview"
+                element={
+                  <Navigate to="/dashboard/script?mode=interview" replace />
+                }
+              />
               <Route path="/goals" element={<GoalTracker />} />
               <Route path="/coaching" element={<CoachingPage />} />
               <Route path="/referral" element={<ReferralPage />} />

@@ -30,7 +30,6 @@ describe("protected product and compliance invariants", () => {
     expect(destinations).toEqual([
       "/dashboard",
       "/dashboard/trends",
-      "/dashboard/interview",
       "/dashboard/script",
       "/dashboard/video",
       "/dashboard/voice",
@@ -50,6 +49,9 @@ describe("protected product and compliance invariants", () => {
     ]);
     const navEntries = navBlock.slice(navBlock.indexOf("> = ["));
     expect((navEntries.match(/separator: true/g) || []).length).toBe(3);
+    expect(dashboard).toContain(
+      '<Navigate to="/dashboard/script?mode=interview" replace />'
+    );
   });
 
   it("keeps drag-and-drop coverage beside every Studio file picker", () => {

@@ -4,13 +4,12 @@ import { useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   Check,
-  Clock3,
   Copy,
   Download,
   Film,
   Image as ImageIcon,
+  Layers3,
   Loader2,
-  MonitorUp,
   SlidersHorizontal,
   Sparkles,
   Volume2,
@@ -38,7 +37,6 @@ const RATIOS = [
 ];
 
 const DURATIONS = Array.from({ length: 13 }, (_, index) => index + 3);
-const PUBLIC_STARTING_RATE_USD = 0.126;
 const DURATION_PATTERN = /\b(\d{1,2})\s*(?:seconds?|secs?|s)\b/gi;
 
 interface PromptDirection {
@@ -156,6 +154,8 @@ export default function VideoGenerator() {
   const [firstFrameUrl, setFirstFrameUrl] = useState("");
   const [lastFrameUrl, setLastFrameUrl] = useState("");
   const [showReferences, setShowReferences] = useState(false);
+  const [clipMode, setClipMode] = useState<"new" | "continue">("new");
+  const [continuitySourceJobId, setContinuitySourceJobId] = useState("");
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [referenceContainsRealPerson, setReferenceContainsRealPerson] =
     useState(false);
@@ -170,6 +170,24 @@ export default function VideoGenerator() {
   const requestIdRef = useRef<string | null>(null);
 
   const template = getTemplateById(selectedTemplate);
+  const assetById = useMemo(
+    () => new Map(workspace.assets.map(asset => [asset.id, asset])),
+    [workspace.assets]
+  );
+  const completedVideoJobs = useMemo(
+    () =>
+      workspace.jobs.filter(
+        candidate =>
+          candidate.type === "video" &&
+          candidate.status === "completed" &&
+          candidate.resultAssetId &&
+          assetById.has(candidate.resultAssetId)
+      ),
+    [assetById, workspace.jobs]
+  );
+  const continuitySourceJob = completedVideoJobs.find(
+    candidate => candidate.id === continuitySourceJobId
+  );
   const scene = useMemo(() => buildScene(direction), [direction]);
   const enhancedPrompt = useMemo(() => {
     if (!scene) return "";
@@ -181,8 +199,18 @@ export default function VideoGenerator() {
         dialogue: direction.dialogue || undefined,
         mood: direction.mood || undefined,
       }) ?? scene;
-    return `${styled} Deliver one coherent ${duration}-second video in ${ratio}.`;
+    const nextDirection = `${styled} Deliver one coherent ${duration}-second video in ${ratio}.`;
+    if (clipMode !== "continue" || !continuitySourceJob) {
+      return nextDirection;
+    }
+    return [
+      "CONTINUITY LOCK: continue directly from the selected previous clip.",
+      "Keep the same subject identity, wardrobe, props, environment, scene state, lighting, lens and visual language.",
+      `Next direction: ${nextDirection}`,
+    ].join(" ");
   }, [
+    clipMode,
+    continuitySourceJob,
     direction.camera,
     direction.dialogue,
     direction.location,
@@ -210,10 +238,6 @@ export default function VideoGenerator() {
   const firstFrameError = validatePublicHttpsUrl(firstFrameUrl);
   const lastFrameError = validatePublicHttpsUrl(lastFrameUrl);
   const videoReady = capabilities.videoGeneration;
-  const videoMissing = capabilities.missing.filter(item =>
-    item.includes("OPENROUTER")
-  );
-  const estimatedCost = duration * PUBLIC_STARTING_RATE_USD;
 
   useEffect(() => {
     if (loading || activeJobId || job) return;
@@ -324,6 +348,7 @@ export default function VideoGenerator() {
       submitting ||
       firstFrameError ||
       lastFrameError ||
+      (clipMode === "continue" && !continuitySourceJob) ||
       !rightsConfirmed ||
       (referenceContainsRealPerson && !realPersonConsentConfirmed)
     ) {
@@ -346,6 +371,8 @@ export default function VideoGenerator() {
         generateAudio,
         firstFrameUrl: firstFrameUrl.trim() || undefined,
         lastFrameUrl: lastFrameUrl.trim() || undefined,
+        continuitySourceJobId:
+          clipMode === "continue" ? continuitySourceJob?.id : undefined,
         projectId: workspace.projects[0]?.id,
         rightsConfirmed,
         referenceContainsRealPerson,
@@ -360,7 +387,10 @@ export default function VideoGenerator() {
         duration_seconds: duration,
         resolution,
         generate_audio: generateAudio,
-        has_reference_frames: Boolean(firstFrameUrl.trim() || lastFrameUrl.trim()),
+        has_reference_frames: Boolean(
+          firstFrameUrl.trim() || lastFrameUrl.trim()
+        ),
+        continuity_mode: clipMode,
       });
       await updateWorkspace(current => ({
         ...current,
@@ -368,7 +398,9 @@ export default function VideoGenerator() {
         activity: [
           createEvent(
             "generation",
-            "Video generation started",
+            clipMode === "continue"
+              ? "Video continuation started"
+              : "Video generation started",
             `${template?.name ?? "Custom style"} · ${duration}s · ${ratio}`
           ),
           ...current.activity,
@@ -404,8 +436,8 @@ export default function VideoGenerator() {
         <p className="mono-eyebrow mb-2 text-primary">AI Video Studio</p>
         <h1 className="text-3xl font-semibold">Prompt Director</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          Turn a loose idea into a production-ready Kling prompt, then follow
-          the real generation job from request to saved asset.
+          Direct a new clip or continue a previous scene while keeping its
+          subject, setting, and visual language consistent.
         </p>
       </div>
 
@@ -420,15 +452,9 @@ export default function VideoGenerator() {
               Video generation is not configured
             </p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/55">
-              Add the server-side video provider credential to enable
-              generation. Prompt design remains available while setup is
-              incomplete.
+              Video generation is temporarily unavailable. Prompt design remains
+              available in the meantime.
             </p>
-            {videoMissing.length > 0 ? (
-              <p className="mt-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
-                Missing: {videoMissing.join(", ")}
-              </p>
-            ) : null}
           </div>
         </div>
       ) : null}
@@ -586,6 +612,88 @@ export default function VideoGenerator() {
         </div>
 
         <div className="space-y-5">
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <Layers3 className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-medium">Clip continuity</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {(["new", "continue"] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={clipMode === mode}
+                  onClick={() => {
+                    if (mode === clipMode) return;
+                    setClipMode(mode);
+                    if (mode === "new") setContinuitySourceJobId("");
+                    else if (!continuitySourceJobId && completedVideoJobs[0]) {
+                      setContinuitySourceJobId(completedVideoJobs[0].id);
+                    }
+                    if (mode === "continue" && duration < 4) setDuration(4);
+                    invalidateRightsAttestations();
+                  }}
+                  className={`rounded-lg border px-3 py-2.5 text-xs font-medium transition-colors ${
+                    clipMode === mode
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border bg-background hover:border-primary/35"
+                  }`}
+                >
+                  {mode === "new" ? "New scene" : "Continue a clip"}
+                </button>
+              ))}
+            </div>
+
+            {clipMode === "continue" ? (
+              completedVideoJobs.length > 0 ? (
+                <div className="mt-4">
+                  <label
+                    className="mb-2 block text-xs font-medium"
+                    htmlFor="continuity-source"
+                  >
+                    Previous clip
+                  </label>
+                  <select
+                    id="continuity-source"
+                    value={continuitySourceJobId}
+                    onChange={event => {
+                      setContinuitySourceJobId(event.target.value);
+                      invalidateRightsAttestations();
+                    }}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  >
+                    {completedVideoJobs.map(candidate => {
+                      const asset = candidate.resultAssetId
+                        ? assetById.get(candidate.resultAssetId)
+                        : undefined;
+                      return (
+                        <option key={candidate.id} value={candidate.id}>
+                          {asset?.name ?? "Generated clip"} ·{" "}
+                          {new Date(candidate.createdAt).toLocaleDateString()}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
+                    Continuity Lock reuses the selected clip, its scene
+                    direction, reference frames, and generation lineage. Write
+                    what happens next below. Consistency is strongly guided, not
+                    guaranteed pixel-for-pixel.
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-4 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground/50">
+                  Generate one clip first. Completed clips will appear here as
+                  continuity sources.
+                </p>
+              )
+            ) : (
+              <p className="mt-3 text-[11px] leading-relaxed text-foreground/45">
+                Starts a fresh subject, setting, and visual sequence.
+              </p>
+            )}
+          </section>
+
           <section className="rounded-xl border border-border bg-surface p-6">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
@@ -743,8 +851,7 @@ export default function VideoGenerator() {
                 <p>
                   Your direction mentions {mentionedDurations.join(", ")}{" "}
                   seconds, but output is set to {duration} seconds. The output
-                  control is sent to the provider; align the wording to avoid
-                  contradictory motion.
+                  setting wins; align the wording to avoid contradictory motion.
                 </p>
               </div>
             ) : null}
@@ -817,8 +924,7 @@ export default function VideoGenerator() {
                 </div>
                 <p className="sm:col-span-2 text-[11px] text-foreground/40">
                   Only public HTTPS image URLs are accepted. Browser blob URLs
-                  and local network addresses cannot be reached by the video
-                  provider.
+                  and local network addresses cannot be used for generation.
                 </p>
               </div>
             ) : null}
@@ -829,7 +935,7 @@ export default function VideoGenerator() {
               <div>
                 <p className="text-sm font-medium">Compiled prompt</p>
                 <p className="mt-0.5 text-[11px] text-foreground/40">
-                  {template?.name ?? "Custom"} · provider-ready
+                  {template?.name ?? "Custom"} · ready to generate
                 </p>
               </div>
               <button
@@ -865,18 +971,18 @@ export default function VideoGenerator() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-foreground/45">
-                  Cost estimate
+                  Ready to generate
                 </p>
-                <p className="mt-1 text-3xl font-semibold text-primary">
-                  from ${estimatedCost.toFixed(2)}
+                <p className="mt-1 text-lg font-semibold text-primary">
+                  {clipMode === "continue"
+                    ? "Continuity Lock enabled"
+                    : "New clip"}
                 </p>
               </div>
-              <Clock3 className="h-5 w-5 text-primary/60" />
+              <Sparkles className="h-5 w-5 text-primary/60" />
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
-              Estimate uses the public starting rate of $
-              {PUBLIC_STARTING_RATE_USD.toFixed(3)} per second. The provider
-              invoice is authoritative and can vary by output settings.
+              Generation uses REELassati credits inside your workspace.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-lg border border-primary/10 bg-background/70 p-2.5">
@@ -946,6 +1052,7 @@ export default function VideoGenerator() {
                 Boolean(activeJobId) ||
                 Boolean(firstFrameError) ||
                 Boolean(lastFrameError) ||
+                (clipMode === "continue" && !continuitySourceJob) ||
                 !rightsConfirmed ||
                 (referenceContainsRealPerson && !realPersonConsentConfirmed)
               }
@@ -954,7 +1061,7 @@ export default function VideoGenerator() {
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Starting job
+                  Starting generation
                 </>
               ) : activeJobId ? (
                 <>
@@ -979,9 +1086,11 @@ export default function VideoGenerator() {
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Generation job</p>
-                  <p className="mt-1 font-mono text-[10px] text-foreground/35">
-                    {job.id}
+                  <p className="text-sm font-medium">Generating video</p>
+                  <p className="mt-1 text-[11px] text-foreground/40">
+                    {job.continuity?.mode === "continue"
+                      ? "Continuing the selected clip"
+                      : "Creating a new clip"}
                   </p>
                 </div>
                 <span
@@ -1007,7 +1116,7 @@ export default function VideoGenerator() {
                 />
               </div>
               <div className="mt-2 flex justify-between text-[11px] text-foreground/40">
-                <span>Provider status</span>
+                <span>Progress</span>
                 <span>{Math.round(job.progress)}%</span>
               </div>
               {job.error ? (
@@ -1016,11 +1125,12 @@ export default function VideoGenerator() {
             </motion.section>
           ) : (
             <section className="rounded-xl border border-border bg-surface p-5">
-              <MonitorUp className="h-6 w-6 text-primary/45" />
-              <p className="mt-3 text-sm font-medium">Real job tracking</p>
+              <Film className="h-6 w-6 text-primary/45" />
+              <p className="mt-3 text-sm font-medium">
+                Your video will appear here
+              </p>
               <p className="mt-1 text-xs leading-relaxed text-foreground/45">
-                After submission, this panel polls the provider-backed job and
-                shows its returned progress. No simulated completion state.
+                Set the scene, confirm the rights, and start generation.
               </p>
             </section>
           )}
@@ -1071,6 +1181,22 @@ export default function VideoGenerator() {
                 <Download className="h-4 w-4" />
                 Download video
               </a>
+              {job?.status === "completed" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClipMode("continue");
+                    setContinuitySourceJobId(job.id);
+                    setRightsConfirmed(false);
+                    setRealPersonConsentConfirmed(false);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+                >
+                  <Layers3 className="h-4 w-4" />
+                  Continue this clip
+                </button>
+              ) : null}
             </motion.section>
           ) : null}
 

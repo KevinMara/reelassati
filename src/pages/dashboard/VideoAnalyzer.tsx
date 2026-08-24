@@ -163,9 +163,6 @@ export default function VideoAnalyzer() {
   const sourceReady =
     sourceMode === "upload" ? Boolean(file || sourceAsset) : !urlError;
   const analysisReady = capabilities.analysis;
-  const analysisMissing = capabilities.missing.filter(item =>
-    item.includes("OPENROUTER")
-  );
 
   const saveUploadedAsset = async (asset: Asset) => {
     await updateWorkspace(current => ({
@@ -323,17 +320,12 @@ export default function VideoAnalyzer() {
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
             <p className="text-sm font-medium">
-              AI analysis needs provider setup
+              AI analysis is temporarily unavailable
             </p>
             <p className="mt-1 text-xs text-foreground/55">
               Uploads and saved assets remain available, but analysis will stay
               disabled until the server-side AI capability is connected.
             </p>
-            {analysisMissing.length > 0 ? (
-              <p className="mt-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
-                Missing: {analysisMissing.join(", ")}
-              </p>
-            ) : null}
           </div>
         </div>
       ) : null}
@@ -488,7 +480,7 @@ export default function VideoAnalyzer() {
               </select>
               <p className="mt-2 text-[11px] text-foreground/40">
                 Analysis receives the stored asset ID. A browser-only blob URL
-                is never sent to the AI provider.
+                is never sent for AI processing.
               </p>
             </div>
           </div>
@@ -530,7 +522,7 @@ export default function VideoAnalyzer() {
         <div className="mt-5 rounded-lg border border-border bg-background/60 p-3">
           <p className="flex items-center gap-1.5 text-[11px] font-medium text-foreground/55">
             <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
-            AI analysis · Gemini via OpenRouter
+            REELassati AI analysis
           </p>
           <label className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-foreground/60">
             <input
@@ -541,7 +533,7 @@ export default function VideoAnalyzer() {
             />
             <span>
               I&apos;m authorized to provide this video and send it to the
-              analysis provider for this review.
+              analysis service for this review.
             </span>
           </label>
           <p className="mt-1 pl-5 text-[10px] text-foreground/40">

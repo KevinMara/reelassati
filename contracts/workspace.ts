@@ -32,9 +32,6 @@ export interface CapabilityState {
   missing: string[];
   modelRoutes: Array<{
     purpose: "Text" | "Analysis" | "Transcription" | "Speech" | "Video";
-    provider: "Kimi Code" | "OpenRouter";
-    model: string;
-    mode: "official" | "owner-test";
   }>;
 }
 
@@ -240,7 +237,6 @@ export interface GenerationJob {
   id: string;
   type: "video" | "speech" | "transcription" | "edit-plan";
   status: "pending" | "in_progress" | "completed" | "failed";
-  providerJobId?: string;
   projectId?: string;
   prompt?: string;
   progress: number;
@@ -249,6 +245,12 @@ export interface GenerationJob {
   createdAt: string;
   updatedAt: string;
   provenance?: ContentProvenance;
+  continuity?: {
+    mode: "new" | "continue";
+    rootJobId: string;
+    parentJobId?: string;
+    sourceAssetId?: string;
+  };
 }
 
 export interface WorkspaceDocument {

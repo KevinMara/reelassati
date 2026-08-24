@@ -117,9 +117,6 @@ export default function VoiceNotes() {
     () => workspace.assets.filter(asset => asset.kind === "audio"),
     [workspace.assets]
   );
-  const voiceMissing = capabilities.missing.filter(item =>
-    item.includes("OPENROUTER")
-  );
 
   const saveAsset = async (asset: Asset, label: string) => {
     await updateWorkspace(current => ({
@@ -175,7 +172,9 @@ export default function VoiceNotes() {
     setBusyAction("transcribe");
     setError(null);
     setGeneratedScript(null);
-    const transcriptionSource = sourceAsset ? "existing_asset" : "uploaded_file";
+    const transcriptionSource = sourceAsset
+      ? "existing_asset"
+      : "uploaded_file";
     try {
       const asset = await uploadSelectedFile();
       const result = await platformApi.transcribe(
@@ -353,14 +352,9 @@ export default function VoiceNotes() {
           <div>
             <p className="text-sm font-medium">Some voice tools need setup</p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/55">
-              Available controls stay active; unavailable provider-backed
-              actions are disabled without pretending to process audio.
+              Available controls stay active; unavailable AI actions are
+              disabled without pretending to process audio.
             </p>
-            {voiceMissing.length > 0 ? (
-              <p className="mt-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
-                Missing: {voiceMissing.join(", ")}
-              </p>
-            ) : null}
           </div>
         </div>
       ) : null}
@@ -516,7 +510,7 @@ export default function VoiceNotes() {
 
             <p className="mt-4 flex items-center gap-1.5 text-[11px] text-foreground/45">
               <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
-              AI transcription · Whisper via OpenRouter
+              REELassati AI transcription
             </p>
             <div className="mt-2 flex gap-2">
               <select
@@ -590,7 +584,7 @@ export default function VoiceNotes() {
               className="mb-2 mt-4 block text-xs font-medium"
               htmlFor="voice-id"
             >
-              Provider voice ID
+              Voice style ID
             </label>
             <input
               id="voice-id"
@@ -604,12 +598,12 @@ export default function VoiceNotes() {
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             />
             <p className="mt-1 text-[11px] text-foreground/40">
-              Use a voice ID supported by the configured speech provider. The
-              default uses its standard voice.
+              Choose a supported voice style ID. The default uses the standard
+              REELassati voice.
             </p>
             <p className="mt-3 flex items-center gap-1.5 text-[11px] text-foreground/45">
               <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
-              AI-generated audio · MiniMax via OpenRouter
+              REELassati AI-generated audio
             </p>
             <label className="mt-2 flex items-start gap-2 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground/60">
               <input

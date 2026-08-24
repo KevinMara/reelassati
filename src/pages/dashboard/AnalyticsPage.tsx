@@ -163,8 +163,8 @@ export default function AnalyticsPage() {
             <h2 className="font-medium">Audience metrics are not synced yet</h2>
             <p className="mt-1 text-sm leading-relaxed text-foreground/55">
               {capabilities.publishing
-                ? "Zernio distribution is configured, but account-level views, watch time, retention, and engagement are not yet imported into this workspace."
-                : "Zernio publishing is not configured, and no platform analytics source is connected."}{" "}
+                ? "Connected distribution is ready, but account-level views, watch time, retention, and engagement are not yet imported into this workspace."
+                : "Publishing is not connected, and no platform analytics source is available."}{" "}
               This screen will not manufacture performance numbers.
             </p>
             <Link

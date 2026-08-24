@@ -414,8 +414,8 @@ describe("Sites worker", () => {
       name: "Ada Creator",
       role: "member",
     });
-    expect(body.capabilities.missing).toContain("OPENROUTER_API_KEY");
-    expect(body.capabilities.missing).toContain("ZERNIO_API_KEY");
+    expect(body.capabilities.missing).toContain("AI_SERVICE");
+    expect(body.capabilities.missing).toContain("PUBLISHING_SERVICE");
   });
 
   it("verifies a Supabase bearer session before returning workspace identity", async () => {
@@ -1551,6 +1551,11 @@ describe("Sites worker", () => {
         "The video job could not be completed. Retry once; if it continues, contact support."
       );
       expect(videoJob.error).not.toContain("private diagnostic");
+      expect(videoJob).not.toHaveProperty("providerJobId");
+      expect(videoJob.continuity).toEqual({
+        mode: "new",
+        rootJobId: "video_provider_failure",
+      });
       expect(errorLog).toHaveBeenCalledWith(
         "REELassati provider operation failed",
         expect.objectContaining({

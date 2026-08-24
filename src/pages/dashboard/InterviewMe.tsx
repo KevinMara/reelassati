@@ -47,7 +47,11 @@ function describeError(cause: unknown) {
   return cause instanceof Error ? cause.message : "Script generation failed.";
 }
 
-export default function InterviewMe() {
+export default function InterviewMe({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const { workspace, capabilities, updateWorkspace } = useWorkspace();
   const [topic, setTopic] = useState("");
   const [niche, setNiche] = useState("");
@@ -134,7 +138,7 @@ export default function InterviewMe() {
   const generateScript = async () => {
     if (!capabilities.ai) {
       setError(
-        "AI generation is not configured. Your interview answers remain on this screen; configure the server-side OpenRouter key before generating."
+        "AI generation is temporarily unavailable. Your interview answers remain on this screen so you can try again later."
       );
       return;
     }
@@ -223,7 +227,7 @@ export default function InterviewMe() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className={`mx-auto max-w-4xl ${embedded ? "pb-4" : ""}`}>
       <div className="mb-8">
         <p className="mono-eyebrow mb-2 text-primary">Story extractor</p>
         <h1 className="text-3xl font-semibold">Interview Me</h1>

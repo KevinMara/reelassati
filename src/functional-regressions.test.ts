@@ -299,6 +299,11 @@ describe("platform-wide functional invariants", () => {
     expect(voice).toContain("voice-source-description");
     expect(voice).toContain("generated-speech-transcript");
     expect(video).toContain("generated-video-caption-status");
+    expect(video).toContain("Clip continuity");
+    expect(video).toContain("continuitySourceJobId");
+    expect(video).toContain("Continue this clip");
+    expect(video).not.toContain("Cost estimate");
+    expect(video).not.toContain("Real job tracking");
   });
 
   it("keeps the editor transport connected to the actual media preview", () => {

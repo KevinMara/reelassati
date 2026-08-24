@@ -257,8 +257,8 @@ export default function PublisherPage() {
               result.changed > 0
                 ? `${result.changed} publication ${
                     result.changed === 1 ? "status" : "statuses"
-                  } updated from the provider.`
-                : `All ${result.checked} provider ${
+                  } updated from the delivery service.`
+                : `All ${result.checked} delivery ${
                     result.checked === 1 ? "status is" : "statuses are"
                   } current.`,
           });
@@ -485,7 +485,7 @@ export default function PublisherPage() {
       setNotice({
         tone: "error",
         message:
-          "Publishing is not configured. Connect the server-side Zernio integration first.",
+          "Publishing is temporarily unavailable. Try again after the managed connection is ready.",
       });
       return;
     }
@@ -542,7 +542,7 @@ export default function PublisherPage() {
         setNotice({
           tone: "error",
           message:
-            "Media posts can be scheduled up to 6 days ahead because the publishing provider uses temporary uploads.",
+            "Media posts can be scheduled up to 6 days ahead because delivery uploads are temporary.",
         });
         return;
       }
@@ -567,12 +567,12 @@ export default function PublisherPage() {
         message:
           result.warning ||
           (result.post.status === "failed"
-            ? "The publishing provider returned a failed delivery state."
+            ? "The publishing service returned a failed delivery state."
             : publishNow
-              ? "The provider accepted your publication."
+              ? "The publishing service accepted your publication."
               : result.post.status === "scheduled"
                 ? `Scheduled for ${new Date(result.post.scheduledAt || scheduledAt!).toLocaleString()}.`
-                : "The provider accepted the schedule request and is still confirming its state."),
+                : "The publishing service accepted the schedule request and is still confirming its state."),
       });
       if (result.post.status !== "failed") {
         posthog?.capture("publication_submitted", {
@@ -747,7 +747,7 @@ export default function PublisherPage() {
         <h1 className="text-3xl font-semibold">Publisher</h1>
         <p className="mt-2 max-w-2xl text-foreground/60">
           Keep drafts, destinations and timing in one persisted queue. Nothing
-          is marked published until the provider accepts it.
+          is marked published until the delivery service accepts it.
         </p>
       </div>
 
@@ -755,8 +755,8 @@ export default function PublisherPage() {
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
           <p className="text-sm text-foreground/65">
-            Drafting works now. To schedule or publish, configure Zernio and
-            connect at least one destination in Social Hub.
+            Drafting works now. To schedule or publish, finish the managed
+            connection and add at least one destination in Social Hub.
           </p>
         </div>
       )}
@@ -906,9 +906,9 @@ export default function PublisherPage() {
                 ))}
               </select>
               <p className="mt-1 text-xs text-foreground/35">
-                Selected media is transferred to the publishing provider only
+                Selected media is transferred to the publishing service only
                 when you publish or schedule. Media schedules are limited to 6
-                days because provider uploads are temporary.
+                days because delivery uploads are temporary.
               </p>
               {selectedAssetHasVerifiedAiOrigin ? (
                 <div className="mt-2 flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700">
@@ -1339,7 +1339,7 @@ export default function PublisherPage() {
                   {post.outgoingContent ? (
                     <div>
                       <p className="mb-1 font-mono text-[9px] uppercase tracking-wide text-foreground/35">
-                        Exact provider payload
+                        Final delivery content
                       </p>
                       <p className="line-clamp-4 whitespace-pre-line text-sm font-medium">
                         {withoutTextProvenanceMarker(post.outgoingContent)}
@@ -1396,7 +1396,7 @@ export default function PublisherPage() {
                   </p>
                   {post.statusCheckedAt && (
                     <p className="mt-1 text-[10px] text-foreground/30">
-                      Provider checked{" "}
+                      Delivery checked{" "}
                       {new Date(post.statusCheckedAt).toLocaleString()}
                     </p>
                   )}

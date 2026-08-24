@@ -276,9 +276,7 @@ export default function TemplatesPage() {
                     </h2>
                   </div>
                   <span className="rounded-pill bg-primary/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-primary">
-                    {language === "it"
-                      ? "Nessuna chiamata provider"
-                      : "No provider call"}
+                    {language === "it" ? "Anteprima locale" : "Local preview"}
                   </span>
                 </div>
 
@@ -338,8 +336,8 @@ export default function TemplatesPage() {
                 </Link>
                 <p className="mt-3 text-center text-[10px] leading-relaxed text-foreground/40">
                   {language === "it"
-                    ? "La generazione nello Studio richiede un provider configurato e una revisione esplicita."
-                    : "Generation in the Studio requires a configured provider and explicit review."}
+                    ? "La generazione nello Studio usa crediti REELassati e richiede una revisione esplicita."
+                    : "Generation in the Studio uses REELassati credits and requires explicit review."}
                 </p>
               </aside>
             ) : null}

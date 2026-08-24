@@ -79,7 +79,7 @@ export default {
     "The studio proposes the cuts. Approve or refine in one click.",
   "how.publish": "Publish",
   "how.publish_desc":
-    "Submit through connected destinations when the publishing provider is configured.",
+    "Submit through connected destinations when publishing is ready.",
 
   // Platforms
   "platforms.eyebrow": "Integrations",
@@ -187,8 +187,7 @@ export default {
   "dash.onboarding_1": "Add your first client",
   "dash.onboarding_1_sub": "The brand, the voice, the channels.",
   "dash.onboarding_2": "Connect a social account",
-  "dash.onboarding_2_sub":
-    "Connect through the configured publishing provider.",
+  "dash.onboarding_2_sub": "Connect through the managed publishing service.",
   "dash.onboarding_3": "Try the analyzer",
   "dash.onboarding_3_sub":
     "Upload a video and review evidence-based edit notes.",

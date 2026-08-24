@@ -79,7 +79,7 @@ const COPY = {
   en: {
     eyebrow: "Edit-plan preview",
     title: "Describe the change. Inspect the plan.",
-    body: "This interactive preview runs locally in your browser. It uses transparent rules—not an AI provider—and never pretends to modify a real file.",
+    body: "This interactive preview runs locally in your browser. It uses transparent rules—not AI processing—and never pretends to modify a real file.",
     promptLabel: "What should the edit accomplish?",
     placeholder:
       "Example: tighten my 50-second talking head into a clear 30-second launch reel…",
@@ -94,13 +94,13 @@ const COPY = {
     directorLead:
       "Use this production direction when a generated insert is needed:",
     open: "Continue in the Studio",
-    noUpload: "No upload · no provider call · no fabricated score",
+    noUpload: "No upload · no AI processing · no fabricated score",
     live: "Plan rebuilt",
   },
   it: {
     eyebrow: "Anteprima piano di montaggio",
     title: "Descrivi la modifica. Ispeziona il piano.",
-    body: "Questa anteprima interattiva gira in locale nel browser. Usa regole trasparenti, non un provider AI, e non finge di modificare un file reale.",
+    body: "Questa anteprima interattiva gira in locale nel browser. Usa regole trasparenti, non elaborazione AI, e non finge di modificare un file reale.",
     promptLabel: "Cosa deve ottenere il montaggio?",
     placeholder:
       "Esempio: stringi il mio talking-head di 50 secondi in un reel lancio chiaro da 30 secondi…",
@@ -116,7 +116,7 @@ const COPY = {
       "Usa questa direzione produttiva se serve un inserto generato:",
     open: "Continua nello Studio",
     noUpload:
-      "Nessun upload · nessuna chiamata provider · nessun punteggio inventato",
+      "Nessun upload · nessuna elaborazione AI · nessun punteggio inventato",
     live: "Piano aggiornato",
   },
 } as const;

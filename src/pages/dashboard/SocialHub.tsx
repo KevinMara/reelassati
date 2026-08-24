@@ -142,8 +142,8 @@ export default function SocialHub() {
           <p className="mono-eyebrow mb-2 text-primary">Distribution layer</p>
           <h1 className="text-3xl font-semibold">Social Hub</h1>
           <p className="mt-2 max-w-2xl text-foreground/60">
-            Link real publishing accounts through Zernio, then use the same
-            verified destinations everywhere in your workspace.
+            Link real publishing accounts, then use the same verified
+            destinations everywhere in your workspace.
           </p>
         </div>
         <button
@@ -178,8 +178,8 @@ export default function SocialHub() {
             </p>
             <p className="mt-1 text-xs text-foreground/55">
               {configured
-                ? "Account data below comes from Zernio. Follower and growth analytics are not invented or estimated here."
-                : "A server-side ZERNIO_API_KEY is required before OAuth connections and account sync can work."}
+                ? "Account data below comes from the connected publishing service. Follower and growth analytics are not invented or estimated here."
+                : "Publishing connections are temporarily unavailable until the managed service is ready."}
             </p>
           </div>
         </div>
@@ -215,7 +215,7 @@ export default function SocialHub() {
                 })
               : "Not synced yet"}
           </p>
-          <p className="mt-1 text-sm text-foreground/50">Last provider sync</p>
+          <p className="mt-1 text-sm text-foreground/50">Last account sync</p>
         </div>
       </div>
 

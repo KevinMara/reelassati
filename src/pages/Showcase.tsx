@@ -279,7 +279,7 @@ const ITEMS: ShowcaseItem[] = [
     ],
     capabilities: [
       { en: "Prompt Director", it: "Prompt Director" },
-      { en: "Provider-gated", it: "Provider richiesto" },
+      { en: "Credit-based", it: "A crediti" },
       { en: "Versioned insert", it: "Inserto versionato" },
     ],
     route: "/dashboard/video",

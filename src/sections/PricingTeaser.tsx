@@ -98,8 +98,8 @@ export function PricingTeaser() {
               </div>
               <p className="mt-5 text-xs leading-relaxed text-foreground/45">
                 {isItalian
-                  ? "Uso di modelli e generazione video addebitato separatamente dal provider collegato."
-                  : "Model and video-generation usage is billed separately by the connected provider."}
+                  ? "Gli strumenti AI usano crediti REELassati all’interno della piattaforma."
+                  : "AI tools use REELassati credits inside the platform."}
               </p>
             </div>
           </div>

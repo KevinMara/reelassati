@@ -186,17 +186,17 @@ export default function Pricing() {
                 </span>
                 <div>
                   <p className="mono-eyebrow text-primary">
-                    {isItalian ? "Uso provider" : "Provider usage"}
+                    {isItalian ? "Crediti REELassati" : "REELassati credits"}
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold">
                     {isItalian
-                      ? "Nessun limite AI nascosto nel piano."
-                      : "No hidden AI allowance inside the plan."}
+                      ? "Un solo saldo per gli strumenti AI."
+                      : "One balance for every AI tool."}
                   </h2>
                   <p className="mt-3 max-w-2xl text-sm leading-relaxed text-foreground/60">
                     {isItalian
-                      ? "La generazione video, la voce e gli altri modelli sono addebitati separatamente dal provider collegato. Vedi il costo prima dell’azione e il prezzo software resta prevedibile."
-                      : "Video generation, voice, and other model usage are billed separately by the connected provider. You see the cost before the action, while the software price stays predictable."}
+                      ? "Video, voce e altri strumenti AI usano crediti REELassati all’interno della piattaforma. Nessun prezzo esterno o dettaglio tecnico da gestire."
+                      : "Video, voice, and other AI tools use REELassati credits inside the platform. There are no external prices or technical integration details to manage."}
                   </p>
                 </div>
               </div>

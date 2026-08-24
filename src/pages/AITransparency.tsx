@@ -22,19 +22,19 @@ const COPY = {
     eyebrow: "AI transparency",
     title: "Clear about where AI works—and where it does not.",
     intro:
-      "REELassati combines manual production tools with reviewable AI assistance. This page identifies the current model routes, the information sent when you invoke them, and the controls that remain with you.",
+      "REELassati combines manual production tools with reviewable AI assistance. This page identifies where AI is used, the information sent when you invoke it, and the controls that remain with you.",
     updated: "Updated 4 August 2026",
     statusTitle: "Current product behavior",
     statusBody:
-      "This page describes the product routes currently implemented. Provider-dependent actions remain unavailable until a connection is configured, and an interface state is never presented as evidence that a provider call occurred.",
+      "This page describes the product routes currently implemented. Managed AI actions remain unavailable until the service is ready, and an interface state is never presented as evidence that generation occurred.",
     registerEyebrow: "System register",
-    registerTitle: "What uses a model",
+    registerTitle: "What uses AI",
     registerIntro:
-      "Provider calls happen only after a person requests the relevant action. Editing, project organization, trends notes, analytics summaries, and the landing-page preview do not silently invoke a model.",
+      "AI processing happens only after a person requests the relevant action. Editing, project organization, trends notes, analytics summaries, and the landing-page preview do not silently invoke AI.",
     dataEyebrow: "Data path",
     dataTitle: "What leaves the browser",
     dataIntro:
-      "The task input, selected settings, and necessary technical request metadata are sent to the configured provider. Provider credentials stay on the server.",
+      "The task input, selected settings, and necessary technical request metadata are sent through REELassati's managed AI service. Service credentials stay on the server.",
     controlsEyebrow: "Human control",
     controlsTitle: "Assistance stays reviewable",
     provenanceEyebrow: "Output evidence",
@@ -56,19 +56,19 @@ const COPY = {
     eyebrow: "Trasparenza AI",
     title: "Chiaro dove lavora l’AI—e dove non lavora.",
     intro:
-      "REELassati unisce strumenti di produzione manuali e assistenza AI revisionabile. Questa pagina identifica i percorsi modello attuali, le informazioni inviate quando li attivi e i controlli che restano nelle tue mani.",
+      "REELassati unisce strumenti di produzione manuali e assistenza AI revisionabile. Questa pagina identifica dove viene usata l’AI, le informazioni inviate quando la attivi e i controlli che restano nelle tue mani.",
     updated: "Aggiornato il 4 agosto 2026",
     statusTitle: "Comportamento attuale del prodotto",
     statusBody:
-      "Questa pagina descrive i percorsi di prodotto attualmente implementati. Le azioni che dipendono da un provider restano indisponibili finché non viene configurata una connessione e nessuno stato dell’interfaccia viene presentato come prova di una chiamata provider.",
+      "Questa pagina descrive i percorsi di prodotto attualmente implementati. Le azioni AI gestite restano indisponibili finché il servizio non è pronto e nessuno stato dell’interfaccia viene presentato come prova di una generazione.",
     registerEyebrow: "Registro dei sistemi",
-    registerTitle: "Cosa usa un modello",
+    registerTitle: "Cosa usa l’AI",
     registerIntro:
-      "Le chiamate ai provider avvengono solo dopo che una persona richiede l’azione corrispondente. Montaggio, organizzazione progetti, note trend, riepiloghi analytics e anteprima nella landing non invocano modelli in modo nascosto.",
+      "L’elaborazione AI avviene solo dopo che una persona richiede l’azione corrispondente. Montaggio, organizzazione progetti, note trend, riepiloghi analytics e anteprima nella landing non invocano l’AI in modo nascosto.",
     dataEyebrow: "Percorso dati",
     dataTitle: "Cosa lascia il browser",
     dataIntro:
-      "Al provider configurato vengono inviati l’input dell’attività, le impostazioni selezionate e i metadati tecnici necessari alla richiesta. Le credenziali dei provider restano sul server.",
+      "L’input dell’attività, le impostazioni selezionate e i metadati tecnici necessari passano dal servizio AI gestito da REELassati. Le credenziali restano sul server.",
     controlsEyebrow: "Controllo umano",
     controlsTitle: "L’assistenza resta revisionabile",
     provenanceEyebrow: "Evidenza dell’output",
@@ -91,16 +91,16 @@ const SYSTEMS = {
   en: [
     {
       title: "Writing and edit planning",
-      provider: "Kimi · direct test route or OpenRouter",
+      provider: "REELassati AI",
       detail:
-        "Creates scripts and proposed edit operations. The owner-only Kimi subscription test can replace only the default text route; explicit non-Kimi models remain on OpenRouter.",
+        "Creates scripts and proposed edit operations through a managed production route.",
       input:
         "Prompts, brand context, interview answers, and the selected project context.",
       icon: Bot,
     },
     {
       title: "Video review",
-      provider: "Gemini · through OpenRouter",
+      provider: "REELassati AI",
       detail:
         "Reviews a supplied video for editorial hook, pacing, and time-based suggestions. Scores are rubric assessments, not predicted views.",
       input: "The chosen video asset or a public HTTPS video URL.",
@@ -108,7 +108,7 @@ const SYSTEMS = {
     },
     {
       title: "Transcription and speech",
-      provider: "Whisper and MiniMax · through OpenRouter",
+      provider: "REELassati AI",
       detail:
         "Turns selected media into editable text or approved copy into a generated narration asset.",
       input:
@@ -117,9 +117,9 @@ const SYSTEMS = {
     },
     {
       title: "Video generation",
-      provider: "Kling · through OpenRouter",
+      provider: "REELassati AI",
       detail:
-        "Generates a new clip from a directed prompt and optional public first/last reference frames.",
+        "Generates a new clip or continues a previous one from a directed prompt and optional reference frames.",
       input:
         "The compiled prompt, output settings, and optional reference-frame URLs.",
       icon: FileSearch,
@@ -128,16 +128,16 @@ const SYSTEMS = {
   it: [
     {
       title: "Scrittura e piano di montaggio",
-      provider: "Kimi · percorso test diretto o OpenRouter",
+      provider: "REELassati AI",
       detail:
-        "Crea script e operazioni di montaggio proposte. Il test dell’abbonamento Kimi, riservato al proprietario, può sostituire solo il percorso testo predefinito; i modelli espliciti non-Kimi restano su OpenRouter.",
+        "Crea script e operazioni di montaggio proposte tramite un percorso di produzione gestito.",
       input:
         "Prompt, contesto brand, risposte all’intervista e contesto del progetto selezionato.",
       icon: Bot,
     },
     {
       title: "Revisione video",
-      provider: "Gemini · tramite OpenRouter",
+      provider: "REELassati AI",
       detail:
         "Esamina un video fornito per hook editoriale, ritmo e suggerimenti temporali. I punteggi sono valutazioni su rubrica, non previsioni di visualizzazioni.",
       input: "L’asset video scelto o un URL video HTTPS pubblico.",
@@ -145,7 +145,7 @@ const SYSTEMS = {
     },
     {
       title: "Trascrizione e voce",
-      provider: "Whisper e MiniMax · tramite OpenRouter",
+      provider: "REELassati AI",
       detail:
         "Trasforma il media selezionato in testo modificabile o il copy approvato in una traccia di narrazione generata.",
       input:
@@ -154,9 +154,9 @@ const SYSTEMS = {
     },
     {
       title: "Generazione video",
-      provider: "Kling · tramite OpenRouter",
+      provider: "REELassati AI",
       detail:
-        "Genera una nuova clip da un prompt diretto e da eventuali frame iniziale/finale pubblici.",
+        "Genera una nuova clip o continua una clip precedente da un prompt diretto e da eventuali frame di riferimento.",
       input:
         "Prompt compilato, impostazioni output ed eventuali URL dei frame di riferimento.",
       icon: FileSearch,
@@ -169,17 +169,17 @@ const DATA_STEPS = {
     {
       label: "You choose",
       detail:
-        "Nothing is sent to an AI or publishing provider until you trigger generation, analysis, transcription, speech, or publishing.",
+        "Nothing is sent for AI processing or publishing until you trigger generation, analysis, transcription, speech, or publishing.",
     },
     {
       label: "Server mediates",
       detail:
-        "The browser sends the request to REELassati; provider keys are never exposed to client code.",
+        "The browser sends the request to REELassati; service credentials are never exposed to client code.",
     },
     {
-      label: "Provider processes",
+      label: "Managed processing",
       detail:
-        "The task input, selected settings, and necessary technical request metadata are transferred to the configured model or publishing provider.",
+        "The task input, selected settings, and necessary technical request metadata are transferred to the managed AI or publishing service.",
     },
     {
       label: "You review",
@@ -191,17 +191,17 @@ const DATA_STEPS = {
     {
       label: "Scegli tu",
       detail:
-        "Nulla viene inviato a un provider AI o di pubblicazione finché non attivi generazione, analisi, trascrizione, voce o pubblicazione.",
+        "Nulla viene inviato per l’elaborazione AI o la pubblicazione finché non attivi generazione, analisi, trascrizione, voce o pubblicazione.",
     },
     {
       label: "Mediazione server",
       detail:
-        "Il browser invia la richiesta a REELassati; le chiavi provider non sono mai esposte nel codice client.",
+        "Il browser invia la richiesta a REELassati; le credenziali dei servizi non sono mai esposte nel codice client.",
     },
     {
-      label: "Elaborazione provider",
+      label: "Elaborazione gestita",
       detail:
-        "Al modello o provider di pubblicazione configurato passano l’input dell’attività, le impostazioni selezionate e i metadati tecnici necessari.",
+        "Al servizio AI o di pubblicazione gestito passano l’input dell’attività, le impostazioni selezionate e i metadati tecnici necessari.",
     },
     {
       label: "La revisione resta a te",

@@ -194,8 +194,8 @@ function toDisplayResult(
         status: artifactVerified ? "verified" : "informational",
       },
       {
-        label: "Provider · model",
-        value: `${provenance.provider} · ${provenance.model}`,
+        label: language === "it" ? "Sistema" : "System",
+        value: "REELassati AI",
         status: artifactVerified ? "verified" : "informational",
       },
       {

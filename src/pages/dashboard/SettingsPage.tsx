@@ -174,7 +174,7 @@ export default function SettingsPage() {
     },
     {
       label: "Writing and edit intelligence",
-      detail: "Kimi and OpenRouter-assisted creative workflows",
+      detail: "Managed REELassati AI creative workflows",
       ready: capabilities.ai,
       icon: Bot,
     },
@@ -192,13 +192,13 @@ export default function SettingsPage() {
     },
     {
       label: "Video generation",
-      detail: "Controlled Kling video jobs",
+      detail: "Controlled generation and clip continuity",
       ready: capabilities.videoGeneration,
       icon: Video,
     },
     {
       label: "Publishing",
-      detail: "Zernio account connection and distribution",
+      detail: "Connected account distribution",
       ready: capabilities.publishing,
       icon: Radio,
     },
