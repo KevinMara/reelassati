@@ -8874,7 +8874,7 @@ async function researchTrendSources(
       youtube:
         "YouTube only. Find several individual Shorts shaped like youtube.com/shorts/ID.",
     };
-    const searchPayloads = await Promise.all(
+    const searchResults = await Promise.allSettled(
       searchPlatforms.map(async searchPlatform => {
         const searchResponse = await fetch(
           `${OPENROUTER_BASE}/chat/completions`,
@@ -8921,6 +8921,21 @@ async function researchTrendSources(
         return searchResponse.json();
       })
     );
+    const searchPayloads = searchResults.flatMap(result =>
+      result.status === "fulfilled" ? [result.value] : []
+    );
+    if (!searchPayloads.length) {
+      failureCode = "all_search_requests_failed";
+      throw json(
+        {
+          error:
+            mode === "weekly"
+              ? "The weekly search sources are temporarily unavailable."
+              : "The search sources are temporarily unavailable. No credits were used.",
+        },
+        502
+      );
+    }
     failureCode = "invalid_search_payload";
     const citationMap = new Map<string, TrendSearchCitation>();
     for (const payload of searchPayloads) {
