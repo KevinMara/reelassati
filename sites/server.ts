@@ -8859,8 +8859,8 @@ async function researchTrendSources(
         : scope.objective;
     const taskInstruction =
       mode === "weekly"
-        ? `Use the web search tool before answering. Search each included platform with focused queries. Identify 4-6 distinct short-form FORMAT PATTERNS performing strongly across ${platformInstruction} right now. Select formats with evidence beyond a single isolated creator where the search sources permit it. For each format, provide one canonical representative video URL copied from the search results and explain only the observable evidence. Prioritize format diversity and practical transferability over returning many near-duplicate videos.`
-        : `Use the web search tool before answering. Find 4-8 current ${platformInstruction} videos that answer this paid custom brief. Topic or niche: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. Copy each source URL from the search results and return diverse creators and practical patterns the creator can test.`;
+        ? `Use the web search tool before answering. Identify 4-6 distinct short-form FORMAT PATTERNS performing strongly across ${platformInstruction} right now. Select formats with evidence beyond a single isolated creator where the search sources permit it. For each format, provide one canonical representative video URL copied exactly from the search results and explain only the observable evidence. Prioritize format diversity and practical transferability over returning many near-duplicate videos.`
+        : `Use the web search tool before answering. Find 4-8 current ${platformInstruction} videos that answer this paid custom brief. Topic or niche: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. Copy each source URL exactly from the search results and return diverse creators and practical patterns the creator can test.`;
     failureCode = "search_request_failure";
     const searchPlatforms: TrendPlatform[] =
       scope.platform === "all"
@@ -8873,6 +8873,11 @@ async function researchTrendSources(
         "Instagram only. Find several individual Reels shaped like instagram.com/reel/CODE.",
       youtube:
         "YouTube only. Find several individual Shorts shaped like youtube.com/shorts/ID.",
+    };
+    const searchDomains: Record<TrendPlatform, string[]> = {
+      tiktok: ["tiktok.com"],
+      instagram: ["instagram.com"],
+      youtube: ["youtube.com"],
     };
     const searchResults = await Promise.allSettled(
       searchPlatforms.map(async searchPlatform => {
@@ -8898,12 +8903,17 @@ async function researchTrendSources(
                   type: "openrouter:web_search",
                   parameters: {
                     engine: "exa",
-                    max_results: 6,
-                    max_total_results: 6,
+                    mode: "fast",
+                    max_results: 10,
+                    max_total_results: 10,
+                    max_uses: 1,
+                    max_characters: 1_200,
+                    allowed_domains: searchDomains[searchPlatform],
                   },
                 },
               ],
               tool_choice: "required",
+              max_tool_calls: 2,
               provider: {
                 allow_fallbacks: true,
                 require_parameters: true,
@@ -8911,7 +8921,7 @@ async function researchTrendSources(
               max_tokens: 1_000,
               temperature: 0.1,
             }),
-            signal: AbortSignal.timeout(150_000),
+            signal: AbortSignal.timeout(75_000),
           }
         );
         if (!searchResponse.ok) {
