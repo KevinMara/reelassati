@@ -6,6 +6,7 @@ import worker, {
   publicationReviewFromInput,
   providerPostState,
   submitZernioPost,
+  trendSearchCitations,
 } from "./server";
 import {
   AI_COMPLIANCE_POLICY_VERSION,
@@ -315,6 +316,43 @@ describe("Sites worker", () => {
     expect(
       normalizeTrendSource("https://www.youtube.com/results?q=shorts")
     ).toBe(null);
+  });
+
+  it("keeps only direct social-video citations from grounded search", () => {
+    expect(
+      trendSearchCitations({
+        choices: [
+          {
+            message: {
+              annotations: [
+                {
+                  type: "url_citation",
+                  url_citation: {
+                    url: "https://youtu.be/AbCdEf123_4",
+                    title: "A current short",
+                    content: "Observed search excerpt",
+                  },
+                },
+                {
+                  type: "url_citation",
+                  url_citation: {
+                    url: "https://example.com/trend-roundup",
+                    title: "Generic article",
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      })
+    ).toEqual([
+      {
+        platform: "youtube",
+        sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
+        title: "A current short",
+        content: "Observed search excerpt",
+      },
+    ]);
   });
 
   it("serves the SPA entry for the production root route", async () => {

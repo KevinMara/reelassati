@@ -8534,6 +8534,38 @@ export function normalizeTrendSource(
   return null;
 }
 
+interface TrendSearchCitation {
+  platform: TrendPlatform;
+  sourceUrl: string;
+  title: string;
+  content: string;
+}
+
+export function trendSearchCitations(payload: unknown): TrendSearchCitation[] {
+  const root = recordValue(payload);
+  const choices = Array.isArray(root?.choices) ? root.choices : [];
+  const choice = recordValue(choices[0]);
+  const message = recordValue(choice?.message);
+  const annotations = Array.isArray(message?.annotations)
+    ? message.annotations
+    : [];
+  const citations: TrendSearchCitation[] = [];
+  const seen = new Set<string>();
+  for (const annotationValue of annotations) {
+    const annotation = recordValue(annotationValue);
+    const citation = recordValue(annotation?.url_citation);
+    const source = normalizeTrendSource(citation?.url);
+    if (!source || seen.has(source.sourceUrl)) continue;
+    seen.add(source.sourceUrl);
+    citations.push({
+      ...source,
+      title: stringValue(citation?.title).slice(0, 180),
+      content: stringValue(citation?.content).slice(0, 900),
+    });
+  }
+  return citations;
+}
+
 function nullableTrendMetric(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -8708,7 +8740,8 @@ async function researchTrendSources(
       mode === "weekly"
         ? `Use the web search tool before answering. Search each included platform with focused queries. Identify 4-6 distinct short-form FORMAT PATTERNS performing strongly across ${platformInstruction} right now. Select formats with evidence beyond a single isolated creator where the search sources permit it. For each format, provide one canonical representative video URL copied from the search results and explain only the observable evidence. Prioritize format diversity and practical transferability over returning many near-duplicate videos.`
         : `Use the web search tool before answering. Find 4-8 current ${platformInstruction} videos that answer this paid custom brief. Topic or niche: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. Copy each source URL from the search results and return diverse creators and practical patterns the creator can test.`;
-    const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+    failureCode = "search_request_failure";
+    const searchResponse = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: "POST",
       headers: openRouterHeaders(env),
       body: JSON.stringify({
@@ -8716,14 +8749,13 @@ async function researchTrendSources(
         messages: [
           {
             role: "system",
-            content: `You are REELassati's evidence-first short-form trend researcher. You must use the provided web search tool and return JSON only with one key, trends. Every sourceUrl must be copied from a web-search result and must resolve to an individual TikTok video, Instagram Reel, or YouTube Short; never use search pages, profiles, compilations, or articles as sourceUrl. Never invent URLs, creators, dates, engagement metrics, or evidence. Use null for every metric that is not explicitly present in a search source. Separate observed evidence from hypotheses. Prefer evidence from the last 14 days; older videos are allowed only when sources show current resurfacing. Each item requires: platform, title, creator, sourceUrl, thumbnailUrl or null, publishedAt ISO string or null, niche, region, language, hook, pattern, lifecycle (seed|emerging|breakout|mainstream|saturated|decaying), confidence from 0 to 1, metrics with views/likes/comments/shares as number or null, evidence as 1-4 short factual observations, hypothesis, adaptation, and passSignal. Do not claim causation from view counts. Do not reproduce captions at length.`,
+            content: `You are REELassati's evidence-first short-form trend researcher. You must use the provided web search tool before answering. Search for individual TikTok videos, Instagram Reels, and YouTube Shorts, never search pages, profiles, articles, or compilations. When the brief spans all platforms, run focused searches for each platform. Report only findings supported by the search results and include each direct individual-video URL. Never invent URLs, creators, dates, metrics, or evidence. Prefer evidence from the last 14 days; older videos are allowed only when the sources show current resurfacing. Keep observations separate from hypotheses.`,
           },
           {
             role: "user",
             content: taskInstruction,
           },
         ],
-        plugins: [{ id: "response-healing" }],
         tools: [
           {
             type: "openrouter:web_search",
@@ -8739,17 +8771,67 @@ async function researchTrendSources(
           allow_fallbacks: true,
           require_parameters: true,
         },
-        response_format: { type: "json_object" },
-        max_tokens: 3_800,
-        temperature: 0.15,
+        max_tokens: 1_800,
+        temperature: 0.1,
       }),
-      signal: AbortSignal.timeout(240_000),
+      signal: AbortSignal.timeout(180_000),
     });
-    if (!response.ok) {
-      failureCode = `provider_${response.status}`;
-      await providerError(response, "OpenRouter");
+    if (!searchResponse.ok) {
+      failureCode = `search_provider_${searchResponse.status}`;
+      await providerError(searchResponse, "OpenRouter");
     }
-    const output = parseModelJson(await response.json());
+    failureCode = "invalid_search_payload";
+    const searchPayload = await searchResponse.json();
+    const citations = trendSearchCitations(searchPayload);
+    if (citations.length < 2) {
+      failureCode = `insufficient_search_citations_${citations.length}`;
+      throw json(
+        {
+          error:
+            mode === "weekly"
+              ? "The weekly update could not verify enough current source videos."
+              : "The research could not verify enough current source videos. No credits were used.",
+        },
+        502
+      );
+    }
+
+    failureCode = "structure_request_failure";
+    const structureResponse = await fetch(
+      `${OPENROUTER_BASE}/chat/completions`,
+      {
+        method: "POST",
+        headers: openRouterHeaders(env),
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            {
+              role: "system",
+              content: `You structure verified short-form research into REELassati trend cards. Return JSON only with one key, trends. Use only the supplied verified source URLs and never alter or invent a URL. Never invent creators, dates, metrics, or factual evidence. Use null for every metric not present in the research. Separate observed evidence from hypotheses. Each item requires: platform, title, creator, sourceUrl, thumbnailUrl or null, publishedAt ISO string or null, niche, region, language, hook, pattern, lifecycle (seed|emerging|breakout|mainstream|saturated|decaying), confidence from 0 to 1, metrics with views/likes/comments/shares as number or null, evidence as 1-4 short factual observations, hypothesis, adaptation, and passSignal. Do not claim causation from view counts.`,
+            },
+            {
+              role: "user",
+              content: `Brief:\n${taskInstruction}\n\nVerified search citations:\n${JSON.stringify(citations)}\n\nResearch notes:\n${extractTextContent(searchPayload).slice(0, 8_000)}`,
+            },
+          ],
+          plugins: [{ id: "response-healing" }],
+          provider: {
+            allow_fallbacks: true,
+            require_parameters: true,
+          },
+          response_format: { type: "json_object" },
+          max_tokens: 3_600,
+          temperature: 0.1,
+        }),
+        signal: AbortSignal.timeout(90_000),
+      }
+    );
+    if (!structureResponse.ok) {
+      failureCode = `structure_provider_${structureResponse.status}`;
+      await providerError(structureResponse, "OpenRouter");
+    }
+    failureCode = "invalid_structured_payload";
+    const output = parseModelJson(await structureResponse.json());
     const trends = normalizeTrendItems(output, generatedAt).filter(item =>
       scope.platform === "all" ? true : item.platform === scope.platform
     );
