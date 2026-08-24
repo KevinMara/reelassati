@@ -188,6 +188,9 @@ describe("platform-wide functional invariants", () => {
       readdirSync(new URL("../legacy-api", import.meta.url).pathname).length
     ).toBeGreaterThan(0);
     expect(vercel).toMatchObject({
+      functions: {
+        "api/trends-weekly.ts": { maxDuration: 300 },
+      },
       crons: [{ path: "/api/trends-weekly", schedule: "0 5 * * 1" }],
     });
   });
