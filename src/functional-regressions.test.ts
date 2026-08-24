@@ -207,6 +207,8 @@ describe("platform-wide functional invariants", () => {
     expect(trends).not.toMatch(/reload free|0 credits|identical scan/i);
     expect(server).toContain("reserveTrendResearchCredit");
     expect(server).toContain('"moonshotai/kimi-k2.5"');
+    expect(server).toContain('type: "openrouter:web_search"');
+    expect(server).not.toContain('{ id: "web"');
     expect(server).toContain("TREND_WEEKLY_TTL_MS");
     expect(server).toMatch(
       /Math\.floor\(Number\(referral\?\.credits\).*\|\| 0\)\s*-\s*Math\.floor\(Number\(spent\?\.credits\)/s

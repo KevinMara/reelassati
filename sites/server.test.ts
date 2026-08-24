@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import worker, {
   appendReleaseDisclosure,
   jobFromRow,
+  normalizeTrendSource,
   publicationReviewFromInput,
   providerPostState,
   submitZernioPost,
@@ -288,6 +289,34 @@ const disclosureReview: PublicationComplianceReview = {
 };
 
 describe("Sites worker", () => {
+  it("normalizes direct short-form video links without accepting generic pages", () => {
+    expect(
+      normalizeTrendSource(
+        "https://www.instagram.com/reels/DAbCdEf12_3/?igsh=test"
+      )
+    ).toEqual({
+      platform: "instagram",
+      sourceUrl: "https://www.instagram.com/reel/DAbCdEf12_3/",
+    });
+    expect(
+      normalizeTrendSource("https://www.youtube.com/watch?v=AbCdEf123_4")
+    ).toEqual({
+      platform: "youtube",
+      sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
+    });
+    expect(
+      normalizeTrendSource(
+        "Source: https://www.tiktok.com/@creator/video/1234567890?lang=en"
+      )
+    ).toEqual({
+      platform: "tiktok",
+      sourceUrl: "https://www.tiktok.com/@creator/video/1234567890",
+    });
+    expect(
+      normalizeTrendSource("https://www.youtube.com/results?q=shorts")
+    ).toBe(null);
+  });
+
   it("serves the SPA entry for the production root route", async () => {
     const requestedPaths: string[] = [];
     const response = await worker.fetch(

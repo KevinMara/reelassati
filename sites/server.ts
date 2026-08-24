@@ -8458,36 +8458,75 @@ function cleanTrendScope(value: unknown, fallbackLanguage = "en"): TrendScope {
   };
 }
 
-function trendSourcePlatform(value: unknown): TrendPlatform | null {
-  const candidate = stringValue(value);
+export function normalizeTrendSource(
+  value: unknown
+): { platform: TrendPlatform; sourceUrl: string } | null {
+  const rawCandidate = stringValue(value);
+  const candidate =
+    rawCandidate.match(/https:\/\/[^\s\])}"']+/i)?.[0] || rawCandidate;
   if (!candidate) return null;
   try {
     const url = new URL(candidate);
     if (url.protocol !== "https:") return null;
     const host = url.hostname.toLowerCase();
+    const tiktokVideo = url.pathname.match(/^\/@([^/]+)\/video\/(\d+)\/?$/);
     if (
       (host === "tiktok.com" || host.endsWith(".tiktok.com")) &&
-      /^\/@[^/]+\/video\/\d+\/?$/.test(url.pathname)
+      tiktokVideo
     ) {
-      return "tiktok";
+      return {
+        platform: "tiktok",
+        sourceUrl: `https://www.tiktok.com/@${tiktokVideo[1]}/video/${tiktokVideo[2]}`,
+      };
     }
+    if (
+      (host === "vt.tiktok.com" || host === "vm.tiktok.com") &&
+      /^\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)
+    ) {
+      return {
+        platform: "tiktok",
+        sourceUrl: `https://${host}${url.pathname}`,
+      };
+    }
+    const instagramReel = url.pathname.match(/^\/reels?\/([A-Za-z0-9_-]+)\/?$/);
     if (
       (host === "instagram.com" || host.endsWith(".instagram.com")) &&
-      /^\/reel\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)
+      instagramReel
     ) {
-      return "instagram";
+      return {
+        platform: "instagram",
+        sourceUrl: `https://www.instagram.com/reel/${instagramReel[1]}/`,
+      };
     }
+    const youtubeShort = url.pathname.match(
+      /^\/shorts\/([A-Za-z0-9_-]{6,})\/?$/
+    );
     if (
       (host === "youtube.com" || host.endsWith(".youtube.com")) &&
-      /^\/shorts\/[A-Za-z0-9_-]{6,}\/?$/.test(url.pathname)
+      youtubeShort
     ) {
-      return "youtube";
+      return {
+        platform: "youtube",
+        sourceUrl: `https://www.youtube.com/shorts/${youtubeShort[1]}`,
+      };
     }
+    const youtubeWatchId = url.searchParams.get("v") || "";
     if (
-      (host === "youtu.be" || host.endsWith(".youtu.be")) &&
-      /^\/[A-Za-z0-9_-]{6,}\/?$/.test(url.pathname)
+      (host === "youtube.com" || host.endsWith(".youtube.com")) &&
+      url.pathname === "/watch" &&
+      /^[A-Za-z0-9_-]{6,}$/.test(youtubeWatchId)
     ) {
-      return "youtube";
+      return {
+        platform: "youtube",
+        sourceUrl: `https://www.youtube.com/shorts/${youtubeWatchId}`,
+      };
+    }
+    const youtubeShareId = url.pathname.match(/^\/([A-Za-z0-9_-]{6,})\/?$/);
+    if ((host === "youtu.be" || host.endsWith(".youtu.be")) && youtubeShareId) {
+      return {
+        platform: "youtube",
+        sourceUrl: `https://www.youtube.com/shorts/${youtubeShareId[1]}`,
+      };
     }
   } catch {
     return null;
@@ -8512,9 +8551,9 @@ function normalizeTrendItems(
   for (const candidateValue of candidates) {
     const candidate = recordValue(candidateValue);
     if (!candidate) continue;
-    const sourceUrl = stringValue(candidate.sourceUrl);
-    const detectedPlatform = trendSourcePlatform(sourceUrl);
-    if (!detectedPlatform || seen.has(sourceUrl)) continue;
+    const source = normalizeTrendSource(candidate.sourceUrl || candidate.url);
+    if (!source || seen.has(source.sourceUrl)) continue;
+    const { platform: detectedPlatform, sourceUrl } = source;
     const claimedPlatform = trendPlatform(candidate.platform);
     if (claimedPlatform !== "all" && claimedPlatform !== detectedPlatform) {
       continue;
@@ -8647,6 +8686,7 @@ async function researchTrendSources(
     selectedModel,
     { mode, scope }
   );
+  let failureCode = "provider_or_validation_failure";
   try {
     const platformInstruction =
       scope.platform === "all"
@@ -8666,8 +8706,8 @@ async function researchTrendSources(
         : scope.objective;
     const taskInstruction =
       mode === "weekly"
-        ? `Identify 4-6 distinct short-form FORMAT PATTERNS performing strongly across ${platformInstruction} right now. Select formats with evidence beyond a single isolated creator where the search sources permit it. For each format, provide one canonical representative video URL and explain only the observable evidence. Prioritize format diversity and practical transferability over returning many near-duplicate videos.`
-        : `Find 4-8 current ${platformInstruction} videos that answer this paid custom brief. Topic or niche: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. Return diverse creators and practical patterns the creator can test.`;
+        ? `Use the web search tool before answering. Search each included platform with focused queries. Identify 4-6 distinct short-form FORMAT PATTERNS performing strongly across ${platformInstruction} right now. Select formats with evidence beyond a single isolated creator where the search sources permit it. For each format, provide one canonical representative video URL copied from the search results and explain only the observable evidence. Prioritize format diversity and practical transferability over returning many near-duplicate videos.`
+        : `Use the web search tool before answering. Find 4-8 current ${platformInstruction} videos that answer this paid custom brief. Topic or niche: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. Copy each source URL from the search results and return diverse creators and practical patterns the creator can test.`;
     const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: "POST",
       headers: openRouterHeaders(env),
@@ -8676,24 +8716,37 @@ async function researchTrendSources(
         messages: [
           {
             role: "system",
-            content: `You are REELassati's evidence-first short-form trend researcher. Use live web search and return JSON only with one key, trends. Use direct canonical video URLs only: TikTok /@creator/video/ID, Instagram /reel/CODE, or YouTube /shorts/ID. Never invent URLs, creators, dates, engagement metrics, or evidence. Use null for every metric that is not explicitly present in a search source. Separate observed evidence from hypotheses. Prefer evidence from the last 14 days; older videos are allowed only when sources show current resurfacing. Each item requires: platform, title, creator, sourceUrl, thumbnailUrl or null, publishedAt ISO string or null, niche, region, language, hook, pattern, lifecycle (seed|emerging|breakout|mainstream|saturated|decaying), confidence from 0 to 1, metrics with views/likes/comments/shares as number or null, evidence as 1-4 short factual observations, hypothesis, adaptation, and passSignal. Do not claim causation from view counts. Do not reproduce captions at length.`,
+            content: `You are REELassati's evidence-first short-form trend researcher. You must use the provided web search tool and return JSON only with one key, trends. Every sourceUrl must be copied from a web-search result and must resolve to an individual TikTok video, Instagram Reel, or YouTube Short; never use search pages, profiles, compilations, or articles as sourceUrl. Never invent URLs, creators, dates, engagement metrics, or evidence. Use null for every metric that is not explicitly present in a search source. Separate observed evidence from hypotheses. Prefer evidence from the last 14 days; older videos are allowed only when sources show current resurfacing. Each item requires: platform, title, creator, sourceUrl, thumbnailUrl or null, publishedAt ISO string or null, niche, region, language, hook, pattern, lifecycle (seed|emerging|breakout|mainstream|saturated|decaying), confidence from 0 to 1, metrics with views/likes/comments/shares as number or null, evidence as 1-4 short factual observations, hypothesis, adaptation, and passSignal. Do not claim causation from view counts. Do not reproduce captions at length.`,
           },
           {
             role: "user",
             content: taskInstruction,
           },
         ],
-        plugins: [
-          { id: "web", engine: "exa", max_results: mode === "weekly" ? 8 : 10 },
-          { id: "response-healing" },
+        plugins: [{ id: "response-healing" }],
+        tools: [
+          {
+            type: "openrouter:web_search",
+            parameters: {
+              engine: "exa",
+              max_results: 4,
+              max_total_results: 12,
+            },
+          },
         ],
+        tool_choice: "auto",
+        provider: {
+          allow_fallbacks: true,
+          require_parameters: true,
+        },
         response_format: { type: "json_object" },
-        max_tokens: 4_500,
+        max_tokens: 3_800,
         temperature: 0.15,
       }),
+      signal: AbortSignal.timeout(240_000),
     });
     if (!response.ok) {
-      await failAiInvocation(env, invocation, `provider_${response.status}`);
+      failureCode = `provider_${response.status}`;
       await providerError(response, "OpenRouter");
     }
     const output = parseModelJson(await response.json());
@@ -8701,6 +8754,7 @@ async function researchTrendSources(
       scope.platform === "all" ? true : item.platform === scope.platform
     );
     if (trends.length < 2) {
+      failureCode = `insufficient_verified_sources_${trends.length}`;
       throw json(
         {
           error:
@@ -8718,7 +8772,7 @@ async function researchTrendSources(
     });
     return { trends, generatedAt };
   } catch (cause) {
-    await failAiInvocation(env, invocation, "provider_or_validation_failure");
+    await failAiInvocation(env, invocation, failureCode);
     if (cause instanceof Response) throw cause;
     throw json(
       {
