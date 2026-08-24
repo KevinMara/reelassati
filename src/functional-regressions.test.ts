@@ -256,6 +256,20 @@ describe("platform-wide functional invariants", () => {
     expect(dashboard).toContain('aria-label="Loading Studio tool"');
   });
 
+  it("keeps subtle Studio rewards grounded in real workspace activity", () => {
+    const dashboard = source("./pages/Dashboard.tsx");
+    const styles = source("./index.css");
+
+    expect(dashboard).toContain("Weekly momentum");
+    expect(dashboard).toContain("estimatedMinutesSaved");
+    expect(dashboard).toContain("weekActivity.reduce");
+    expect(dashboard).toContain('aria-label="Studio setup progress"');
+    expect(dashboard).toContain('className="studio-route-enter"');
+    expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(styles).toContain(".studio-action-card:hover");
+    expect(styles).not.toContain("confetti");
+  });
+
   it("keeps clipboard fallback and reliable object-URL downloads", () => {
     const clipboard = source("./lib/clipboard.ts");
     const allSource = filesUnder(new URL(".", import.meta.url).pathname)

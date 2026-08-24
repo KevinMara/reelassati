@@ -46,6 +46,9 @@ import {
   BrainCircuit,
   Radio,
   Sparkles,
+  CheckCircle2,
+  Timer,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -125,24 +128,51 @@ function DashboardHome() {
       now - new Date(post.publishedAt).getTime() <= 7 * 24 * 60 * 60 * 1000
     );
   }).length;
+  const weekActivity = workspace.activity.filter(item => {
+    const createdAt = new Date(item.createdAt).getTime();
+    return Number.isFinite(createdAt) && now - createdAt <= 7 * 86_400_000;
+  });
+  const activeDays = new Set(
+    weekActivity.map(item =>
+      new Date(item.createdAt).toISOString().slice(0, 10)
+    )
+  ).size;
+  const estimatedMinutesSaved = weekActivity.reduce((total, item) => {
+    const minutesByAction: Record<(typeof item)["type"], number> = {
+      generation: 18,
+      script: 12,
+      project: 8,
+      publish: 5,
+      upload: 0,
+      goal: 0,
+    };
+    return total + minutesByAction[item.type];
+  }, 0);
+  const formattedTimeSaved =
+    estimatedMinutesSaved >= 60
+      ? `${Math.floor(estimatedMinutesSaved / 60)}h ${estimatedMinutesSaved % 60 ? `${estimatedMinutesSaved % 60}m` : ""}`.trim()
+      : `${estimatedMinutesSaved}m`;
   const stats = [
     {
       label: "Editing projects",
       value: workspace.projects.length,
       sub: `${workspace.projects.filter(project => project.status === "editing").length} currently in edit`,
       icon: Scissors,
+      to: "/dashboard/edit",
     },
     {
       label: "Media assets",
       value: workspace.assets.length,
       sub: "Stored in your private library",
       icon: Library,
+      to: "/dashboard/library",
     },
     {
       label: t("dash.post_settimana"),
       value: publishedThisWeek,
       sub: "Published in the last 7 days",
       icon: FileText,
+      to: "/dashboard/analytics",
     },
     {
       label: "Connected accounts",
@@ -153,6 +183,7 @@ function DashboardHome() {
         ? "Publishing is connected"
         : "Publishing setup required",
       icon: AtSign,
+      to: "/dashboard/social",
     },
   ];
 
@@ -213,6 +244,18 @@ function DashboardHome() {
       detail: "Manual and AI changes share one reviewable timeline.",
     },
   ];
+  const onboardingDone = onboarding.filter(item => item.done).length;
+  const onboardingProgress = Math.round(
+    (onboardingDone / onboarding.length) * 100
+  );
+  const momentumMessage =
+    weekActivity.length === 0
+      ? "Your first small win is one action away."
+      : weekActivity.length < 3
+        ? "Nice start. Keep the next action small."
+        : weekActivity.length < 7
+          ? "Momentum is building naturally."
+          : "A strong week—keep the rhythm sustainable.";
 
   if (loading) {
     return (
@@ -224,41 +267,115 @@ function DashboardHome() {
 
   return (
     <div>
-      <p className="mono-eyebrow text-primary mb-2">Dashboard</p>
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-8">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-semibold">
-            {t(greetKey)}, {user?.name || "Creator"}.
-          </h1>
-          <p className="text-sm text-foreground/50 mt-2">
-            What will you make impossible to scroll past today?
-          </p>
+      <div className="dashboard-hero mb-6 rounded-2xl border border-border px-5 py-5 md:px-6">
+        <p className="mono-eyebrow text-primary mb-2">Dashboard</p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-semibold">
+              {t(greetKey)}, {user?.name || "Creator"}.
+            </h1>
+            <p className="text-sm text-foreground/50 mt-2">
+              What will you make impossible to scroll past today?
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs text-foreground/50 shadow-sm backdrop-blur-sm">
+            <span
+              aria-hidden="true"
+              className={cn(
+                "h-1.5 w-1.5 rounded-full transition-colors",
+                saving
+                  ? "save-status-dot bg-primary"
+                  : error
+                    ? "bg-destructive"
+                    : "bg-emerald-500"
+              )}
+            />
+            {saving
+              ? "Saving workspace…"
+              : error
+                ? "Changes need attention"
+                : "Everything saved"}
+          </span>
         </div>
-        <span className="text-xs text-foreground/45">
-          {saving
-            ? "Saving workspace…"
-            : error
-              ? "Changes need attention"
-              : "Everything saved"}
-        </span>
       </div>
+
+      <section
+        className="momentum-strip mb-6 rounded-xl border border-border bg-surface px-4 py-4 shadow-card sm:px-5"
+        aria-label="Weekly momentum"
+      >
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          <div className="min-w-[180px] flex-1">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Sparkles className="h-3.5 w-3.5" />
+              </span>
+              <div>
+                <p className="text-xs font-medium">Weekly momentum</p>
+                <p className="text-[11px] text-foreground/45">
+                  {momentumMessage}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex min-w-[110px] items-center gap-2.5">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <div>
+              <p className="text-sm font-semibold tabular">
+                {weekActivity.length}
+              </p>
+              <p className="text-[10px] uppercase tracking-wide text-foreground/40">
+                actions this week
+              </p>
+            </div>
+          </div>
+          <div
+            className="flex min-w-[120px] items-center gap-2.5"
+            title="Estimate based only on AI-assisted actions recorded in this workspace"
+          >
+            <Timer className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-sm font-semibold tabular">
+                {formattedTimeSaved}
+              </p>
+              <p className="text-[10px] uppercase tracking-wide text-foreground/40">
+                time reclaimed
+              </p>
+              <span className="sr-only">
+                Estimated only from AI-assisted actions recorded in this
+                workspace.
+              </span>
+            </div>
+          </div>
+          <div className="flex min-w-[105px] items-center gap-2.5">
+            <Activity className="h-4 w-4 text-amber-500" />
+            <div>
+              <p className="text-sm font-semibold tabular">{activeDays}</p>
+              <p className="text-[10px] uppercase tracking-wide text-foreground/40">
+                active days
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {stats.map(s => (
-          <div
+          <Link
             key={s.label}
-            className="bg-surface border border-border rounded-xl p-5 shadow-card"
+            to={s.to}
+            data-reward-surface
+            className="studio-stat-card group bg-surface border border-border rounded-xl p-5 shadow-card"
           >
             <div className="flex items-center justify-between mb-3">
               <span className="mono-eyebrow text-foreground/50 text-[10px]">
                 {s.label}
               </span>
-              <s.icon className="h-4 w-4 text-foreground/40" />
+              <s.icon className="h-4 w-4 text-foreground/40 transition-colors group-hover:text-primary" />
             </div>
             <div className="text-2xl font-semibold tabular">{s.value}</div>
             <p className="text-xs text-foreground/50 mt-1">{s.sub}</p>
-          </div>
+          </Link>
         ))}
       </div>
 
@@ -277,13 +394,14 @@ function DashboardHome() {
           <Link
             key={qs.title}
             to={qs.to}
-            className="bg-surface border border-border rounded-xl p-5 hover:shadow-card-hover transition-shadow group"
+            data-reward-surface
+            className="studio-action-card bg-surface border border-border rounded-xl p-5 group"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="h-9 w-9 rounded-lg bg-primary-wash flex items-center justify-center">
                 <qs.icon className="h-4 w-4 text-primary" />
               </div>
-              <ChevronRight className="h-4 w-4 text-foreground/30 group-hover:text-primary transition-colors" />
+              <ChevronRight className="studio-action-arrow h-4 w-4 text-foreground/30 group-hover:text-primary" />
             </div>
             <h3 className="font-semibold">{qs.title}</h3>
             <p className="text-sm text-foreground/60 mt-1">{qs.desc}</p>
@@ -303,7 +421,7 @@ function DashboardHome() {
               recentActivity.map(item => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-background"
+                  className="studio-activity-row flex items-center gap-3 p-3 rounded-lg bg-background"
                 >
                   <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-medium bg-primary/10 text-primary">
                     {item.type.slice(0, 1).toUpperCase()}
@@ -335,10 +453,28 @@ function DashboardHome() {
 
         {/* Onboarding */}
         <div className="bg-surface border border-border rounded-xl p-6">
-          <h3 className="font-semibold mb-2">{t("dash.onboarding_title")}</h3>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="font-semibold">{t("dash.onboarding_title")}</h3>
+            <span className="text-xs font-medium tabular text-primary">
+              {onboardingProgress}%
+            </span>
+          </div>
           <p className="text-sm text-foreground/60 mb-4">
             {t("dash.onboarding_desc")}
           </p>
+          <div
+            className="mb-5 h-1.5 overflow-hidden rounded-full bg-primary/10"
+            role="progressbar"
+            aria-label="Studio setup progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={onboardingProgress}
+          >
+            <div
+              className="momentum-progress-fill h-full rounded-full bg-primary"
+              style={{ width: `${onboardingProgress}%` }}
+            />
+          </div>
           <div className="space-y-3">
             {onboarding.map((item, index) => (
               <div key={item.title} className="flex items-start gap-3">
@@ -773,7 +909,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
+    <div className="studio-shell min-h-screen bg-background text-foreground flex">
       {/* Mobile overlay */}
       {mobileOpen && (
         <button
@@ -842,7 +978,7 @@ export default function Dashboard() {
                     setCreateOpen(current => !current);
                   }}
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                    "studio-nav-link flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
                     path.startsWith("/dashboard/video") ||
                       path.startsWith("/dashboard/image") ||
                       path.startsWith("/dashboard/voice")
@@ -977,35 +1113,40 @@ export default function Dashboard() {
 
         <main className="flex-1 p-6 lg:p-10 w-full">
           <Suspense fallback={<StudioPageFallback />}>
-            <Routes>
-              <Route path="/" element={<DashboardHome />} />
-              <Route path="/analyze" element={<VideoAnalyzer />} />
-              <Route path="/script" element={<ScriptGenerator />} />
-              <Route path="/video" element={<VideoGenerator />} />
-              <Route path="/image" element={<ImageGenerator />} />
-              <Route path="/edit" element={<EditorPage />} />
-              <Route path="/publish" element={<PublisherPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/library" element={<ContentLibrary />} />
-              <Route path="/clients" element={<ClientsPage />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/social" element={<SocialHub />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/trends" element={<TrendsPage />} />
-              <Route path="/voice" element={<VoiceNotes />} />
-              <Route
-                path="/interview"
-                element={
-                  <Navigate to="/dashboard/script?mode=interview" replace />
-                }
-              />
-              <Route path="/goals" element={<GoalTracker />} />
-              <Route path="/coaching" element={<CoachingPage />} />
-              <Route path="/referral" element={<ReferralPage />} />
-              <Route path="/feedback" element={<FeedbackPage />} />
-              <Route path="/status" element={<StudioStatus />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
+            <div key={path} className="studio-route-enter">
+              <Routes>
+                <Route path="/" element={<DashboardHome />} />
+                <Route path="/analyze" element={<VideoAnalyzer />} />
+                <Route path="/script" element={<ScriptGenerator />} />
+                <Route path="/video" element={<VideoGenerator />} />
+                <Route path="/image" element={<ImageGenerator />} />
+                <Route path="/edit" element={<EditorPage />} />
+                <Route path="/publish" element={<PublisherPage />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/library" element={<ContentLibrary />} />
+                <Route path="/clients" element={<ClientsPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/social" element={<SocialHub />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/trends" element={<TrendsPage />} />
+                <Route path="/voice" element={<VoiceNotes />} />
+                <Route
+                  path="/interview"
+                  element={
+                    <Navigate to="/dashboard/script?mode=interview" replace />
+                  }
+                />
+                <Route path="/goals" element={<GoalTracker />} />
+                <Route path="/coaching" element={<CoachingPage />} />
+                <Route path="/referral" element={<ReferralPage />} />
+                <Route path="/feedback" element={<FeedbackPage />} />
+                <Route path="/status" element={<StudioStatus />} />
+                <Route
+                  path="*"
+                  element={<Navigate to="/dashboard" replace />}
+                />
+              </Routes>
+            </div>
           </Suspense>
         </main>
       </div>
@@ -1032,7 +1173,7 @@ function SidebarItem({
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
       className={cn(
-        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+        "studio-nav-link flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
         active
           ? "bg-primary/10 text-primary font-medium"
           : "text-foreground/70 hover:text-foreground hover:bg-foreground/[0.04]"

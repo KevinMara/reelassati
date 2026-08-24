@@ -12,6 +12,27 @@
   }
 }
 
+@keyframes studio-route-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes save-status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0);
+  }
+}
+
 .auth-grid {
   background-image:
     linear-gradient(hsl(var(--border) / 0.22) 1px, transparent 1px),
@@ -300,6 +321,133 @@
     mix-blend-mode: overlay;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
   }
+
+  /* Studio reward layer — quiet feedback, never arcade-like. */
+  .studio-route-enter {
+    animation: studio-route-enter 260ms var(--ease-out) both;
+  }
+
+  .dashboard-hero {
+    background:
+      radial-gradient(
+        circle at 92% 8%,
+        hsl(var(--primary) / 0.09),
+        transparent 34%
+      ),
+      linear-gradient(135deg, hsl(var(--surface)), hsl(var(--surface) / 0.72));
+    box-shadow: inset 0 1px hsl(var(--foreground) / 0.025);
+  }
+
+  .momentum-strip {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .momentum-strip::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      hsl(var(--primary) / 0.8),
+      transparent
+    );
+  }
+
+  .save-status-dot {
+    animation: save-status-pulse 1.35s ease-out infinite;
+  }
+
+  .studio-stat-card,
+  .studio-action-card,
+  .studio-activity-row,
+  [data-reward-surface] {
+    transition:
+      transform 180ms var(--ease-out),
+      border-color 180ms var(--ease-out),
+      box-shadow 180ms var(--ease-out),
+      background-color 180ms var(--ease-out);
+  }
+
+  .studio-action-arrow {
+    transition:
+      color 180ms var(--ease-out),
+      transform 180ms var(--ease-out);
+  }
+
+  .momentum-progress-fill {
+    transition: width 520ms var(--ease-out);
+    box-shadow: 0 0 12px hsl(var(--primary) / 0.18);
+  }
+
+  .studio-shell button:not(:disabled),
+  .studio-shell [role="button"],
+  .studio-shell a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .studio-shell button:not(:disabled) {
+    transition:
+      transform 150ms var(--ease-out),
+      color 150ms var(--ease-out),
+      background-color 150ms var(--ease-out),
+      border-color 150ms var(--ease-out),
+      box-shadow 150ms var(--ease-out);
+  }
+
+  .studio-shell button:not(:disabled):active,
+  .studio-shell a:active {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  .studio-shell input,
+  .studio-shell textarea,
+  .studio-shell select {
+    transition:
+      border-color 160ms var(--ease-out),
+      box-shadow 160ms var(--ease-out),
+      background-color 160ms var(--ease-out);
+  }
+
+  .studio-shell input:focus,
+  .studio-shell textarea:focus,
+  .studio-shell select:focus {
+    border-color: hsl(var(--primary) / 0.5);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.09);
+    outline: none;
+  }
+
+  .studio-nav-link svg {
+    transition:
+      transform 160ms var(--ease-out),
+      color 160ms var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .studio-stat-card:hover,
+    .studio-action-card:hover,
+    [data-reward-surface]:hover {
+      transform: translateY(-2px);
+      border-color: hsl(var(--primary) / 0.2);
+      box-shadow: var(--shadow-card-hover);
+    }
+
+    .studio-action-card:hover .studio-action-arrow {
+      transform: translateX(2px);
+    }
+
+    .studio-activity-row:hover {
+      background: hsl(var(--primary) / 0.055);
+      transform: translateX(2px);
+    }
+
+    .studio-nav-link:hover svg {
+      color: hsl(var(--primary));
+      transform: scale(1.06);
+    }
+  }
 }
 
 @layer utilities {
@@ -311,5 +459,25 @@
   }
   .text-pretty {
     text-wrap: pretty;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-route-enter,
+  .save-status-dot {
+    animation: none;
+  }
+
+  .studio-stat-card,
+  .studio-action-card,
+  .studio-activity-row,
+  [data-reward-surface],
+  .studio-shell button,
+  .studio-shell a,
+  .studio-nav-link svg,
+  .studio-action-arrow,
+  .momentum-progress-fill {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms !important;
   }
 }
