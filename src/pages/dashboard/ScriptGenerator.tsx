@@ -1,14 +1,17 @@
 import { lazy, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
+  ArrowRight,
   Check,
   Clock3,
   Copy,
   FileText,
+  Film,
   Library,
   MessageSquareText,
+  Mic,
   PenLine,
   Sparkles,
   WandSparkles,
@@ -114,6 +117,11 @@ function createEvent(
 function DirectScriptGenerator() {
   const { workspace, capabilities, loading, saving, updateWorkspace } =
     useWorkspace();
+  const [searchParams] = useSearchParams();
+  const requestedScriptId = searchParams.get("script") ?? "";
+  const requestedScript = workspace.scripts.find(
+    script => script.id === requestedScriptId
+  );
   const [topic, setTopic] = useState("");
   const [platform, setPlatform] = useState<Platform>("tiktok");
   const [tone, setTone] = useState<(typeof TONES)[number]>("energetic");
@@ -123,10 +131,12 @@ function DirectScriptGenerator() {
   );
   const [hookDirection, setHookDirection] = useState("");
   const [generatedScript, setGeneratedScript] = useState<ScriptDraft | null>(
-    null
+    requestedScript ?? null
   );
   const [generating, setGenerating] = useState(false);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveState, setSaveState] = useState<SaveState>(
+    requestedScript ? "saved" : "idle"
+  );
   const [copied, setCopied] = useState(false);
   const [showHooks, setShowHooks] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -621,6 +631,24 @@ function DirectScriptGenerator() {
                     ? "Saving edits"
                     : "Save edits"}
                 </button>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <Link
+                    to={`/dashboard/video?script=${encodeURIComponent(generatedScript.id)}`}
+                    className="group flex items-center justify-center gap-2 rounded-lg border border-primary/25 bg-primary/[0.05] px-4 py-2.5 text-sm font-medium text-primary transition-all hover:-translate-y-0.5 hover:bg-primary/10"
+                  >
+                    <Film className="h-4 w-4" />
+                    Create visuals
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                  <Link
+                    to={`/dashboard/voice?script=${encodeURIComponent(generatedScript.id)}`}
+                    className="group flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium transition-all hover:-translate-y-0.5 hover:border-primary/30"
+                  >
+                    <Mic className="h-4 w-4 text-primary" />
+                    Make voiceover
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
               </motion.section>
             ) : (
               <motion.section

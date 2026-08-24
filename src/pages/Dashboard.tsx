@@ -56,6 +56,7 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace";
 import { platformApi } from "@/lib/platform-api";
 import type { ComplianceStatus } from "@contracts/compliance";
+import { StudioMediaTray } from "@/components/studio/StudioMediaTray";
 
 function formatActivityTime(timestamp: string, now: number): string {
   const time = new Date(timestamp).getTime();
@@ -852,6 +853,7 @@ export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const { user, logout, loading: authLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { loading: workspaceLoading } = useWorkspace();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -1069,12 +1071,7 @@ export default function Dashboard() {
             Dashboard
           </span>
           <div className="flex-1" />
-          <Link
-            to="/dashboard/library?focus=search"
-            className="hidden sm:flex items-center gap-1 h-9 px-3 rounded-md border border-border bg-surface text-xs text-foreground/50 hover:text-foreground"
-          >
-            <Search className="h-3.5 w-3.5 mr-1" /> Find assets
-          </Link>
+          <StudioMediaTray key={path} />
           <Link
             to="/dashboard#recent-activity"
             aria-label="Recent activity"
@@ -1113,40 +1110,44 @@ export default function Dashboard() {
 
         <main className="flex-1 p-6 lg:p-10 w-full">
           <Suspense fallback={<StudioPageFallback />}>
-            <div key={path} className="studio-route-enter">
-              <Routes>
-                <Route path="/" element={<DashboardHome />} />
-                <Route path="/analyze" element={<VideoAnalyzer />} />
-                <Route path="/script" element={<ScriptGenerator />} />
-                <Route path="/video" element={<VideoGenerator />} />
-                <Route path="/image" element={<ImageGenerator />} />
-                <Route path="/edit" element={<EditorPage />} />
-                <Route path="/publish" element={<PublisherPage />} />
-                <Route path="/analytics" element={<AnalyticsPage />} />
-                <Route path="/library" element={<ContentLibrary />} />
-                <Route path="/clients" element={<ClientsPage />} />
-                <Route path="/calendar" element={<CalendarPage />} />
-                <Route path="/social" element={<SocialHub />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/trends" element={<TrendsPage />} />
-                <Route path="/voice" element={<VoiceNotes />} />
-                <Route
-                  path="/interview"
-                  element={
-                    <Navigate to="/dashboard/script?mode=interview" replace />
-                  }
-                />
-                <Route path="/goals" element={<GoalTracker />} />
-                <Route path="/coaching" element={<CoachingPage />} />
-                <Route path="/referral" element={<ReferralPage />} />
-                <Route path="/feedback" element={<FeedbackPage />} />
-                <Route path="/status" element={<StudioStatus />} />
-                <Route
-                  path="*"
-                  element={<Navigate to="/dashboard" replace />}
-                />
-              </Routes>
-            </div>
+            {workspaceLoading ? (
+              <StudioPageFallback />
+            ) : (
+              <div key={path} className="studio-route-enter">
+                <Routes>
+                  <Route path="/" element={<DashboardHome />} />
+                  <Route path="/analyze" element={<VideoAnalyzer />} />
+                  <Route path="/script" element={<ScriptGenerator />} />
+                  <Route path="/video" element={<VideoGenerator />} />
+                  <Route path="/image" element={<ImageGenerator />} />
+                  <Route path="/edit" element={<EditorPage />} />
+                  <Route path="/publish" element={<PublisherPage />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/library" element={<ContentLibrary />} />
+                  <Route path="/clients" element={<ClientsPage />} />
+                  <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="/social" element={<SocialHub />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/trends" element={<TrendsPage />} />
+                  <Route path="/voice" element={<VoiceNotes />} />
+                  <Route
+                    path="/interview"
+                    element={
+                      <Navigate to="/dashboard/script?mode=interview" replace />
+                    }
+                  />
+                  <Route path="/goals" element={<GoalTracker />} />
+                  <Route path="/coaching" element={<CoachingPage />} />
+                  <Route path="/referral" element={<ReferralPage />} />
+                  <Route path="/feedback" element={<FeedbackPage />} />
+                  <Route path="/status" element={<StudioStatus />} />
+                  <Route
+                    path="*"
+                    element={<Navigate to="/dashboard" replace />}
+                  />
+                </Routes>
+              </div>
+            )}
           </Suspense>
         </main>
       </div>

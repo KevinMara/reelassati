@@ -27,6 +27,7 @@ import {
 } from "@/lib/videoPromptTemplates";
 import { useWorkspace } from "@/providers/workspace";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { EditAssetLink } from "@/components/studio/EditAssetLink";
 import { writeClipboardText } from "@/lib/clipboard";
 import posthog from "@/lib/posthog";
 
@@ -133,16 +134,29 @@ export default function VideoGenerator() {
   const requestedTemplate = getTemplateById(
     searchParams.get("template")?.trim() ?? ""
   );
+  const requestedScriptId = searchParams.get("script")?.trim() ?? "";
+  const requestedScript = workspace.scripts.find(
+    script => script.id === requestedScriptId
+  );
   const initialTemplate = requestedTemplate ?? VIDEO_PROMPT_TEMPLATES[0];
   const initialSubject =
-    searchParams.get("subject")?.trim().slice(0, 1200) ?? "";
+    searchParams.get("subject")?.trim().slice(0, 1200) ??
+    (requestedScript
+      ? `Short-form visual concept for “${requestedScript.title}”`
+      : "");
   const [selectedTemplate, setSelectedTemplate] = useState(
     initialTemplate?.id ?? ""
   );
-  const [assetName, setAssetName] = useState("Untitled video");
+  const [assetName, setAssetName] = useState(
+    requestedScript ? `${requestedScript.title} · video` : "Untitled video"
+  );
   const [direction, setDirection] = useState<PromptDirection>(() => ({
     ...EMPTY_DIRECTION,
     subject: initialSubject,
+    action: requestedScript
+      ? "Create a coherent sequence that supports the supplied script"
+      : "",
+    dialogue: requestedScript?.fullScript.slice(0, 1_200) ?? "",
   }));
   const [ratio, setRatio] = useState<"16:9" | "9:16" | "1:1">(
     initialTemplate?.defaultRatio ?? "9:16"
@@ -1191,10 +1205,15 @@ export default function VideoGenerator() {
                 Caption track not added yet. Open the asset in Edit to create
                 and review captions before delivery.
               </p>
+              <EditAssetLink
+                assetId={resultAsset.id}
+                label="Add video to Edit"
+                className="mt-4"
+              />
               <a
                 href={resultAsset.url}
                 download={resultAsset.name}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2.5 text-sm font-medium transition-colors hover:border-primary/45"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2.5 text-sm font-medium transition-colors hover:border-primary/45"
               >
                 <Download className="h-4 w-4" />
                 Download video

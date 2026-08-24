@@ -260,18 +260,21 @@ describe("platform-wide functional invariants", () => {
     expect(html).toContain("prefers-color-scheme: dark");
   });
 
-  it("keeps route fallbacks, delayed hash targets, and focused header shortcuts", () => {
+  it("keeps route fallbacks, delayed hash targets, and the connected media tray", () => {
     const app = source("./App.tsx");
     const dashboard = source("./pages/Dashboard.tsx");
     const library = source("./pages/dashboard/ContentLibrary.tsx");
+    const mediaTray = source("./components/studio/StudioMediaTray.tsx");
     expect(app).toContain("if (retry < 40)");
     expect(app).toContain(
       '<Route path="*" element={<Navigate to="/" replace />} />'
     );
-    expect(dashboard).toContain('to="/dashboard/library?focus=search"');
+    expect(dashboard).toContain("<StudioMediaTray key={path} />");
     expect(dashboard).toContain('to="/dashboard#recent-activity"');
     expect(dashboard).toContain('id="recent-activity"');
     expect(library).toContain("searchInputRef.current?.focus()");
+    expect(mediaTray).toContain("Connected media");
+    expect(mediaTray).toContain("/dashboard/edit?asset=");
   });
 
   it("keeps heavy Studio tools route-split behind an accessible fallback", () => {
@@ -368,10 +371,31 @@ describe("platform-wide functional invariants", () => {
     expect(voice).toContain("Audio name");
     expect(editor).toContain("Connected media library");
     expect(editor).toContain("addAssetToTimeline");
+    expect(editor).toContain("addLibraryAssetAtPlayhead");
+    expect(editor).toContain('searchParams.get("asset")');
+    expect(image).toContain('label="Add image to Edit"');
+    expect(video).toContain('label="Add video to Edit"');
+    expect(voice).toContain('label="Add audio to Edit"');
+    expect(library).toContain('label="Use in Edit"');
     expect(library).toContain("platformApi.renameAsset");
     expect(api).toContain('"/api/ai/image"');
     expect(server).toContain('url.pathname === "/api/ai/image"');
     expect(server).toContain("OPENROUTER_IMAGE_MODEL");
+  });
+
+  it("carries saved scripts into video and voice workflows without copying", () => {
+    const script = source("./pages/dashboard/ScriptGenerator.tsx");
+    const video = source("./pages/dashboard/VideoGenerator.tsx");
+    const voice = source("./pages/dashboard/VoiceNotes.tsx");
+    const library = source("./pages/dashboard/ContentLibrary.tsx");
+
+    expect(script).toContain("Create visuals");
+    expect(script).toContain("Make voiceover");
+    expect(video).toContain('searchParams.get("script")');
+    expect(video).toContain("requestedScript?.fullScript.slice(0, 1_200)");
+    expect(voice).toContain('searchParams.get("script")');
+    expect(voice).toContain("requestedScript?.fullScript ??");
+    expect(library).toContain("/dashboard/script?script=");
   });
 
   it("uses a non-blocking analysis privacy notice instead of repeated consent", () => {

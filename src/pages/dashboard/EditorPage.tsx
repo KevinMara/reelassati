@@ -30,6 +30,7 @@ import {
   Play,
   Plus,
   Redo2,
+  Search,
   Scissors,
   Sparkles,
   Trash2,
@@ -42,6 +43,7 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import type {
   Asset,
   EditOperation,
@@ -310,6 +312,7 @@ export default function EditorPage() {
     error: workspaceError,
     updateWorkspace,
   } = useWorkspace();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null
   );
@@ -340,6 +343,13 @@ export default function EditorPage() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [libraryKind, setLibraryKind] = useState<
+    "all" | "video" | "image" | "audio"
+  >("all");
+  const [recentlyAddedAssetId, setRecentlyAddedAssetId] = useState<
+    string | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaPreviewRef = useRef<HTMLMediaElement | null>(null);
 
@@ -355,6 +365,26 @@ export default function EditorPage() {
     const assetId = selectedClip?.assetId ?? project?.activeAssetId;
     return workspace.assets.find(asset => asset.id === assetId);
   }, [project?.activeAssetId, selectedClip?.assetId, workspace.assets]);
+  const pendingAsset = useMemo(() => {
+    const assetId = searchParams.get("asset");
+    return assetId
+      ? (workspace.assets.find(asset => asset.id === assetId) ?? null)
+      : null;
+  }, [searchParams, workspace.assets]);
+  const filteredLibraryAssets = useMemo(() => {
+    const query = librarySearch.trim().toLowerCase();
+    return workspace.assets.filter(asset => {
+      if (
+        asset.kind !== "video" &&
+        asset.kind !== "image" &&
+        asset.kind !== "audio"
+      ) {
+        return false;
+      }
+      if (libraryKind !== "all" && asset.kind !== libraryKind) return false;
+      return !query || asset.name.toLowerCase().includes(query);
+    });
+  }, [libraryKind, librarySearch, workspace.assets]);
   const mediaTimeForPlayhead = useCallback(
     (timelineTime: number) => {
       if (!selectedClip) return Math.max(0, timelineTime);
@@ -442,6 +472,12 @@ export default function EditorPage() {
     const media = mediaPreviewRef.current;
     if (media) configurePreviewMedia(media);
   }, [configurePreviewMedia, previewAsset?.id]);
+
+  useEffect(() => {
+    if (!recentlyAddedAssetId) return;
+    const timer = window.setTimeout(() => setRecentlyAddedAssetId(null), 1_800);
+    return () => window.clearTimeout(timer);
+  }, [recentlyAddedAssetId]);
 
   useEffect(() => {
     if (!playing || !project) return;
@@ -625,15 +661,17 @@ export default function EditorPage() {
   const addAssetToTimeline = async (
     asset: Asset,
     targetProjectId: string,
-    activityLabel: string
+    activityLabel: string,
+    insertAt?: number
   ) => {
     await updateWorkspace(current => {
       const target = current.projects.find(item => item.id === targetProjectId);
       if (!target) return current;
-      const start = target.clips.reduce(
+      const timelineEnd = target.clips.reduce(
         (latest, clip) => Math.max(latest, clip.start + clip.duration),
         0
       );
+      const start = clamp(insertAt ?? timelineEnd, 0, target.duration);
       const duration =
         asset.duration && asset.duration > 0
           ? asset.duration
@@ -697,6 +735,81 @@ export default function EditorPage() {
         ],
       };
     });
+  };
+
+  const clearPendingAsset = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("asset");
+    setSearchParams(next, { replace: true });
+  };
+
+  const addPendingAssetToProject = async (target: EditProject) => {
+    if (!pendingAsset) return;
+    openProject(target);
+    setBusyAction("library-handoff");
+    setLocalError(null);
+    try {
+      await addAssetToTimeline(
+        pendingAsset,
+        target.id,
+        "Library media added",
+        target.playhead
+      );
+      setRecentlyAddedAssetId(pendingAsset.id);
+      clearPendingAsset();
+    } catch (cause) {
+      setLocalError(
+        cause instanceof Error
+          ? cause.message
+          : "The library asset could not be added."
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const createProjectWithPendingAsset = async (template = "blank") => {
+    if (!pendingAsset) return;
+    const asset = pendingAsset;
+    const projectId = await createProject(template);
+    if (!projectId) return;
+    setBusyAction("library-handoff");
+    try {
+      await addAssetToTimeline(asset, projectId, "Library media added", 0);
+      setRecentlyAddedAssetId(asset.id);
+      clearPendingAsset();
+    } catch (cause) {
+      setLocalError(
+        cause instanceof Error
+          ? cause.message
+          : "The library asset could not be added."
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const addLibraryAssetAtPlayhead = async (asset: Asset) => {
+    if (!project) return;
+    setBusyAction(`library-${asset.id}`);
+    setLocalError(null);
+    try {
+      await addAssetToTimeline(
+        asset,
+        project.id,
+        "Library media added",
+        playhead
+      );
+      setRecentlyAddedAssetId(asset.id);
+    } catch (cause) {
+      setLocalError(
+        cause instanceof Error
+          ? cause.message
+          : "The library asset could not be added."
+      );
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const addUploadedFiles = async (
@@ -1196,6 +1309,52 @@ export default function EditorPage() {
           </div>
         )}
 
+        {pendingAsset ? (
+          <section className="relative mb-6 overflow-hidden rounded-2xl border border-primary/25 bg-primary/[0.06] p-5 shadow-card">
+            <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-primary/10 blur-2xl" />
+            <div className="relative flex flex-wrap items-center gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-card">
+                {pendingAsset.kind === "image" ? (
+                  <ImageIcon className="h-5 w-5" />
+                ) : pendingAsset.kind === "audio" ? (
+                  <Music2 className="h-5 w-5" />
+                ) : (
+                  <Film className="h-5 w-5" />
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="mono-eyebrow text-primary">Ready for Edit</p>
+                <h2 className="mt-1 truncate font-medium">
+                  {pendingAsset.name}
+                </h2>
+                <p className="mt-1 text-xs text-foreground/50">
+                  Choose an existing project below or start a new timeline with
+                  this {pendingAsset.kind} already placed.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void createProjectWithPendingAsset()}
+                  disabled={Boolean(busyAction)}
+                  className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5 disabled:opacity-45"
+                >
+                  {busyAction === "library-handoff"
+                    ? "Adding…"
+                    : "New edit with media"}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearPendingAsset}
+                  className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground/55 hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
         <button
           type="button"
           {...newEditDrop.dropZoneProps}
@@ -1249,7 +1408,11 @@ export default function EditorPage() {
               key={item.template}
               type="button"
               disabled={busyAction === "create"}
-              onClick={() => void createProject(item.template)}
+              onClick={() =>
+                void (pendingAsset
+                  ? createProjectWithPendingAsset(item.template)
+                  : createProject(item.template))
+              }
               className="group rounded-2xl border border-border bg-surface p-5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-card-hover disabled:opacity-50"
             >
               <span className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -1271,7 +1434,11 @@ export default function EditorPage() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => openProject(item)}
+                  onClick={() =>
+                    void (pendingAsset
+                      ? addPendingAssetToProject(item)
+                      : openProject(item))
+                  }
                   className="rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary/30"
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -1284,6 +1451,11 @@ export default function EditorPage() {
                     <span>{item.clips.length} clips</span>
                     <span>{formatTime(item.duration)}</span>
                     <span className="capitalize">{item.status}</span>
+                    {pendingAsset ? (
+                      <span className="ml-auto font-medium text-primary">
+                        Add here
+                      </span>
+                    ) : null}
                   </div>
                 </button>
               ))}
@@ -1692,14 +1864,14 @@ export default function EditorPage() {
 
             {libraryOpen ? (
               <div className="border-b border-border bg-background/55 p-3">
-                <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium">
                       Connected media library
                     </p>
                     <p className="mt-0.5 text-[10px] text-foreground/40">
-                      Generated and uploaded video, images, and audio are ready
-                      to place on the timeline.
+                      Tap any generated or uploaded asset to place it at the
+                      current playhead ({formatTime(playhead)}).
                     </p>
                   </div>
                   <button
@@ -1711,53 +1883,88 @@ export default function EditorPage() {
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
-                {workspace.assets.some(asset =>
-                  ["video", "image", "audio"].includes(asset.kind)
-                ) ? (
-                  <div className="grid max-h-52 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
-                    {workspace.assets
-                      .filter(asset =>
-                        ["video", "image", "audio"].includes(asset.kind)
-                      )
-                      .map(asset => {
-                        const Icon =
-                          asset.kind === "image"
-                            ? ImageIcon
-                            : asset.kind === "audio"
-                              ? Music2
-                              : Film;
-                        return (
-                          <button
-                            key={asset.id}
-                            type="button"
-                            onClick={() => {
-                              void addAssetToTimeline(
-                                asset,
-                                project.id,
-                                "Library media added"
-                              );
-                              setLibraryOpen(false);
-                            }}
-                            className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface p-2.5 text-left hover:border-primary/40"
-                          >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <label className="relative min-w-52 flex-1">
+                    <span className="sr-only">Search connected media</span>
+                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/35" />
+                    <input
+                      type="search"
+                      value={librarySearch}
+                      onChange={event => setLibrarySearch(event.target.value)}
+                      placeholder="Search media"
+                      className="h-8 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-xs outline-none focus:border-primary/45"
+                    />
+                  </label>
+                  <div
+                    className="flex gap-1"
+                    aria-label="Filter connected media"
+                  >
+                    {(["all", "video", "image", "audio"] as const).map(kind => (
+                      <button
+                        key={kind}
+                        type="button"
+                        onClick={() => setLibraryKind(kind)}
+                        aria-pressed={libraryKind === kind}
+                        className={`rounded-md px-2.5 py-1.5 text-[10px] font-medium capitalize transition-colors ${
+                          libraryKind === kind
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-border bg-surface text-foreground/55 hover:border-primary/35"
+                        }`}
+                      >
+                        {kind}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {filteredLibraryAssets.length ? (
+                  <div className="grid max-h-60 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
+                    {filteredLibraryAssets.map(asset => {
+                      const Icon =
+                        asset.kind === "image"
+                          ? ImageIcon
+                          : asset.kind === "audio"
+                            ? Music2
+                            : Film;
+                      return (
+                        <button
+                          key={asset.id}
+                          type="button"
+                          onClick={() => void addLibraryAssetAtPlayhead(asset)}
+                          disabled={Boolean(busyAction)}
+                          className={`group flex min-w-0 items-center gap-2 rounded-lg border bg-surface p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 disabled:opacity-45 ${
+                            recentlyAddedAssetId === asset.id
+                              ? "border-emerald-500/35 bg-emerald-500/[0.06]"
+                              : "border-border"
+                          }`}
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 transition-transform group-hover:scale-105">
+                            {busyAction === `library-${asset.id}` ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            ) : recentlyAddedAssetId === asset.id ? (
+                              <Check className="h-4 w-4 text-emerald-500" />
+                            ) : (
                               <Icon className="h-4 w-4 text-primary" />
+                            )}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs font-medium">
+                              {asset.name}
                             </span>
-                            <span className="min-w-0">
-                              <span className="block truncate text-xs font-medium">
-                                {asset.name}
-                              </span>
-                              <span className="block text-[10px] capitalize text-foreground/40">
-                                {asset.kind}
-                              </span>
+                            <span className="block text-[10px] capitalize text-foreground/40">
+                              {recentlyAddedAssetId === asset.id
+                                ? `Added at ${formatTime(playhead)}`
+                                : `${asset.kind} · add at playhead`}
                             </span>
-                          </button>
-                        );
-                      })}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-foreground/45">
-                    No media yet. Upload a file or generate one from Create.
+                    {workspace.assets.length
+                      ? "No media matches this search."
+                      : "No media yet. Upload here or create video, images, and audio from Create."}
                   </p>
                 )}
               </div>

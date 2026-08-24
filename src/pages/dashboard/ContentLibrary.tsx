@@ -27,6 +27,7 @@ import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { EditAssetLink } from "@/components/studio/EditAssetLink";
 import { copyTextWithProvenance } from "@/lib/provenance";
 import { validateFileSelection } from "@/lib/file-validation";
 import posthog from "@/lib/posthog";
@@ -600,30 +601,49 @@ export default function ContentLibrary() {
                   </div>
                   <div className="mt-4">
                     {item.source === "asset" ? (
-                      <a
-                        href={item.asset.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-hover"
-                      >
-                        Open asset <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      <details className="text-xs">
-                        <summary className="cursor-pointer font-medium text-primary">
-                          Read script
-                        </summary>
-                        <p className="mt-3 whitespace-pre-wrap rounded-lg bg-background p-3 leading-relaxed text-foreground/65">
-                          {item.script.fullScript}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => void copyLibraryScript(item)}
-                          className="mt-2 text-[11px] font-medium text-primary hover:underline"
+                      <div className="flex flex-wrap items-center gap-2">
+                        {item.asset.kind === "video" ||
+                        item.asset.kind === "image" ||
+                        item.asset.kind === "audio" ? (
+                          <EditAssetLink
+                            assetId={item.asset.id}
+                            label="Use in Edit"
+                            compact
+                          />
+                        ) : null}
+                        <a
+                          href={item.asset.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground/55 transition-colors hover:border-primary/35 hover:text-foreground"
                         >
-                          Copy with origin record
-                        </button>
-                      </details>
+                          Open <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 text-xs">
+                        <Link
+                          to={`/dashboard/script?script=${encodeURIComponent(item.script.id)}`}
+                          className="inline-flex rounded-lg bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary-hover"
+                        >
+                          Open in Script
+                        </Link>
+                        <details>
+                          <summary className="cursor-pointer font-medium text-primary">
+                            Read script
+                          </summary>
+                          <p className="mt-3 whitespace-pre-wrap rounded-lg bg-background p-3 leading-relaxed text-foreground/65">
+                            {item.script.fullScript}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void copyLibraryScript(item)}
+                            className="mt-2 text-[11px] font-medium text-primary hover:underline"
+                          >
+                            Copy with origin record
+                          </button>
+                        </details>
+                      </div>
                     )}
                   </div>
                 </div>

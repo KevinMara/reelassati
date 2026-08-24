@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   AudioLines,
@@ -29,6 +30,7 @@ import {
   type ContentProvenance,
 } from "@contracts/compliance";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { EditAssetLink } from "@/components/studio/EditAssetLink";
 import { copyTextWithProvenance } from "@/lib/provenance";
 import { validateFileSelection } from "@/lib/file-validation";
 import posthog from "@/lib/posthog";
@@ -58,6 +60,17 @@ function createEvent(
 
 export default function VoiceNotes() {
   const { workspace, capabilities, loading, updateWorkspace } = useWorkspace();
+  const [searchParams] = useSearchParams();
+  const requestedScriptId = searchParams.get("script") ?? "";
+  const requestedScript = workspace.scripts.find(
+    script => script.id === requestedScriptId
+  );
+  const initialScriptPlatform: Platform =
+    requestedScript?.platform === "instagram" ||
+    requestedScript?.platform === "youtube" ||
+    requestedScript?.platform === "linkedin"
+      ? requestedScript.platform
+      : "tiktok";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
@@ -70,14 +83,20 @@ export default function VoiceNotes() {
   const [transcriptionProvenance, setTranscriptionProvenance] =
     useState<ContentProvenance | null>(null);
   const [segmentCount, setSegmentCount] = useState(0);
-  const [scriptPlatform, setScriptPlatform] = useState<Platform>("tiktok");
+  const [scriptPlatform, setScriptPlatform] = useState<Platform>(
+    initialScriptPlatform
+  );
   const [generatedScript, setGeneratedScript] = useState<ScriptDraft | null>(
     null
   );
-  const [speechText, setSpeechText] = useState("");
+  const [speechText, setSpeechText] = useState(
+    requestedScript?.fullScript ?? ""
+  );
   const [voiceId, setVoiceId] = useState("English_Graceful_Lady");
   const [speechAssetName, setSpeechAssetName] = useState(
-    "Untitled voice track"
+    requestedScript
+      ? `${requestedScript.title} · voiceover`
+      : "Untitled voice track"
   );
   const [speechAsset, setSpeechAsset] = useState<Asset | null>(null);
   const [voiceRightsConfirmed, setVoiceRightsConfirmed] = useState(false);
@@ -690,6 +709,11 @@ export default function VoiceNotes() {
                 <p id="generated-speech-transcript" className="sr-only">
                   Spoken text: {speechText}
                 </p>
+                <EditAssetLink
+                  assetId={speechAsset.id}
+                  label="Add audio to Edit"
+                  className="mt-3"
+                />
               </motion.div>
             ) : null}
           </section>

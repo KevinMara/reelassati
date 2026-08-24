@@ -11,6 +11,7 @@ import type { Asset, WorkspaceEvent } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
+import { EditAssetLink } from "@/components/studio/EditAssetLink";
 import posthog from "@/lib/posthog";
 
 const RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16"] as const;
@@ -300,10 +301,15 @@ export default function ImageGenerator() {
                     className="h-full w-full object-contain"
                   />
                 </div>
+                <EditAssetLink
+                  assetId={resultAsset.id}
+                  label="Add image to Edit"
+                  className="mt-4"
+                />
                 <a
                   href={resultAsset.url}
                   download={resultAsset.name}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2.5 text-sm font-medium hover:border-primary/45"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2.5 text-sm font-medium hover:border-primary/45"
                 >
                   <Download className="h-4 w-4" /> Download image
                 </a>
