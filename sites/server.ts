@@ -8741,48 +8741,73 @@ async function researchTrendSources(
         ? `Use the web search tool before answering. Search each included platform with focused queries. Identify 4-6 distinct short-form FORMAT PATTERNS performing strongly across ${platformInstruction} right now. Select formats with evidence beyond a single isolated creator where the search sources permit it. For each format, provide one canonical representative video URL copied from the search results and explain only the observable evidence. Prioritize format diversity and practical transferability over returning many near-duplicate videos.`
         : `Use the web search tool before answering. Find 4-8 current ${platformInstruction} videos that answer this paid custom brief. Topic or niche: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. Copy each source URL from the search results and return diverse creators and practical patterns the creator can test.`;
     failureCode = "search_request_failure";
-    const searchResponse = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method: "POST",
-      headers: openRouterHeaders(env),
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [
+    const searchPlatforms: TrendPlatform[] =
+      scope.platform === "all"
+        ? ["tiktok", "instagram", "youtube"]
+        : [scope.platform];
+    const directUrlInstructions: Record<TrendPlatform, string> = {
+      tiktok:
+        "TikTok only. Find several individual pages shaped like tiktok.com/@creator/video/ID.",
+      instagram:
+        "Instagram only. Find several individual Reels shaped like instagram.com/reel/CODE.",
+      youtube:
+        "YouTube only. Find several individual Shorts shaped like youtube.com/shorts/ID.",
+    };
+    const searchPayloads = await Promise.all(
+      searchPlatforms.map(async searchPlatform => {
+        const searchResponse = await fetch(
+          `${OPENROUTER_BASE}/chat/completions`,
           {
-            role: "system",
-            content: `You are REELassati's evidence-first short-form trend researcher. You must use the provided web search tool before answering. Search for individual TikTok videos, Instagram Reels, and YouTube Shorts, never search pages, profiles, articles, or compilations. When the brief spans all platforms, run focused searches for each platform. Report only findings supported by the search results and include each direct individual-video URL. Never invent URLs, creators, dates, metrics, or evidence. Prefer evidence from the last 14 days; older videos are allowed only when the sources show current resurfacing. Keep observations separate from hypotheses.`,
-          },
-          {
-            role: "user",
-            content: taskInstruction,
-          },
-        ],
-        tools: [
-          {
-            type: "openrouter:web_search",
-            parameters: {
-              engine: "exa",
-              max_results: 4,
-              max_total_results: 12,
-            },
-          },
-        ],
-        tool_choice: "auto",
-        provider: {
-          allow_fallbacks: true,
-          require_parameters: true,
-        },
-        max_tokens: 1_800,
-        temperature: 0.1,
-      }),
-      signal: AbortSignal.timeout(180_000),
-    });
-    if (!searchResponse.ok) {
-      failureCode = `search_provider_${searchResponse.status}`;
-      await providerError(searchResponse, "OpenRouter");
-    }
+            method: "POST",
+            headers: openRouterHeaders(env),
+            body: JSON.stringify({
+              model: selectedModel,
+              messages: [
+                {
+                  role: "system",
+                  content: `You are REELassati's evidence-first short-form trend researcher. You must use the provided web search tool before answering. ${directUrlInstructions[searchPlatform]} Never return search pages, profiles, articles, or compilations. Report only findings supported by the search results and include each direct individual-video URL. Never invent URLs, creators, dates, metrics, or evidence. Prefer evidence from the last 14 days; older videos are allowed only when the sources show current resurfacing. Keep observations separate from hypotheses.`,
+                },
+                {
+                  role: "user",
+                  content: `${taskInstruction}\n\nThis search pass is exclusively for ${searchPlatform}. Find multiple distinct direct video examples.`,
+                },
+              ],
+              tools: [
+                {
+                  type: "openrouter:web_search",
+                  parameters: {
+                    engine: "exa",
+                    max_results: 6,
+                    max_total_results: 6,
+                  },
+                },
+              ],
+              tool_choice: "required",
+              provider: {
+                allow_fallbacks: true,
+                require_parameters: true,
+              },
+              max_tokens: 1_000,
+              temperature: 0.1,
+            }),
+            signal: AbortSignal.timeout(150_000),
+          }
+        );
+        if (!searchResponse.ok) {
+          failureCode = `search_${searchPlatform}_provider_${searchResponse.status}`;
+          await providerError(searchResponse, "OpenRouter");
+        }
+        return searchResponse.json();
+      })
+    );
     failureCode = "invalid_search_payload";
-    const searchPayload = await searchResponse.json();
-    const citations = trendSearchCitations(searchPayload);
+    const citationMap = new Map<string, TrendSearchCitation>();
+    for (const payload of searchPayloads) {
+      for (const citation of trendSearchCitations(payload)) {
+        citationMap.set(citation.sourceUrl, citation);
+      }
+    }
+    const citations = Array.from(citationMap.values());
     if (citations.length < 2) {
       failureCode = `insufficient_search_citations_${citations.length}`;
       throw json(
@@ -8811,7 +8836,10 @@ async function researchTrendSources(
             },
             {
               role: "user",
-              content: `Brief:\n${taskInstruction}\n\nVerified search citations:\n${JSON.stringify(citations)}\n\nResearch notes:\n${extractTextContent(searchPayload).slice(0, 8_000)}`,
+              content: `Brief:\n${taskInstruction}\n\nVerified search citations:\n${JSON.stringify(citations)}\n\nResearch notes:\n${searchPayloads
+                .map(payload => extractTextContent(payload))
+                .join("\n\n")
+                .slice(0, 8_000)}`,
             },
           ],
           plugins: [{ id: "response-healing" }],
