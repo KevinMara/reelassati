@@ -7,6 +7,7 @@ import worker, {
   providerPostState,
   submitZernioPost,
   trendSearchCitations,
+  trendTextCitations,
 } from "./server";
 import {
   AI_COMPLIANCE_POLICY_VERSION,
@@ -351,6 +352,28 @@ describe("Sites worker", () => {
         sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
         title: "A current short",
         content: "Observed search excerpt",
+      },
+    ]);
+  });
+
+  it("extracts direct video links from grounded research notes", () => {
+    expect(
+      trendTextCitations({
+        choices: [
+          {
+            message: {
+              content:
+                "Examples: [Short](https://www.youtube.com/shorts/AbCdEf123_4) and https://example.com/roundup.",
+            },
+          },
+        ],
+      })
+    ).toEqual([
+      {
+        platform: "youtube",
+        sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
+        title: "Source video",
+        content: "Direct video URL returned in the grounded research notes.",
       },
     ]);
   });

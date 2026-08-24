@@ -8566,6 +8566,55 @@ export function trendSearchCitations(payload: unknown): TrendSearchCitation[] {
   return citations;
 }
 
+export function trendTextCitations(payload: unknown): TrendSearchCitation[] {
+  const content = extractTextContent(payload);
+  const citations: TrendSearchCitation[] = [];
+  const seen = new Set<string>();
+  for (const match of content.matchAll(/https:\/\/[^\s\])}"']+/gi)) {
+    const source = normalizeTrendSource(match[0]);
+    if (!source || seen.has(source.sourceUrl)) continue;
+    seen.add(source.sourceUrl);
+    citations.push({
+      ...source,
+      title: "Source video",
+      content: "Direct video URL returned in the grounded research notes.",
+    });
+  }
+  return citations;
+}
+
+async function verifyTrendCitation(
+  citation: TrendSearchCitation
+): Promise<TrendSearchCitation | null> {
+  let verificationUrl = citation.sourceUrl;
+  if (citation.platform === "youtube") {
+    verificationUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(citation.sourceUrl)}`;
+  } else if (citation.platform === "tiktok") {
+    verificationUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(citation.sourceUrl)}`;
+  } else {
+    const code = new URL(citation.sourceUrl).pathname.match(
+      /^\/reel\/([A-Za-z0-9_-]+)\/?$/
+    )?.[1];
+    if (!code) return null;
+    verificationUrl = `https://www.instagram.com/reel/${code}/embed/`;
+  }
+  try {
+    const response = await fetch(verificationUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json,text/html;q=0.9",
+        "User-Agent": "REELassati-Trend-Verifier/1.0",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(8_000),
+    });
+    await response.body?.cancel().catch(() => undefined);
+    return response.ok ? citation : null;
+  } catch {
+    return null;
+  }
+}
+
 function nullableTrendMetric(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -8803,13 +8852,20 @@ async function researchTrendSources(
     failureCode = "invalid_search_payload";
     const citationMap = new Map<string, TrendSearchCitation>();
     for (const payload of searchPayloads) {
-      for (const citation of trendSearchCitations(payload)) {
+      for (const citation of [
+        ...trendSearchCitations(payload),
+        ...trendTextCitations(payload),
+      ]) {
         citationMap.set(citation.sourceUrl, citation);
       }
     }
-    const citations = Array.from(citationMap.values());
+    const citations = (
+      await Promise.all(
+        Array.from(citationMap.values()).slice(0, 18).map(verifyTrendCitation)
+      )
+    ).filter((citation): citation is TrendSearchCitation => Boolean(citation));
     if (citations.length < 2) {
-      failureCode = `insufficient_search_citations_${citations.length}`;
+      failureCode = `insufficient_verified_citations_${citations.length}`;
       throw json(
         {
           error:
