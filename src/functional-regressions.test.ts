@@ -14,6 +14,24 @@ function filesUnder(directory: string): string[] {
 }
 
 describe("platform-wide functional invariants", () => {
+  it("keeps user-created events durable and connected to publication planning", () => {
+    const calendar = source("./pages/dashboard/CalendarPage.tsx");
+    const contract = source("../contracts/workspace.ts");
+    const server = source("../sites/server.ts");
+
+    expect(calendar).toContain("New event");
+    expect(calendar).toContain("workspace.calendarEvents");
+    expect(calendar).toContain("Calendar event created");
+    expect(calendar).toContain("Calendar event updated");
+    expect(calendar).toContain("Calendar event deleted");
+    expect(calendar).toContain("<Dialog");
+    expect(calendar).toContain('to="/dashboard/publish"');
+    expect(contract).toContain("calendarEvents: CalendarEvent[]");
+    expect(server).toContain(
+      "calendarEvents: normalizeCalendarEvents(candidate.calendarEvents)"
+    );
+  });
+
   it("keeps picker and drag-and-drop behavior on every upload surface", () => {
     const uploadSurfaces = [
       "./pages/ProvenanceDetector.tsx",

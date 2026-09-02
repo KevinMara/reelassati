@@ -4,6 +4,7 @@ import worker, {
   groundTrendOutput,
   jobFromRow,
   normalizeTrendItems,
+  normalizeCalendarEvents,
   normalizeTrendSource,
   publicationReviewFromInput,
   providerPostState,
@@ -293,6 +294,58 @@ const disclosureReview: PublicationComplianceReview = {
 };
 
 describe("Sites worker", () => {
+  it("normalizes durable user-created calendar events", () => {
+    expect(
+      normalizeCalendarEvents([
+        {
+          id: "event_valid_123",
+          title: "  Product shoot  ",
+          notes: "  Bring the prototype  ",
+          date: "2026-09-12",
+          startTime: "10:00",
+          endTime: "09:00",
+          kind: "shoot",
+          createdAt: "2026-09-01T10:00:00.000Z",
+          updatedAt: "2026-09-01T11:00:00.000Z",
+        },
+        {
+          id: "event_valid_123",
+          title: "Duplicate",
+          date: "2026-09-13",
+        },
+        {
+          id: "event_bad_date",
+          title: "Impossible",
+          date: "2026-02-31",
+        },
+        {
+          id: "event_other_123",
+          title: "Planning",
+          notes: "",
+          date: "2026-09-14",
+          kind: "unsupported",
+        },
+      ])
+    ).toEqual([
+      {
+        id: "event_valid_123",
+        title: "Product shoot",
+        notes: "Bring the prototype",
+        date: "2026-09-12",
+        startTime: "10:00",
+        kind: "shoot",
+        createdAt: "2026-09-01T10:00:00.000Z",
+        updatedAt: "2026-09-01T11:00:00.000Z",
+      },
+      expect.objectContaining({
+        id: "event_other_123",
+        title: "Planning",
+        date: "2026-09-14",
+        kind: "other",
+      }),
+    ]);
+  });
+
   it("normalizes direct short-form video links without accepting generic pages", () => {
     expect(
       normalizeTrendSource(

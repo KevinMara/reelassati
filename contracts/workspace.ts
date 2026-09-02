@@ -216,6 +216,21 @@ export interface ScheduledPost {
   complianceReview?: PublicationComplianceReview;
 }
 
+export type CalendarEventKind =
+  "task" | "shoot" | "meeting" | "deadline" | "other";
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  notes: string;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  kind: CalendarEventKind;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Goal {
   id: string;
   label: string;
@@ -229,7 +244,14 @@ export interface Goal {
 
 export interface WorkspaceEvent {
   id: string;
-  type: "project" | "upload" | "script" | "publish" | "goal" | "generation";
+  type:
+    | "project"
+    | "upload"
+    | "script"
+    | "publish"
+    | "goal"
+    | "generation"
+    | "calendar";
   label: string;
   detail: string;
   createdAt: string;
@@ -265,6 +287,7 @@ export interface WorkspaceDocument {
   scripts: ScriptDraft[];
   accounts: PublishingAccount[];
   posts: ScheduledPost[];
+  calendarEvents: CalendarEvent[];
   goals: Goal[];
   jobs: GenerationJob[];
   activity: WorkspaceEvent[];
@@ -304,6 +327,7 @@ export function createEmptyWorkspace(
     scripts: [],
     accounts: [],
     posts: [],
+    calendarEvents: [],
     goals: [],
     jobs: [],
     activity: [],

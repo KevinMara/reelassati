@@ -146,6 +146,7 @@ function DashboardHome() {
       publish: 5,
       upload: 0,
       goal: 0,
+      calendar: 0,
     };
     return total + minutesByAction[item.type];
   }, 0);

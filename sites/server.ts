@@ -1,6 +1,8 @@
 import {
   createEmptyWorkspace,
   type Asset,
+  type CalendarEvent,
+  type CalendarEventKind,
   type CapabilityState,
   type EditOperation,
   type GenerationJob,
@@ -1657,6 +1659,7 @@ function normalizeWorkspace(
     scripts: Array.isArray(candidate.scripts) ? candidate.scripts : [],
     accounts: Array.isArray(candidate.accounts) ? candidate.accounts : [],
     posts: Array.isArray(candidate.posts) ? candidate.posts : [],
+    calendarEvents: normalizeCalendarEvents(candidate.calendarEvents),
     goals: Array.isArray(candidate.goals) ? candidate.goals : [],
     jobs: Array.isArray(candidate.jobs) ? candidate.jobs : [],
     activity: Array.isArray(candidate.activity) ? candidate.activity : [],
@@ -1665,6 +1668,81 @@ function normalizeWorkspace(
         ? candidate.updatedAt
         : new Date().toISOString(),
   };
+}
+
+const CALENDAR_EVENT_KINDS = new Set<CalendarEventKind>([
+  "task",
+  "shoot",
+  "meeting",
+  "deadline",
+  "other",
+]);
+
+const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const CALENDAR_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+export function normalizeCalendarEvents(value: unknown): CalendarEvent[] {
+  if (!Array.isArray(value)) return [];
+  const now = new Date().toISOString();
+  const normalized: CalendarEvent[] = [];
+  const seen = new Set<string>();
+
+  for (const item of value) {
+    const candidate = recordValue(item);
+    if (!candidate) continue;
+    const id = stringValue(candidate.id).slice(0, 140);
+    const title = stringValue(candidate.title).trim().slice(0, 160);
+    const date = stringValue(candidate.date).slice(0, 10);
+    const parsedDate = new Date(`${date}T12:00:00.000Z`);
+    if (
+      !/^[A-Za-z0-9_-]{8,140}$/.test(id) ||
+      seen.has(id) ||
+      !title ||
+      !CALENDAR_DATE_PATTERN.test(date) ||
+      !Number.isFinite(parsedDate.getTime()) ||
+      parsedDate.toISOString().slice(0, 10) !== date
+    ) {
+      continue;
+    }
+
+    const kindValue = stringValue(candidate.kind).toLowerCase();
+    const kind = CALENDAR_EVENT_KINDS.has(kindValue as CalendarEventKind)
+      ? (kindValue as CalendarEventKind)
+      : "other";
+    const startCandidate = stringValue(candidate.startTime);
+    const endCandidate = stringValue(candidate.endTime);
+    const startTime = CALENDAR_TIME_PATTERN.test(startCandidate)
+      ? startCandidate
+      : undefined;
+    const endTime =
+      startTime &&
+      CALENDAR_TIME_PATTERN.test(endCandidate) &&
+      endCandidate > startTime
+        ? endCandidate
+        : undefined;
+    const createdCandidate = stringValue(candidate.createdAt);
+    const updatedCandidate = stringValue(candidate.updatedAt);
+
+    seen.add(id);
+    normalized.push({
+      id,
+      title,
+      notes: stringValue(candidate.notes).trim().slice(0, 2_000),
+      date,
+      ...(startTime ? { startTime } : {}),
+      ...(endTime ? { endTime } : {}),
+      kind,
+      createdAt: Number.isFinite(Date.parse(createdCandidate))
+        ? new Date(createdCandidate).toISOString()
+        : now,
+      updatedAt: Number.isFinite(Date.parse(updatedCandidate))
+        ? new Date(updatedCandidate).toISOString()
+        : now,
+    });
+    if (normalized.length >= 500) break;
+  }
+
+  return normalized;
 }
 
 type EditOperationProvenanceProjection = Pick<
