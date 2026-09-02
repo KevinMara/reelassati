@@ -9406,7 +9406,8 @@ async function handleTrends(
 async function handleApi(
   request: Request,
   env: SitesEnvironment,
-  url: URL
+  url: URL,
+  ctx?: { waitUntil(promise: Promise<unknown>): void }
 ): Promise<Response> {
   if (url.pathname === "/api/health") {
     return json({
@@ -9493,6 +9494,15 @@ async function handleApi(
   }
 
   if (url.pathname === "/api/trends") {
+    if (request.method === "GET" && ctx) {
+      ctx.waitUntil(
+        refreshWeeklyTrendFeed(env).catch(cause => {
+          console.error("On-demand weekly trend bootstrap failed", {
+            errorType: cause instanceof Error ? cause.name : typeof cause,
+          });
+        })
+      );
+    }
     try {
       return await handleTrends(request, env, user);
     } catch (cause) {
@@ -9626,17 +9636,8 @@ export default {
       if (request.method === "OPTIONS") {
         return apiResponse(new Response(null, { status: 204 }), request);
       }
-      if (url.pathname === "/api/trends" && request.method === "GET" && ctx) {
-        ctx.waitUntil(
-          refreshWeeklyTrendFeed(env).catch(cause => {
-            console.error("On-demand weekly trend bootstrap failed", {
-              errorType: cause instanceof Error ? cause.name : typeof cause,
-            });
-          })
-        );
-      }
       try {
-        return apiResponse(await handleApi(request, env, url), request);
+        return apiResponse(await handleApi(request, env, url, ctx), request);
       } catch (cause) {
         if (cause instanceof Response) return apiResponse(cause, request);
         const reference = crypto.randomUUID();
