@@ -212,6 +212,8 @@ describe("platform-wide functional invariants", () => {
     expect(server).toContain('type: "openrouter:web_search"');
     expect(server).not.toContain('{ id: "web"');
     expect(server).toContain("TREND_WEEKLY_TTL_MS");
+    expect(server).toContain("On-demand weekly trend bootstrap failed");
+    expect(server).toContain("ctx.waitUntil");
     expect(server).toContain("TREND_MIN_VIEWS");
     expect(server).toContain("candidate.organicBrandPromotion !== true");
     expect(server).toContain("candidate.paidAd !== false");

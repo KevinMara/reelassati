@@ -9615,12 +9615,25 @@ function apiResponse(response: Response, request: Request): Response {
 }
 
 export default {
-  async fetch(request: Request, env: SitesEnvironment): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: SitesEnvironment,
+    ctx?: { waitUntil(promise: Promise<unknown>): void }
+  ): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api/")) {
       if (request.method === "OPTIONS") {
         return apiResponse(new Response(null, { status: 204 }), request);
+      }
+      if (url.pathname === "/api/trends" && request.method === "GET" && ctx) {
+        ctx.waitUntil(
+          refreshWeeklyTrendFeed(env).catch(cause => {
+            console.error("On-demand weekly trend bootstrap failed", {
+              errorType: cause instanceof Error ? cause.name : typeof cause,
+            });
+          })
+        );
       }
       try {
         return apiResponse(await handleApi(request, env, url), request);
