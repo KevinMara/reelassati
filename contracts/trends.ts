@@ -27,6 +27,7 @@ export interface TrendEvidenceItem {
   platform: TrendPlatform;
   title: string;
   creator: string;
+  brandName: string;
   sourceUrl: string;
   thumbnailUrl: string | null;
   publishedAt: string | null;
@@ -40,6 +41,8 @@ export interface TrendEvidenceItem {
   confidence: number;
   metrics: TrendMetrics;
   evidence: string[];
+  organicEvidence: string;
+  viralityEvidence: string;
   hypothesis: string;
   adaptation: string;
   passSignal: string;

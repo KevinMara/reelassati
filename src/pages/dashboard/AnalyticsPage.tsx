@@ -1,14 +1,30 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertCircle,
   CalendarClock,
   CheckCircle2,
+  FileText,
   Film,
+  ImageIcon,
   Radio,
   Send,
+  Sparkles,
+  type LucideIcon,
 } from "lucide-react";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import type { Platform } from "@contracts/workspace";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import {
+  analyticsMetricTotal,
+  buildAnalyticsSeries,
+  type AnalyticsMetricKey,
+} from "@/lib/analytics";
 import { useWorkspace } from "@/providers/workspace";
 
 const PLATFORM_LABELS: Record<Platform, string> = {
@@ -22,8 +38,93 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   threads: "Threads",
 };
 
+const ANALYTICS_METRICS: Array<{
+  key: AnalyticsMetricKey;
+  label: string;
+  shortLabel: string;
+  color: string;
+  icon: LucideIcon;
+}> = [
+  {
+    key: "published",
+    label: "Published posts",
+    shortLabel: "Published",
+    color: "hsl(var(--primary))",
+    icon: Send,
+  },
+  {
+    key: "scheduled",
+    label: "Scheduled posts",
+    shortLabel: "Scheduled",
+    color: "#f59e0b",
+    icon: CalendarClock,
+  },
+  {
+    key: "assets",
+    label: "Created media",
+    shortLabel: "Media",
+    color: "#10b981",
+    icon: ImageIcon,
+  },
+  {
+    key: "scripts",
+    label: "Created scripts",
+    shortLabel: "Scripts",
+    color: "#38bdf8",
+    icon: FileText,
+  },
+  {
+    key: "projects",
+    label: "Started edits",
+    shortLabel: "Edits",
+    color: "#f472b6",
+    icon: Film,
+  },
+];
+
+const ANALYTICS_CHART_CONFIG = Object.fromEntries(
+  ANALYTICS_METRICS.map(metric => [
+    metric.key,
+    { label: metric.label, color: metric.color },
+  ])
+) as ChartConfig;
+
 export default function AnalyticsPage() {
   const { workspace, capabilities, loading } = useWorkspace();
+  const [selectedMetrics, setSelectedMetrics] = useState<AnalyticsMetricKey[]>([
+    "published",
+    "scheduled",
+    "assets",
+  ]);
+
+  const chartSeries = useMemo(
+    () => buildAnalyticsSeries(workspace, 14),
+    [workspace]
+  );
+  const metricTotals = useMemo(
+    () =>
+      ANALYTICS_METRICS.reduce(
+        (totals, metric) => {
+          totals[metric.key] = analyticsMetricTotal(chartSeries, metric.key);
+          return totals;
+        },
+        {} as Record<AnalyticsMetricKey, number>
+      ),
+    [chartSeries]
+  );
+  const selectedTotal = selectedMetrics.reduce(
+    (total, metric) => total + metricTotals[metric],
+    0
+  );
+
+  const toggleMetric = (metric: AnalyticsMetricKey) => {
+    setSelectedMetrics(current => {
+      if (!current.includes(metric)) return [...current, metric];
+      return current.length === 1
+        ? current
+        : current.filter(item => item !== metric);
+    });
+  };
 
   const publishedPosts = useMemo(
     () =>
@@ -142,19 +243,145 @@ export default function AnalyticsPage() {
         {kpis.map(kpi => (
           <article
             key={kpi.label}
-            className="rounded-xl border border-border bg-surface p-5"
+            className="group relative overflow-hidden rounded-xl border border-border bg-surface p-5 transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-primary/[0.06]"
           >
+            <div className="pointer-events-none absolute -right-10 -top-12 h-24 w-24 rounded-full bg-primary/[0.06] blur-2xl transition group-hover:bg-primary/[0.11]" />
             <div className="mb-4 flex items-center justify-between">
               <p className="mono-eyebrow text-[10px] text-foreground/45">
                 {kpi.label}
               </p>
-              <kpi.icon className="h-4 w-4 text-primary" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/[0.08] text-primary transition group-hover:scale-105 group-hover:bg-primary/[0.13]">
+                <kpi.icon className="h-4 w-4" />
+              </span>
             </div>
-            <p className="text-3xl font-semibold tabular-nums">{kpi.value}</p>
+            <p className="relative text-3xl font-semibold tabular-nums">
+              {kpi.value}
+            </p>
             <p className="mt-1 text-xs text-foreground/45">{kpi.detail}</p>
           </article>
         ))}
       </div>
+
+      <section className="relative mb-6 overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.09] via-surface to-surface p-5 shadow-sm sm:p-6">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-primary/[0.12] blur-3xl" />
+        <div className="relative mb-5 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Sparkles className="h-3.5 w-3.5" />
+              </span>
+              <p className="mono-eyebrow text-[10px] text-primary">
+                Output momentum
+              </p>
+            </div>
+            <h2 className="mt-2 text-lg font-medium">Your last 14 days</h2>
+            <p className="mt-1 text-xs text-foreground/45">
+              Toggle one metric or compare several. Every point comes from your
+              saved workspace records.
+            </p>
+          </div>
+          <div className="rounded-xl border border-primary/15 bg-background/70 px-4 py-2.5 text-right backdrop-blur">
+            <p className="text-2xl font-semibold tabular-nums text-primary">
+              {selectedTotal}
+            </p>
+            <p className="text-[10px] uppercase tracking-wide text-foreground/40">
+              selected output
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="relative mb-5 flex flex-wrap gap-2"
+          role="group"
+          aria-label="Chart metrics"
+        >
+          {ANALYTICS_METRICS.map(metric => {
+            const selected = selectedMetrics.includes(metric.key);
+            const isOnlySelection = selected && selectedMetrics.length === 1;
+            return (
+              <button
+                key={metric.key}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => toggleMetric(metric.key)}
+                title={
+                  isOnlySelection
+                    ? "Keep at least one metric selected"
+                    : `${selected ? "Hide" : "Show"} ${metric.label.toLowerCase()}`
+                }
+                className={`group/metric inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition duration-200 hover:-translate-y-px ${
+                  selected
+                    ? "border-primary/20 bg-background text-foreground shadow-sm"
+                    : "border-border/70 bg-background/35 text-foreground/45 hover:border-border hover:text-foreground/70"
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full transition ${selected ? "scale-110 shadow-[0_0_10px_currentColor]" : "opacity-45"}`}
+                  style={{ backgroundColor: metric.color, color: metric.color }}
+                />
+                {metric.shortLabel}
+                <span
+                  className={`font-mono text-[10px] tabular-nums ${selected ? "text-foreground/50" : "text-foreground/30"}`}
+                >
+                  {metricTotals[metric.key]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative rounded-xl border border-border/70 bg-background/70 p-2 shadow-inner backdrop-blur sm:p-4">
+          <ChartContainer
+            config={ANALYTICS_CHART_CONFIG}
+            className="h-[300px] w-full aspect-auto"
+          >
+            <LineChart
+              accessibilityLayer
+              data={chartSeries}
+              margin={{ top: 12, right: 12, left: -12, bottom: 0 }}
+            >
+              <CartesianGrid vertical={false} strokeDasharray="3 6" />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={10}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                allowDecimals={false}
+                tickLine={false}
+                axisLine={false}
+                width={32}
+              />
+              <ChartTooltip
+                cursor={{
+                  stroke: "hsl(var(--foreground) / 0.16)",
+                  strokeDasharray: "4 4",
+                }}
+                content={<ChartTooltipContent indicator="line" />}
+              />
+              {selectedMetrics.map(metric => (
+                <Line
+                  key={metric}
+                  type="monotone"
+                  dataKey={metric}
+                  stroke={`var(--color-${metric})`}
+                  strokeWidth={2.5}
+                  dot={false}
+                  activeDot={{
+                    r: 5,
+                    strokeWidth: 2,
+                    fill: "hsl(var(--background))",
+                  }}
+                  isAnimationActive
+                  animationDuration={650}
+                />
+              ))}
+            </LineChart>
+          </ChartContainer>
+        </div>
+      </section>
 
       <section className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
         <div className="flex items-start gap-3">

@@ -56,21 +56,28 @@ const PLATFORMS: Array<{ value: Platform; label: string }> = [
   { value: "threads", label: "Threads" },
 ];
 
-const TREND_PLATFORM_OPTIONS: Array<{
+const TREND_RESEARCH_PLATFORM_OPTIONS: Array<{
   value: "all" | TrendPlatform;
   label: string;
 }> = [
-  { value: "all", label: "All video platforms" },
+  { value: "all", label: "TikTok + Instagram Reels" },
   { value: "tiktok", label: "TikTok" },
   { value: "instagram", label: "Instagram Reels" },
   { value: "youtube", label: "YouTube Shorts" },
 ];
 
+const TREND_FILTER_PLATFORM_OPTIONS = TREND_RESEARCH_PLATFORM_OPTIONS.map(
+  option =>
+    option.value === "all"
+      ? { ...option, label: "All short-form sources" }
+      : option
+);
+
 const CONTENT_TYPE_OPTIONS: Array<{
   value: TrendContentType;
   label: string;
 }> = [
-  { value: "overall", label: "All content formats" },
+  { value: "overall", label: "All short-form styles" },
   { value: "creator-led", label: "Creator-led" },
   { value: "product-demo", label: "Product / demo" },
   { value: "educational", label: "Educational" },
@@ -464,7 +471,7 @@ export default function TrendsPage() {
   const runResearch = async (event: FormEvent) => {
     event.preventDefault();
     const scope: TrendScope = {
-      query: query.trim() || "overall short-form content",
+      query: query.trim() || "hyperviral organic brand promotion",
       platform: researchPlatform,
       contentType,
       objective,
@@ -497,7 +504,7 @@ export default function TrendsPage() {
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <p className="mono-eyebrow text-primary">
-              Weekly format intelligence
+              Weekly viral intelligence
             </p>
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -506,9 +513,9 @@ export default function TrendsPage() {
           </div>
           <h1 className="text-3xl font-semibold">Trends</h1>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-foreground/55">
-            REELassati updates the strongest cross-platform formats every week.
-            Watch the source videos, inspect the evidence, or run a separate
-            credit-based research for your exact brief.
+            Every weekly pick is a recent, hyperviral organic brand-promotion
+            short from TikTok or Instagram Reels—not a paid ad or a generic
+            trend idea. Watch the source or research your exact brief.
           </p>
         </div>
         <button
@@ -540,7 +547,7 @@ export default function TrendsPage() {
         <span className="flex-1">
           <span className="block text-sm font-medium">Custom research</span>
           <span className="block text-xs text-foreground/45">
-            Choose topic, platform, format, objective, market, and language · 1
+            Find verified viral organic brand shorts for your exact brief · 1
             credit
           </span>
         </span>
@@ -589,7 +596,7 @@ export default function TrendsPage() {
                     }
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   >
-                    {TREND_PLATFORM_OPTIONS.map(option => (
+                    {TREND_RESEARCH_PLATFORM_OPTIONS.map(option => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -719,7 +726,7 @@ export default function TrendsPage() {
                 : "text-foreground/55 hover:text-foreground"
             }`}
           >
-            Platform weekly
+            Weekly viral shorts
           </button>
           {customFeed ? (
             <button
@@ -739,7 +746,7 @@ export default function TrendsPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="mono-eyebrow text-[10px] text-foreground/45">
-                Actual videos · observed evidence · explicit hypotheses
+                Organic brand posts · current-week evidence · no paid ads
               </p>
               {activeFeed ? (
                 <span className="rounded-full border border-border bg-surface px-2 py-1 text-[10px] text-foreground/45">
@@ -754,7 +761,7 @@ export default function TrendsPage() {
             <h2 id="trend-evidence-heading" className="mt-1 font-medium">
               {activeFeed?.kind === "custom"
                 ? `Research for “${activeFeed.scope.query}”`
-                : "This week’s strongest formats"}
+                : "This week’s hyperviral brand shorts"}
             </h2>
             {activeFeed?.status === "ready" ? (
               <p className="mt-1 text-xs text-foreground/40">
@@ -776,7 +783,7 @@ export default function TrendsPage() {
               className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
               aria-label="Filter trend evidence by platform"
             >
-              {TREND_PLATFORM_OPTIONS.map(option => (
+              {TREND_FILTER_PLATFORM_OPTIONS.map(option => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -841,6 +848,9 @@ export default function TrendsPage() {
                       <p className="truncate text-xs font-medium text-primary">
                         {trend.creator}
                       </p>
+                      <p className="mt-0.5 truncate text-[10px] uppercase tracking-wide text-foreground/40">
+                        Organic promotion · {trend.brandName}
+                      </p>
                       <h3 className="mt-1 line-clamp-2 text-sm font-medium leading-snug">
                         {trend.title}
                       </h3>
@@ -888,6 +898,14 @@ export default function TrendsPage() {
                       Observed evidence
                     </p>
                     <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-foreground/60">
+                      <li className="flex gap-2">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-emerald-400" />
+                        <span>{trend.viralityEvidence}</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-emerald-400" />
+                        <span>{trend.organicEvidence}</span>
+                      </li>
                       {trend.evidence.slice(0, 3).map(item => (
                         <li key={item} className="flex gap-2">
                           <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-emerald-400" />
@@ -940,7 +958,7 @@ export default function TrendsPage() {
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-foreground/45">
               {activeFeed?.status === "preparing"
                 ? "REELassati updates this feed internally; no action or credits are required from you."
-                : "Change the display filters or run a custom credit-based research. REELassati does not fill empty states with fabricated trends."}
+                : "Change the filters or run custom research. REELassati will show fewer results rather than fill the feed with stale, paid, generic, or unverified content."}
             </p>
           </div>
         )}

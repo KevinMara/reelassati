@@ -200,22 +200,43 @@ describe("platform-wide functional invariants", () => {
     const server = source("../sites/server.ts");
     const cron = source("../api/trends-weekly.ts");
 
-    expect(trends).toContain("Platform weekly");
+    expect(trends).toContain("Weekly viral shorts");
     expect(trends).toContain("1 credit per completed research");
-    expect(trends).toContain("All content formats");
+    expect(trends).toContain("All short-form styles");
     expect(trends).toContain("Overall performance");
+    expect(trends).toContain("Organic brand posts");
+    expect(trends).toContain("trend.brandName");
     expect(trends).not.toMatch(/reload free|0 credits|identical scan/i);
     expect(server).toContain("reserveTrendResearchCredit");
     expect(server).toContain('"moonshotai/kimi-k2.5"');
     expect(server).toContain('type: "openrouter:web_search"');
     expect(server).not.toContain('{ id: "web"');
     expect(server).toContain("TREND_WEEKLY_TTL_MS");
+    expect(server).toContain("TREND_MIN_VIEWS");
+    expect(server).toContain("candidate.organicBrandPromotion !== true");
+    expect(server).toContain("candidate.paidAd !== false");
+    expect(server).toContain('? ["tiktok", "instagram"]');
     expect(server).toMatch(
       /Math\.floor\(Number\(referral\?\.credits\).*\|\| 0\)\s*-\s*Math\.floor\(Number\(spent\?\.credits\)/s
     );
     expect(server).not.toContain("TREND_STARTER_CREDITS");
     expect(server).not.toContain("TREND_PERSONAL_CACHE_MS");
     expect(cron).toContain("/api/internal/trends/weekly");
+  });
+
+  it("keeps Analytics grounded while allowing one or several chart metrics", () => {
+    const analytics = source("./pages/dashboard/AnalyticsPage.tsx");
+    const analyticsData = source("./lib/analytics.ts");
+
+    expect(analytics).toContain("Your last 14 days");
+    expect(analytics).toContain("selectedMetrics.map");
+    expect(analytics).toContain("aria-pressed={selected}");
+    expect(analytics).toContain("current.length === 1");
+    expect(analytics).toContain("<LineChart");
+    expect(analytics).toContain("Every point comes from your");
+    expect(analyticsData).toContain("workspace.assets.forEach");
+    expect(analyticsData).toContain("workspace.scripts.forEach");
+    expect(analyticsData).not.toMatch(/Math\.random|estimated|mock/i);
   });
 
   it("uses public SaaS authentication and sends bearer tokens to the product API", () => {

@@ -3,6 +3,7 @@ import worker, {
   appendReleaseDisclosure,
   groundTrendOutput,
   jobFromRow,
+  normalizeTrendItems,
   normalizeTrendSource,
   publicationReviewFromInput,
   providerPostState,
@@ -302,11 +303,14 @@ describe("Sites worker", () => {
       sourceUrl: "https://www.instagram.com/reel/DAbCdEf12_3/",
     });
     expect(
-      normalizeTrendSource("https://www.youtube.com/watch?v=AbCdEf123_4")
+      normalizeTrendSource("https://www.youtube.com/shorts/AbCdEf123_4")
     ).toEqual({
       platform: "youtube",
       sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
     });
+    expect(
+      normalizeTrendSource("https://www.youtube.com/watch?v=AbCdEf123_4")
+    ).toBe(null);
     expect(
       normalizeTrendSource(
         "Source: https://www.tiktok.com/@creator/video/1234567890?lang=en"
@@ -330,7 +334,7 @@ describe("Sites worker", () => {
                 {
                   type: "url_citation",
                   url_citation: {
-                    url: "https://youtu.be/AbCdEf123_4",
+                    url: "https://www.youtube.com/shorts/AbCdEf123_4",
                     title: "A current short",
                     content: "Observed search excerpt",
                   },
@@ -384,7 +388,18 @@ describe("Sites worker", () => {
       groundTrendOutput(
         {
           trends: [
-            { title: "Observed format", sourceUrl: "https://fake.test" },
+            {
+              title: "Observed format",
+              sourceUrl: "https://www.tiktok.com/@verified/video/1234567890",
+            },
+            {
+              title: "Unverified format",
+              sourceUrl: "https://www.tiktok.com/@fake/video/9999999999",
+            },
+            {
+              title: "Second observed format",
+              sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
+            },
           ],
         },
         [
@@ -407,14 +422,98 @@ describe("Sites worker", () => {
         {
           sourceUrl: "https://www.tiktok.com/@verified/video/1234567890",
           creator: "verified",
-          evidence: ["Verified source observation."],
         },
         {
           sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
-          creator: "Source creator",
-          evidence: ["Second verified observation."],
         },
       ],
+    });
+  });
+
+  it("keeps only current hyperviral organic brand shorts in the weekly feed", () => {
+    const observedAt = "2026-09-02T12:00:00.000Z";
+    const candidate = {
+      platform: "tiktok",
+      title: "A native product reveal",
+      creator: "brandcreator",
+      brandName: "Example Brand",
+      sourceUrl: "https://www.tiktok.com/@brandcreator/video/1234567890",
+      publishedAt: "2026-08-30T12:00:00.000Z",
+      thumbnailUrl: null,
+      niche: "Beauty",
+      region: "Global",
+      language: "en",
+      hook: "The result appears in the first frame.",
+      pattern: "Result, reveal, then a quick demonstration.",
+      lifecycle: "breakout",
+      confidence: 0.9,
+      metrics: {
+        views: 1_200_000,
+        likes: 75_000,
+        comments: 3_000,
+        shares: 12_000,
+      },
+      evidence: ["The source reports 1.2 million views."],
+      organicBrandPromotion: true,
+      paidAd: false,
+      organicEvidence: "A normal brand-owned feed post with no ad disclosure.",
+      viralityEvidence: "1.2 million reported views within three days.",
+      hypothesis: "The immediate result may drive the opening hold.",
+      adaptation: "Open with the customer outcome before showing the product.",
+      passSignal: "Beat the recent three-second hold baseline.",
+    };
+
+    const results = normalizeTrendItems(
+      {
+        trends: [
+          candidate,
+          {
+            ...candidate,
+            sourceUrl: "https://www.instagram.com/reel/LowPerformance123/",
+            platform: "instagram",
+            metrics: { views: 12_000, likes: 500, comments: 30, shares: 10 },
+          },
+          {
+            ...candidate,
+            sourceUrl: "https://www.instagram.com/reel/PaidPlacement123/",
+            platform: "instagram",
+            paidAd: true,
+          },
+          {
+            ...candidate,
+            sourceUrl: "https://www.instagram.com/reel/StaleOrganic123/",
+            platform: "instagram",
+            publishedAt: "2026-08-01T12:00:00.000Z",
+          },
+          {
+            ...candidate,
+            sourceUrl: "https://www.instagram.com/reel/GenericViral123/",
+            platform: "instagram",
+            organicBrandPromotion: false,
+            brandName: "",
+          },
+          {
+            ...candidate,
+            sourceUrl: "https://www.instagram.com/reel/DisclosedAd123/",
+            platform: "instagram",
+            organicEvidence: "The caption labels this as a paid partnership.",
+          },
+          {
+            ...candidate,
+            sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
+            platform: "youtube",
+          },
+        ],
+      },
+      observedAt,
+      "weekly"
+    );
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      platform: "tiktok",
+      brandName: "Example Brand",
+      metrics: { views: 1_200_000 },
     });
   });
 

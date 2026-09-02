@@ -255,7 +255,12 @@ const REFERRAL_REWARD_CENTS = 500;
 const TREND_RESEARCH_CREDIT_COST = 1;
 const TREND_WEEKLY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TREND_REFRESH_LEASE_MS = 10 * 60 * 1000;
-const TREND_WEEKLY_SCOPE_KEY = "weekly:global:cross-platform";
+const TREND_WEEKLY_SCOPE_KEY = "weekly:organic-brand-hyperviral-shorts:v2";
+const TREND_MAX_AGE_MS = 8 * 24 * 60 * 60 * 1000;
+const TREND_MIN_VIEWS = 500_000;
+const TREND_MIN_LIKES = 50_000;
+const TREND_MIN_COMMENTS = 5_000;
+const TREND_MIN_SHARES = 10_000;
 const TREND_SYSTEM_OWNER: AuthenticatedUser = {
   email: "trend-system@reelassati.app",
   name: "REELassati Trends",
@@ -8510,24 +8515,6 @@ export function normalizeTrendSource(
         sourceUrl: `https://www.youtube.com/shorts/${youtubeShort[1]}`,
       };
     }
-    const youtubeWatchId = url.searchParams.get("v") || "";
-    if (
-      (host === "youtube.com" || host.endsWith(".youtube.com")) &&
-      url.pathname === "/watch" &&
-      /^[A-Za-z0-9_-]{6,}$/.test(youtubeWatchId)
-    ) {
-      return {
-        platform: "youtube",
-        sourceUrl: `https://www.youtube.com/shorts/${youtubeWatchId}`,
-      };
-    }
-    const youtubeShareId = url.pathname.match(/^\/([A-Za-z0-9_-]{6,})\/?$/);
-    if ((host === "youtu.be" || host.endsWith(".youtu.be")) && youtubeShareId) {
-      return {
-        platform: "youtube",
-        sourceUrl: `https://www.youtube.com/shorts/${youtubeShareId[1]}`,
-      };
-    }
   } catch {
     return null;
   }
@@ -8624,64 +8611,30 @@ export function groundTrendOutput(
   const allowedSources = new Map(
     citations.map(citation => [citation.sourceUrl, citation] as const)
   );
-  const targetCount = Math.min(6, citations.length);
-  const cardCount = Math.max(candidates.length, targetCount);
   const trends: Record<string, unknown>[] = [];
-  for (let index = 0; index < cardCount; index += 1) {
-    const candidate = recordValue(candidates[index]) || {};
+  for (const candidateValue of candidates) {
+    const candidate = recordValue(candidateValue);
+    if (!candidate) continue;
     const candidateSource = normalizeTrendSource(
       candidate.sourceUrl || candidate.url
     );
-    const citation =
-      (candidateSource
-        ? allowedSources.get(candidateSource.sourceUrl)
-        : undefined) || citations[index % citations.length];
+    const citation = candidateSource
+      ? allowedSources.get(candidateSource.sourceUrl)
+      : undefined;
     if (!citation) continue;
-    const title = stringValue(
-      candidate.title,
-      citation.title || `${citation.platform} short-form example`
-    ).slice(0, 160);
-    const pattern = stringValue(
-      candidate.pattern,
-      stringValue(candidate.hook, title)
-    ).slice(0, 280);
-    const hook = stringValue(candidate.hook, pattern).slice(0, 280);
     const creatorFromUrl =
       citation.platform === "tiktok"
         ? new URL(citation.sourceUrl).pathname.match(/^\/@([^/]+)/)?.[1] || ""
         : "";
-    const evidence =
-      Array.isArray(candidate.evidence) && candidate.evidence.length
-        ? candidate.evidence
-        : citation.content
-          ? [citation.content]
-          : [
-              "Direct individual video verified during the current platform search.",
-            ];
     trends.push({
       ...candidate,
       platform: citation.platform,
       sourceUrl: citation.sourceUrl,
-      title,
+      title: stringValue(candidate.title).slice(0, 160),
       creator: stringValue(
         candidate.creator || candidate.author || candidate.channel,
-        creatorFromUrl || "Source creator"
+        creatorFromUrl
       ).slice(0, 100),
-      hook,
-      pattern,
-      evidence,
-      hypothesis: stringValue(
-        candidate.hypothesis,
-        "Test whether this observed format transfers to your audience."
-      ),
-      adaptation: stringValue(
-        candidate.adaptation,
-        "Adapt the opening and structure to your own subject and brand."
-      ),
-      passSignal: stringValue(
-        candidate.passSignal,
-        "Compare retention and engagement with your recent baseline."
-      ),
     });
   }
   return { trends };
@@ -8693,9 +8646,28 @@ function nullableTrendMetric(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
 }
 
-function normalizeTrendItems(
+function trendViralityScore(metrics: TrendEvidenceItem["metrics"]): number {
+  return Math.max(
+    metrics.views || 0,
+    (metrics.likes || 0) * 10,
+    (metrics.comments || 0) * 100,
+    (metrics.shares || 0) * 50
+  );
+}
+
+function hasHyperviralSignal(metrics: TrendEvidenceItem["metrics"]): boolean {
+  return (
+    (metrics.views || 0) >= TREND_MIN_VIEWS ||
+    (metrics.likes || 0) >= TREND_MIN_LIKES ||
+    (metrics.comments || 0) >= TREND_MIN_COMMENTS ||
+    (metrics.shares || 0) >= TREND_MIN_SHARES
+  );
+}
+
+export function normalizeTrendItems(
   value: unknown,
-  observedAt: string
+  observedAt: string,
+  mode: "weekly" | "custom" = "weekly"
 ): TrendEvidenceItem[] {
   const root = recordValue(value);
   const candidates = Array.isArray(root?.trends) ? root.trends : [];
@@ -8718,14 +8690,28 @@ function normalizeTrendItems(
     const hypothesis = stringValue(candidate.hypothesis).slice(0, 500);
     const adaptation = stringValue(candidate.adaptation).slice(0, 500);
     const passSignal = stringValue(candidate.passSignal).slice(0, 300);
+    const brandName = stringValue(candidate.brandName).slice(0, 100);
+    const organicEvidence = stringValue(candidate.organicEvidence).slice(
+      0,
+      300
+    );
+    const viralityEvidence = stringValue(candidate.viralityEvidence).slice(
+      0,
+      300
+    );
     if (
       !title ||
       !creator ||
+      !brandName ||
       !hook ||
       !pattern ||
+      !organicEvidence ||
+      !viralityEvidence ||
       !hypothesis ||
       !adaptation ||
-      !passSignal
+      !passSignal ||
+      candidate.organicBrandPromotion !== true ||
+      candidate.paidAd !== false
     ) {
       continue;
     }
@@ -8746,16 +8732,41 @@ function normalizeTrendItems(
       ? thumbnailCandidate
       : null;
     const publishedCandidate = stringValue(candidate.publishedAt);
-    const publishedAt = Number.isFinite(Date.parse(publishedCandidate))
-      ? new Date(publishedCandidate).toISOString()
+    const publishedTimestamp = Date.parse(publishedCandidate);
+    const observedTimestamp = Date.parse(observedAt);
+    const publishedAt = Number.isFinite(publishedTimestamp)
+      ? new Date(publishedTimestamp).toISOString()
       : null;
     const confidence = boundedNumber(candidate.confidence, 0.55, 0.15, 0.95);
+    const normalizedMetrics = {
+      views: nullableTrendMetric(metrics.views),
+      likes: nullableTrendMetric(metrics.likes),
+      comments: nullableTrendMetric(metrics.comments),
+      shares: nullableTrendMetric(metrics.shares),
+    };
+    const explicitPaidSignal =
+      /(?:#ad\b|paid partnership|paid placement|sponsored (?:post|content)|advertisement|ad library)/i.test(
+        `${title} ${organicEvidence} ${evidence.join(" ")}`
+      );
+    if (
+      !publishedAt ||
+      !Number.isFinite(observedTimestamp) ||
+      publishedTimestamp > observedTimestamp + 6 * 60 * 60 * 1000 ||
+      observedTimestamp - publishedTimestamp > TREND_MAX_AGE_MS ||
+      confidence < 0.7 ||
+      explicitPaidSignal ||
+      !hasHyperviralSignal(normalizedMetrics) ||
+      (mode === "weekly" && detectedPlatform === "youtube")
+    ) {
+      continue;
+    }
     seen.add(sourceUrl);
     trends.push({
       id: `trend_${crypto.randomUUID()}`,
       platform: detectedPlatform,
       title,
       creator,
+      brandName,
       sourceUrl,
       thumbnailUrl,
       publishedAt,
@@ -8767,20 +8778,20 @@ function normalizeTrendItems(
       pattern,
       lifecycle,
       confidence,
-      metrics: {
-        views: nullableTrendMetric(metrics.views),
-        likes: nullableTrendMetric(metrics.likes),
-        comments: nullableTrendMetric(metrics.comments),
-        shares: nullableTrendMetric(metrics.shares),
-      },
+      metrics: normalizedMetrics,
       evidence,
+      organicEvidence,
+      viralityEvidence,
       hypothesis,
       adaptation,
       passSignal,
     });
     if (trends.length >= 12) break;
   }
-  return trends;
+  return trends.sort(
+    (left, right) =>
+      trendViralityScore(right.metrics) - trendViralityScore(left.metrics)
+  );
 }
 
 async function trendAvailableCredits(
@@ -8843,7 +8854,7 @@ async function researchTrendSources(
   try {
     const platformInstruction =
       scope.platform === "all"
-        ? "TikTok, Instagram Reels, and YouTube Shorts"
+        ? "TikTok and Instagram Reels"
         : scope.platform === "youtube"
           ? "YouTube Shorts"
           : scope.platform === "instagram"
@@ -8859,13 +8870,11 @@ async function researchTrendSources(
         : scope.objective;
     const taskInstruction =
       mode === "weekly"
-        ? `Use the web search tool before answering. Identify 4-6 distinct short-form FORMAT PATTERNS performing strongly across ${platformInstruction} right now. Select formats with evidence beyond a single isolated creator where the search sources permit it. For each format, provide one canonical representative video URL copied exactly from the search results and explain only the observable evidence. Prioritize format diversity and practical transferability over returning many near-duplicate videos.`
-        : `Use the web search tool before answering. Find 4-8 current ${platformInstruction} videos that answer this paid custom brief. Topic or niche: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. Copy each source URL exactly from the search results and return diverse creators and practical patterns the creator can test.`;
+        ? `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 7 * 86_400_000).toISOString()} and ${generatedAt} on ${platformInstruction}. These must be real posts where a brand, product, or service is central to the content, but the post itself is native organic content rather than a paid ad. Rank the strongest verified pieces by reported views and engagement. Return fewer results instead of adding a weak, generic, stale, or unverified example.`
+        : `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 7 * 86_400_000).toISOString()} and ${generatedAt} that answer this paid custom brief. Platform: ${platformInstruction}. Topic, niche, product, or audience: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. The brand, product, or service must be central, while the post must be native organic content rather than a paid ad. Rank by verified views and engagement and return fewer results instead of filler.`;
     failureCode = "search_request_failure";
     const searchPlatforms: TrendPlatform[] =
-      scope.platform === "all"
-        ? ["tiktok", "instagram", "youtube"]
-        : [scope.platform];
+      scope.platform === "all" ? ["tiktok", "instagram"] : [scope.platform];
     const directUrlInstructions: Record<TrendPlatform, string> = {
       tiktok:
         "TikTok only. Find several individual pages shaped like tiktok.com/@creator/video/ID.",
@@ -8891,11 +8900,11 @@ async function researchTrendSources(
               messages: [
                 {
                   role: "system",
-                  content: `You are REELassati's evidence-first short-form trend researcher. You must use the provided web search tool before answering. ${directUrlInstructions[searchPlatform]} Never return search pages, profiles, articles, or compilations. Report only findings supported by the search results and include each direct individual-video URL. Never invent URLs, creators, dates, metrics, or evidence. Prefer evidence from the last 14 days; older videos are allowed only when the sources show current resurfacing. Keep observations separate from hypotheses. Return JSON only with one key, trends. Each trend needs: platform, title, creator, sourceUrl, hook, pattern, evidence as an array, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics, thumbnailUrl, and publishedAt. Use null for unknown metrics, thumbnailUrl, and publishedAt.`,
+                  content: `You are REELassati's strict evidence-first researcher for hyperviral organic brand shorts. You must use the provided web search tool before answering. ${directUrlInstructions[searchPlatform]} Never return search pages, profiles, articles, compilations, long-form videos, paid ads, boosted ad creatives, affiliate placements, sponsored posts, gifted collaborations, or generic entertainment with no central brand promotion. A qualifying result is one individual vertical short published in the stated seven-day window where a brand, product, or service is central and the post is either a normal brand-owned social post or clearly earned organic creator content. It must have a reported hyperviral signal: at least 500000 views, 50000 likes, 5000 comments, or 10000 shares. Never invent URLs, creators, brands, dates, metrics, organic status, or evidence. Omit any candidate whose direct URL, exact publication date, brand, organic status, or performance cannot be supported by the search results. Return fewer items rather than filler. Keep observations separate from hypotheses. Return JSON only with one key, trends. Each trend needs: platform, title, creator, brandName, sourceUrl, hook, pattern, evidence as an array, organicBrandPromotion as true, paidAd as false, organicEvidence, viralityEvidence, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics, thumbnailUrl, and publishedAt. Metrics has views, likes, comments, and shares; use null only for individual unavailable metrics, never for all performance metrics. thumbnailUrl may be null. publishedAt must be an ISO date.`,
                 },
                 {
                   role: "user",
-                  content: `${taskInstruction}\n\nThis search pass is exclusively for ${searchPlatform}. Find multiple distinct direct video examples.`,
+                  content: `${taskInstruction}\n\nThis search pass is exclusively for ${searchPlatform}. Return only exact individual-video URLs copied from the search results. Do not turn a normal YouTube watch URL into a Short.`,
                 },
               ],
               tools: [
@@ -8961,7 +8970,7 @@ async function researchTrendSources(
         Array.from(citationMap.values()).slice(0, 18).map(verifyTrendCitation)
       )
     ).filter((citation): citation is TrendSearchCitation => Boolean(citation));
-    if (citations.length < 2) {
+    if (!citations.length) {
       failureCode = `insufficient_verified_citations_${citations.length}`;
       throw json(
         {
@@ -8984,11 +8993,14 @@ async function researchTrendSources(
       }
     });
     const groundedOutput = groundTrendOutput({ trends: candidates }, citations);
-    const trends = normalizeTrendItems(groundedOutput, generatedAt).filter(
-      item =>
-        scope.platform === "all" ? true : item.platform === scope.platform
+    const trends = normalizeTrendItems(
+      groundedOutput,
+      generatedAt,
+      mode
+    ).filter(item =>
+      scope.platform === "all" ? true : item.platform === scope.platform
     );
-    if (trends.length < 2) {
+    if (!trends.length) {
       failureCode = `insufficient_verified_sources_${trends.length}`;
       throw json(
         {
@@ -9038,7 +9050,7 @@ function trendResponse(input: {
 
 function weeklyTrendScope(): TrendScope {
   return cleanTrendScope({
-    query: "overall short-form content",
+    query: "hyperviral organic brand promotion",
     platform: "all",
     contentType: "overall",
     objective: "overall",
@@ -9290,7 +9302,7 @@ async function handleTrends(
             creditCost: 0,
             availableCredits,
             cacheNote:
-              "Curated automatically across TikTok, Reels, and Shorts.",
+              "Curated automatically from hyperviral organic TikToks and Reels.",
           })
         );
       } catch {
@@ -9333,7 +9345,7 @@ async function handleTrends(
     return json(
       {
         error:
-          "You need 1 credit for custom trend research. The platform weekly formats remain available.",
+          "You need 1 credit for custom trend research. The weekly organic brand shorts remain available.",
         availableCredits: await trendAvailableCredits(env, user),
       },
       402
