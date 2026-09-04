@@ -89,6 +89,13 @@ const ANALYTICS_CHART_CONFIG = Object.fromEntries(
   ])
 ) as ChartConfig;
 
+const ANALYTICS_RANGES = [
+  { days: 7, label: "7D" },
+  { days: 14, label: "14D" },
+  { days: 30, label: "30D" },
+  { days: 90, label: "90D" },
+] as const;
+
 export default function AnalyticsPage() {
   const { workspace, capabilities, loading } = useWorkspace();
   const [selectedMetrics, setSelectedMetrics] = useState<AnalyticsMetricKey[]>([
@@ -96,10 +103,11 @@ export default function AnalyticsPage() {
     "scheduled",
     "assets",
   ]);
+  const [rangeDays, setRangeDays] = useState(14);
 
   const chartSeries = useMemo(
-    () => buildAnalyticsSeries(workspace, 14),
-    [workspace]
+    () => buildAnalyticsSeries(workspace, rangeDays),
+    [rangeDays, workspace]
   );
   const metricTotals = useMemo(
     () =>
@@ -274,19 +282,47 @@ export default function AnalyticsPage() {
                 Output momentum
               </p>
             </div>
-            <h2 className="mt-2 text-lg font-medium">Your last 14 days</h2>
+            <h2 className="mt-2 text-lg font-medium">
+              Your last {rangeDays} days
+            </h2>
             <p className="mt-1 text-xs text-foreground/45">
               Toggle one metric or compare several. Every point comes from your
               saved workspace records.
             </p>
           </div>
-          <div className="rounded-xl border border-primary/15 bg-background/70 px-4 py-2.5 text-right backdrop-blur">
-            <p className="text-2xl font-semibold tabular-nums text-primary">
-              {selectedTotal}
-            </p>
-            <p className="text-[10px] uppercase tracking-wide text-foreground/40">
-              selected output
-            </p>
+          <div className="flex items-center gap-2">
+            <div
+              className="flex rounded-xl border border-border/70 bg-background/55 p-1 backdrop-blur"
+              role="group"
+              aria-label="Analytics time range"
+            >
+              {ANALYTICS_RANGES.map(range => {
+                const selected = rangeDays === range.days;
+                return (
+                  <button
+                    key={range.days}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setRangeDays(range.days)}
+                    className={`rounded-lg px-2.5 py-1.5 font-mono text-[10px] font-medium transition duration-200 ${
+                      selected
+                        ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                        : "text-foreground/45 hover:bg-surface hover:text-foreground/75"
+                    }`}
+                  >
+                    {range.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="rounded-xl border border-primary/15 bg-background/70 px-4 py-2.5 text-right backdrop-blur">
+              <p className="text-2xl font-semibold tabular-nums text-primary">
+                {selectedTotal}
+              </p>
+              <p className="text-[10px] uppercase tracking-wide text-foreground/40">
+                selected output
+              </p>
+            </div>
           </div>
         </div>
 

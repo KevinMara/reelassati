@@ -227,11 +227,12 @@ describe("platform-wide functional invariants", () => {
     expect(trends).not.toMatch(/reload free|0 credits|identical scan/i);
     expect(server).toContain("reserveTrendResearchCredit");
     expect(server).toContain('"moonshotai/kimi-k2.5"');
-    expect(server).toContain('type: "openrouter:web_search"');
-    expect(server).not.toContain('{ id: "web"');
+    expect(server).toContain('id: "web"');
+    expect(server).toContain("include_domains");
+    expect(server).not.toContain('type: "openrouter:web_search"');
     expect(server).toContain("TREND_WEEKLY_TTL_MS");
-    expect(server).toContain("On-demand weekly trend bootstrap failed");
-    expect(server).toContain("ctx.waitUntil");
+    expect(server).toContain("await refreshWeeklyTrendFeed(env)");
+    expect(server).not.toContain("On-demand weekly trend bootstrap failed");
     expect(server).toContain("TREND_MIN_VIEWS");
     expect(server).toContain("candidate.organicBrandPromotion !== true");
     expect(server).toContain("candidate.paidAd !== false");
@@ -248,7 +249,9 @@ describe("platform-wide functional invariants", () => {
     const analytics = source("./pages/dashboard/AnalyticsPage.tsx");
     const analyticsData = source("./lib/analytics.ts");
 
-    expect(analytics).toContain("Your last 14 days");
+    expect(analytics).toContain("Your last {rangeDays} days");
+    expect(analytics).toContain('aria-label="Analytics time range"');
+    expect(analytics).toContain("setRangeDays(range.days)");
     expect(analytics).toContain("selectedMetrics.map");
     expect(analytics).toContain("aria-pressed={selected}");
     expect(analytics).toContain("current.length === 1");

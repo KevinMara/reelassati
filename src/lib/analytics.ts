@@ -28,7 +28,7 @@ export function buildAnalyticsSeries(
   dayCount = 14,
   now = new Date()
 ): AnalyticsDataPoint[] {
-  const safeDayCount = Math.min(30, Math.max(7, Math.floor(dayCount)));
+  const safeDayCount = Math.min(90, Math.max(7, Math.floor(dayCount)));
   const end = Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),

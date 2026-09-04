@@ -8985,22 +8985,15 @@ async function researchTrendSources(
                   content: `${taskInstruction}\n\nThis search pass is exclusively for ${searchPlatform}. Return only exact individual-video URLs copied from the search results. Do not turn a normal YouTube watch URL into a Short.`,
                 },
               ],
-              tools: [
+              plugins: [
                 {
-                  type: "openrouter:web_search",
-                  parameters: {
-                    engine: "exa",
-                    mode: "fast",
-                    max_results: 10,
-                    max_total_results: 10,
-                    max_uses: 1,
-                    max_characters: 1_200,
-                    allowed_domains: searchDomains[searchPlatform],
-                  },
+                  id: "web",
+                  engine: "exa",
+                  mode: "fast",
+                  max_results: 10,
+                  include_domains: searchDomains[searchPlatform],
                 },
               ],
-              tool_choice: "required",
-              max_tool_calls: 2,
               provider: {
                 allow_fallbacks: true,
                 require_parameters: true,
@@ -9008,7 +9001,7 @@ async function researchTrendSources(
               max_tokens: 1_400,
               temperature: 0.1,
             }),
-            signal: AbortSignal.timeout(75_000),
+            signal: AbortSignal.timeout(55_000),
           }
         );
         if (!searchResponse.ok) {
@@ -9364,7 +9357,13 @@ async function handleTrends(
 
   if (request.method === "GET") {
     const scope = weeklyTrendScope();
-    const cached = await latestWeeklyTrendSnapshot(env);
+    let cached = await latestWeeklyTrendSnapshot(env);
+    if (!cached) {
+      const bootstrap = await refreshWeeklyTrendFeed(env);
+      if (bootstrap.reason !== "in_progress") {
+        cached = await latestWeeklyTrendSnapshot(env);
+      }
+    }
     if (cached) {
       try {
         const trends = JSON.parse(cached.payload_json) as TrendEvidenceItem[];
@@ -9484,8 +9483,7 @@ async function handleTrends(
 async function handleApi(
   request: Request,
   env: SitesEnvironment,
-  url: URL,
-  ctx?: { waitUntil(promise: Promise<unknown>): void }
+  url: URL
 ): Promise<Response> {
   if (url.pathname === "/api/health") {
     return json({
@@ -9572,15 +9570,6 @@ async function handleApi(
   }
 
   if (url.pathname === "/api/trends") {
-    if (request.method === "GET" && ctx) {
-      ctx.waitUntil(
-        refreshWeeklyTrendFeed(env).catch(cause => {
-          console.error("On-demand weekly trend bootstrap failed", {
-            errorType: cause instanceof Error ? cause.name : typeof cause,
-          });
-        })
-      );
-    }
     try {
       return await handleTrends(request, env, user);
     } catch (cause) {
@@ -9705,8 +9694,7 @@ function apiResponse(response: Response, request: Request): Response {
 export default {
   async fetch(
     request: Request,
-    env: SitesEnvironment,
-    ctx?: { waitUntil(promise: Promise<unknown>): void }
+    env: SitesEnvironment
   ): Promise<Response> {
     const url = new URL(request.url);
 
@@ -9715,7 +9703,7 @@ export default {
         return apiResponse(new Response(null, { status: 204 }), request);
       }
       try {
-        return apiResponse(await handleApi(request, env, url, ctx), request);
+        return apiResponse(await handleApi(request, env, url), request);
       } catch (cause) {
         if (cause instanceof Response) return apiResponse(cause, request);
         const reference = crypto.randomUUID();

@@ -68,4 +68,17 @@ describe("analytics series", () => {
     expect(analyticsMetricTotal(series, "published")).toBe(1);
     expect(analyticsMetricTotal(series, "projects")).toBe(0);
   });
+
+  it("supports a user-selected 90-day range", () => {
+    const workspace = createEmptyWorkspace("creator@example.com");
+    const series = buildAnalyticsSeries(
+      workspace,
+      90,
+      new Date("2026-09-02T12:00:00.000Z")
+    );
+
+    expect(series).toHaveLength(90);
+    expect(series[0]?.date).toBe("2026-06-05");
+    expect(series.at(-1)?.date).toBe("2026-09-02");
+  });
 });
