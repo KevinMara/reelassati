@@ -34,6 +34,12 @@ import {
   inspectMediaProvenanceMarker,
 } from "./media-provenance";
 import { MAX_AI_MEDIA_BYTES, MAX_UPLOAD_BYTES } from "../contracts/uploads";
+import {
+  ANNUAL_BILLED_MONTHS,
+  annualMonthlyEquivalent,
+  customTrendResearchCreditCost,
+  PUBLIC_PLAN_PRICING,
+} from "../contracts/pricing";
 import type {
   TrendEvidenceItem,
   TrendFeedResponse,
@@ -254,7 +260,6 @@ const ZERNIO_BASE = "https://zernio.com/api/v1";
 const MAX_WORKSPACE_BYTES = 2_000_000;
 const REFERRAL_REWARD_CREDITS = 500;
 const REFERRAL_REWARD_CENTS = 500;
-const TREND_RESEARCH_CREDIT_COST = 1;
 const TREND_WEEKLY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TREND_REFRESH_LEASE_MS = 10 * 60 * 1000;
 const TREND_WEEKLY_SCOPE_KEY = "weekly:organic-brand-hyperviral-shorts:v2";
@@ -7832,7 +7837,7 @@ const SUPPORT_SYSTEM_PROMPT = `You are REELassati Support, the official product 
 
 OFFICIAL PRODUCT KNOWLEDGE
 - Public routes: pricing at /pricing; login at /auth/login; signup at /auth/signup; password recovery at /auth/forgot-password; support at /contact.
-- Pricing: Creator is EUR 29 monthly or EUR 288 annually (EUR 24/month equivalent) for 1 brand workspace and 2 connected social accounts. Pro is EUR 79 monthly or EUR 804 annually (EUR 67/month equivalent) for 3 brand workspaces and 6 connected social accounts. Studio is EUR 179 monthly or EUR 1,824 annually (EUR 152/month equivalent) for 10 brand workspaces and 12 connected social accounts. The complete Studio is included in every plan. AI tools use REELassati credits inside the platform; never quote upstream model or provider prices.
+- Pricing: Creator is EUR ${PUBLIC_PLAN_PRICING.Creator.monthlyPrice} monthly or EUR ${PUBLIC_PLAN_PRICING.Creator.annualTotal} annually (EUR ${annualMonthlyEquivalent("Creator").toFixed(2)}/month equivalent) with ${PUBLIC_PLAN_PRICING.Creator.monthlyCredits.toLocaleString("en-US")} credits per month, 1 brand workspace, and 2 connected social accounts. Pro is EUR ${PUBLIC_PLAN_PRICING.Pro.monthlyPrice} monthly or EUR ${PUBLIC_PLAN_PRICING.Pro.annualTotal} annually (EUR ${annualMonthlyEquivalent("Pro").toFixed(2)}/month equivalent) with ${PUBLIC_PLAN_PRICING.Pro.monthlyCredits.toLocaleString("en-US")} credits per month, 3 brand workspaces, and 6 connected social accounts. Studio is EUR ${PUBLIC_PLAN_PRICING.Studio.monthlyPrice} monthly or EUR ${PUBLIC_PLAN_PRICING.Studio.annualTotal.toLocaleString("en-US")} annually (EUR ${annualMonthlyEquivalent("Studio").toFixed(2)}/month equivalent) with ${PUBLIC_PLAN_PRICING.Studio.monthlyCredits.toLocaleString("en-US")} credits per month, 10 brand workspaces, and 12 connected social accounts. Annual billing charges the price of ${ANNUAL_BILLED_MONTHS} monthly payments. The complete Studio is included in every plan. AI tools use REELassati credits inside the platform; never quote upstream model or provider prices.
 - Account access: users can sign up, log in, request a password-reset email, and set a new password from the reset link. A reset link may be expired or already used; request a fresh one and use only the newest email. Never ask for passwords, verification codes, OAuth secrets, private tokens, card data, or identity documents.
 - Uploads: hosted workspace uploads accept video, audio, and image files up to 64 MB. Direct AI video analysis and audio transcription require the relevant media to be below 24 MB. If a file is too large, instruct the user to trim or compress it, then retry with a new upload.
 - Studio: users can create projects; trim, split, move, delete, caption, adjust pacing, add B-roll/audio/style suggestions, lock clips, and review AI edit plans before applying changes. AI recommendations are proposals, not proof that an edit was applied.
@@ -8002,22 +8007,28 @@ function guidedPricingSupport(
 
   const rates = {
     Creator: {
-      monthly: 29,
-      annualMonthly: 24,
-      annualTotal: 288,
+      monthly: PUBLIC_PLAN_PRICING.Creator.monthlyPrice,
+      annualMonthly: annualMonthlyEquivalent("Creator"),
+      annualTotal: PUBLIC_PLAN_PRICING.Creator.annualTotal,
+      monthlyCredits: PUBLIC_PLAN_PRICING.Creator.monthlyCredits,
       scale: "1 brand workspace and 2 connected social accounts",
+      scaleItalian: "1 workspace brand e 2 account social collegati",
     },
     Pro: {
-      monthly: 79,
-      annualMonthly: 67,
-      annualTotal: 804,
+      monthly: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
+      annualMonthly: annualMonthlyEquivalent("Pro"),
+      annualTotal: PUBLIC_PLAN_PRICING.Pro.annualTotal,
+      monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       scale: "3 brand workspaces and 6 connected social accounts",
+      scaleItalian: "3 workspace brand e 6 account social collegati",
     },
     Studio: {
-      monthly: 179,
-      annualMonthly: 152,
-      annualTotal: 1824,
+      monthly: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
+      annualMonthly: annualMonthlyEquivalent("Studio"),
+      annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
+      monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       scale: "10 brand workspaces and 12 connected social accounts",
+      scaleItalian: "10 workspace brand e 12 account social collegati",
     },
   } as const;
 
@@ -8025,8 +8036,8 @@ function guidedPricingSupport(
     const rate = rates[plan];
     return {
       reply: italian
-        ? `${plan} include ${rate.scale}. Costa €${rate.monthly}/mese oppure €${rate.annualTotal}/anno (€${rate.annualMonthly}/mese equivalente). Lo Studio completo è incluso; l’uso dei modelli e della generazione video viene addebitato separatamente dal provider collegato. Quale fatturazione preferisci?`
-        : `${plan} includes ${rate.scale}. It costs €${rate.monthly}/month or €${rate.annualTotal}/year (€${rate.annualMonthly}/month equivalent). The complete Studio is included; AI tools use REELassati credits inside the platform. Which billing term do you prefer?`,
+        ? `${plan} include ${rate.monthlyCredits.toLocaleString("it-IT")} crediti al mese, ${rate.scaleItalian}. Costa €${rate.monthly}/mese oppure €${rate.annualTotal.toLocaleString("it-IT")}/anno (€${rate.annualMonthly.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mese equivalente). Lo Studio completo è incluso e gli strumenti AI usano soltanto crediti REELassati. Quale fatturazione preferisci?`
+        : `${plan} includes ${rate.monthlyCredits.toLocaleString("en-US")} credits per month and ${rate.scale}. It costs €${rate.monthly}/month or €${rate.annualTotal.toLocaleString("en-US")}/year (€${rate.annualMonthly.toFixed(2)}/month equivalent). The complete Studio is included; AI tools use REELassati credits inside the platform. Which billing term do you prefer?`,
       resolved: false,
       needsHuman: false,
       suggestedActions: italian
@@ -8064,8 +8075,8 @@ function guidedPricingSupport(
   ) {
     return {
       reply: italian
-        ? "Con fatturazione mensile: Creator €29, Pro €79, Studio €179. Con fatturazione annuale: Creator €288 (€24/mese equivalente), Pro €804 (€67/mese), Studio €1.824 (€152/mese). Lo Studio completo è incluso in ogni piano; cambia la scala del workspace. Quale profilo ti descrive meglio?"
-        : "Monthly: Creator €29, Pro €79, Studio €179. Annual: Creator €288 (€24/month equivalent), Pro €804 (€67/month), Studio €1,824 (€152/month). Every plan includes the complete Studio; workspace scale is what changes. Which profile fits you?",
+        ? `Mensile: Creator €19 con 1.000 crediti, Pro €59 con 4.000 crediti, Studio €149 con 12.000 crediti. Annuale, pagando ${ANNUAL_BILLED_MONTHS} mesi: Creator €190, Pro €590, Studio €1.490. Lo Studio completo è incluso in ogni piano; cambiano crediti, workspace e account collegati. Quale profilo ti descrive meglio?`
+        : `Monthly: Creator €19 with 1,000 credits, Pro €59 with 4,000 credits, and Studio €149 with 12,000 credits. Annual billing charges ${ANNUAL_BILLED_MONTHS} months: Creator €190, Pro €590, and Studio €1,490. Every plan includes the complete Studio; credits, workspaces, and connected accounts scale by plan. Which profile fits you?`,
       resolved: false,
       needsHuman: false,
       suggestedActions: italian
@@ -8106,8 +8117,8 @@ function guidedPricingSupport(
 
   return {
     reply: italian
-      ? "Certo. Prima di coinvolgere il team vendite posso darti subito prezzi e piano adatto: Creator €29/mese, Pro €79/mese, Studio €179/mese, con sconto annuale fino al 17%. Lo Studio completo è incluso in ogni piano; cambia la scala. Quale profilo ti descrive meglio?"
-      : "Yes. Before involving sales, here are the useful facts: Creator is €29/month, Pro €79/month, and Studio €179/month, with annual savings up to 17%. Every plan includes the complete Studio; workspace scale is what changes. Which profile fits you?",
+      ? `Certo. Prima di coinvolgere il team vendite posso darti subito prezzi e piano adatto: Creator €19/mese con 1.000 crediti, Pro €59/mese con 4.000 crediti, Studio €149/mese con 12.000 crediti. Con l’annuale paghi ${ANNUAL_BILLED_MONTHS} mesi. Lo Studio completo è incluso in ogni piano; cambiano crediti, workspace e account collegati. Quale profilo ti descrive meglio?`
+      : `Yes. Before involving sales, here are the useful facts: Creator is €19/month with 1,000 credits, Pro €59/month with 4,000 credits, and Studio €149/month with 12,000 credits. Annual billing charges ${ANNUAL_BILLED_MONTHS} months. Every plan includes the complete Studio; credits, workspaces, and connected accounts scale by plan. Which profile fits you?`,
     resolved: false,
     needsHuman: false,
     suggestedActions: italian
@@ -9299,7 +9310,8 @@ async function reserveTrendResearchCredit(
   env: SitesEnvironment,
   user: AuthenticatedUser,
   scopeJson: string,
-  queryHash: string
+  queryHash: string,
+  creditCost: number
 ): Promise<{ id: string; createdAt: string } | null> {
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
@@ -9334,12 +9346,12 @@ async function reserveTrendResearchCredit(
       user.email,
       queryHash,
       scopeJson,
-      TREND_RESEARCH_CREDIT_COST,
+      creditCost,
       createdAt,
       user.email,
       user.email,
       user.email,
-      TREND_RESEARCH_CREDIT_COST
+      creditCost
     )
     .run();
   return (reservation.meta?.changes || 0) === 1 ? { id, createdAt } : null;
@@ -9412,17 +9424,18 @@ async function handleTrends(
   }
   const scopeJson = JSON.stringify(scope);
   const queryHash = await sha256Hex(scopeJson);
+  const creditCost = customTrendResearchCreditCost(scope.platform);
   const reservation = await reserveTrendResearchCredit(
     env,
     user,
     scopeJson,
-    queryHash
+    queryHash,
+    creditCost
   );
   if (!reservation) {
     return json(
       {
-        error:
-          "You need 1 credit for custom trend research. The weekly organic brand shorts remain available.",
+        error: `You need ${creditCost} credits for this custom trend research. The weekly organic brand shorts remain available.`,
         availableCredits: await trendAvailableCredits(env, user),
       },
       402
@@ -9473,9 +9486,9 @@ async function handleTrends(
       kind: "custom",
       status: "ready",
       scope,
-      creditCost: TREND_RESEARCH_CREDIT_COST,
+      creditCost,
       availableCredits: await trendAvailableCredits(env, user),
-      cacheNote: "1 credit used for this completed custom research.",
+      cacheNote: `${creditCost} credits used for this completed custom research.`,
     })
   );
 }
@@ -9692,10 +9705,7 @@ function apiResponse(response: Response, request: Request): Response {
 }
 
 export default {
-  async fetch(
-    request: Request,
-    env: SitesEnvironment
-  ): Promise<Response> {
+  async fetch(request: Request, env: SitesEnvironment): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api/")) {

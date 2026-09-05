@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { PUBLIC_PLAN_PRICING } from "@contracts/pricing";
 
 export function PricingTeaser() {
   const { i18n } = useTranslation();
@@ -8,21 +9,24 @@ export function PricingTeaser() {
   const plans = [
     {
       name: "Creator",
-      price: 29,
+      price: PUBLIC_PLAN_PRICING.Creator.monthlyPrice,
+      credits: PUBLIC_PLAN_PRICING.Creator.monthlyCredits,
       scale: isItalian
         ? "1 brand · 2 account social"
         : "1 brand · 2 social accounts",
     },
     {
       name: "Pro",
-      price: 79,
+      price: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
+      credits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       scale: isItalian
         ? "3 brand · 6 account social"
         : "3 brands · 6 social accounts",
     },
     {
       name: "Studio",
-      price: 179,
+      price: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
+      credits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       scale: isItalian
         ? "10 brand · 12 account social"
         : "10 brands · 12 social accounts",
@@ -83,7 +87,13 @@ export function PricingTeaser() {
                         </span>
                         <p className="text-sm font-semibold">{plan.name}</p>
                       </div>
-                      <p className="mt-2 text-xs text-foreground/45">
+                      <p className="mt-2 text-xs font-medium text-primary">
+                        {plan.credits.toLocaleString(
+                          isItalian ? "it-IT" : "en-IE"
+                        )}{" "}
+                        {isItalian ? "crediti/mese" : "credits/month"}
+                      </p>
+                      <p className="mt-1 text-xs text-foreground/45">
                         {plan.scale}
                       </p>
                     </div>

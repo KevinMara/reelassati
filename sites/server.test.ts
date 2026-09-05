@@ -864,7 +864,9 @@ describe("Sites worker", () => {
         needsHuman: false,
         ticketDraft: null,
       });
-      expect(payload.reply).toContain("Creator is €29/month");
+      expect(payload.reply).toContain(
+        "Creator is €19/month with 1,000 credits"
+      );
       expect(payload.suggestedActions).toEqual(
         expect.arrayContaining([
           {

@@ -14,6 +14,26 @@ function filesUnder(directory: string): string[] {
 }
 
 describe("platform-wide functional invariants", () => {
+  it("keeps public pricing, annual savings, and credit allowances centralized", () => {
+    const pricingContract = source("../contracts/pricing.ts");
+    const pricingPage = source("./pages/Pricing.tsx");
+    const pricingTeaser = source("./sections/PricingTeaser.tsx");
+    const server = source("../sites/server.ts");
+
+    expect(pricingContract).toContain("monthlyPrice: 19");
+    expect(pricingContract).toContain("annualTotal: 190");
+    expect(pricingContract).toContain("monthlyCredits: 1_000");
+    expect(pricingContract).toContain("monthlyCredits: 4_000");
+    expect(pricingContract).toContain("monthlyCredits: 12_000");
+    expect(pricingContract).toContain("singlePlatform: 8");
+    expect(pricingContract).toContain("tiktokAndInstagram: 15");
+    expect(pricingPage).toContain('from "@contracts/pricing"');
+    expect(pricingPage).toContain("ANNUAL_BILLED_MONTHS");
+    expect(pricingTeaser).toContain('from "@contracts/pricing"');
+    expect(server).toContain('from "../contracts/pricing"');
+    expect(server).toContain("customTrendResearchCreditCost(scope.platform)");
+  });
+
   it("keeps user-created events durable and connected to publication planning", () => {
     const calendar = source("./pages/dashboard/CalendarPage.tsx");
     const contract = source("../contracts/workspace.ts");

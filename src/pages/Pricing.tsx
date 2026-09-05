@@ -4,6 +4,11 @@ import { ArrowRight, Check, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import {
+  ANNUAL_BILLED_MONTHS,
+  annualMonthlyEquivalent,
+  PUBLIC_PLAN_PRICING,
+} from "@contracts/pricing";
 
 type BillingCycle = "monthly" | "annual";
 
@@ -13,6 +18,7 @@ type Plan = {
   monthlyPrice: number;
   annualMonthlyPrice: number;
   annualTotal: number;
+  monthlyCredits: number;
   features: string[];
   featured?: boolean;
 };
@@ -22,9 +28,10 @@ const PLANS: Record<"en" | "it", Plan[]> = {
     {
       name: "Creator",
       description: "For one creator building a repeatable short-form system.",
-      monthlyPrice: 29,
-      annualMonthlyPrice: 24,
-      annualTotal: 288,
+      monthlyPrice: PUBLIC_PLAN_PRICING.Creator.monthlyPrice,
+      annualMonthlyPrice: annualMonthlyEquivalent("Creator"),
+      annualTotal: PUBLIC_PLAN_PRICING.Creator.annualTotal,
+      monthlyCredits: PUBLIC_PLAN_PRICING.Creator.monthlyCredits,
       features: [
         "1 brand workspace",
         "2 connected social accounts",
@@ -36,9 +43,10 @@ const PLANS: Record<"en" | "it", Plan[]> = {
     {
       name: "Pro",
       description: "For creators and small teams running several channels.",
-      monthlyPrice: 79,
-      annualMonthlyPrice: 67,
-      annualTotal: 804,
+      monthlyPrice: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
+      annualMonthlyPrice: annualMonthlyEquivalent("Pro"),
+      annualTotal: PUBLIC_PLAN_PRICING.Pro.annualTotal,
+      monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       featured: true,
       features: [
         "3 brand workspaces",
@@ -51,9 +59,10 @@ const PLANS: Record<"en" | "it", Plan[]> = {
     {
       name: "Studio",
       description: "For agencies and operators managing a client portfolio.",
-      monthlyPrice: 179,
-      annualMonthlyPrice: 152,
-      annualTotal: 1824,
+      monthlyPrice: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
+      annualMonthlyPrice: annualMonthlyEquivalent("Studio"),
+      annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
+      monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       features: [
         "10 brand workspaces",
         "12 connected social accounts",
@@ -68,9 +77,10 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       name: "Creator",
       description:
         "Per un creator che costruisce un sistema short-form ripetibile.",
-      monthlyPrice: 29,
-      annualMonthlyPrice: 24,
-      annualTotal: 288,
+      monthlyPrice: PUBLIC_PLAN_PRICING.Creator.monthlyPrice,
+      annualMonthlyPrice: annualMonthlyEquivalent("Creator"),
+      annualTotal: PUBLIC_PLAN_PRICING.Creator.annualTotal,
+      monthlyCredits: PUBLIC_PLAN_PRICING.Creator.monthlyCredits,
       features: [
         "1 workspace brand",
         "2 account social collegati",
@@ -82,9 +92,10 @@ const PLANS: Record<"en" | "it", Plan[]> = {
     {
       name: "Pro",
       description: "Per creator e piccoli team che gestiscono più canali.",
-      monthlyPrice: 79,
-      annualMonthlyPrice: 67,
-      annualTotal: 804,
+      monthlyPrice: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
+      annualMonthlyPrice: annualMonthlyEquivalent("Pro"),
+      annualTotal: PUBLIC_PLAN_PRICING.Pro.annualTotal,
+      monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       featured: true,
       features: [
         "3 workspace brand",
@@ -98,9 +109,10 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       name: "Studio",
       description:
         "Per agenzie e operatori che gestiscono un portfolio clienti.",
-      monthlyPrice: 179,
-      annualMonthlyPrice: 152,
-      annualTotal: 1824,
+      monthlyPrice: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
+      annualMonthlyPrice: annualMonthlyEquivalent("Studio"),
+      annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
+      monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       features: [
         "10 workspace brand",
         "12 account social collegati",
@@ -161,8 +173,8 @@ export default function Pricing() {
                 className={`rounded-pill px-5 py-2 text-sm font-medium transition-all ${billingCycle === "annual" ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:text-foreground"}`}
               >
                 {isItalian
-                  ? "Annuale · risparmia fino al 17%"
-                  : "Annual · save up to 17%"}
+                  ? `Annuale · paghi ${ANNUAL_BILLED_MONTHS} mesi`
+                  : `Annual · pay for ${ANNUAL_BILLED_MONTHS} months`}
               </button>
             </div>
           </div>
@@ -243,6 +255,16 @@ function PlanCard({
 }) {
   const price =
     billingCycle === "monthly" ? plan.monthlyPrice : plan.annualMonthlyPrice;
+  const priceLabel = new Intl.NumberFormat(isItalian ? "it-IT" : "en-IE", {
+    minimumFractionDigits: Number.isInteger(price) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(price);
+  const creditLabel = new Intl.NumberFormat(
+    isItalian ? "it-IT" : "en-IE"
+  ).format(plan.monthlyCredits);
+  const annualTotalLabel = new Intl.NumberFormat(
+    isItalian ? "it-IT" : "en-IE"
+  ).format(plan.annualTotal);
 
   return (
     <article
@@ -266,7 +288,9 @@ function PlanCard({
         {plan.description}
       </p>
       <div className="mt-6 flex items-end gap-2">
-        <span className="text-5xl font-semibold tracking-tight">€{price}</span>
+        <span className="text-5xl font-semibold tracking-tight">
+          €{priceLabel}
+        </span>
         <span className="pb-1 text-sm text-foreground/45">
           /{isItalian ? "mese" : "month"}
         </span>
@@ -274,12 +298,23 @@ function PlanCard({
       <p className="mt-2 min-h-[20px] text-xs text-foreground/45">
         {billingCycle === "annual"
           ? isItalian
-            ? `€${plan.annualTotal} fatturati annualmente`
-            : `€${plan.annualTotal} billed annually`
+            ? `€${annualTotalLabel} fatturati annualmente`
+            : `€${annualTotalLabel} billed annually`
           : isItalian
             ? "Fatturazione mensile"
             : "Billed monthly"}
       </p>
+      <div className="mt-4 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/[0.06] px-4 py-3">
+        <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+        <div>
+          <p className="text-lg font-semibold leading-none text-foreground">
+            {creditLabel}
+          </p>
+          <p className="mt-1 text-xs text-foreground/55">
+            {isItalian ? "crediti ogni mese" : "credits every month"}
+          </p>
+        </div>
+      </div>
       <Link
         to="/auth/signup"
         className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-pill px-5 py-3 text-sm font-medium transition-colors ${plan.featured ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "border border-border bg-background text-foreground hover:border-primary/35"}`}

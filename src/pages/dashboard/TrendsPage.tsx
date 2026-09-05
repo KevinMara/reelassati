@@ -40,6 +40,7 @@ import type {
   TrendPlatform,
   TrendScope,
 } from "@contracts/trends";
+import { customTrendResearchCreditCost } from "@contracts/pricing";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 
@@ -304,6 +305,7 @@ export default function TrendsPage() {
     activeFeedKind === "custom" && customFeed ? customFeed : weeklyFeed;
   const availableCredits =
     customFeed?.availableCredits ?? weeklyFeed?.availableCredits;
+  const researchCreditCost = customTrendResearchCreditCost(researchPlatform);
 
   const visibleTrends = useMemo(
     () =>
@@ -675,13 +677,16 @@ export default function TrendsPage() {
               ) : (
                 <Zap className="h-4 w-4" />
               )}
-              {researching ? "Researching sources…" : "Research with 1 credit"}
+              {researching
+                ? "Researching sources…"
+                : `Research with ${researchCreditCost} credits`}
             </button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/35 px-5 py-3 text-[11px] text-foreground/45">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              Every custom request uses 1 credit after verified results succeed.
+              {researchCreditCost} credits are used only after verified results
+              succeed.
             </span>
             <span className="font-medium text-foreground/65">
               {availableCredits ?? "—"} credits available
