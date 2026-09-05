@@ -128,7 +128,7 @@ export default function ImageGenerator() {
             <p className="text-sm font-medium">
               Image generation is temporarily unavailable
             </p>
-            <p className="mt-1 text-xs text-foreground/55">
+            <p className="mt-1 text-xs text-foreground/70">
               Your saved images and uploads remain available in the Library and
               Edit.
             </p>
@@ -168,7 +168,7 @@ export default function ImageGenerator() {
             placeholder="A high-contrast editorial product shot with..."
             className="mt-2 w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-relaxed"
           />
-          <p className="mt-1 text-right text-[10px] text-foreground/35">
+          <p className="mt-1 text-right text-xs text-foreground/35">
             {prompt.length}/4000
           </p>
 
@@ -276,7 +276,7 @@ export default function ImageGenerator() {
               </>
             )}
           </button>
-          <p className="mt-2 text-center text-[11px] text-foreground/40">
+          <p className="mt-2 text-center text-xs text-foreground/65">
             Credits are returned automatically if generation fails.
           </p>
         </section>
@@ -288,7 +288,7 @@ export default function ImageGenerator() {
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium">{resultAsset.name}</p>
-                    <p className="mt-0.5 text-[11px] text-foreground/40">
+                    <p className="mt-0.5 text-xs text-foreground/65">
                       Saved to your image library
                     </p>
                   </div>
@@ -324,7 +324,7 @@ export default function ImageGenerator() {
                 <p className="mt-4 text-sm font-medium">
                   Your generated image will appear here
                 </p>
-                <p className="mt-1 max-w-sm text-xs leading-relaxed text-foreground/45">
+                <p className="mt-1 max-w-sm text-xs leading-relaxed text-foreground/65">
                   Name it, describe it, choose its format, and generate. The
                   saved result is immediately available inside Edit.
                 </p>
@@ -336,7 +336,7 @@ export default function ImageGenerator() {
             <section className="rounded-xl border border-border bg-surface p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-medium">Recent images</h2>
-                <span className="text-[10px] uppercase tracking-wider text-foreground/35">
+                <span className="text-xs uppercase tracking-wider text-foreground/35">
                   Connected library
                 </span>
               </div>
@@ -355,7 +355,7 @@ export default function ImageGenerator() {
                       loading="lazy"
                       className="aspect-square w-full object-cover"
                     />
-                    <span className="block truncate px-2 py-1.5 text-[10px]">
+                    <span className="block truncate px-2 py-1.5 text-xs">
                       {asset.name}
                     </span>
                   </button>

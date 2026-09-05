@@ -1,3 +1,4 @@
+import { VoicePreview } from "@/components/studio/VoicePreview";
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
@@ -381,7 +382,7 @@ export default function VoiceNotes() {
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
             <p className="text-sm font-medium">Some voice tools need setup</p>
-            <p className="mt-1 text-xs leading-relaxed text-foreground/55">
+            <p className="mt-1 text-xs leading-relaxed text-foreground/70">
               Available controls stay active; unavailable AI actions are
               disabled without pretending to process audio.
             </p>
@@ -397,7 +398,7 @@ export default function VoiceNotes() {
                 <h2 className="font-medium">Source voice note</h2>
                 <p
                   id="voice-source-description"
-                  className="mt-1 text-xs text-foreground/45"
+                  className="mt-1 text-xs text-foreground/65"
                 >
                   The uploaded workspace asset—not a local blob URL—is sent for
                   transcription. Use Transcribe below to create its text
@@ -449,7 +450,7 @@ export default function VoiceNotes() {
                 <span className="block truncate text-sm font-medium">
                   {file?.name ?? "Choose an audio file"}
                 </span>
-                <span className="mt-1 block text-xs text-foreground/45">
+                <span className="mt-1 block text-xs text-foreground/65">
                   {file
                     ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
                     : isDragging
@@ -499,7 +500,7 @@ export default function VoiceNotes() {
 
             <div className="my-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-border" />
-              <span className="text-[10px] uppercase tracking-wider text-foreground/35">
+              <span className="text-xs uppercase tracking-wider text-foreground/35">
                 or existing asset
               </span>
               <div className="h-px flex-1 bg-border" />
@@ -538,7 +539,7 @@ export default function VoiceNotes() {
               ))}
             </select>
 
-            <p className="mt-4 flex items-center gap-1.5 text-[11px] text-foreground/45">
+            <p className="mt-4 flex items-center gap-1.5 text-xs text-foreground/65">
               <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
               REELassati AI transcription
             </p>
@@ -591,7 +592,7 @@ export default function VoiceNotes() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-medium">Speech synthesis</h2>
-                <p className="mt-1 text-xs text-foreground/45">
+                <p className="mt-1 text-xs text-foreground/65">
                   Render approved copy into a saved audio asset.
                 </p>
               </div>
@@ -630,27 +631,53 @@ export default function VoiceNotes() {
               className="w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-relaxed"
             />
             <label
-              className="mb-2 mt-4 block text-xs font-medium"
+              className="mb-2 mt-4 block text-sm font-medium"
               htmlFor="voice-id"
             >
-              Voice style ID
+              Voice
             </label>
-            <input
+            <select
               id="voice-id"
               value={voiceId}
               onChange={event => {
-                if (event.target.value === voiceId) return;
                 setVoiceId(event.target.value);
                 invalidateVoiceAttestation();
               }}
-              placeholder="English_Graceful_Lady"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-            />
-            <p className="mt-1 text-[11px] text-foreground/40">
-              Choose a supported voice style ID. The default uses the standard
-              REELassati voice.
+              className="w-full rounded-lg border border-border bg-background p-3 text-sm"
+            >
+              <optgroup label="English">
+                <option value="English_Graceful_Lady">
+                  Grace · polished and clear
+                </option>
+                <option value="English_CalmWoman">
+                  Calm · gentle delivery
+                </option>
+                <option value="English_Trustworth_Man">
+                  Trust · steady delivery
+                </option>
+                <option value="English_Diligent_Man">
+                  Focus · direct delivery
+                </option>
+              </optgroup>
+              <optgroup label="Italiano">
+                <option value="Italian_Narrator">Narratore · racconto</option>
+                <option value="Italian_BraveHeroine">
+                  Eroina · espressiva
+                </option>
+              </optgroup>
+              <optgroup label="Français">
+                <option value="French_MaleNarrator">Narrateur · récit</option>
+              </optgroup>
+              <optgroup label="Deutsch">
+                <option value="German_FriendlyMan">Freundlich · locker</option>
+              </optgroup>
+            </select>
+            <VoicePreview key={voiceId} voice={voiceId} />
+            <p className="mt-2 text-sm text-foreground/70">
+              Choose the voice that fits your story. Your generated audio stays
+              in this brand’s Library.
             </p>
-            <p className="mt-3 flex items-center gap-1.5 text-[11px] text-foreground/45">
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-foreground/65">
               <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
               REELassati AI-generated audio
             </p>
@@ -746,7 +773,7 @@ export default function VoiceNotes() {
                       Clean the thought before writing
                     </h2>
                   </div>
-                  <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 text-[10px] text-foreground/45">
+                  <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 text-xs text-foreground/65">
                     {segmentCount} timestamped segments
                   </span>
                 </div>
@@ -766,7 +793,7 @@ export default function VoiceNotes() {
                   aria-label="Editable transcript"
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-3 text-sm leading-relaxed"
                 />
-                <p className="mt-2 text-[11px] text-foreground/40">
+                <p className="mt-2 text-xs text-foreground/65">
                   Transcript edits affect the script brief. The original
                   uploaded audio asset remains unchanged.
                 </p>
@@ -821,7 +848,7 @@ export default function VoiceNotes() {
                 <h2 className="mt-4 text-lg font-medium text-foreground/65">
                   Your transcript will stay editable
                 </h2>
-                <p className="mt-2 max-w-sm text-sm text-foreground/45">
+                <p className="mt-2 max-w-sm text-sm text-foreground/65">
                   Select a stored audio asset or upload a new one. The app waits
                   for the real transcription response before showing content.
                 </p>
@@ -839,7 +866,7 @@ export default function VoiceNotes() {
                 <div>
                   <p className="mono-eyebrow mb-1 text-primary">Saved script</p>
                   <h2 className="font-medium">{generatedScript.title}</h2>
-                  <p className="mt-1 text-xs text-foreground/40">
+                  <p className="mt-1 text-xs text-foreground/65">
                     {generatedScript.platform} · {generatedScript.duration}s
                   </p>
                   <div className="mt-2">
@@ -876,7 +903,7 @@ export default function VoiceNotes() {
                   </p>
                 </div>
                 <div className="rounded-lg border border-border bg-background p-4">
-                  <p className="text-xs font-medium uppercase tracking-wider text-foreground/40">
+                  <p className="text-xs font-medium uppercase tracking-wider text-foreground/65">
                     Call to action
                   </p>
                   <p className="mt-2 text-sm font-medium">

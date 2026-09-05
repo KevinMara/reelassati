@@ -20,16 +20,16 @@ export function PricingTeaser() {
       price: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
       credits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       scale: isItalian
-        ? "1 brand · 6 account social"
-        : "1 brand · 6 social accounts",
+        ? "3 brand · 6 account social"
+        : "3 brand · 6 social accounts",
     },
     {
       name: "Studio",
       price: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
       credits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       scale: isItalian
-        ? "1 brand · 12 account social"
-        : "1 brand · 12 social accounts",
+        ? "10 brand · 12 account social"
+        : "10 brand · 12 social accounts",
     },
   ];
 

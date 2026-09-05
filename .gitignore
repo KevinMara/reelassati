@@ -48,3 +48,5 @@ coverage/
 
 # Vercel
 .vercel
+
+/public/vendor/render/

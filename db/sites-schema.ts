@@ -4,6 +4,7 @@ import {
   sqliteTable,
   text,
   uniqueIndex,
+  primaryKey,
 } from "drizzle-orm/sqlite-core";
 
 export const workspaceState = sqliteTable("workspace_state", {
@@ -18,6 +19,7 @@ export const assets = sqliteTable(
   {
     id: text("id").primaryKey().notNull(),
     ownerEmail: text("owner_email").notNull(),
+    brandId: text("brand_id").notNull().default("default"),
     name: text("name").notNull(),
     kind: text("kind").notNull(),
     contentType: text("content_type").notNull(),
@@ -35,6 +37,7 @@ export const generationJobs = sqliteTable(
   {
     id: text("id").primaryKey().notNull(),
     ownerEmail: text("owner_email").notNull(),
+    brandId: text("brand_id").notNull().default("default"),
     providerJobId: text("provider_job_id"),
     projectId: text("project_id"),
     prompt: text("prompt"),
@@ -356,3 +359,41 @@ export const stripeEvents = sqliteTable("stripe_events", {
   processedAt: text("processed_at"),
   error: text("error"),
 });
+
+export const brandWorkspaces = sqliteTable(
+  "brand_workspaces",
+  {
+    id: text("id").primaryKey().notNull(),
+    ownerEmail: text("owner_email").notNull(),
+    name: text("name").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  table => [index("brands_owner_idx").on(table.ownerEmail)]
+);
+
+export const socialAnalyticsSnapshots = sqliteTable(
+  "social_analytics_snapshots",
+  {
+    ownerKey: text("owner_key").notNull(),
+    day: text("day").notNull(),
+    payload: text("payload").notNull(),
+    syncedAt: text("synced_at").notNull(),
+  },
+  table => [primaryKey({ columns: [table.ownerKey, table.day] })]
+);
+
+export const billingPaymentAdjustments = sqliteTable(
+  "billing_payment_adjustments",
+  {
+    paymentIntent: text("payment_intent").primaryKey(),
+    ownerEmail: text("owner_email").notNull(),
+    credits: integer("credits").notNull(),
+    totalCents: integer("total_cents").notNull(),
+    refundedCents: integer("refunded_cents").notNull().default(0),
+    disputedCents: integer("disputed_cents").notNull().default(0),
+    disputeUpdatedAt: integer("dispute_updated_at").notNull().default(0),
+    disputeId: text("dispute_id"),
+    disputeClosed: integer("dispute_closed").notNull().default(0),
+    appliedDebit: integer("applied_debit").notNull().default(0),
+  }
+);

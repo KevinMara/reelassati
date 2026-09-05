@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AI_CREDIT_COSTS,
   CREDIT_TOP_UPS,
+  topUpPriceCents,
   imageCreditCost,
   planEntitlements,
   speechCreditCost,
@@ -16,13 +17,23 @@ describe("billing contracts", () => {
     expect(planEntitlements("studio").monthlyCredits).toBe(12_000);
   });
 
-  it("keeps top-ups less attractive than upgrading a recurring plan", () => {
-    expect(CREDIT_TOP_UPS.boost).toMatchObject({ credits: 500, price: 12 });
-    expect(CREDIT_TOP_UPS.momentum).toMatchObject({
-      credits: 2_000,
-      price: 39,
-    });
-    expect(CREDIT_TOP_UPS.scale).toMatchObject({ credits: 5_000, price: 89 });
+  it("charges no premium over the member's plan, including annual billing", () => {
+    for (const planId of ["creator", "pro", "studio"] as const)
+      for (const cycle of ["monthly", "annual"] as const) {
+        const plan = planEntitlements(planId);
+        for (const id of ["boost", "momentum", "scale"] as const) {
+          const unit =
+            (cycle === "annual" ? plan.annualTotal / 12 : plan.monthlyPrice) /
+            plan.monthlyCredits;
+          expect(
+            topUpPriceCents(id, planId, cycle) /
+              100 /
+              CREDIT_TOP_UPS[id].credits
+          ).toBeLessThanOrEqual(unit);
+        }
+      }
+    expect(topUpPriceCents("boost", "creator", "monthly")).toBe(1900);
+    expect(topUpPriceCents("boost", "studio", "annual")).toBe(1034);
   });
 
   it("quotes image, speech, transcription and analysis credits deterministically", () => {
@@ -31,7 +42,9 @@ describe("billing contracts", () => {
     expect(speechCreditCost(1)).toBe(30);
     expect(speechCreditCost(1_001)).toBe(60);
     expect(timedCreditCost(61, AI_CREDIT_COSTS.transcriptionPerMinute)).toBe(2);
-    expect(timedCreditCost(61, AI_CREDIT_COSTS.videoAnalysisPerMinute)).toBe(20);
+    expect(timedCreditCost(61, AI_CREDIT_COSTS.videoAnalysisPerMinute)).toBe(
+      20
+    );
   });
 
   it("prices new and continued video clips from the chosen settings", () => {

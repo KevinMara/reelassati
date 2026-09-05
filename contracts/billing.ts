@@ -12,12 +12,27 @@ export const PLAN_NAME_BY_ID: Record<PlanId, PublicPlanName> = {
 };
 
 export const CREDIT_TOP_UPS = {
-  boost: { id: "boost", credits: 500, price: 12 },
-  momentum: { id: "momentum", credits: 2_000, price: 39 },
-  scale: { id: "scale", credits: 5_000, price: 89 },
+  boost: { id: "boost", credits: 1_000, price: 19 },
+  momentum: { id: "momentum", credits: 2_000, price: 38 },
+  scale: { id: "scale", credits: 5_000, price: 95 },
 } as const;
 
 export type CreditTopUpId = keyof typeof CREDIT_TOP_UPS;
+
+/** Same unit rate as the member's plan; round down to avoid a fractional-cent premium. */
+export function topUpPriceCents(
+  id: CreditTopUpId,
+  planId: PlanId,
+  cycle: BillingCycle
+): number {
+  const plan = planEntitlements(planId);
+  const priceCents =
+    cycle === "annual" ? plan.annualTotal * 100 : plan.monthlyPrice * 100;
+  return Math.floor(
+    (priceCents * CREDIT_TOP_UPS[id].credits) /
+      (plan.monthlyCredits * (cycle === "annual" ? 12 : 1))
+  );
+}
 
 /** Customer-facing credit tariffs. Provider and model costs remain private. */
 export const AI_CREDIT_COSTS = {
@@ -49,7 +64,7 @@ export function isBillingCycle(value: string): value is BillingCycle {
 }
 
 export function isCreditTopUpId(value: string): value is CreditTopUpId {
-  return value in CREDIT_TOP_UPS;
+  return Object.prototype.hasOwnProperty.call(CREDIT_TOP_UPS, value);
 }
 
 export function imageCreditCost(resolution: string): number {
@@ -121,6 +136,7 @@ export interface BillingSummary {
   availableCredits: number;
   includedCredits: number;
   topUpCredits: number;
+  adjustmentDebt?: number;
   canUseCredits: boolean;
   plan: null | {
     id: PlanId;

@@ -1,3 +1,4 @@
+import { BrandSwitcher } from "@/components/studio/BrandSwitcher";
 import { useMemo, useState, type FormEvent } from "react";
 import {
   Captions,
@@ -123,6 +124,7 @@ export default function ClientsPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
+      <BrandSwitcher manage />
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="mono-eyebrow mb-2 text-primary">
@@ -131,7 +133,7 @@ export default function ClientsPage() {
           <h1 className="text-3xl font-semibold">Brand DNA</h1>
           <p className="mt-2 max-w-2xl text-sm text-foreground/55">
             One truthful source of creative constraints for this workspace.
-            Multi-brand client workspaces are not simulated here.
+            Switch brands above to keep each client’s content separate.
           </p>
         </div>
         <div className="rounded-xl border border-border bg-surface px-4 py-3 text-right">

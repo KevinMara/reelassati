@@ -5,7 +5,11 @@ import { useTranslation } from "react-i18next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
-import { CREDIT_TOP_UPS, type PlanId } from "@contracts/billing";
+import {
+  CREDIT_TOP_UPS,
+  topUpPriceCents,
+  type PlanId,
+} from "@contracts/billing";
 import {
   ANNUAL_BILLED_MONTHS,
   annualMonthlyEquivalent,
@@ -41,7 +45,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
         "2 connected social accounts",
         "Precision Studio and reviewable edit plans",
         "Scripts, Prompt Director, calendar, and analytics",
-        "Version history and edit-brief exports",
+        "Version history and finished MP4 exports",
       ],
     },
     {
@@ -54,7 +58,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       featured: true,
       features: [
-        "1 brand workspace · multi-brand planned",
+        "3 brand workspaces",
         "6 connected social accounts",
         "Everything in Creator",
         "Content library and publishing queue",
@@ -70,7 +74,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       features: [
-        "1 brand workspace · multi-brand planned",
+        "10 brand workspaces",
         "12 connected social accounts",
         "Everything in Pro",
         "Higher generation and publishing allowances",
@@ -93,7 +97,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
         "2 account social collegati",
         "Studio di precisione e piani di montaggio revisionabili",
         "Script, Prompt Director, calendario e analytics",
-        "Cronologia versioni ed export del piano di montaggio",
+        "Cronologia versioni ed export MP4",
       ],
     },
     {
@@ -106,7 +110,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       featured: true,
       features: [
-        "1 workspace brand · multi-brand in arrivo",
+        "3 workspace brand",
         "6 account social collegati",
         "Tutto il piano Creator",
         "Libreria contenuti e coda di pubblicazione",
@@ -122,7 +126,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       features: [
-        "1 workspace brand · multi-brand in arrivo",
+        "10 workspace brand",
         "12 account social collegati",
         "Tutto il piano Pro",
         "Più crediti e account social collegati",
@@ -156,8 +160,8 @@ export default function Pricing() {
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-foreground/65">
               {isItalian
-                ? "Ogni piano include strumenti creativi, libreria e pianificazione. Scegli i crediti mensili e il numero di account social. Il rendering finale della timeline e i workspace multi-brand sono in sviluppo."
-                : "Every plan includes the creation tools, library, and planning workspace. Choose your monthly credits and connected social account allowance. Final timeline rendering and multi-brand workspaces are in development."}
+                ? "Ogni piano include strumenti creativi, libreria e pianificazione. Scegli i crediti mensili e il numero di account social. Esporta MP4 finiti e gestisci i brand inclusi nel tuo piano."
+                : "Every plan includes the creation tools, library, and planning workspace. Choose your monthly credits and connected social account allowance. Export finished MP4s and manage the brands included in your plan."}
             </p>
 
             <div
@@ -263,7 +267,7 @@ export default function Pricing() {
               <p className="text-xs text-foreground/45">
                 {isItalian
                   ? "Richiedono un piano attivo · non scadono"
-                  : "Active plan required · credits roll over"}
+                  : "Same credit rate as your plan · credits roll over"}
               </p>
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -282,7 +286,22 @@ export default function Pricing() {
                       {isItalian ? "crediti" : "credits"}
                     </p>
                   </div>
-                  <p className="text-2xl font-semibold">€{pack.price}</p>
+                  <div className="space-y-2">
+                    {(["creator", "pro", "studio"] as PlanId[]).map(id => (
+                      <p
+                        key={id}
+                        className="flex justify-between gap-4 text-sm capitalize"
+                      >
+                        <span>{id}</span>
+                        <strong>
+                          €
+                          {(
+                            topUpPriceCents(pack.id, id, billingCycle) / 100
+                          ).toFixed(2)}
+                        </strong>
+                      </p>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>

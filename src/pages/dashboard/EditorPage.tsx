@@ -13,9 +13,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   CircleGauge,
-  Clock3,
   Copy,
-  Download,
   Film,
   Image as ImageIcon,
   Layers3,
@@ -24,7 +22,6 @@ import {
   Lock,
   Maximize2,
   Mic2,
-  MoreHorizontal,
   Music2,
   Pause,
   Play,
@@ -43,6 +40,7 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
+import { RenderExportPanel } from "@/components/studio/RenderExportPanel";
 import { useSearchParams } from "react-router-dom";
 import type {
   Asset,
@@ -1585,7 +1583,7 @@ export default function EditorPage() {
             className="flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
           >
             <Maximize2 className="h-3.5 w-3.5" />
-            Prepare export
+            Export video
           </button>
         </div>
       </header>
@@ -2729,141 +2727,11 @@ export default function EditorPage() {
       </div>
 
       {exportOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="export-title"
-        >
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-modal">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="mono-eyebrow text-primary">Delivery preflight</p>
-                <h2 id="export-title" className="mt-2 text-xl font-semibold">
-                  Prepare the edit handoff
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setExportOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-background"
-                aria-label="Close export panel"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <label>
-                <span className="mb-1.5 block text-xs text-foreground/45">
-                  Platform
-                </span>
-                <select
-                  value={project.platform}
-                  onChange={event =>
-                    void saveProjectChange(
-                      () =>
-                        patchProject({
-                          platform: event.target
-                            .value as EditProject["platform"],
-                        }),
-                      "The target platform could not be saved."
-                    )
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                >
-                  <option value="tiktok">TikTok</option>
-                  <option value="instagram">Instagram</option>
-                  <option value="youtube">YouTube</option>
-                  <option value="facebook">Facebook</option>
-                  <option value="linkedin">LinkedIn</option>
-                </select>
-              </label>
-              <label>
-                <span className="mb-1.5 block text-xs text-foreground/45">
-                  Canvas
-                </span>
-                <select
-                  value={project.aspectRatio}
-                  onChange={event =>
-                    void saveProjectChange(
-                      () =>
-                        patchProject({
-                          aspectRatio: event.target
-                            .value as EditProject["aspectRatio"],
-                        }),
-                      "The aspect ratio could not be saved."
-                    )
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                >
-                  <option value="9:16">Vertical 9:16</option>
-                  <option value="1:1">Square 1:1</option>
-                  <option value="16:9">Landscape 16:9</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="mt-5 space-y-2">
-              {preflightChecks.map(check => (
-                <div
-                  key={check.label}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5"
-                >
-                  <span className="flex items-center gap-2 text-xs">
-                    {check.passed ? (
-                      <Check className="h-3.5 w-3.5 text-emerald-600" />
-                    ) : (
-                      <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
-                    )}
-                    {check.label}
-                  </span>
-                  <span className="text-[10px] text-foreground/40">
-                    {check.passed ? "Ready" : "Review"}
-                  </span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/15 bg-destructive/[0.035] px-3 py-2.5">
-                <span className="flex items-center gap-2 text-xs">
-                  <MoreHorizontal className="h-3.5 w-3.5 text-destructive" />
-                  Final video renderer
-                </span>
-                <span className="text-[10px] text-destructive">
-                  Not connected
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-xl border border-border bg-background/55 p-4">
-              <p className="text-xs font-medium">What this action creates</p>
-              <p className="mt-1 text-xs leading-5 text-foreground/50">
-                A JSON edit brief containing the real timeline, transcript,
-                asset references, and accepted AI decisions. It does not claim
-                to render an MP4.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => void downloadEditBrief()}
-              disabled={busyAction === "export-brief"}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
-            >
-              {busyAction === "export-brief" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              {busyAction === "export-brief"
-                ? "Preparing marked brief"
-                : "Download edit brief"}
-            </button>
-            <p className="mt-3 flex items-center justify-center gap-1.5 text-[10px] text-foreground/40">
-              <Clock3 className="h-3 w-3" />
-              No rendered video has been produced.
-            </p>
-          </div>
-        </div>
+        <RenderExportPanel
+          project={project}
+          onClose={() => setExportOpen(false)}
+          onBrief={() => void downloadEditBrief()}
+        />
       )}
     </div>
   );

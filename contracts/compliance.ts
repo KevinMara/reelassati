@@ -32,7 +32,8 @@ export type AiOperation =
   | "video-generation"
   | "trend-research"
   | "support-assistance"
-  | "publication-marking";
+  | "publication-marking"
+  | "timeline-render";
 
 export type MarkingStatus = "not-required" | "pending" | "verified" | "failed";
 

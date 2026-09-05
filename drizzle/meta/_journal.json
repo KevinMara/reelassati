@@ -78,6 +78,34 @@
       "when": 1788599525021,
       "tag": "0010_unique_wong",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1788623738872,
+      "tag": "0011_minor_gunslinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788624824458,
+      "tag": "0012_ambiguous_shaman",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788628167442,
+      "tag": "0013_nosy_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1788628851171,
+      "tag": "0014_premium_jack_murdock",
+      "breakpoints": true
     }
   ]
 }

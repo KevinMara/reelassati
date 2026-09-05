@@ -1,3 +1,6 @@
+import { OwnerOperations } from "@/components/studio/OwnerOperations";
+import { CreationStart } from "@/components/studio/CreationStart";
+import { BrandSwitcher } from "@/components/studio/BrandSwitcher";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
@@ -117,15 +120,20 @@ function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
 
   useEffect(() => {
     let active = true;
-    void platformApi
-      .billingSummary()
-      .then(result => {
-        if (active) setCredits(result.billing.availableCredits);
-      })
-      .catch(() => {
-        if (active) setCredits(null);
-      });
+    const refresh = () => {
+      void platformApi
+        .billingSummary()
+        .then(result => {
+          if (active) setCredits(result.billing.availableCredits);
+        })
+        .catch(() => {
+          if (active) setCredits(null);
+        });
+    };
+    refresh();
+    window.addEventListener("reelassati:credits-changed", refresh);
     return () => {
+      window.removeEventListener("reelassati:credits-changed", refresh);
       active = false;
     };
   }, [refreshKey]);
@@ -142,7 +150,6 @@ function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
     >
       <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
         <Coins className="h-3 w-3" />
-        <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.75)]" />
       </span>
       <span className="font-mono font-medium">
         {credits === null ? "Credits" : credits.toLocaleString()}
@@ -314,6 +321,7 @@ function DashboardHome() {
 
   return (
     <div>
+      <CreationStart />
       <div className="dashboard-hero mb-6 rounded-2xl border border-border px-5 py-5 md:px-6">
         <p className="mono-eyebrow text-primary mb-2">Dashboard</p>
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -680,6 +688,7 @@ function StudioStatus() {
 
   return (
     <div className="max-w-4xl mx-auto">
+      {capabilities.operations && <OwnerOperations />}
       <p className="mono-eyebrow text-primary mb-2">Production readiness</p>
       <h1 className="text-3xl font-semibold">Studio status</h1>
       <p className="text-foreground/60 mt-2">
@@ -1008,6 +1017,11 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {!collapsed && (
+          <div className="px-4 py-3">
+            <BrandSwitcher />
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
           {navItems.map((item, i) =>
             item.separator ? (

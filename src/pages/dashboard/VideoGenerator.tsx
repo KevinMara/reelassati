@@ -1,3 +1,4 @@
+import { ScenePresets } from "@/components/studio/ScenePresets";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
@@ -474,7 +475,7 @@ export default function VideoGenerator() {
             <p className="text-sm font-medium">
               Video generation is not configured
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-foreground/55">
+            <p className="mt-1 text-xs leading-relaxed text-foreground/70">
               Video generation is temporarily unavailable. Prompt design remains
               available in the meantime.
             </p>
@@ -488,7 +489,7 @@ export default function VideoGenerator() {
             <div className="mb-3 flex items-center gap-2">
               <Film className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-medium">Visual style</h2>
-              <span className="ml-auto text-[10px] uppercase tracking-wider text-foreground/35">
+              <span className="ml-auto text-xs uppercase tracking-wider text-foreground/35">
                 {VIDEO_PROMPT_TEMPLATES.length} templates
               </span>
             </div>
@@ -507,11 +508,11 @@ export default function VideoGenerator() {
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium">{item.name}</span>
-                    <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[9px] uppercase tracking-wider text-foreground/45">
+                    <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[9px] uppercase tracking-wider text-foreground/65">
                       {item.category}
                     </span>
                   </span>
-                  <span className="mt-1 block text-xs leading-relaxed text-foreground/45">
+                  <span className="mt-1 block text-xs leading-relaxed text-foreground/65">
                     {item.description}
                   </span>
                 </button>
@@ -526,7 +527,7 @@ export default function VideoGenerator() {
             </div>
 
             <label
-              className="mb-2 block text-xs font-medium text-foreground/55"
+              className="mb-2 block text-xs font-medium text-foreground/70"
               htmlFor="video-asset-name"
             >
               Video name
@@ -541,7 +542,7 @@ export default function VideoGenerator() {
             />
 
             <fieldset>
-              <legend className="mb-2 text-xs font-medium text-foreground/55">
+              <legend className="mb-2 text-xs font-medium text-foreground/70">
                 Aspect ratio
               </legend>
               <div className="grid grid-cols-3 gap-2">
@@ -572,7 +573,7 @@ export default function VideoGenerator() {
 
             <div className="mt-4">
               <label
-                className="mb-2 block text-xs font-medium text-foreground/55"
+                className="mb-2 block text-xs font-medium text-foreground/70"
                 htmlFor="video-duration"
               >
                 Duration
@@ -639,7 +640,7 @@ export default function VideoGenerator() {
                   <Volume2 className="h-3.5 w-3.5" />
                   Native audio
                 </span>
-                <span className="mt-0.5 block text-[11px] text-foreground/40">
+                <span className="mt-0.5 block text-xs text-foreground/65">
                   {generateAudio
                     ? "Requested with the video"
                     : "Silent output requested"}
@@ -712,7 +713,7 @@ export default function VideoGenerator() {
                       );
                     })}
                   </select>
-                  <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
+                  <p className="mt-2 text-xs leading-relaxed text-foreground/65">
                     Continuity Lock reuses the selected clip, its scene
                     direction, reference frames, and generation lineage. Write
                     what happens next below. Consistency is strongly guided, not
@@ -720,13 +721,13 @@ export default function VideoGenerator() {
                   </p>
                 </div>
               ) : (
-                <p className="mt-4 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground/50">
+                <p className="mt-4 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground/70">
                   Generate one clip first. Completed clips will appear here as
                   continuity sources.
                 </p>
               )
             ) : (
-              <p className="mt-3 text-[11px] leading-relaxed text-foreground/45">
+              <p className="mt-3 text-xs leading-relaxed text-foreground/65">
                 Starts a fresh subject, setting, and visual sequence.
               </p>
             )}
@@ -736,7 +737,7 @@ export default function VideoGenerator() {
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">Scene direction</p>
-                <p className="mt-1 text-xs text-foreground/45">
+                <p className="mt-1 text-xs text-foreground/65">
                   Be concrete. The selected style adds camera and production
                   language.
                 </p>
@@ -744,6 +745,15 @@ export default function VideoGenerator() {
               <WandSparkles className="h-5 w-5 text-primary" />
             </div>
 
+            <ScenePresets
+              direction={{ ...direction }}
+              onSelect={value => {
+                setDirection({ ...EMPTY_DIRECTION, ...value });
+                setRightsConfirmed(false);
+                setRealPersonConsentConfirmed(false);
+                requestIdRef.current = null;
+              }}
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label
@@ -796,92 +806,99 @@ export default function VideoGenerator() {
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
-              <div>
-                <label
-                  className="mb-2 block text-xs font-medium"
-                  htmlFor="director-camera"
-                >
-                  Camera movement
-                </label>
-                <input
-                  id="director-camera"
-                  value={direction.camera}
-                  onChange={event =>
-                    updateDirection("camera", event.target.value)
-                  }
-                  placeholder="Slow push-in, then a macro detail"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                />
-              </div>
-              <div>
-                <label
-                  className="mb-2 block text-xs font-medium"
-                  htmlFor="director-mood"
-                >
-                  Mood and light
-                </label>
-                <input
-                  id="director-mood"
-                  value={direction.mood}
-                  onChange={event =>
-                    updateDirection("mood", event.target.value)
-                  }
-                  placeholder="Warm morning light, tactile and calm"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                />
-              </div>
-              <div>
-                <label
-                  className="mb-2 block text-xs font-medium"
-                  htmlFor="director-dialogue"
-                >
-                  Dialogue
-                </label>
-                <input
-                  id="director-dialogue"
-                  value={direction.dialogue}
-                  onChange={event =>
-                    updateDirection("dialogue", event.target.value)
-                  }
-                  placeholder="The detail that makes every cup different."
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                />
-              </div>
-              <div>
-                <label
-                  className="mb-2 block text-xs font-medium"
-                  htmlFor="director-sound"
-                >
-                  Sound
-                </label>
-                <input
-                  id="director-sound"
-                  value={direction.sound}
-                  onChange={event =>
-                    updateDirection("sound", event.target.value)
-                  }
-                  placeholder="Brush on clay, room tone, no music"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                />
-              </div>
-              <div>
-                <label
-                  className="mb-2 block text-xs font-medium"
-                  htmlFor="director-avoid"
-                >
-                  Avoid
-                </label>
-                <input
-                  id="director-avoid"
-                  value={direction.avoid}
-                  onChange={event =>
-                    updateDirection("avoid", event.target.value)
-                  }
-                  placeholder="Extra fingers, warped cup, logos"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                />
-              </div>
             </div>
+            <details className="mt-4 rounded-xl border border-border p-4">
+              <summary className="cursor-pointer text-sm font-medium">
+                Camera, lighting, dialogue and sound
+              </summary>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    className="mb-2 block text-xs font-medium"
+                    htmlFor="director-camera"
+                  >
+                    Camera movement
+                  </label>
+                  <input
+                    id="director-camera"
+                    value={direction.camera}
+                    onChange={event =>
+                      updateDirection("camera", event.target.value)
+                    }
+                    placeholder="Slow push-in, then a macro detail"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-2 block text-xs font-medium"
+                    htmlFor="director-mood"
+                  >
+                    Mood and light
+                  </label>
+                  <input
+                    id="director-mood"
+                    value={direction.mood}
+                    onChange={event =>
+                      updateDirection("mood", event.target.value)
+                    }
+                    placeholder="Warm morning light, tactile and calm"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-2 block text-xs font-medium"
+                    htmlFor="director-dialogue"
+                  >
+                    Dialogue
+                  </label>
+                  <input
+                    id="director-dialogue"
+                    value={direction.dialogue}
+                    onChange={event =>
+                      updateDirection("dialogue", event.target.value)
+                    }
+                    placeholder="The detail that makes every cup different."
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-2 block text-xs font-medium"
+                    htmlFor="director-sound"
+                  >
+                    Sound
+                  </label>
+                  <input
+                    id="director-sound"
+                    value={direction.sound}
+                    onChange={event =>
+                      updateDirection("sound", event.target.value)
+                    }
+                    placeholder="Brush on clay, room tone, no music"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-2 block text-xs font-medium"
+                    htmlFor="director-avoid"
+                  >
+                    Avoid
+                  </label>
+                  <input
+                    id="director-avoid"
+                    value={direction.avoid}
+                    onChange={event =>
+                      updateDirection("avoid", event.target.value)
+                    }
+                    placeholder="Extra fingers, warped cup, logos"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  />
+                </div>
+              </div>
+            </details>
 
             {durationConflict ? (
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs">
@@ -929,7 +946,7 @@ export default function VideoGenerator() {
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   />
                   {firstFrameError ? (
-                    <p className="mt-1 text-[11px] text-red-500">
+                    <p className="mt-1 text-xs text-red-500">
                       {firstFrameError}
                     </p>
                   ) : null}
@@ -955,12 +972,12 @@ export default function VideoGenerator() {
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   />
                   {lastFrameError ? (
-                    <p className="mt-1 text-[11px] text-red-500">
+                    <p className="mt-1 text-xs text-red-500">
                       {lastFrameError}
                     </p>
                   ) : null}
                 </div>
-                <p className="sm:col-span-2 text-[11px] text-foreground/40">
+                <p className="sm:col-span-2 text-xs text-foreground/65">
                   Only public HTTPS image URLs are accepted. Browser blob URLs
                   and local network addresses cannot be used for generation.
                 </p>
@@ -972,7 +989,7 @@ export default function VideoGenerator() {
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">Compiled prompt</p>
-                <p className="mt-0.5 text-[11px] text-foreground/40">
+                <p className="mt-0.5 text-xs text-foreground/65">
                   {template?.name ?? "Custom"} · ready to generate
                 </p>
               </div>
@@ -997,7 +1014,7 @@ export default function VideoGenerator() {
               </p>
             </div>
             {template?.finishingNote ? (
-              <p className="mt-3 rounded-lg border border-primary/15 bg-primary/5 p-3 text-[11px] leading-relaxed text-foreground/55">
+              <p className="mt-3 rounded-lg border border-primary/15 bg-primary/5 p-3 text-xs leading-relaxed text-foreground/70">
                 Finishing workflow: {template.finishingNote}
               </p>
             ) : null}
@@ -1008,7 +1025,7 @@ export default function VideoGenerator() {
           <section className="rounded-xl border border-primary/20 bg-primary/5 p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-foreground/45">
+                <p className="text-xs font-medium uppercase tracking-wider text-foreground/65">
                   Ready to generate
                 </p>
                 <p className="mt-1 text-lg font-semibold text-primary">
@@ -1019,18 +1036,18 @@ export default function VideoGenerator() {
               </div>
               <Sparkles className="h-5 w-5 text-primary/60" />
             </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
+            <p className="mt-2 text-xs leading-relaxed text-foreground/65">
               Generation uses REELassati credits inside your workspace.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-lg border border-primary/10 bg-background/70 p-2.5">
-                <span className="block text-foreground/40">Output</span>
+                <span className="block text-foreground/65">Output</span>
                 <span className="mt-1 block font-medium">
                   {duration}s · {resolution}
                 </span>
               </div>
               <div className="rounded-lg border border-primary/10 bg-background/70 p-2.5">
-                <span className="block text-foreground/40">Format</span>
+                <span className="block text-foreground/65">Format</span>
                 <span className="mt-1 block font-medium">
                   {ratio} · {generateAudio ? "audio" : "silent"}
                 </span>
@@ -1127,14 +1144,14 @@ export default function VideoGenerator() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Generating video</p>
-                  <p className="mt-1 text-[11px] text-foreground/40">
+                  <p className="mt-1 text-xs text-foreground/65">
                     {job.continuity?.mode === "continue"
                       ? "Continuing the selected clip"
                       : "Creating a new clip"}
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider ${
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-wider ${
                     job.status === "completed"
                       ? "bg-emerald-500/10 text-emerald-500"
                       : job.status === "failed"
@@ -1155,7 +1172,7 @@ export default function VideoGenerator() {
                   }}
                 />
               </div>
-              <div className="mt-2 flex justify-between text-[11px] text-foreground/40">
+              <div className="mt-2 flex justify-between text-xs text-foreground/65">
                 <span>Progress</span>
                 <span>{Math.round(job.progress)}%</span>
               </div>
@@ -1169,7 +1186,7 @@ export default function VideoGenerator() {
               <p className="mt-3 text-sm font-medium">
                 Your video will appear here
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+              <p className="mt-1 text-xs leading-relaxed text-foreground/65">
                 Set the scene, confirm the rights, and start generation.
               </p>
             </section>
@@ -1183,7 +1200,7 @@ export default function VideoGenerator() {
             >
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-medium">Generated asset</p>
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase text-emerald-500">
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium uppercase text-emerald-500">
                   Saved
                 </span>
               </div>
@@ -1208,7 +1225,7 @@ export default function VideoGenerator() {
               </div>
               <p
                 id="generated-video-caption-status"
-                className="mt-2 text-[11px] leading-relaxed text-foreground/45"
+                className="mt-2 text-xs leading-relaxed text-foreground/65"
               >
                 Caption track not added yet. Open the asset in Edit to create
                 and review captions before delivery.

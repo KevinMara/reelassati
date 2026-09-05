@@ -83,12 +83,15 @@ describe("platform API transport", () => {
       onabort: (() => void) | null = null;
       onerror: (() => void) | null = null;
       onload: (() => void) | null = null;
-      responseText = JSON.stringify({ asset: { id: "asset-1" } });
+      responseText = JSON.stringify({
+        asset: { id: "asset-1", url: "/api/assets/asset-1" },
+      });
       responseType = "";
       status = 201;
       withCredentials = false;
 
       open() {}
+      setRequestHeader() {}
 
       getResponseHeader(name: string) {
         return name.toLowerCase() === "content-type"

@@ -18,6 +18,7 @@ import {
   Music,
   Pencil,
   Search,
+  Star,
   Trash2,
   Upload,
   Video,
@@ -127,6 +128,8 @@ export default function ContentLibrary() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [search, setSearch] = useState("");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [projectFilter, setProjectFilter] = useState("");
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -171,6 +174,19 @@ export default function ContentLibrary() {
   const filteredItems = useMemo(
     () =>
       items.filter(item => {
+        if (favoritesOnly && (item.source !== "asset" || !item.asset.favorite))
+          return false;
+        if (
+          projectFilter &&
+          (item.source !== "asset" ||
+            !(
+              item.asset.projectId === projectFilter ||
+              workspace.projects
+                .find(project => project.id === projectFilter)
+                ?.clips.some(clip => clip.assetId === item.asset.id)
+            ))
+        )
+          return false;
         if (filter !== "all" && item.kind !== filter) return false;
         return (
           !deferredSearch ||
@@ -178,7 +194,14 @@ export default function ContentLibrary() {
           item.kind.includes(deferredSearch)
         );
       }),
-    [deferredSearch, filter, items]
+    [
+      deferredSearch,
+      filter,
+      items,
+      favoritesOnly,
+      projectFilter,
+      workspace.projects,
+    ]
   );
 
   const uploadSelectedFile = async (file: File | undefined) => {
@@ -370,9 +393,9 @@ export default function ContentLibrary() {
         <div>
           <p className="mono-eyebrow mb-2 text-primary">Private media system</p>
           <h1 className="text-3xl font-semibold">Content Library</h1>
-          <p className="mt-2 max-w-2xl text-sm text-foreground/55">
-            Your uploaded footage, generated media, exports, and saved
-            scripts—nothing staged or fabricated.
+          <p className="mt-2 max-w-2xl text-sm text-foreground/70">
+            Your uploaded footage, generated media, exports, and saved scripts,
+            ready to reuse across your projects.
           </p>
         </div>
         <div>
@@ -397,7 +420,7 @@ export default function ContentLibrary() {
             )}
             {uploading ? `Uploading ${uploadProgress}%` : "Upload media"}
           </button>
-          <p className="mt-1 text-center text-[11px] text-foreground/45">
+          <p className="mt-1 text-center text-xs text-foreground/65">
             {isDragging ? "Drop files here" : "or drop a file here"}
           </p>
           {!capabilities.uploads ? (
@@ -425,7 +448,7 @@ export default function ContentLibrary() {
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <label className="relative min-w-64 flex-1 sm:max-w-md">
           <span className="sr-only">Search library</span>
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/65" />
           <input
             ref={searchInputRef}
             type="search"
@@ -482,6 +505,30 @@ export default function ContentLibrary() {
         </div>
       </div>
 
+      <div className="mb-5 flex flex-wrap gap-3">
+        <button
+          type="button"
+          aria-pressed={favoritesOnly}
+          onClick={() => setFavoritesOnly(!favoritesOnly)}
+          className={`flex items-center gap-2 rounded-pill border px-4 py-2 text-sm ${favoritesOnly ? "border-primary bg-primary/15" : "border-border"}`}
+        >
+          <Star className="h-4 w-4" />
+          Favorites
+        </button>
+        <select
+          aria-label="Filter Library by project"
+          value={projectFilter}
+          onChange={event => setProjectFilter(event.target.value)}
+          className="rounded-lg border border-border bg-surface p-2 text-sm"
+        >
+          <option value="">All projects</option>
+          {workspace.projects.map(project => (
+            <option value={project.id} key={project.id}>
+              {project.title}
+            </option>
+          ))}
+        </select>
+      </div>
       {filteredItems.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-14 text-center">
           <FileText className="mx-auto h-7 w-7 text-primary" />
@@ -490,7 +537,7 @@ export default function ContentLibrary() {
               ? "No matching content"
               : "Your reusable library starts here"}
           </h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm text-foreground/50">
+          <p className="mx-auto mt-2 max-w-lg text-sm text-foreground/70">
             {items.length
               ? "Change the search or filter to reveal more items."
               : "Upload real media here, or create a script and it will appear automatically."}
@@ -524,6 +571,37 @@ export default function ContentLibrary() {
                   viewMode === "list" ? "flex items-center gap-4 p-4" : ""
                 }`}
               >
+                {item.source === "asset" && (
+                  <button
+                    type="button"
+                    aria-label={
+                      item.asset.favorite ? "Remove favorite" : "Add favorite"
+                    }
+                    aria-pressed={item.asset.favorite === true}
+                    disabled={saving}
+                    onClick={() => {
+                      void updateWorkspace(current => ({
+                        ...current,
+                        assets: current.assets.map(asset =>
+                          asset.id === item.asset.id
+                            ? { ...asset, favorite: !asset.favorite }
+                            : asset
+                        ),
+                      })).catch(() =>
+                        setNotice({
+                          tone: "error",
+                          message: "Favorite could not be saved.",
+                        })
+                      );
+                    }}
+                    className="absolute right-3 top-3 z-10 rounded-full border border-border bg-surface p-2 text-primary"
+                  >
+                    <Star
+                      className="h-4 w-4"
+                      fill={item.asset.favorite ? "currentColor" : "none"}
+                    />
+                  </button>
+                )}
                 <div
                   className={`flex shrink-0 items-center justify-center overflow-hidden bg-background ${
                     viewMode === "grid"
@@ -541,7 +619,7 @@ export default function ContentLibrary() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${meta.color}`}
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${meta.color}`}
                       >
                         {meta.label}
                       </span>
@@ -551,7 +629,7 @@ export default function ContentLibrary() {
                       >
                         {item.title}
                       </h2>
-                      <p className="mt-1 text-xs text-foreground/45">
+                      <p className="mt-1 text-xs text-foreground/65">
                         {new Date(item.createdAt).toLocaleDateString()}
                         {item.source === "asset"
                           ? ` · ${formatBytes(item.asset.size)}`
@@ -615,7 +693,7 @@ export default function ContentLibrary() {
                           href={item.asset.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground/55 transition-colors hover:border-primary/35 hover:text-foreground"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground/70 transition-colors hover:border-primary/35 hover:text-foreground"
                         >
                           Open <ExternalLink className="h-3 w-3" />
                         </a>
@@ -638,7 +716,7 @@ export default function ContentLibrary() {
                           <button
                             type="button"
                             onClick={() => void copyLibraryScript(item)}
-                            className="mt-2 text-[11px] font-medium text-primary hover:underline"
+                            className="mt-2 text-xs font-medium text-primary hover:underline"
                           >
                             Copy with origin record
                           </button>

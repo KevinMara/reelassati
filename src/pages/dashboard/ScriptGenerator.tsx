@@ -123,7 +123,7 @@ function DirectScriptGenerator() {
   const requestedScript = workspace.scripts.find(
     script => script.id === requestedScriptId
   );
-  const [topic, setTopic] = useState("");
+  const [topic, setTopic] = useState(searchParams.get("topic") || "");
   const [platform, setPlatform] = useState<Platform>("tiktok");
   const [tone, setTone] = useState<(typeof TONES)[number]>("energetic");
   const [duration, setDuration] = useState<(typeof DURATIONS)[number]>(30);
@@ -289,7 +289,7 @@ function DirectScriptGenerator() {
             <p className="text-sm font-medium">
               Script generation needs AI setup
             </p>
-            <p className="mt-1 text-xs text-foreground/55">
+            <p className="mt-1 text-xs text-foreground/70">
               Script generation is temporarily unavailable. Your prompts stay in
               the browser until you choose Generate.
             </p>
@@ -413,7 +413,7 @@ function DirectScriptGenerator() {
               htmlFor="hook-direction"
             >
               Hook direction{" "}
-              <span className="font-normal text-foreground/40">(optional)</span>
+              <span className="font-normal text-foreground/65">(optional)</span>
             </label>
             <textarea
               id="hook-direction"
@@ -461,7 +461,7 @@ function DirectScriptGenerator() {
                 <MessageSquareText className="h-4 w-4 text-primary" />
                 Hook patterns
               </span>
-              <span className="text-xs text-foreground/45">
+              <span className="text-xs text-foreground/65">
                 {showHooks ? "Hide" : "Show"}
               </span>
             </button>
@@ -486,13 +486,13 @@ function DirectScriptGenerator() {
                         <span className="mt-1 block text-xs leading-relaxed text-foreground/65">
                           {hook.pattern}
                         </span>
-                        <span className="mt-2 block text-[11px] text-foreground/40">
+                        <span className="mt-2 block text-xs text-foreground/65">
                           {hook.intent}
                         </span>
                       </button>
                     ))}
                   </div>
-                  <p className="mt-3 text-[11px] leading-relaxed text-foreground/40">
+                  <p className="mt-3 text-xs leading-relaxed text-foreground/65">
                     These are writing structures, not performance guarantees.
                     Edit the wording to match your proof, audience, and offer.
                   </p>
@@ -525,7 +525,7 @@ function DirectScriptGenerator() {
                         }
                         className="w-full border-0 bg-transparent p-0 font-medium outline-none"
                       />
-                      <p className="mt-1 text-xs text-foreground/45">
+                      <p className="mt-1 text-xs text-foreground/65">
                         {generatedScript.duration}s · {generatedScript.platform}{" "}
                         · {generatedScript.language.toUpperCase()}
                       </p>
@@ -543,7 +543,7 @@ function DirectScriptGenerator() {
                           ? "text-red-500"
                           : saveState === "saved"
                             ? "text-emerald-500"
-                            : "text-foreground/40"
+                            : "text-foreground/65"
                       }`}
                       aria-live="polite"
                     >
@@ -590,7 +590,7 @@ function DirectScriptGenerator() {
                   </div>
                   <div className="rounded-lg border border-border bg-background p-4">
                     <label
-                      className="mb-2 block text-xs font-medium uppercase tracking-wider text-foreground/45"
+                      className="mb-2 block text-xs font-medium uppercase tracking-wider text-foreground/65"
                       htmlFor="generated-body"
                     >
                       Body
@@ -607,7 +607,7 @@ function DirectScriptGenerator() {
                   </div>
                   <div className="rounded-lg border border-border bg-background p-4">
                     <label
-                      className="mb-2 block text-xs font-medium uppercase tracking-wider text-foreground/45"
+                      className="mb-2 block text-xs font-medium uppercase tracking-wider text-foreground/65"
                       htmlFor="generated-cta"
                     >
                       Call to action
@@ -664,7 +664,7 @@ function DirectScriptGenerator() {
                 <h2 className="text-lg font-medium text-foreground/65">
                   Direct the opening. Generate the draft.
                 </h2>
-                <p className="mt-2 max-w-sm text-sm text-foreground/45">
+                <p className="mt-2 max-w-sm text-sm text-foreground/65">
                   The result stays editable and is stored in your content
                   workspace, ready for the editor or Prompt Director.
                 </p>
@@ -694,7 +694,7 @@ function DirectScriptGenerator() {
                       <span className="block truncate text-sm font-medium">
                         {script.title}
                       </span>
-                      <span className="mt-0.5 block text-xs text-foreground/40">
+                      <span className="mt-0.5 block text-xs text-foreground/65">
                         {script.platform} · {script.duration}s
                       </span>
                     </span>
@@ -737,7 +737,7 @@ export default function ScriptGenerator() {
           className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
             activeMode === "generator"
               ? "bg-primary text-white shadow-sm"
-              : "text-foreground/55 hover:bg-background hover:text-foreground"
+              : "text-foreground/70 hover:bg-background hover:text-foreground"
           }`}
         >
           Write from a brief
@@ -750,7 +750,7 @@ export default function ScriptGenerator() {
           className={`flex-1 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
             activeMode === "interview"
               ? "bg-primary text-white shadow-sm"
-              : "text-foreground/55 hover:bg-background hover:text-foreground"
+              : "text-foreground/70 hover:bg-background hover:text-foreground"
           }`}
         >
           Interview me

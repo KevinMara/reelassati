@@ -1,3 +1,4 @@
+import { PublicationReadiness } from "@/components/studio/PublicationReadiness";
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -394,7 +395,7 @@ export default function CalendarPage() {
         <div>
           <p className="mono-eyebrow mb-2 text-primary">Plan and publish</p>
           <h1 className="text-3xl font-semibold">Content Calendar</h1>
-          <p className="mt-2 text-sm text-foreground/55">
+          <p className="mt-2 text-sm text-foreground/70">
             Your events and publication schedule, together in {timeZone}.
           </p>
         </div>
@@ -465,7 +466,7 @@ export default function CalendarPage() {
             </select>
           </>
         ) : null}
-        <span className="self-center text-xs text-foreground/40">
+        <span className="self-center text-xs text-foreground/65">
           Select any day to plan something there.
         </span>
       </div>
@@ -513,7 +514,7 @@ export default function CalendarPage() {
             {DAYS.map(day => (
               <div
                 key={day}
-                className="py-2 text-center text-[10px] uppercase tracking-wider text-foreground/40 sm:text-xs"
+                className="py-2 text-center text-xs uppercase tracking-wider text-foreground/65 sm:text-xs"
               >
                 {day}
               </div>
@@ -590,7 +591,7 @@ export default function CalendarPage() {
                         );
                       })}
                       {items.length > 3 ? (
-                        <p className="text-[9px] text-foreground/40">
+                        <p className="text-[9px] text-foreground/65">
                           +{items.length - 3} more
                         </p>
                       ) : null}
@@ -660,7 +661,7 @@ export default function CalendarPage() {
                   <p className="text-sm font-medium">
                     {selectedDate ? "This day is open" : "Nothing coming up"}
                   </p>
-                  <p className="mt-1 text-xs text-foreground/45">
+                  <p className="mt-1 text-xs text-foreground/65">
                     Add your own event or schedule a publication.
                   </p>
                   <Button
@@ -888,7 +889,7 @@ function EventCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-foreground/55">
+          <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-foreground/70">
             <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
             {meta.label}
           </p>
@@ -908,7 +909,7 @@ function EventCard({
             type="button"
             onClick={() => onDelete(event)}
             disabled={saving}
-            className="rounded-md p-1.5 text-foreground/55 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
+            className="rounded-md p-1.5 text-foreground/70 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
             aria-label={`Delete ${event.title}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -920,7 +921,7 @@ function EventCard({
           {event.notes}
         </p>
       ) : null}
-      <p className="mt-2 flex items-center gap-1 text-[10px] text-foreground/45">
+      <p className="mt-2 flex items-center gap-1 text-xs text-foreground/65">
         <Clock className="h-3 w-3" />
         {showDate ? `${event.date} · ` : ""}
         {event.startTime
@@ -947,7 +948,7 @@ function PostCard({
         {post.platforms.map(platform => (
           <span
             key={platform}
-            className="inline-flex items-center gap-1 text-[10px] font-medium text-foreground/55"
+            className="inline-flex items-center gap-1 text-xs font-medium text-foreground/70"
           >
             <span
               className={`h-1.5 w-1.5 rounded-full ${PLATFORM_META[platform].dot}`}
@@ -957,7 +958,18 @@ function PostCard({
         ))}
       </div>
       <p className="mt-2 text-sm font-medium">{postTitle(post)}</p>
-      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wide">
+      {(post.status === "draft" || post.status === "failed") && (
+        <>
+          <PublicationReadiness post={post} />
+          <Link
+            to={`/dashboard/publish?draft=${encodeURIComponent(post.id)}`}
+            className="mt-3 inline-flex text-sm font-medium text-primary"
+          >
+            Continue preparing →
+          </Link>
+        </>
+      )}
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs uppercase tracking-wide">
         <span
           className={
             post.status === "failed"
@@ -970,7 +982,7 @@ function PostCard({
           {post.status}
         </span>
         {value ? (
-          <span className="flex items-center gap-1 text-foreground/40">
+          <span className="flex items-center gap-1 text-foreground/65">
             <Clock className="h-3 w-3" />
             {showDate ? `${dateKey(value, timeZone)} · ` : ""}
             {timeLabel(value, timeZone)}

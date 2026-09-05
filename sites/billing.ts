@@ -1,5 +1,11 @@
 import {
+  BILLING_ADJUSTMENTS_SCHEMA,
+  registerCreditPurchase,
+  adjustCreditPurchase,
+} from "./billing-adjustments";
+import {
   CREDIT_TOP_UPS,
+  topUpPriceCents,
   PLAN_NAME_BY_ID,
   isBillingCycle,
   isCreditTopUpId,
@@ -168,6 +174,7 @@ export async function initializeBillingSchema(
           error TEXT
         )
       `),
+      env.DB.prepare(BILLING_ADJUSTMENTS_SCHEMA),
     ]).catch(cause => {
       billingSchemaInitialization = undefined;
       throw cause;
@@ -217,9 +224,6 @@ export function stripeBillingConfigured(env: BillingEnvironment): boolean {
     cleanString(env.STRIPE_WEBHOOK_SECRET).startsWith("whsec_") &&
     Object.values(prices.plans).every(
       plan => Boolean(plan.monthly) && Boolean(plan.annual)
-    ) &&
-    Object.keys(CREDIT_TOP_UPS).every(id =>
-      Boolean(prices.topUps[id as CreditTopUpId])
     )
   );
 }
@@ -294,7 +298,8 @@ async function applyTopUpGrant(
        SET topup_balance = topup_balance + COALESCE((
              SELECT topup_amount FROM credit_ledger
              WHERE operation_key = ? AND applied = 0
-           ), 0),
+           ),
+ 0),
            updated_at = ?
        WHERE owner_email = ?`
     ).bind(operationKey, now, ownerEmail),
@@ -753,7 +758,6 @@ export async function billingSummary(
           cancelAtPeriodEnd: subscription.cancel_at_period_end === 1,
         }
       : null;
-  const prices = parsePriceConfiguration(env);
   return {
     configured: stripeBillingConfigured(env),
     availableCredits: Math.max(
@@ -762,11 +766,18 @@ export async function billingSummary(
     ),
     includedCredits: Math.max(0, credits.included_balance),
     topUpCredits: Math.max(0, credits.topup_balance),
+    adjustmentDebt: Math.max(0, -credits.topup_balance),
     canUseCredits: activeSubscription(subscription),
     plan,
     topUps: (Object.keys(CREDIT_TOP_UPS) as CreditTopUpId[]).map(id => ({
       ...CREDIT_TOP_UPS[id],
-      available: Boolean(prices.topUps[id]),
+      price:
+        topUpPriceCents(
+          id,
+          plan?.id || "creator",
+          plan?.billingCycle || "monthly"
+        ) / 100,
+      available: stripeBillingConfigured(env),
     })),
     usage: { through: usageThrough, daily: usage.results },
     recentActivity: activity.results.map(item => ({
@@ -812,7 +823,8 @@ function safeAppOrigin(request: Request, env: BillingEnvironment): string {
 async function stripeRequest(
   env: BillingEnvironment,
   path: string,
-  params: URLSearchParams
+  params: URLSearchParams,
+  idempotencyKey?: string
 ): Promise<Record<string, unknown>> {
   const key = cleanString(env.STRIPE_SECRET_KEY);
   if (!key.startsWith("sk_")) throw error("Billing is not active yet", 503);
@@ -821,6 +833,7 @@ async function stripeRequest(
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/x-www-form-urlencoded",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: params.toString(),
   });
@@ -833,6 +846,24 @@ async function stripeRequest(
     throw error("Billing could not be opened. Try again shortly.", 502);
   }
   return payload;
+}
+
+async function stripeRead(
+  env: BillingEnvironment,
+  path: string
+): Promise<Record<string, unknown>> {
+  const response = await fetch(`https://api.stripe.com/v1${path}`, {
+    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error("Stripe reconciliation unavailable");
+  return (await response.json()) as Record<string, unknown>;
+}
+
+async function currentSubscription(env: BillingEnvironment, id: string) {
+  return cleanString(env.STRIPE_SECRET_KEY).startsWith("sk_")
+    ? stripeRead(env, `/subscriptions/${encodeURIComponent(id)}`)
+    : null;
 }
 
 function addCheckoutTaxOptions(params: URLSearchParams): void {
@@ -863,7 +894,8 @@ async function checkoutSession(
       : kind === "topup" && isCreditTopUpId(id)
         ? prices.topUps[id]
         : undefined;
-  if (!priceId) return error("That purchase option is not available", 422);
+  if (kind === "subscription" && !priceId)
+    return error("That purchase option is not available", 422);
   const account = await billingAccount(env, user.email);
   if (kind === "topup" && !activeSubscription(account)) {
     return error("Choose an active plan before adding extra credits", 409);
@@ -877,7 +909,9 @@ async function checkoutSession(
   const origin = safeAppOrigin(request, env);
   const params = new URLSearchParams({
     mode: kind === "subscription" ? "subscription" : "payment",
-    "line_items[0][price]": priceId,
+    ...(priceId && kind === "subscription"
+      ? { "line_items[0][price]": priceId }
+      : {}),
     "line_items[0][quantity]": "1",
     client_reference_id: user.email,
     success_url: `${origin}/#/dashboard/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
@@ -900,11 +934,48 @@ async function checkoutSession(
     params.set("subscription_data[metadata][plan_id]", id);
     params.set("subscription_data[metadata][billing_cycle]", cycle);
   } else if (isCreditTopUpId(id)) {
+    if (
+      !isCreditTopUpId(id) ||
+      !account ||
+      !isPlanId(account.plan_id || "") ||
+      !isBillingCycle(account.billing_cycle || "")
+    )
+      return error("Choose a valid active plan first", 409);
+    const cents = topUpPriceCents(
+      id,
+      account.plan_id as PlanId,
+      account.billing_cycle as BillingCycle
+    );
+    params.set("line_items[0][price_data][currency]", "eur");
+    params.set("line_items[0][price_data][unit_amount]", String(cents));
+    params.set("line_items[0][price_data][tax_behavior]", "inclusive");
+    params.set(
+      "line_items[0][price_data][product_data][name]",
+      `${CREDIT_TOP_UPS[id].credits.toLocaleString("en-US")} REELassati credits`
+    );
+    params.set("metadata[credits]", String(CREDIT_TOP_UPS[id].credits));
+    params.set("metadata[quoted_cents]", String(cents));
+    params.set("metadata[pricing_version]", "2");
     params.set("metadata[topup_id]", id);
     params.set("payment_intent_data[metadata][owner_email]", user.email);
     params.set("payment_intent_data[metadata][topup_id]", id);
+    params.set("payment_intent_data[metadata][purchase_kind]", "topup");
+    params.set(
+      "payment_intent_data[metadata][credits]",
+      String(CREDIT_TOP_UPS[id].credits)
+    );
+    params.set("payment_intent_data[metadata][pricing_version]", "2");
   }
-  const session = await stripeRequest(env, "/checkout/sessions", params);
+  const checkoutKey = await hmacHex(
+    cleanString(env.STRIPE_SECRET_KEY),
+    `${user.email}:${kind}:${id}:${cycle || account?.billing_cycle}:${params.get("line_items[0][price_data][unit_amount]")}:${Math.floor(Date.now() / 300000)}`
+  );
+  const session = await stripeRequest(
+    env,
+    "/checkout/sessions",
+    params,
+    `checkout:${checkoutKey}`
+  );
   const checkoutUrl = cleanString(session.url);
   if (!/^https:\/\/checkout\.stripe\.com\//.test(checkoutUrl)) {
     return error("Billing did not return a secure checkout URL", 502);
@@ -1054,7 +1125,9 @@ function subscriptionIdFromObject(object: Record<string, unknown>): string {
 function priceIdFromObject(object: Record<string, unknown>): string {
   const lines = record(object.lines);
   const data = Array.isArray(lines?.data) ? lines.data : [];
-  const firstLine = record(data[0]);
+  const firstLine = record(
+    data.find(line => Number(record(line)?.amount) > 0) || data[0]
+  );
   const price = record(firstLine?.price);
   const pricing = record(firstLine?.pricing);
   const priceDetails = record(pricing?.price_details);
@@ -1074,7 +1147,9 @@ function periodFromObject(object: Record<string, unknown>): {
 } {
   const lines = record(object.lines);
   const data = Array.isArray(lines?.data) ? lines.data : [];
-  const firstLine = record(data[0]);
+  const firstLine = record(
+    data.find(line => Number(record(line)?.amount) > 0) || data[0]
+  );
   const period = record(firstLine?.period);
   const items = record(object.items);
   const itemData = Array.isArray(items?.data) ? items.data : [];
@@ -1191,12 +1266,122 @@ async function qualifyReferralFromPaidPlan(
   }
 }
 
+/** A paid mid-cycle upgrade adds only the unused portion of the allowance difference. */
+async function applyProratedPlanCredits(
+  env: BillingEnvironment,
+  ownerEmail: string,
+  invoice: Record<string, unknown>,
+  planId: PlanId,
+  start: string,
+  end: string | null,
+  cycle: BillingCycle
+) {
+  const lines = record(invoice.lines);
+  const data = (Array.isArray(lines?.data) ? lines.data : [])
+    .map(record)
+    .filter((line): line is Record<string, unknown> => Boolean(line));
+  const oldLine = data.find(
+    line =>
+      Number(line.amount) < 0 &&
+      priceIdentity(env, priceIdFromObject({ lines: { data: [line] } }))
+  );
+  const oldPlan = oldLine
+    ? priceIdentity(env, priceIdFromObject({ lines: { data: [oldLine] } }))
+        ?.planId
+    : null;
+  // Without a credited old-plan line, don't guess an allowance from an unrelated invoice.
+  if (!oldPlan || !end) return;
+  const newLine = data.find(
+    line =>
+      Number(line.amount) > 0 &&
+      priceIdentity(env, priceIdFromObject({ lines: { data: [line] } }))
+        ?.planId === planId
+  );
+  if (!newLine) return;
+  const changeAt = unixIso(record(newLine.period)?.start);
+  if (!changeAt) return;
+  if (cycle === "annual") {
+    for (
+      let i = 0;
+      i < 12 && Date.parse(addCalendarMonth(start)) <= Date.parse(changeAt);
+      i++
+    )
+      start = addCalendarMonth(start);
+    if (Date.parse(addCalendarMonth(start)) < Date.parse(end))
+      end = addCalendarMonth(start);
+  }
+  const fraction = Math.min(
+    1,
+    Math.max(
+      0,
+      (Date.parse(end) - Date.parse(changeAt)) /
+        Math.max(1, Date.parse(end) - Date.parse(start))
+    )
+  );
+  const amount = Math.max(
+    0,
+    Math.floor(
+      (planEntitlements(planId).monthlyCredits -
+        planEntitlements(oldPlan).monthlyCredits) *
+        fraction
+    )
+  );
+  if (!amount) return;
+  await creditAccount(env, ownerEmail);
+  const key = `stripe-plan-upgrade:${cleanString(invoice.id)}`;
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO credit_ledger (id, owner_email, amount, included_amount, topup_amount, category, status, operation_key, reference_id, description, metadata_json, applied, created_at, settled_at) VALUES (?, ?, ?, ?, 0, 'subscription', 'settled', ?, ?, ?, ?, 0, ?, ?) ON CONFLICT(operation_key) DO NOTHING`
+    ).bind(
+      crypto.randomUUID(),
+      ownerEmail,
+      amount,
+      amount,
+      key,
+      cleanString(invoice.id),
+      "Prorated plan upgrade credits",
+      JSON.stringify({ planId, oldPlan, fraction }),
+      now,
+      now
+    ),
+    env.DB.prepare(
+      `UPDATE credit_accounts SET included_balance = included_balance + COALESCE((SELECT included_amount FROM credit_ledger WHERE operation_key = ? AND applied = 0), 0), updated_at = ? WHERE owner_email = ?`
+    ).bind(key, now, ownerEmail),
+    env.DB.prepare(
+      "UPDATE credit_ledger SET applied = 1 WHERE operation_key = ?"
+    ).bind(key),
+  ]);
+}
+
 async function processStripeEvent(
   env: BillingEnvironment,
   eventId: string,
   eventType: string,
-  object: Record<string, unknown>
+  object: Record<string, unknown>,
+  eventCreated = Math.floor(Date.now() / 1000)
 ): Promise<void> {
+  if (
+    eventType === "charge.refunded" ||
+    eventType.startsWith("charge.dispute.")
+  ) {
+    if (
+      !(await adjustCreditPurchase(
+        env,
+        eventId,
+        eventType,
+        object,
+        eventCreated
+      ))
+    ) {
+      const owner = await ownerForStripeObject(env, object);
+      if (validEmail(owner))
+        throw new Error(
+          "Payment adjustment requires reconciliation before retry"
+        );
+    }
+    return;
+  }
   if (
     eventType === "checkout.session.completed" ||
     eventType === "checkout.session.async_payment_succeeded"
@@ -1212,6 +1397,20 @@ async function processStripeEvent(
     ) {
       const topUpId = cleanString(metadata.topup_id);
       if (isCreditTopUpId(topUpId)) {
+        // Old Checkout sessions retain their original allowance after repricing.
+        const credits =
+          metadata.pricing_version === "2"
+            ? Number(metadata.credits)
+            : ({ boost: 500, momentum: 2000, scale: 5000 } as const)[topUpId];
+        if (!Number.isSafeInteger(credits) || credits <= 0 || credits > 5000)
+          throw new Error("Invalid top-up credit snapshot");
+        await registerCreditPurchase(
+          env,
+          cleanString(object.payment_intent),
+          ownerEmail,
+          credits,
+          Number(object.amount_total)
+        );
         // A credit purchase must never overwrite subscription entitlements.
         await env.DB.prepare(
           "UPDATE billing_accounts SET stripe_customer_id = COALESCE(stripe_customer_id, ?), updated_at = ? WHERE owner_email = ?"
@@ -1221,12 +1420,17 @@ async function processStripeEvent(
         await applyTopUpGrant(
           env,
           ownerEmail,
-          CREDIT_TOP_UPS[topUpId].credits,
+          credits,
           `stripe-topup:${cleanString(object.id, eventId)}`,
           "topup",
-          `${CREDIT_TOP_UPS[topUpId].credits.toLocaleString("en-US")} credit top-up`,
+          `${credits.toLocaleString("en-US")} credit top-up`,
           cleanString(object.id, eventId),
-          { topUpId }
+          {
+            topUpId,
+            paymentIntentId: cleanString(object.payment_intent),
+            paidCents: Number(object.amount_total) || 0,
+            credits,
+          }
         );
       }
       return;
@@ -1256,8 +1460,18 @@ async function processStripeEvent(
     if (!subscriptionId) return; // One-off invoices cannot refill plan credits.
     const ownerEmail = await ownerForStripeObject(env, object);
     if (!validEmail(ownerEmail)) return;
-    const metadata = eventMetadata(object);
-    const identity = priceIdentity(env, priceIdFromObject(object));
+    const latest = await currentSubscription(env, subscriptionId);
+    if (
+      latest &&
+      (cleanString(
+        latest.latest_invoice,
+        cleanString(record(latest.latest_invoice)?.id)
+      ) !== cleanString(object.id) ||
+        !["active", "trialing"].includes(cleanString(latest.status)))
+    )
+      return;
+    const metadata = eventMetadata(latest || object);
+    const identity = priceIdentity(env, priceIdFromObject(latest || object));
     const metadataPlan = cleanString(metadata.plan_id);
     const metadataCycle = cleanString(metadata.billing_cycle);
     const existing = await billingAccount(env, ownerEmail);
@@ -1274,10 +1488,35 @@ async function processStripeEvent(
         ? (existing.billing_cycle as BillingCycle)
         : null);
     if (!planId || !cycle) return;
-    const period = periodFromObject(object);
+    if (
+      existing?.stripe_subscription_id &&
+      existing.stripe_subscription_id !== subscriptionId &&
+      activeSubscription(existing)
+    )
+      throw new Error(
+        "A different subscription is already active; reconcile duplicate purchase"
+      );
+    const period = periodFromObject(latest || object);
+    if (
+      period.end &&
+      existing?.current_period_end &&
+      Date.parse(period.end) < Date.parse(existing.current_period_end)
+    )
+      return;
+    if (
+      existing?.status === "canceled" &&
+      existing.stripe_subscription_id === subscriptionId
+    )
+      return;
     const periodStart = period.start || new Date().toISOString();
     const nextCreditRenewalAt =
-      cycle === "annual" ? addCalendarMonth(periodStart) : period.end;
+      cycle === "annual" &&
+      existing?.current_period_start === periodStart &&
+      existing.next_credit_renewal_at
+        ? existing.next_credit_renewal_at
+        : cycle === "annual"
+          ? addCalendarMonth(periodStart)
+          : period.end;
     await upsertBillingAccount(env, {
       ownerEmail,
       customerId: cleanString(object.customer),
@@ -1288,7 +1527,22 @@ async function processStripeEvent(
       periodStart,
       periodEnd: period.end,
       nextCreditRenewalAt,
+      cancelAtPeriodEnd: latest
+        ? latest.cancel_at_period_end === true
+        : existing?.cancel_at_period_end === 1,
     });
+    if (cleanString(object.billing_reason) === "subscription_update") {
+      await applyProratedPlanCredits(
+        env,
+        ownerEmail,
+        object,
+        planId,
+        periodStart,
+        period.end,
+        cycle
+      );
+      return;
+    }
     await resetIncludedCredits(
       env,
       ownerEmail,
@@ -1306,6 +1560,7 @@ async function processStripeEvent(
     eventType === "customer.subscription.updated" ||
     eventType === "customer.subscription.deleted"
   ) {
+    object = (await currentSubscription(env, cleanString(object.id))) || object;
     const ownerEmail = await ownerForStripeObject(env, object);
     if (!validEmail(ownerEmail)) return;
     const identity = priceIdentity(env, priceIdFromObject(object));
@@ -1319,6 +1574,22 @@ async function processStripeEvent(
       (isBillingCycle(metadataCycle) ? metadataCycle : undefined);
     const period = periodFromObject(object);
     const existing = await billingAccount(env, ownerEmail);
+    if (
+      existing?.stripe_subscription_id &&
+      existing.stripe_subscription_id !== cleanString(object.id)
+    )
+      return;
+    if (
+      period.end &&
+      existing?.current_period_end &&
+      Date.parse(period.end) < Date.parse(existing.current_period_end)
+    )
+      return;
+    if (
+      existing?.status === "canceled" &&
+      eventType !== "customer.subscription.deleted"
+    )
+      return;
     const status =
       eventType === "customer.subscription.deleted"
         ? "canceled"
@@ -1360,6 +1631,24 @@ async function processStripeEvent(
     const ownerEmail = await ownerForStripeObject(env, object);
     if (!validEmail(ownerEmail)) return;
     const existing = await billingAccount(env, ownerEmail);
+    if (existing?.stripe_subscription_id !== subscriptionIdFromObject(object))
+      return;
+    const latest = await currentSubscription(
+      env,
+      subscriptionIdFromObject(object)
+    );
+    if (
+      latest &&
+      ["active", "trialing", "canceled"].includes(cleanString(latest.status))
+    )
+      return;
+    const failedPeriod = periodFromObject(object);
+    if (
+      failedPeriod.end &&
+      existing?.current_period_end &&
+      Date.parse(failedPeriod.end) < Date.parse(existing.current_period_end)
+    )
+      return;
     await upsertBillingAccount(env, {
       ownerEmail,
       customerId: cleanString(object.customer),
@@ -1421,15 +1710,23 @@ export async function handleStripeWebhook(
     .first<{ status: string }>();
   if (existing?.status === "processed") return json({ received: true });
   const now = new Date().toISOString();
-  await env.DB.prepare(
+  const lease = await env.DB.prepare(
     `INSERT INTO stripe_events (event_id, event_type, status, created_at)
      VALUES (?, ?, 'processing', ?)
-     ON CONFLICT(event_id) DO UPDATE SET status = 'processing', error = NULL`
+     ON CONFLICT(event_id) DO UPDATE SET status = 'processing', error = NULL, created_at = excluded.created_at WHERE stripe_events.status = 'failed' OR (stripe_events.status = 'processing' AND stripe_events.created_at <= ?)`
   )
-    .bind(eventId, eventType, now)
+    .bind(eventId, eventType, now, new Date(Date.now() - 300000).toISOString())
     .run();
+  if (lease.meta?.changes !== 1)
+    return error("This event is already processing; retry shortly", 409);
   try {
-    await processStripeEvent(env, eventId, eventType, object);
+    await processStripeEvent(
+      env,
+      eventId,
+      eventType,
+      object,
+      Number(event?.created) || Math.floor(Date.now() / 1000)
+    );
     await env.DB.prepare(
       `UPDATE stripe_events SET status = 'processed', processed_at = ?, error = NULL
        WHERE event_id = ?`

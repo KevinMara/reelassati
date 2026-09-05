@@ -30,6 +30,7 @@ import {
   type PublicationComplianceReview,
   type RightsBasis,
 } from "@contracts/compliance";
+import { useSearchParams } from "react-router-dom";
 import posthog from "@/lib/posthog";
 
 const PLATFORM_META: Record<Platform, { label: string; badge: string }> = {
@@ -134,6 +135,15 @@ function TriStateQuestion({
 }
 
 export default function PublisherPage() {
+  const [query] = useSearchParams();
+  return (
+    <PublisherComposer
+      key={query.get("draft") || query.get("asset") || "new"}
+    />
+  );
+}
+
+function PublisherComposer() {
   const {
     workspace,
     capabilities,
@@ -142,14 +152,42 @@ export default function PublisherPage() {
     refresh,
     saving,
   } = useWorkspace();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [composerPostId, setComposerPostId] = useState(() => createId("post"));
-  const [caption, setCaption] = useState("");
-  const [hashtags, setHashtags] = useState("");
-  const [mediaAssetId, setMediaAssetId] = useState("");
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
+  const [searchParams] = useSearchParams();
+  const initialDraft = workspace.posts.find(
+    p =>
+      p.id === searchParams.get("draft") &&
+      (p.status === "draft" || p.status === "failed")
+  );
+  const initialSchedule = initialDraft?.scheduledAt
+    ? new Date(initialDraft.scheduledAt)
+    : null;
+  const initialLocal =
+    initialSchedule && Number.isFinite(initialSchedule.getTime())
+      ? new Date(
+          initialSchedule.getTime() -
+            initialSchedule.getTimezoneOffset() * 60000
+        )
+          .toISOString()
+          .slice(0, 16)
+      : "";
+  const [editingId, setEditingId] = useState<string | null>(
+    initialDraft?.id || null
+  );
+  const [composerPostId, setComposerPostId] = useState(
+    () => initialDraft?.id || createId("post")
+  );
+  const [caption, setCaption] = useState(initialDraft?.caption || "");
+  const [hashtags, setHashtags] = useState(
+    initialDraft?.hashtags.map(tag => `#${tag}`).join(" ") || ""
+  );
+  const [mediaAssetId, setMediaAssetId] = useState(
+    searchParams.get("asset") || initialDraft?.mediaAssetId || ""
+  );
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(
+    initialDraft?.accountIds || []
+  );
+  const [scheduleDate, setScheduleDate] = useState(initialLocal.slice(0, 10));
+  const [scheduleTime, setScheduleTime] = useState(initialLocal.slice(11, 16));
   const [rightsBasis, setRightsBasis] =
     useState<MediaRightsAnswer>("not-applicable");
   const [aiTextAnswer, setAiTextAnswer] = useState<TriStateAnswer>("unset");

@@ -1,3 +1,5 @@
+import { CreditPlanner } from "@/components/studio/CreditPlanner";
+import posthog from "@/lib/posthog";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -95,6 +97,7 @@ export default function BillingPage() {
   };
 
   useEffect(() => {
+    posthog?.capture("plans_viewed");
     let active = true;
     void platformApi
       .billingSummary()
@@ -139,6 +142,11 @@ export default function BillingPage() {
         planId,
         billingCycle
       );
+      posthog?.capture("checkout_opened", {
+        kind: "subscription",
+        planId,
+        billingCycle,
+      });
       window.location.assign(checkoutUrl);
     } catch (cause) {
       setError(
@@ -153,6 +161,7 @@ export default function BillingPage() {
     setError(null);
     try {
       const { checkoutUrl } = await platformApi.createTopUpCheckout(topUpId);
+      posthog?.capture("checkout_opened", { kind: "topup", topUpId });
       window.location.assign(checkoutUrl);
     } catch (cause) {
       setError(
@@ -249,13 +258,16 @@ export default function BillingPage() {
           <div>
             <h2 className="font-medium">Credit top-ups</h2>
             <p className="text-xs text-foreground/70">
-              Add more without changing your plan. Top-ups roll over.
+              The same credit rate as your plan, including your annual discount.
+              Top-ups roll over.
             </p>
           </div>
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           {(Object.keys(CREDIT_TOP_UPS) as CreditTopUpId[]).map((id, index) => {
-            const pack = CREDIT_TOP_UPS[id];
+            const pack =
+              summary?.topUps.find(item => item.id === id) ||
+              CREDIT_TOP_UPS[id];
             const available = summary?.topUps.find(
               item => item.id === id
             )?.available;
@@ -278,7 +290,7 @@ export default function BillingPage() {
                   ) : null}
                 </div>
                 <div className="mt-5 flex items-center justify-between">
-                  <span className="font-medium">€{pack.price}</span>
+                  <span className="font-medium">€{pack.price.toFixed(2)}</span>
                   {busy === `topup:${id}` ? (
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
                   ) : (
@@ -342,6 +354,13 @@ export default function BillingPage() {
               </span>
             ) : null}
           </div>
+          {!!summary?.adjustmentDebt && (
+            <p className="relative mt-4 text-sm text-foreground/75">
+              {summary.adjustmentDebt.toLocaleString()} credits deducted for a
+              payment refund or dispute. Your available balance includes this
+              adjustment.
+            </p>
+          )}
           <div className="relative mt-7 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-border/70 bg-background/55 p-4 backdrop-blur">
               <p className="text-xs text-foreground/70">Plan credits</p>
@@ -368,6 +387,8 @@ export default function BillingPage() {
         </section>
         <UsageChart summary={summary} loading={loading} />
       </div>
+
+      <CreditPlanner />
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[.85fr_1.15fr]">
         <section className="rounded-2xl border border-border bg-surface p-6">
@@ -606,11 +627,12 @@ function PlanChooser({
               </div>
               <ul className="space-y-3 text-sm text-foreground/85">
                 {[
+                  `${plan.workspaces} brand workspace${plan.workspaces === 1 ? "" : "s"}`,
                   `${plan.socialAccounts} connected social accounts`,
                   "AI scripts, images, video and voice",
                   "Video analysis and custom trend research",
                   "Weekly organic short-form trends",
-                  "Library, editing and content calendar",
+                  "Library, MP4 export and content calendar",
                   "Optional credit top-ups that roll over",
                 ].map(detail => (
                   <li key={detail} className="flex gap-2">

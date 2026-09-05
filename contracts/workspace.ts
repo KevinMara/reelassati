@@ -21,6 +21,7 @@ export type TrackKind = "video" | "audio" | "captions" | "overlay";
 export type ChangeStatus = "proposed" | "accepted" | "rejected";
 
 export interface CapabilityState {
+  operations?: boolean;
   persistence: boolean;
   uploads: boolean;
   ai: boolean;
@@ -57,6 +58,11 @@ export interface BrandKit {
   font: string;
   safeZone: number;
   audioDucking: number;
+  scenePresets?: Array<{
+    id: string;
+    name: string;
+    direction: Record<string, string>;
+  }>;
 }
 
 export interface Asset {
@@ -73,6 +79,8 @@ export interface Asset {
   createdAt: string;
   variantGroupId?: string;
   parentAssetId?: string;
+  favorite?: boolean;
+  projectId?: string;
   provenance?: ContentProvenance;
 }
 

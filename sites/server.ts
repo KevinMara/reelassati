@@ -1,3 +1,10 @@
+import { SOCIAL_METRICS } from "../contracts/social-analytics";
+import { isAuthorizedMaintenanceIdentity } from "../contracts/maintenance";
+import { VOICE_PREVIEWS } from "../contracts/voices";
+import {
+  parseSocialPost,
+  type SocialAnalyticsResponse,
+} from "../contracts/social-analytics";
 import {
   createEmptyWorkspace,
   type Asset,
@@ -165,6 +172,7 @@ type SitesEnvironment = {
 };
 
 interface AuthenticatedUser {
+  brandId?: string;
   email: string;
   name: string;
 }
@@ -181,6 +189,7 @@ interface AssetRow {
 }
 
 interface JobRow {
+  brand_id?: string;
   id: string;
   owner_email: string;
   provider_job_id: string | null;
@@ -482,6 +491,7 @@ function capabilities(
   if (!provenanceReady) missing.push("OUTPUT_MARKING");
 
   return {
+    operations: operatorOwnerEmail(env) === user.email,
     persistence: Boolean(env.DB),
     uploads: Boolean(env.BUCKET),
     ai:
@@ -757,6 +767,24 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
         `),
     ])
       .then(async () => {
+        await env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS brand_workspaces (id TEXT PRIMARY KEY NOT NULL, owner_email TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL)`
+        ).run();
+        await env.DB.prepare(
+          "CREATE INDEX IF NOT EXISTS brands_owner_idx ON brand_workspaces(owner_email)"
+        ).run();
+        for (const table of ["assets", "generation_jobs"]) {
+          const fields = await env.DB.prepare(
+            `PRAGMA table_info(${table})`
+          ).all<{ name: string }>();
+          if (!fields.results.some(field => field.name === "brand_id"))
+            await env.DB.prepare(
+              `ALTER TABLE ${table} ADD COLUMN brand_id TEXT NOT NULL DEFAULT 'default'`
+            ).run();
+          await env.DB.prepare(
+            `CREATE INDEX IF NOT EXISTS ${table}_brand_created_idx ON ${table}(owner_email, brand_id, created_at)`
+          ).run();
+        }
         const columns = await env.DB.prepare(
           "PRAGMA table_info(workspace_state)"
         ).all<{ name: string }>();
@@ -1568,6 +1596,237 @@ async function tokenIsAuthentic(
   return constantTimeEqual(supplied, expected);
 }
 
+async function signedMediaUrl(
+  env: SitesEnvironment,
+  id: string
+): Promise<string> {
+  const key = env.AI_PROVENANCE_SIGNING_KEY || env.OPENROUTER_API_KEY;
+  if (!key) return `/api/assets/${encodeURIComponent(id)}`;
+  const expires = Math.floor(Date.now() / 1000) + 6 * 3600;
+  const token = await videoReferenceToken(key, `media:${id}`, expires);
+  return `/api/media/${encodeURIComponent(id)}?expires=${expires}&token=${token}`;
+}
+
+async function handleSignedMedia(
+  request: Request,
+  env: SitesEnvironment,
+  url: URL
+): Promise<Response> {
+  const id = url.pathname.split("/")[3] || "";
+  const expires = Number(url.searchParams.get("expires"));
+  const key = env.AI_PROVENANCE_SIGNING_KEY || env.OPENROUTER_API_KEY;
+  const now = Math.floor(Date.now() / 1000);
+  if (
+    !["GET", "HEAD"].includes(request.method) ||
+    !key ||
+    !Number.isInteger(expires) ||
+    expires <= now ||
+    expires > now + 6 * 3600 ||
+    !id
+  )
+    return errorResponse("Media link expired. Refresh your Library.", 403);
+  const expected = await videoReferenceToken(key, `media:${id}`, expires);
+  if (!constantTimeEqual(url.searchParams.get("token") || "", expected))
+    return errorResponse("Media unavailable", 403);
+  const row = await env.DB.prepare(
+    "SELECT owner_email, brand_id FROM assets WHERE id = ?"
+  )
+    .bind(id)
+    .first<{ owner_email: string; brand_id: string }>();
+  if (!row) return errorResponse("Media not found", 404);
+  return handleAssets(
+    request,
+    env,
+    { email: row.owner_email, name: "Creator", brandId: row.brand_id },
+    new URL(`/api/assets/${id}`, url.origin)
+  );
+}
+
+function workspaceOwnerKey(user: AuthenticatedUser): string {
+  return user.brandId && user.brandId !== "default"
+    ? `${user.email}::brand:${user.brandId}`
+    : user.email;
+}
+
+async function handleSocialAnalytics(
+  request: Request,
+  env: SitesEnvironment,
+  user: AuthenticatedUser
+): Promise<Response> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS social_analytics_snapshots (owner_key TEXT NOT NULL, day TEXT NOT NULL, payload TEXT NOT NULL, synced_at TEXT NOT NULL, PRIMARY KEY(owner_key, day))`
+  ).run();
+  const key = workspaceOwnerKey(user);
+  const latest = await env.DB.prepare(
+    "SELECT payload, synced_at FROM social_analytics_snapshots WHERE owner_key = ? ORDER BY day DESC LIMIT 1"
+  )
+    .bind(key)
+    .first<{ payload: string; synced_at: string }>();
+  const profile = await env.DB.prepare(
+    "SELECT profile_id FROM zernio_profiles WHERE owner_email = ?"
+  )
+    .bind(key)
+    .first<{ profile_id: string }>();
+  const response: SocialAnalyticsResponse = {
+    configured: Boolean(env.ZERNIO_API_KEY),
+    connected: Boolean(profile),
+    syncedAt: latest?.synced_at || null,
+    partial: false,
+    posts: [],
+  };
+  if (latest) {
+    try {
+      const cached = JSON.parse(latest.payload);
+      response.posts = cached.posts || [];
+      response.partial = cached.partial === true;
+    } catch {
+      response.message = "Previous analytics could not be read. Sync again.";
+    }
+  }
+  if (request.method === "GET") return json(response);
+  if (request.method !== "POST")
+    return errorResponse("Method not allowed", 405);
+  if (!env.ZERNIO_API_KEY || !profile)
+    return json(
+      {
+        ...response,
+        message: "Connect a social account before syncing performance.",
+      },
+      409
+    );
+  if (latest && Date.now() - Date.parse(latest.synced_at) < 15 * 60_000)
+    return json({
+      ...response,
+      message: "Your analytics were synced recently.",
+    });
+  const posts = new Map<
+    string,
+    NonNullable<ReturnType<typeof parseSocialPost>>
+  >();
+  const fromDate = new Date(Date.now() - 180 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  for (let page = 1; page <= 10; page++) {
+    const query = new URLSearchParams({
+      profileId: profile.profile_id,
+      fromDate,
+      limit: "100",
+      page: String(page),
+    });
+    const payload = await zernioRequest(env, `/analytics?${query}`);
+    const nested = recordValue(payload.data);
+    const list = Array.isArray(payload.posts)
+      ? payload.posts
+      : Array.isArray(payload.data)
+        ? payload.data
+        : Array.isArray(nested?.posts)
+          ? nested.posts
+          : null;
+    if (!list)
+      throw errorResponse(
+        "Performance data is not ready yet. Your previous results are preserved.",
+        502
+      );
+    for (const value of list) {
+      const post = parseSocialPost(value);
+      if (post) posts.set(post.id, post);
+    }
+    if (list.length < 100) break;
+    if (page === 10) response.partial = true;
+  }
+  response.posts = Array.from(posts.values());
+  response.syncedAt = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO social_analytics_snapshots (owner_key, day, payload, synced_at) VALUES (?, ?, ?, ?) ON CONFLICT(owner_key, day) DO UPDATE SET payload=excluded.payload, synced_at=excluded.synced_at"
+    ).bind(
+      key,
+      response.syncedAt.slice(0, 10),
+      JSON.stringify({
+        posts: response.posts,
+        partial: response.partial,
+        totals: Object.fromEntries(
+          SOCIAL_METRICS.map(metric => [
+            metric,
+            response.posts.reduce(
+              (sum, post) => sum + (post.metrics[metric] || 0),
+              0
+            ),
+          ])
+        ),
+      }),
+      response.syncedAt
+    ),
+    env.DB.prepare(
+      "UPDATE social_analytics_snapshots SET payload = json_remove(payload, '$.posts') WHERE owner_key = ? AND day < ?"
+    ).bind(key, new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
+    env.DB.prepare(
+      "DELETE FROM social_analytics_snapshots WHERE owner_key = ? AND day < ?"
+    ).bind(
+      key,
+      new Date(Date.now() - 180 * 86400000).toISOString().slice(0, 10)
+    ),
+  ]);
+  return json(response);
+}
+
+async function handleBrands(
+  request: Request,
+  env: SitesEnvironment,
+  user: AuthenticatedUser
+): Promise<Response> {
+  const billing = await billingSummary(env, user);
+  const limit = billing.canUseCredits ? billing.plan?.workspaces || 1 : 1;
+  if (request.method === "GET") {
+    const result = await env.DB.prepare(
+      "SELECT id, name, created_at AS createdAt FROM brand_workspaces WHERE owner_email = ? ORDER BY created_at"
+    )
+      .bind(user.email)
+      .all();
+    const main = await env.DB.prepare(
+      "SELECT document FROM workspace_state WHERE owner_email = ?"
+    )
+      .bind(user.email)
+      .first<{ document: string }>();
+    let name = "My brand";
+    try {
+      name = JSON.parse(main?.document || "{}").brandKit?.name || name;
+    } catch {
+      /* keep display fallback */
+    }
+    return json({
+      brands: [{ id: "default", name }, ...result.results],
+      limit,
+      activeId: user.brandId || "default",
+    });
+  }
+  if (request.method === "POST") {
+    const input = (await request.json()) as { name?: unknown };
+    const name = stringValue(input.name).trim().slice(0, 100);
+    if (!name) return errorResponse("Give your brand a name");
+    const id = crypto.randomUUID();
+    const result = await env.DB.prepare(
+      `INSERT INTO brand_workspaces (id, owner_email, name, created_at) SELECT ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM brand_workspaces WHERE owner_email = ?) < ?`
+    )
+      .bind(
+        id,
+        user.email,
+        name,
+        new Date().toISOString(),
+        user.email,
+        limit - 1
+      )
+      .run();
+    if (result.meta?.changes !== 1)
+      return errorResponse(
+        "Your plan's brand workspace allowance is full. Choose a larger plan to add another brand.",
+        409
+      );
+    return json({ id, name }, 201);
+  }
+  return errorResponse("Method not allowed", 405);
+}
+
 async function getWorkspace(
   env: SitesEnvironment,
   user: AuthenticatedUser
@@ -1576,7 +1835,7 @@ async function getWorkspace(
   const row = await env.DB.prepare(
     "SELECT document, revision FROM workspace_state WHERE owner_email = ?"
   )
-    .bind(user.email)
+    .bind(workspaceOwnerKey(user))
     .first<{ document: string; revision: number }>();
 
   let workspace: WorkspaceDocument | null = null;
@@ -1599,6 +1858,17 @@ async function getWorkspace(
 
   if (!workspace) {
     workspace = createEmptyWorkspace(user.email, user.name);
+    if (user.brandId && user.brandId !== "default") {
+      const brand = await env.DB.prepare(
+        "SELECT name FROM brand_workspaces WHERE id = ? AND owner_email = ?"
+      )
+        .bind(user.brandId, user.email)
+        .first<{ name: string }>();
+      if (brand) {
+        workspace.brandKit.name = brand.name;
+        workspace.profile.workspaceName = brand.name;
+      }
+    }
     workspace = await saveWorkspace(env, user, workspace);
   }
   workspace = await reconcileWorkspaceProvenance(env, user, workspace, {
@@ -1624,6 +1894,11 @@ async function getWorkspace(
         : {}),
       ...(saved.variantGroupId ? { variantGroupId: saved.variantGroupId } : {}),
       ...(saved.parentAssetId ? { parentAssetId: saved.parentAssetId } : {}),
+      favorite: saved.favorite === true,
+      ...(saved.projectId &&
+      workspace!.projects.some(project => project.id === saved.projectId)
+        ? { projectId: saved.projectId }
+        : {}),
     };
   });
   const availableAssetIds = new Set(workspace.assets.map(asset => asset.id));
@@ -1645,6 +1920,12 @@ async function getWorkspace(
         : undefined,
   }));
   workspace.jobs = await listOwnerJobs(env, user);
+  workspace.assets = await Promise.all(
+    workspace.assets.map(async asset => ({
+      ...asset,
+      url: await signedMediaUrl(env, asset.id),
+    }))
+  );
   return workspace;
 }
 
@@ -1671,7 +1952,44 @@ function normalizeWorkspace(
       email: user.email,
       name: candidate.profile?.name || user.name,
     },
-    brandKit: { ...empty.brandKit, ...(candidate.brandKit || {}) },
+    brandKit: {
+      ...empty.brandKit,
+      ...(candidate.brandKit || {}),
+      scenePresets: Array.isArray(candidate.brandKit?.scenePresets)
+        ? candidate.brandKit.scenePresets.slice(0, 20).flatMap(p => {
+            if (
+              !p ||
+              typeof p.id !== "string" ||
+              typeof p.name !== "string" ||
+              !recordValue(p.direction)
+            )
+              return [];
+            return [
+              {
+                id: p.id.slice(0, 100),
+                name: p.name.slice(0, 80),
+                direction: Object.fromEntries(
+                  Object.entries(p.direction)
+                    .filter(
+                      ([key, v]) =>
+                        [
+                          "subject",
+                          "action",
+                          "location",
+                          "camera",
+                          "mood",
+                          "dialogue",
+                          "sound",
+                          "avoid",
+                        ].includes(key) && typeof v === "string"
+                    )
+                    .map(([key, v]) => [key, String(v).slice(0, 4000)])
+                ),
+              },
+            ];
+          })
+        : [],
+    },
     projects: Array.isArray(candidate.projects)
       ? candidate.projects.map(project => ({
           ...project,
@@ -2507,7 +2825,7 @@ async function saveWorkspace(
   const current = await env.DB.prepare(
     "SELECT revision FROM workspace_state WHERE owner_email = ?"
   )
-    .bind(user.email)
+    .bind(workspaceOwnerKey(user))
     .first<{ revision: number }>();
   const expectedRevision = workspace.revision;
 
@@ -2579,7 +2897,7 @@ async function saveWorkspace(
             serialized,
             workspace.updatedAt,
             workspace.revision,
-            user.email,
+            workspaceOwnerKey(user),
             expectedRevision
           )
           .run()
@@ -2591,7 +2909,7 @@ async function saveWorkspace(
         ON CONFLICT(owner_email) DO NOTHING
       `
         )
-          .bind(user.email, serialized, workspace.updatedAt)
+          .bind(workspaceOwnerKey(user), serialized, workspace.updatedAt)
           .run();
     if ((result.meta?.changes || 0) !== 1) {
       throw new Response(
@@ -2845,8 +3163,8 @@ async function insertAssetRecord(
   await env.DB.prepare(
     `
     INSERT INTO assets
-      (id, owner_email, name, kind, content_type, bytes, r2_key, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (id, owner_email, name, kind, content_type, bytes, r2_key, created_at, brand_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `
   )
     .bind(
@@ -2857,7 +3175,8 @@ async function insertAssetRecord(
       input.contentType,
       input.size,
       input.r2Key,
-      createdAt
+      createdAt,
+      user.brandId || "default"
     )
     .run();
 
@@ -2867,7 +3186,7 @@ async function insertAssetRecord(
     kind: input.kind,
     contentType: input.contentType,
     size: input.size,
-    url: `/api/assets/${encodeURIComponent(id)}`,
+    url: await signedMediaUrl(env, id),
     status: "ready",
     createdAt,
   };
@@ -2887,8 +3206,8 @@ async function ensureGeneratedAssetRecord(
   await env.DB.prepare(
     `
     INSERT INTO assets
-      (id, owner_email, name, kind, content_type, bytes, r2_key, created_at)
-    VALUES (?, ?, ?, 'video', ?, ?, ?, ?)
+      (id, owner_email, name, kind, content_type, bytes, r2_key, created_at, brand_id)
+    VALUES (?, ?, ?, 'video', ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO NOTHING
   `
   )
@@ -2899,14 +3218,15 @@ async function ensureGeneratedAssetRecord(
       input.contentType,
       input.size,
       input.r2Key,
-      new Date().toISOString()
+      new Date().toISOString(),
+      user.brandId || "default"
     )
     .run();
   const row = await getAssetRow(env, user, input.id);
   if (!row || row.r2_key !== input.r2Key) {
     throw new Error("The generated asset id is already bound elsewhere");
   }
-  return rowToAsset(row);
+  return { ...rowToAsset(row), url: await signedMediaUrl(env, row.id) };
 }
 
 async function getAssetRow(
@@ -2917,9 +3237,9 @@ async function getAssetRow(
   await initializeSchema(env);
   return env.DB.prepare(
     `SELECT id, owner_email, name, kind, content_type, bytes, r2_key, created_at
-     FROM assets WHERE id = ? AND owner_email = ?`
+     FROM assets WHERE id = ? AND owner_email = ? AND brand_id = ?`
   )
-    .bind(id, user.email)
+    .bind(id, user.email, user.brandId || "default")
     .first<AssetRow>();
 }
 
@@ -2930,9 +3250,9 @@ async function listOwnerAssets(
   await initializeSchema(env);
   const result = await env.DB.prepare(
     `SELECT id, owner_email, name, kind, content_type, bytes, r2_key, created_at
-     FROM assets WHERE owner_email = ? ORDER BY created_at DESC`
+     FROM assets WHERE owner_email = ? AND brand_id = ? ORDER BY created_at DESC`
   )
-    .bind(user.email)
+    .bind(user.email, user.brandId || "default")
     .all<AssetRow>();
   const provenanceRows = await env.DB.prepare(
     `
@@ -2967,9 +3287,9 @@ async function listOwnerJobs(
     `SELECT id, owner_email, provider_job_id, project_id, prompt, status,
             progress, result_asset_id, error, payload, finalizing_at,
             created_at, updated_at
-     FROM generation_jobs WHERE owner_email = ? ORDER BY created_at DESC`
+     FROM generation_jobs WHERE owner_email = ? AND brand_id = ? ORDER BY created_at DESC`
   )
-    .bind(user.email)
+    .bind(user.email, user.brandId || "default")
     .all<JobRow>();
   return result.results.map(jobFromRow);
 }
@@ -3818,7 +4138,7 @@ async function ensureZernioProfile(
   const existing = await env.DB.prepare(
     "SELECT profile_id FROM zernio_profiles WHERE owner_email = ?"
   )
-    .bind(user.email)
+    .bind(workspaceOwnerKey(user))
     .first<{ profile_id: string }>();
   if (existing?.profile_id) return existing.profile_id;
 
@@ -3826,7 +4146,7 @@ async function ensureZernioProfile(
   try {
     payload = await zernioRequest(env, "/profiles", {
       method: "POST",
-      headers: { "Idempotency-Key": `reelassati-${user.email}` },
+      headers: { "Idempotency-Key": `reelassati-${workspaceOwnerKey(user)}` },
       body: JSON.stringify({
         name: `REELassati — ${user.name}`,
         description: "Creator profile managed by REELassati",
@@ -3858,7 +4178,7 @@ async function ensureZernioProfile(
     ON CONFLICT(owner_email) DO UPDATE SET profile_id = excluded.profile_id
   `
   )
-    .bind(user.email, id, new Date().toISOString())
+    .bind(workspaceOwnerKey(user), id, new Date().toISOString())
     .run();
   return id;
 }
@@ -3867,7 +4187,13 @@ async function listZernioAccounts(
   env: SitesEnvironment,
   user: AuthenticatedUser
 ): Promise<PublishingAccount[]> {
-  const profileId = await ensureZernioProfile(env, user);
+  const stored = await env.DB.prepare(
+    "SELECT profile_id FROM zernio_profiles WHERE owner_email = ?"
+  )
+    .bind(workspaceOwnerKey(user))
+    .first<{ profile_id: string }>();
+  if (!stored) return [];
+  const profileId = stored.profile_id;
   const payload = await zernioRequest(
     env,
     `/accounts?profileId=${encodeURIComponent(profileId)}`
@@ -4008,28 +4334,119 @@ async function handleAssets(
       );
     }
 
+    const renderProjectId = stringValue(form.get("render_project_id"));
+    let renderSources: ContentProvenance[] = [];
+    if (renderProjectId) {
+      if (contentType !== "video/mp4" || file.size > MAX_AI_MEDIA_BYTES)
+        return errorResponse(
+          "Rendered Library videos must be MP4 files under 24 MB. Your download is still available.",
+          413
+        );
+      const renderWorkspace = await getWorkspace(env, user);
+      const sourceProject = renderWorkspace.projects.find(
+        project => project.id === renderProjectId
+      );
+      if (!sourceProject) return errorResponse("Source project not found", 404);
+      renderSources = renderWorkspace.assets
+        .filter(asset =>
+          sourceProject.clips.some(clip => clip.assetId === asset.id)
+        )
+        .flatMap(asset => (asset.provenance ? [asset.provenance] : []));
+      if (sourceProject.transcriptProvenance)
+        renderSources.push(sourceProject.transcriptProvenance);
+    }
     const assetId = crypto.randomUUID();
     const safeName = sanitizeFilename(file.name);
-    const r2Key = `users/${encodeURIComponent(user.email)}/assets/${assetId}/${safeName}`;
+    const r2Key = `users/${encodeURIComponent(user.email)}/${renderSources.length ? "generated" : "assets"}/${assetId}/${safeName}`;
     await env.BUCKET.put(r2Key, file.stream(), {
       httpMetadata: { contentType },
       customMetadata: { owner: user.email, originalName: file.name },
     });
     let asset: Asset;
+    let renderedProvenance: ContentProvenance | undefined;
+    let pendingRenderProvenance: ContentProvenance | undefined;
+    let storedSize = file.size;
     try {
+      if (
+        renderSources.some(source =>
+          ["ai-generated", "ai-manipulated", "ai-assisted"].includes(
+            source.origin
+          )
+        )
+      ) {
+        const bytes = await file.arrayBuffer();
+        const pending = await createProvenanceRecord(env, user, {
+          entityType: "asset",
+          entityId: assetId,
+          origin: "ai-manipulated",
+          operation: "timeline-render",
+          provider: "REELassati",
+          model: "timeline-compositor",
+          content: bytes,
+          embeddedMediaMarker: true,
+          metadata: {
+            projectId: renderProjectId,
+            parentRecordIds: renderSources.map(source => source.recordId),
+            rendering: "client-composited",
+          },
+        });
+        pendingRenderProvenance = pending;
+        const marked = embedMediaProvenanceMarker(
+          bytes,
+          contentType,
+          pending.marking.publicToken || ""
+        );
+        if (!marked)
+          throw new Error(
+            "Rendered video could not preserve its source marking"
+          );
+        await env.BUCKET.put(r2Key, marked.bytes, {
+          httpMetadata: { contentType },
+          customMetadata: {
+            owner: user.email,
+            originalName: file.name,
+            provenanceToken: pending.marking.publicToken || "",
+            policyVersion: AI_COMPLIANCE_POLICY_VERSION,
+            embeddedMarking: marked.method,
+          },
+        });
+        renderedProvenance = await finalizeEmbeddedProvenance(
+          env,
+          user,
+          pending,
+          marked.bytes
+        );
+        storedSize = marked.bytes.byteLength;
+      }
       asset = await insertAssetRecord(env, user, {
         id: assetId,
         name: file.name,
         kind: inferAssetKind(contentType, stringValue(form.get("kind"))),
         contentType,
-        size: file.size,
+        size: storedSize,
         r2Key,
       });
     } catch (cause) {
       await env.BUCKET.delete(r2Key).catch(() => undefined);
+      if (pendingRenderProvenance)
+        await failProvenanceRecord(
+          env,
+          user,
+          pendingRenderProvenance.recordId,
+          "asset",
+          assetId,
+          "Timeline export could not be finalized"
+        ).catch(() => undefined);
       throw cause;
     }
-    return json({ asset }, 201);
+    return json(
+      {
+        asset: renderedProvenance
+          ? { ...asset, provenance: renderedProvenance }
+          : asset,
+      },
+      201
+    );
   }
 
   if (!id) return errorResponse("Asset not found", 404);
@@ -4066,7 +4483,12 @@ async function handleAssets(
     )
       .bind(name, id, user.email)
       .run();
-    return json({ asset: rowToAsset({ ...row, name }) });
+    return json({
+      asset: {
+        ...rowToAsset({ ...row, name }),
+        url: await signedMediaUrl(env, row.id),
+      },
+    });
   }
 
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -5196,6 +5618,15 @@ async function handleVideoJobs(
   }
   await initializeSchema(env);
   const id = url.pathname.split("/").filter(Boolean)[3];
+  if (id) {
+    const scoped = await env.DB.prepare(
+      "SELECT brand_id FROM generation_jobs WHERE id = ? AND owner_email = ?"
+    )
+      .bind(id, user.email)
+      .first<{ brand_id: string }>();
+    if (scoped && scoped.brand_id !== (user.brandId || "default"))
+      return errorResponse("Video not found in this brand", 404);
+  }
 
   if (request.method === "POST" && !id) {
     const input = await parseJsonBody<{
@@ -5262,6 +5693,7 @@ async function handleVideoJobs(
         .first<JobRow>();
       if (
         !parentJob ||
+        (parentJob.brand_id || "default") !== (user.brandId || "default") ||
         parentJob.status !== "completed" ||
         !parentJob.result_asset_id
       ) {
@@ -5406,8 +5838,8 @@ async function handleVideoJobs(
       `
       INSERT INTO generation_jobs
         (id, owner_email, provider_job_id, project_id, prompt, status, progress,
-         result_asset_id, error, payload, finalizing_at, created_at, updated_at)
-      VALUES (?, ?, NULL, ?, ?, 'pending', 2, NULL, NULL, ?, NULL, ?, ?)
+         result_asset_id, error, payload, finalizing_at, created_at, updated_at, brand_id)
+      VALUES (?, ?, NULL, ?, ?, 'pending', 2, NULL, NULL, ?, NULL, ?, ?, ?)
       ON CONFLICT(id) DO NOTHING
     `
     )
@@ -5433,7 +5865,8 @@ async function handleVideoJobs(
           creditReservation,
         }),
         now,
-        now
+        now,
+        user.brandId || "default"
       )
       .run();
     const registered = await env.DB.prepare(
@@ -6006,7 +6439,14 @@ async function handleVideoJobs(
     : null;
   return json({
     job: jobFromRow(row as JobRow),
-    ...(asset ? { asset: rowToAsset(asset, assetProvenance) } : {}),
+    ...(asset
+      ? {
+          asset: {
+            ...rowToAsset(asset, assetProvenance),
+            url: await signedMediaUrl(env, asset.id),
+          },
+        }
+      : {}),
   });
 }
 
@@ -6157,6 +6597,7 @@ async function handleVideoWebhook(
 
   const user: AuthenticatedUser = {
     email: row.owner_email,
+    brandId: row.brand_id || "default",
     name: nameFromEmail(row.owner_email),
   };
   const jobUrl = new URL(
@@ -6643,6 +7084,363 @@ async function reconcilePublishingStatuses(
   );
 }
 
+const maintenanceJwks = createRemoteJWKSet(
+  new URL("https://token.actions.githubusercontent.com/.well-known/jwks")
+);
+async function handleMaintenance(
+  request: Request,
+  env: SitesEnvironment
+): Promise<Response> {
+  if (request.method !== "POST")
+    return errorResponse("Method not allowed", 405);
+  const token = (request.headers.get("authorization") || "").replace(
+    /^Bearer /,
+    ""
+  );
+  try {
+    const { payload } = await jwtVerify(token, maintenanceJwks, {
+      issuer: "https://token.actions.githubusercontent.com",
+      audience: "https://reelassati.app",
+      algorithms: ["RS256"],
+    });
+    if (!isAuthorizedMaintenanceIdentity(payload))
+      return errorResponse("Unauthorized", 401);
+  } catch {
+    return errorResponse("Unauthorized", 401);
+  }
+  await initializeSchema(env);
+  const tasks: Array<{ task: string; ok: boolean; checked?: number }> = [];
+  try {
+    await applyAllDueAnnualCreditRenewals(env);
+    tasks.push({ task: "monthly credit renewals", ok: true });
+  } catch {
+    tasks.push({ task: "monthly credit renewals", ok: false });
+  }
+  try {
+    await refreshWeeklyTrendFeed(env);
+    tasks.push({ task: "weekly trends", ok: true });
+  } catch {
+    tasks.push({ task: "weekly trends", ok: false });
+  }
+  if (env.OPENROUTER_API_KEY) {
+    const pending = await env.DB.prepare(
+      "SELECT id,owner_email,brand_id FROM generation_jobs WHERE status IN ('pending','in_progress') ORDER BY updated_at LIMIT 2"
+    ).all<{ id: string; owner_email: string; brand_id: string }>();
+    let failed = 0;
+    for (const job of pending.results) {
+      try {
+        const url = new URL(`https://reelassati.app/api/video/jobs/${job.id}`);
+        const response = await handleVideoJobs(
+          new Request(url),
+          env,
+          {
+            email: job.owner_email,
+            name: nameFromEmail(job.owner_email),
+            brandId: job.brand_id,
+          },
+          url
+        );
+        if (!response.ok) failed++;
+      } catch {
+        failed++;
+      }
+    }
+    tasks.push({
+      task: "generation recovery",
+      ok: failed === 0,
+      checked: pending.results.length,
+    });
+  }
+  if (env.ZERNIO_API_KEY) {
+    await env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS social_analytics_snapshots(owner_key TEXT NOT NULL,day TEXT NOT NULL,payload TEXT NOT NULL,synced_at TEXT NOT NULL,PRIMARY KEY(owner_key,day))"
+    ).run();
+    const profiles = await env.DB.prepare(
+      "SELECT owner_email FROM zernio_profiles ORDER BY COALESCE((SELECT MAX(synced_at) FROM social_analytics_snapshots WHERE owner_key = zernio_profiles.owner_email),'') LIMIT 20"
+    ).all<{ owner_email: string }>();
+    let failed = 0;
+    for (const profile of profiles.results) {
+      const [email, brandId] = profile.owner_email.split("::brand:");
+      const user = {
+        email,
+        name: nameFromEmail(email),
+        brandId: brandId || "default",
+      };
+      try {
+        const response = await handleSocialAnalytics(
+          new Request("https://reelassati.app/api/analytics/social", {
+            method: "POST",
+          }),
+          env,
+          user
+        );
+        if (!response.ok) failed++;
+        await reconcilePublishingStatuses(env, user);
+      } catch {
+        failed++;
+      }
+    }
+    tasks.push({
+      task: "social results and publication status",
+      ok: failed === 0,
+      checked: profiles.results.length,
+    });
+  }
+  const ok = tasks.every(t => t.ok);
+  return json(
+    { ok, checkedAt: new Date().toISOString(), tasks },
+    ok ? 200 : 502
+  );
+}
+
+async function handleOperations(
+  request: Request,
+  env: SitesEnvironment,
+  user: AuthenticatedUser
+): Promise<Response> {
+  if (request.method !== "GET") return errorResponse("Method not allowed", 405);
+  if (!operatorOwnerEmail(env) || operatorOwnerEmail(env) !== user.email)
+    return errorResponse("Operator access required", 403);
+  await billingSummary(env, user);
+  const since = new Date(Date.now() - 7 * 86400000).toISOString(),
+    stalled = new Date(Date.now() - 30 * 60000).toISOString();
+  const [
+    storage,
+    payments,
+    generations,
+    stalledJobs,
+    tickets,
+    trend,
+    paymentIssues,
+  ] = await Promise.all([
+    env.DB.prepare(
+      "SELECT COUNT(*) AS count, COALESCE(SUM(bytes),0) AS bytes FROM assets"
+    ).first<{ count: number; bytes: number }>(),
+    env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM stripe_events WHERE status = 'failed'"
+    ).first<{ count: number }>(),
+    env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM ai_invocations WHERE status = 'failed' AND created_at >= ?"
+    )
+      .bind(since)
+      .first<{ count: number }>(),
+    env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM generation_jobs WHERE status IN ('pending','in_progress') AND updated_at < ?"
+    )
+      .bind(stalled)
+      .first<{ count: number }>(),
+    env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM support_tickets WHERE status = 'open'"
+    ).first<{ count: number }>(),
+    env.DB.prepare(
+      "SELECT last_completed_at, last_error FROM trend_refresh_state WHERE refresh_key = ?"
+    )
+      .bind(TREND_WEEKLY_SCOPE_KEY)
+      .first<{ last_completed_at: string | null; last_error: string | null }>(),
+    env.DB.prepare(
+      "SELECT event_id AS eventId, event_type AS type, created_at AS createdAt FROM stripe_events WHERE status = 'failed' ORDER BY created_at DESC LIMIT 10"
+    ).all(),
+  ]);
+  return json({
+    checkedAt: new Date().toISOString(),
+    services: [
+      { name: "AI generation", configured: !!env.OPENROUTER_API_KEY },
+      { name: "Payments", configured: stripeBillingConfigured(env) },
+      {
+        name: "Social publishing and analytics",
+        configured: !!env.ZERNIO_API_KEY,
+      },
+      { name: "Output marking", configured: !!env.AI_PROVENANCE_SIGNING_KEY },
+    ],
+    counts: {
+      assets: storage?.count || 0,
+      storageBytes: storage?.bytes || 0,
+      failedPayments: payments?.count || 0,
+      failedGenerations: generations?.count || 0,
+      stalledGenerations: stalledJobs?.count || 0,
+      openSupport: tickets?.count || 0,
+    },
+    trends: {
+      generatedAt: trend?.last_completed_at || null,
+      lastError: trend?.last_error || null,
+    },
+    paymentIssues: paymentIssues.results,
+  });
+}
+
+async function handleAccountData(
+  request: Request,
+  env: SitesEnvironment,
+  user: AuthenticatedUser
+): Promise<Response> {
+  if (request.method === "GET") {
+    const brands = await env.DB.prepare(
+      "SELECT id, name FROM brand_workspaces WHERE owner_email = ?"
+    )
+      .bind(user.email)
+      .all<{ id: string; name: string }>();
+    const workspaces = [];
+    for (const brandId of ["default", ...brands.results.map(b => b.id)])
+      workspaces.push({
+        brandId,
+        workspace: await getWorkspace(env, { ...user, brandId }),
+      });
+    const billing = await billingSummary(env, user);
+    return json({
+      exportedAt: new Date().toISOString(),
+      email: user.email,
+      workspaces,
+      billing,
+      note: "Workspace data and Library media links. Media links expire after six hours; download media separately from your Library.",
+    });
+  }
+  if (request.method === "POST") {
+    const input = await parseJsonBody<{ confirmation?: string }>(request);
+    if (input.confirmation !== "DELETE MY ACCOUNT")
+      return errorResponse("Confirm your account deletion request", 422);
+    const existing = await env.DB.prepare(
+      "SELECT id FROM support_tickets WHERE authenticated_owner_email = ? AND category = 'privacy' AND subject = 'Account deletion request' AND status = 'open' LIMIT 1"
+    )
+      .bind(user.email)
+      .first<{ id: string }>();
+    if (existing) return json({ requestId: existing.id });
+    const ticket = await createSupportTicket(env, user, {
+      category: "privacy",
+      priority: "high",
+      subject: "Account deletion request",
+      description:
+        "The signed-in account owner requests deletion of their account and all brand workspaces. Confirm billing cancellation and applicable record-retention requirements before completing deletion.",
+    });
+    return json({ requestId: ticket.id }, 201);
+  }
+  return errorResponse("Method not allowed", 405);
+}
+
+async function handleVoicePreview(
+  request: Request,
+  env: SitesEnvironment
+): Promise<Response> {
+  if (request.method !== "POST")
+    return errorResponse("Method not allowed", 405);
+  const input = await parseJsonBody<{ voice?: string }>(request);
+  const voice = stringValue(input.voice);
+  const previewText = Object.prototype.hasOwnProperty.call(
+    VOICE_PREVIEWS,
+    voice
+  )
+    ? VOICE_PREVIEWS[voice]
+    : null;
+  if (!previewText) return errorResponse("Choose an available voice", 422);
+  if (!env.OPENROUTER_API_KEY || !env.AI_PROVENANCE_SIGNING_KEY || !env.BUCKET)
+    return errorResponse("Voice preview is temporarily unavailable", 503);
+  const system = {
+    email: "system-voice-previews@reelassati.app",
+    name: "REELassati",
+  };
+  const model = env.OPENROUTER_TTS_MODEL || "minimax/speech-2.8-turbo";
+  const id = `voice-preview-${(await sha256Hex(`${model}:${voice}:${previewText}`)).slice(0, 32)}`;
+  const r2Key = `users/${encodeURIComponent(system.email)}/generated/${id}.mp3`;
+  const cached = await env.DB.prepare(
+    "SELECT id FROM assets WHERE owner_email = ? AND r2_key = ?"
+  )
+    .bind(system.email, r2Key)
+    .first<{ id: string }>();
+  if (cached) return json({ url: await signedMediaUrl(env, cached.id) });
+  const now = new Date().toISOString(),
+    leaseUntil = new Date(Date.now() + 300000).toISOString();
+  const lock = await env.DB.prepare(
+    `INSERT INTO trend_refresh_state(refresh_key,lease_expires_at,last_started_at) VALUES (?,?,?) ON CONFLICT(refresh_key) DO UPDATE SET lease_expires_at=excluded.lease_expires_at,last_started_at=excluded.last_started_at WHERE lease_expires_at <= ?`
+  )
+    .bind(id, leaseUntil, now, now)
+    .run();
+  if (lock.meta?.changes !== 1)
+    return errorResponse(
+      "This voice preview is being prepared. Try again in a moment.",
+      409
+    );
+  const invocation = await beginAiInvocation(
+    env,
+    system,
+    "speech-synthesis",
+    "OpenRouter",
+    model,
+    { sharedPreview: true, voice, text: previewText }
+  );
+  const assetId = crypto.randomUUID();
+  let provenance: ContentProvenance | undefined;
+  try {
+    const response = await fetch(`${OPENROUTER_BASE}/audio/speech`, {
+      method: "POST",
+      headers: openRouterHeaders(env),
+      body: JSON.stringify({
+        model,
+        input: previewText,
+        voice,
+        response_format: "mp3",
+      }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!response.ok) await providerError(response, "OpenRouter");
+    const bytes = await response.arrayBuffer();
+    if (bytes.byteLength > 2000000)
+      throw new Error("Voice preview exceeds its size limit");
+    provenance = await createProvenanceRecord(env, system, {
+      entityType: "asset",
+      entityId: assetId,
+      origin: "ai-generated",
+      operation: "speech-synthesis",
+      provider: "OpenRouter",
+      model,
+      content: bytes,
+      embeddedMediaMarker: true,
+      metadata: { sharedPreview: true, voice },
+    });
+    const marked = embedMediaProvenanceMarker(
+      bytes,
+      "audio/mpeg",
+      provenance.marking.publicToken || ""
+    );
+    if (!marked) throw new Error("Voice preview marking unavailable");
+    await env.BUCKET.put(r2Key, marked.bytes, {
+      httpMetadata: { contentType: "audio/mpeg" },
+      customMetadata: {
+        owner: system.email,
+        provenanceToken: provenance.marking.publicToken || "",
+        policyVersion: AI_COMPLIANCE_POLICY_VERSION,
+        embeddedMarking: marked.method,
+      },
+    });
+    await finalizeEmbeddedProvenance(env, system, provenance, marked.bytes);
+    await insertAssetRecord(env, system, {
+      id: assetId,
+      name: "Voice preview.mp3",
+      kind: "audio",
+      contentType: "audio/mpeg",
+      size: marked.bytes.byteLength,
+      r2Key,
+    });
+    await completeAiInvocation(env, invocation, await sha256Hex(bytes));
+    return json({ url: await signedMediaUrl(env, assetId) });
+  } catch (cause) {
+    await failAiInvocation(env, invocation, "preview_generation_failure");
+    if (provenance)
+      await failProvenanceRecord(
+        env,
+        system,
+        provenance.recordId,
+        "asset",
+        assetId,
+        "preview_generation_failure"
+      );
+    await env.BUCKET.delete(r2Key).catch(() => undefined);
+    await env.DB.prepare("DELETE FROM assets WHERE id = ? AND owner_email = ?")
+      .bind(assetId, system.email)
+      .run()
+      .catch(() => undefined);
+    throw cause;
+  }
+}
+
 async function handlePublishing(
   request: Request,
   env: SitesEnvironment,
@@ -6684,7 +7482,19 @@ async function handlePublishing(
     }
     const [accountLimit, connectedAccounts] = await Promise.all([
       socialAccountLimit(env, user),
-      listZernioAccounts(env, user),
+      (async () => {
+        const brands = await env.DB.prepare(
+          "SELECT id FROM brand_workspaces WHERE owner_email = ?"
+        )
+          .bind(user.email)
+          .all<{ id: string }>();
+        const accounts = [] as PublishingAccount[];
+        for (const brandId of ["default", ...brands.results.map(b => b.id)])
+          accounts.push(
+            ...(await listZernioAccounts(env, { ...user, brandId }))
+          );
+        return accounts;
+      })(),
     ]);
     if (accountLimit <= 0) {
       return errorResponse(
@@ -9691,13 +10501,7 @@ async function handleTrends(
 
   if (request.method === "GET") {
     const scope = weeklyTrendScope();
-    let cached = await latestWeeklyTrendSnapshot(env);
-    if (!cached) {
-      const bootstrap = await refreshWeeklyTrendFeed(env);
-      if (bootstrap.reason !== "in_progress") {
-        cached = await latestWeeklyTrendSnapshot(env);
-      }
-    }
+    const cached = await latestWeeklyTrendSnapshot(env);
     if (cached) {
       try {
         const trends = JSON.parse(cached.payload_json) as TrendEvidenceItem[];
@@ -9831,6 +10635,16 @@ async function handleApi(
     return json({ country });
   }
 
+  if (url.pathname === "/api/publishing/callback" && request.method === "GET") {
+    const platform =
+      knownPlatform(url.searchParams.get("platform")) || "account";
+    return Response.redirect(
+      `https://www.reelassati.app/#/dashboard/social?connected=${encodeURIComponent(platform)}`,
+      302
+    );
+  }
+  if (url.pathname === "/api/internal/maintenance")
+    return handleMaintenance(request, env);
   if (url.pathname === "/api/internal/trends/weekly") {
     return handleWeeklyTrendRefresh(request, env);
   }
@@ -9859,10 +10673,35 @@ async function handleApi(
     return handlePublicProvenance(request, env, url);
   }
 
+  if (url.pathname.startsWith("/api/media/")) {
+    await initializeSchema(env);
+    return handleSignedMedia(request, env, url);
+  }
   const user = await getUser(request, env);
   if (!user) {
     return errorResponse("Sign in to access this workspace", 401);
   }
+
+  await initializeSchema(env);
+  const requestedBrand = request.headers.get("x-reelassati-brand") || "default";
+  if (requestedBrand !== "default") {
+    const brand = await env.DB.prepare(
+      "SELECT id FROM brand_workspaces WHERE id = ? AND owner_email = ?"
+    )
+      .bind(requestedBrand, user.email)
+      .first();
+    if (!brand) return errorResponse("Brand workspace not found", 404);
+    user.brandId = requestedBrand;
+  }
+  if (url.pathname === "/api/brands") return handleBrands(request, env, user);
+  if (url.pathname === "/api/operations")
+    return handleOperations(request, env, user);
+  if (url.pathname === "/api/account/data")
+    return handleAccountData(request, env, user);
+  if (url.pathname === "/api/voice-preview")
+    return handleVoicePreview(request, env);
+  if (url.pathname === "/api/analytics/social")
+    return handleSocialAnalytics(request, env, user);
 
   if (
     (url.pathname === "/api/session" || url.pathname === "/api/auth/me") &&
@@ -10007,7 +10846,10 @@ function withCors(response: Response, request: Request): Response {
   if (!allowed) return response;
   const headers = new Headers(response.headers);
   headers.set("Access-Control-Allow-Origin", origin);
-  headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  headers.set(
+    "Access-Control-Allow-Headers",
+    "Authorization, Content-Type, X-Reelassati-Brand"
+  );
   headers.set(
     "Access-Control-Allow-Methods",
     "GET, POST, PUT, PATCH, DELETE, OPTIONS"

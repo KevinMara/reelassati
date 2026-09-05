@@ -48,7 +48,10 @@ const env: BillingEnvironment = {
   },
   STRIPE_WEBHOOK_SECRET: "whsec_test_only",
   STRIPE_PRICE_IDS_JSON: JSON.stringify({
-    plans: { creator: { monthly: "price_creator", annual: "price_annual" } },
+    plans: {
+      creator: { monthly: "price_creator", annual: "price_annual" },
+      pro: { monthly: "price_pro", annual: "price_proannual" },
+    },
   }),
 };
 const owner = "owner@example.com";
@@ -91,7 +94,7 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   sqlite.exec(
-    "DELETE FROM billing_accounts; DELETE FROM credit_accounts; DELETE FROM credit_ledger; DELETE FROM stripe_events;"
+    "DELETE FROM billing_accounts; DELETE FROM credit_accounts; DELETE FROM credit_ledger; DELETE FROM stripe_events; DELETE FROM billing_payment_adjustments;"
   );
   sqlite
     .prepare(
@@ -260,5 +263,133 @@ describe("Stripe entitlement integrity with actual SQLite", () => {
       name: "Empty",
     });
     expect(empty.usage?.daily).toEqual([]);
+  });
+});
+
+describe("refund and upgrade edge cases", () => {
+  it("grants the purchased snapshot and reverses partial refunds exactly once, including spent credits", async () => {
+    await webhook("evt_paid", "checkout.session.completed", {
+      id: "cs_adjust",
+      customer: "cus_owner",
+      payment_intent: "pi_adjust",
+      amount_total: 1900,
+      payment_status: "paid",
+      metadata: {
+        owner_email: owner,
+        purchase_kind: "topup",
+        topup_id: "boost",
+        pricing_version: "2",
+        credits: "1000",
+      },
+    });
+    sqlite
+      .prepare(
+        "UPDATE credit_accounts SET topup_balance=100 WHERE owner_email=?"
+      )
+      .run(owner);
+    const charge = {
+      id: "ch_a",
+      payment_intent: "pi_adjust",
+      amount: 1900,
+      amount_refunded: 950,
+    };
+    expect(
+      (await webhook("evt_refund", "charge.refunded", charge)).status
+    ).toBe(200);
+    expect(credits().topup_balance).toBe(-400);
+    await webhook("evt_refund_retry", "charge.refunded", charge);
+    expect(credits().topup_balance).toBe(-400);
+    await webhook("evt_older_refund", "charge.refunded", {
+      ...charge,
+      amount_refunded: 190,
+    });
+    expect(credits().topup_balance).toBe(-400);
+    const summary = await billingSummary(env, { email: owner, name: "Owner" });
+    expect(summary.availableCredits).toBe(300);
+    expect(summary.adjustmentDebt).toBe(400);
+  });
+  it("handles a refund arriving before the paid Checkout event", async () => {
+    await webhook("evt_refund_first", "charge.refunded", {
+      id: "ch_pre",
+      payment_intent: "pi_pre",
+      amount: 1900,
+      amount_refunded: 1900,
+      metadata: { owner_email: owner, purchase_kind: "topup", credits: "1000" },
+    });
+    await webhook("evt_paid_later", "checkout.session.completed", {
+      id: "cs_pre",
+      payment_intent: "pi_pre",
+      amount_total: 1900,
+      payment_status: "paid",
+      metadata: {
+        owner_email: owner,
+        purchase_kind: "topup",
+        topup_id: "boost",
+        pricing_version: "2",
+        credits: "1000",
+      },
+    });
+    expect(credits().topup_balance).toBe(0);
+  });
+  it("returns held top-up credits when a dispute is won", async () => {
+    await webhook("evt_pay_dispute", "checkout.session.completed", {
+      id: "cs_dispute",
+      payment_intent: "pi_dispute",
+      amount_total: 1900,
+      payment_status: "paid",
+      metadata: {
+        owner_email: owner,
+        purchase_kind: "topup",
+        topup_id: "boost",
+        pricing_version: "2",
+        credits: "1000",
+      },
+    });
+    const d = {
+      id: "dp_one",
+      payment_intent: "pi_dispute",
+      amount: 1900,
+      status: "needs_response",
+    };
+    await webhook("evt_dispute", "charge.dispute.created", d);
+    expect(credits().topup_balance).toBe(0);
+    await webhook("evt_dispute_won", "charge.dispute.closed", {
+      ...d,
+      status: "won",
+    });
+    expect(credits().topup_balance).toBe(1000);
+    await webhook("evt_dispute_created_late", "charge.dispute.created", d);
+    expect(credits().topup_balance).toBe(1000);
+  });
+  it("adds the paid mid-month allowance difference without resetting spent credits", async () => {
+    const halfway = (start.getTime() + end.getTime()) / 2000;
+    await webhook("evt_upgrade", "invoice.paid", {
+      id: "in_upgrade",
+      subscription: "sub_owner",
+      customer: "cus_owner",
+      billing_reason: "subscription_update",
+      metadata: {
+        owner_email: owner,
+        plan_id: "pro",
+        billing_cycle: "monthly",
+      },
+      current_period_start: start.getTime() / 1000,
+      current_period_end: end.getTime() / 1000,
+      lines: {
+        data: [
+          {
+            amount: -950,
+            price: { id: "price_creator" },
+            period: { start: halfway, end: end.getTime() / 1000 },
+          },
+          {
+            amount: 2950,
+            price: { id: "price_pro" },
+            period: { start: halfway, end: end.getTime() / 1000 },
+          },
+        ],
+      },
+    });
+    expect(credits().included_balance).toBe(2200);
   });
 });

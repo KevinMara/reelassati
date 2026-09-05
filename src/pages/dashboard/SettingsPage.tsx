@@ -1,3 +1,4 @@
+import { AccountDataControls } from "@/components/studio/AccountDataControls";
 import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -217,7 +218,7 @@ export default function SettingsPage() {
       <div className="mb-8">
         <p className="mono-eyebrow mb-2 text-primary">Workspace control</p>
         <h1 className="text-3xl font-semibold">Settings</h1>
-        <p className="mt-2 text-sm text-foreground/55">
+        <p className="mt-2 text-sm text-foreground/70">
           Saved studio preferences and live capability checks.
         </p>
       </div>
@@ -272,7 +273,7 @@ export default function SettingsPage() {
             >
               <div>
                 <h2 className="text-lg font-medium">Studio profile</h2>
-                <p className="mt-1 text-sm text-foreground/50">
+                <p className="mt-1 text-sm text-foreground/70">
                   The owner email comes from the authenticated private site
                   session.
                 </p>
@@ -305,7 +306,7 @@ export default function SettingsPage() {
                   <input
                     value={workspace.profile.email}
                     readOnly
-                    className="w-full cursor-not-allowed rounded-lg border border-border bg-foreground/[0.03] px-4 py-2.5 text-foreground/50"
+                    className="w-full cursor-not-allowed rounded-lg border border-border bg-foreground/[0.03] px-4 py-2.5 text-foreground/70"
                   />
                 </label>
                 <label className="text-sm">
@@ -364,7 +365,7 @@ export default function SettingsPage() {
                 </label>
               </div>
               <div className="flex items-center justify-between border-t border-border pt-5">
-                <span className="text-xs text-foreground/45">
+                <span className="text-xs text-foreground/65">
                   {profileDirty
                     ? "Unsaved profile changes"
                     : "Profile is saved"}
@@ -392,7 +393,7 @@ export default function SettingsPage() {
             >
               <div>
                 <h2 className="text-lg font-medium">Brand defaults</h2>
-                <p className="mt-1 text-sm text-foreground/50">
+                <p className="mt-1 text-sm text-foreground/70">
                   These constraints are reusable across scripts, AI plans, and
                   edits.
                 </p>
@@ -546,7 +547,7 @@ export default function SettingsPage() {
             <section className="space-y-6 rounded-xl border border-border bg-surface p-6">
               <div>
                 <h2 className="text-lg font-medium">Appearance</h2>
-                <p className="mt-1 text-sm text-foreground/50">
+                <p className="mt-1 text-sm text-foreground/70">
                   Theme preference is kept in this browser.
                 </p>
               </div>
@@ -565,7 +566,7 @@ export default function SettingsPage() {
                 >
                   <Sun className="h-5 w-5 text-primary" />
                   <span className="mt-3 block text-sm font-medium">Light</span>
-                  <span className="mt-1 block text-xs text-foreground/45">
+                  <span className="mt-1 block text-xs text-foreground/65">
                     Warm paper surfaces and high-contrast controls.
                   </span>
                 </button>
@@ -583,7 +584,7 @@ export default function SettingsPage() {
                 >
                   <Moon className="h-5 w-5 text-primary" />
                   <span className="mt-3 block text-sm font-medium">Dark</span>
-                  <span className="mt-1 block text-xs text-foreground/45">
+                  <span className="mt-1 block text-xs text-foreground/65">
                     Low-glare editing surfaces for longer sessions.
                   </span>
                 </button>
@@ -593,7 +594,7 @@ export default function SettingsPage() {
                   <Globe2 className="h-4 w-4 text-primary" />
                   <p className="text-sm font-medium">Language and timezone</p>
                 </div>
-                <p className="mt-1 text-xs text-foreground/45">
+                <p className="mt-1 text-xs text-foreground/65">
                   Edit these under Studio profile so interface and publishing
                   settings stay in one saved record.
                 </p>
@@ -608,7 +609,7 @@ export default function SettingsPage() {
                   <h2 className="text-lg font-medium">
                     Configured capabilities
                   </h2>
-                  <p className="mt-1 text-sm text-foreground/50">
+                  <p className="mt-1 text-sm text-foreground/70">
                     These checks confirm deployed bindings and keys are present.
                     The first real request verifies each external service.
                   </p>
@@ -639,7 +640,7 @@ export default function SettingsPage() {
                       </span>
                     </div>
                     <h3 className="mt-4 text-sm font-medium">{row.label}</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+                    <p className="mt-1 text-xs leading-relaxed text-foreground/65">
                       {row.detail}
                     </p>
                   </article>
@@ -650,7 +651,7 @@ export default function SettingsPage() {
                   <p className="text-xs font-medium text-amber-700">
                     Missing environment configuration
                   </p>
-                  <p className="mt-1 break-words font-mono text-[11px] text-foreground/55">
+                  <p className="mt-1 break-words font-mono text-xs text-foreground/70">
                     {capabilities.missing.join(", ")}
                   </p>
                 </div>
@@ -667,6 +668,7 @@ export default function SettingsPage() {
           ) : null}
         </div>
       </div>
+      <AccountDataControls />
     </div>
   );
 }

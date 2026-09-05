@@ -11,7 +11,10 @@ import {
   type EditProject,
   type ScriptDraft,
 } from "../contracts/workspace";
-import { embedMediaProvenanceMarker } from "./media-provenance";
+import {
+  embedMediaProvenanceMarker,
+  inspectMediaProvenanceMarker,
+} from "./media-provenance";
 import worker from "./server";
 
 type StoredRow = Record<string, unknown>;
@@ -308,7 +311,9 @@ function createIntegrityD1() {
         ) {
           return (
             state.assets.find(
-              row => row.id === bindings[0] && row.owner_email === bindings[1]
+              row =>
+                row.id === bindings[0] &&
+                (bindings.length === 1 || row.owner_email === bindings[1])
             ) || null
           );
         }
@@ -1118,6 +1123,86 @@ describe("provenance integrity boundaries", () => {
     );
     expect(range.status).toBe(206);
     expect((await range.arrayBuffer()).byteLength).toBe(4);
+  });
+
+  it("marks rendered MP4s from AI timeline sources and verifies their signed downloads", async () => {
+    const DB = createIntegrityD1(),
+      BUCKET = createMemoryBucket(),
+      env = testEnv(DB, BUCKET);
+    const source = await generateSpeech(DB, BUCKET);
+    const workspace = createEmptyWorkspace("creator@example.com");
+    const now = new Date().toISOString();
+    workspace.assets = [source];
+    workspace.projects = [
+      {
+        id: "render-project",
+        title: "Finished video",
+        template: "blank",
+        status: "editing",
+        platform: "tiktok",
+        aspectRatio: "9:16",
+        duration: 2,
+        playhead: 0,
+        createdAt: now,
+        updatedAt: now,
+        clips: [
+          {
+            id: "voice-clip",
+            assetId: source.id,
+            label: "Voice",
+            track: "audio",
+            start: 0,
+            inPoint: 0,
+            duration: 2,
+            locked: false,
+            muted: false,
+          },
+        ],
+        transcript: [],
+        proposedChanges: [],
+        qualitySignals: [],
+        revisions: [],
+      },
+    ];
+    DB.state.workspaces.push({
+      owner_email: "creator@example.com",
+      document: JSON.stringify(workspace),
+      revision: 0,
+      updated_at: now,
+    });
+    const original = new Uint8Array([
+      0, 0, 0, 16, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0,
+    ]);
+    const form = new FormData();
+    form.set(
+      "file",
+      new File([original], "Finished.mp4", { type: "video/mp4" })
+    );
+    form.set("kind", "video");
+    form.set("render_project_id", "render-project");
+    const upload = new Request("https://studio.example/api/assets", {
+      method: "POST",
+      headers: { "oai-authenticated-user-email": "creator@example.com" },
+      body: form,
+    });
+    // Native fetch supplies this transport header; direct Worker invocation does not.
+    upload.headers.set(
+      "content-length",
+      String((await upload.clone().arrayBuffer()).byteLength)
+    );
+    const response = await worker.fetch(upload, env as never);
+    expect(response.status).toBe(201);
+    const { asset } = (await response.json()) as { asset: Asset };
+    expect(asset.provenance?.operation).toBe("timeline-render");
+    expect(asset.provenance?.marking.status).toBe("verified");
+    const delivered = await worker.fetch(
+      new Request(`https://studio.example${asset.url}`),
+      env as never
+    );
+    expect(delivered.status).toBe(200);
+    const marked = inspectMediaProvenanceMarker(await delivered.arrayBuffer());
+    expect(marked?.token).toBe(asset.provenance?.marking.publicToken);
+    expect(new Uint8Array(marked!.unmarkedBytes)).toEqual(original);
   });
 
   it("blocks metadata-preserving byte corruption on full GET and HEAD", async () => {

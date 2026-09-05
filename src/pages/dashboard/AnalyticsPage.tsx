@@ -1,3 +1,4 @@
+import { SocialPerformance } from "@/components/studio/SocialPerformance";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -270,6 +271,7 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
+      <SocialPerformance />
       <section className="relative mb-6 overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.09] via-surface to-surface p-5 shadow-sm sm:p-6">
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-primary/[0.12] blur-3xl" />
         <div className="relative mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -426,7 +428,7 @@ export default function AnalyticsPage() {
             <h2 className="font-medium">Audience metrics are not synced yet</h2>
             <p className="mt-1 text-sm leading-relaxed text-foreground/55">
               {capabilities.publishing
-                ? "Connected distribution is ready, but account-level views, watch time, retention, and engagement are not yet imported into this workspace."
+                ? "Connected distribution is ready, but sync your social performance above to import the metrics available for your accounts."
                 : "Publishing is not connected, and no platform analytics source is available."}{" "}
               This screen will not manufacture performance numbers.
             </p>
