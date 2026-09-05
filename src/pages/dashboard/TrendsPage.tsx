@@ -751,14 +751,22 @@ export default function TrendsPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="mono-eyebrow text-[10px] text-foreground/45">
-                Organic brand posts · current-week evidence · no paid ads
+                Organic brand posts ·{" "}
+                {activeFeed?.status === "stale"
+                  ? "previous verified edition"
+                  : "current-week evidence"}{" "}
+                · no paid ads
               </p>
               {activeFeed ? (
                 <span className="rounded-full border border-border bg-surface px-2 py-1 text-[10px] text-foreground/45">
                   {activeFeed.kind === "weekly"
                     ? activeFeed.status === "preparing"
                       ? "Preparing"
-                      : "Updated weekly"
+                      : activeFeed.status === "unavailable"
+                        ? "Awaiting verified picks"
+                        : activeFeed.status === "stale"
+                          ? "Previous edition"
+                          : "Updated weekly"
                     : "Credit research"}
                 </span>
               ) : null}
@@ -766,16 +774,26 @@ export default function TrendsPage() {
             <h2 id="trend-evidence-heading" className="mt-1 font-medium">
               {activeFeed?.kind === "custom"
                 ? `Research for “${activeFeed.scope.query}”`
-                : "This week’s hyperviral brand shorts"}
+                : activeFeed?.status === "stale"
+                  ? "Latest verified brand shorts"
+                  : "This week’s hyperviral brand shorts"}
             </h2>
-            {activeFeed?.status === "ready" ? (
+            {activeFeed?.status === "ready" ||
+            activeFeed?.status === "stale" ? (
               <p className="mt-1 text-xs text-foreground/40">
                 Updated {new Date(activeFeed.generatedAt).toLocaleString()} ·{" "}
-                {activeFeed.cacheNote}
+                {activeFeed.status === "stale"
+                  ? "A new edition is awaiting verification."
+                  : activeFeed.cacheNote}
               </p>
             ) : activeFeed?.status === "preparing" ? (
               <p className="mt-1 text-xs text-foreground/40">
                 The first weekly format update is being prepared automatically.
+              </p>
+            ) : activeFeed?.status === "unavailable" ? (
+              <p className="mt-1 text-xs text-foreground/65">
+                No current examples have passed verification yet. The next check
+                runs automatically.
               </p>
             ) : null}
           </div>
@@ -958,13 +976,25 @@ export default function TrendsPage() {
             <h3 className="mt-3 text-sm font-medium">
               {activeFeed?.status === "preparing"
                 ? "Weekly update in preparation"
-                : "No matching evidence"}
+                : activeFeed?.status === "unavailable"
+                  ? "Your next idea can start here"
+                  : "No matching evidence"}
             </h3>
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-foreground/45">
               {activeFeed?.status === "preparing"
                 ? "REELassati updates this feed internally; no action or credits are required from you."
-                : "Change the filters or run custom research. REELassati will show fewer results rather than fill the feed with stale, paid, generic, or unverified content."}
+                : activeFeed?.status === "unavailable"
+                  ? "Verified weekly picks are not available yet. Keep creating from your own idea while the next automatic check runs."
+                  : "Change the filters or run custom research. REELassati will show fewer results rather than fill the feed with stale, paid, generic, or unverified content."}
             </p>
+            {activeFeed?.status === "unavailable" ? (
+              <Link
+                to="/dashboard/script"
+                className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+              >
+                Start with my idea
+              </Link>
+            ) : null}
           </div>
         )}
       </section>

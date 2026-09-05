@@ -78,6 +78,7 @@ import type {
   TrendPlatform,
   TrendScope,
 } from "../contracts/trends";
+import { weeklyTrendFeedStatus } from "../contracts/trends";
 import { createRemoteJWKSet, decodeJwt, jwtVerify } from "jose";
 
 type AssetBinding = {
@@ -10140,7 +10141,7 @@ async function researchTrendSources(
                 },
                 {
                   role: "user",
-                  content: `${taskInstruction}\n\nThis search pass is exclusively for ${searchPlatform}. Return only exact individual-video URLs copied from the search results. Do not turn a normal YouTube watch URL into a Short.`,
+                  content: `${taskInstruction}\n\nThis search pass is exclusively for ${searchPlatform}. Return at most three concise examples and only exact individual-video URLs copied from the search results. Do not turn a normal YouTube watch URL into a Short.`,
                 },
               ],
               plugins: [
@@ -10156,10 +10157,11 @@ async function researchTrendSources(
                 allow_fallbacks: true,
                 require_parameters: true,
               },
-              max_tokens: 1_400,
+              reasoning: { enabled: false },
+              max_tokens: 2_400,
               temperature: 0.1,
             }),
-            signal: AbortSignal.timeout(55_000),
+            signal: AbortSignal.timeout(90_000),
           }
         );
         if (!searchResponse.ok) {
@@ -10173,7 +10175,18 @@ async function researchTrendSources(
       result.status === "fulfilled" ? [result.value] : []
     );
     if (!searchPayloads.length) {
-      failureCode = "all_search_requests_failed";
+      failureCode = searchResults
+        .map((result, index) => {
+          const reason = result.status === "rejected" ? result.reason : null;
+          const code =
+            reason instanceof Response
+              ? `http_${reason.status}`
+              : reason?.name === "TimeoutError" || reason?.name === "AbortError"
+                ? "timeout"
+                : "unavailable";
+          return `${searchPlatforms[index]}_${code}`;
+        })
+        .join(";");
       throw json(
         {
           error:
@@ -10268,7 +10281,7 @@ function trendResponse(input: {
   nextRefreshAt: string;
   freshness: "live" | "cached";
   kind: "weekly" | "custom";
-  status: "ready" | "preparing";
+  status: TrendFeedResponse["status"];
   scope: TrendScope;
   creditCost: number;
   availableCredits: number;
@@ -10394,6 +10407,12 @@ async function refreshWeeklyTrendFeed(env: SitesEnvironment): Promise<{
     };
   } catch (cause) {
     const failedAt = new Date().toISOString();
+    const failure = await env.DB.prepare(
+      "SELECT error_code FROM ai_invocations WHERE owner_email = ? AND purpose = 'trend-research' AND created_at >= ? ORDER BY created_at DESC LIMIT 1"
+    )
+      .bind(TREND_SYSTEM_OWNER.email, nowIso)
+      .first<{ error_code: string | null }>()
+      .catch(() => null);
     await env.DB.prepare(
       `
         UPDATE trend_refresh_state
@@ -10401,7 +10420,11 @@ async function refreshWeeklyTrendFeed(env: SitesEnvironment): Promise<{
         WHERE refresh_key = ?
       `
     )
-      .bind(failedAt, "provider_or_validation_failure", TREND_WEEKLY_SCOPE_KEY)
+      .bind(
+        failedAt,
+        failure?.error_code || "provider_or_validation_failure",
+        TREND_WEEKLY_SCOPE_KEY
+      )
       .run()
       .catch(() => undefined);
     throw cause;
@@ -10512,7 +10535,7 @@ async function handleTrends(
             nextRefreshAt: cached.expires_at,
             freshness: "cached",
             kind: "weekly",
-            status: "ready",
+            status: weeklyTrendFeedStatus(cached.expires_at, null),
             scope,
             creditCost: 0,
             availableCredits,
@@ -10524,6 +10547,11 @@ async function handleTrends(
         // A malformed weekly snapshot never triggers user-initiated research.
       }
     }
+    const refresh = await env.DB.prepare(
+      "SELECT lease_expires_at FROM trend_refresh_state WHERE refresh_key = ?"
+    )
+      .bind(TREND_WEEKLY_SCOPE_KEY)
+      .first<{ lease_expires_at: string }>();
     return json(
       trendResponse({
         trends: [],
@@ -10531,7 +10559,7 @@ async function handleTrends(
         nextRefreshAt: new Date().toISOString(),
         freshness: "cached",
         kind: "weekly",
-        status: "preparing",
+        status: weeklyTrendFeedStatus(null, refresh?.lease_expires_at || null),
         scope,
         creditCost: 0,
         availableCredits,

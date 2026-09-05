@@ -14,7 +14,10 @@ void initializeI18n().finally(() => {
       <HashRouter>
         <PostHogPageviewTracker />
         <App />
-        <Analytics />
+        {(["reelassati.app", "www.reelassati.app"].includes(
+          window.location.hostname
+        ) ||
+          window.location.hostname.endsWith(".vercel.app")) && <Analytics />}
       </HashRouter>
     </StrictMode>
   );

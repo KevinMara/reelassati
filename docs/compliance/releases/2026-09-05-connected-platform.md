@@ -60,7 +60,7 @@ stored in this record. No hosted environment configuration was changed.
   restoration and mid-month upgrade allocation. Schema migrations 0011–0014
   preserve existing workspace and ledger rows.
 - Final gates passed: TypeScript for application/Node/Worker, ESLint,
-  136 tests across 18 files, and the production client/Worker build. Vite
+  138 tests across 19 files, and the production client/Worker build. Vite
   reports its existing large initial-bundle advisory; it is not a build error.
 - Browser rendering verification used synthetic local material. Live paid
   checkout, provider generation, OAuth and external publication were not
@@ -91,3 +91,17 @@ Publication uses the existing public audience under the owner's standing
 authorization. The hosting deployment record is authoritative for terminal
 status, environment revision and URL; GitHub records maintenance execution.
 Rollback baseline: `8ee165fd62510daa1e298693cbbc03a2f1753c87` (Sites version 64).
+
+## First production maintenance observation
+
+The authenticated GitHub workflow reached production successfully; its first
+trend invocation failed after 55 seconds with `all_search_requests_failed`.
+This does not establish a funding failure. The follow-up gives search 90 seconds,
+disables optional reasoning for concise evidence extraction, caps each platform
+at three results and records per-platform timeouts/statuses without secret data.
+The same Kimi route and strict date/organic/virality/source requirements remain.
+No current verified snapshot existed for the strict weekly scope at inspection.
+The feed now distinguishes active preparation, unavailable picks and a previous
+verified edition; an expired edition is never called this week's evidence.
+Vercel analytics loads only on Vercel/custom-domain frontends, removing an
+irrelevant missing-script request on the Sites backend origin.

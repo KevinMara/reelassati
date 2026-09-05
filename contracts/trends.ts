@@ -63,9 +63,23 @@ export interface TrendFeedResponse {
   nextRefreshAt: string;
   freshness: "live" | "cached";
   kind: "weekly" | "custom";
-  status: "ready" | "preparing";
+  status: "ready" | "preparing" | "stale" | "unavailable";
   scope: TrendScope;
   creditCost: number;
   availableCredits: number;
   cacheNote: string;
+}
+
+export function weeklyTrendFeedStatus(
+  snapshotExpiresAt: string | null,
+  refreshLeaseExpiresAt: string | null,
+  now = Date.now()
+): TrendFeedResponse["status"] {
+  if (snapshotExpiresAt)
+    return Date.parse(snapshotExpiresAt) > now ? "ready" : "stale";
+  if (refreshLeaseExpiresAt)
+    return Date.parse(refreshLeaseExpiresAt) > now
+      ? "preparing"
+      : "unavailable";
+  return "preparing";
 }
