@@ -714,7 +714,11 @@ export async function billingSummary(
   user: BillingUser
 ): Promise<BillingSummary> {
   await availableCredits(env, user);
-  const [credits, subscription, activity] = await Promise.all([
+  const usageThrough = new Date().toISOString();
+  const usageSince = new Date(usageThrough);
+  usageSince.setUTCHours(0, 0, 0, 0);
+  usageSince.setUTCDate(usageSince.getUTCDate() - 29);
+  const [credits, subscription, activity, usage] = await Promise.all([
     creditAccount(env, user.email),
     billingAccount(env, user.email),
     env.DB.prepare(
@@ -724,6 +728,15 @@ export async function billingSummary(
     )
       .bind(user.email)
       .all<CreditLedgerRow>(),
+    env.DB.prepare(
+      `SELECT substr(created_at, 1, 10) AS date, category, SUM(-amount) AS credits
+      FROM credit_ledger WHERE owner_email = ? AND created_at >= ? AND created_at <= ?
+      AND status = 'settled' AND amount < 0
+      AND category IN ('video', 'image', 'speech', 'script', 'analysis', 'transcription', 'edit-plan', 'trend-research')
+      GROUP BY substr(created_at, 1, 10), category ORDER BY date`
+    )
+      .bind(user.email, usageSince.toISOString(), usageThrough)
+      .all<{ date: string; category: string; credits: number }>(),
   ]);
   const planId = subscription?.plan_id || "";
   const cycle = subscription?.billing_cycle || "";
@@ -755,6 +768,7 @@ export async function billingSummary(
       ...CREDIT_TOP_UPS[id],
       available: Boolean(prices.topUps[id]),
     })),
+    usage: { through: usageThrough, daily: usage.results },
     recentActivity: activity.results.map(item => ({
       id: item.id,
       amount: item.amount,
@@ -1024,7 +1038,7 @@ function eventMetadata(
   const direct = record(object.metadata);
   const parent = record(object.parent);
   const subscriptionDetails = record(parent?.subscription_details);
-  return direct || record(subscriptionDetails?.metadata) || {};
+  return { ...record(subscriptionDetails?.metadata), ...direct };
 }
 
 function subscriptionIdFromObject(object: Record<string, unknown>): string {
@@ -1198,7 +1212,12 @@ async function processStripeEvent(
     ) {
       const topUpId = cleanString(metadata.topup_id);
       if (isCreditTopUpId(topUpId)) {
-        await upsertBillingAccount(env, { ownerEmail, customerId });
+        // A credit purchase must never overwrite subscription entitlements.
+        await env.DB.prepare(
+          "UPDATE billing_accounts SET stripe_customer_id = COALESCE(stripe_customer_id, ?), updated_at = ? WHERE owner_email = ?"
+        )
+          .bind(customerId || null, new Date().toISOString(), ownerEmail)
+          .run();
         await applyTopUpGrant(
           env,
           ownerEmail,
@@ -1215,6 +1234,11 @@ async function processStripeEvent(
     const planId = cleanString(metadata.plan_id);
     const cycle = cleanString(metadata.billing_cycle);
     if (isPlanId(planId) && isBillingCycle(cycle)) {
+      const existing = await billingAccount(env, ownerEmail);
+      // Invoice/subscription events can arrive before Checkout completion.
+      if (existing?.stripe_subscription_id === cleanString(object.subscription))
+        return;
+      if (activeSubscription(existing)) return;
       await upsertBillingAccount(env, {
         ownerEmail,
         customerId,
@@ -1228,6 +1252,8 @@ async function processStripeEvent(
   }
 
   if (eventType === "invoice.paid") {
+    const subscriptionId = subscriptionIdFromObject(object);
+    if (!subscriptionId) return; // One-off invoices cannot refill plan credits.
     const ownerEmail = await ownerForStripeObject(env, object);
     if (!validEmail(ownerEmail)) return;
     const metadata = eventMetadata(object);
@@ -1252,7 +1278,6 @@ async function processStripeEvent(
     const periodStart = period.start || new Date().toISOString();
     const nextCreditRenewalAt =
       cycle === "annual" ? addCalendarMonth(periodStart) : period.end;
-    const subscriptionId = subscriptionIdFromObject(object);
     await upsertBillingAccount(env, {
       ownerEmail,
       customerId: cleanString(object.customer),
@@ -1293,6 +1318,7 @@ async function processStripeEvent(
       identity?.cycle ||
       (isBillingCycle(metadataCycle) ? metadataCycle : undefined);
     const period = periodFromObject(object);
+    const existing = await billingAccount(env, ownerEmail);
     const status =
       eventType === "customer.subscription.deleted"
         ? "canceled"
@@ -1308,7 +1334,11 @@ async function processStripeEvent(
       periodEnd: period.end,
       nextCreditRenewalAt:
         cycle === "annual" && period.start
-          ? addCalendarMonth(period.start)
+          ? existing?.stripe_subscription_id === cleanString(object.id) &&
+            existing.current_period_start === period.start &&
+            existing.next_credit_renewal_at
+            ? existing.next_credit_renewal_at
+            : addCalendarMonth(period.start)
           : period.end,
       cancelAtPeriodEnd: object.cancel_at_period_end === true,
     });
@@ -1326,6 +1356,7 @@ async function processStripeEvent(
   }
 
   if (eventType === "invoice.payment_failed") {
+    if (!subscriptionIdFromObject(object)) return;
     const ownerEmail = await ownerForStripeObject(env, object);
     if (!validEmail(ownerEmail)) return;
     const existing = await billingAccount(env, ownerEmail);

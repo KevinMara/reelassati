@@ -20,16 +20,16 @@ export function PricingTeaser() {
       price: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
       credits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       scale: isItalian
-        ? "3 brand · 6 account social"
-        : "3 brands · 6 social accounts",
+        ? "1 brand · 6 account social"
+        : "1 brand · 6 social accounts",
     },
     {
       name: "Studio",
       price: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
       credits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       scale: isItalian
-        ? "10 brand · 12 account social"
-        : "10 brands · 12 social accounts",
+        ? "1 brand · 12 account social"
+        : "1 brand · 12 social accounts",
     },
   ];
 
@@ -52,8 +52,8 @@ export function PricingTeaser() {
               </h2>
               <p className="mt-6 max-w-2xl text-lg leading-relaxed text-foreground/70">
                 {isItalian
-                  ? "Lo Studio completo è incluso in ogni piano. Paghi per la scala del workspace, non per sbloccare gli strumenti essenziali."
-                  : "The complete Studio is included in every plan. You pay for workspace scale—not to unlock the essential tools."}
+                  ? "Strumenti creativi, libreria e pianificazione in ogni piano. Scegli i crediti e gli account collegati adatti alla tua produzione."
+                  : "Creation tools, library, and planning in every plan. Choose the credits and connected accounts that fit your output."}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link

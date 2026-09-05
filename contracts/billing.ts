@@ -140,5 +140,9 @@ export interface BillingSummary {
     price: number;
     available: boolean;
   }>;
+  usage?: {
+    through: string;
+    daily: Array<{ date: string; category: string; credits: number }>;
+  };
   recentActivity: BillingActivityItem[];
 }
