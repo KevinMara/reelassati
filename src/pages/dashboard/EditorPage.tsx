@@ -60,6 +60,7 @@ import { useFileDropZone } from "@/hooks/useFileDropZone";
 import type { ContentProvenance } from "@contracts/compliance";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { validateFileSelection } from "@/lib/file-validation";
+import { AI_CREDIT_COSTS } from "@contracts/billing";
 
 const PROJECT_TEMPLATES = [
   {
@@ -2526,7 +2527,7 @@ export default function EditorPage() {
                     ) : (
                       <Sparkles className="h-4 w-4" />
                     )}
-                    Generate edit plan
+                    Generate edit plan · {AI_CREDIT_COSTS.editPlan} credits
                   </button>
                 </div>
 

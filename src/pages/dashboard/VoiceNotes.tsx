@@ -34,6 +34,11 @@ import { EditAssetLink } from "@/components/studio/EditAssetLink";
 import { copyTextWithProvenance } from "@/lib/provenance";
 import { validateFileSelection } from "@/lib/file-validation";
 import posthog from "@/lib/posthog";
+import {
+  AI_CREDIT_COSTS,
+  speechCreditCost,
+  timedCreditCost,
+} from "@contracts/billing";
 
 type BusyAction = "upload" | "transcribe" | "script" | "speech" | null;
 
@@ -570,7 +575,12 @@ export default function VoiceNotes() {
                 ) : (
                   <>
                     <AudioLines className="h-4 w-4" />
-                    Transcribe
+                    Transcribe ·{" "}
+                    {timedCreditCost(
+                      sourceAsset?.duration,
+                      AI_CREDIT_COSTS.transcriptionPerMinute
+                    )}{" "}
+                    credits
                   </>
                 )}
               </button>
@@ -680,7 +690,8 @@ export default function VoiceNotes() {
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Generate speech
+                  Generate speech · {speechCreditCost(speechText.length)}{" "}
+                  credits
                 </>
               )}
             </button>

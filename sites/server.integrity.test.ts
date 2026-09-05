@@ -23,6 +23,7 @@ function createIntegrityD1() {
     assets: [] as StoredRow[],
     events: [] as StoredRow[],
     workspaces: [] as StoredRow[],
+    creditLedger: [] as StoredRow[],
   };
 
   const prepare = (query: string) => {
@@ -35,7 +36,20 @@ function createIntegrityD1() {
       },
       run: async () => {
         let changes = 1;
-        if (normalized.includes("insert into ai_provenance_records")) {
+        if (normalized.includes("insert into credit_ledger")) {
+          state.creditLedger.push({
+            id: bindings[0],
+            amount: -Number(bindings[1]),
+            status: "reserved",
+            operation_key: bindings[6],
+          });
+        } else if (
+          normalized.startsWith("update credit_ledger") &&
+          normalized.includes("status = 'settled'")
+        ) {
+          const row = state.creditLedger.find(item => item.id === bindings[1]);
+          if (row) row.status = "settled";
+        } else if (normalized.includes("insert into ai_provenance_records")) {
           const [
             id,
             publicToken,
@@ -213,6 +227,39 @@ function createIntegrityD1() {
         return { success: true, meta: { changes } };
       },
       first: async () => {
+        if (
+          normalized.includes("from billing_accounts where owner_email = ?")
+        ) {
+          return {
+            owner_email: bindings[0],
+            plan_id: "studio",
+            billing_cycle: "monthly",
+            status: "active",
+            current_period_end: "2099-12-31T00:00:00.000Z",
+            cancel_at_period_end: 0,
+          };
+        }
+        if (
+          normalized.includes(
+            "select included_balance, topup_balance from credit_accounts"
+          )
+        ) {
+          return { included_balance: 100_000, topup_balance: 0 };
+        }
+        if (
+          normalized.includes("select id, amount, status from credit_ledger")
+        ) {
+          return (
+            state.creditLedger.find(row => row.operation_key === bindings[0]) ||
+            null
+          );
+        }
+        if (
+          normalized.includes("$.profile.credits") ||
+          normalized.includes("sum(credit_cost)")
+        ) {
+          return { credits: 0 };
+        }
         if (normalized.includes("from ai_provenance_records")) {
           if (normalized.includes("public_token = ?")) {
             return (

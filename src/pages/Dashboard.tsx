@@ -40,6 +40,8 @@ import {
   MessageSquareWarning,
   Mail,
   Gift,
+  WalletCards,
+  Coins,
   Menu,
   Database,
   HardDrive,
@@ -96,6 +98,7 @@ const GoalTracker = lazy(() => import("./dashboard/GoalTracker"));
 const CoachingPage = lazy(() => import("./dashboard/CoachingPage"));
 const ReferralPage = lazy(() => import("./dashboard/ReferralPage"));
 const FeedbackPage = lazy(() => import("./dashboard/FeedbackPage"));
+const BillingPage = lazy(() => import("./dashboard/BillingPage"));
 
 function StudioPageFallback() {
   return (
@@ -106,6 +109,45 @@ function StudioPageFallback() {
     >
       <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
     </div>
+  );
+}
+
+function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
+  const [credits, setCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void platformApi
+      .billingSummary()
+      .then(result => {
+        if (active) setCredits(result.billing.availableCredits);
+      })
+      .catch(() => {
+        if (active) setCredits(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
+  return (
+    <Link
+      to="/dashboard/billing"
+      aria-label={
+        credits === null
+          ? "Open plan and credits"
+          : `${credits} credits available`
+      }
+      className="group hidden items-center gap-2 rounded-pill border border-border bg-surface px-3 py-1.5 text-xs transition-all hover:border-primary/35 hover:shadow-sm sm:flex"
+    >
+      <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Coins className="h-3 w-3" />
+        <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.75)]" />
+      </span>
+      <span className="font-mono font-medium">
+        {credits === null ? "Credits" : credits.toLocaleString()}
+      </span>
+    </Link>
   );
 }
 
@@ -901,6 +943,7 @@ export default function Dashboard() {
     { icon: Library, label: t("nav.library"), to: "/dashboard/library" },
     { icon: AtSign, label: t("nav.social"), to: "/dashboard/social" },
     { icon: Gift, label: "Refer & Earn", to: "/dashboard/referral" },
+    { icon: WalletCards, label: "Plan & credits", to: "/dashboard/billing" },
     { separator: true },
     {
       icon: MessageSquareWarning,
@@ -1072,6 +1115,7 @@ export default function Dashboard() {
             Dashboard
           </span>
           <div className="flex-1" />
+          <CreditBalanceChip refreshKey={path} />
           <StudioMediaTray key={path} />
           <Link
             to="/dashboard#recent-activity"
@@ -1140,6 +1184,7 @@ export default function Dashboard() {
                   <Route path="/goals" element={<GoalTracker />} />
                   <Route path="/coaching" element={<CoachingPage />} />
                   <Route path="/referral" element={<ReferralPage />} />
+                  <Route path="/billing" element={<BillingPage />} />
                   <Route path="/feedback" element={<FeedbackPage />} />
                   <Route path="/status" element={<StudioStatus />} />
                   <Route

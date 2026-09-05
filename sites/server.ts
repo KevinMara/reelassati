@@ -40,6 +40,28 @@ import {
   customTrendResearchCreditCost,
   PUBLIC_PLAN_PRICING,
 } from "../contracts/pricing";
+import {
+  AI_CREDIT_COSTS,
+  CREDIT_TOP_UPS,
+  imageCreditCost,
+  speechCreditCost,
+  timedCreditCost,
+  videoCreditCost,
+} from "../contracts/billing";
+import {
+  applyAllDueAnnualCreditRenewals,
+  availableCredits,
+  billingSummary,
+  grantReferralCredits,
+  handleBillingApi,
+  handleStripeWebhook,
+  releaseCreditReservation,
+  reserveCredits,
+  settleCreditReservation,
+  socialAccountLimit,
+  stripeBillingConfigured,
+  type CreditReservation,
+} from "./billing";
 import type {
   TrendEvidenceItem,
   TrendFeedResponse,
@@ -136,6 +158,10 @@ type SitesEnvironment = {
   RESEND_API_KEY?: string;
   SUPPORT_EMAIL_TO?: string;
   SUPPORT_EMAIL_FROM?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRICE_IDS_JSON?: string;
+  PUBLIC_APP_URL?: string;
 };
 
 interface AuthenticatedUser {
@@ -2475,6 +2501,9 @@ async function saveWorkspace(
 ): Promise<WorkspaceDocument> {
   await initializeSchema(env);
   let workspace = normalizeWorkspace(workspaceValue, user);
+  // Balances are server-owned in credit_accounts; clients cannot mint credits
+  // by changing the workspace document.
+  workspace.profile.credits = 0;
   const current = await env.DB.prepare(
     "SELECT revision FROM workspace_state WHERE owner_email = ?"
   )
@@ -4154,6 +4183,103 @@ async function handleAssets(
   );
 }
 
+async function requireCreditReservation(
+  env: SitesEnvironment,
+  user: AuthenticatedUser,
+  input: {
+    cost: number;
+    operationKey: string;
+    category: string;
+    description: string;
+    referenceId?: string;
+    metadata?: Record<string, unknown>;
+  }
+): Promise<CreditReservation> {
+  const reservation = await reserveCredits(env, user, input);
+  if (reservation) return reservation;
+  const summary = await billingSummary(env, user);
+  if (!summary.configured && !summary.canUseCredits) {
+    throw json(
+      {
+        error:
+          "Billing activation is in progress. No credits were used and no payment was attempted.",
+        availableCredits: summary.availableCredits,
+      },
+      503
+    );
+  }
+  if (!summary.canUseCredits) {
+    throw json(
+      {
+        error: "Choose an active plan to use REELassati AI tools.",
+        availableCredits: summary.availableCredits,
+      },
+      402
+    );
+  }
+  throw json(
+    {
+      error: `You need ${input.cost} credits for this action.`,
+      availableCredits: summary.availableCredits,
+    },
+    402
+  );
+}
+
+async function runPaidAiAction(
+  env: SitesEnvironment,
+  user: AuthenticatedUser,
+  input: {
+    cost: number;
+    operationKey: string;
+    category: string;
+    description: string;
+    referenceId?: string;
+    metadata?: Record<string, unknown>;
+  },
+  action: (reservation: CreditReservation) => Promise<Response>
+): Promise<Response> {
+  const reservation = await requireCreditReservation(env, user, input);
+  try {
+    const response = await action(reservation);
+    if (response.ok) {
+      await settleCreditReservation(env, reservation);
+    } else {
+      await releaseCreditReservation(env, reservation);
+    }
+    return response;
+  } catch (cause) {
+    await releaseCreditReservation(env, reservation).catch(() => undefined);
+    throw cause;
+  }
+}
+
+async function assetDurationSeconds(
+  env: SitesEnvironment,
+  user: AuthenticatedUser,
+  assetId: string
+): Promise<number | undefined> {
+  const workspace = await getWorkspace(env, user);
+  const duration = workspace.assets.find(
+    asset => asset.id === assetId
+  )?.duration;
+  return typeof duration === "number" && Number.isFinite(duration)
+    ? Math.max(0, duration)
+    : undefined;
+}
+
+function reservationFromJobPayload(
+  payload: Record<string, unknown>
+): CreditReservation | null {
+  const row = recordValue(payload.creditReservation);
+  const id = stringValue(row?.id);
+  const operationKey = stringValue(row?.operationKey);
+  const cost = Math.floor(Number(row?.cost));
+  return id && operationKey && Number.isFinite(cost) && cost > 0
+    ? { id, operationKey, cost }
+    : null;
+}
+
 async function handleAi(
   request: Request,
   env: SitesEnvironment,
@@ -4213,127 +4339,149 @@ async function handleAi(
       "png"
     );
     const r2Key = `users/${encodeURIComponent(user.email)}/generated/${assetId}.png`;
-    const invocation = await beginAiInvocation(
+    return runPaidAiAction(
       env,
       user,
-      "image-generation",
-      "OpenRouter",
-      model,
-      { prompt, aspectRatio, resolution, rightsConfirmed: true }
-    );
-    let provenance: ContentProvenance | null = null;
-    try {
-      const response = await fetch(`${OPENROUTER_BASE}/images`, {
-        method: "POST",
-        headers: openRouterHeaders(env),
-        body: JSON.stringify({
-          model,
-          prompt,
-          n: 1,
-          aspect_ratio: aspectRatio,
-          resolution,
-          quality: "high",
-          output_format: "png",
-        }),
-      });
-      if (!response.ok) await providerError(response, "OpenRouter");
-      const payload = (await response.json()) as {
-        data?: Array<{ b64_json?: string; media_type?: string }>;
-      };
-      const encoded = stringValue(payload.data?.[0]?.b64_json).replace(
-        /^data:image\/png;base64,/i,
-        ""
-      );
-      if (!encoded || encoded.length > 28_000_000) {
-        throw new Error("Image generation returned an invalid image");
-      }
-      const binary = atob(encoded);
-      const imageBytes = new Uint8Array(binary.length);
-      for (let index = 0; index < binary.length; index += 1) {
-        imageBytes[index] = binary.charCodeAt(index);
-      }
-      if (
-        imageBytes.byteLength < 8 ||
-        ![137, 80, 78, 71, 13, 10, 26, 10].every(
-          (byte, index) => imageBytes[index] === byte
-        )
-      ) {
-        throw new Error("Image generation did not return a valid PNG");
-      }
-      provenance = await createProvenanceRecord(env, user, {
-        entityType: "asset",
-        entityId: assetId,
-        origin: "ai-generated",
-        operation: "image-generation",
-        provider: invocation.provider,
-        model: invocation.model,
-        content: imageBytes,
-        embeddedMediaMarker: true,
-        metadata: {
-          invocationId: invocation.id,
-          aspectRatio,
-          resolution,
-          rightsAttested: true,
-          referenceContainsRealPerson:
-            input.referenceContainsRealPerson === true,
-          realPersonConsentAttested: input.realPersonConsentConfirmed === true,
-        },
-      });
-      const markedImage = embedMediaProvenanceMarker(
-        imageBytes.buffer,
-        "image/png",
-        provenance.marking.publicToken || ""
-      );
-      if (!markedImage) throw new Error("Image output marking failed");
-      await env.BUCKET.put(r2Key, markedImage.bytes, {
-        httpMetadata: { contentType: "image/png" },
-        customMetadata: {
-          owner: user.email,
-          source: "reelassati-image",
-          provenanceToken: provenance.marking.publicToken || "",
-          policyVersion: AI_COMPLIANCE_POLICY_VERSION,
-          embeddedMarking: markedImage.method,
-        },
-      });
-      const stored = await env.BUCKET.get(r2Key);
-      if (!stored) throw new Error("Generated image storage is missing");
-      const verifiedProvenance = await finalizeEmbeddedProvenance(
-        env,
-        user,
-        provenance,
-        await stored.arrayBuffer()
-      );
-      const asset = await insertAssetRecord(env, user, {
-        id: assetId,
-        name: assetName,
-        kind: "image",
-        contentType: "image/png",
-        size: markedImage.bytes.byteLength,
-        r2Key,
-      });
-      await completeAiInvocation(env, invocation, await sha256Hex(imageBytes));
-      return json({ asset: { ...asset, provenance: verifiedProvenance } }, 201);
-    } catch (cause) {
-      await env.BUCKET.delete(r2Key).catch(() => undefined);
-      await env.DB.prepare(
-        "DELETE FROM assets WHERE id = ? AND owner_email = ?"
-      )
-        .bind(assetId, user.email)
-        .run()
-        .catch(() => undefined);
-      if (provenance) {
-        await failProvenanceRecord(
+      {
+        cost: imageCreditCost(resolution),
+        operationKey: `image:${assetId}`,
+        category: "image",
+        description: `${resolution} image generation`,
+        referenceId: assetId,
+        metadata: { resolution, aspectRatio },
+      },
+      async () => {
+        const invocation = await beginAiInvocation(
           env,
           user,
-          provenance.recordId,
-          "asset",
-          assetId,
-          "image-output-rollback"
-        ).catch(() => undefined);
+          "image-generation",
+          "OpenRouter",
+          model,
+          { prompt, aspectRatio, resolution, rightsConfirmed: true }
+        );
+        let provenance: ContentProvenance | null = null;
+        try {
+          const response = await fetch(`${OPENROUTER_BASE}/images`, {
+            method: "POST",
+            headers: openRouterHeaders(env),
+            body: JSON.stringify({
+              model,
+              prompt,
+              n: 1,
+              aspect_ratio: aspectRatio,
+              resolution,
+              quality: "high",
+              output_format: "png",
+            }),
+          });
+          if (!response.ok) await providerError(response, "OpenRouter");
+          const payload = (await response.json()) as {
+            data?: Array<{ b64_json?: string; media_type?: string }>;
+          };
+          const encoded = stringValue(payload.data?.[0]?.b64_json).replace(
+            /^data:image\/png;base64,/i,
+            ""
+          );
+          if (!encoded || encoded.length > 28_000_000) {
+            throw new Error("Image generation returned an invalid image");
+          }
+          const binary = atob(encoded);
+          const imageBytes = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index += 1) {
+            imageBytes[index] = binary.charCodeAt(index);
+          }
+          if (
+            imageBytes.byteLength < 8 ||
+            ![137, 80, 78, 71, 13, 10, 26, 10].every(
+              (byte, index) => imageBytes[index] === byte
+            )
+          ) {
+            throw new Error("Image generation did not return a valid PNG");
+          }
+          provenance = await createProvenanceRecord(env, user, {
+            entityType: "asset",
+            entityId: assetId,
+            origin: "ai-generated",
+            operation: "image-generation",
+            provider: invocation.provider,
+            model: invocation.model,
+            content: imageBytes,
+            embeddedMediaMarker: true,
+            metadata: {
+              invocationId: invocation.id,
+              aspectRatio,
+              resolution,
+              rightsAttested: true,
+              referenceContainsRealPerson:
+                input.referenceContainsRealPerson === true,
+              realPersonConsentAttested:
+                input.realPersonConsentConfirmed === true,
+            },
+          });
+          const markedImage = embedMediaProvenanceMarker(
+            imageBytes.buffer,
+            "image/png",
+            provenance.marking.publicToken || ""
+          );
+          if (!markedImage) throw new Error("Image output marking failed");
+          await env.BUCKET.put(r2Key, markedImage.bytes, {
+            httpMetadata: { contentType: "image/png" },
+            customMetadata: {
+              owner: user.email,
+              source: "reelassati-image",
+              provenanceToken: provenance.marking.publicToken || "",
+              policyVersion: AI_COMPLIANCE_POLICY_VERSION,
+              embeddedMarking: markedImage.method,
+            },
+          });
+          const stored = await env.BUCKET.get(r2Key);
+          if (!stored) throw new Error("Generated image storage is missing");
+          const verifiedProvenance = await finalizeEmbeddedProvenance(
+            env,
+            user,
+            provenance,
+            await stored.arrayBuffer()
+          );
+          const asset = await insertAssetRecord(env, user, {
+            id: assetId,
+            name: assetName,
+            kind: "image",
+            contentType: "image/png",
+            size: markedImage.bytes.byteLength,
+            r2Key,
+          });
+          await completeAiInvocation(
+            env,
+            invocation,
+            await sha256Hex(imageBytes)
+          );
+          return json(
+            { asset: { ...asset, provenance: verifiedProvenance } },
+            201
+          );
+        } catch (cause) {
+          await env.BUCKET.delete(r2Key).catch(() => undefined);
+          await env.DB.prepare(
+            "DELETE FROM assets WHERE id = ? AND owner_email = ?"
+          )
+            .bind(assetId, user.email)
+            .run()
+            .catch(() => undefined);
+          if (provenance) {
+            await failProvenanceRecord(
+              env,
+              user,
+              provenance.recordId,
+              "asset",
+              assetId,
+              "image-output-rollback"
+            ).catch(() => undefined);
+          }
+          await failAiInvocation(env, invocation, "image_generation_failure");
+          throw cause;
+        }
       }
-      await failAiInvocation(env, invocation, "image_generation_failure");
-      throw cause;
-    }
+    );
   }
 
   if (url.pathname === "/api/ai/script") {
@@ -4351,59 +4499,72 @@ async function handleAi(
     await assertAllowedCreativeUse(env, user, topic);
     const duration = boundedNumber(input.duration, 30, 8, 180);
     const platform = platformValue(input.platform);
-    const { output, invocation } = await chatJson(
+    return runPaidAiAction(
       env,
       user,
-      "script-generation",
-      `You are REELassati's senior short-form script editor. Return JSON only with keys title, hook, body, cta, fullScript. Write a shootable ${duration}-second script for ${platform}; no inflated viral guarantees, no fake statistics, no generic filler. Make the first line immediately specific. Language: ${stringValue(input.language, "en")}. Tone: ${stringValue(input.tone, "energetic")}. Brand voice: ${stringValue(input.brandVoice, "not supplied")}.`,
-      topic
+      {
+        cost: AI_CREDIT_COSTS.script,
+        operationKey: `script:${crypto.randomUUID()}`,
+        category: "script",
+        description: "Script generation",
+        metadata: { platform, duration },
+      },
+      async () => {
+        const { output, invocation } = await chatJson(
+          env,
+          user,
+          "script-generation",
+          `You are REELassati's senior short-form script editor. Return JSON only with keys title, hook, body, cta, fullScript. Write a shootable ${duration}-second script for ${platform}; no inflated viral guarantees, no fake statistics, no generic filler. Make the first line immediately specific. Language: ${stringValue(input.language, "en")}. Tone: ${stringValue(input.tone, "energetic")}. Brand voice: ${stringValue(input.brandVoice, "not supplied")}.`,
+          topic
+        );
+        const createdAt = new Date().toISOString();
+        const hook = stringValue(output.hook);
+        const body = stringValue(output.body);
+        const cta = stringValue(output.cta);
+        const fullScript = stringValue(
+          output.fullScript,
+          [hook, body, cta].filter(Boolean).join("\n\n")
+        );
+        const scriptId = crypto.randomUUID();
+        const canonicalScript: ScriptDraft = {
+          id: scriptId,
+          title: stringValue(output.title, topic.slice(0, 72)),
+          hook,
+          body,
+          cta,
+          fullScript,
+          platform,
+          tone: stringValue(input.tone, "energetic"),
+          duration,
+          language: stringValue(input.language, "en"),
+          createdAt,
+        };
+        const metadata = await scriptProvenanceMetadata(
+          canonicalScript,
+          invocation.id
+        );
+        const provenance = await createProvenanceRecord(env, user, {
+          entityType: "script",
+          entityId: scriptId,
+          origin: "ai-generated",
+          operation: "script-generation",
+          provider: invocation.provider,
+          model: invocation.model,
+          content: fullScript,
+          textToken: true,
+          metadata: { ...metadata },
+        });
+        const script: ScriptDraft = {
+          ...canonicalScript,
+          fullScript: appendTextProvenanceMarker(
+            fullScript,
+            provenance.marking.publicToken
+          ),
+          provenance,
+        };
+        return json({ script });
+      }
     );
-    const createdAt = new Date().toISOString();
-    const hook = stringValue(output.hook);
-    const body = stringValue(output.body);
-    const cta = stringValue(output.cta);
-    const fullScript = stringValue(
-      output.fullScript,
-      [hook, body, cta].filter(Boolean).join("\n\n")
-    );
-    const scriptId = crypto.randomUUID();
-    const canonicalScript: ScriptDraft = {
-      id: scriptId,
-      title: stringValue(output.title, topic.slice(0, 72)),
-      hook,
-      body,
-      cta,
-      fullScript,
-      platform,
-      tone: stringValue(input.tone, "energetic"),
-      duration,
-      language: stringValue(input.language, "en"),
-      createdAt,
-    };
-    const metadata = await scriptProvenanceMetadata(
-      canonicalScript,
-      invocation.id
-    );
-    const provenance = await createProvenanceRecord(env, user, {
-      entityType: "script",
-      entityId: scriptId,
-      origin: "ai-generated",
-      operation: "script-generation",
-      provider: invocation.provider,
-      model: invocation.model,
-      content: fullScript,
-      textToken: true,
-      metadata: { ...metadata },
-    });
-    const script: ScriptDraft = {
-      ...canonicalScript,
-      fullScript: appendTextProvenanceMarker(
-        fullScript,
-        provenance.marking.publicToken
-      ),
-      provenance,
-    };
-    return json({ script });
   }
 
   if (url.pathname === "/api/ai/edit-plan") {
@@ -4416,7 +4577,8 @@ async function handleAi(
     if (!input.project || !stringValue(input.command)) {
       return errorResponse("Choose a project and describe the edit");
     }
-    const projectId = stringValue(input.project.id);
+    const project = input.project;
+    const projectId = stringValue(project.id);
     if (!projectId) {
       return errorResponse(
         "Save the project before requesting an AI edit plan"
@@ -4443,53 +4605,70 @@ async function handleAi(
         : [],
       selectedRange: input.range,
     };
-    const { output, invocation } = await chatJson(
+    return runPaidAiAction(
       env,
       user,
-      "edit-planning",
-      `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), and intensity (light|balanced|aggressive). Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
-      JSON.stringify({ command: input.command, project: projectContext })
+      {
+        cost: AI_CREDIT_COSTS.editPlan,
+        operationKey: `edit-plan:${crypto.randomUUID()}`,
+        category: "edit-plan",
+        description: "AI edit plan",
+        referenceId: projectId,
+        metadata: { projectId, duration },
+      },
+      async () => {
+        const { output, invocation } = await chatJson(
+          env,
+          user,
+          "edit-planning",
+          `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), and intensity (light|balanced|aggressive). Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
+          JSON.stringify({ command: input.command, project: projectContext })
+        );
+        const summary = stringValue(
+          output.summary,
+          "Edit plan ready for review"
+        );
+        const changes = mapEditOperations(
+          output.changes,
+          duration,
+          project.clips,
+          Array.isArray(input.selectedClipIds) ? input.selectedClipIds : []
+        );
+        const normalizedProjection = {
+          summary,
+          changes: changes.map(editOperationProvenanceProjection),
+        };
+        const normalizedProjectionJson = JSON.stringify(normalizedProjection);
+        const operationBindings = await Promise.all(
+          changes.map(async change => ({
+            operationId: change.id,
+            contentSha256: await editOperationContentSha256(change),
+          }))
+        );
+        const provenance = await createProvenanceRecord(env, user, {
+          entityType: "edit-plan",
+          entityId: invocation.id,
+          origin: "ai-assisted",
+          operation: "edit-planning",
+          provider: invocation.provider,
+          model: invocation.model,
+          content: normalizedProjectionJson,
+          textToken: true,
+          metadata: {
+            schema: "edit-plan-bindings-v1",
+            projectId,
+            invocationId: invocation.id,
+            projectionContentSha256: await sha256Hex(normalizedProjectionJson),
+            operationBindings,
+          } satisfies EditPlanProvenanceMetadata,
+        });
+        return json({
+          summary,
+          changes: changes.map(change => ({ ...change, provenance })),
+          provenance,
+        });
+      }
     );
-    const summary = stringValue(output.summary, "Edit plan ready for review");
-    const changes = mapEditOperations(
-      output.changes,
-      duration,
-      input.project.clips,
-      Array.isArray(input.selectedClipIds) ? input.selectedClipIds : []
-    );
-    const normalizedProjection = {
-      summary,
-      changes: changes.map(editOperationProvenanceProjection),
-    };
-    const normalizedProjectionJson = JSON.stringify(normalizedProjection);
-    const operationBindings = await Promise.all(
-      changes.map(async change => ({
-        operationId: change.id,
-        contentSha256: await editOperationContentSha256(change),
-      }))
-    );
-    const provenance = await createProvenanceRecord(env, user, {
-      entityType: "edit-plan",
-      entityId: invocation.id,
-      origin: "ai-assisted",
-      operation: "edit-planning",
-      provider: invocation.provider,
-      model: invocation.model,
-      content: normalizedProjectionJson,
-      textToken: true,
-      metadata: {
-        schema: "edit-plan-bindings-v1",
-        projectId,
-        invocationId: invocation.id,
-        projectionContentSha256: await sha256Hex(normalizedProjectionJson),
-        operationBindings,
-      } satisfies EditPlanProvenanceMetadata,
-    });
-    return json({
-      summary,
-      changes: changes.map(change => ({ ...change, provenance })),
-      provenance,
-    });
   }
 
   if (url.pathname === "/api/ai/analyze") {
@@ -4507,6 +4686,7 @@ async function handleAi(
       );
     }
     let videoUrl = stringValue(input.publicUrl);
+    let analysisDuration: number | undefined;
     if (videoUrl && !isPublicHttpsUrl(videoUrl)) {
       return errorResponse("Use a public HTTPS video URL");
     }
@@ -4524,6 +4704,7 @@ async function handleAi(
       }
       const object = await env.BUCKET.get(row.r2_key);
       if (!object) return errorResponse("Video bytes are missing", 404);
+      analysisDuration = await assetDurationSeconds(env, user, row.id);
       videoUrl = `data:${row.content_type};base64,${arrayBufferToBase64(
         await object.arrayBuffer()
       )}`;
@@ -4541,71 +4722,88 @@ async function handleAi(
       },
     });
 
-    const { output, invocation } = await chatJson(
+    return runPaidAiAction(
       env,
       user,
-      "video-analysis",
-      `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied video. Return JSON only with summary, hook {score 0..100,note}, pacing {score 0..100,note}, retention [{start,end,score,note}], and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. Each change follows the edit-plan schema: type,label,reason,start,end,confidence,intensity. Target platform: ${platformValue(input.platform)}.`,
-      [
-        {
-          type: "text",
-          text: "Analyze the video for hook clarity, pacing, dead air, visual proof, captions, audio, and CTA. Produce only reviewable edit suggestions.",
-        },
-        { type: "video_url", video_url: { url: videoUrl } },
-      ],
-      env.OPENROUTER_ANALYSIS_MODEL || "google/gemini-2.5-flash"
+      {
+        cost: timedCreditCost(
+          analysisDuration,
+          AI_CREDIT_COSTS.videoAnalysisPerMinute
+        ),
+        operationKey: `video-analysis:${crypto.randomUUID()}`,
+        category: "analysis",
+        description: "Video analysis",
+        referenceId: stringValue(input.assetId) || undefined,
+        metadata: { durationSeconds: analysisDuration || null },
+      },
+      async () => {
+        const { output, invocation } = await chatJson(
+          env,
+          user,
+          "video-analysis",
+          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied video. Return JSON only with summary, hook {score 0..100,note}, pacing {score 0..100,note}, retention [{start,end,score,note}], and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. Each change follows the edit-plan schema: type,label,reason,start,end,confidence,intensity. Target platform: ${platformValue(input.platform)}.`,
+          [
+            {
+              type: "text",
+              text: "Analyze the video for hook clarity, pacing, dead air, visual proof, captions, audio, and CTA. Produce only reviewable edit suggestions.",
+            },
+            { type: "video_url", video_url: { url: videoUrl } },
+          ],
+          env.OPENROUTER_ANALYSIS_MODEL || "google/gemini-2.5-flash"
+        );
+        const provenance = await createProvenanceRecord(env, user, {
+          entityType: "analysis",
+          entityId: invocation.id,
+          origin: "ai-assisted",
+          operation: "video-analysis",
+          provider: invocation.provider,
+          model: invocation.model,
+          content: JSON.stringify(output),
+          textToken: true,
+          metadata: {
+            invocationId: invocation.id,
+            assetId: input.assetId || null,
+            sourceRightsConfirmed: true,
+          },
+        });
+        const retention = Array.isArray(output.retention)
+          ? output.retention.slice(0, 20).map(item => {
+              const row = item as Record<string, unknown>;
+              return {
+                start: boundedNumber(row.start, 0, 0, 600),
+                end: boundedNumber(row.end, 1, 0, 600),
+                score: boundedNumber(row.score, 50, 0, 100),
+                note: stringValue(row.note, "Review this interval"),
+              };
+            })
+          : [];
+        const hook =
+          output.hook && typeof output.hook === "object"
+            ? (output.hook as Record<string, unknown>)
+            : {};
+        const pacing =
+          output.pacing && typeof output.pacing === "object"
+            ? (output.pacing as Record<string, unknown>)
+            : {};
+        return json({
+          summary: stringValue(output.summary, "Analysis complete"),
+          hook: {
+            score: boundedNumber(hook.score, 50, 0, 100),
+            note: stringValue(hook.note, "Review the first three seconds"),
+          },
+          pacing: {
+            score: boundedNumber(pacing.score, 50, 0, 100),
+            note: stringValue(pacing.note, "Review pauses and shot length"),
+          },
+          retention,
+          changes: mapEditOperations(output.changes, 600).map(change => ({
+            ...change,
+            provenance,
+          })),
+          provenance,
+        });
+      }
     );
-    const provenance = await createProvenanceRecord(env, user, {
-      entityType: "analysis",
-      entityId: invocation.id,
-      origin: "ai-assisted",
-      operation: "video-analysis",
-      provider: invocation.provider,
-      model: invocation.model,
-      content: JSON.stringify(output),
-      textToken: true,
-      metadata: {
-        invocationId: invocation.id,
-        assetId: input.assetId || null,
-        sourceRightsConfirmed: true,
-      },
-    });
-    const retention = Array.isArray(output.retention)
-      ? output.retention.slice(0, 20).map(item => {
-          const row = item as Record<string, unknown>;
-          return {
-            start: boundedNumber(row.start, 0, 0, 600),
-            end: boundedNumber(row.end, 1, 0, 600),
-            score: boundedNumber(row.score, 50, 0, 100),
-            note: stringValue(row.note, "Review this interval"),
-          };
-        })
-      : [];
-    const hook =
-      output.hook && typeof output.hook === "object"
-        ? (output.hook as Record<string, unknown>)
-        : {};
-    const pacing =
-      output.pacing && typeof output.pacing === "object"
-        ? (output.pacing as Record<string, unknown>)
-        : {};
-    return json({
-      summary: stringValue(output.summary, "Analysis complete"),
-      hook: {
-        score: boundedNumber(hook.score, 50, 0, 100),
-        note: stringValue(hook.note, "Review the first three seconds"),
-      },
-      pacing: {
-        score: boundedNumber(pacing.score, 50, 0, 100),
-        note: stringValue(pacing.note, "Review pauses and shot length"),
-      },
-      retention,
-      changes: mapEditOperations(output.changes, 600).map(change => ({
-        ...change,
-        provenance,
-      })),
-      provenance,
-    });
   }
 
   if (url.pathname === "/api/ai/transcribe") {
@@ -4646,94 +4844,124 @@ async function handleAi(
     }
     const object = await env.BUCKET.get(row.r2_key);
     if (!object) return errorResponse("Audio bytes are missing", 404);
-    const model = env.OPENROUTER_STT_MODEL || "openai/whisper-large-v3-turbo";
-    const invocation = await beginAiInvocation(
+    const transcriptionDuration = await assetDurationSeconds(
       env,
       user,
-      "transcription",
-      "OpenRouter",
-      model,
-      { assetId, projectId, language: input.language || null }
+      assetId
     );
-    let payload: {
-      text?: string;
-      segments?: Array<{ start?: number; end?: number; text?: string }>;
-    };
-    try {
-      const response = await fetch(`${OPENROUTER_BASE}/audio/transcriptions`, {
-        method: "POST",
-        headers: openRouterHeaders(env),
-        body: JSON.stringify({
+    return runPaidAiAction(
+      env,
+      user,
+      {
+        cost: timedCreditCost(
+          transcriptionDuration,
+          AI_CREDIT_COSTS.transcriptionPerMinute
+        ),
+        operationKey: `transcription:${crypto.randomUUID()}`,
+        category: "transcription",
+        description: "Media transcription",
+        referenceId: assetId,
+        metadata: { durationSeconds: transcriptionDuration || null },
+      },
+      async () => {
+        const model =
+          env.OPENROUTER_STT_MODEL || "openai/whisper-large-v3-turbo";
+        const invocation = await beginAiInvocation(
+          env,
+          user,
+          "transcription",
+          "OpenRouter",
           model,
-          input_audio: {
-            data: arrayBufferToBase64(await object.arrayBuffer()),
-            format: audioFormat(row.content_type, row.name),
-          },
-          ...(input.language ? { language: input.language } : {}),
-          response_format: "verbose_json",
-          timestamp_granularities: ["segment"],
-        }),
-      });
-      if (!response.ok) {
-        await failAiInvocation(env, invocation, `provider_${response.status}`);
-        await providerError(response, "OpenRouter");
-      }
-      payload = (await response.json()) as typeof payload;
-      await completeAiInvocation(env, invocation, payload);
-    } catch (cause) {
-      await failAiInvocation(env, invocation, "provider_or_parse_failure");
-      throw cause;
-    }
-    const providerTranscript = stringValue(payload.text);
-    const segments = normalizeTranscriptSegments(
-      (payload.segments || []).length > 0
-        ? (payload.segments || []).map(segment => ({
-            id: crypto.randomUUID(),
-            start: boundedNumber(segment.start, 0, 0, 100_000),
-            end: boundedNumber(segment.end, 0.1, 0, 100_000),
-            text: stringValue(segment.text),
-          }))
-        : providerTranscript
-          ? [
-              {
+          { assetId, projectId, language: input.language || null }
+        );
+        let payload: {
+          text?: string;
+          segments?: Array<{ start?: number; end?: number; text?: string }>;
+        };
+        try {
+          const response = await fetch(
+            `${OPENROUTER_BASE}/audio/transcriptions`,
+            {
+              method: "POST",
+              headers: openRouterHeaders(env),
+              body: JSON.stringify({
+                model,
+                input_audio: {
+                  data: arrayBufferToBase64(await object.arrayBuffer()),
+                  format: audioFormat(row.content_type, row.name),
+                },
+                ...(input.language ? { language: input.language } : {}),
+                response_format: "verbose_json",
+                timestamp_granularities: ["segment"],
+              }),
+            }
+          );
+          if (!response.ok) {
+            await failAiInvocation(
+              env,
+              invocation,
+              `provider_${response.status}`
+            );
+            await providerError(response, "OpenRouter");
+          }
+          payload = (await response.json()) as typeof payload;
+          await completeAiInvocation(env, invocation, payload);
+        } catch (cause) {
+          await failAiInvocation(env, invocation, "provider_or_parse_failure");
+          throw cause;
+        }
+        const providerTranscript = stringValue(payload.text);
+        const segments = normalizeTranscriptSegments(
+          (payload.segments || []).length > 0
+            ? (payload.segments || []).map(segment => ({
                 id: crypto.randomUUID(),
-                start: 0,
-                end: 0.1,
-                text: providerTranscript,
-              },
-            ]
-          : []
+                start: boundedNumber(segment.start, 0, 0, 100_000),
+                end: boundedNumber(segment.end, 0.1, 0, 100_000),
+                text: stringValue(segment.text),
+              }))
+            : providerTranscript
+              ? [
+                  {
+                    id: crypto.randomUUID(),
+                    start: 0,
+                    end: 0.1,
+                    text: providerTranscript,
+                  },
+                ]
+              : []
+        );
+        const transcript = canonicalTranscriptText(segments);
+        const metadata = projectId
+          ? await transcriptProvenanceMetadata(
+              projectId,
+              invocation.id,
+              assetId,
+              segments
+            )
+          : { invocationId: invocation.id, sourceAssetId: assetId };
+        const provenance = await createProvenanceRecord(env, user, {
+          entityType: "transcript",
+          entityId: projectId
+            ? `${projectId}:source:${invocation.id}`
+            : invocation.id,
+          origin: "ai-assisted",
+          operation: "transcription",
+          provider: invocation.provider,
+          model: invocation.model,
+          content: transcript,
+          textToken: true,
+          metadata: { ...metadata },
+        });
+        return json({
+          transcript: appendTextProvenanceMarker(
+            transcript,
+            provenance.marking.publicToken
+          ),
+          segments,
+          provenance,
+        });
+      }
     );
-    const transcript = canonicalTranscriptText(segments);
-    const metadata = projectId
-      ? await transcriptProvenanceMetadata(
-          projectId,
-          invocation.id,
-          assetId,
-          segments
-        )
-      : { invocationId: invocation.id, sourceAssetId: assetId };
-    const provenance = await createProvenanceRecord(env, user, {
-      entityType: "transcript",
-      entityId: projectId
-        ? `${projectId}:source:${invocation.id}`
-        : invocation.id,
-      origin: "ai-assisted",
-      operation: "transcription",
-      provider: invocation.provider,
-      model: invocation.model,
-      content: transcript,
-      textToken: true,
-      metadata: { ...metadata },
-    });
-    return json({
-      transcript: appendTextProvenanceMarker(
-        transcript,
-        provenance.marking.publicToken
-      ),
-      segments,
-      provenance,
-    });
   }
 
   if (url.pathname === "/api/ai/speech") {
@@ -4765,176 +4993,193 @@ async function handleAi(
       env.OPENROUTER_TTS_VOICE || "English_Graceful_Lady"
     );
     const model = env.OPENROUTER_TTS_MODEL || "minimax/speech-2.8-turbo";
-    const invocation = await beginAiInvocation(
+    return runPaidAiAction(
       env,
       user,
-      "speech-synthesis",
-      "OpenRouter",
-      model,
-      { text, voice, rightsConfirmed: true }
-    );
-    let buffer: ArrayBuffer;
-    try {
-      const response = await fetch(`${OPENROUTER_BASE}/audio/speech`, {
-        method: "POST",
-        headers: openRouterHeaders(env),
-        body: JSON.stringify({
-          model,
-          input: text,
-          voice,
-          response_format: "mp3",
-        }),
-      });
-      if (!response.ok) {
-        await failAiInvocation(env, invocation, `provider_${response.status}`);
-        await providerError(response, "OpenRouter");
-      }
-      buffer = await response.arrayBuffer();
-    } catch (cause) {
-      await failAiInvocation(env, invocation, "provider_failure");
-      throw cause;
-    }
-    const assetId = crypto.randomUUID();
-    const r2Key = `users/${encodeURIComponent(user.email)}/generated/${assetId}.mp3`;
-    const pendingProvenance = await createProvenanceRecord(env, user, {
-      entityType: "asset",
-      entityId: assetId,
-      origin: "ai-generated",
-      operation: "speech-synthesis",
-      provider: invocation.provider,
-      model: invocation.model,
-      content: buffer,
-      embeddedMediaMarker: true,
-      metadata: {
-        invocationId: invocation.id,
-        voice,
-        rightsAttested: true,
+      {
+        cost: speechCreditCost(text.length),
+        operationKey: `speech:${crypto.randomUUID()}`,
+        category: "speech",
+        description: "Voice generation",
+        metadata: { characters: text.length },
       },
-    });
-    const markedSpeech = embedMediaProvenanceMarker(
-      buffer,
-      "audio/mpeg",
-      pendingProvenance.marking.publicToken || ""
+      async () => {
+        const invocation = await beginAiInvocation(
+          env,
+          user,
+          "speech-synthesis",
+          "OpenRouter",
+          model,
+          { text, voice, rightsConfirmed: true }
+        );
+        let buffer: ArrayBuffer;
+        try {
+          const response = await fetch(`${OPENROUTER_BASE}/audio/speech`, {
+            method: "POST",
+            headers: openRouterHeaders(env),
+            body: JSON.stringify({
+              model,
+              input: text,
+              voice,
+              response_format: "mp3",
+            }),
+          });
+          if (!response.ok) {
+            await failAiInvocation(
+              env,
+              invocation,
+              `provider_${response.status}`
+            );
+            await providerError(response, "OpenRouter");
+          }
+          buffer = await response.arrayBuffer();
+        } catch (cause) {
+          await failAiInvocation(env, invocation, "provider_failure");
+          throw cause;
+        }
+        const assetId = crypto.randomUUID();
+        const r2Key = `users/${encodeURIComponent(user.email)}/generated/${assetId}.mp3`;
+        const pendingProvenance = await createProvenanceRecord(env, user, {
+          entityType: "asset",
+          entityId: assetId,
+          origin: "ai-generated",
+          operation: "speech-synthesis",
+          provider: invocation.provider,
+          model: invocation.model,
+          content: buffer,
+          embeddedMediaMarker: true,
+          metadata: {
+            invocationId: invocation.id,
+            voice,
+            rightsAttested: true,
+          },
+        });
+        const markedSpeech = embedMediaProvenanceMarker(
+          buffer,
+          "audio/mpeg",
+          pendingProvenance.marking.publicToken || ""
+        );
+        if (!markedSpeech) {
+          await failProvenanceRecord(
+            env,
+            user,
+            pendingProvenance.recordId,
+            "asset",
+            assetId,
+            "unsupported-or-invalid-audio-marker"
+          );
+          await failAiInvocation(env, invocation, "output_marking_failure");
+          throw new Response(
+            JSON.stringify({
+              error:
+                "The generated audio could not be machine-marked, so it was not saved or returned.",
+              code: "OUTPUT_MARKING_FAILED",
+            }),
+            { status: 500, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        try {
+          await env.BUCKET.put(r2Key, markedSpeech.bytes, {
+            httpMetadata: { contentType: "audio/mpeg" },
+            customMetadata: {
+              owner: user.email,
+              source: "openrouter-tts",
+              provenanceToken: pendingProvenance.marking.publicToken || "",
+              policyVersion: AI_COMPLIANCE_POLICY_VERSION,
+              embeddedMarking: markedSpeech.method,
+            },
+          });
+        } catch {
+          await rollbackGeneratedSpeech(
+            env,
+            user,
+            invocation,
+            pendingProvenance,
+            assetId,
+            r2Key,
+            "audio-storage-write-failure"
+          );
+          throw new Response(
+            JSON.stringify({
+              error:
+                "The generated audio could not be stored safely, so it was not saved or returned.",
+              code: "OUTPUT_STORAGE_FAILED",
+            }),
+            { status: 500, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        let provenance: ContentProvenance;
+        try {
+          const storedSpeech = await env.BUCKET.get(r2Key);
+          if (!storedSpeech) throw new Error("Marked audio storage is missing");
+          provenance = await finalizeEmbeddedProvenance(
+            env,
+            user,
+            pendingProvenance,
+            await storedSpeech.arrayBuffer()
+          );
+        } catch (cause) {
+          await rollbackGeneratedSpeech(
+            env,
+            user,
+            invocation,
+            pendingProvenance,
+            assetId,
+            r2Key,
+            "audio-marking-readback-failure"
+          );
+          throw cause;
+        }
+        let asset: Asset;
+        try {
+          asset = await insertAssetRecord(env, user, {
+            id: assetId,
+            name: generatedAssetName(
+              input.assetName,
+              `Voice take ${new Date().toLocaleDateString("en-GB")}`,
+              "mp3"
+            ),
+            kind: "audio",
+            contentType: "audio/mpeg",
+            size: markedSpeech.bytes.byteLength,
+            r2Key,
+          });
+        } catch (cause) {
+          await rollbackGeneratedSpeech(
+            env,
+            user,
+            invocation,
+            pendingProvenance,
+            assetId,
+            r2Key,
+            "asset-persistence-failure"
+          );
+          throw cause;
+        }
+        try {
+          await completeAiInvocation(env, invocation, await sha256Hex(buffer));
+        } catch {
+          await rollbackGeneratedSpeech(
+            env,
+            user,
+            invocation,
+            pendingProvenance,
+            assetId,
+            r2Key,
+            "invocation-finalization-failure"
+          );
+          throw new Response(
+            JSON.stringify({
+              error:
+                "The generated audio audit trail could not be finalized, so the output was not released.",
+              code: "OUTPUT_AUDIT_FAILED",
+            }),
+            { status: 500, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        return json({ asset: { ...asset, provenance } }, 201);
+      }
     );
-    if (!markedSpeech) {
-      await failProvenanceRecord(
-        env,
-        user,
-        pendingProvenance.recordId,
-        "asset",
-        assetId,
-        "unsupported-or-invalid-audio-marker"
-      );
-      await failAiInvocation(env, invocation, "output_marking_failure");
-      throw new Response(
-        JSON.stringify({
-          error:
-            "The generated audio could not be machine-marked, so it was not saved or returned.",
-          code: "OUTPUT_MARKING_FAILED",
-        }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
-    try {
-      await env.BUCKET.put(r2Key, markedSpeech.bytes, {
-        httpMetadata: { contentType: "audio/mpeg" },
-        customMetadata: {
-          owner: user.email,
-          source: "openrouter-tts",
-          provenanceToken: pendingProvenance.marking.publicToken || "",
-          policyVersion: AI_COMPLIANCE_POLICY_VERSION,
-          embeddedMarking: markedSpeech.method,
-        },
-      });
-    } catch {
-      await rollbackGeneratedSpeech(
-        env,
-        user,
-        invocation,
-        pendingProvenance,
-        assetId,
-        r2Key,
-        "audio-storage-write-failure"
-      );
-      throw new Response(
-        JSON.stringify({
-          error:
-            "The generated audio could not be stored safely, so it was not saved or returned.",
-          code: "OUTPUT_STORAGE_FAILED",
-        }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
-    let provenance: ContentProvenance;
-    try {
-      const storedSpeech = await env.BUCKET.get(r2Key);
-      if (!storedSpeech) throw new Error("Marked audio storage is missing");
-      provenance = await finalizeEmbeddedProvenance(
-        env,
-        user,
-        pendingProvenance,
-        await storedSpeech.arrayBuffer()
-      );
-    } catch (cause) {
-      await rollbackGeneratedSpeech(
-        env,
-        user,
-        invocation,
-        pendingProvenance,
-        assetId,
-        r2Key,
-        "audio-marking-readback-failure"
-      );
-      throw cause;
-    }
-    let asset: Asset;
-    try {
-      asset = await insertAssetRecord(env, user, {
-        id: assetId,
-        name: generatedAssetName(
-          input.assetName,
-          `Voice take ${new Date().toLocaleDateString("en-GB")}`,
-          "mp3"
-        ),
-        kind: "audio",
-        contentType: "audio/mpeg",
-        size: markedSpeech.bytes.byteLength,
-        r2Key,
-      });
-    } catch (cause) {
-      await rollbackGeneratedSpeech(
-        env,
-        user,
-        invocation,
-        pendingProvenance,
-        assetId,
-        r2Key,
-        "asset-persistence-failure"
-      );
-      throw cause;
-    }
-    try {
-      await completeAiInvocation(env, invocation, await sha256Hex(buffer));
-    } catch {
-      await rollbackGeneratedSpeech(
-        env,
-        user,
-        invocation,
-        pendingProvenance,
-        assetId,
-        r2Key,
-        "invocation-finalization-failure"
-      );
-      throw new Response(
-        JSON.stringify({
-          error:
-            "The generated audio audit trail could not be finalized, so the output was not released.",
-          code: "OUTPUT_AUDIT_FAILED",
-        }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
-    return json({ asset: { ...asset, provenance } }, 201);
   }
 
   return errorResponse("AI route not found", 404);
@@ -5134,6 +5379,28 @@ async function handleVideoJobs(
       return json({ job: jobFromRow(existing) }, 202);
     }
 
+    const videoCost = videoCreditCost({
+      duration,
+      resolution,
+      generateAudio: input.generateAudio !== false,
+      continuation: Boolean(parentJob),
+    });
+    const creditReservation = await requireCreditReservation(env, user, {
+      cost: videoCost,
+      operationKey: `video:${requestId}`,
+      category: "video",
+      description: parentJob
+        ? "Continued video generation"
+        : "Video generation",
+      referenceId: requestId,
+      metadata: {
+        duration,
+        resolution,
+        generateAudio: input.generateAudio !== false,
+        continuation: Boolean(parentJob),
+      },
+    });
+
     const now = new Date().toISOString();
     const registration = await env.DB.prepare(
       `
@@ -5163,6 +5430,7 @@ async function handleVideoJobs(
           rootScenePrompt,
           requestedPrompt,
           assetName,
+          creditReservation,
         }),
         now,
         now
@@ -5174,139 +5442,167 @@ async function handleVideoJobs(
       .bind(requestId, user.email)
       .first<JobRow>();
     if (!registered) {
+      await releaseCreditReservation(env, creditReservation).catch(
+        () => undefined
+      );
       return errorResponse("The video request could not be registered", 500);
     }
     if ((registration.meta?.changes || 0) !== 1 || registered.provider_job_id) {
       return json({ job: jobFromRow(registered) }, 202);
     }
 
-    const selectedVideoModel = parentJob
-      ? env.OPENROUTER_CONTINUITY_VIDEO_MODEL || "bytedance/seedance-2.0"
-      : env.OPENROUTER_VIDEO_MODEL || "kwaivgi/kling-v3.0-std";
-    const invocation = await beginAiInvocation(
-      env,
-      user,
-      "video-generation",
-      "OpenRouter",
-      selectedVideoModel,
-      {
-        prompt,
-        duration,
-        aspectRatio,
-        resolution,
-        generateAudio: input.generateAudio !== false,
-        firstFrameUrl: firstFrameUrl || null,
-        lastFrameUrl: lastFrameUrl || null,
-        continuityMode: parentJob ? "continue" : "new",
-        rootJobId,
-        parentJobId: parentJob?.id || null,
-        sourceAssetId: sourceAssetId || null,
-        rootScenePrompt,
-        requestedPrompt,
-        assetName,
-        rightsConfirmed: true,
-        referenceContainsRealPerson: input.referenceContainsRealPerson === true,
-        realPersonConsentConfirmed: input.realPersonConsentConfirmed === true,
-      }
-    );
-    const response = await fetch(`${OPENROUTER_BASE}/videos`, {
-      method: "POST",
-      headers: openRouterHeaders(env),
-      body: JSON.stringify({
-        model: selectedVideoModel,
-        prompt,
-        duration,
-        resolution,
-        aspect_ratio: aspectRatio,
-        generate_audio: input.generateAudio !== false,
-        seed: continuitySeed,
-        callback_url: `${url.origin}/api/video/webhook?token=${encodeURIComponent(
-          await videoWebhookToken(env.OPENROUTER_API_KEY)
-        )}&requestId=${encodeURIComponent(requestId)}`,
-        ...(frameImages.length ? { frame_images: frameImages } : {}),
-        ...(inputReferences.length
-          ? { input_references: inputReferences }
-          : {}),
-      }),
-    });
-    if (!response.ok) {
-      await failAiInvocation(env, invocation, `provider_${response.status}`);
-      await env.DB.prepare(
-        `
+    let providerAccepted = false;
+    try {
+      const selectedVideoModel = parentJob
+        ? env.OPENROUTER_CONTINUITY_VIDEO_MODEL || "bytedance/seedance-2.0"
+        : env.OPENROUTER_VIDEO_MODEL || "kwaivgi/kling-v3.0-std";
+      const invocation = await beginAiInvocation(
+        env,
+        user,
+        "video-generation",
+        "OpenRouter",
+        selectedVideoModel,
+        {
+          prompt,
+          duration,
+          aspectRatio,
+          resolution,
+          generateAudio: input.generateAudio !== false,
+          firstFrameUrl: firstFrameUrl || null,
+          lastFrameUrl: lastFrameUrl || null,
+          continuityMode: parentJob ? "continue" : "new",
+          rootJobId,
+          parentJobId: parentJob?.id || null,
+          sourceAssetId: sourceAssetId || null,
+          rootScenePrompt,
+          requestedPrompt,
+          assetName,
+          rightsConfirmed: true,
+          referenceContainsRealPerson:
+            input.referenceContainsRealPerson === true,
+          realPersonConsentConfirmed: input.realPersonConsentConfirmed === true,
+        }
+      );
+      const response = await fetch(`${OPENROUTER_BASE}/videos`, {
+        method: "POST",
+        headers: openRouterHeaders(env),
+        body: JSON.stringify({
+          model: selectedVideoModel,
+          prompt,
+          duration,
+          resolution,
+          aspect_ratio: aspectRatio,
+          generate_audio: input.generateAudio !== false,
+          seed: continuitySeed,
+          callback_url: `${url.origin}/api/video/webhook?token=${encodeURIComponent(
+            await videoWebhookToken(env.OPENROUTER_API_KEY)
+          )}&requestId=${encodeURIComponent(requestId)}`,
+          ...(frameImages.length ? { frame_images: frameImages } : {}),
+          ...(inputReferences.length
+            ? { input_references: inputReferences }
+            : {}),
+        }),
+      });
+      if (!response.ok) {
+        await failAiInvocation(env, invocation, `provider_${response.status}`);
+        await env.DB.prepare(
+          `
         UPDATE generation_jobs
         SET status = 'failed', progress = 100,
             error = 'Video generation could not start',
             updated_at = ?
         WHERE id = ? AND owner_email = ? AND provider_job_id IS NULL
       `
-      )
-        .bind(new Date().toISOString(), requestId, user.email)
-        .run();
-      await providerError(response, "OpenRouter");
-    }
-    const payload = (await response.json()) as {
-      id?: string;
-      status?: string;
-      polling_url?: string;
-    };
-    if (!payload.id) {
-      await failAiInvocation(env, invocation, "missing_provider_job_id");
-      await env.DB.prepare(
-        `
+        )
+          .bind(new Date().toISOString(), requestId, user.email)
+          .run();
+        await releaseCreditReservation(env, creditReservation);
+        await providerError(response, "OpenRouter");
+      }
+      const payload = (await response.json()) as {
+        id?: string;
+        status?: string;
+        polling_url?: string;
+      };
+      if (!payload.id) {
+        await failAiInvocation(env, invocation, "missing_provider_job_id");
+        await env.DB.prepare(
+          `
         UPDATE generation_jobs
         SET status = 'failed', progress = 100,
             error = 'Video generation could not be confirmed', updated_at = ?
         WHERE id = ? AND owner_email = ?
       `
-      )
-        .bind(new Date().toISOString(), requestId, user.email)
-        .run();
-      return errorResponse("Video generation could not be confirmed", 502);
-    }
-    await env.DB.prepare(
-      `
+        )
+          .bind(new Date().toISOString(), requestId, user.email)
+          .run();
+        await releaseCreditReservation(env, creditReservation);
+        return errorResponse("Video generation could not be confirmed", 502);
+      }
+      providerAccepted = true;
+      await env.DB.prepare(
+        `
       UPDATE generation_jobs
       SET provider_job_id = ?, status = ?, progress = ?, error = NULL,
           payload = ?, updated_at = ?
       WHERE id = ? AND owner_email = ?
     `
-    )
-      .bind(
-        payload.id,
-        payload.status === "in_progress" ? "in_progress" : "pending",
-        payload.status === "in_progress" ? 35 : 8,
-        JSON.stringify({
-          duration,
-          aspectRatio,
-          resolution,
-          pollingUrl: payload.polling_url,
-          invocationId: invocation.id,
-          model: selectedVideoModel,
-          continuitySeed,
-          rootJobId,
-          parentJobId: parentJob?.id || undefined,
-          sourceAssetId: sourceAssetId || undefined,
-          rootScenePrompt,
-          requestedPrompt,
-          assetName,
-          firstFrameUrl: firstFrameUrl || undefined,
-          lastFrameUrl: lastFrameUrl || undefined,
-          rightsConfirmed: true,
-          referenceContainsRealPerson:
-            input.referenceContainsRealPerson === true,
-          realPersonConsentConfirmed: input.realPersonConsentConfirmed === true,
-        }),
-        new Date().toISOString(),
-        requestId,
-        user.email
       )
-      .run();
-    const row = await env.DB.prepare(
-      "SELECT * FROM generation_jobs WHERE id = ? AND owner_email = ?"
-    )
-      .bind(requestId, user.email)
-      .first<JobRow>();
-    return json({ job: jobFromRow(row as JobRow) }, 202);
+        .bind(
+          payload.id,
+          payload.status === "in_progress" ? "in_progress" : "pending",
+          payload.status === "in_progress" ? 35 : 8,
+          JSON.stringify({
+            duration,
+            aspectRatio,
+            resolution,
+            pollingUrl: payload.polling_url,
+            invocationId: invocation.id,
+            model: selectedVideoModel,
+            continuitySeed,
+            rootJobId,
+            parentJobId: parentJob?.id || undefined,
+            sourceAssetId: sourceAssetId || undefined,
+            rootScenePrompt,
+            requestedPrompt,
+            assetName,
+            firstFrameUrl: firstFrameUrl || undefined,
+            lastFrameUrl: lastFrameUrl || undefined,
+            rightsConfirmed: true,
+            referenceContainsRealPerson:
+              input.referenceContainsRealPerson === true,
+            realPersonConsentConfirmed:
+              input.realPersonConsentConfirmed === true,
+            creditReservation,
+          }),
+          new Date().toISOString(),
+          requestId,
+          user.email
+        )
+        .run();
+      const row = await env.DB.prepare(
+        "SELECT * FROM generation_jobs WHERE id = ? AND owner_email = ?"
+      )
+        .bind(requestId, user.email)
+        .first<JobRow>();
+      return json({ job: jobFromRow(row as JobRow) }, 202);
+    } catch (cause) {
+      if (!providerAccepted) {
+        await releaseCreditReservation(env, creditReservation).catch(
+          () => undefined
+        );
+        await env.DB.prepare(
+          `UPDATE generation_jobs
+           SET status = 'failed', progress = 100,
+               error = 'Video generation could not start', updated_at = ?
+           WHERE id = ? AND owner_email = ? AND provider_job_id IS NULL`
+        )
+          .bind(new Date().toISOString(), requestId, user.email)
+          .run()
+          .catch(() => undefined);
+      }
+      throw cause;
+    }
   }
 
   if (request.method !== "GET" || !id) {
@@ -5325,6 +5621,18 @@ async function handleVideoJobs(
     !row.provider_job_id &&
     Date.now() - new Date(row.created_at).getTime() > 10 * 60 * 1000
   ) {
+    let stalePayload: Record<string, unknown> = {};
+    try {
+      stalePayload = recordValue(JSON.parse(row.payload)) || {};
+    } catch {
+      stalePayload = {};
+    }
+    const staleReservation = reservationFromJobPayload(stalePayload);
+    if (staleReservation) {
+      await releaseCreditReservation(env, staleReservation).catch(
+        () => undefined
+      );
+    }
     await env.DB.prepare(
       `
       UPDATE generation_jobs
@@ -5552,6 +5860,10 @@ async function handleVideoJobs(
           )
             .bind(asset.id, now, id, user.email)
             .run();
+          const completedReservation = reservationFromJobPayload(jobPayload);
+          if (completedReservation) {
+            await settleCreditReservation(env, completedReservation);
+          }
         } catch (cause) {
           const failedAssetId = `video-${id}`;
           const failedR2Key = `users/${encodeURIComponent(
@@ -5596,6 +5908,12 @@ async function handleVideoJobs(
               "output_marking_or_storage_failure"
             );
           }
+          const failedReservation = reservationFromJobPayload(jobPayload);
+          if (failedReservation) {
+            await releaseCreditReservation(env, failedReservation).catch(
+              () => undefined
+            );
+          }
           await env.DB.prepare(
             `
             UPDATE generation_jobs
@@ -5631,6 +5949,12 @@ async function handleVideoJobs(
             purpose: "video-generation",
           },
           `provider_${statusPayload.status}`
+        );
+      }
+      const failedReservation = reservationFromJobPayload(jobPayload);
+      if (failedReservation) {
+        await releaseCreditReservation(env, failedReservation).catch(
+          () => undefined
         );
       }
       await env.DB.prepare(
@@ -6357,6 +6681,22 @@ async function handlePublishing(
         : stringValue(input.platform).toLowerCase();
     if (!ZERNIO_PLATFORMS.has(platform)) {
       return errorResponse("That publishing platform is not supported yet");
+    }
+    const [accountLimit, connectedAccounts] = await Promise.all([
+      socialAccountLimit(env, user),
+      listZernioAccounts(env, user),
+    ]);
+    if (accountLimit <= 0) {
+      return errorResponse(
+        "Choose an active plan before connecting a publishing account",
+        402
+      );
+    }
+    if (connectedAccounts.length >= accountLimit) {
+      return errorResponse(
+        `Your plan includes ${accountLimit} connected social account${accountLimit === 1 ? "" : "s"}. Manage your plan to add another.`,
+        409
+      );
     }
     const profileId = await ensureZernioProfile(env, user);
     const redirectUrl = `${url.origin}/api/publishing/callback?platform=${encodeURIComponent(
@@ -7224,6 +7564,13 @@ async function handleReferralBillingWebhook(
     return errorResponse("The referral could not be qualified", 409);
   }
 
+  await grantReferralCredits(
+    env,
+    claim.referrer_email,
+    claim.id,
+    REFERRAL_REWARD_CREDITS
+  );
+
   return json({
     success: true,
     verified: true,
@@ -7321,7 +7668,9 @@ async function referralStats(
     dollarValue: referralDollarValue(valueCents),
     rewardCredits: REFERRAL_REWARD_CREDITS,
     rewardDollarValue: referralDollarValue(REFERRAL_REWARD_CENTS),
-    billingVerificationConfigured: Boolean(referralBillingWebhookSecret(env)),
+    billingVerificationConfigured: Boolean(
+      referralBillingWebhookSecret(env) || stripeBillingConfigured(env)
+    ),
     referrals: result.results.map(claim => ({
       id: claim.id,
       referredDisplay: maskReferralEmail(claim.referred_email),
@@ -7953,7 +8302,7 @@ function guidedPricingSupport(
   const latest = userMessages.at(-1)?.content || "";
   const previous = userMessages.slice(0, -1);
   const pricingPattern =
-    /\b(?:pricing|prices?|cost|plans?|sales|contract|monthly|annual|prezzi?|costo|piani?|vendite|contratto|mensile|annuale)\b/i;
+    /\b(?:pricing|prices?|cost|plans?|sales|contract|monthly|annual|credits?|top[ -]?ups?|prezzi?|costo|piani?|vendite|contratto|mensile|annuale|crediti|ricariche?)\b/i;
   const hasPricingContext = userMessages.some(message =>
     pricingPattern.test(message.content)
   );
@@ -8031,6 +8380,18 @@ function guidedPricingSupport(
       scaleItalian: "10 workspace brand e 12 account social collegati",
     },
   } as const;
+
+  if (/\b(?:credits?|top[ -]?ups?|crediti|ricariche?)\b/i.test(latest)) {
+    return {
+      reply: italian
+        ? `Le ricariche sono: ${CREDIT_TOP_UPS.boost.credits} crediti a €${CREDIT_TOP_UPS.boost.price}, ${CREDIT_TOP_UPS.momentum.credits.toLocaleString("it-IT")} a €${CREDIT_TOP_UPS.momentum.price}, oppure ${CREDIT_TOP_UPS.scale.credits.toLocaleString("it-IT")} a €${CREDIT_TOP_UPS.scale.price}. Richiedono un piano attivo e non scadono; i crediti inclusi nel piano si aggiornano ogni mese.`
+        : `Top-ups are ${CREDIT_TOP_UPS.boost.credits} credits for €${CREDIT_TOP_UPS.boost.price}, ${CREDIT_TOP_UPS.momentum.credits.toLocaleString("en-US")} for €${CREDIT_TOP_UPS.momentum.price}, or ${CREDIT_TOP_UPS.scale.credits.toLocaleString("en-US")} for €${CREDIT_TOP_UPS.scale.price}. They require an active plan and roll over; included plan credits refresh monthly.`,
+      resolved: true,
+      needsHuman: false,
+      suggestedActions: [],
+      ticketDraft: null,
+    };
+  }
 
   if (plan) {
     const rate = rates[plan];
@@ -8887,31 +9248,7 @@ async function trendAvailableCredits(
   env: SitesEnvironment,
   user: AuthenticatedUser
 ): Promise<number> {
-  const workspace = await getWorkspace(env, user);
-  const referral = await env.DB.prepare(
-    `
-      SELECT COALESCE(SUM(credits_awarded), 0) AS credits
-      FROM referral_claims
-      WHERE referrer_email = ? AND status = 'verified'
-    `
-  )
-    .bind(user.email)
-    .first<{ credits: number | null }>();
-  const spent = await env.DB.prepare(
-    `
-      SELECT COALESCE(SUM(credit_cost), 0) AS credits
-      FROM trend_research_runs
-      WHERE owner_email = ?
-    `
-  )
-    .bind(user.email)
-    .first<{ credits: number | null }>();
-  return Math.max(
-    0,
-    Math.floor(Number(workspace.profile.credits) || 0) +
-      Math.floor(Number(referral?.credits) || 0) -
-      Math.floor(Number(spent?.credits) || 0)
-  );
+  return availableCredits(env, user);
 }
 
 async function researchTrendSources(
@@ -9306,39 +9643,21 @@ async function handleWeeklyTrendRefresh(
   }
 }
 
-async function reserveTrendResearchCredit(
+async function saveTrendResearchRun(
   env: SitesEnvironment,
   user: AuthenticatedUser,
   scopeJson: string,
   queryHash: string,
-  creditCost: number
-): Promise<{ id: string; createdAt: string } | null> {
+  creditCost: number,
+  trends: TrendEvidenceItem[],
+  createdAt: string
+): Promise<string> {
   const id = crypto.randomUUID();
-  const createdAt = new Date().toISOString();
-  const reservation = await env.DB.prepare(
+  const saved = await env.DB.prepare(
     `
       INSERT INTO trend_research_runs
         (id, owner_email, query_hash, scope_json, payload_json, credit_cost, created_at)
-      SELECT ?, ?, ?, ?, '[]', ?, ?
-      WHERE (
-        COALESCE(
-          CAST(json_extract(
-            (SELECT document FROM workspace_state WHERE owner_email = ?),
-            '$.profile.credits'
-          ) AS INTEGER),
-          0
-        )
-        + COALESCE((
-          SELECT SUM(credits_awarded)
-          FROM referral_claims
-          WHERE referrer_email = ? AND status = 'verified'
-        ), 0)
-        - COALESCE((
-          SELECT SUM(credit_cost)
-          FROM trend_research_runs
-          WHERE owner_email = ?
-        ), 0)
-      ) >= ?
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `
   )
     .bind(
@@ -9346,15 +9665,18 @@ async function reserveTrendResearchCredit(
       user.email,
       queryHash,
       scopeJson,
+      JSON.stringify(trends),
       creditCost,
-      createdAt,
-      user.email,
-      user.email,
-      user.email,
-      creditCost
+      createdAt
     )
     .run();
-  return (reservation.meta?.changes || 0) === 1 ? { id, createdAt } : null;
+  if ((saved.meta?.changes || 0) !== 1) {
+    throw errorResponse(
+      "The custom research could not be saved. No credits were used.",
+      500
+    );
+  }
+  return id;
 }
 
 async function handleTrends(
@@ -9425,52 +9747,43 @@ async function handleTrends(
   const scopeJson = JSON.stringify(scope);
   const queryHash = await sha256Hex(scopeJson);
   const creditCost = customTrendResearchCreditCost(scope.platform);
-  const reservation = await reserveTrendResearchCredit(
-    env,
-    user,
-    scopeJson,
-    queryHash,
-    creditCost
-  );
-  if (!reservation) {
-    return json(
-      {
-        error: `You need ${creditCost} credits for this custom trend research. The weekly organic brand shorts remain available.`,
-        availableCredits: await trendAvailableCredits(env, user),
-      },
-      402
-    );
+  let reservation: CreditReservation;
+  try {
+    reservation = await requireCreditReservation(env, user, {
+      cost: creditCost,
+      operationKey: `trend:${crypto.randomUUID()}`,
+      category: "trend-research",
+      description: "Custom trend research",
+      metadata: { scope },
+    });
+  } catch (cause) {
+    if (cause instanceof Response) return cause;
+    throw cause;
   }
   let result: Awaited<ReturnType<typeof researchTrendSources>>;
+  let runId = "";
   try {
     result = await researchTrendSources(env, user, scope, "custom");
-    const finalized = await env.DB.prepare(
-      `
-        UPDATE trend_research_runs
-        SET payload_json = ?, created_at = ?
-        WHERE id = ? AND owner_email = ?
-      `
-    )
-      .bind(
-        JSON.stringify(result.trends),
-        result.generatedAt,
-        reservation.id,
-        user.email
-      )
-      .run();
-    if ((finalized.meta?.changes || 0) !== 1) {
-      throw errorResponse(
-        "The custom research could not be saved. No credits were used.",
-        500
-      );
-    }
+    runId = await saveTrendResearchRun(
+      env,
+      user,
+      scopeJson,
+      queryHash,
+      creditCost,
+      result.trends,
+      result.generatedAt
+    );
+    await settleCreditReservation(env, reservation);
   } catch (cause) {
-    await env.DB.prepare(
-      "DELETE FROM trend_research_runs WHERE id = ? AND owner_email = ?"
-    )
-      .bind(reservation.id, user.email)
-      .run()
-      .catch(() => undefined);
+    if (runId) {
+      await env.DB.prepare(
+        "DELETE FROM trend_research_runs WHERE id = ? AND owner_email = ?"
+      )
+        .bind(runId, user.email)
+        .run()
+        .catch(() => undefined);
+    }
+    await releaseCreditReservation(env, reservation).catch(() => undefined);
     if (cause instanceof Response) return cause;
     return errorResponse(
       "The custom research could not be completed. No credits were used.",
@@ -9538,6 +9851,10 @@ async function handleApi(
     return handleReferralBillingWebhook(request, env);
   }
 
+  if (url.pathname === "/api/billing/stripe-webhook") {
+    return handleStripeWebhook(request, env);
+  }
+
   if (url.pathname.startsWith("/api/provenance/")) {
     return handlePublicProvenance(request, env, url);
   }
@@ -9576,6 +9893,10 @@ async function handleApi(
 
   if (url.pathname === "/api/referrals/claim" && request.method === "POST") {
     return claimReferral(request, env, user);
+  }
+
+  if (url.pathname.startsWith("/api/billing/")) {
+    return handleBillingApi(request, env, user, url);
   }
 
   if (url.pathname.startsWith("/api/compliance/")) {
@@ -9775,7 +10096,10 @@ export default {
     ctx: { waitUntil(promise: Promise<unknown>): void }
   ): Promise<void> {
     ctx.waitUntil(
-      refreshWeeklyTrendFeed(env).catch(cause => {
+      Promise.all([
+        refreshWeeklyTrendFeed(env),
+        applyAllDueAnnualCreditRenewals(env),
+      ]).catch(cause => {
         console.error("Weekly trend refresh failed", {
           errorType: cause instanceof Error ? cause.name : typeof cause,
         });

@@ -114,6 +114,20 @@ Required for social publishing:
 ZERNIO_API_KEY
 ```
 
+Required for subscriptions, invoices, monthly credit renewals, and top-ups:
+
+```text
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+STRIPE_PRICE_IDS_JSON
+PUBLIC_APP_URL=https://www.reelassati.app
+```
+
+Point the Stripe webhook at `/api/billing/stripe-webhook` and subscribe it to
+Checkout Session, Invoice, and Customer Subscription events. Plan credits reset
+monthly; top-up and referral credits roll over. Keep all Stripe secrets and
+Price IDs in the hosted backend environment, never in `VITE_*` variables.
+
 Recommended webhook verification hardening:
 
 ```text

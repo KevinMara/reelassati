@@ -27,6 +27,7 @@ import { useFileDropZone } from "@/hooks/useFileDropZone";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { validateFileSelection } from "@/lib/file-validation";
 import posthog from "@/lib/posthog";
+import { AI_CREDIT_COSTS, timedCreditCost } from "@contracts/billing";
 
 type AnalysisResult = Awaited<ReturnType<typeof platformApi.analyzeVideo>>;
 type SourceMode = "upload" | "url";
@@ -161,6 +162,10 @@ export default function VideoAnalyzer() {
   const sourceReady =
     sourceMode === "upload" ? Boolean(file || sourceAsset) : !urlError;
   const analysisReady = capabilities.analysis;
+  const analysisCreditCost = timedCreditCost(
+    sourceAsset?.duration,
+    AI_CREDIT_COSTS.videoAnalysisPerMinute
+  );
 
   const saveUploadedAsset = async (asset: Asset) => {
     await updateWorkspace(current => ({
@@ -544,7 +549,7 @@ export default function VideoAnalyzer() {
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              Analyze video
+              Analyze video · {analysisCreditCost} credits
             </>
           )}
         </button>

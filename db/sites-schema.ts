@@ -292,3 +292,67 @@ export const trendRefreshState = sqliteTable("trend_refresh_state", {
   lastCompletedAt: text("last_completed_at"),
   lastError: text("last_error"),
 });
+
+export const creditAccounts = sqliteTable("credit_accounts", {
+  ownerEmail: text("owner_email").primaryKey().notNull(),
+  includedBalance: integer("included_balance").notNull().default(0),
+  topupBalance: integer("topup_balance").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const creditLedger = sqliteTable(
+  "credit_ledger",
+  {
+    id: text("id").primaryKey().notNull(),
+    ownerEmail: text("owner_email").notNull(),
+    amount: integer("amount").notNull(),
+    includedAmount: integer("included_amount").notNull().default(0),
+    topupAmount: integer("topup_amount").notNull().default(0),
+    category: text("category").notNull(),
+    status: text("status").notNull(),
+    operationKey: text("operation_key").notNull().unique(),
+    referenceId: text("reference_id"),
+    description: text("description").notNull(),
+    metadataJson: text("metadata_json").notNull().default("{}"),
+    applied: integer("applied").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    settledAt: text("settled_at"),
+  },
+  table => [
+    index("credit_ledger_owner_created_idx").on(
+      table.ownerEmail,
+      table.createdAt
+    ),
+  ]
+);
+
+export const billingAccounts = sqliteTable(
+  "billing_accounts",
+  {
+    ownerEmail: text("owner_email").primaryKey().notNull(),
+    stripeCustomerId: text("stripe_customer_id").unique(),
+    stripeSubscriptionId: text("stripe_subscription_id").unique(),
+    planId: text("plan_id"),
+    billingCycle: text("billing_cycle"),
+    status: text("status").notNull().default("inactive"),
+    currentPeriodStart: text("current_period_start"),
+    currentPeriodEnd: text("current_period_end"),
+    nextCreditRenewalAt: text("next_credit_renewal_at"),
+    cancelAtPeriodEnd: integer("cancel_at_period_end").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  table => [
+    index("billing_accounts_subscription_idx").on(table.stripeSubscriptionId),
+  ]
+);
+
+export const stripeEvents = sqliteTable("stripe_events", {
+  eventId: text("event_id").primaryKey().notNull(),
+  eventType: text("event_type").notNull(),
+  status: text("status").notNull(),
+  createdAt: text("created_at").notNull(),
+  processedAt: text("processed_at"),
+  error: text("error"),
+});

@@ -4,6 +4,8 @@ import { ArrowRight, Check, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { useAuth } from "@/hooks/useAuth";
+import { CREDIT_TOP_UPS, type PlanId } from "@contracts/billing";
 import {
   ANNUAL_BILLED_MONTHS,
   annualMonthlyEquivalent,
@@ -13,6 +15,7 @@ import {
 type BillingCycle = "monthly" | "annual";
 
 type Plan = {
+  id: PlanId;
   name: string;
   description: string;
   monthlyPrice: number;
@@ -26,6 +29,7 @@ type Plan = {
 const PLANS: Record<"en" | "it", Plan[]> = {
   en: [
     {
+      id: "creator",
       name: "Creator",
       description: "For one creator building a repeatable short-form system.",
       monthlyPrice: PUBLIC_PLAN_PRICING.Creator.monthlyPrice,
@@ -41,6 +45,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       ],
     },
     {
+      id: "pro",
       name: "Pro",
       description: "For creators and small teams running several channels.",
       monthlyPrice: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
@@ -57,6 +62,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       ],
     },
     {
+      id: "studio",
       name: "Studio",
       description: "For agencies and operators managing a client portfolio.",
       monthlyPrice: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
@@ -74,6 +80,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
   ],
   it: [
     {
+      id: "creator",
       name: "Creator",
       description:
         "Per un creator che costruisce un sistema short-form ripetibile.",
@@ -90,6 +97,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       ],
     },
     {
+      id: "pro",
       name: "Pro",
       description: "Per creator e piccoli team che gestiscono più canali.",
       monthlyPrice: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
@@ -106,6 +114,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       ],
     },
     {
+      id: "studio",
       name: "Studio",
       description:
         "Per agenzie e operatori che gestiscono un portfolio clienti.",
@@ -125,6 +134,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
 };
 
 export default function Pricing() {
+  const { user } = useAuth();
   const { i18n } = useTranslation();
   const isItalian = Boolean(i18n.resolvedLanguage?.startsWith("it"));
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
@@ -186,6 +196,7 @@ export default function Pricing() {
                 plan={plan}
                 billingCycle={billingCycle}
                 isItalian={isItalian}
+                signedIn={Boolean(user)}
               />
             ))}
           </div>
@@ -237,6 +248,46 @@ export default function Pricing() {
               </a>
             </div>
           </div>
+
+          <section className="mx-auto mt-5 max-w-6xl rounded-2xl border border-border bg-surface p-7 md:p-9">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+              <div>
+                <p className="mono-eyebrow text-primary">
+                  {isItalian ? "Ricariche opzionali" : "Optional top-ups"}
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold">
+                  {isItalian
+                    ? "Più crediti, senza cambiare piano."
+                    : "More credits, without changing plan."}
+                </h2>
+              </div>
+              <p className="text-xs text-foreground/45">
+                {isItalian
+                  ? "Richiedono un piano attivo · non scadono"
+                  : "Active plan required · credits roll over"}
+              </p>
+            </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              {Object.values(CREDIT_TOP_UPS).map(pack => (
+                <div
+                  key={pack.id}
+                  className="flex items-center justify-between rounded-xl border border-border bg-background px-5 py-4"
+                >
+                  <div>
+                    <p className="text-xl font-semibold">
+                      {pack.credits.toLocaleString(
+                        isItalian ? "it-IT" : "en-IE"
+                      )}
+                    </p>
+                    <p className="text-xs text-foreground/45">
+                      {isItalian ? "crediti" : "credits"}
+                    </p>
+                  </div>
+                  <p className="text-2xl font-semibold">€{pack.price}</p>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </main>
       <Footer />
@@ -248,10 +299,12 @@ function PlanCard({
   plan,
   billingCycle,
   isItalian,
+  signedIn,
 }: {
   plan: Plan;
   billingCycle: BillingCycle;
   isItalian: boolean;
+  signedIn: boolean;
 }) {
   const price =
     billingCycle === "monthly" ? plan.monthlyPrice : plan.annualMonthlyPrice;
@@ -265,6 +318,10 @@ function PlanCard({
   const annualTotalLabel = new Intl.NumberFormat(
     isItalian ? "it-IT" : "en-IE"
   ).format(plan.annualTotal);
+  const billingPath = `/dashboard/billing?plan=${plan.id}&cycle=${billingCycle}`;
+  const checkoutPath = signedIn
+    ? billingPath
+    : `/auth/signup?next=${encodeURIComponent(billingPath)}`;
 
   return (
     <article
@@ -316,7 +373,7 @@ function PlanCard({
         </div>
       </div>
       <Link
-        to="/auth/signup"
+        to={checkoutPath}
         className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-pill px-5 py-3 text-sm font-medium transition-colors ${plan.featured ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "border border-border bg-background text-foreground hover:border-primary/35"}`}
       >
         {isItalian ? `Scegli ${plan.name}` : `Choose ${plan.name}`}{" "}

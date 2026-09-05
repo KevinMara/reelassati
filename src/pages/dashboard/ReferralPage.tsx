@@ -11,12 +11,11 @@ import {
   Users,
 } from "lucide-react";
 import { platformApi, type ReferralStats } from "@/lib/platform-api";
-import { useWorkspace } from "@/providers/workspace";
 import { writeClipboardText } from "@/lib/clipboard";
 
 export default function ReferralPage() {
-  const { workspace } = useWorkspace();
   const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [creditBalance, setCreditBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<"link" | "code" | null>(null);
   const [claimCode, setClaimCode] = useState("");
@@ -28,7 +27,12 @@ export default function ReferralPage() {
     setLoading(true);
     setError(null);
     try {
-      setStats(await platformApi.referralStats());
+      const [referrals, billing] = await Promise.all([
+        platformApi.referralStats(),
+        platformApi.billingSummary(),
+      ]);
+      setStats(referrals);
+      setCreditBalance(billing.billing.availableCredits);
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -42,10 +46,15 @@ export default function ReferralPage() {
 
   useEffect(() => {
     let active = true;
-    void platformApi
-      .referralStats()
-      .then(result => {
-        if (active) setStats(result);
+    void Promise.all([
+      platformApi.referralStats(),
+      platformApi.billingSummary(),
+    ])
+      .then(([referrals, billing]) => {
+        if (active) {
+          setStats(referrals);
+          setCreditBalance(billing.billing.availableCredits);
+        }
       })
       .catch((cause: unknown) => {
         if (!active) return;
@@ -64,7 +73,6 @@ export default function ReferralPage() {
   }, []);
 
   const billingReady = stats?.billingVerificationConfigured === true;
-  const totalCredits = workspace.profile.credits + (stats?.creditsEarned ?? 0);
 
   const copyValue = async (kind: "link" | "code", value: string) => {
     setError(null);
@@ -174,7 +182,7 @@ export default function ReferralPage() {
         <Metric
           icon={Coins}
           label="Available credits"
-          value={totalCredits.toLocaleString()}
+          value={creditBalance.toLocaleString()}
           detail={
             billingReady
               ? `${stats?.creditsEarned.toLocaleString() ?? 0} earned through referrals.`

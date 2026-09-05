@@ -239,13 +239,14 @@ describe("platform-wide functional invariants", () => {
     const cron = source("../api/trends-weekly.ts");
 
     expect(trends).toContain("Weekly viral shorts");
-    expect(trends).toContain("1 credit per completed research");
+    expect(trends).toContain("credits when completed");
     expect(trends).toContain("All short-form styles");
     expect(trends).toContain("Overall performance");
     expect(trends).toContain("Organic brand posts");
     expect(trends).toContain("trend.brandName");
     expect(trends).not.toMatch(/reload free|0 credits|identical scan/i);
-    expect(server).toContain("reserveTrendResearchCredit");
+    expect(server).toContain("requireCreditReservation");
+    expect(server).toContain('category: "trend-research"');
     expect(server).toContain('"moonshotai/kimi-k2.5"');
     expect(server).toContain('id: "web"');
     expect(server).toContain("include_domains");
@@ -257,9 +258,7 @@ describe("platform-wide functional invariants", () => {
     expect(server).toContain("candidate.organicBrandPromotion !== true");
     expect(server).toContain("candidate.paidAd !== false");
     expect(server).toContain('? ["tiktok", "instagram"]');
-    expect(server).toMatch(
-      /Math\.floor\(Number\(referral\?\.credits\).*\|\| 0\)\s*-\s*Math\.floor\(Number\(spent\?\.credits\)/s
-    );
+    expect(server).toContain("return availableCredits(env, user)");
     expect(server).not.toContain("TREND_STARTER_CREDITS");
     expect(server).not.toContain("TREND_PERSONAL_CACHE_MS");
     expect(cron).toContain("/api/internal/trends/weekly");
@@ -280,6 +279,29 @@ describe("platform-wide functional invariants", () => {
     expect(analyticsData).toContain("workspace.assets.forEach");
     expect(analyticsData).toContain("workspace.scripts.forEach");
     expect(analyticsData).not.toMatch(/Math\.random|estimated|mock/i);
+  });
+
+  it("uses one server-owned Stripe and credit ledger across paid AI tools", () => {
+    const dashboard = source("./pages/Dashboard.tsx");
+    const billingPage = source("./pages/dashboard/BillingPage.tsx");
+    const api = source("./lib/platform-api.ts");
+    const server = source("../sites/server.ts");
+    const billing = source("../sites/billing.ts");
+
+    expect(dashboard).toContain('path="/billing"');
+    expect(dashboard).toContain("CreditBalanceChip");
+    expect(billingPage).toMatch(/Plan credits\s+refresh monthly/);
+    expect(billingPage).toContain("purchased top-ups roll over");
+    expect(api).toContain('"/api/billing/checkout"');
+    expect(api).toContain('"/api/billing/topup-checkout"');
+    expect(api).toContain('"/api/billing/portal"');
+    expect(server).toContain('"/api/billing/stripe-webhook"');
+    expect(server).toContain("runPaidAiAction");
+    expect(server).toContain("workspace.profile.credits = 0");
+    expect(billing).toContain("verifyStripeSignature");
+    expect(billing).toContain("operation_key TEXT NOT NULL UNIQUE");
+    expect(billing).toContain("releaseCreditReservation");
+    expect(billing).not.toContain("VITE_STRIPE_SECRET");
   });
 
   it("uses public SaaS authentication and sends bearer tokens to the product API", () => {

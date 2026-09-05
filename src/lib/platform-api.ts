@@ -15,6 +15,12 @@ import type {
   ProvenanceDetectionResult,
 } from "@contracts/compliance";
 import type { TrendFeedResponse, TrendScope } from "@contracts/trends";
+import type {
+  BillingCycle,
+  BillingSummary,
+  CreditTopUpId,
+  PlanId,
+} from "@contracts/billing";
 import { supabase } from "@/lib/supabase/client";
 import { platformApiUrl } from "@/lib/runtime";
 
@@ -397,6 +403,27 @@ export const platformApi = {
     }>("/api/referrals/claim", {
       method: "POST",
       body: JSON.stringify({ code }),
+    }),
+
+  billingSummary: () =>
+    requestJson<{ billing: BillingSummary }>("/api/billing/summary"),
+
+  createSubscriptionCheckout: (planId: PlanId, billingCycle: BillingCycle) =>
+    requestJson<{ checkoutUrl: string }>("/api/billing/checkout", {
+      method: "POST",
+      body: JSON.stringify({ planId, billingCycle }),
+    }),
+
+  createTopUpCheckout: (topUpId: CreditTopUpId) =>
+    requestJson<{ checkoutUrl: string }>("/api/billing/topup-checkout", {
+      method: "POST",
+      body: JSON.stringify({ topUpId }),
+    }),
+
+  createBillingPortal: () =>
+    requestJson<{ portalUrl: string }>("/api/billing/portal", {
+      method: "POST",
+      body: JSON.stringify({}),
     }),
 
   uploadAsset: async (

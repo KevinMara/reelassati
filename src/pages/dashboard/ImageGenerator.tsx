@@ -13,6 +13,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { EditAssetLink } from "@/components/studio/EditAssetLink";
 import posthog from "@/lib/posthog";
+import { imageCreditCost } from "@contracts/billing";
 
 const RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16"] as const;
 
@@ -270,12 +271,13 @@ export default function ImageGenerator() {
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4" /> Generate image
+                <Sparkles className="h-4 w-4" /> Generate image ·{" "}
+                {imageCreditCost(resolution)} credits
               </>
             )}
           </button>
           <p className="mt-2 text-center text-[11px] text-foreground/40">
-            Generation uses REELassati credits.
+            Credits are returned automatically if generation fails.
           </p>
         </section>
 

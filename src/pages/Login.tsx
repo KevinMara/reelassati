@@ -1,28 +1,36 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { useAuth } from "@/hooks/useAuth";
 import posthog from "@/lib/posthog";
+import {
+  consumeAuthNext,
+  rememberAuthNext,
+  safeDashboardNext,
+} from "@/lib/auth-next";
 
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, login, loading, error, clearError } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const requestedNext = searchParams.get("next");
 
   useEffect(() => {
-    if (user) navigate("/dashboard", { replace: true });
-  }, [navigate, user]);
+    rememberAuthNext(requestedNext);
+    if (user) navigate(consumeAuthNext(requestedNext), { replace: true });
+  }, [navigate, requestedNext, user]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (await login(email, password)) {
       posthog?.capture("studio_access_opened");
-      navigate("/dashboard", { replace: true });
+      navigate(consumeAuthNext(requestedNext), { replace: true });
     }
   };
 
@@ -105,7 +113,7 @@ export default function Login() {
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {t("auth.no_account")}{" "}
         <Link
-          to="/auth/signup"
+          to={`/auth/signup?next=${encodeURIComponent(safeDashboardNext(requestedNext))}`}
           className="font-medium text-primary hover:text-primary-hover"
         >
           {t("auth.signup_btn")}

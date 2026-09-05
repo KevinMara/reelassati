@@ -41,6 +41,7 @@ describe("protected product and compliance invariants", () => {
       "/dashboard/library",
       "/dashboard/social",
       "/dashboard/referral",
+      "/dashboard/billing",
       "/dashboard/feedback",
       "/dashboard/settings",
       "/dashboard/status",

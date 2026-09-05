@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
+import { consumeAuthNext } from "@/lib/auth-next";
 
 export default function OAuthSuccess() {
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ export default function OAuthSuccess() {
 
   useEffect(() => {
     if (loading) return;
-    navigate(user ? "/dashboard" : "/auth/login", { replace: true });
+    navigate(user ? consumeAuthNext() : "/auth/login", { replace: true });
   }, [loading, navigate, user]);
 
   return (

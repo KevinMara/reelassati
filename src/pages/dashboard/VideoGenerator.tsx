@@ -30,6 +30,7 @@ import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { EditAssetLink } from "@/components/studio/EditAssetLink";
 import { writeClipboardText } from "@/lib/clipboard";
 import posthog from "@/lib/posthog";
+import { videoCreditCost } from "@contracts/billing";
 
 const RATIOS = [
   { id: "9:16" as const, name: "9:16", description: "Reels, TikTok, Shorts" },
@@ -203,6 +204,12 @@ export default function VideoGenerator() {
   const continuitySourceJob = completedVideoJobs.find(
     candidate => candidate.id === continuitySourceJobId
   );
+  const generationCreditCost = videoCreditCost({
+    duration,
+    resolution,
+    generateAudio,
+    continuation: clipMode === "continue",
+  });
   const scene = useMemo(() => buildScene(direction), [direction]);
   const enhancedPrompt = useMemo(() => {
     if (!scene) return "";
@@ -1103,7 +1110,8 @@ export default function VideoGenerator() {
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Generate video
+                  Generate video · {generationCreditCost.toLocaleString()}{" "}
+                  credits
                 </>
               )}
             </button>

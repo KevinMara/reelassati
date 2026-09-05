@@ -66,6 +66,7 @@ function createD1StubWithOperatorRow() {
 
 function createStatefulD1Stub() {
   const provenanceRows: Array<Record<string, unknown>> = [];
+  const creditRows: Array<Record<string, unknown>> = [];
   const prepare = (query: string) => {
     let bindings: unknown[] = [];
     const statement = {
@@ -74,7 +75,17 @@ function createStatefulD1Stub() {
         return statement;
       },
       run: async () => {
-        if (/INSERT INTO ai_provenance_records/i.test(query)) {
+        if (/INSERT INTO credit_ledger/i.test(query)) {
+          creditRows.push({
+            id: bindings[0],
+            amount: -Number(bindings[1]),
+            status: "reserved",
+            operation_key: bindings[6],
+          });
+        } else if (/UPDATE credit_ledger SET status = 'settled'/i.test(query)) {
+          const row = creditRows.find(item => item.id === bindings[1]);
+          if (row) row.status = "settled";
+        } else if (/INSERT INTO ai_provenance_records/i.test(query)) {
           const [
             id,
             publicToken,
@@ -116,6 +127,31 @@ function createStatefulD1Stub() {
         return { success: true, meta: { changes: 1 } };
       },
       first: async () => {
+        if (/FROM billing_accounts WHERE owner_email = \?/i.test(query)) {
+          return {
+            owner_email: bindings[0],
+            plan_id: "studio",
+            billing_cycle: "monthly",
+            status: "active",
+            current_period_end: "2099-12-31T00:00:00.000Z",
+            cancel_at_period_end: 0,
+          };
+        }
+        if (
+          /SELECT included_balance, topup_balance FROM credit_accounts/i.test(
+            query
+          )
+        ) {
+          return { included_balance: 100_000, topup_balance: 0 };
+        }
+        if (/SELECT id, amount, status FROM credit_ledger/i.test(query)) {
+          return (
+            creditRows.find(row => row.operation_key === bindings[0]) || null
+          );
+        }
+        if (/profile\.credits|SUM\(credit_cost\)/i.test(query)) {
+          return { credits: 0 };
+        }
         if (/FROM ai_provenance_records/i.test(query)) {
           if (/public_token = \?/i.test(query)) {
             return (
@@ -170,7 +206,8 @@ function createStatefulD1Stub() {
   };
   return {
     prepare,
-    batch: async () => [],
+    batch: async (statements: Array<{ run(): Promise<unknown> }>) =>
+      Promise.all(statements.map(statement => statement.run())),
     exec: async () => ({ count: 0, duration: 0 }),
   };
 }
@@ -1581,6 +1618,7 @@ describe("Sites worker", () => {
         }),
         {
           ...env,
+          DB: createStatefulD1Stub(),
           KIMI_TEST_MODE: "enabled",
           KIMI_TEST_OWNER_EMAIL: "creator@example.com",
           KIMI_CODE_API_KEY: "test-kimi-key",
@@ -1778,6 +1816,7 @@ describe("Sites worker", () => {
         }),
         {
           ...env,
+          DB: createStatefulD1Stub(),
           KIMI_TEST_MODE: "enabled",
           KIMI_CODE_API_KEY: "test-kimi-key",
           OPENROUTER_API_KEY: "test-openrouter-key",

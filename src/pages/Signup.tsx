@@ -1,24 +1,32 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { useAuth } from "@/hooks/useAuth";
 import posthog from "@/lib/posthog";
+import {
+  consumeAuthNext,
+  rememberAuthNext,
+  safeDashboardNext,
+} from "@/lib/auth-next";
 
 export default function Signup() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, signup, loading, error, clearError } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const requestedNext = searchParams.get("next");
 
   useEffect(() => {
-    if (user) navigate("/dashboard", { replace: true });
-  }, [navigate, user]);
+    rememberAuthNext(requestedNext);
+    if (user) navigate(consumeAuthNext(requestedNext), { replace: true });
+  }, [navigate, requestedNext, user]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -27,7 +35,7 @@ export default function Signup() {
       posthog?.capture("workspace_creation_opened", {
         confirmation_required: false,
       });
-      navigate("/dashboard", { replace: true });
+      navigate(consumeAuthNext(requestedNext), { replace: true });
     } else if (result.confirmationRequired) {
       posthog?.capture("workspace_creation_opened", {
         confirmation_required: true,
@@ -57,7 +65,7 @@ export default function Signup() {
             We sent a secure confirmation link to {email}.
           </p>
           <Link
-            to="/auth/login"
+            to={`/auth/login?next=${encodeURIComponent(safeDashboardNext(requestedNext))}`}
             className="mt-4 inline-flex text-sm font-medium text-primary"
           >
             {t("auth.back_to_login")}
@@ -157,7 +165,7 @@ export default function Signup() {
         <p className="mt-6 text-center text-sm text-muted-foreground">
           {t("auth.has_account")}{" "}
           <Link
-            to="/auth/login"
+            to={`/auth/login?next=${encodeURIComponent(safeDashboardNext(requestedNext))}`}
             className="font-medium text-primary hover:text-primary-hover"
           >
             {t("auth.login_btn")}

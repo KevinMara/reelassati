@@ -27,6 +27,7 @@ import { WRITING_LANGUAGES } from "@/lib/languages";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { copyTextWithProvenance } from "@/lib/provenance";
 import posthog from "@/lib/posthog";
+import { AI_CREDIT_COSTS } from "@contracts/billing";
 
 const InterviewMe = lazy(() => import("./InterviewMe"));
 
@@ -437,7 +438,7 @@ function DirectScriptGenerator() {
               ) : (
                 <>
                   <WandSparkles className="h-4 w-4" />
-                  Generate script
+                  Generate script · {AI_CREDIT_COSTS.script} credits
                 </>
               )}
             </button>

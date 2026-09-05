@@ -549,8 +549,8 @@ export default function TrendsPage() {
         <span className="flex-1">
           <span className="block text-sm font-medium">Custom research</span>
           <span className="block text-xs text-foreground/45">
-            Find verified viral organic brand shorts for your exact brief · 1
-            credit
+            Find verified viral organic brand shorts for your exact brief · 8–15
+            credits
           </span>
         </span>
         <ChevronDown
@@ -570,7 +570,7 @@ export default function TrendsPage() {
                 <Search className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-medium">Custom trend research</h2>
                 <span className="rounded-full bg-background px-2 py-1 text-[10px] text-foreground/50">
-                  1 credit per completed research
+                  {researchCreditCost} credits when completed
                 </span>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
