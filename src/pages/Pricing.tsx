@@ -41,7 +41,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
         "2 connected social accounts",
         "Precision Studio and reviewable edit plans",
         "Scripts, Prompt Director, calendar, and analytics",
-        "Version history and exports",
+        "Version history and edit-brief exports",
       ],
     },
     {
@@ -54,27 +54,27 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       featured: true,
       features: [
-        "3 brand workspaces",
+        "1 brand workspace · multi-brand planned",
         "6 connected social accounts",
         "Everything in Creator",
-        "Client workflow and publishing queue",
-        "Cross-channel analytics and content library",
+        "Content library and publishing queue",
+        "Content activity charts and usage tracking",
       ],
     },
     {
       id: "studio",
       name: "Studio",
-      description: "For agencies and operators managing a client portfolio.",
+      description: "For creators producing a larger volume of content.",
       monthlyPrice: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
       annualMonthlyPrice: annualMonthlyEquivalent("Studio"),
       annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       features: [
-        "10 brand workspaces",
+        "1 brand workspace · multi-brand planned",
         "12 connected social accounts",
         "Everything in Pro",
-        "Multi-client command view",
-        "Consolidated analytics and priority workflow",
+        "Higher generation and publishing allowances",
+        "Shared library across creation tools",
       ],
     },
   ],
@@ -93,7 +93,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
         "2 account social collegati",
         "Studio di precisione e piani di montaggio revisionabili",
         "Script, Prompt Director, calendario e analytics",
-        "Cronologia versioni ed export",
+        "Cronologia versioni ed export del piano di montaggio",
       ],
     },
     {
@@ -106,28 +106,27 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       featured: true,
       features: [
-        "3 workspace brand",
+        "1 workspace brand · multi-brand in arrivo",
         "6 account social collegati",
         "Tutto il piano Creator",
-        "Flusso clienti e coda di pubblicazione",
-        "Analytics cross-channel e libreria contenuti",
+        "Libreria contenuti e coda di pubblicazione",
+        "Grafici attività contenuti e utilizzo",
       ],
     },
     {
       id: "studio",
       name: "Studio",
-      description:
-        "Per agenzie e operatori che gestiscono un portfolio clienti.",
+      description: "Per creator che producono un volume maggiore di contenuti.",
       monthlyPrice: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
       annualMonthlyPrice: annualMonthlyEquivalent("Studio"),
       annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       features: [
-        "10 workspace brand",
+        "1 workspace brand · multi-brand in arrivo",
         "12 account social collegati",
         "Tutto il piano Pro",
-        "Vista operativa multi-cliente",
-        "Analytics consolidati e flusso prioritario",
+        "Più crediti e account social collegati",
+        "Libreria condivisa tra gli strumenti creativi",
       ],
     },
   ],
@@ -157,8 +156,8 @@ export default function Pricing() {
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-foreground/65">
               {isItalian
-                ? "Ogni piano include lo Studio completo, modifiche revisionabili e un flusso dall’idea alla pubblicazione. Cambia solo la scala del workspace."
-                : "Every plan includes the complete Studio, reviewable changes, and one path from idea to publication. Only the workspace scale changes."}
+                ? "Ogni piano include strumenti creativi, libreria e pianificazione. Scegli i crediti mensili e il numero di account social. Il rendering finale della timeline e i workspace multi-brand sono in sviluppo."
+                : "Every plan includes the creation tools, library, and planning workspace. Choose your monthly credits and connected social account allowance. Final timeline rendering and multi-brand workspaces are in development."}
             </p>
 
             <div

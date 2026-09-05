@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Check,
   Coins,
-  CreditCard,
   Gauge,
   Loader2,
   RefreshCw,
@@ -23,6 +22,15 @@ import {
   type PlanId,
 } from "@contracts/billing";
 import { PUBLIC_PLAN_PRICING } from "@contracts/pricing";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { platformApi } from "@/lib/platform-api";
 
 const PLAN_IDS: PlanId[] = ["creator", "pro", "studio"];
@@ -196,8 +204,8 @@ export default function BillingPage() {
         <div className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm">
           <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
           <p>
-            Payment received. Your plan or top-up appears as soon as the signed
-            confirmation reaches REELassati—normally within a few seconds.
+            Checkout completed. Your balance updates after payment is confirmed.
+            Use Refresh if your purchase has not appeared yet.
           </p>
         </div>
       ) : null}
@@ -224,7 +232,93 @@ export default function BillingPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-[1.05fr_.95fr]">
+      <PlanChooser
+        billingCycle={billingCycle}
+        setBillingCycle={setBillingCycle}
+        selectedPlan={isPlanId(selectedPlan) ? selectedPlan : null}
+        busy={busy}
+        disabled={!summary?.configured}
+        onChoose={openCheckout}
+        summary={summary}
+        onManage={openPortal}
+      />
+
+      <section className="mt-5 rounded-2xl border border-border bg-surface p-6 sm:p-8">
+        <div className="flex items-center gap-3">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <div>
+            <h2 className="font-medium">Credit top-ups</h2>
+            <p className="text-xs text-foreground/70">
+              Add more without changing your plan. Top-ups roll over.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          {(Object.keys(CREDIT_TOP_UPS) as CreditTopUpId[]).map((id, index) => {
+            const pack = CREDIT_TOP_UPS[id];
+            const available = summary?.topUps.find(
+              item => item.id === id
+            )?.available;
+            return (
+              <article
+                key={id}
+                className="group rounded-xl border border-border bg-background p-5 text-left transition-all motion-safe:hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-card"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-2xl font-semibold">
+                      {pack.credits.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-foreground/70">credits</p>
+                  </div>
+                  {index === 1 ? (
+                    <span className="rounded-pill bg-primary/10 px-2 py-1 font-mono text-xs uppercase tracking-wide text-primary">
+                      Flexible boost
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-5 flex items-center justify-between">
+                  <span className="font-medium">€{pack.price}</span>
+                  {busy === `topup:${id}` ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" />
+                  )}
+                </div>
+                <p className="mt-3 text-sm text-foreground/70">
+                  €{((pack.price / pack.credits) * 1000).toFixed(2)} per 1,000
+                  credits
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void openTopUp(id)}
+                  disabled={
+                    !summary?.configured ||
+                    !summary?.canUseCredits ||
+                    !available ||
+                    busy !== null
+                  }
+                  className="mt-4 w-full rounded-pill bg-primary/15 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {busy === `topup:${id}`
+                    ? "Opening…"
+                    : !summary?.configured
+                      ? "Purchases opening soon"
+                      : !summary?.canUseCredits
+                        ? "Active plan required"
+                        : "Add credits"}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-xs text-foreground/65">
+          Displayed prices include VAT where applicable. Checkout confirms the
+          correct tax treatment from your billing details.
+        </p>
+      </section>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
         <section className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.12] via-surface to-fuchsia-500/[0.06] p-6 shadow-card sm:p-8">
           <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
           <div className="relative flex items-start justify-between gap-4">
@@ -250,7 +344,7 @@ export default function BillingPage() {
           </div>
           <div className="relative mt-7 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-border/70 bg-background/55 p-4 backdrop-blur">
-              <p className="text-xs text-foreground/45">Plan credits</p>
+              <p className="text-xs text-foreground/70">Plan credits</p>
               <p className="mt-1 text-xl font-semibold">
                 {(summary?.includedCredits || 0).toLocaleString()}
               </p>
@@ -262,145 +356,18 @@ export default function BillingPage() {
               </div>
             </div>
             <div className="rounded-xl border border-border/70 bg-background/55 p-4 backdrop-blur">
-              <p className="text-xs text-foreground/45">Rollover top-ups</p>
+              <p className="text-xs text-foreground/70">Rollover top-ups</p>
               <p className="mt-1 text-xl font-semibold">
                 {(summary?.topUpCredits || 0).toLocaleString()}
               </p>
-              <p className="mt-3 text-[11px] text-foreground/45">
+              <p className="mt-3 text-xs text-foreground/70">
                 Extra credits stay in your balance.
               </p>
             </div>
           </div>
         </section>
-
-        <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <CreditCard className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="font-medium">
-                {summary?.plan ? "Current plan" : "Choose a plan"}
-              </p>
-              <p className="text-xs text-foreground/45">
-                Payments secured by Stripe
-              </p>
-            </div>
-          </div>
-          {summary?.plan ? (
-            <div className="mt-6">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-3xl font-semibold">{summary.plan.name}</p>
-                  <p className="mt-1 text-sm capitalize text-foreground/50">
-                    {summary.plan.billingCycle} billing
-                  </p>
-                </div>
-                <p className="text-right text-xs text-foreground/45">
-                  {summary.plan.cancelAtPeriodEnd ? "Ends" : "Renews"}
-                  <br />
-                  <span className="text-foreground/70">
-                    {formatDate(summary.plan.currentPeriodEnd)}
-                  </span>
-                </p>
-              </div>
-              <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="rounded-lg bg-background p-3">
-                  <p className="font-semibold">
-                    {summary.plan.monthlyCredits.toLocaleString()}
-                  </p>
-                  <p className="mt-1 text-foreground/40">credits/mo</p>
-                </div>
-                <div className="rounded-lg bg-background p-3">
-                  <p className="font-semibold">{summary.plan.workspaces}</p>
-                  <p className="mt-1 text-foreground/40">workspaces</p>
-                </div>
-                <div className="rounded-lg bg-background p-3">
-                  <p className="font-semibold">{summary.plan.socialAccounts}</p>
-                  <p className="mt-1 text-foreground/40">socials</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void openPortal()}
-                disabled={busy === "portal" || !summary.configured}
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-pill border border-border px-5 py-3 text-sm font-medium hover:border-primary/40 disabled:opacity-50"
-              >
-                {busy === "portal" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : null}
-                Manage plan and invoices
-              </button>
-            </div>
-          ) : (
-            <PlanChooser
-              billingCycle={billingCycle}
-              setBillingCycle={setBillingCycle}
-              selectedPlan={isPlanId(selectedPlan) ? selectedPlan : null}
-              busy={busy}
-              disabled={!summary?.configured}
-              onChoose={openCheckout}
-            />
-          )}
-        </section>
+        <UsageChart summary={summary} loading={loading} />
       </div>
-
-      <section className="mt-5 rounded-2xl border border-border bg-surface p-6 sm:p-8">
-        <div className="flex items-center gap-3">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <div>
-            <h2 className="font-medium">Credit top-ups</h2>
-            <p className="text-xs text-foreground/45">
-              Add more without changing your plan. Top-ups roll over.
-            </p>
-          </div>
-        </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {(Object.keys(CREDIT_TOP_UPS) as CreditTopUpId[]).map((id, index) => {
-            const pack = CREDIT_TOP_UPS[id];
-            const available = summary?.topUps.find(
-              item => item.id === id
-            )?.available;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => void openTopUp(id)}
-                disabled={
-                  !summary?.canUseCredits || !available || busy !== null
-                }
-                className="group rounded-xl border border-border bg-background p-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-card disabled:translate-y-0 disabled:opacity-45"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-2xl font-semibold">
-                      {pack.credits.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-foreground/45">credits</p>
-                  </div>
-                  {index === 1 ? (
-                    <span className="rounded-pill bg-primary/10 px-2 py-1 font-mono text-[9px] uppercase tracking-wide text-primary">
-                      Popular
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-5 flex items-center justify-between">
-                  <span className="font-medium">€{pack.price}</span>
-                  {busy === `topup:${id}` ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  ) : (
-                    <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" />
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-3 text-[11px] text-foreground/40">
-          Displayed prices include VAT where applicable. Checkout confirms the
-          correct tax treatment from your billing details.
-        </p>
-      </section>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[.85fr_1.15fr]">
         <section className="rounded-2xl border border-border bg-surface p-6">
@@ -411,6 +378,7 @@ export default function BillingPage() {
           <div className="mt-4 space-y-2 text-sm">
             {[
               ["Script", `${AI_CREDIT_COSTS.script}`],
+              ["Trend research · one / both platforms", "8 / 15"],
               ["AI edit plan", `${AI_CREDIT_COSTS.editPlan}`],
               ["1K image", `${AI_CREDIT_COSTS.image1K}`],
               ["2K image", `${AI_CREDIT_COSTS.image2K}`],
@@ -427,8 +395,16 @@ export default function BillingPage() {
                 `${AI_CREDIT_COSTS.transcriptionPerMinute}`,
               ],
               [
-                "15s video · 720p",
-                `${AI_CREDIT_COSTS.video720pPerSecond * 15}+`,
+                "15s video · 720p, no audio",
+                `${AI_CREDIT_COSTS.video720pPerSecond * 15}`,
+              ],
+              [
+                "15s video · 720p with audio",
+                `${AI_CREDIT_COSTS.video720pWithAudioPerSecond * 15}`,
+              ],
+              [
+                "Continue 15s · 720p / 1080p",
+                `${AI_CREDIT_COSTS.continuation720p15Seconds} / ${AI_CREDIT_COSTS.continuation1080p15Seconds}`,
               ],
             ].map(([label, value]) => (
               <div
@@ -445,8 +421,43 @@ export default function BillingPage() {
         </section>
 
         <section className="rounded-2xl border border-border bg-surface p-6">
+          <h2 className="font-medium">What can your credits create?</h2>
+          <p className="mt-2 text-sm text-foreground/70">
+            With your current balance, choose up to one of these:
+          </p>
+          <div className="my-5 grid grid-cols-2 gap-3">
+            {[
+              ["scripts", AI_CREDIT_COSTS.script],
+              ["1K images", AI_CREDIT_COSTS.image1K],
+              [
+                "1,000-character voice clips",
+                AI_CREDIT_COSTS.speechPerThousandCharacters,
+              ],
+              [
+                "15s 720p videos without audio",
+                AI_CREDIT_COSTS.video720pPerSecond * 15,
+              ],
+            ].map(([label, cost]) => (
+              <div
+                key={label}
+                className="rounded-xl border border-primary/15 bg-primary/5 p-4"
+              >
+                <p className="text-2xl font-semibold text-primary">
+                  {loading
+                    ? "—"
+                    : Math.floor(
+                        (summary?.availableCredits || 0) / Number(cost)
+                      ).toLocaleString()}
+                </p>
+                <p className="mt-1 text-sm text-foreground/75">{label}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mb-6 text-xs text-foreground/65">
+            Examples are alternatives, not a combined allowance.
+          </p>
           <h2 className="font-medium">Recent credit activity</h2>
-          <p className="mt-1 text-xs text-foreground/45">
+          <p className="mt-1 text-xs text-foreground/70">
             Failed AI jobs are released automatically and do not consume
             credits.
           </p>
@@ -465,7 +476,7 @@ export default function BillingPage() {
                     <p className="truncate text-sm font-medium">
                       {actionLabel(item.category)}
                     </p>
-                    <p className="truncate text-xs text-foreground/40">
+                    <p className="truncate text-xs text-foreground/65">
                       {item.description} · {formatDate(item.createdAt)}
                     </p>
                   </div>
@@ -478,7 +489,7 @@ export default function BillingPage() {
                 </div>
               ))
             ) : (
-              <div className="py-10 text-center text-sm text-foreground/40">
+              <div className="py-10 text-center text-sm text-foreground/65">
                 Credit activity will appear here.
               </div>
             )}
@@ -496,6 +507,8 @@ function PlanChooser({
   busy,
   disabled,
   onChoose,
+  summary,
+  onManage,
 }: {
   billingCycle: BillingCycle;
   setBillingCycle: (cycle: BillingCycle) => void;
@@ -503,59 +516,311 @@ function PlanChooser({
   busy: string | null;
   disabled: boolean;
   onChoose: (planId: PlanId) => Promise<void>;
+  summary: BillingSummary | null;
+  onManage: () => Promise<void>;
 }) {
   return (
-    <div className="mt-5">
-      <div className="inline-flex rounded-pill border border-border bg-background p-1 text-xs">
-        {(["monthly", "annual"] as const).map(cycle => (
-          <button
-            key={cycle}
-            type="button"
-            onClick={() => setBillingCycle(cycle)}
-            className={`rounded-pill px-3 py-1.5 capitalize ${billingCycle === cycle ? "bg-primary text-primary-foreground" : "text-foreground/50"}`}
-          >
-            {cycle}
-            {cycle === "annual" ? " · 2 months free" : ""}
-          </button>
-        ))}
+    <section aria-labelledby="plans-title">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 id="plans-title" className="text-2xl font-semibold">
+            Find your creative pace.
+          </h2>
+          <p className="mt-2 text-foreground/70">
+            One plan. Every creation tool. Room to keep going.
+          </p>
+        </div>
+        <div
+          className="inline-flex rounded-pill border border-border bg-surface p-1 text-sm"
+          role="group"
+          aria-label="Billing cycle"
+        >
+          {(["monthly", "annual"] as const).map(cycle => (
+            <button
+              key={cycle}
+              type="button"
+              aria-pressed={billingCycle === cycle}
+              onClick={() => setBillingCycle(cycle)}
+              className={`rounded-pill px-4 py-2 capitalize transition-colors ${billingCycle === cycle ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground/75 hover:bg-primary/10"}`}
+            >
+              {cycle}
+              {cycle === "annual" ? " · 2 months free" : ""}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="mt-4 space-y-2">
+      <div className="grid gap-5 xl:grid-cols-3">
         {PLAN_IDS.map(planId => {
           const name = PLAN_NAME_BY_ID[planId];
           const plan = PUBLIC_PLAN_PRICING[name];
-          const price =
-            billingCycle === "monthly" ? plan.monthlyPrice : plan.annualTotal;
+          const current = summary?.plan?.id === planId && summary.canUseCredits;
+          const featured = planId === "pro";
+          const annual = billingCycle === "annual";
+          const price = annual ? plan.annualTotal / 12 : plan.monthlyPrice;
           return (
-            <button
+            <article
               key={planId}
-              type="button"
-              onClick={() => void onChoose(planId)}
-              disabled={disabled || busy !== null}
-              className={`flex w-full items-center justify-between gap-4 rounded-xl border p-4 text-left transition-all hover:border-primary/40 disabled:opacity-50 ${selectedPlan === planId ? "border-primary/45 bg-primary/[0.06]" : "border-border bg-background"}`}
+              className={`relative flex flex-col rounded-2xl border p-6 transition-all motion-safe:hover:-translate-y-1 ${featured ? "border-primary/60 bg-gradient-to-br from-primary/15 via-surface to-surface shadow-[0_8px_40px_-16px_hsl(var(--primary)/0.45)]" : "border-border bg-surface hover:border-primary/40"} ${selectedPlan === planId ? "ring-2 ring-primary/30" : ""}`}
             >
-              <div>
-                <p className="font-medium">{name}</p>
-                <p className="text-xs text-foreground/45">
-                  {plan.monthlyCredits.toLocaleString()} credits/month
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-right">
-                <div>
-                  <p className="font-semibold">€{price.toLocaleString()}</p>
-                  <p className="text-[10px] text-foreground/40">
-                    /{billingCycle === "monthly" ? "mo" : "yr"}
-                  </p>
-                </div>
-                {busy === `plan:${planId}` ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                ) : (
-                  <ArrowRight className="h-4 w-4 text-primary" />
+              <div className="mb-5 flex items-center justify-between gap-2">
+                <span className="font-mono text-xs uppercase tracking-widest text-primary">
+                  {planId === "creator"
+                    ? "Your first momentum"
+                    : featured
+                      ? "More room to create"
+                      : "Your biggest ideas"}
+                </span>
+                {(current || featured) && (
+                  <span className="rounded-pill bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
+                    {current ? "Current plan" : "Recommended"}
+                  </span>
                 )}
               </div>
-            </button>
+              <h3 className="text-2xl font-semibold">{name}</h3>
+              <p className="mt-2 min-h-12 text-sm text-foreground/75">
+                {planId === "creator"
+                  ? "For one creator finding a consistent rhythm."
+                  : featured
+                    ? "For frequent creators running several channels."
+                    : "For a larger content output across your channels."}
+              </p>
+              <p className="mt-5">
+                <span className="text-4xl font-semibold tracking-tight">
+                  €
+                  {price.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+                <span className="text-sm text-foreground/70"> / month</span>
+              </p>
+              <p className="mt-2 text-sm text-foreground/70">
+                {annual
+                  ? `€${plan.annualTotal.toLocaleString()} billed yearly · save €${plan.monthlyPrice * 2}`
+                  : "Billed monthly · cancel renewal anytime"}
+              </p>
+              <div className="my-6 rounded-xl border border-primary/20 bg-primary/10 p-4">
+                <p className="text-3xl font-semibold text-primary">
+                  {plan.monthlyCredits.toLocaleString()}
+                </p>
+                <p className="mt-1 text-sm">credits every month</p>
+              </div>
+              <ul className="space-y-3 text-sm text-foreground/85">
+                {[
+                  `${plan.socialAccounts} connected social accounts`,
+                  "AI scripts, images, video and voice",
+                  "Video analysis and custom trend research",
+                  "Weekly organic short-form trends",
+                  "Library, editing and content calendar",
+                  "Optional credit top-ups that roll over",
+                ].map(detail => (
+                  <li key={detail} className="flex gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    {detail}
+                  </li>
+                ))}
+              </ul>
+              <p className="my-5 border-t border-border pt-4 text-sm text-foreground/70">
+                For example: up to{" "}
+                {Math.floor(
+                  plan.monthlyCredits / AI_CREDIT_COSTS.image1K
+                ).toLocaleString()}{" "}
+                1K images if used only for images.
+              </p>
+              <button
+                type="button"
+                disabled={disabled || busy !== null}
+                onClick={() =>
+                  void (summary?.canUseCredits ? onManage() : onChoose(planId))
+                }
+                className={`mt-auto flex w-full items-center justify-center gap-2 rounded-pill px-5 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${featured ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "border border-primary/35 bg-primary/10 text-foreground hover:bg-primary/20"}`}
+              >
+                {busy === `plan:${planId}` || busy === "portal" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                {disabled
+                  ? "Purchases opening soon"
+                  : current
+                    ? "Manage your plan"
+                    : summary?.canUseCredits
+                      ? `Explore ${name} in billing`
+                      : `Choose ${name}`}
+              </button>
+            </article>
           );
         })}
       </div>
-    </div>
+      <p className="mt-4 text-sm text-foreground/70">
+        Prices include VAT where applicable. Annual plans receive credits
+        monthly. Plan credits reset; purchased credits roll over.
+      </p>
+      {summary?.plan && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 text-sm">
+          <span>
+            {summary.plan.name} · {summary.plan.status.replace(/_/g, " ")} ·{" "}
+            {summary.plan.cancelAtPeriodEnd ? "Ends" : "Period ends"}{" "}
+            {formatDate(summary.plan.currentPeriodEnd)}
+          </span>
+          <button
+            type="button"
+            onClick={() => void onManage()}
+            disabled={disabled || busy !== null}
+            className="font-medium text-primary disabled:opacity-60"
+          >
+            Manage plan and invoices
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const USAGE_CATEGORIES = [
+  { key: "video", label: "Video", color: "#9879f5" },
+  { key: "image", label: "Images", color: "#e678bd" },
+  { key: "speech", label: "Voice", color: "#43bba7" },
+  { key: "script", label: "Scripts", color: "#599ce8" },
+  { key: "analysis", label: "Analysis", color: "#e5a84e" },
+  { key: "transcription", label: "Transcription", color: "#a9bc53" },
+  { key: "edit-plan", label: "Editing", color: "#c783ee" },
+  { key: "trend-research", label: "Research", color: "#ee8577" },
+];
+function UsageChart({
+  summary,
+  loading,
+}: {
+  summary: BillingSummary | null;
+  loading: boolean;
+}) {
+  const [range, setRange] = useState(30);
+  const data = useMemo(() => {
+    const end = new Date(summary?.usage?.through || new Date().toISOString());
+    end.setUTCHours(0, 0, 0, 0);
+    return Array.from({ length: range }, (_, i) => {
+      const day = new Date(end);
+      day.setUTCDate(day.getUTCDate() - range + 1 + i);
+      const date = day.toISOString().slice(0, 10);
+      const row: Record<string, string | number> = { date };
+      for (const category of USAGE_CATEGORIES) row[category.key] = 0;
+      for (const entry of summary?.usage?.daily || [])
+        if (entry.date === date) row[entry.category] = entry.credits;
+      return row;
+    });
+  }, [summary?.usage, range]);
+  const totals = USAGE_CATEGORIES.map(category => ({
+    ...category,
+    total: data.reduce((sum, row) => sum + Number(row[category.key] || 0), 0),
+  }));
+  const total = totals.reduce((sum, category) => sum + category.total, 0);
+  return (
+    <section
+      className="min-w-0 rounded-2xl border border-border bg-surface p-6"
+      aria-labelledby="usage-title"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="usage-title" className="text-xl font-semibold">
+            Your creative activity
+          </h2>
+          <p className="mt-2 text-3xl font-semibold">
+            {loading || !summary?.usage ? "—" : total.toLocaleString()}{" "}
+            <span className="text-sm font-normal text-foreground/70">
+              credits used
+            </span>
+          </p>
+        </div>
+        <select
+          aria-label="Credit usage time range"
+          value={range}
+          onChange={e => setRange(Number(e.target.value))}
+          className="rounded-lg border border-border bg-background p-2 text-sm"
+        >
+          <option value={7}>Last 7 days</option>
+          <option value={30}>Last 30 days</option>
+        </select>
+      </div>
+      <div
+        className="mt-5 h-56"
+        role="img"
+        aria-label={`Daily credit usage by tool over ${range} days: ${total} credits. Exact totals listed below.`}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            accessibilityLayer
+            margin={{ top: 8, right: 4, left: -20, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 5"
+              vertical={false}
+              stroke="currentColor"
+              opacity={0.15}
+            />
+            <XAxis
+              dataKey="date"
+              tickFormatter={date => String(date).slice(5)}
+              minTickGap={28}
+              tick={{ fill: "currentColor", fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              domain={[0, total === 0 ? 10 : "auto"]}
+              allowDecimals={false}
+              tick={{ fill: "currentColor", fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              contentStyle={{
+                background: "hsl(var(--background))",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: 12,
+              }}
+            />
+            {USAGE_CATEGORIES.map(category => (
+              <Bar
+                key={category.key}
+                name={category.label}
+                dataKey={category.key}
+                stackId="usage"
+                fill={category.color}
+                maxBarSize={22}
+                isAnimationActive={false}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        {totals.map(category => (
+          <div
+            key={category.key}
+            className="flex items-center justify-between gap-2"
+          >
+            <span className="flex items-center gap-2 text-foreground/80">
+              <span
+                className="h-2.5 w-2.5 rounded-sm"
+                style={{ background: category.color }}
+              />
+              {category.label}
+            </span>
+            <span className="font-mono">
+              {loading || !summary?.usage
+                ? "—"
+                : category.total.toLocaleString()}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-xs text-foreground/65">
+        {loading
+          ? "Loading credit usage…"
+          : !summary?.usage
+            ? "Usage could not be loaded. Try Refresh."
+            : total === 0
+              ? "No credits used in this period. Your first creation will appear here."
+              : "Completed AI actions · UTC dates · failed and pending jobs excluded."}
+      </p>
+    </section>
   );
 }

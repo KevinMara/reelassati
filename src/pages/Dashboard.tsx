@@ -274,16 +274,19 @@ function DashboardHome() {
   const onboarding = [
     {
       done: Boolean(workspace.brandKit.voice && workspace.brandKit.audience),
+      to: "/dashboard/clients",
       title: "Define Brand DNA",
-      detail: "Add voice, audience, colors, and caption behavior in Settings.",
+      detail: "Save your voice, audience, colors, and caption style.",
     },
     {
       done: workspace.assets.length > 0,
+      to: "/dashboard/library",
       title: "Upload real footage",
       detail: "Build a reusable, private media library.",
     },
     {
       done: workspace.projects.length > 0,
+      to: "/dashboard/edit",
       title: "Create your first edit",
       detail: "Manual and AI changes share one reviewable timeline.",
     },
@@ -487,8 +490,8 @@ function DashboardHome() {
                   Your activity starts with a real action.
                 </p>
                 <p className="text-xs text-foreground/50 mt-1">
-                  Upload footage or create an editing project—no fabricated demo
-                  feed.
+                  Upload footage or create a project to start your activity
+                  history.
                 </p>
               </div>
             )}
@@ -521,7 +524,11 @@ function DashboardHome() {
           </div>
           <div className="space-y-3">
             {onboarding.map((item, index) => (
-              <div key={item.title} className="flex items-start gap-3">
+              <Link
+                to={item.to}
+                key={item.title}
+                className="flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              >
                 <div
                   className={cn(
                     "h-5 w-5 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center",
@@ -541,9 +548,9 @@ function DashboardHome() {
                 </div>
                 <div>
                   <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-foreground/50">{item.detail}</p>
+                  <p className="text-xs text-foreground/70">{item.detail}</p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
           <div className="mt-6 pt-4 border-t border-border">
