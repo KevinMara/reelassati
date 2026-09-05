@@ -287,6 +287,11 @@ export default function Pricing() {
                 </div>
               ))}
             </div>
+            <p className="mt-4 text-[11px] text-foreground/40">
+              {isItalian
+                ? "I prezzi mostrati includono l'IVA ove applicabile. Il checkout conferma il trattamento fiscale corretto."
+                : "Displayed prices include VAT where applicable. Checkout confirms the correct tax treatment."}
+            </p>
           </section>
         </div>
       </main>

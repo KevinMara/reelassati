@@ -127,6 +127,10 @@ Point the Stripe webhook at `/api/billing/stripe-webhook` and subscribe it to
 Checkout Session, Invoice, and Customer Subscription events. Plan credits reset
 monthly; top-up and referral credits roll over. Keep all Stripe secrets and
 Price IDs in the hosted backend environment, never in `VITE_*` variables.
+Create the EUR Prices with inclusive tax behavior so the public €19/€59/€149
+monthly prices, €190/€590/€1,490 annual prices, and €12/€39/€89 top-ups remain
+the customer-facing totals where VAT applies. Stripe Tax and valid business tax
+IDs can then apply the correct jurisdiction-specific treatment at Checkout.
 
 Recommended webhook verification hardening:
 

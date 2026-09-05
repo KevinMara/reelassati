@@ -397,7 +397,8 @@ export default function BillingPage() {
           })}
         </div>
         <p className="mt-3 text-[11px] text-foreground/40">
-          Taxes are calculated at checkout based on your billing details.
+          Displayed prices include VAT where applicable. Checkout confirms the
+          correct tax treatment from your billing details.
         </p>
       </section>
 
