@@ -37,6 +37,33 @@ export function OwnerOperations() {
               </div>
             ))}
           </div>
+          {data.billingReadiness && !data.billingReadiness.ready ? (
+            <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+              <h3 className="font-medium">Finish payment setup</h3>
+              <ul className="mt-3 space-y-2 text-sm">
+                {data.billingReadiness.checks.map(check => (
+                  <li key={check.id} className="flex justify-between gap-4">
+                    <span>{check.message}</span>
+                    <span
+                      className={
+                        check.ready ? "text-emerald-500" : "text-amber-500"
+                      }
+                    >
+                      {check.ready ? "Ready" : "Needs setup"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                className="mt-4 inline-flex text-sm font-medium text-primary underline underline-offset-4"
+                href="https://dashboard.stripe.com/account/onboarding"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open Stripe account setup
+              </a>
+            </div>
+          ) : null}
           <div className="mt-5 grid gap-3 sm:grid-cols-4">
             {[
               ["Payment issues", data.counts.failedPayments],

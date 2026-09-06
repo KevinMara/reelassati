@@ -467,6 +467,11 @@ export const platformApi = {
   billingSummary: () =>
     requestJson<{ billing: BillingSummary }>("/api/billing/summary"),
 
+  checkoutStatus: (sessionId: string) =>
+    requestJson<{ status: "pending" | "processing" | "complete" | "expired" }>(
+      `/api/billing/checkout-status?session_id=${encodeURIComponent(sessionId)}`
+    ),
+
   createSubscriptionCheckout: (planId: PlanId, billingCycle: BillingCycle) =>
     requestJson<{ checkoutUrl: string }>("/api/billing/checkout", {
       method: "POST",

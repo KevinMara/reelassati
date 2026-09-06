@@ -1,3 +1,6 @@
+import type Stripe from "stripe";
+import { hasStripeKey, stripeClient } from "./stripe-client";
+import type { StripeReadiness } from "../contracts/billing";
 import {
   BILLING_ADJUSTMENTS_SCHEMA,
   registerCreditPurchase,
@@ -42,6 +45,9 @@ export type BillingEnvironment = {
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_IDS_JSON?: string;
+  STRIPE_ACCOUNT_ID?: string;
+  STRIPE_PORTAL_CONFIGURATION_ID?: string;
+  STRIPE_TAX_MODE?: "automatic" | "not_collecting";
   PUBLIC_APP_URL?: string;
 };
 
@@ -175,6 +181,12 @@ export async function initializeBillingSchema(
         )
       `),
       env.DB.prepare(BILLING_ADJUSTMENTS_SCHEMA),
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS billing_checkouts (
+        owner_email TEXT NOT NULL, kind TEXT NOT NULL, selection TEXT NOT NULL,
+        attempt_id TEXT NOT NULL, session_id TEXT, lease_token TEXT,
+        lease_until INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (owner_email, kind)
+      )`),
     ]).catch(cause => {
       billingSchemaInitialization = undefined;
       throw cause;
@@ -220,12 +232,152 @@ function parsePriceConfiguration(
 export function stripeBillingConfigured(env: BillingEnvironment): boolean {
   const prices = parsePriceConfiguration(env);
   return Boolean(
-    cleanString(env.STRIPE_SECRET_KEY).startsWith("sk_") &&
+    hasStripeKey(env.STRIPE_SECRET_KEY) &&
     cleanString(env.STRIPE_WEBHOOK_SECRET).startsWith("whsec_") &&
+    /^bpc_[A-Za-z0-9]+$/.test(
+      cleanString(env.STRIPE_PORTAL_CONFIGURATION_ID)
+    ) &&
+    Object.keys(CREDIT_TOP_UPS).every(id =>
+      Boolean(prices.topUps[id as CreditTopUpId])
+    ) &&
     Object.values(prices.plans).every(
       plan => Boolean(plan.monthly) && Boolean(plan.annual)
     )
   );
+}
+
+const readinessCache = new WeakMap<
+  BillingEnvironment,
+  { expiresAt: number; result: Promise<StripeReadiness> }
+>();
+
+/** Verify actual account, catalog and tax configuration before offering checkout. */
+export function stripeReadiness(
+  env: BillingEnvironment
+): Promise<StripeReadiness> {
+  const cached = readinessCache.get(env);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+  const result = inspectStripeReadiness(env);
+  readinessCache.set(env, { expiresAt: Date.now() + 60_000, result });
+  return result;
+}
+
+async function inspectStripeReadiness(
+  env: BillingEnvironment
+): Promise<StripeReadiness> {
+  const checkedAt = new Date().toISOString();
+  const checks: StripeReadiness["checks"] = [];
+  const add = (id: string, ready: boolean, message: string) =>
+    checks.push({ id, ready, message });
+  add(
+    "api_key",
+    hasStripeKey(env.STRIPE_SECRET_KEY),
+    "Server API key with the required restricted permissions"
+  );
+  add(
+    "webhook",
+    cleanString(env.STRIPE_WEBHOOK_SECRET).startsWith("whsec_"),
+    "Signed billing webhook"
+  );
+  const prices = parsePriceConfiguration(env);
+  const expected = [
+    ...(["creator", "pro", "studio"] as const).flatMap(id =>
+      (["monthly", "annual"] as const).map(cycle => ({
+        id: prices.plans[id][cycle],
+        cents:
+          (cycle === "annual"
+            ? planEntitlements(id).annualTotal
+            : planEntitlements(id).monthlyPrice) * 100,
+        interval: cycle === "annual" ? "year" : "month",
+      }))
+    ),
+    ...Object.keys(CREDIT_TOP_UPS).map(id => ({
+      id: prices.topUps[id as CreditTopUpId],
+      cents: topUpPriceCents(id as CreditTopUpId),
+      interval: null,
+    })),
+  ];
+  add(
+    "price_ids",
+    expected.every(p => Boolean(p.id)),
+    "Six subscription prices and three credit packs"
+  );
+  add(
+    "portal_id",
+    /^bpc_[A-Za-z0-9]+$/.test(cleanString(env.STRIPE_PORTAL_CONFIGURATION_ID)),
+    "Customer portal for invoices, plan changes and cancellation"
+  );
+  if (!hasStripeKey(env.STRIPE_SECRET_KEY))
+    return { ready: false, checkedAt, checks };
+  const stripe = stripeClient(env.STRIPE_SECRET_KEY!);
+  const results = await Promise.allSettled([
+    stripe.accounts.retrieve(null),
+    env.STRIPE_TAX_MODE === "not_collecting"
+      ? Promise.resolve(null)
+      : stripe.tax.registrations.list({ status: "active", limit: 1 }),
+    env.STRIPE_TAX_MODE === "not_collecting"
+      ? Promise.resolve(null)
+      : stripe.tax.settings.retrieve(),
+    Promise.all(
+      expected.map(async p => {
+        if (!p.id) return false;
+        const price = await stripe.prices.retrieve(p.id);
+        return (
+          price.active &&
+          price.currency === "eur" &&
+          price.unit_amount === p.cents &&
+          price.tax_behavior === "inclusive" &&
+          (p.interval
+            ? price.recurring?.interval === p.interval &&
+              price.recurring.interval_count === 1
+            : price.recurring === null)
+        );
+      })
+    ),
+    env.STRIPE_PORTAL_CONFIGURATION_ID
+      ? stripe.billingPortal.configurations.retrieve(
+          env.STRIPE_PORTAL_CONFIGURATION_ID
+        )
+      : Promise.resolve(null),
+  ] as const);
+  const [account, registrations, taxSettings, catalog, portal] = results;
+  add(
+    "account",
+    account.status === "fulfilled" &&
+      (!env.STRIPE_ACCOUNT_ID || account.value.id === env.STRIPE_ACCOUNT_ID) &&
+      (env.STRIPE_SECRET_KEY!.includes("_test_") ||
+        account.value.charges_enabled === true),
+    "Correct Stripe account with payment acceptance enabled"
+  );
+  add(
+    "tax",
+    registrations.status === "fulfilled" &&
+      taxSettings.status === "fulfilled" &&
+      (env.STRIPE_TAX_MODE === "not_collecting" ||
+        Boolean(
+          registrations.value?.data.length &&
+          taxSettings.value?.status === "active"
+        )),
+    env.STRIPE_TAX_MODE === "not_collecting"
+      ? "Tax collection explicitly disabled by the operator"
+      : "Active tax settings and a recorded tax registration"
+  );
+  add(
+    "catalog",
+    catalog.status === "fulfilled" && catalog.value.every(Boolean),
+    "Stripe amounts, currencies and billing intervals match the website"
+  );
+  add(
+    "portal",
+    portal.status === "fulfilled" &&
+      Boolean(
+        portal.value?.active &&
+        portal.value.features.subscription_cancel.enabled &&
+        portal.value.features.invoice_history.enabled
+      ),
+    "Active portal with invoices and cancellation"
+  );
+  return { ready: checks.every(c => c.ready), checkedAt, checks };
 }
 
 function activeSubscription(row: BillingAccountRow | null): boolean {
@@ -758,8 +910,9 @@ export async function billingSummary(
           cancelAtPeriodEnd: subscription.cancel_at_period_end === 1,
         }
       : null;
+  const readiness = await stripeReadiness(env);
   return {
-    configured: stripeBillingConfigured(env),
+    configured: readiness.ready,
     availableCredits: Math.max(
       0,
       credits.included_balance + credits.topup_balance
@@ -768,16 +921,14 @@ export async function billingSummary(
     topUpCredits: Math.max(0, credits.topup_balance),
     adjustmentDebt: Math.max(0, -credits.topup_balance),
     canUseCredits: activeSubscription(subscription),
+    canManageBilling:
+      hasStripeKey(env.STRIPE_SECRET_KEY) &&
+      Boolean(subscription?.stripe_customer_id),
     plan,
     topUps: (Object.keys(CREDIT_TOP_UPS) as CreditTopUpId[]).map(id => ({
       ...CREDIT_TOP_UPS[id],
-      price:
-        topUpPriceCents(
-          id,
-          plan?.id || "creator",
-          plan?.billingCycle || "monthly"
-        ) / 100,
-      available: stripeBillingConfigured(env),
+      price: topUpPriceCents(id) / 100,
+      available: readiness.ready,
     })),
     usage: { through: usageThrough, daily: usage.results },
     recentActivity: activity.results.map(item => ({
@@ -820,58 +971,30 @@ function safeAppOrigin(request: Request, env: BillingEnvironment): string {
   return "https://www.reelassati.app";
 }
 
-async function stripeRequest(
-  env: BillingEnvironment,
-  path: string,
-  params: URLSearchParams,
-  idempotencyKey?: string
-): Promise<Record<string, unknown>> {
-  const key = cleanString(env.STRIPE_SECRET_KEY);
-  if (!key.startsWith("sk_")) throw error("Billing is not active yet", 503);
-  const response = await fetch(`https://api.stripe.com/v1${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-    },
-    body: params.toString(),
-  });
-  const payload = (await response.json().catch(() => ({}))) as Record<
-    string,
-    unknown
-  >;
-  if (!response.ok) {
-    console.error("Stripe request failed", { path, status: response.status });
-    throw error("Billing could not be opened. Try again shortly.", 502);
-  }
-  return payload;
-}
-
-async function stripeRead(
-  env: BillingEnvironment,
-  path: string
-): Promise<Record<string, unknown>> {
-  const response = await fetch(`https://api.stripe.com/v1${path}`, {
-    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!response.ok) throw new Error("Stripe reconciliation unavailable");
-  return (await response.json()) as Record<string, unknown>;
-}
-
 async function currentSubscription(env: BillingEnvironment, id: string) {
-  return cleanString(env.STRIPE_SECRET_KEY).startsWith("sk_")
-    ? stripeRead(env, `/subscriptions/${encodeURIComponent(id)}`)
-    : null;
+  if (!hasStripeKey(env.STRIPE_SECRET_KEY)) return null;
+  try {
+    return (await stripeClient(env.STRIPE_SECRET_KEY!).subscriptions.retrieve(
+      id
+    )) as unknown as Record<string, unknown>;
+  } catch {
+    throw new Error("Stripe subscription reconciliation unavailable");
+  }
 }
 
-function addCheckoutTaxOptions(params: URLSearchParams): void {
-  params.set("automatic_tax[enabled]", "true");
-  params.set("tax_id_collection[enabled]", "true");
-  params.set("billing_address_collection", "required");
-  params.set("allow_promotion_codes", "true");
+function billingFailure(cause: unknown): Response {
+  // SDK errors can contain request parameters. Keep them out of customer messages/logs.
+  console.error("Stripe operation failed", {
+    type: cause instanceof Error ? cause.name : "UnknownError",
+  });
+  return error("Billing could not be opened. Try again shortly.", 502);
 }
+
+type CheckoutRow = {
+  selection: string;
+  attempt_id: string;
+  session_id: string | null;
+};
 
 async function checkoutSession(
   request: Request,
@@ -887,100 +1010,208 @@ async function checkoutSession(
       503
     );
   }
+  if (!(await stripeReadiness(env)).ready) {
+    return error(
+      "Payment setup is being completed. No payment was attempted.",
+      503
+    );
+  }
   const prices = parsePriceConfiguration(env);
   const priceId =
     kind === "subscription" && isPlanId(id) && cycle
       ? prices.plans[id][cycle]
-      : kind === "topup" && isCreditTopUpId(id)
+      : isCreditTopUpId(id)
         ? prices.topUps[id]
         : undefined;
-  if (kind === "subscription" && !priceId)
-    return error("That purchase option is not available", 422);
+  if (!priceId) return error("That purchase option is not available", 422);
   const account = await billingAccount(env, user.email);
-  if (kind === "topup" && !activeSubscription(account)) {
+  if (kind === "topup" && !activeSubscription(account))
     return error("Choose an active plan before adding extra credits", 409);
-  }
-  if (kind === "subscription" && activeSubscription(account)) {
+  if (kind === "subscription" && activeSubscription(account))
     return error(
       "Manage or change your active plan from the billing portal",
       409
     );
-  }
-  const origin = safeAppOrigin(request, env);
-  const params = new URLSearchParams({
-    mode: kind === "subscription" ? "subscription" : "payment",
-    ...(priceId && kind === "subscription"
-      ? { "line_items[0][price]": priceId }
-      : {}),
-    "line_items[0][quantity]": "1",
-    client_reference_id: user.email,
-    success_url: `${origin}/#/dashboard/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/#/dashboard/billing?checkout=cancelled`,
-    "metadata[owner_email]": user.email,
-    "metadata[purchase_kind]": kind,
-  });
-  if (account?.stripe_customer_id) {
-    params.set("customer", account.stripe_customer_id);
-    params.set("customer_update[address]", "auto");
-    params.set("customer_update[name]", "auto");
-  } else {
-    params.set("customer_email", user.email);
-  }
-  addCheckoutTaxOptions(params);
-  if (kind === "subscription" && isPlanId(id) && cycle) {
-    params.set("metadata[plan_id]", id);
-    params.set("metadata[billing_cycle]", cycle);
-    params.set("subscription_data[metadata][owner_email]", user.email);
-    params.set("subscription_data[metadata][plan_id]", id);
-    params.set("subscription_data[metadata][billing_cycle]", cycle);
-  } else if (isCreditTopUpId(id)) {
-    if (
-      !isCreditTopUpId(id) ||
-      !account ||
-      !isPlanId(account.plan_id || "") ||
-      !isBillingCycle(account.billing_cycle || "")
+
+  // One resumable session per owner/purchase kind. A lease covers concurrent tabs,
+  // and the persisted attempt ID survives a provider response or process timeout.
+  const lease = crypto.randomUUID();
+  const selection = `${id}:${cycle || "once"}:${priceId}:v3`;
+  await env.DB.prepare(
+    `INSERT INTO billing_checkouts
+    (owner_email, kind, selection, attempt_id, lease_token, lease_until)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(owner_email, kind) DO UPDATE SET lease_token = excluded.lease_token,
+    lease_until = excluded.lease_until WHERE billing_checkouts.lease_until < ?`
+  )
+    .bind(
+      user.email,
+      kind,
+      selection,
+      crypto.randomUUID(),
+      lease,
+      Date.now() + 120_000,
+      Date.now()
     )
-      return error("Choose a valid active plan first", 409);
-    const cents = topUpPriceCents(
-      id,
-      account.plan_id as PlanId,
-      account.billing_cycle as BillingCycle
+    .run();
+  let state = await env.DB.prepare(
+    "SELECT selection, attempt_id, session_id FROM billing_checkouts WHERE owner_email = ? AND kind = ? AND lease_token = ?"
+  )
+    .bind(user.email, kind, lease)
+    .first<CheckoutRow>();
+  if (!state)
+    return error(
+      "Checkout is already opening. Please try again in a moment.",
+      409
     );
-    params.set("line_items[0][price_data][currency]", "eur");
-    params.set("line_items[0][price_data][unit_amount]", String(cents));
-    params.set("line_items[0][price_data][tax_behavior]", "inclusive");
-    params.set(
-      "line_items[0][price_data][product_data][name]",
-      `${CREDIT_TOP_UPS[id].credits.toLocaleString("en-US")} REELassati credits`
-    );
-    params.set("metadata[credits]", String(CREDIT_TOP_UPS[id].credits));
-    params.set("metadata[quoted_cents]", String(cents));
-    params.set("metadata[pricing_version]", "2");
-    params.set("metadata[topup_id]", id);
-    params.set("payment_intent_data[metadata][owner_email]", user.email);
-    params.set("payment_intent_data[metadata][topup_id]", id);
-    params.set("payment_intent_data[metadata][purchase_kind]", "topup");
-    params.set(
-      "payment_intent_data[metadata][credits]",
-      String(CREDIT_TOP_UPS[id].credits)
-    );
-    params.set("payment_intent_data[metadata][pricing_version]", "2");
+  const stripe = stripeClient(env.STRIPE_SECRET_KEY!);
+  try {
+    let customerId = account?.stripe_customer_id;
+    if (!customerId) {
+      const customerKey = await hmacHex(
+        env.STRIPE_SECRET_KEY!,
+        `customer:${user.email}`
+      );
+      const customer = await stripe.customers.create(
+        { email: user.email, metadata: { owner_email: user.email } },
+        { idempotencyKey: `reelassati-customer:${customerKey}` }
+      );
+      customerId = customer.id;
+      const now = new Date().toISOString();
+      await env.DB.prepare(
+        `INSERT INTO billing_accounts (owner_email, stripe_customer_id, status, created_at, updated_at)
+        VALUES (?, ?, 'inactive', ?, ?) ON CONFLICT(owner_email) DO UPDATE SET
+        stripe_customer_id = COALESCE(billing_accounts.stripe_customer_id, excluded.stripe_customer_id), updated_at = excluded.updated_at`
+      )
+        .bind(user.email, customerId, now, now)
+        .run();
+    }
+    if (kind === "subscription") {
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 100,
+      });
+      if (
+        subscriptions.has_more ||
+        subscriptions.data.some(
+          s => !["canceled", "incomplete_expired"].includes(s.status)
+        )
+      )
+        return error(
+          "An existing subscription or payment needs attention. Open Manage subscription to continue.",
+          409
+        );
+    }
+    let newAttempt = state.selection !== selection;
+    if (!state.session_id) {
+      const recent = await stripe.checkout.sessions.list({
+        customer: customerId,
+        created: { gte: Math.floor(Date.now() / 1000) - 86400 },
+        limit: 100,
+      });
+      const attemptId = state.attempt_id;
+      const recovered = recent.data.find(
+        s => s.metadata?.checkout_attempt_id === attemptId
+      );
+      if (recovered) state.session_id = recovered.id;
+      else if (recent.has_more)
+        return error(
+          "There are too many recent checkout attempts. Complete or close an existing checkout first.",
+          409
+        );
+    }
+    if (state.session_id) {
+      const previous = await stripe.checkout.sessions.retrieve(
+        state.session_id
+      );
+      if (previous.status === "open" && !newAttempt && previous.url)
+        return json({ checkoutUrl: previous.url });
+      if (previous.status === "open")
+        await stripe.checkout.sessions.expire(previous.id);
+      if (previous.status === "complete" && kind === "subscription") {
+        const priorId =
+          typeof previous.subscription === "string"
+            ? previous.subscription
+            : previous.subscription?.id;
+        const prior = priorId
+          ? await stripe.subscriptions.retrieve(priorId)
+          : null;
+        if (
+          !prior ||
+          !["canceled", "incomplete_expired"].includes(prior.status)
+        )
+          return error(
+            "Your previous payment is being confirmed. Refresh your balance shortly.",
+            409
+          );
+      }
+      newAttempt = true;
+    }
+    if (newAttempt) {
+      state = { selection, attempt_id: crypto.randomUUID(), session_id: null };
+      await env.DB.prepare(
+        "UPDATE billing_checkouts SET selection = ?, attempt_id = ?, session_id = NULL WHERE owner_email = ? AND kind = ? AND lease_token = ?"
+      )
+        .bind(selection, state.attempt_id, user.email, kind, lease)
+        .run();
+    }
+    const origin = safeAppOrigin(request, env);
+    const metadata: Record<string, string> = {
+      owner_email: user.email,
+      purchase_kind: kind,
+      checkout_attempt_id: state.attempt_id,
+    };
+    if (kind === "subscription")
+      Object.assign(metadata, { plan_id: id, billing_cycle: cycle! });
+    else
+      Object.assign(metadata, {
+        topup_id: id,
+        credits: String(CREDIT_TOP_UPS[id as CreditTopUpId].credits),
+        quoted_cents: String(topUpPriceCents(id as CreditTopUpId)),
+        pricing_version: "3",
+      });
+    const params: Stripe.Checkout.SessionCreateParams = {
+      mode: kind === "subscription" ? "subscription" : "payment",
+      customer: customerId,
+      customer_update: { address: "auto", name: "auto" },
+      line_items: [{ price: priceId, quantity: 1 }],
+      client_reference_id: user.email,
+      success_url: `${origin}/#/dashboard/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/#/dashboard/billing?checkout=cancelled`,
+      metadata,
+      // Keep the integration label stable across retries of a persisted attempt.
+      integration_identifier: `reelassati_${kind}_${state.attempt_id
+        .replace(/-/g, "")
+        .slice(0, 8)
+        .replace(/[0-9]/g, n => String.fromCharCode(97 + Number(n)))}`,
+      automatic_tax: { enabled: env.STRIPE_TAX_MODE !== "not_collecting" },
+      tax_id_collection: { enabled: true },
+      billing_address_collection: "required",
+      ...(kind === "subscription"
+        ? { subscription_data: { metadata }, allow_promotion_codes: true }
+        : { payment_intent_data: { metadata } }),
+    };
+    const session = await stripe.checkout.sessions.create(params, {
+      idempotencyKey: `reelassati-checkout:${state.attempt_id}`,
+    });
+    if (!session.url || !/^https:\/\/checkout\.stripe\.com\//.test(session.url))
+      return error("Billing did not return a secure checkout URL", 502);
+    await env.DB.prepare(
+      "UPDATE billing_checkouts SET session_id = ? WHERE owner_email = ? AND kind = ? AND lease_token = ?"
+    )
+      .bind(session.id, user.email, kind, lease)
+      .run();
+    return json({ checkoutUrl: session.url });
+  } catch (cause) {
+    return billingFailure(cause);
+  } finally {
+    await env.DB.prepare(
+      "UPDATE billing_checkouts SET lease_token = NULL, lease_until = 0 WHERE owner_email = ? AND kind = ? AND lease_token = ?"
+    )
+      .bind(user.email, kind, lease)
+      .run();
   }
-  const checkoutKey = await hmacHex(
-    cleanString(env.STRIPE_SECRET_KEY),
-    `${user.email}:${kind}:${id}:${cycle || account?.billing_cycle}:${params.get("line_items[0][price_data][unit_amount]")}:${Math.floor(Date.now() / 300000)}`
-  );
-  const session = await stripeRequest(
-    env,
-    "/checkout/sessions",
-    params,
-    `checkout:${checkoutKey}`
-  );
-  const checkoutUrl = cleanString(session.url);
-  if (!/^https:\/\/checkout\.stripe\.com\//.test(checkoutUrl)) {
-    return error("Billing did not return a secure checkout URL", 502);
-  }
-  return json({ checkoutUrl });
 }
 
 export async function handleBillingApi(
@@ -991,6 +1222,52 @@ export async function handleBillingApi(
 ): Promise<Response> {
   if (url.pathname === "/api/billing/summary" && request.method === "GET") {
     return json({ billing: await billingSummary(env, user) });
+  }
+  if (
+    url.pathname === "/api/billing/checkout-status" &&
+    request.method === "GET"
+  ) {
+    const sessionId = url.searchParams.get("session_id") || "";
+    if (!/^cs_[A-Za-z0-9_]{1,200}$/.test(sessionId))
+      return error("Checkout not found", 404);
+    if (!hasStripeKey(env.STRIPE_SECRET_KEY))
+      return error("Billing is not active yet", 503);
+    try {
+      const session = await stripeClient(
+        env.STRIPE_SECRET_KEY!
+      ).checkout.sessions.retrieve(sessionId);
+      if (normalizeEmail(session.metadata?.owner_email) !== user.email)
+        return error("Checkout not found", 404);
+      let status: "pending" | "processing" | "complete" | "expired" =
+        session.status === "expired" ? "expired" : "pending";
+      if (session.status === "complete") {
+        status = "processing";
+        if (["paid", "no_payment_required"].includes(session.payment_status)) {
+          if (session.metadata?.purchase_kind === "topup") {
+            const applied = await env.DB.prepare(
+              "SELECT id FROM credit_ledger WHERE owner_email = ? AND reference_id = ? AND category = 'topup' AND applied = 1 AND status = 'settled'"
+            )
+              .bind(user.email, session.id)
+              .first();
+            if (applied) status = "complete";
+          } else {
+            const subscription = await billingAccount(env, user.email);
+            const id =
+              typeof session.subscription === "string"
+                ? session.subscription
+                : session.subscription?.id;
+            if (
+              activeSubscription(subscription) &&
+              subscription?.stripe_subscription_id === id
+            )
+              status = "complete";
+          }
+        }
+      }
+      return json({ status });
+    } catch (cause) {
+      return billingFailure(cause);
+    }
   }
   if (url.pathname === "/api/billing/checkout" && request.method === "POST") {
     const body = (await request.json().catch(() => ({}))) as {
@@ -1021,14 +1298,18 @@ export async function handleBillingApi(
       return error("No billing account is attached to this workspace", 404);
     }
     const origin = safeAppOrigin(request, env);
-    const portal = await stripeRequest(
-      env,
-      "/billing_portal/sessions",
-      new URLSearchParams({
+    let portal: Stripe.BillingPortal.Session;
+    try {
+      portal = await stripeClient(
+        env.STRIPE_SECRET_KEY || ""
+      ).billingPortal.sessions.create({
         customer: account.stripe_customer_id,
+        configuration: env.STRIPE_PORTAL_CONFIGURATION_ID,
         return_url: `${origin}/#/dashboard/billing`,
-      })
-    );
+      });
+    } catch (cause) {
+      return billingFailure(cause);
+    }
     const portalUrl = cleanString(portal.url);
     if (!/^https:\/\/billing\.stripe\.com\//.test(portalUrl)) {
       return error("Billing did not return a secure portal URL", 502);
@@ -1398,10 +1679,11 @@ async function processStripeEvent(
       const topUpId = cleanString(metadata.topup_id);
       if (isCreditTopUpId(topUpId)) {
         // Old Checkout sessions retain their original allowance after repricing.
-        const credits =
-          metadata.pricing_version === "2"
-            ? Number(metadata.credits)
-            : ({ boost: 500, momentum: 2000, scale: 5000 } as const)[topUpId];
+        const credits = ["2", "3"].includes(
+          cleanString(metadata.pricing_version)
+        )
+          ? Number(metadata.credits)
+          : ({ boost: 500, momentum: 2000, scale: 5000 } as const)[topUpId];
         if (!Number.isSafeInteger(credits) || credits <= 0 || credits > 5000)
           throw new Error("Invalid top-up credit snapshot");
         await registerCreditPurchase(

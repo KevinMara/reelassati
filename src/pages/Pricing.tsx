@@ -5,11 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  CREDIT_TOP_UPS,
-  topUpPriceCents,
-  type PlanId,
-} from "@contracts/billing";
+import { CREDIT_TOP_UPS, type PlanId } from "@contracts/billing";
 import {
   ANNUAL_BILLED_MONTHS,
   annualMonthlyEquivalent,
@@ -264,10 +260,10 @@ export default function Pricing() {
                     : "More credits, without changing plan."}
                 </h2>
               </div>
-              <p className="text-xs text-foreground/45">
+              <p className="text-sm text-foreground/70">
                 {isItalian
-                  ? "Richiedono un piano attivo · non scadono"
-                  : "Same credit rate as your plan · credits roll over"}
+                  ? "Crediti a un costo inferiore a tutti i piani · serve un abbonamento attivo"
+                  : "Lower credit prices than every plan · active subscription required"}
               </p>
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -282,30 +278,23 @@ export default function Pricing() {
                         isItalian ? "it-IT" : "en-IE"
                       )}
                     </p>
-                    <p className="text-xs text-foreground/45">
+                    <p className="text-sm text-foreground/70">
                       {isItalian ? "crediti" : "credits"}
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    {(["creator", "pro", "studio"] as PlanId[]).map(id => (
-                      <p
-                        key={id}
-                        className="flex justify-between gap-4 text-sm capitalize"
-                      >
-                        <span>{id}</span>
-                        <strong>
-                          €
-                          {(
-                            topUpPriceCents(pack.id, id, billingCycle) / 100
-                          ).toFixed(2)}
-                        </strong>
-                      </p>
-                    ))}
+                  <div className="text-right">
+                    <strong className="text-2xl">€{pack.price}</strong>
+                    <p className="mt-1 text-sm text-foreground/70">
+                      €{((pack.price / pack.credits) * 1000).toFixed(2)} /{" "}
+                      {Number(1000).toLocaleString(
+                        isItalian ? "it-IT" : "en-IE"
+                      )}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-[11px] text-foreground/40">
+            <p className="mt-4 text-sm text-foreground/70">
               {isItalian
                 ? "I prezzi mostrati includono l'IVA ove applicabile. Il checkout conferma il trattamento fiscale corretto."
                 : "Displayed prices include VAT where applicable. Checkout confirms the correct tax treatment."}

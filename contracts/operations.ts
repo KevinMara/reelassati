@@ -1,6 +1,9 @@
+import type { StripeReadiness } from "./billing";
+
 export interface OperationsStatus {
   checkedAt: string;
   services: Array<{ name: string; configured: boolean }>;
+  billingReadiness: StripeReadiness;
   counts: {
     assets: number;
     storageBytes: number;

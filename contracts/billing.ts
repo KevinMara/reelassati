@@ -12,26 +12,16 @@ export const PLAN_NAME_BY_ID: Record<PlanId, PublicPlanName> = {
 };
 
 export const CREDIT_TOP_UPS = {
-  boost: { id: "boost", credits: 1_000, price: 19 },
-  momentum: { id: "momentum", credits: 2_000, price: 38 },
-  scale: { id: "scale", credits: 5_000, price: 95 },
+  boost: { id: "boost", credits: 1_000, price: 9 },
+  momentum: { id: "momentum", credits: 2_000, price: 17 },
+  scale: { id: "scale", credits: 5_000, price: 39 },
 } as const;
 
 export type CreditTopUpId = keyof typeof CREDIT_TOP_UPS;
 
-/** Same unit rate as the member's plan; round down to avoid a fractional-cent premium. */
-export function topUpPriceCents(
-  id: CreditTopUpId,
-  planId: PlanId,
-  cycle: BillingCycle
-): number {
-  const plan = planEntitlements(planId);
-  const priceCents =
-    cycle === "annual" ? plan.annualTotal * 100 : plan.monthlyPrice * 100;
-  return Math.floor(
-    (priceCents * CREDIT_TOP_UPS[id].credits) /
-      (plan.monthlyCredits * (cycle === "annual" ? 12 : 1))
-  );
+/** Subscriber-only packs: lower unit prices than every monthly or annual plan. */
+export function topUpPriceCents(id: CreditTopUpId): number {
+  return CREDIT_TOP_UPS[id].price * 100;
 }
 
 /** Customer-facing credit tariffs. Provider and model costs remain private. */
@@ -131,6 +121,12 @@ export interface BillingActivityItem {
   createdAt: string;
 }
 
+export interface StripeReadiness {
+  ready: boolean;
+  checkedAt: string;
+  checks: Array<{ id: string; ready: boolean; message: string }>;
+}
+
 export interface BillingSummary {
   configured: boolean;
   availableCredits: number;
@@ -138,6 +134,7 @@ export interface BillingSummary {
   topUpCredits: number;
   adjustmentDebt?: number;
   canUseCredits: boolean;
+  canManageBilling?: boolean;
   plan: null | {
     id: PlanId;
     name: PublicPlanName;

@@ -87,6 +87,7 @@
     "react-router-dom": "^7.6.1",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
+    "stripe": "22.6.1",
     "superjson": "^2.2.6",
     "tailwind-merge": "^3.4.0",
     "uuid": "^14.0.0",

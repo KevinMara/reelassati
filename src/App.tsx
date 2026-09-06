@@ -2,9 +2,14 @@ import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
-import { WorkspaceProvider } from "@/providers/workspace";
 import { ReferralCapture } from "@/components/ReferralCapture";
-import EntryAnimation from "@/components/entry/EntryAnimation";
+
+const WorkspaceProvider = lazy(() =>
+  import("@/providers/workspace").then(module => ({
+    default: module.WorkspaceProvider,
+  }))
+);
+const EntryAnimation = lazy(() => import("@/components/entry/EntryAnimation"));
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));

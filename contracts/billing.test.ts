@@ -17,7 +17,7 @@ describe("billing contracts", () => {
     expect(planEntitlements("studio").monthlyCredits).toBe(12_000);
   });
 
-  it("charges no premium over the member's plan, including annual billing", () => {
+  it("keeps every top-up cheaper per credit than every monthly and annual plan", () => {
     for (const planId of ["creator", "pro", "studio"] as const)
       for (const cycle of ["monthly", "annual"] as const) {
         const plan = planEntitlements(planId);
@@ -26,14 +26,22 @@ describe("billing contracts", () => {
             (cycle === "annual" ? plan.annualTotal / 12 : plan.monthlyPrice) /
             plan.monthlyCredits;
           expect(
-            topUpPriceCents(id, planId, cycle) /
-              100 /
-              CREDIT_TOP_UPS[id].credits
-          ).toBeLessThanOrEqual(unit);
+            topUpPriceCents(id) / 100 / CREDIT_TOP_UPS[id].credits
+          ).toBeLessThan(unit);
         }
       }
-    expect(topUpPriceCents("boost", "creator", "monthly")).toBe(1900);
-    expect(topUpPriceCents("boost", "studio", "annual")).toBe(1034);
+    expect(topUpPriceCents("boost")).toBe(900);
+    expect(topUpPriceCents("momentum")).toBe(1700);
+    expect(topUpPriceCents("scale")).toBe(3900);
+    const packs = Object.values(CREDIT_TOP_UPS);
+    expect(packs[0].credits).toBeGreaterThanOrEqual(
+      15 * AI_CREDIT_COSTS.video720pWithAudioPerSecond
+    );
+    for (let i = 1; i < packs.length; i++) {
+      expect(packs[i].price / packs[i].credits).toBeLessThan(
+        packs[i - 1].price / packs[i - 1].credits
+      );
+    }
   });
 
   it("quotes image, speech, transcription and analysis credits deterministically", () => {

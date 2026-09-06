@@ -1,10 +1,21 @@
 import { DatabaseSync } from "node:sqlite";
 import { createHmac } from "node:crypto";
-import { beforeAll, beforeEach, afterAll, describe, expect, it } from "vitest";
+import {
+  beforeAll,
+  beforeEach,
+  afterAll,
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   handleStripeWebhook,
   initializeBillingSchema,
   billingSummary,
+  handleBillingApi,
+  stripeReadiness,
   type BillingEnvironment,
 } from "./billing";
 
@@ -94,7 +105,7 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   sqlite.exec(
-    "DELETE FROM billing_accounts; DELETE FROM credit_accounts; DELETE FROM credit_ledger; DELETE FROM stripe_events; DELETE FROM billing_payment_adjustments;"
+    "DELETE FROM billing_accounts; DELETE FROM credit_accounts; DELETE FROM credit_ledger; DELETE FROM stripe_events; DELETE FROM billing_payment_adjustments; DELETE FROM billing_checkouts;"
   );
   sqlite
     .prepare(
@@ -113,6 +124,242 @@ beforeEach(() => {
     .run(owner, start.toISOString(), start.toISOString());
 });
 afterAll(() => sqlite.close());
+afterEach(() => vi.unstubAllGlobals());
+
+function stripeFixture(
+  options: {
+    tax?: boolean;
+    wrongAmount?: boolean;
+    charges?: boolean;
+    remoteSubscription?: boolean;
+  } = {}
+) {
+  const prices: Record<string, { cents: number; interval: string | null }> = {
+    price_creatormonthly: { cents: 1900, interval: "month" },
+    price_creatorannual: { cents: 19000, interval: "year" },
+    price_promonthly: { cents: 5900, interval: "month" },
+    price_proannual: { cents: 59000, interval: "year" },
+    price_studiomonthly: { cents: 14900, interval: "month" },
+    price_studioannual: { cents: 149000, interval: "year" },
+    price_boost: { cents: 900, interval: null },
+    price_momentum: { cents: 1700, interval: null },
+    price_scale: { cents: 3900, interval: null },
+  };
+  const runtime: BillingEnvironment = {
+    ...env,
+    STRIPE_SECRET_KEY: "rk_live_testFixtureOnly",
+    STRIPE_ACCOUNT_ID: "acct_fixture",
+    STRIPE_PORTAL_CONFIGURATION_ID: "bpc_fixture",
+    PUBLIC_APP_URL: "https://reelassati.app",
+    STRIPE_PRICE_IDS_JSON: JSON.stringify({
+      plans: Object.fromEntries(
+        ["creator", "pro", "studio"].map(id => [
+          id,
+          { monthly: `price_${id}monthly`, annual: `price_${id}annual` },
+        ])
+      ),
+      topUps: {
+        boost: "price_boost",
+        momentum: "price_momentum",
+        scale: "price_scale",
+      },
+    }),
+  };
+  const writes: URLSearchParams[] = [];
+  const sessions = new Map<string, Record<string, unknown>>();
+  const fetchMock = vi.fn(
+    async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url
+      );
+      const path = url.pathname;
+      let data: unknown;
+      const list = (rows: unknown[]) => ({
+        object: "list",
+        data: rows,
+        has_more: false,
+      });
+      if (path === "/v1/account")
+        data = {
+          id: "acct_fixture",
+          charges_enabled: options.charges !== false,
+        };
+      else if (path === "/v1/tax/registrations")
+        data = list(
+          options.tax === false
+            ? []
+            : [{ id: "taxreg_fixture", status: "active" }]
+        );
+      else if (path === "/v1/tax/settings") data = { status: "active" };
+      else if (path === "/v1/billing_portal/configurations/bpc_fixture")
+        data = {
+          active: true,
+          features: {
+            subscription_cancel: { enabled: true },
+            invoice_history: { enabled: true },
+          },
+        };
+      else if (path.startsWith("/v1/prices/")) {
+        const id = path.split("/").pop()!;
+        const price = prices[id];
+        data = {
+          id,
+          active: true,
+          currency: "eur",
+          unit_amount: price.cents + (options.wrongAmount ? 1 : 0),
+          tax_behavior: "inclusive",
+          recurring: price.interval
+            ? { interval: price.interval, interval_count: 1 }
+            : null,
+        };
+      } else if (path === "/v1/subscriptions")
+        data = list(
+          options.remoteSubscription
+            ? [{ id: "sub_other", status: "active" }]
+            : []
+        );
+      else if (path === "/v1/checkout/sessions" && init?.method === "POST") {
+        const params = new URLSearchParams(String(init.body));
+        writes.push(params);
+        const id = `cs_test_${writes.length}`;
+        data = {
+          id,
+          status: "open",
+          payment_status: "unpaid",
+          metadata: Object.fromEntries(
+            [...params]
+              .filter(([k]) => k.startsWith("metadata["))
+              .map(([k, v]) => [k.slice(9, -1), v])
+          ),
+          url: `https://checkout.stripe.com/c/pay/${id}`,
+        };
+        sessions.set(id, data as Record<string, unknown>);
+        expect(new Headers(init.headers).get("Stripe-Version")).toBe(
+          "2026-08-26.dahlia"
+        );
+      } else if (path === "/v1/checkout/sessions")
+        data = list([...sessions.values()]);
+      else if (path.startsWith("/v1/checkout/sessions/"))
+        data = sessions.get(path.split("/").pop()!);
+      else throw new Error(`Unexpected Stripe operation: ${path}`);
+      return new Response(JSON.stringify(data), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  const call = (path: string, body?: unknown) => {
+    const url = new URL(`https://reelassati.app/api/billing/${path}`);
+    return handleBillingApi(
+      new Request(
+        url,
+        body ? { method: "POST", body: JSON.stringify(body) } : {}
+      ),
+      runtime,
+      { email: owner, name: "Owner" },
+      url
+    );
+  };
+  return { runtime, writes, sessions, call };
+}
+
+describe("Stripe checkout readiness and customer journey", () => {
+  it.each([{ tax: false }, { wrongAmount: true }, { charges: false }])(
+    "prevents a purchase when account, tax or catalog checks fail: %j",
+    async options => {
+      const fixture = stripeFixture(options);
+      expect((await stripeReadiness(fixture.runtime)).ready).toBe(false);
+      expect(
+        (await fixture.call("topup-checkout", { topUpId: "boost" })).status
+      ).toBe(503);
+      expect(fixture.writes).toHaveLength(0);
+      expect(
+        (await billingSummary(fixture.runtime, { email: owner, name: "Owner" }))
+          .canManageBilling
+      ).toBe(true);
+    }
+  );
+
+  it("accepts a restricted key, uses server prices and resumes an unpaid checkout", async () => {
+    const fixture = stripeFixture();
+    expect((await stripeReadiness(fixture.runtime)).ready).toBe(true);
+    const first = await fixture.call("topup-checkout", {
+      topUpId: "boost",
+      credits: 999999,
+      price: 1,
+    });
+    expect(first.status).toBe(200);
+    // Recover a provider success whose session ID was not persisted before a restart.
+    sqlite.prepare("UPDATE billing_checkouts SET session_id = NULL").run();
+    expect(
+      await (await fixture.call("topup-checkout", { topUpId: "boost" })).json()
+    ).toEqual(await first.json());
+    expect(fixture.writes).toHaveLength(1);
+    const params = fixture.writes[0];
+    expect(params.get("line_items[0][price]")).toBe("price_boost");
+    expect(params.get("metadata[credits]")).toBe("1000");
+    expect(params.get("metadata[quoted_cents]")).toBe("900");
+    expect(params.get("automatic_tax[enabled]")).toBe("true");
+    expect(
+      [...params.keys()].some(k => k.startsWith("payment_method_types"))
+    ).toBe(false);
+    expect(params.get("integration_identifier")).toMatch(
+      /reelassati_topup_[a-z]{8}$/
+    );
+    expect(credits().topup_balance).toBe(0);
+  });
+
+  it("serializes simultaneous subscription attempts and checks existing remote subscriptions", async () => {
+    sqlite.prepare("UPDATE billing_accounts SET status = 'inactive'").run();
+    const fixture = stripeFixture();
+    const results = await Promise.all([
+      fixture.call("checkout", { planId: "pro", billingCycle: "annual" }),
+      fixture.call("checkout", { planId: "pro", billingCycle: "annual" }),
+    ]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 409]);
+    expect(fixture.writes).toHaveLength(1);
+    const remote = stripeFixture({ remoteSubscription: true });
+    expect(
+      (await remote.call("checkout", { planId: "pro", billingCycle: "annual" }))
+        .status
+    ).toBe(409);
+    expect(remote.writes).toHaveLength(0);
+  });
+
+  it("confirms only an owned payment whose credits reached the ledger and permits another top-up", async () => {
+    const fixture = stripeFixture();
+    await fixture.call("topup-checkout", { topUpId: "boost" });
+    const session = fixture.sessions.get("cs_test_1")!;
+    session.status = "complete";
+    session.payment_status = "paid";
+    session.payment_intent = "pi_newpack";
+    session.amount_total = 900;
+    expect(
+      await (await fixture.call("checkout-status?session_id=cs_test_1")).json()
+    ).toEqual({ status: "processing" });
+    expect(
+      (await webhook("evt_newpack", "checkout.session.completed", session))
+        .status
+    ).toBe(200);
+    expect(credits().topup_balance).toBe(1000);
+    expect(
+      await (await fixture.call("checkout-status?session_id=cs_test_1")).json()
+    ).toEqual({ status: "complete" });
+    (session.metadata as Record<string, string>).owner_email =
+      "someone-else@example.com";
+    expect(
+      (await fixture.call("checkout-status?session_id=cs_test_1")).status
+    ).toBe(404);
+    expect(
+      (await fixture.call("topup-checkout", { topUpId: "boost" })).status
+    ).toBe(200);
+    expect(fixture.writes).toHaveLength(2);
+  });
+});
 describe("Stripe entitlement integrity with actual SQLite", () => {
   it("grants one top-up across retries without deactivating or uncancelling the plan", async () => {
     const object = {

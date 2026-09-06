@@ -120,6 +120,9 @@ Required for subscriptions, invoices, monthly credit renewals, and top-ups:
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 STRIPE_PRICE_IDS_JSON
+STRIPE_ACCOUNT_ID
+STRIPE_PORTAL_CONFIGURATION_ID
+STRIPE_TAX_MODE=automatic
 PUBLIC_APP_URL=https://www.reelassati.app
 ```
 
@@ -128,9 +131,34 @@ Checkout Session, Invoice, and Customer Subscription events. Plan credits reset
 monthly; top-up and referral credits roll over. Keep all Stripe secrets and
 Price IDs in the hosted backend environment, never in `VITE_*` variables.
 Create the EUR Prices with inclusive tax behavior so the public €19/€59/€149
-monthly prices, €190/€590/€1,490 annual prices, and €12/€39/€89 top-ups remain
+monthly prices, €190/€590/€1,490 annual prices, and €9/€17/€39 top-ups remain
 the customer-facing totals where VAT applies. Stripe Tax and valid business tax
 IDs can then apply the correct jurisdiction-specific treatment at Checkout.
+
+`node scripts/configure-stripe.mjs` previews the exact catalog without touching
+Stripe. With an authorized restricted setup key and `STRIPE_ACCOUNT_ID` in the
+environment, `node scripts/configure-stripe.mjs --apply --out stripe.env.local`
+provisions the six subscription prices, three top-up prices, customer portal
+and webhook. It saves configuration and the signing secret into an exclusive
+0600 file, never stdout. Install these settings in the backend environment,
+alongside a separate restricted runtime key. Re-running reuses owned resources;
+an existing webhook requires its original signing secret. No customer is charged
+and no tax registration or business identity is created by this script.
+
+Runtime key access: read Account, Prices, Tax Settings and Tax Registrations;
+write Customers, Checkout Sessions and Billing Portal Sessions; read Billing
+Portal Configurations and Subscriptions. The setup key additionally needs write
+Products, Prices, Billing Portal Configurations and Webhook Endpoints. Keep
+setup credentials out of the running app. Both `rk_` and `sk_` keys are accepted;
+restricted keys are preferred.
+
+The owner operations page reports actual account, tax and catalog readiness.
+Automatic tax requires an active registration recorded in Stripe and active
+tax settings. A registration must represent an existing legal registration;
+the script never creates one. `not_collecting` is an explicit operator choice
+only after determining that tax should not be collected. Checkout remains
+unavailable until all readiness checks pass. Customer cancellation remains
+accessible independently of readiness for new purchases.
 
 Recommended webhook verification hardening:
 

@@ -67,6 +67,7 @@ import {
   settleCreditReservation,
   socialAccountLimit,
   stripeBillingConfigured,
+  stripeReadiness,
   type CreditReservation,
 } from "./billing";
 import type {
@@ -7202,7 +7203,7 @@ async function handleOperations(
   if (request.method !== "GET") return errorResponse("Method not allowed", 405);
   if (!operatorOwnerEmail(env) || operatorOwnerEmail(env) !== user.email)
     return errorResponse("Operator access required", 403);
-  await billingSummary(env, user);
+  const billing = await billingSummary(env, user);
   const since = new Date(Date.now() - 7 * 86400000).toISOString(),
     stalled = new Date(Date.now() - 30 * 60000).toISOString();
   const [
@@ -7246,7 +7247,7 @@ async function handleOperations(
     checkedAt: new Date().toISOString(),
     services: [
       { name: "AI generation", configured: !!env.OPENROUTER_API_KEY },
-      { name: "Payments", configured: stripeBillingConfigured(env) },
+      { name: "Payments", configured: billing.configured },
       {
         name: "Social publishing and analytics",
         configured: !!env.ZERNIO_API_KEY,
@@ -7266,6 +7267,7 @@ async function handleOperations(
       lastError: trend?.last_error || null,
     },
     paymentIssues: paymentIssues.results,
+    billingReadiness: await stripeReadiness(env),
   });
 }
 

@@ -78,6 +78,41 @@ export default function BillingPage() {
     isBillingCycle(selectedCycle) ? selectedCycle : "monthly"
   );
   const checkoutState = searchParams.get("checkout");
+  const sessionId = searchParams.get("session_id");
+  const [paymentState, setPaymentState] = useState<string>("checking");
+
+  useEffect(() => {
+    if (checkoutState !== "success" || !sessionId) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+    const confirm = async () => {
+      try {
+        const { status } = await platformApi.checkoutStatus(sessionId);
+        if (!active) return;
+        setPaymentState(status);
+        if (status === "complete") {
+          const result = await platformApi.billingSummary();
+          if (active) setSummary(result.billing);
+          return;
+        }
+        if (status === "expired") return;
+      } catch {
+        if (!active) return;
+        setPaymentState("unconfirmed");
+      }
+      if (++attempt < 6)
+        timer = setTimeout(
+          () => void confirm(),
+          Math.min(15_000, 2_000 * 2 ** attempt)
+        );
+    };
+    void confirm();
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [checkoutState, sessionId]);
 
   const load = async () => {
     setLoading(true);
@@ -85,6 +120,12 @@ export default function BillingPage() {
     try {
       const result = await platformApi.billingSummary();
       setSummary(result.billing);
+      if (checkoutState === "success" && sessionId) {
+        const confirmation = await platformApi
+          .checkoutStatus(sessionId)
+          .catch(() => null);
+        if (confirmation) setPaymentState(confirmation.status);
+      }
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -209,18 +250,25 @@ export default function BillingPage() {
         </button>
       </div>
 
-      {checkoutState === "success" ? (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm">
-          <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+      {checkoutState === "success" && sessionId ? (
+        <div
+          role="status"
+          className={`mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm ${paymentState === "complete" ? "border-emerald-500/25 bg-emerald-500/10" : "border-primary/25 bg-primary/5"}`}
+        >
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <p>
-            Checkout completed. Your balance updates after payment is confirmed.
-            Use Refresh if your purchase has not appeared yet.
+            {paymentState === "complete"
+              ? "Payment confirmed. Your credits are ready—let’s create something."
+              : paymentState === "expired"
+                ? "This checkout expired. You can start a new purchase."
+                : "Confirming your payment and credits. This page checks automatically; delayed payment methods may take longer."}
           </p>
         </div>
       ) : null}
       {checkoutState === "cancelled" ? (
         <div className="mb-5 rounded-xl border border-border bg-surface p-4 text-sm text-foreground/65">
-          Checkout was closed. Nothing was charged.
+          Checkout was closed. Your current balance and invoices show any
+          completed purchases.
         </div>
       ) : null}
       {error ? (
@@ -257,9 +305,9 @@ export default function BillingPage() {
           <Sparkles className="h-5 w-5 text-primary" />
           <div>
             <h2 className="font-medium">Credit top-ups</h2>
-            <p className="text-xs text-foreground/70">
-              The same credit rate as your plan, including your annual discount.
-              Top-ups roll over.
+            <p className="text-sm text-foreground/70">
+              Extra credits at a lower unit price than any plan. Yours to keep
+              across renewals, with an active subscription.
             </p>
           </div>
         </div>
@@ -283,9 +331,9 @@ export default function BillingPage() {
                     </p>
                     <p className="text-xs text-foreground/70">credits</p>
                   </div>
-                  {index === 1 ? (
+                  {index === 2 ? (
                     <span className="rounded-pill bg-primary/10 px-2 py-1 font-mono text-xs uppercase tracking-wide text-primary">
-                      Flexible boost
+                      Best credit value
                     </span>
                   ) : null}
                 </div>
@@ -300,6 +348,13 @@ export default function BillingPage() {
                 <p className="mt-3 text-sm text-foreground/70">
                   €{((pack.price / pack.credits) * 1000).toFixed(2)} per 1,000
                   credits
+                </p>
+                <p className="mt-2 text-sm text-foreground/80">
+                  {id === "boost"
+                    ? "Covers one 15-second 720p video with audio, plus 100 credits."
+                    : id === "momentum"
+                      ? "Room for two 15-second 720p videos with audio, plus 200 credits."
+                      : "Room for five 15-second 720p videos with audio, plus 500 credits."}
                 </p>
                 <button
                   type="button"
@@ -540,6 +595,12 @@ function PlanChooser({
   summary: BillingSummary | null;
   onManage: () => Promise<void>;
 }) {
+  const manageExisting = Boolean(
+    summary?.plan &&
+    !["canceled", "incomplete_expired", "inactive"].includes(
+      summary.plan.status
+    )
+  );
   return (
     <section aria-labelledby="plans-title">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -650,20 +711,23 @@ function PlanChooser({
               </p>
               <button
                 type="button"
-                disabled={disabled || busy !== null}
+                disabled={
+                  (manageExisting ? !summary?.canManageBilling : disabled) ||
+                  busy !== null
+                }
                 onClick={() =>
-                  void (summary?.canUseCredits ? onManage() : onChoose(planId))
+                  void (manageExisting ? onManage() : onChoose(planId))
                 }
                 className={`mt-auto flex w-full items-center justify-center gap-2 rounded-pill px-5 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${featured ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "border border-primary/35 bg-primary/10 text-foreground hover:bg-primary/20"}`}
               >
                 {busy === `plan:${planId}` || busy === "portal" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
-                {disabled
+                {disabled && !manageExisting
                   ? "Purchases opening soon"
                   : current
                     ? "Manage your plan"
-                    : summary?.canUseCredits
+                    : manageExisting
                       ? `Explore ${name} in billing`
                       : `Choose ${name}`}
               </button>
@@ -675,17 +739,23 @@ function PlanChooser({
         Prices include VAT where applicable. Annual plans receive credits
         monthly. Plan credits reset; purchased credits roll over.
       </p>
-      {summary?.plan && (
+      {(summary?.plan || summary?.canManageBilling) && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 text-sm">
           <span>
-            {summary.plan.name} · {summary.plan.status.replace(/_/g, " ")} ·{" "}
-            {summary.plan.cancelAtPeriodEnd ? "Ends" : "Period ends"}{" "}
-            {formatDate(summary.plan.currentPeriodEnd)}
+            {summary.plan ? (
+              <>
+                {summary.plan.name} · {summary.plan.status.replace(/_/g, " ")} ·{" "}
+                {summary.plan.cancelAtPeriodEnd ? "Ends" : "Period ends"}{" "}
+                {formatDate(summary.plan.currentPeriodEnd)}
+              </>
+            ) : (
+              "Your billing account"
+            )}
           </span>
           <button
             type="button"
             onClick={() => void onManage()}
-            disabled={disabled || busy !== null}
+            disabled={!summary?.canManageBilling || busy !== null}
             className="font-medium text-primary disabled:opacity-60"
           >
             Manage plan and invoices

@@ -360,6 +360,20 @@ export const stripeEvents = sqliteTable("stripe_events", {
   error: text("error"),
 });
 
+export const billingCheckouts = sqliteTable(
+  "billing_checkouts",
+  {
+    ownerEmail: text("owner_email").notNull(),
+    kind: text("kind").notNull(),
+    selection: text("selection").notNull(),
+    attemptId: text("attempt_id").notNull(),
+    sessionId: text("session_id"),
+    leaseToken: text("lease_token"),
+    leaseUntil: integer("lease_until").notNull().default(0),
+  },
+  table => [primaryKey({ columns: [table.ownerEmail, table.kind] })]
+);
+
 export const brandWorkspaces = sqliteTable(
   "brand_workspaces",
   {
