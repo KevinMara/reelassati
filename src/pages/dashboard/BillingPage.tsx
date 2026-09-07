@@ -369,9 +369,9 @@ export default function BillingPage() {
                 >
                   {busy === `topup:${id}`
                     ? "Opening…"
-                    : !summary?.configured
+                    : summary && !summary.configured
                       ? "Purchases opening soon"
-                      : !summary?.canUseCredits
+                      : summary && !summary.canUseCredits
                         ? "Active plan required"
                         : "Add credits"}
                 </button>
@@ -723,7 +723,7 @@ function PlanChooser({
                 {busy === `plan:${planId}` || busy === "portal" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
-                {disabled && !manageExisting
+                {disabled && !manageExisting && summary
                   ? "Purchases opening soon"
                   : current
                     ? "Manage your plan"

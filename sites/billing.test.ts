@@ -313,6 +313,25 @@ describe("Stripe checkout readiness and customer journey", () => {
     expect(credits().topup_balance).toBe(0);
   });
 
+  it("creates Managed Payments sessions without unsupported tax fields", async () => {
+    sqlite.prepare("UPDATE billing_accounts SET status = 'inactive'").run();
+    const fixture = stripeFixture();
+    fixture.runtime.STRIPE_TAX_MODE = "managed";
+    expect((await stripeReadiness(fixture.runtime)).ready).toBe(true);
+    expect(
+      (await fixture.call("checkout", {
+        planId: "pro",
+        billingCycle: "monthly",
+      })).status
+    ).toBe(200);
+    const params = fixture.writes[0];
+    expect(params.get("managed_payments[enabled]")).toBe("true");
+    expect(params.has("automatic_tax[enabled]")).toBe(false);
+    expect(params.has("tax_id_collection[enabled]")).toBe(false);
+    expect(params.has("customer_update[address]")).toBe(false);
+    expect(params.has("customer_update[name]")).toBe(false);
+  });
+
   it("serializes simultaneous subscription attempts and checks existing remote subscriptions", async () => {
     sqlite.prepare("UPDATE billing_accounts SET status = 'inactive'").run();
     const fixture = stripeFixture();

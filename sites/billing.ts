@@ -47,7 +47,7 @@ export type BillingEnvironment = {
   STRIPE_PRICE_IDS_JSON?: string;
   STRIPE_ACCOUNT_ID?: string;
   STRIPE_PORTAL_CONFIGURATION_ID?: string;
-  STRIPE_TAX_MODE?: "automatic" | "not_collecting";
+  STRIPE_TAX_MODE?: "automatic" | "managed" | "not_collecting";
   PUBLIC_APP_URL?: string;
 };
 
@@ -312,10 +312,10 @@ async function inspectStripeReadiness(
   const stripe = stripeClient(env.STRIPE_SECRET_KEY!);
   const results = await Promise.allSettled([
     stripe.accounts.retrieve(null),
-    env.STRIPE_TAX_MODE === "not_collecting"
+    ["managed", "not_collecting"].includes(env.STRIPE_TAX_MODE || "")
       ? Promise.resolve(null)
       : stripe.tax.registrations.list({ status: "active", limit: 1 }),
-    env.STRIPE_TAX_MODE === "not_collecting"
+    ["managed", "not_collecting"].includes(env.STRIPE_TAX_MODE || "")
       ? Promise.resolve(null)
       : stripe.tax.settings.retrieve(),
     Promise.all(
@@ -353,14 +353,16 @@ async function inspectStripeReadiness(
     "tax",
     registrations.status === "fulfilled" &&
       taxSettings.status === "fulfilled" &&
-      (env.STRIPE_TAX_MODE === "not_collecting" ||
+      (["managed", "not_collecting"].includes(env.STRIPE_TAX_MODE || "") ||
         Boolean(
           registrations.value?.data.length &&
           taxSettings.value?.status === "active"
         )),
-    env.STRIPE_TAX_MODE === "not_collecting"
-      ? "Tax collection explicitly disabled by the operator"
-      : "Active tax settings and a recorded tax registration"
+    env.STRIPE_TAX_MODE === "managed"
+      ? "Stripe Managed Payments handles indirect tax compliance"
+      : env.STRIPE_TAX_MODE === "not_collecting"
+        ? "Tax collection explicitly disabled by the operator"
+        : "Active tax settings and a recorded tax registration"
   );
   add(
     "catalog",
@@ -1171,10 +1173,10 @@ async function checkoutSession(
         quoted_cents: String(topUpPriceCents(id as CreditTopUpId)),
         pricing_version: "3",
       });
+    const managedPayments = env.STRIPE_TAX_MODE === "managed";
     const params: Stripe.Checkout.SessionCreateParams = {
       mode: kind === "subscription" ? "subscription" : "payment",
       customer: customerId,
-      customer_update: { address: "auto", name: "auto" },
       line_items: [{ price: priceId, quantity: 1 }],
       client_reference_id: user.email,
       success_url: `${origin}/#/dashboard/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
@@ -1185,9 +1187,17 @@ async function checkoutSession(
         .replace(/-/g, "")
         .slice(0, 8)
         .replace(/[0-9]/g, n => String.fromCharCode(97 + Number(n)))}`,
-      automatic_tax: { enabled: env.STRIPE_TAX_MODE !== "not_collecting" },
-      tax_id_collection: { enabled: true },
-      billing_address_collection: "required",
+      ...(managedPayments
+        ? { managed_payments: { enabled: true } }
+        : {
+            managed_payments: { enabled: false },
+            customer_update: { address: "auto", name: "auto" } as const,
+            automatic_tax: {
+              enabled: env.STRIPE_TAX_MODE !== "not_collecting",
+            },
+            tax_id_collection: { enabled: true },
+            billing_address_collection: "required" as const,
+          }),
       ...(kind === "subscription"
         ? { subscription_data: { metadata }, allow_promotion_codes: true }
         : { payment_intent_data: { metadata } }),
