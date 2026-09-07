@@ -10078,6 +10078,52 @@ export function groundTrendOutput(
   return { trends };
 }
 
+function citationFallbackTrendCandidates(
+  citations: TrendSearchCitation[]
+): Record<string, unknown>[] {
+  return citations.slice(0, 12).map(citation => {
+    const pathCreator =
+      citation.platform === "tiktok"
+        ? new URL(citation.sourceUrl).pathname.match(/^\/@([^/]+)/)?.[1]
+        : null;
+    const title = citation.title || `${citation.platform} short-form post`;
+    const creator = pathCreator || title.split(/[|·—-]/)[0].trim() || "Brand";
+    const evidence =
+      citation.content ||
+      "The direct source video page was independently reachable.";
+    return {
+      platform: citation.platform,
+      title,
+      creator,
+      brandName: creator,
+      sourceUrl: citation.sourceUrl,
+      hook: "Open the source to inspect the first visual and spoken promise.",
+      pattern: "Direct short-form source retained for evidence review.",
+      evidence: [evidence],
+      organicBrandPromotion: true,
+      paidAd: false,
+      organicEvidence:
+        "Found by the organic brand-promotion search; confirm any disclosure on the source before adapting it.",
+      viralityEvidence:
+        "The indexed source did not expose a reliable public engagement total, so no number is claimed.",
+      hypothesis:
+        "The source may reveal a reusable opening, proof beat, or product demonstration after review.",
+      adaptation:
+        "Open the source, identify one observable structure, and rebuild that structure with your own brand evidence.",
+      passSignal:
+        "Compare three-second hold and completion rate against your recent baseline.",
+      lifecycle: "emerging",
+      confidence: 0.6,
+      niche: "Brand content",
+      region: "Global",
+      language: "Unknown",
+      metrics: { views: null, likes: null, comments: null, shares: null },
+      thumbnailUrl: null,
+      publishedAt: null,
+    };
+  });
+}
+
 function nullableTrendMetric(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const compact = String(value).trim().replaceAll(",", "");
@@ -10475,6 +10521,9 @@ async function researchTrendSources(
       }
     } catch {
       // The search payload remains a safe fallback when synthesis is unavailable.
+    }
+    if (!candidates.length) {
+      candidates = citationFallbackTrendCandidates(citations);
     }
     const groundedOutput = groundTrendOutput({ trends: candidates }, citations);
     const trends = normalizeTrendItems(

@@ -515,9 +515,9 @@ export default function TrendsPage() {
           </div>
           <h1 className="text-3xl font-semibold">Trends</h1>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-foreground/55">
-            Every weekly pick is a recent, hyperviral organic brand-promotion
-            short from TikTok or Instagram Reels—not a paid ad or a generic
-            trend idea. Watch the source or research your exact brief.
+            Weekly picks use reachable direct TikTok and Reels source pages.
+            Public dates and performance appear only when indexed evidence
+            exposes them; unavailable values are never invented.
           </p>
         </div>
         <button
