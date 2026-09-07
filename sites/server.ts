@@ -10414,7 +10414,7 @@ async function researchTrendSources(
     }
 
     failureCode = "invalid_search_analysis";
-    const candidates = searchPayloads.flatMap(payload => {
+    let candidates = searchPayloads.flatMap(payload => {
       try {
         const parsed = parseModelJson(payload);
         return Array.isArray(parsed.trends) ? parsed.trends : [];
@@ -10422,6 +10422,52 @@ async function researchTrendSources(
         return [];
       }
     });
+    try {
+      const synthesisResponse = await fetch(
+        `${OPENROUTER_BASE}/chat/completions`,
+        {
+          method: "POST",
+          headers: openRouterHeaders(env),
+          body: JSON.stringify({
+            model: selectedModel,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You turn verified short-form search evidence into strict JSON. Use only the supplied direct-video URLs and factual evidence. Never invent a date, metric, creator, brand, or organic-status claim. Metrics may be numbers or compact strings such as 1.2M or 850K. Editorial hook/pattern/hypothesis/adaptation may be reasoned from the evidence but must stay distinct from observed facts. Return JSON only with one key, trends. Each usable item needs platform, title, creator, brandName, sourceUrl, hook, pattern, evidence, organicBrandPromotion=true, paidAd=false, organicEvidence, viralityEvidence, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics {views,likes,comments,shares}, thumbnailUrl, and ISO publishedAt. Omit an item when the supplied evidence cannot support its direct URL, publication date, central brand promotion, organic status, and at least one reported performance metric.",
+              },
+              {
+                role: "user",
+                content: JSON.stringify({
+                  scope,
+                  observedAt: generatedAt,
+                  verifiedSources: citations,
+                  searchFindings: searchPayloads
+                    .map(extractTextContent)
+                    .map(text => text.slice(0, 12_000)),
+                }),
+              },
+            ],
+            response_format: { type: "json_object" },
+            provider: { allow_fallbacks: true },
+            reasoning: { enabled: false },
+            max_tokens: 4_000,
+            temperature: 0,
+          }),
+          signal: AbortSignal.timeout(90_000),
+        }
+      );
+      if (synthesisResponse.ok) {
+        const synthesized = parseModelJson(await synthesisResponse.json());
+        if (Array.isArray(synthesized.trends)) {
+          candidates = synthesized.trends;
+        }
+      } else {
+        await synthesisResponse.body?.cancel().catch(() => undefined);
+      }
+    } catch {
+      // The search payload remains a safe fallback when synthesis is unavailable.
+    }
     const groundedOutput = groundTrendOutput({ trends: candidates }, citations);
     const trends = normalizeTrendItems(
       groundedOutput,
