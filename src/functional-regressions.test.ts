@@ -83,15 +83,17 @@ describe("platform-wide functional invariants", () => {
     }
   });
 
-  it("keeps browser and server upload limits on one shared contract", () => {
+  it("routes large workspace media through multipart storage", () => {
     const validator = source("./lib/file-validation.ts");
+    const client = source("./lib/platform-api.ts");
     const server = source("../sites/server.ts");
-    expect(validator).toContain(
-      'import { MAX_UPLOAD_BYTES, UPLOAD_SIZE_LABEL } from "@contracts/uploads"'
-    );
+    expect(validator).not.toContain("MAX_UPLOAD_BYTES");
+    expect(client).toContain("UPLOAD_PART_BYTES");
+    expect(client).toContain("/api/assets/uploads");
     expect(server).toContain('from "../contracts/uploads"');
-    expect(server).toContain("file.size > MAX_UPLOAD_BYTES");
-    expect(server).toContain("row.bytes > MAX_AI_MEDIA_BYTES");
+    expect(server).toContain("createMultipartUpload");
+    expect(server).toContain("resumeMultipartUpload");
+    expect(server).not.toContain("For direct AI analysis, trim or compress");
   });
 
   it("prevents native buttons from accidentally submitting a surrounding form", () => {

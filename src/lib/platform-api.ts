@@ -24,6 +24,10 @@ import type {
 import { supabase } from "@/lib/supabase/client";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { platformApiUrl } from "@/lib/runtime";
+import {
+  DIRECT_UPLOAD_MAX_BYTES,
+  UPLOAD_PART_BYTES,
+} from "@contracts/uploads";
 
 interface ApiErrorBody {
   error?: string;
@@ -496,6 +500,83 @@ export const platformApi = {
     onProgress?: (percent: number) => void,
     projectId?: string
   ): Promise<Asset> => {
+    if (file.size > DIRECT_UPLOAD_MAX_BYTES && !projectId) {
+      const initiated = await requestJson<{
+        assetId: string;
+        partSize: number;
+      }>("/api/assets/uploads", {
+        method: "POST",
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          type: file.type || "application/octet-stream",
+          kind,
+        }),
+      });
+      const partSize = Math.min(
+        Math.max(initiated.partSize || UPLOAD_PART_BYTES, 5 * 1024 * 1024),
+        UPLOAD_PART_BYTES
+      );
+      const completedParts: Array<{ partNumber: number; etag: string }> = [];
+      const { data } = await supabase.auth.getSession();
+      const headers = {
+        "Content-Type": "application/octet-stream",
+        "X-Reelassati-Brand": selectedBrand(data.session?.user.email),
+        ...(data.session?.access_token
+          ? { Authorization: `Bearer ${data.session.access_token}` }
+          : {}),
+      };
+      try {
+        for (
+          let offset = 0, partNumber = 1;
+          offset < file.size;
+          offset += partSize, partNumber += 1
+        ) {
+          const end = Math.min(offset + partSize, file.size);
+          const response = await fetch(
+            platformApiUrl(
+              `/api/assets/uploads/${encodeURIComponent(initiated.assetId)}/parts/${partNumber}`
+            ),
+            {
+              method: "PUT",
+              headers,
+              body: file.slice(offset, end),
+            }
+          );
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+            etag?: string;
+            partNumber?: number;
+          };
+          if (!response.ok || !payload.etag) {
+            throw new PlatformApiError(
+              payload.error || `Upload failed (${response.status})`,
+              response.status
+            );
+          }
+          completedParts.push({
+            partNumber: payload.partNumber || partNumber,
+            etag: payload.etag,
+          });
+          onProgress?.(Math.min(99, Math.round((end / file.size) * 100)));
+        }
+        const completed = await requestJson<{ asset: Asset }>(
+          `/api/assets/uploads/${encodeURIComponent(initiated.assetId)}/complete`,
+          {
+            method: "POST",
+            body: JSON.stringify({ parts: completedParts }),
+          }
+        );
+        onProgress?.(100);
+        return completed.asset;
+      } catch (cause) {
+        await requestJson<{ ok: true }>(
+          `/api/assets/uploads/${encodeURIComponent(initiated.assetId)}`,
+          { method: "DELETE" }
+        ).catch(() => undefined);
+        throw cause;
+      }
+    }
     const form = new FormData();
     form.append("file", file);
     if (kind) form.append("kind", kind);

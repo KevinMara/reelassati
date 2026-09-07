@@ -1,5 +1,3 @@
-import { MAX_UPLOAD_BYTES, UPLOAD_SIZE_LABEL } from "@contracts/uploads";
-
 export type FilePurpose = "media" | "video" | "audio" | "provenance";
 
 interface FileLike {
@@ -122,17 +120,6 @@ export function validateFileSelection<T extends FileLike>(
         language === "it"
           ? `“${empty.name}” è vuoto.`
           : `“${empty.name}” is empty.`,
-    };
-  }
-
-  const oversized = files.find(file => file.size > MAX_UPLOAD_BYTES);
-  if (oversized) {
-    return {
-      files: [],
-      error:
-        language === "it"
-          ? `“${oversized.name}” supera il limite di caricamento di ${UPLOAD_SIZE_LABEL}.`
-          : `“${oversized.name}” is larger than the ${UPLOAD_SIZE_LABEL} upload limit.`,
     };
   }
 

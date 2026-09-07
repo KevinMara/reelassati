@@ -538,8 +538,8 @@ describe("Sites worker", () => {
       lifecycle: "breakout",
       confidence: 0.9,
       metrics: {
-        views: 1_200_000,
-        likes: 75_000,
+        views: "1.2M",
+        likes: "75K",
         comments: 3_000,
         shares: 12_000,
       },

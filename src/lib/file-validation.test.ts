@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { MAX_UPLOAD_BYTES } from "@contracts/uploads";
 import { validateFileSelection } from "./file-validation";
 
 const file = (name: string, type: string, size = 10) => ({ name, type, size });
@@ -26,13 +25,13 @@ describe("file selection validation", () => {
     expect(result.error).toContain("notes.pdf");
   });
 
-  it("rejects oversized, empty, active-markup, and multi-file single picks", () => {
+  it("accepts large media and rejects empty, active-markup, and multi-file single picks", () => {
     expect(
       validateFileSelection(
-        [file("large.mov", "video/quicktime", MAX_UPLOAD_BYTES + 1)],
+        [file("long-form.mov", "video/quicktime", 8 * 1024 * 1024 * 1024)],
         { purpose: "video" }
       ).error
-    ).toContain("64 MB");
+    ).toBeNull();
     expect(
       validateFileSelection([file("empty.wav", "audio/wav", 0)], {
         purpose: "audio",

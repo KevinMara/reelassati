@@ -40,7 +40,7 @@ import {
   embedMediaProvenanceMarker,
   inspectMediaProvenanceMarker,
 } from "./media-provenance";
-import { MAX_AI_MEDIA_BYTES, MAX_UPLOAD_BYTES } from "../contracts/uploads";
+import { MAX_AI_MEDIA_BYTES, UPLOAD_PART_BYTES } from "../contracts/uploads";
 import {
   ANNUAL_BILLED_MONTHS,
   annualMonthlyEquivalent,
@@ -130,6 +130,26 @@ type R2Bucket = {
     options?: { range?: { offset: number; length?: number; suffix?: number } }
   ): Promise<R2ObjectBody | null>;
   delete(key: string): Promise<void>;
+  createMultipartUpload(
+    key: string,
+    options?: {
+      httpMetadata?: { contentType?: string };
+      customMetadata?: Record<string, string>;
+    }
+  ): Promise<R2MultipartUpload>;
+  resumeMultipartUpload(key: string, uploadId: string): R2MultipartUpload;
+};
+
+type R2UploadedPart = { etag: string; partNumber: number };
+
+type R2MultipartUpload = {
+  uploadId: string;
+  uploadPart(
+    partNumber: number,
+    value: ReadableStream | ArrayBuffer | Uint8Array
+  ): Promise<R2UploadedPart>;
+  complete(parts: R2UploadedPart[]): Promise<{ size: number }>;
+  abort(): Promise<void>;
 };
 
 type SitesEnvironment = {
@@ -171,6 +191,7 @@ type SitesEnvironment = {
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_IDS_JSON?: string;
   PUBLIC_APP_URL?: string;
+  TREND_REFRESH_TOKEN?: string;
 };
 
 interface AuthenticatedUser {
@@ -188,6 +209,19 @@ interface AssetRow {
   bytes: number;
   r2_key: string;
   created_at: string;
+}
+
+interface AssetUploadRow {
+  asset_id: string;
+  upload_id: string;
+  owner_email: string;
+  brand_id: string;
+  name: string;
+  kind: Asset["kind"];
+  content_type: string;
+  bytes: number;
+  r2_key: string;
+  expires_at: string;
 }
 
 interface JobRow {
@@ -295,12 +329,13 @@ const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const KIMI_CODE_BASE = "https://api.kimi.com/coding/v1";
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 const MAX_WORKSPACE_BYTES = 2_000_000;
+const MAX_PROVENANCE_UPLOAD_BYTES = 64 * 1024 * 1024;
 const REFERRAL_REWARD_CREDITS = 500;
 const REFERRAL_REWARD_CENTS = 500;
 const TREND_WEEKLY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TREND_REFRESH_LEASE_MS = 10 * 60 * 1000;
-const TREND_WEEKLY_SCOPE_KEY = "weekly:organic-brand-hyperviral-shorts:v2";
-const TREND_MAX_AGE_MS = 8 * 24 * 60 * 60 * 1000;
+const TREND_WEEKLY_SCOPE_KEY = "weekly:organic-brand-hyperviral-shorts:v3";
+const TREND_MAX_AGE_MS = 31 * 24 * 60 * 60 * 1000;
 const TREND_MIN_VIEWS = 500_000;
 const TREND_MIN_LIKES = 50_000;
 const TREND_MIN_COMMENTS = 5_000;
@@ -550,6 +585,23 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
         `),
       env.DB.prepare(
         "CREATE INDEX IF NOT EXISTS assets_owner_created_idx ON assets (owner_email, created_at)"
+      ),
+      env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS asset_uploads (
+            asset_id TEXT PRIMARY KEY NOT NULL,
+            upload_id TEXT NOT NULL,
+            owner_email TEXT NOT NULL,
+            brand_id TEXT NOT NULL DEFAULT 'default',
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            content_type TEXT NOT NULL,
+            bytes INTEGER NOT NULL,
+            r2_key TEXT NOT NULL UNIQUE,
+            expires_at TEXT NOT NULL
+          )
+        `),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS asset_uploads_owner_expiry_idx ON asset_uploads (owner_email, expires_at)"
       ),
       env.DB.prepare(`
           CREATE TABLE IF NOT EXISTS generation_jobs (
@@ -4286,6 +4338,148 @@ async function handleAssets(
   const parts = url.pathname.split("/").filter(Boolean);
   const id = parts[2];
 
+  if (id === "uploads") {
+    const assetId = parts[3];
+    const action = parts[4];
+    const brandId = user.brandId || "default";
+
+    if (request.method === "POST" && !assetId) {
+      const input = await parseJsonBody<{
+        name?: string;
+        size?: number;
+        type?: string;
+        kind?: Asset["kind"];
+      }>(request);
+      const name = stringValue(input.name);
+      const size = Number(input.size);
+      const contentType = stringValue(input.type, "application/octet-stream");
+      if (!name || !Number.isSafeInteger(size) || size <= 0) {
+        return errorResponse("Choose a non-empty file to upload", 422);
+      }
+      if (
+        ACTIVE_UPLOAD_TYPES.has(contentType.toLowerCase()) ||
+        !ALLOWED_UPLOAD_PREFIXES.some(prefix => contentType.startsWith(prefix))
+      ) {
+        return errorResponse("Upload a video, audio file, or image", 415);
+      }
+      const newAssetId = crypto.randomUUID();
+      const safeName = sanitizeFilename(name);
+      const r2Key = `users/${encodeURIComponent(user.email)}/assets/${newAssetId}/${safeName}`;
+      const multipart = await env.BUCKET.createMultipartUpload(r2Key, {
+        httpMetadata: { contentType },
+        customMetadata: { owner: user.email, originalName: name },
+      });
+      await env.DB.prepare(
+        `INSERT INTO asset_uploads
+          (asset_id, upload_id, owner_email, brand_id, name, kind, content_type, bytes, r2_key, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+        .bind(
+          newAssetId,
+          multipart.uploadId,
+          user.email,
+          brandId,
+          name,
+          inferAssetKind(contentType, stringValue(input.kind)),
+          contentType,
+          size,
+          r2Key,
+          new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        )
+        .run();
+      return json({ assetId: newAssetId, partSize: UPLOAD_PART_BYTES }, 201);
+    }
+
+    if (!assetId) return errorResponse("Upload not found", 404);
+    const upload = await env.DB.prepare(
+      "SELECT * FROM asset_uploads WHERE asset_id = ? AND owner_email = ? AND brand_id = ?"
+    )
+      .bind(assetId, user.email, brandId)
+      .first<AssetUploadRow>();
+    if (!upload) return errorResponse("Upload not found", 404);
+    if (Date.parse(upload.expires_at) <= Date.now()) {
+      await env.BUCKET.resumeMultipartUpload(
+        upload.r2_key,
+        upload.upload_id
+      )
+        .abort()
+        .catch(() => undefined);
+      await env.DB.prepare("DELETE FROM asset_uploads WHERE asset_id = ?")
+        .bind(assetId)
+        .run();
+      return errorResponse("This upload expired. Start it again.", 410);
+    }
+    const multipart = env.BUCKET.resumeMultipartUpload(
+      upload.r2_key,
+      upload.upload_id
+    );
+
+    if (request.method === "PUT" && action === "parts") {
+      const partNumber = Number(parts[5]);
+      const contentLength = Number(request.headers.get("content-length") || 0);
+      if (
+        !Number.isInteger(partNumber) ||
+        partNumber < 1 ||
+        partNumber > 10_000 ||
+        !request.body
+      ) {
+        return errorResponse("Invalid upload part", 422);
+      }
+      if (contentLength > UPLOAD_PART_BYTES) {
+        return errorResponse("Upload part is too large", 413);
+      }
+      const uploadedPart = await multipart.uploadPart(partNumber, request.body);
+      return json(uploadedPart);
+    }
+
+    if (request.method === "POST" && action === "complete") {
+      const input = await parseJsonBody<{ parts?: unknown }>(request);
+      const completedParts = Array.isArray(input.parts)
+        ? input.parts.flatMap(value => {
+            const part = recordValue(value);
+            const partNumber = Number(part?.partNumber);
+            const etag = stringValue(part?.etag);
+            return Number.isInteger(partNumber) && partNumber > 0 && etag
+              ? [{ partNumber, etag }]
+              : [];
+          })
+        : [];
+      if (!completedParts.length) {
+        return errorResponse("No completed upload parts were supplied", 422);
+      }
+      completedParts.sort((left, right) => left.partNumber - right.partNumber);
+      const completed = await multipart.complete(completedParts);
+      if (completed.size !== upload.bytes) {
+        await env.BUCKET.delete(upload.r2_key).catch(() => undefined);
+        await env.DB.prepare("DELETE FROM asset_uploads WHERE asset_id = ?")
+          .bind(assetId)
+          .run();
+        return errorResponse("The uploaded file was incomplete. Try again.", 422);
+      }
+      const asset = await insertAssetRecord(env, user, {
+        id: upload.asset_id,
+        name: upload.name,
+        kind: upload.kind,
+        contentType: upload.content_type,
+        size: completed.size,
+        r2Key: upload.r2_key,
+      });
+      await env.DB.prepare("DELETE FROM asset_uploads WHERE asset_id = ?")
+        .bind(assetId)
+        .run();
+      return json({ asset }, 201);
+    }
+
+    if (request.method === "DELETE" && !action) {
+      await multipart.abort().catch(() => undefined);
+      await env.DB.prepare("DELETE FROM asset_uploads WHERE asset_id = ?")
+        .bind(assetId)
+        .run();
+      return json({ ok: true });
+    }
+    return errorResponse("Upload route not found", 404);
+  }
+
   if (request.method === "POST" && !id) {
     const contentLength = request.headers.get("content-length");
     const requestBytes = Number(contentLength || "0");
@@ -4295,23 +4489,11 @@ async function handleAssets(
         411
       );
     }
-    if (requestBytes > MAX_UPLOAD_BYTES + 1024 * 1024) {
-      return errorResponse(
-        "Files are limited to 64 MB in this hosted studio",
-        413
-      );
-    }
     const form = await request.formData();
     const file = form.get("file");
     if (!(file instanceof File))
       return errorResponse("Choose a file to upload");
     if (file.size <= 0) return errorResponse("The selected file is empty");
-    if (file.size > MAX_UPLOAD_BYTES) {
-      return errorResponse(
-        "Files are limited to 64 MB in this hosted studio",
-        413
-      );
-    }
     const contentType = file.type || "application/octet-stream";
     if (
       ACTIVE_UPLOAD_TYPES.has(contentType.toLowerCase()) ||
@@ -5120,18 +5302,11 @@ async function handleAi(
       if (!row.content_type.startsWith("video/")) {
         return errorResponse("Choose a video asset");
       }
-      if (row.bytes > MAX_AI_MEDIA_BYTES) {
-        return errorResponse(
-          "For direct AI analysis, trim or compress this video below 24 MB",
-          413
-        );
-      }
-      const object = await env.BUCKET.get(row.r2_key);
-      if (!object) return errorResponse("Video bytes are missing", 404);
       analysisDuration = await assetDurationSeconds(env, user, row.id);
-      videoUrl = `data:${row.content_type};base64,${arrayBufferToBase64(
-        await object.arrayBuffer()
-      )}`;
+      videoUrl = new URL(
+        await signedMediaUrl(env, row.id),
+        url.origin
+      ).toString();
     }
     if (!videoUrl)
       return errorResponse("Upload a video or provide a public URL");
@@ -8659,7 +8834,7 @@ async function handlePublicProvenance(
     if (!Number.isFinite(contentLength) || contentLength <= 0) {
       return errorResponse("A known file size is required", 411);
     }
-    if (contentLength > MAX_UPLOAD_BYTES + 1024 * 1024) {
+    if (contentLength > MAX_PROVENANCE_UPLOAD_BYTES + 1024 * 1024) {
       return errorResponse("Detection files are limited to 64 MB", 413);
     }
     const form = await request.formData();
@@ -8667,7 +8842,7 @@ async function handlePublicProvenance(
     if (!(file instanceof File) || file.size <= 0) {
       return errorResponse("Choose a file to check");
     }
-    if (file.size > MAX_UPLOAD_BYTES) {
+    if (file.size > MAX_PROVENANCE_UPLOAD_BYTES) {
       return errorResponse("Detection files are limited to 64 MB", 413);
     }
     const fileBytes = await file.arrayBuffer();
@@ -9001,7 +9176,7 @@ OFFICIAL PRODUCT KNOWLEDGE
 - Public routes: pricing at /pricing; login at /auth/login; signup at /auth/signup; password recovery at /auth/forgot-password; support at /contact.
 - Pricing: Creator is EUR ${PUBLIC_PLAN_PRICING.Creator.monthlyPrice} monthly or EUR ${PUBLIC_PLAN_PRICING.Creator.annualTotal} annually (EUR ${annualMonthlyEquivalent("Creator").toFixed(2)}/month equivalent) with ${PUBLIC_PLAN_PRICING.Creator.monthlyCredits.toLocaleString("en-US")} credits per month, 1 brand workspace, and 2 connected social accounts. Pro is EUR ${PUBLIC_PLAN_PRICING.Pro.monthlyPrice} monthly or EUR ${PUBLIC_PLAN_PRICING.Pro.annualTotal} annually (EUR ${annualMonthlyEquivalent("Pro").toFixed(2)}/month equivalent) with ${PUBLIC_PLAN_PRICING.Pro.monthlyCredits.toLocaleString("en-US")} credits per month, 3 brand workspaces, and 6 connected social accounts. Studio is EUR ${PUBLIC_PLAN_PRICING.Studio.monthlyPrice} monthly or EUR ${PUBLIC_PLAN_PRICING.Studio.annualTotal.toLocaleString("en-US")} annually (EUR ${annualMonthlyEquivalent("Studio").toFixed(2)}/month equivalent) with ${PUBLIC_PLAN_PRICING.Studio.monthlyCredits.toLocaleString("en-US")} credits per month, 10 brand workspaces, and 12 connected social accounts. Annual billing charges the price of ${ANNUAL_BILLED_MONTHS} monthly payments. The complete Studio is included in every plan. AI tools use REELassati credits inside the platform; never quote upstream model or provider prices.
 - Account access: users can sign up, log in, request a password-reset email, and set a new password from the reset link. A reset link may be expired or already used; request a fresh one and use only the newest email. Never ask for passwords, verification codes, OAuth secrets, private tokens, card data, or identity documents.
-- Uploads: hosted workspace uploads accept video, audio, and image files up to 64 MB. Direct AI video analysis and audio transcription require the relevant media to be below 24 MB. If a file is too large, instruct the user to trim or compress it, then retry with a new upload.
+- Uploads: workspace video, audio, and image files use multipart object storage for long-form media. Video analysis reads a temporary signed media URL. Audio transcription still depends on the transcription provider's accepted input size and format.
 - Studio: users can create projects; trim, split, move, delete, caption, adjust pacing, add B-roll/audio/style suggestions, lock clips, and review AI edit plans before applying changes. AI recommendations are proposals, not proof that an edit was applied.
 - AI tools: Script, AI Video, Video Analyzer, Voice Studio, Interview Me, Trends, Weekly Coach, and Prompt Director use managed REELassati AI routes. Never reveal upstream providers, model names, internal job identifiers, or upstream prices. For an AI failure, preserve the displayed reference, retry once unchanged, then gather the tool, exact error, file type/size, browser, and last successful step.
 - Publishing: users connect supported social accounts in Social Hub/Settings and publish or schedule from Publisher. Supported platforms include Instagram, TikTok, YouTube, Facebook, LinkedIn, Pinterest, Threads, and X/Twitter when the publishing integration is configured. A caption and a connected account are required. Never claim a post is live until the UI/provider reports published.
@@ -9905,7 +10080,18 @@ export function groundTrendOutput(
 
 function nullableTrendMetric(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
+  const compact = String(value).trim().replaceAll(",", "");
+  const match = compact.match(/^([0-9]+(?:\.[0-9]+)?)\s*([kmb])?\+?$/i);
+  if (!match) return null;
+  const multiplier =
+    match[2]?.toLowerCase() === "b"
+      ? 1_000_000_000
+      : match[2]?.toLowerCase() === "m"
+        ? 1_000_000
+        : match[2]?.toLowerCase() === "k"
+          ? 1_000
+          : 1;
+  const parsed = Number(match[1]) * multiplier;
   return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
 }
 
@@ -10109,8 +10295,8 @@ async function researchTrendSources(
         : scope.objective;
     const taskInstruction =
       mode === "weekly"
-        ? `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 7 * 86_400_000).toISOString()} and ${generatedAt} on ${platformInstruction}. These must be real posts where a brand, product, or service is central to the content, but the post itself is native organic content rather than a paid ad. Rank the strongest verified pieces by reported views and engagement. Return fewer results instead of adding a weak, generic, stale, or unverified example.`
-        : `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 7 * 86_400_000).toISOString()} and ${generatedAt} that answer this paid custom brief. Platform: ${platformInstruction}. Topic, niche, product, or audience: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. The brand, product, or service must be central, while the post must be native organic content rather than a paid ad. Rank by verified views and engagement and return fewer results instead of filler.`;
+        ? `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 30 * 86_400_000).toISOString()} and ${generatedAt} on ${platformInstruction}. This is a rolling evidence window refreshed every week. These must be real posts where a brand, product, or service is central to the content, but the post itself is native organic content rather than a paid ad. Rank the strongest verified pieces by reported views and engagement. Return fewer results instead of adding a weak, generic, stale, or unverified example.`
+        : `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 30 * 86_400_000).toISOString()} and ${generatedAt} that answer this paid custom brief. Platform: ${platformInstruction}. Topic, niche, product, or audience: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. The brand, product, or service must be central, while the post must be native organic content rather than a paid ad. Rank by verified views and engagement and return fewer results instead of filler.`;
     failureCode = "search_request_failure";
     const searchPlatforms: TrendPlatform[] =
       scope.platform === "all" ? ["tiktok", "instagram"] : [scope.platform];
@@ -10445,29 +10631,35 @@ async function handleWeeklyTrendRefresh(
     ? authorization.slice("Bearer ".length).trim()
     : "";
   if (!token) return errorResponse("Unauthorized", 401);
-  try {
-    const issuer = stringValue(decodeJwt(token).iss);
-    if (!VERCEL_TREND_ISSUERS.has(issuer)) {
+  const trustedRefreshToken = stringValue(env.TREND_REFRESH_TOKEN);
+  const hasTrustedRefreshToken =
+    trustedRefreshToken.length >= 32 &&
+    constantTimeEqual(token, trustedRefreshToken);
+  if (!hasTrustedRefreshToken) {
+    try {
+      const issuer = stringValue(decodeJwt(token).iss);
+      if (!VERCEL_TREND_ISSUERS.has(issuer)) {
+        return errorResponse("Unauthorized", 401);
+      }
+      let jwks = vercelTrendJwks.get(issuer);
+      if (!jwks) {
+        jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks`));
+        vercelTrendJwks.set(issuer, jwks);
+      }
+      const { payload } = await jwtVerify(token, jwks, {
+        issuer,
+        audience: `https://vercel.com/${VERCEL_TREND_TEAM_SLUG}`,
+        subject: `owner:${VERCEL_TREND_TEAM_SLUG}:project:reelassati:environment:production`,
+      });
+      if (
+        payload.project_id !== VERCEL_TREND_PROJECT_ID ||
+        payload.environment !== "production"
+      ) {
+        return errorResponse("Unauthorized", 401);
+      }
+    } catch {
       return errorResponse("Unauthorized", 401);
     }
-    let jwks = vercelTrendJwks.get(issuer);
-    if (!jwks) {
-      jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks`));
-      vercelTrendJwks.set(issuer, jwks);
-    }
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer,
-      audience: `https://vercel.com/${VERCEL_TREND_TEAM_SLUG}`,
-      subject: `owner:${VERCEL_TREND_TEAM_SLUG}:project:reelassati:environment:production`,
-    });
-    if (
-      payload.project_id !== VERCEL_TREND_PROJECT_ID ||
-      payload.environment !== "production"
-    ) {
-      return errorResponse("Unauthorized", 401);
-    }
-  } catch {
-    return errorResponse("Unauthorized", 401);
   }
   try {
     const result = await refreshWeeklyTrendFeed(env);

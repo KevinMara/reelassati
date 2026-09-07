@@ -120,4 +120,42 @@ describe("platform API transport", () => {
     expect(asset.id).toBe("asset-1");
     expect(progress).toEqual([0, 40, 100]);
   });
+
+  it("uploads long-form media in multipart chunks", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          { assetId: "large-asset", partSize: 16 * 1024 * 1024 },
+          { status: 201 }
+        )
+      )
+      .mockResolvedValueOnce(Response.json({ partNumber: 1, etag: "one" }))
+      .mockResolvedValueOnce(Response.json({ partNumber: 2, etag: "two" }))
+      .mockResolvedValueOnce(Response.json({ partNumber: 3, etag: "three" }))
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            asset: {
+              id: "large-asset",
+              url: "/api/media/large-asset?expires=1&token=test",
+            },
+          },
+          { status: 201 }
+        )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const progress: number[] = [];
+    const asset = await platformApi.uploadAsset(
+      new File([new Uint8Array(33 * 1024 * 1024)], "long-form.mp4", {
+        type: "video/mp4",
+      }),
+      "video",
+      percent => progress.push(percent)
+    );
+
+    expect(asset.id).toBe("large-asset");
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(progress.at(-1)).toBe(100);
+  });
 });
