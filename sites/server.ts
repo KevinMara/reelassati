@@ -10477,7 +10477,10 @@ async function researchTrendSources(
       scope.platform === "all" ? true : item.platform === scope.platform
     );
     if (!trends.length) {
-      failureCode = `insufficient_verified_sources_${trends.length}`;
+      const groundedCount = Array.isArray(groundedOutput.trends)
+        ? groundedOutput.trends.length
+        : 0;
+      failureCode = `insufficient_verified_sources_${trends.length}_candidates_${candidates.length}_grounded_${groundedCount}_citations_${citations.length}`;
       throw json(
         {
           error:
