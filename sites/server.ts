@@ -10197,14 +10197,22 @@ export function normalizeTrendItems(
       /(?:#ad\b|paid partnership|paid placement|sponsored (?:post|content)|advertisement|ad library)/i.test(
         `${title} ${organicEvidence} ${evidence.join(" ")}`
       );
+    const datedOutsideWindow = Boolean(
+      publishedAt &&
+        (publishedTimestamp > observedTimestamp + 6 * 60 * 60 * 1000 ||
+          observedTimestamp - publishedTimestamp > TREND_MAX_AGE_MS)
+    );
+    const hasReportedPerformance = hasHyperviralSignal(normalizedMetrics);
+    const hasAnyReportedMetric = Object.values(normalizedMetrics).some(
+      metric => metric !== null
+    );
     if (
-      !publishedAt ||
       !Number.isFinite(observedTimestamp) ||
-      publishedTimestamp > observedTimestamp + 6 * 60 * 60 * 1000 ||
-      observedTimestamp - publishedTimestamp > TREND_MAX_AGE_MS ||
-      confidence < 0.7 ||
+      datedOutsideWindow ||
+      confidence < (mode === "weekly" ? 0.6 : 0.7) ||
       explicitPaidSignal ||
-      !hasHyperviralSignal(normalizedMetrics) ||
+      (!hasReportedPerformance &&
+        (mode !== "weekly" || hasAnyReportedMetric)) ||
       (mode === "weekly" && detectedPlatform === "youtube")
     ) {
       continue;
@@ -10434,7 +10442,7 @@ async function researchTrendSources(
               {
                 role: "system",
                 content:
-                  "You turn verified short-form search evidence into strict JSON. Use only the supplied direct-video URLs and factual evidence. Never invent a date, metric, creator, brand, or organic-status claim. Metrics may be numbers or compact strings such as 1.2M or 850K. Editorial hook/pattern/hypothesis/adaptation may be reasoned from the evidence but must stay distinct from observed facts. Return JSON only with one key, trends. Each usable item needs platform, title, creator, brandName, sourceUrl, hook, pattern, evidence, organicBrandPromotion=true, paidAd=false, organicEvidence, viralityEvidence, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics {views,likes,comments,shares}, thumbnailUrl, and ISO publishedAt. Omit an item when the supplied evidence cannot support its direct URL, publication date, central brand promotion, organic status, and at least one reported performance metric.",
+                  "You turn verified short-form search evidence into strict JSON. Use only the supplied direct-video URLs and factual evidence. Never invent a date, metric, creator, brand, or organic-status claim. Metrics may be numbers or compact strings such as 1.2M or 850K. Use null for a publication date or metric that the supplied evidence does not reveal, and say that the public metric is unavailable in viralityEvidence. Do not omit an otherwise useful verified source merely because its exact date or public metric is unavailable. Editorial hook/pattern/hypothesis/adaptation may be reasoned from the evidence but must stay distinct from observed facts. Return JSON only with one key, trends. Each usable item needs platform, title, creator, brandName, sourceUrl, hook, pattern, evidence, organicBrandPromotion=true, paidAd=false, organicEvidence, viralityEvidence, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics {views,likes,comments,shares}, thumbnailUrl, and publishedAt. Omit an item only when the supplied evidence cannot support its direct URL, central brand promotion, or organic status.",
               },
               {
                 role: "user",
