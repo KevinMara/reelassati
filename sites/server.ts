@@ -1,3 +1,15 @@
+import { pcmWaveDuration } from "../contracts/audio-chunks";
+import {
+  hashMediaStream,
+  inspectMp4Stream,
+  mediaParts,
+  mp4Marker,
+} from "./media-streams";
+import {
+  balancedTrendSelection,
+  performanceFromSource,
+  sourceContainsDate,
+} from "../contracts/trend-quality";
 import { SOCIAL_METRICS } from "../contracts/social-analytics";
 import { isAuthorizedMaintenanceIdentity } from "../contracts/maintenance";
 import { VOICE_PREVIEWS } from "../contracts/voices";
@@ -334,8 +346,8 @@ const REFERRAL_REWARD_CREDITS = 500;
 const REFERRAL_REWARD_CENTS = 500;
 const TREND_WEEKLY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TREND_REFRESH_LEASE_MS = 10 * 60 * 1000;
-const TREND_WEEKLY_SCOPE_KEY = "weekly:organic-brand-hyperviral-shorts:v3";
-const TREND_MAX_AGE_MS = 31 * 24 * 60 * 60 * 1000;
+const TREND_WEEKLY_SCOPE_KEY = "weekly:organic-brand-hyperviral-shorts:v4";
+const TREND_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const TREND_MIN_VIEWS = 500_000;
 const TREND_MIN_LIKES = 50_000;
 const TREND_MIN_COMMENTS = 5_000;
@@ -961,8 +973,9 @@ function bytesToBase64Url(bytes: Uint8Array): string {
 }
 
 async function sha256Hex(
-  value: string | ArrayBuffer | Uint8Array
+  value: string | ArrayBuffer | Uint8Array | ReadableStream<Uint8Array>
 ): Promise<string> {
+  if (value instanceof ReadableStream) return hashMediaStream(value);
   const bytes =
     typeof value === "string"
       ? new TextEncoder().encode(value)
@@ -1238,7 +1251,7 @@ async function createProvenanceRecord(
     operation: AiOperation;
     provider: string;
     model: string;
-    content: string | ArrayBuffer | Uint8Array;
+    content: string | ArrayBuffer | Uint8Array | ReadableStream<Uint8Array>;
     textToken?: boolean;
     embeddedMediaMarker?: boolean;
     metadata?: Record<string, unknown>;
@@ -1541,7 +1554,7 @@ async function finalizeEmbeddedProvenance(
   env: SitesEnvironment,
   user: AuthenticatedUser,
   provenance: ContentProvenance,
-  storedBytes: ArrayBuffer
+  storedBytes: ArrayBuffer | ReadableStream<Uint8Array>
 ): Promise<ContentProvenance> {
   const row = await env.DB.prepare(
     "SELECT * FROM ai_provenance_records WHERE id = ? AND owner_email = ? LIMIT 1"
@@ -1549,8 +1562,18 @@ async function finalizeEmbeddedProvenance(
     .bind(provenance.recordId, user.email)
     .first<ProvenanceRow>();
   if (!row) throw new Error("Stored provenance record is missing");
-  const inspected = inspectMediaProvenanceMarker(storedBytes);
-  const fingerprint = inspected ? await sha256Hex(inspected.unmarkedBytes) : "";
+  const streamed =
+    storedBytes instanceof ReadableStream
+      ? await inspectMp4Stream(storedBytes)
+      : null;
+  const inspected = streamed
+    ? streamed.marker
+    : inspectMediaProvenanceMarker(storedBytes as ArrayBuffer);
+  const fingerprint = streamed
+    ? streamed.fingerprint
+    : inspected
+      ? await sha256Hex(inspected.unmarkedBytes)
+      : "";
   const authenticAsVerified = await tokenIsAuthentic(env, {
     ...row,
     marking_status: "verified",
@@ -2159,6 +2182,7 @@ type EditOperationProvenanceProjection = Pick<
   | "confidence"
   | "intensity"
   | "targetClipIds"
+  | "parameters"
 >;
 
 interface EditPlanProvenanceMetadata {
@@ -2393,6 +2417,7 @@ function editOperationProvenanceProjection(
     end: operation.end,
     confidence: operation.confidence,
     intensity: operation.intensity,
+    ...(operation.parameters ? { parameters: operation.parameters } : {}),
     targetClipIds: Array.isArray(operation.targetClipIds)
       ? operation.targetClipIds.filter(
           (clipId): clipId is string => typeof clipId === "string"
@@ -3457,6 +3482,25 @@ async function generatedAssetStructuralFailure(
   return null;
 }
 
+async function generatedMp4StreamFailure(
+  row: AssetRow,
+  provenance: ProvenanceRow,
+  object: R2ObjectBody
+): Promise<GeneratedAssetVerificationFailure | null> {
+  const inspected = await inspectMp4Stream(object.body);
+  if (object.size !== row.bytes || inspected.size !== row.bytes)
+    return "object-size-mismatch";
+  if (
+    !inspected.marker ||
+    inspected.marker.token !== provenance.public_token ||
+    object.customMetadata?.embeddedMarking !== "mp4-uuid-box"
+  )
+    return "embedded-marker-mismatch";
+  return inspected.fingerprint === provenance.content_sha256
+    ? null
+    : "content-fingerprint-mismatch";
+}
+
 async function generatedAssetByteFailure(
   row: AssetRow,
   provenance: ProvenanceRow,
@@ -3920,7 +3964,7 @@ function mapEditOperations(
   const validSelectedIds = new Set(
     selectedClipIds.filter(id => clips.some(clip => clip.id === id))
   );
-  return value.slice(0, 12).map((item, index) => {
+  return value.slice(0, 80).map((item, index) => {
     const row = item && typeof item === "object" ? item : {};
     const typed = row as Record<string, unknown>;
     const start = boundedNumber(typed.start, 0, 0, duration);
@@ -3943,13 +3987,47 @@ function mapEditOperations(
       "audio",
       "style",
     ];
+    const requestedIds = Array.isArray(typed.targetClipIds)
+      ? typed.targetClipIds.filter(
+          (id): id is string =>
+            typeof id === "string" && clips.some(c => c.id === id && !c.locked)
+        )
+      : [];
     const targetClipIds = validSelectedIds.size
       ? Array.from(validSelectedIds)
-      : clips
-          .filter(
-            clip => clip.start < end && clip.start + clip.duration > start
-          )
-          .map(clip => clip.id);
+      : requestedIds.length
+        ? requestedIds
+        : clips
+            .filter(
+              clip => clip.start < end && clip.start + clip.duration > start
+            )
+            .map(clip => clip.id);
+    const params = recordValue(typed.parameters) || {};
+    const parameters: NonNullable<EditOperation["parameters"]> = {};
+    for (const [key, min, max] of [
+      ["sourceIn", 0, 86400],
+      ["destination", 0, duration],
+      ["speed", 0.25, 4],
+      ["volume", 0, 2],
+      ["fadeIn", 0, 5],
+      ["fadeOut", 0, 5],
+      ["brightness", -1, 1],
+      ["contrast", 0.5, 2],
+      ["saturation", 0, 3],
+    ] as const) {
+      if (typeof params[key] === "number" && Number.isFinite(params[key]))
+        parameters[key] = boundedNumber(params[key], min, min, max);
+    }
+    if (typeof params.text === "string")
+      parameters.text = params.text.slice(0, 1000);
+    if (typeof params.prompt === "string")
+      parameters.prompt = params.prompt.slice(0, 3000);
+    if (typeof params.assetId === "string")
+      parameters.assetId = params.assetId.slice(0, 160);
+    if (params.mediaKind === "image" || params.mediaKind === "video")
+      parameters.mediaKind = params.mediaKind;
+    if (params.fit === "cover" || params.fit === "contain")
+      parameters.fit = params.fit;
     return {
       id: crypto.randomUUID(),
       type: allowedTypes.includes(type) ? type : "pacing",
@@ -3966,6 +4044,7 @@ function mapEditOperations(
           ? typed.intensity
           : "balanced",
       targetClipIds,
+      ...(Object.keys(parameters).length ? { parameters } : {}),
       status: "proposed",
     };
   });
@@ -4329,6 +4408,108 @@ export function jobFromRow(row: JobRow): GenerationJob {
   };
 }
 
+async function finalizeTimelineUpload(
+  env: SitesEnvironment,
+  user: AuthenticatedUser,
+  projectId: string,
+  input: {
+    id: string;
+    name: string;
+    kind: Asset["kind"];
+    contentType: string;
+    size: number;
+    r2Key: string;
+  }
+): Promise<Asset> {
+  if (input.contentType !== "video/mp4")
+    throw errorResponse("Render your timeline as an MP4", 422);
+  const workspace = await getWorkspace(env, user);
+  const project = workspace.projects.find(p => p.id === projectId);
+  if (!project) throw errorResponse("Source project not found", 404);
+  const sources = workspace.assets
+    .filter(a => project.clips.some(c => c.assetId === a.id))
+    .flatMap(a => (a.provenance ? [a.provenance] : []));
+  if (project.transcriptProvenance) sources.push(project.transcriptProvenance);
+  if (
+    !sources.some(s =>
+      ["ai-generated", "ai-manipulated", "ai-assisted"].includes(s.origin)
+    )
+  ) {
+    return insertAssetRecord(env, user, input);
+  }
+  const raw = await env.BUCKET.get(input.r2Key);
+  if (!raw || raw.size !== input.size)
+    throw errorResponse("The upload is incomplete", 422);
+  const pending = await createProvenanceRecord(env, user, {
+    entityType: "asset",
+    entityId: input.id,
+    origin: "ai-manipulated",
+    operation: "timeline-render",
+    provider: "REELassati",
+    model: "timeline-compositor",
+    content: raw.body,
+    embeddedMediaMarker: true,
+    metadata: {
+      projectId,
+      parentRecordIds: sources.map(s => s.recordId),
+      rendering: "client-composited",
+    },
+  });
+  const key = `users/${encodeURIComponent(user.email)}/generated/${input.id}/${sanitizeFilename(input.name)}`;
+  const multipart = await env.BUCKET.createMultipartUpload(key, {
+    httpMetadata: { contentType: "video/mp4" },
+    customMetadata: {
+      owner: user.email,
+      originalName: input.name,
+      provenanceToken: pending.marking.publicToken || "",
+      policyVersion: AI_COMPLIANCE_POLICY_VERSION,
+      embeddedMarking: "mp4-uuid-box",
+    },
+  });
+  try {
+    const source = await env.BUCKET.get(input.r2Key);
+    if (!source || source.etag !== raw.etag)
+      throw new Error("The source changed during saving");
+    const parts: R2UploadedPart[] = [];
+    for await (const part of mediaParts(
+      source.body,
+      mp4Marker(pending.marking.publicToken || ""),
+      UPLOAD_PART_BYTES
+    )) {
+      parts.push(await multipart.uploadPart(parts.length + 1, part));
+    }
+    const completed = await multipart.complete(parts);
+    const stored = await env.BUCKET.get(key);
+    if (!stored || stored.size !== completed.size)
+      throw new Error("The saved video is incomplete");
+    const provenance = await finalizeEmbeddedProvenance(
+      env,
+      user,
+      pending,
+      stored.body
+    );
+    const asset = await insertAssetRecord(env, user, {
+      ...input,
+      r2Key: key,
+      size: stored.size,
+    });
+    await env.BUCKET.delete(input.r2Key);
+    return { ...asset, provenance };
+  } catch (error) {
+    await multipart.abort().catch(() => undefined);
+    await env.BUCKET.delete(key).catch(() => undefined);
+    await failProvenanceRecord(
+      env,
+      user,
+      pending.recordId,
+      "asset",
+      input.id,
+      "Timeline export could not be finalized"
+    ).catch(() => undefined);
+    throw error;
+  }
+}
+
 async function handleAssets(
   request: Request,
   env: SitesEnvironment,
@@ -4430,7 +4611,10 @@ async function handleAssets(
     }
 
     if (request.method === "POST" && action === "complete") {
-      const input = await parseJsonBody<{ parts?: unknown }>(request);
+      const input = await parseJsonBody<{
+        parts?: unknown;
+        projectId?: string;
+      }>(request);
       const completedParts = Array.isArray(input.parts)
         ? input.parts.flatMap(value => {
             const part = recordValue(value);
@@ -4456,14 +4640,17 @@ async function handleAssets(
           422
         );
       }
-      const asset = await insertAssetRecord(env, user, {
+      const assetInput = {
         id: upload.asset_id,
         name: upload.name,
         kind: upload.kind,
         contentType: upload.content_type,
         size: completed.size,
         r2Key: upload.r2_key,
-      });
+      };
+      const asset = input.projectId
+        ? await finalizeTimelineUpload(env, user, input.projectId, assetInput)
+        : await insertAssetRecord(env, user, assetInput);
       await env.DB.prepare("DELETE FROM asset_uploads WHERE asset_id = ?")
         .bind(assetId)
         .run();
@@ -4519,118 +4706,29 @@ async function handleAssets(
     }
 
     const renderProjectId = stringValue(form.get("render_project_id"));
-    let renderSources: ContentProvenance[] = [];
-    if (renderProjectId) {
-      if (contentType !== "video/mp4" || file.size > MAX_AI_MEDIA_BYTES)
-        return errorResponse(
-          "Rendered Library videos must be MP4 files under 24 MB. Your download is still available.",
-          413
-        );
-      const renderWorkspace = await getWorkspace(env, user);
-      const sourceProject = renderWorkspace.projects.find(
-        project => project.id === renderProjectId
-      );
-      if (!sourceProject) return errorResponse("Source project not found", 404);
-      renderSources = renderWorkspace.assets
-        .filter(asset =>
-          sourceProject.clips.some(clip => clip.assetId === asset.id)
-        )
-        .flatMap(asset => (asset.provenance ? [asset.provenance] : []));
-      if (sourceProject.transcriptProvenance)
-        renderSources.push(sourceProject.transcriptProvenance);
-    }
     const assetId = crypto.randomUUID();
-    const safeName = sanitizeFilename(file.name);
-    const r2Key = `users/${encodeURIComponent(user.email)}/${renderSources.length ? "generated" : "assets"}/${assetId}/${safeName}`;
+    const r2Key = `users/${encodeURIComponent(user.email)}/assets/${assetId}/${sanitizeFilename(file.name)}`;
     await env.BUCKET.put(r2Key, file.stream(), {
       httpMetadata: { contentType },
       customMetadata: { owner: user.email, originalName: file.name },
     });
-    let asset: Asset;
-    let renderedProvenance: ContentProvenance | undefined;
-    let pendingRenderProvenance: ContentProvenance | undefined;
-    let storedSize = file.size;
     try {
-      if (
-        renderSources.some(source =>
-          ["ai-generated", "ai-manipulated", "ai-assisted"].includes(
-            source.origin
-          )
-        )
-      ) {
-        const bytes = await file.arrayBuffer();
-        const pending = await createProvenanceRecord(env, user, {
-          entityType: "asset",
-          entityId: assetId,
-          origin: "ai-manipulated",
-          operation: "timeline-render",
-          provider: "REELassati",
-          model: "timeline-compositor",
-          content: bytes,
-          embeddedMediaMarker: true,
-          metadata: {
-            projectId: renderProjectId,
-            parentRecordIds: renderSources.map(source => source.recordId),
-            rendering: "client-composited",
-          },
-        });
-        pendingRenderProvenance = pending;
-        const marked = embedMediaProvenanceMarker(
-          bytes,
-          contentType,
-          pending.marking.publicToken || ""
-        );
-        if (!marked)
-          throw new Error(
-            "Rendered video could not preserve its source marking"
-          );
-        await env.BUCKET.put(r2Key, marked.bytes, {
-          httpMetadata: { contentType },
-          customMetadata: {
-            owner: user.email,
-            originalName: file.name,
-            provenanceToken: pending.marking.publicToken || "",
-            policyVersion: AI_COMPLIANCE_POLICY_VERSION,
-            embeddedMarking: marked.method,
-          },
-        });
-        renderedProvenance = await finalizeEmbeddedProvenance(
-          env,
-          user,
-          pending,
-          marked.bytes
-        );
-        storedSize = marked.bytes.byteLength;
-      }
-      asset = await insertAssetRecord(env, user, {
+      const assetInput = {
         id: assetId,
         name: file.name,
         kind: inferAssetKind(contentType, stringValue(form.get("kind"))),
         contentType,
-        size: storedSize,
+        size: file.size,
         r2Key,
-      });
-    } catch (cause) {
+      };
+      const asset = renderProjectId
+        ? await finalizeTimelineUpload(env, user, renderProjectId, assetInput)
+        : await insertAssetRecord(env, user, assetInput);
+      return json({ asset }, 201);
+    } catch (error) {
       await env.BUCKET.delete(r2Key).catch(() => undefined);
-      if (pendingRenderProvenance)
-        await failProvenanceRecord(
-          env,
-          user,
-          pendingRenderProvenance.recordId,
-          "asset",
-          assetId,
-          "Timeline export could not be finalized"
-        ).catch(() => undefined);
-      throw cause;
+      throw error;
     }
-    return json(
-      {
-        asset: renderedProvenance
-          ? { ...asset, provenance: renderedProvenance }
-          : asset,
-      },
-      201
-    );
   }
 
   if (!id) return errorResponse("Asset not found", 404);
@@ -4688,6 +4786,7 @@ async function handleAssets(
   const provenance = await provenanceByEntity(env, user, "asset", row.id);
   const generatedAsset = row.r2_key.includes("/generated/");
   let verifiedFullBytes: ArrayBuffer | null = null;
+  let verifiedStream: ReadableStream | null = null;
   if (generatedAsset) {
     let verificationFailure = await generatedAssetStructuralFailure(
       env,
@@ -4719,16 +4818,33 @@ async function handleAssets(
             fullObject
           );
           if (!verificationFailure) {
-            const fullBytes = await fullObject.arrayBuffer();
-            verificationFailure = await generatedAssetByteFailure(
-              row,
-              provenance,
-              fullObject,
-              fullBytes
-            );
-            if (!verificationFailure) {
-              rememberGeneratedAssetVerification(cacheKey);
-              if (!requestedRange) verifiedFullBytes = fullBytes;
+            if (row.content_type === "video/mp4") {
+              verificationFailure = await generatedMp4StreamFailure(
+                row,
+                provenance,
+                fullObject
+              );
+              if (!verificationFailure) {
+                rememberGeneratedAssetVerification(cacheKey);
+                if (!requestedRange) {
+                  const delivery = await env.BUCKET.get(row.r2_key);
+                  if (!delivery || delivery.etag !== fullObject.etag)
+                    verificationFailure = "object-version-mismatch";
+                  else verifiedStream = delivery.body;
+                }
+              }
+            } else {
+              const fullBytes = await fullObject.arrayBuffer();
+              verificationFailure = await generatedAssetByteFailure(
+                row,
+                provenance,
+                fullObject,
+                fullBytes
+              );
+              if (!verificationFailure) {
+                rememberGeneratedAssetVerification(cacheKey);
+                if (!requestedRange) verifiedFullBytes = fullBytes;
+              }
             }
           }
         }
@@ -4781,7 +4897,9 @@ async function handleAssets(
     headers.set("Content-Length", String(row.bytes));
   }
   return new Response(
-    request.method === "HEAD" ? null : verifiedFullBytes || object.body,
+    request.method === "HEAD"
+      ? null
+      : verifiedFullBytes || verifiedStream || object.body,
     {
       status: requestedRange ? 206 : 200,
       headers,
@@ -5197,14 +5315,14 @@ async function handleAi(
       stringValue(input.command),
       projectId
     );
-    const duration = boundedNumber(input.project.duration, 30, 1, 600);
+    const duration = boundedNumber(input.project.duration, 30, 0.2, 86400);
     const projectContext = {
       title: input.project.title,
       duration,
       platform: input.project.platform,
       aspectRatio: input.project.aspectRatio,
-      clips: input.project.clips.slice(0, 80),
-      transcript: input.project.transcript.slice(0, 180),
+      clips: input.project.clips,
+      transcript: input.project.transcript,
       qualitySignals: input.project.qualitySignals.slice(0, 30),
       selectedClipIds: Array.isArray(input.selectedClipIds)
         ? input.selectedClipIds.slice(0, 20)
@@ -5227,7 +5345,7 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), and intensity (light|balanced|aggressive). Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
+          `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
           JSON.stringify({ command: input.command, project: projectContext })
         );
         const summary = stringValue(
@@ -5413,6 +5531,7 @@ async function handleAi(
       assetId?: string;
       projectId?: string;
       language?: string;
+      audioAssetIds?: string[];
     }>(request);
     assertProvenanceConfigured(env);
     const assetId = stringValue(input.assetId);
@@ -5435,18 +5554,44 @@ async function handleAi(
     ) {
       return errorResponse("Choose an audio or video asset");
     }
-    if (row.bytes > MAX_AI_MEDIA_BYTES) {
-      return errorResponse(
-        "Trim the file below 24 MB before transcription",
-        413
-      );
+    const audioParts: Array<{ row: AssetRow; duration: number }> = [];
+    if (Array.isArray(input.audioAssetIds) && input.audioAssetIds.length) {
+      for (const id of input.audioAssetIds) {
+        const audio = await getAssetRow(env, user, stringValue(id));
+        if (
+          !audio ||
+          audio.content_type !== "audio/wav" ||
+          audio.bytes > MAX_AI_MEDIA_BYTES
+        ) {
+          return errorResponse(
+            "A prepared speech segment is unavailable. Prepare captions again.",
+            422
+          );
+        }
+        const header = await env.BUCKET.get(audio.r2_key, {
+          range: { offset: 0, length: Math.min(4096, audio.bytes) },
+        });
+        if (!header) return errorResponse("Speech audio is missing", 404);
+        const duration = pcmWaveDuration(
+          await header.arrayBuffer(),
+          audio.bytes
+        );
+        audioParts.push({ row: audio, duration });
+      }
+    } else {
+      if (row.bytes > MAX_AI_MEDIA_BYTES)
+        return errorResponse(
+          "Prepare speech segments before transcribing a large recording",
+          422
+        );
+      audioParts.push({
+        row,
+        duration: (await assetDurationSeconds(env, user, assetId)) || 0,
+      });
     }
-    const object = await env.BUCKET.get(row.r2_key);
-    if (!object) return errorResponse("Audio bytes are missing", 404);
-    const transcriptionDuration = await assetDurationSeconds(
-      env,
-      user,
-      assetId
+    const transcriptionDuration = audioParts.reduce(
+      (sum, part) => sum + part.duration,
+      0
     );
     return runPaidAiAction(
       env,
@@ -5478,32 +5623,59 @@ async function handleAi(
           segments?: Array<{ start?: number; end?: number; text?: string }>;
         };
         try {
-          const response = await fetch(
-            `${OPENROUTER_BASE}/audio/transcriptions`,
-            {
-              method: "POST",
-              headers: openRouterHeaders(env),
-              body: JSON.stringify({
-                model,
-                input_audio: {
-                  data: arrayBufferToBase64(await object.arrayBuffer()),
-                  format: audioFormat(row.content_type, row.name),
-                },
-                ...(input.language ? { language: input.language } : {}),
-                response_format: "verbose_json",
-                timestamp_granularities: ["segment"],
-              }),
-            }
-          );
-          if (!response.ok) {
-            await failAiInvocation(
-              env,
-              invocation,
-              `provider_${response.status}`
+          payload = { text: "", segments: [] };
+          let offset = 0;
+          for (const part of audioParts) {
+            const object = await env.BUCKET.get(part.row.r2_key);
+            if (!object) throw new Error("Speech audio is missing");
+            const response = await fetch(
+              `${OPENROUTER_BASE}/audio/transcriptions`,
+              {
+                method: "POST",
+                headers: openRouterHeaders(env),
+                body: JSON.stringify({
+                  model,
+                  input_audio: {
+                    data: arrayBufferToBase64(await object.arrayBuffer()),
+                    format: audioFormat(part.row.content_type, part.row.name),
+                  },
+                  ...(input.language ? { language: input.language } : {}),
+                  response_format: "verbose_json",
+                  timestamp_granularities: ["segment"],
+                }),
+              }
             );
-            await providerError(response, "OpenRouter");
+            if (!response.ok) {
+              await failAiInvocation(
+                env,
+                invocation,
+                `provider_${response.status}`
+              );
+              await providerError(response, "OpenRouter");
+            }
+            const result = (await response.json()) as typeof payload;
+            payload.text = [payload.text, result.text]
+              .filter(Boolean)
+              .join("\n");
+            const segments = result.segments?.length
+              ? result.segments
+              : result.text
+                ? [{ start: 0, end: part.duration || 0.1, text: result.text }]
+                : [];
+            payload.segments!.push(
+              ...segments.map(segment => ({
+                ...segment,
+                start: offset + Math.max(0, Number(segment.start) || 0),
+                end:
+                  offset +
+                  Math.min(
+                    part.duration || Infinity,
+                    Math.max(0.1, Number(segment.end) || part.duration || 0.1)
+                  ),
+              }))
+            );
+            offset += part.duration;
           }
-          payload = (await response.json()) as typeof payload;
           await completeAiInvocation(env, invocation, payload);
         } catch (cause) {
           await failAiInvocation(env, invocation, "provider_or_parse_failure");
@@ -6682,15 +6854,16 @@ async function handleVideoReference(
       provenance,
       object
     );
-    const bytes = structuralFailure ? null : await object.arrayBuffer();
     const byteFailure =
-      !structuralFailure && bytes && provenance
-        ? await generatedAssetByteFailure(row, provenance, object, bytes)
+      !structuralFailure && provenance
+        ? await generatedMp4StreamFailure(row, provenance, object)
         : null;
-    if (structuralFailure || byteFailure || !bytes) {
+    if (structuralFailure || byteFailure)
       return errorResponse("Reference unavailable", 404);
-    }
-    body = bytes;
+    const delivery = await env.BUCKET.get(row.r2_key);
+    if (!delivery || delivery.etag !== object.etag)
+      return errorResponse("Reference unavailable", 404);
+    body = delivery.body;
   }
 
   return new Response(request.method === "HEAD" ? null : body, {
@@ -9985,7 +10158,7 @@ export function trendSearchCitations(payload: unknown): TrendSearchCitation[] {
     citations.push({
       ...source,
       title: stringValue(citation?.title).slice(0, 180),
-      content: stringValue(citation?.content).slice(0, 900),
+      content: stringValue(citation?.content).slice(0, 8000),
     });
   }
   return citations;
@@ -10060,12 +10233,28 @@ export function groundTrendOutput(
       ? allowedSources.get(candidateSource.sourceUrl)
       : undefined;
     if (!citation) continue;
+    const sourceText = `${citation.title} ${citation.content}`;
+    const brandName = stringValue(candidate.brandName).trim();
+    const brandEvidence = stringValue(candidate.brandEvidence).trim();
+    // Model assertions cannot establish facts. Require a verbatim source excerpt
+    // describing a specific brand/product action, plus metrics in retrieved text.
+    if (
+      brandName.length < 2 ||
+      !sourceText.toLowerCase().includes(brandName.toLowerCase()) ||
+      brandEvidence.length < 20 ||
+      !sourceText.toLowerCase().includes(brandEvidence.toLowerCase())
+    )
+      continue;
+    if (!sourceContainsDate(sourceText, stringValue(candidate.publishedAt)))
+      continue;
     const creatorFromUrl =
       citation.platform === "tiktok"
         ? new URL(citation.sourceUrl).pathname.match(/^\/@([^/]+)/)?.[1] || ""
         : "";
     trends.push({
       ...candidate,
+      metrics: performanceFromSource(sourceText),
+      evidence: [brandEvidence, citation.content],
       platform: citation.platform,
       sourceUrl: citation.sourceUrl,
       title: stringValue(candidate.title).slice(0, 160),
@@ -10076,52 +10265,6 @@ export function groundTrendOutput(
     });
   }
   return { trends };
-}
-
-function citationFallbackTrendCandidates(
-  citations: TrendSearchCitation[]
-): Record<string, unknown>[] {
-  return citations.slice(0, 12).map(citation => {
-    const pathCreator =
-      citation.platform === "tiktok"
-        ? new URL(citation.sourceUrl).pathname.match(/^\/@([^/]+)/)?.[1]
-        : null;
-    const title = citation.title || `${citation.platform} short-form post`;
-    const creator = pathCreator || title.split(/[|·—-]/)[0].trim() || "Brand";
-    const evidence =
-      citation.content ||
-      "The direct source video page was independently reachable.";
-    return {
-      platform: citation.platform,
-      title,
-      creator,
-      brandName: creator,
-      sourceUrl: citation.sourceUrl,
-      hook: "Open the source to inspect the first visual and spoken promise.",
-      pattern: "Direct short-form source retained for evidence review.",
-      evidence: [evidence],
-      organicBrandPromotion: true,
-      paidAd: false,
-      organicEvidence:
-        "Found by the organic brand-promotion search; confirm any disclosure on the source before adapting it.",
-      viralityEvidence:
-        "The indexed source did not expose a reliable public engagement total, so no number is claimed.",
-      hypothesis:
-        "The source may reveal a reusable opening, proof beat, or product demonstration after review.",
-      adaptation:
-        "Open the source, identify one observable structure, and rebuild that structure with your own brand evidence.",
-      passSignal:
-        "Compare three-second hold and completion rate against your recent baseline.",
-      lifecycle: "emerging",
-      confidence: 0.6,
-      niche: "Brand content",
-      region: "Global",
-      language: "Unknown",
-      metrics: { views: null, likes: null, comments: null, shares: null },
-      thumbnailUrl: null,
-      publishedAt: null,
-    };
-  });
 }
 
 function nullableTrendMetric(value: unknown): number | null {
@@ -10249,16 +10392,13 @@ export function normalizeTrendItems(
         observedTimestamp - publishedTimestamp > TREND_MAX_AGE_MS)
     );
     const hasReportedPerformance = hasHyperviralSignal(normalizedMetrics);
-    const hasAnyReportedMetric = Object.values(normalizedMetrics).some(
-      metric => metric !== null
-    );
     if (
       !Number.isFinite(observedTimestamp) ||
+      !publishedAt ||
       datedOutsideWindow ||
       confidence < (mode === "weekly" ? 0.6 : 0.7) ||
       explicitPaidSignal ||
-      (!hasReportedPerformance &&
-        (mode !== "weekly" || hasAnyReportedMetric)) ||
+      !hasReportedPerformance ||
       (mode === "weekly" && detectedPlatform === "youtube")
     ) {
       continue;
@@ -10289,7 +10429,7 @@ export function normalizeTrendItems(
       adaptation,
       passSignal,
     });
-    if (trends.length >= 12) break;
+    if (trends.length >= 60) break;
   }
   return trends.sort(
     (left, right) =>
@@ -10349,8 +10489,8 @@ async function researchTrendSources(
         : scope.objective;
     const taskInstruction =
       mode === "weekly"
-        ? `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 30 * 86_400_000).toISOString()} and ${generatedAt} on ${platformInstruction}. This is a rolling evidence window refreshed every week. These must be real posts where a brand, product, or service is central to the content, but the post itself is native organic content rather than a paid ad. Rank the strongest verified pieces by reported views and engagement. Return fewer results instead of adding a weak, generic, stale, or unverified example.`
-        : `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 30 * 86_400_000).toISOString()} and ${generatedAt} that answer this paid custom brief. Platform: ${platformInstruction}. Topic, niche, product, or audience: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. The brand, product, or service must be central, while the post must be native organic content rather than a paid ad. Rank by verified views and engagement and return fewer results instead of filler.`;
+        ? `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 7 * 86_400_000).toISOString()} and ${generatedAt} on ${platformInstruction}. This is the last seven days, refreshed weekly. These must be real posts where a brand, product, or service is central to the content, but the post itself is native organic content rather than a paid ad. Rank the strongest verified pieces by reported views and engagement. Return fewer results instead of adding a weak, generic, stale, or unverified example.`
+        : `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 7 * 86_400_000).toISOString()} and ${generatedAt} that answer this paid custom brief. Platform: ${platformInstruction}. Topic, niche, product, or audience: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. The brand, product, or service must be central, while the post must be native organic content rather than a paid ad. Rank by verified views and engagement and return fewer results instead of filler.`;
     failureCode = "search_request_failure";
     const searchPlatforms: TrendPlatform[] =
       scope.platform === "all" ? ["tiktok", "instagram"] : [scope.platform];
@@ -10362,13 +10502,19 @@ async function researchTrendSources(
       youtube:
         "YouTube only. Find several individual Shorts shaped like youtube.com/shorts/ID.",
     };
-    const searchDomains: Record<TrendPlatform, string[]> = {
-      tiktok: ["tiktok.com"],
-      instagram: ["instagram.com"],
-      youtube: ["youtube.com"],
-    };
+    const discoveryCohorts =
+      mode === "weekly"
+        ? [
+            "Product demonstrations and transformations: beauty, skincare, food, fashion, and physical products. Discover current breakout posts from actual brands and their founders; investigate brands such as CeraVe, Rhode, Rare Beauty, Scrub Daddy, Liquid Death only as discovery seeds, never automatic selections.",
+            "Service/software and founder storytelling: discover current breakout brand-owned posts from software, hospitality, local businesses and consumer services. Look for demonstrable product outcomes, customer proof, behind-the-scenes and founder stories, not generic social-media advice.",
+            "Emerging and independent brands: identify this week's breakout product reveals, manufacturing/process videos and customer transformations across different countries. Avoid filling the list exclusively with large familiar brands.",
+          ]
+        : [`Custom topic: ${scope.query}`];
+    const searchPasses = searchPlatforms.flatMap(platform =>
+      discoveryCohorts.map(cohort => ({ platform, cohort }))
+    );
     const searchResults = await Promise.allSettled(
-      searchPlatforms.map(async searchPlatform => {
+      searchPasses.map(async ({ platform: searchPlatform, cohort }) => {
         const searchResponse = await fetch(
           `${OPENROUTER_BASE}/chat/completions`,
           {
@@ -10383,24 +10529,29 @@ async function researchTrendSources(
                 },
                 {
                   role: "user",
-                  content: `${taskInstruction}\n\nThis search pass is exclusively for ${searchPlatform}. Return at most three concise examples and only exact individual-video URLs copied from the search results. Do not turn a normal YouTube watch URL into a Short.`,
+                  content: `${taskInstruction}\n\nThis search pass is exclusively for ${searchPlatform}. Discovery cohort: ${cohort} First discover brands/posts achieving unusual reach this week using sector-specific breakout reports and brand names. Then inspect the individual posts. Do NOT use a generic "brand promotion" search as your candidate set. Return at most six examples with exact individual-video URLs copied from search results, plus brandEvidence: a verbatim excerpt from the source that specifically describes the brand/product demonstration, result, or offer. Brand ownership or a brand mentioned in passing is insufficient. Do not turn a normal YouTube watch URL into a Short.`,
                 },
               ],
-              plugins: [
+              tools: [
                 {
-                  id: "web",
-                  engine: "exa",
-                  mode: "fast",
-                  max_results: 10,
-                  include_domains: searchDomains[searchPlatform],
+                  type: "openrouter:web_search",
+                  parameters: {
+                    engine: "exa",
+                    mode: "auto",
+                    max_results: 10,
+                    max_uses: mode === "weekly" ? 5 : 2,
+                    max_total_results: mode === "weekly" ? 50 : 20,
+                    max_characters: 8000,
+                  },
                 },
               ],
+              max_tool_calls: mode === "weekly" ? 5 : 2,
               provider: {
                 allow_fallbacks: true,
                 require_parameters: true,
               },
               reasoning: { enabled: false },
-              max_tokens: 2_400,
+              max_tokens: 4_000,
               temperature: 0.1,
             }),
             signal: AbortSignal.timeout(90_000),
@@ -10426,7 +10577,7 @@ async function researchTrendSources(
               : reason?.name === "TimeoutError" || reason?.name === "AbortError"
                 ? "timeout"
                 : "unavailable";
-          return `${searchPlatforms[index]}_${code}`;
+          return `${searchPasses[index].platform}_${code}`;
         })
         .join(";");
       throw json(
@@ -10442,16 +10593,15 @@ async function researchTrendSources(
     failureCode = "invalid_search_payload";
     const citationMap = new Map<string, TrendSearchCitation>();
     for (const payload of searchPayloads) {
-      for (const citation of [
-        ...trendSearchCitations(payload),
-        ...trendTextCitations(payload),
-      ]) {
-        citationMap.set(citation.sourceUrl, citation);
+      for (const citation of trendSearchCitations(payload)) {
+        const previous = citationMap.get(citation.sourceUrl);
+        if (!previous || citation.content.length > previous.content.length)
+          citationMap.set(citation.sourceUrl, citation);
       }
     }
     const citations = (
       await Promise.all(
-        Array.from(citationMap.values()).slice(0, 18).map(verifyTrendCitation)
+        Array.from(citationMap.values()).slice(0, 60).map(verifyTrendCitation)
       )
     ).filter((citation): citation is TrendSearchCitation => Boolean(citation));
     if (!citations.length) {
@@ -10488,7 +10638,7 @@ async function researchTrendSources(
               {
                 role: "system",
                 content:
-                  "You turn verified short-form search evidence into strict JSON. Use only the supplied direct-video URLs and factual evidence. Never invent a date, metric, creator, brand, or organic-status claim. Metrics may be numbers or compact strings such as 1.2M or 850K. Use null for a publication date or metric that the supplied evidence does not reveal, and say that the public metric is unavailable in viralityEvidence. Do not omit an otherwise useful verified source merely because its exact date or public metric is unavailable. Editorial hook/pattern/hypothesis/adaptation may be reasoned from the evidence but must stay distinct from observed facts. Return JSON only with one key, trends. Each usable item needs platform, title, creator, brandName, sourceUrl, hook, pattern, evidence, organicBrandPromotion=true, paidAd=false, organicEvidence, viralityEvidence, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics {views,likes,comments,shares}, thumbnailUrl, and publishedAt. Omit an item only when the supplied evidence cannot support its direct URL, central brand promotion, or organic status.",
+                  "You turn verified short-form search evidence into strict JSON. Use only the supplied direct-video URLs and factual evidence. Never invent a date, metric, creator, brand, or organic-status claim. Metrics may be numbers or compact strings such as 1.2M or 850K. Use null for a publication date or metric that the supplied evidence does not reveal, and say that the public metric is unavailable in viralityEvidence. Reject every source missing its exact date or a labeled performance metric. Include brandEvidence as a verbatim excerpt of the supplied source describing its specific brand/product promotion. Never treat a reachable URL as evidence of relevance or virality. Editorial hook/pattern/hypothesis/adaptation may be reasoned from the evidence but must stay distinct from observed facts. Return JSON only with one key, trends. Each usable item needs platform, title, creator, brandName, sourceUrl, hook, pattern, evidence, organicBrandPromotion=true, paidAd=false, organicEvidence, viralityEvidence, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics {views,likes,comments,shares}, thumbnailUrl, and publishedAt. Omit items lacking a source-backed date within the last seven days, a measured viral performance signal, a specific central brand promotion, or organic status.",
               },
               {
                 role: "user",
@@ -10522,17 +10672,18 @@ async function researchTrendSources(
     } catch {
       // The search payload remains a safe fallback when synthesis is unavailable.
     }
-    if (!candidates.length) {
-      candidates = citationFallbackTrendCandidates(citations);
-    }
     const groundedOutput = groundTrendOutput({ trends: candidates }, citations);
-    const trends = normalizeTrendItems(
+    const eligibleTrends = normalizeTrendItems(
       groundedOutput,
       generatedAt,
       mode
     ).filter(item =>
       scope.platform === "all" ? true : item.platform === scope.platform
     );
+    const trends =
+      scope.platform === "all"
+        ? balancedTrendSelection(eligibleTrends)
+        : eligibleTrends.slice(0, 12);
     if (!trends.length) {
       const groundedCount = Array.isArray(groundedOutput.trends)
         ? groundedOutput.trends.length

@@ -473,7 +473,7 @@ describe("Sites worker", () => {
     ]);
   });
 
-  it("pins formatted cards to verified sources and fills safe card fields", () => {
+  it("rejects reachable videos with no brand, date, or performance evidence", () => {
     expect(
       groundTrendOutput(
         {
@@ -507,17 +507,7 @@ describe("Sites worker", () => {
           },
         ]
       )
-    ).toMatchObject({
-      trends: [
-        {
-          sourceUrl: "https://www.tiktok.com/@verified/video/1234567890",
-          creator: "verified",
-        },
-        {
-          sourceUrl: "https://www.youtube.com/shorts/AbCdEf123_4",
-        },
-      ],
-    });
+    ).toEqual({ trends: [] });
   });
 
   it("keeps only current hyperviral organic brand shorts in the weekly feed", () => {

@@ -497,7 +497,7 @@ export const platformApi = {
     onProgress?: (percent: number) => void,
     projectId?: string
   ): Promise<Asset> => {
-    if (file.size > DIRECT_UPLOAD_MAX_BYTES && !projectId) {
+    if (file.size > DIRECT_UPLOAD_MAX_BYTES || projectId) {
       const initiated = await requestJson<{
         assetId: string;
         partSize: number;
@@ -561,7 +561,7 @@ export const platformApi = {
           `/api/assets/uploads/${encodeURIComponent(initiated.assetId)}/complete`,
           {
             method: "POST",
-            body: JSON.stringify({ parts: completedParts }),
+            body: JSON.stringify({ parts: completedParts, projectId }),
           }
         );
         onProgress?.(100);
@@ -591,6 +591,29 @@ export const platformApi = {
     };
   },
 
+  downloadAssetBlob: async (
+    id: string,
+    signal?: AbortSignal
+  ): Promise<Blob> => {
+    const { data } = await supabase.auth.getSession();
+    const response = await fetch(
+      platformApiUrl(`/api/assets/${encodeURIComponent(id)}`),
+      {
+        signal,
+        headers: {
+          "X-Reelassati-Brand": selectedBrand(data.session?.user.email),
+          ...(data.session?.access_token
+            ? { Authorization: `Bearer ${data.session.access_token}` }
+            : {}),
+        },
+      }
+    );
+    if (!response.ok)
+      throw new Error(
+        "A source file could not be downloaded. Reload your Library and try again."
+      );
+    return response.blob();
+  },
   downloadAsset: async (
     id: string,
     signal?: AbortSignal
@@ -677,14 +700,19 @@ export const platformApi = {
       body: JSON.stringify(input),
     }),
 
-  transcribe: (assetId: string, language?: string, projectId?: string) =>
+  transcribe: (
+    assetId: string,
+    language?: string,
+    projectId?: string,
+    audioAssetIds?: string[]
+  ) =>
     requestJson<{
       transcript: string;
       segments: EditProject["transcript"];
       provenance: ContentProvenance;
     }>("/api/ai/transcribe", {
       method: "POST",
-      body: JSON.stringify({ assetId, language, projectId }),
+      body: JSON.stringify({ assetId, language, projectId, audioAssetIds }),
     }),
 
   synthesizeSpeech: async (input: {

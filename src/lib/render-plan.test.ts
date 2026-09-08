@@ -26,6 +26,7 @@ const assets = [
 ] as Asset[];
 const project = {
   title: "Render test",
+  duration: 4,
   aspectRatio: "9:16",
   transcript: [{ start: 0, end: 2, text: "A real caption" }],
   clips: [
@@ -61,12 +62,8 @@ describe("timeline rendering", () => {
   it("rejects missing media and unsafe timelines instead of silently omitting clips", () => {
     expect(() => buildRenderPlan(project, [], new Set())).toThrow("missing");
     expect(() =>
-      buildRenderPlan(
-        { ...project, clips: [{ ...project.clips[0], start: 181 }] },
-        assets,
-        new Set()
-      )
-    ).toThrow("180");
+      buildRenderPlan({ ...project, duration: -1 }, assets, new Set())
+    ).toThrow("positive");
     expect(() =>
       buildRenderPlan(
         { ...project, clips: [{ ...project.clips[0], speed: 0 }] },

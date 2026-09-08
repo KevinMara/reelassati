@@ -1,7 +1,7 @@
-import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "./platform-api";
-import { buildRenderPlan, RENDER_MAX_INPUT_BYTES } from "./render-plan";
+import { buildRenderPlan } from "./render-plan";
 
 export async function renderVideo(
   project: EditProject,
@@ -60,7 +60,7 @@ export async function renderVideo(
       "DejaVuSans.ttf",
       new Uint8Array(await font.arrayBuffer())
     );
-    let bytes = 0;
+    const sourceBlobs: Array<{ name: string; data: Blob }> = [];
     const audioIds = new Set<string>();
     for (const [i, asset] of firstPlan.inputs.entries()) {
       options.signal.throwIfAborted();
@@ -68,22 +68,23 @@ export async function renderVideo(
         Math.round((i / firstPlan.inputs.length) * 15),
         `Loading ${asset.name}`
       );
-      const data = await (options.loadAsset || platformApi.downloadAsset)(
-        asset.id,
-        options.signal
-      );
-      bytes += data.byteLength;
-      if (bytes > RENDER_MAX_INPUT_BYTES)
-        throw new Error(
-          "Source media is too large for this export. Split the project into shorter videos."
-        );
-      await ffmpeg.writeFile(`input-${i}`, data);
+      const data = options.loadAsset
+        ? new Blob([
+            new Uint8Array(await options.loadAsset(asset.id, options.signal))
+              .buffer,
+          ])
+        : await platformApi.downloadAssetBlob(asset.id, options.signal);
+      sourceBlobs.push({ name: `input-${i}`, data });
+    }
+    await ffmpeg.createDir("/sources");
+    await ffmpeg.mount(FFFSType.WORKERFS, { blobs: sourceBlobs }, "/sources");
+    for (const [i, asset] of firstPlan.inputs.entries()) {
       let hasAudio = false;
       const probe = ({ message }: { message: string }) => {
         if (/Stream #.*Audio:/.test(message)) hasAudio = true;
       };
       ffmpeg.on("log", probe);
-      await ffmpeg.exec(["-i", `input-${i}`]); // Probe only; FFmpeg returns 1 without an output.
+      await ffmpeg.exec(["-i", `/sources/input-${i}`]); // Probe only; FFmpeg returns 1 without an output.
       ffmpeg.off("log", probe);
       if (hasAudio) audioIds.add(asset.id);
     }
@@ -98,7 +99,9 @@ export async function renderVideo(
         "Rendering your video"
       )
     );
-    const code = await ffmpeg.exec(plan.args, 15 * 60_000);
+    const code = await ffmpeg.exec(
+      plan.args.map(arg => (/^input-\d+$/.test(arg) ? `/sources/${arg}` : arg))
+    );
     options.signal.throwIfAborted();
     if (code !== 0)
       throw new Error(

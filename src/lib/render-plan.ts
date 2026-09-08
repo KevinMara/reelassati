@@ -1,8 +1,5 @@
 import type { Asset, EditProject } from "@contracts/workspace";
 
-export const RENDER_MAX_SECONDS = 180;
-export const RENDER_MAX_INPUT_BYTES = 160 * 1024 * 1024;
-
 const number = (n: number) => Number(n.toFixed(4));
 function time(seconds: number) {
   const cs = Math.round(Math.max(0, seconds) * 100);
@@ -16,19 +13,15 @@ export function buildRenderPlan(
   audioIds: Set<string>,
   resolution: 720 | 1080 = 720
 ) {
-  const mediaClips = project.clips.filter(c => c.track !== "captions");
-  if (!mediaClips.length) throw new Error("Add media to your timeline first.");
-  if (mediaClips.length > 40)
-    throw new Error(
-      "Export supports up to 40 media clips. Split this project into shorter videos."
+  const mediaClips = project.clips
+    .filter(c => c.track !== "captions")
+    .sort(
+      (a, b) => Number(a.track === "overlay") - Number(b.track === "overlay")
     );
-  const duration = Math.max(...mediaClips.map(c => c.start + c.duration));
-  if (
-    !Number.isFinite(duration) ||
-    duration <= 0 ||
-    duration > RENDER_MAX_SECONDS
-  )
-    throw new Error("Export a timeline between 1 and 180 seconds.");
+  if (!mediaClips.length) throw new Error("Add media to your timeline first.");
+  const duration = project.duration;
+  if (!Number.isFinite(duration) || duration <= 0)
+    throw new Error("Choose a positive video duration.");
   const sources = new Map(assets.map(a => [a.id, a]));
   const used = [...new Set(mediaClips.map(c => c.assetId))].map(id =>
     sources.get(id || "")
@@ -45,10 +38,6 @@ export function buildRenderPlan(
       "Some timeline media is missing or still processing. Replace it before exporting."
     );
   const inputs = used as Asset[];
-  if (inputs.reduce((sum, a) => sum + a.size, 0) > RENDER_MAX_INPUT_BYTES)
-    throw new Error(
-      "This export uses too much source media. Use smaller files or split the project."
-    );
   const landscape = Math.round((resolution * 16) / 9 / 2) * 2;
   const [width, height] =
     project.aspectRatio === "16:9"
@@ -66,7 +55,8 @@ export function buildRenderPlan(
   mediaClips.forEach((clip, index) => {
     const asset = sources.get(clip.assetId!)!;
     const speed = clip.speed ?? 1;
-    const volume = clip.volume ?? 1;
+    const volume =
+      (clip.volume ?? 1) > 2 ? (clip.volume ?? 100) / 100 : (clip.volume ?? 1);
     if (
       ![clip.start, clip.duration, clip.inPoint, speed, volume].every(
         Number.isFinite
@@ -87,8 +77,32 @@ export function buildRenderPlan(
     const end = number(clip.inPoint + clip.duration * speed);
     const trim = `start=${number(clip.inPoint)}:end=${end}`;
     if (clip.track !== "audio" && asset.kind !== "audio") {
+      const fit =
+        clip.fit === "cover"
+          ? `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`
+          : `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`;
+      const bounded = (
+        value: number | undefined,
+        fallback: number,
+        min: number,
+        max: number
+      ) =>
+        Number.isFinite(value)
+          ? Math.min(max, Math.max(min, value!))
+          : fallback;
+      const grade = `eq=brightness=${bounded(clip.brightness, 0, -0.5, 0.5)}:contrast=${bounded(clip.contrast, 1, 0.5, 2)}:saturation=${bounded(clip.saturation, 1, 0, 3)}`;
+      const fades = [
+        clip.fadeIn
+          ? `fade=t=in:st=0:d=${number(Math.min(clip.duration, bounded(clip.fadeIn, 0, 0, 5)))}`
+          : "",
+        clip.fadeOut
+          ? `fade=t=out:st=${number(Math.max(0, clip.duration - bounded(clip.fadeOut, 0, 0, 5)))}:d=${number(Math.min(clip.duration, bounded(clip.fadeOut, 0, 0, 5)))}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(",");
       filters.push(
-        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed}+${number(clip.start)}/TB,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v${index}]`
+        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},${fit},setsar=1,fps=30,${grade}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
       );
       filters.push(
         `[${visual}][v${index}]overlay=eof_action=pass:repeatlast=0:enable='gte(t,${number(clip.start)})*lt(t,${number(clip.start + clip.duration)})'[layer${index}]`
@@ -103,7 +117,7 @@ export function buildRenderPlan(
             ? `atempo=2,atempo=${speed / 2}`
             : `atempo=${speed}`;
       filters.push(
-        `[${index}:a]atrim=${trim},asetpts=PTS-STARTPTS,${tempo},volume=${volume},aresample=48000,adelay=${Math.round(clip.start * 1000)}:all=1[a${index}]`
+        `[${index}:a]atrim=${trim},asetpts=PTS-STARTPTS,${tempo},volume=${volume}${clip.fadeIn ? `,afade=t=in:st=0:d=${number(Math.min(clip.duration, clip.fadeIn))}` : ""}${clip.fadeOut ? `,afade=t=out:st=${number(Math.max(0, clip.duration - clip.fadeOut))}:d=${number(Math.min(clip.duration, clip.fadeOut))}` : ""},aresample=48000,adelay=${Math.round(clip.start * 1000)}:all=1[a${index}]`
       );
       audio.push(`a${index}`);
     }
@@ -126,13 +140,7 @@ export function buildRenderPlan(
   filters.push(
     `${audio.map(a => `[${a}]`).join("")}amix=inputs=${audio.length}:normalize=0:duration=longest,alimiter=limit=0.95,atrim=duration=${number(duration)}[audio]`
   );
-  const videoRate = Math.max(
-    250000,
-    Math.min(
-      resolution === 720 ? 4000000 : 8000000,
-      Math.floor(((22 * 1024 * 1024 * 8) / duration - 128000) * 0.85)
-    )
-  );
+  const videoRate = resolution === 720 ? 6_000_000 : 12_000_000;
   args.push(
     "-filter_complex",
     filters.join(";"),
@@ -145,7 +153,7 @@ export function buildRenderPlan(
     "-preset",
     "ultrafast",
     "-crf",
-    "23",
+    "20",
     "-maxrate",
     String(videoRate),
     "-bufsize",

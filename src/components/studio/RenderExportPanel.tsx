@@ -11,7 +11,6 @@ import {
 import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
-import { MAX_AI_MEDIA_BYTES } from "@contracts/uploads";
 
 export function RenderExportPanel({
   project,
@@ -80,13 +79,6 @@ export function RenderExportPanel({
           });
       }
       const result = pending.current;
-      if (result.file.size > MAX_AI_MEDIA_BYTES) {
-        pending.current = null;
-        setHasRender(false);
-        throw new Error(
-          "This export exceeds the 24 MB finished-video limit. Use a shorter timeline or 720p. Your project is saved."
-        );
-      }
       setStage("Saving to your Library");
       setProgress(96);
       if (!uploaded.current)

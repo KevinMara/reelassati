@@ -250,9 +250,9 @@ describe("platform-wide functional invariants", () => {
     expect(server).toContain("requireCreditReservation");
     expect(server).toContain('category: "trend-research"');
     expect(server).toContain('"moonshotai/kimi-k2.5"');
-    expect(server).toContain('id: "web"');
-    expect(server).toContain("include_domains");
-    expect(server).not.toContain('type: "openrouter:web_search"');
+    expect(server).toContain('type: "openrouter:web_search"');
+    expect(server).toContain("max_uses");
+    expect(server).not.toContain("citationFallbackTrendCandidates");
     expect(server).toContain("TREND_WEEKLY_TTL_MS");
     expect(server).toContain("await refreshWeeklyTrendFeed(env)");
     expect(server).not.toContain("On-demand weekly trend bootstrap failed");
@@ -429,8 +429,10 @@ describe("platform-wide functional invariants", () => {
     const editor = source("./pages/dashboard/EditorPage.tsx");
     const voice = source("./pages/dashboard/VoiceNotes.tsx");
     const video = source("./pages/dashboard/VideoGenerator.tsx");
-    expect(editor).toContain('kind="captions"');
-    expect(editor).toContain("No transcript is available yet");
+    expect(editor).toContain("TimelinePreview");
+    expect(source("./components/studio/TimelinePreview.tsx")).toContain(
+      'kind="captions"'
+    );
     expect(voice).toContain("voice-source-description");
     expect(voice).toContain("generated-speech-transcript");
     expect(video).toContain("generated-video-caption-status");
@@ -499,15 +501,13 @@ describe("platform-wide functional invariants", () => {
 
   it("keeps the editor transport connected to the actual media preview", () => {
     const editor = source("./pages/dashboard/EditorPage.tsx");
-    expect(editor).toContain("mediaPreviewRef");
-    expect(editor).toContain("await media.play()");
-    expect(editor).toContain("media?.pause()");
-    expect(editor).toContain("media.currentTime = clamp(");
-    expect(editor).toContain(
-      "playheadForMediaTime(event.currentTarget.currentTime)"
-    );
-    expect(editor).toContain("media.playbackRate =");
-    expect(editor).toContain("media.volume =");
+    expect(editor).toContain("TimelinePreview");
+    const preview = source("./components/studio/TimelinePreview.tsx");
+    expect(preview).toContain("media.play()");
+    expect(preview).toContain("media.pause()");
+    expect(preview).toContain("media.currentTime = sourceTime");
+    expect(preview).toContain("media.playbackRate =");
+    expect(preview).toContain("media.volume =");
   });
 
   it("keeps referral rewards pending unless billing sends a signed event", () => {

@@ -434,6 +434,44 @@ function createMemoryBucket(failWrites = false) {
         arrayBuffer: async () => selected.slice().buffer,
       };
     },
+    createMultipartUpload: async (
+      key: string,
+      options?: {
+        httpMetadata?: { contentType?: string };
+        customMetadata?: Record<string, string>;
+      }
+    ) => {
+      const chunks = new Map<number, Uint8Array>();
+      return {
+        uploadId: crypto.randomUUID(),
+        uploadPart: async (
+          partNumber: number,
+          value: ReadableStream | ArrayBuffer | Uint8Array
+        ) => {
+          if (failWrites) throw new Error("super-secret-storage-stack");
+          chunks.set(partNumber, await bodyBytes(value));
+          return { partNumber, etag: `part-${partNumber}` };
+        },
+        complete: async (
+          parts: Array<{ partNumber: number; etag: string }>
+        ) => {
+          const selected = parts.map(p => chunks.get(p.partNumber)!);
+          const bytes = new Uint8Array(
+            selected.reduce((sum, part) => sum + part.length, 0)
+          );
+          let offset = 0;
+          for (const chunk of selected) {
+            bytes.set(chunk, offset);
+            offset += chunk.length;
+          }
+          objects.set(key, { bytes, etag: `etag-${++version}`, ...options });
+          return { size: bytes.length };
+        },
+        abort: async () => {
+          chunks.clear();
+        },
+      };
+    },
     delete: async (key: string) => {
       objects.delete(key);
     },
@@ -1125,7 +1163,7 @@ describe("provenance integrity boundaries", () => {
     expect((await range.arrayBuffer()).byteLength).toBe(4);
   });
 
-  it("marks rendered MP4s from AI timeline sources and verifies their signed downloads", async () => {
+  it("streams rendered MP4s above 24 MB from AI sources and verifies their signed downloads", async () => {
     const DB = createIntegrityD1(),
       BUCKET = createMemoryBucket(),
       env = testEnv(DB, BUCKET);
@@ -1170,7 +1208,8 @@ describe("provenance integrity boundaries", () => {
       revision: 0,
       updated_at: now,
     });
-    const original = new Uint8Array([
+    const original = new Uint8Array(26 * 1024 * 1024);
+    original.set([
       0, 0, 0, 16, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0,
     ]);
     const form = new FormData();
@@ -1202,7 +1241,9 @@ describe("provenance integrity boundaries", () => {
     expect(delivered.status).toBe(200);
     const marked = inspectMediaProvenanceMarker(await delivered.arrayBuffer());
     expect(marked?.token).toBe(asset.provenance?.marking.publicToken);
-    expect(new Uint8Array(marked!.unmarkedBytes)).toEqual(original);
+    expect(
+      await crypto.subtle.digest("SHA-256", marked!.unmarkedBytes)
+    ).toEqual(await crypto.subtle.digest("SHA-256", original));
   });
 
   it("blocks metadata-preserving byte corruption on full GET and HEAD", async () => {

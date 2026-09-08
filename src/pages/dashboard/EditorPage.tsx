@@ -1,3 +1,4 @@
+import { TimelinePreview } from "@/components/studio/TimelinePreview";
 import {
   useCallback,
   useEffect,
@@ -40,6 +41,14 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
+import {
+  applyEditOperation,
+  contentDuration,
+  resizeTimeline,
+  rippleRemove,
+} from "@/lib/edit-timeline";
+import { EditorCreationDock } from "@/components/studio/EditorCreationDock";
+import { AutonomousEditor } from "@/components/studio/AutonomousEditor";
 import { RenderExportPanel } from "@/components/studio/RenderExportPanel";
 import { useSearchParams } from "react-router-dom";
 import type {
@@ -117,36 +126,12 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainder.toFixed(1).padStart(4, "0")}`;
 }
 
-function formatVttTime(seconds: number) {
-  const milliseconds = Math.max(0, Math.round(seconds * 1000));
-  const hours = Math.floor(milliseconds / 3_600_000);
-  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
-  const remainder = (milliseconds % 60_000) / 1000;
-  return `${hours.toString().padStart(2, "0")}:${minutes
-    .toString()
-    .padStart(2, "0")}:${remainder.toFixed(3).padStart(6, "0")}`;
-}
-
-function transcriptTrack(segments: TranscriptSegment[]): string | null {
-  const cues = segments
-    .filter(segment => segment.text.trim())
-    .map(
-      (segment, index) =>
-        `${index + 1}\n${formatVttTime(segment.start)} --> ${formatVttTime(
-          Math.max(segment.end, segment.start + 0.1)
-        )}\n${segment.text.replaceAll("-->", "→").trim()}`
-    );
-  if (cues.length === 0) return null;
-  return `data:text/vtt;charset=utf-8,${encodeURIComponent(
-    `WEBVTT\n\n${cues.join("\n\n")}\n`
-  )}`;
-}
-
 function snapshotProject(project: EditProject, label: string): EditRevision {
   return {
     id: createId("revision"),
     label,
     createdAt: new Date().toISOString(),
+    duration: project.duration,
     clips: project.clips.map(clip => ({ ...clip })),
     transcript: project.transcript.map(segment => ({ ...segment })),
     ...(project.transcriptProvenance
@@ -159,9 +144,7 @@ function compactRevisions(revisions: EditRevision[]) {
   return revisions.slice(-MAX_REVISIONS);
 }
 
-function getProjectDuration(clips: TimelineClip[], minimum = 15) {
-  return Math.max(minimum, ...clips.map(clip => clip.start + clip.duration));
-}
+const getProjectDuration = contentDuration;
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -256,7 +239,7 @@ function deriveQualitySignals(project: EditProject): QualitySignal[] {
       clip.duration <= 0 ||
       clip.inPoint < 0 ||
       clip.outPoint <= clip.inPoint ||
-      clip.duration > clip.outPoint - clip.inPoint + 0.01 ||
+      clip.duration * (clip.speed ?? 1) > clip.outPoint - clip.inPoint + 0.01 ||
       clip.start < 0
   );
   if (invalidClip) {
@@ -284,24 +267,6 @@ function deriveQualitySignals(project: EditProject): QualitySignal[] {
   return signals;
 }
 
-function projectWithApprovedOperation(
-  project: EditProject,
-  operation: EditOperation
-) {
-  return {
-    ...project,
-    proposedChanges: project.proposedChanges.map(change =>
-      change.id === operation.id
-        ? {
-            ...change,
-            status: "accepted" as const,
-            reviewedAt: new Date().toISOString(),
-          }
-        : change
-    ),
-  };
-}
-
 export default function EditorPage() {
   const {
     workspace,
@@ -316,6 +281,8 @@ export default function EditorPage() {
     null
   );
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState<"manual" | "auto">("manual");
+  const [durationDraft, setDurationDraft] = useState<number | null>(null);
   const [rightPanel, setRightPanel] = useState<
     "inspect" | "transcript" | "assistant" | "preflight"
   >("inspect");
@@ -333,7 +300,7 @@ export default function EditorPage() {
     useState<ContentProvenance | null>(null);
   const [rangeStart, setRangeStart] = useState(0);
   const [rangeEnd, setRangeEnd] = useState(5);
-  const [playhead, setPlayhead] = useState(0);
+  const [rawPlayhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [revisionCursor, setRevisionCursor] = useState(-1);
   const [timelineZoom, setTimelineZoom] = useState(100);
@@ -350,15 +317,19 @@ export default function EditorPage() {
     string | null
   >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const mediaPreviewRef = useRef<HTMLMediaElement | null>(null);
 
   const project = useMemo(
     () => workspace.projects.find(item => item.id === selectedProjectId),
     [selectedProjectId, workspace.projects]
   );
+  const playhead = Math.min(rawPlayhead, project?.duration ?? rawPlayhead);
   const selectedClip = useMemo(
     () => project?.clips.find(clip => clip.id === selectedClipId),
     [project?.clips, selectedClipId]
+  );
+  const qualitySignals = useMemo(
+    () => (project ? deriveQualitySignals(project) : []),
+    [project]
   );
   const previewAsset = useMemo(() => {
     const assetId = selectedClip?.assetId ?? project?.activeAssetId;
@@ -384,76 +355,19 @@ export default function EditorPage() {
       return !query || asset.name.toLowerCase().includes(query);
     });
   }, [libraryKind, librarySearch, workspace.assets]);
-  const mediaTimeForPlayhead = useCallback(
-    (timelineTime: number) => {
-      if (!selectedClip) return Math.max(0, timelineTime);
-      const speed = Math.max(0.1, selectedClip.speed ?? 1);
-      const relativeTime = Math.min(
-        selectedClip.duration,
-        Math.max(0, timelineTime - selectedClip.start)
-      );
-      return Math.min(
-        selectedClip.outPoint,
-        selectedClip.inPoint + relativeTime * speed
-      );
-    },
-    [selectedClip]
-  );
-  const playheadForMediaTime = useCallback(
-    (mediaTime: number) => {
-      if (!project) return 0;
-      if (!selectedClip) return clamp(mediaTime, 0, project.duration);
-      const speed = Math.max(0.1, selectedClip.speed ?? 1);
-      return clamp(
-        selectedClip.start + (mediaTime - selectedClip.inPoint) / speed,
-        selectedClip.start,
-        Math.min(project.duration, selectedClip.start + selectedClip.duration)
-      );
-    },
-    [project, selectedClip]
-  );
-  const configurePreviewMedia = useCallback(
-    (media: HTMLMediaElement) => {
-      media.playbackRate = Math.max(0.1, selectedClip?.speed ?? 1);
-      media.muted = selectedClip?.muted ?? false;
-      media.volume = clamp((selectedClip?.volume ?? 100) / 100, 0, 1);
-    },
-    [selectedClip]
-  );
   const seekTimeline = useCallback(
     (nextTime: number) => {
       const duration = project?.duration ?? 0;
       const boundedTime = clamp(nextTime, 0, duration);
       setPlayhead(boundedTime);
-      const media = mediaPreviewRef.current;
-      if (media && Number.isFinite(media.duration)) {
-        media.currentTime = clamp(
-          mediaTimeForPlayhead(boundedTime),
-          0,
-          media.duration
-        );
-      }
     },
-    [mediaTimeForPlayhead, project?.duration]
-  );
-  const captionTrackUrl = useMemo(
-    () => transcriptTrack(transcriptDraft),
-    [transcriptDraft]
-  );
-  const qualitySignals = useMemo(
-    () =>
-      project
-        ? [...project.qualitySignals, ...deriveQualitySignals(project)].filter(
-            (signal, index, all) =>
-              all.findIndex(candidate => candidate.id === signal.id) === index
-          )
-        : [],
-    [project]
+    [project?.duration]
   );
 
   const openProject = (item: EditProject) => {
     const firstClip = item.clips[0] ?? null;
     setSelectedProjectId(item.id);
+    setDurationDraft(null);
     setTitleDraft(item.title);
     setPlayhead(item.playhead);
     setRangeStart(item.playhead);
@@ -468,11 +382,6 @@ export default function EditorPage() {
   };
 
   useEffect(() => {
-    const media = mediaPreviewRef.current;
-    if (media) configurePreviewMedia(media);
-  }, [configurePreviewMedia, previewAsset?.id]);
-
-  useEffect(() => {
     if (!recentlyAddedAssetId) return;
     const timer = window.setTimeout(() => setRecentlyAddedAssetId(null), 1_800);
     return () => window.clearTimeout(timer);
@@ -480,12 +389,6 @@ export default function EditorPage() {
 
   useEffect(() => {
     if (!playing || !project) return;
-    if (
-      mediaPreviewRef.current &&
-      (previewAsset?.kind === "video" || previewAsset?.kind === "audio")
-    ) {
-      return;
-    }
     const interval = window.setInterval(() => {
       setPlayhead(current => {
         const next = current + 0.1;
@@ -500,33 +403,12 @@ export default function EditorPage() {
   }, [playing, previewAsset?.kind, project]);
 
   const toggleTimelinePlayback = async () => {
-    const media = mediaPreviewRef.current;
     if (playing) {
-      media?.pause();
       setPlaying(false);
       return;
     }
-
-    const startTime = playhead >= (project?.duration ?? 0) ? 0 : playhead;
-    seekTimeline(startTime);
-    if (!media) {
-      setPlaying(true);
-      return;
-    }
-
-    configurePreviewMedia(media);
-    try {
-      await media.play();
-      setPlaying(true);
-      setLocalError(null);
-    } catch (cause) {
-      setPlaying(false);
-      setLocalError(
-        cause instanceof Error
-          ? cause.message
-          : "The media preview could not start."
-      );
-    }
+    if (playhead >= (project?.duration ?? 0)) seekTimeline(0);
+    setPlaying(true);
   };
 
   const createProject = async (template: string) => {
@@ -628,10 +510,10 @@ export default function EditorPage() {
         });
         const next = {
           ...transformed,
-          duration: getProjectDuration(
-            transformed.clips,
-            Math.max(15, transformed.duration)
-          ),
+          duration:
+            transformed.duration !== item.duration
+              ? transformed.duration
+              : getProjectDuration(transformed.clips),
           updatedAt: new Date().toISOString(),
         };
         const revisions = compactRevisions([
@@ -695,7 +577,7 @@ export default function EditorPage() {
         locked: false,
         muted: false,
         speed: 1,
-        volume: 100,
+        volume: 1,
         color: TRACK_COLORS[track],
       };
       const clips = [...target.clips, clip];
@@ -703,7 +585,7 @@ export default function EditorPage() {
         ...target,
         clips,
         activeAssetId: asset.id,
-        duration: getProjectDuration(clips, target.duration),
+        duration: getProjectDuration(clips),
         updatedAt: new Date().toISOString(),
       };
       const revisions = compactRevisions([
@@ -1040,7 +922,7 @@ export default function EditorPage() {
           ...current,
           clips: revision.clips.map(clip => ({ ...clip })),
           transcript: revision.transcript.map(segment => ({ ...segment })),
-          duration: getProjectDuration(revision.clips, 15),
+          duration: revision.duration ?? getProjectDuration(revision.clips),
         })),
       "Undo could not be saved."
     );
@@ -1065,7 +947,7 @@ export default function EditorPage() {
           ...current,
           clips: revision.clips.map(clip => ({ ...clip })),
           transcript: revision.transcript.map(segment => ({ ...segment })),
-          duration: getProjectDuration(revision.clips, 15),
+          duration: revision.duration ?? getProjectDuration(revision.clips),
         })),
       "Redo could not be saved."
     );
@@ -1125,7 +1007,7 @@ export default function EditorPage() {
     await saveProjectChange(
       () =>
         commitProject(`Approved decision: ${operation.label}`, current =>
-          projectWithApprovedOperation(current, operation)
+          applyEditOperation(current, operation)
         ),
       "The approved edit decision could not be saved."
     );
@@ -1187,16 +1069,39 @@ export default function EditorPage() {
     setBusyAction("transcribe");
     setLocalError(null);
     try {
-      const result = await platformApi.transcribe(
-        previewAsset.id,
+      const { transcribeMedia } = await import("@/lib/transcribe-media");
+      const result = await transcribeMedia(
+        previewAsset,
         workspace.profile.contentLanguage,
         project.id
       );
-      setTranscriptDraft(result.segments);
-      setTranscriptionProvenance(result.provenance);
+      const sourceClips = project.clips.filter(
+        c => c.assetId === previewAsset.id && !c.muted
+      );
+      const mapped = sourceClips.flatMap(clip =>
+        result.segments
+          .filter(
+            segment =>
+              segment.end > clip.inPoint &&
+              segment.start < clip.inPoint + clip.duration * (clip.speed ?? 1)
+          )
+          .map(segment => ({
+            ...segment,
+            id: `${clip.id}-${segment.id}`,
+            start:
+              clip.start +
+              Math.max(0, segment.start - clip.inPoint) / (clip.speed ?? 1),
+            end: Math.min(
+              clip.start + clip.duration,
+              clip.start + (segment.end - clip.inPoint) / (clip.speed ?? 1)
+            ),
+          }))
+      );
+      setTranscriptDraft(mapped);
+      setTranscriptionProvenance(result.provenance ?? null);
       const saved = await commitProject("Media transcribed", current => ({
         ...current,
-        transcript: result.segments,
+        transcript: mapped,
         transcriptProvenance: result.provenance,
       }));
       const canonical = saved?.projects.find(
@@ -1604,7 +1509,106 @@ export default function EditorPage() {
         </div>
       )}
 
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-3">
+        <div className="flex rounded-xl bg-background p-1">
+          <button
+            type="button"
+            aria-pressed={editMode === "manual"}
+            onClick={() => setEditMode("manual")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium ${editMode === "manual" ? "bg-primary text-primary-foreground" : "text-foreground/70"}`}
+          >
+            Edit myself
+          </button>
+          <button
+            type="button"
+            aria-pressed={editMode === "auto"}
+            onClick={() => setEditMode("auto")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium ${editMode === "auto" ? "bg-primary text-primary-foreground" : "text-foreground/70"}`}
+          >
+            AI complete edit
+          </button>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          Video duration
+          <input
+            aria-label="Total video duration in seconds"
+            type="number"
+            min={0.2}
+            step={0.1}
+            value={durationDraft ?? project.duration}
+            onChange={e => setDurationDraft(Number(e.target.value))}
+            className="w-24 rounded-lg border border-border bg-background px-2 py-2 font-mono"
+          />{" "}
+          s
+        </label>
+        <button
+          type="button"
+          onClick={() =>
+            void saveProjectChange(
+              () =>
+                commitProject("Video duration changed", p =>
+                  resizeTimeline(p, durationDraft ?? p.duration)
+                ),
+              "Could not change duration."
+            )
+          }
+          className="rounded-lg border border-border px-3 py-2 text-sm"
+        >
+          Set end
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            void saveProjectChange(
+              () =>
+                commitProject("Fitted timeline to content", p => ({
+                  ...p,
+                  duration: contentDuration(p.clips),
+                })),
+              "Could not fit timeline."
+            )
+          }
+          className="rounded-lg border border-border px-3 py-2 text-sm"
+        >
+          Fit to content
+        </button>
+        <select
+          aria-label="Video aspect ratio"
+          value={project.aspectRatio}
+          onChange={e =>
+            void patchProject({
+              aspectRatio: e.target.value as EditProject["aspectRatio"],
+            })
+          }
+          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+        >
+          <option value="9:16">Vertical 9:16</option>
+          <option value="16:9">Landscape 16:9</option>
+          <option value="1:1">Square 1:1</option>
+        </select>
+      </div>
+      {editMode === "auto" && (
+        <AutonomousEditor
+          key={project.id}
+          project={project}
+          onFinished={() => {
+            setEditMode("manual");
+            setRevisionCursor(project.revisions.length - 1);
+            setTranscriptDraft(
+              project.transcript.map(segment => ({ ...segment }))
+            );
+            setRightPanel("inspect");
+          }}
+        />
+      )}
+      <EditorCreationDock
+        project={project}
+        playhead={playhead}
+        onInsert={asset =>
+          addAssetToTimeline(asset, project.id, "Created in editor", playhead)
+        }
+      />
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
         <main className="min-w-0 space-y-4">
           <section
             {...previewDrop.dropZoneProps}
@@ -1616,133 +1620,20 @@ export default function EditorPage() {
           >
             <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-white/60 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-[#A894FF]" />
-              Source preview
+              Timeline preview
             </div>
-            <div className="relative flex min-h-[390px] items-center justify-center p-7">
+            <div className="relative flex min-h-[460px] items-center justify-center p-7">
               {previewDrop.isDragging ? (
                 <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border border-dashed border-[#A894FF] bg-black/75 text-sm font-medium text-white backdrop-blur-sm">
                   Drop media into this edit
                 </div>
               ) : null}
-              {previewAsset?.kind === "video" && (
-                <video
-                  key={previewAsset.id}
-                  ref={element => {
-                    mediaPreviewRef.current = element;
-                  }}
-                  src={previewAsset.url}
-                  controls
-                  onLoadedMetadata={event => {
-                    configurePreviewMedia(event.currentTarget);
-                    seekTimeline(playhead);
-                  }}
-                  onPlay={() => setPlaying(true)}
-                  onPause={() => setPlaying(false)}
-                  onEnded={() => setPlaying(false)}
-                  onTimeUpdate={event =>
-                    setPlayhead(
-                      playheadForMediaTime(event.currentTarget.currentTime)
-                    )
-                  }
-                  aria-label={`Video preview: ${previewAsset.name}`}
-                  aria-describedby={
-                    captionTrackUrl ? undefined : "editor-caption-status"
-                  }
-                  className={`max-h-[470px] max-w-full bg-black object-contain ${
-                    project.aspectRatio === "9:16"
-                      ? "aspect-[9/16] rounded-xl"
-                      : project.aspectRatio === "1:1"
-                        ? "aspect-square rounded-xl"
-                        : "aspect-video rounded-xl"
-                  }`}
-                >
-                  {captionTrackUrl ? (
-                    <track
-                      kind="captions"
-                      src={captionTrackUrl}
-                      label="Project captions"
-                      default
-                    />
-                  ) : null}
-                </video>
-              )}
-              {previewAsset?.kind === "image" && (
-                <img
-                  src={previewAsset.url}
-                  alt={previewAsset.name}
-                  className={`max-h-[470px] max-w-full bg-black object-contain ${
-                    project.aspectRatio === "9:16"
-                      ? "aspect-[9/16] rounded-xl"
-                      : project.aspectRatio === "1:1"
-                        ? "aspect-square rounded-xl"
-                        : "aspect-video rounded-xl"
-                  }`}
-                />
-              )}
-              {previewAsset?.kind === "audio" && (
-                <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center text-white">
-                  <AudioLines className="mx-auto mb-5 h-10 w-10 text-[#A894FF]" />
-                  <p className="truncate text-sm font-medium">
-                    {previewAsset.name}
-                  </p>
-                  <audio
-                    key={previewAsset.id}
-                    ref={element => {
-                      mediaPreviewRef.current = element;
-                    }}
-                    src={previewAsset.url}
-                    controls
-                    onLoadedMetadata={event => {
-                      configurePreviewMedia(event.currentTarget);
-                      seekTimeline(playhead);
-                    }}
-                    onPlay={() => setPlaying(true)}
-                    onPause={() => setPlaying(false)}
-                    onEnded={() => setPlaying(false)}
-                    onTimeUpdate={event =>
-                      setPlayhead(
-                        playheadForMediaTime(event.currentTarget.currentTime)
-                      )
-                    }
-                    aria-label={`Audio preview: ${previewAsset.name}`}
-                    aria-describedby="editor-audio-alternative"
-                    className="mt-5 w-full"
-                  />
-                  <p id="editor-audio-alternative" className="sr-only">
-                    {transcriptDraft.some(segment => segment.text.trim())
-                      ? `Transcript: ${transcriptDraft
-                          .map(segment => segment.text.trim())
-                          .filter(Boolean)
-                          .join(" ")}`
-                      : "No transcript is available yet. Use the transcription tool to create a text alternative."}
-                  </p>
-                </div>
-              )}
-              {!previewAsset && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={Boolean(busyAction)}
-                  className="flex max-w-sm flex-col items-center text-center text-white disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-[#A894FF]">
-                    <Upload className="h-5 w-5" />
-                  </span>
-                  <span className="font-medium">
-                    Bring your first shot onto the timeline
-                  </span>
-                  <span className="mt-1 text-sm leading-5 text-white/45">
-                    Upload source media. Nothing is cut or transformed without
-                    your approval.
-                  </span>
-                </button>
-              )}
-              {!captionTrackUrl && previewAsset?.kind === "video" ? (
-                <p id="editor-caption-status" className="sr-only">
-                  No caption track is available yet. Use the transcript panel to
-                  create and review captions.
-                </p>
-              ) : null}
+              <TimelinePreview
+                project={project}
+                assets={workspace.assets}
+                time={playhead}
+                playing={playing}
+              />
             </div>
             <div className="flex items-center justify-center gap-3 border-t border-white/10 bg-black/30 px-4 py-2.5 text-white">
               <button
@@ -2275,6 +2166,89 @@ export default function EditorPage() {
                       Apply timing
                     </button>
 
+                    <label className="block text-sm">
+                      Framing
+                      <select
+                        value={clipDraft.fit ?? "contain"}
+                        onChange={e =>
+                          setClipDraft(c =>
+                            c
+                              ? {
+                                  ...c,
+                                  fit: e.target.value as "contain" | "cover",
+                                }
+                              : c
+                          )
+                        }
+                        className="mt-2 w-full rounded-lg border border-border bg-background p-2"
+                      >
+                        <option value="contain">Fit whole shot</option>
+                        <option value="cover">Fill frame</option>
+                      </select>
+                    </label>
+                    {(
+                      [
+                        ["speed", "Playback speed", 0.25, 4, 0.05, 1],
+                        ["volume", "Volume", 0, 2, 0.05, 1],
+                        ["fadeIn", "Fade in (seconds)", 0, 3, 0.1, 0],
+                        ["fadeOut", "Fade out (seconds)", 0, 3, 0.1, 0],
+                        ["brightness", "Brightness", -0.5, 0.5, 0.05, 0],
+                        ["contrast", "Contrast", 0.5, 2, 0.05, 1],
+                        ["saturation", "Saturation", 0, 2, 0.05, 1],
+                      ] as const
+                    ).map(([key, label, min, max, step, fallback]) => (
+                      <label key={key} className="block text-sm">
+                        {label}{" "}
+                        <span className="float-right font-mono">
+                          {clipDraft[key] ?? fallback}
+                        </span>
+                        <input
+                          type="range"
+                          aria-label={label}
+                          min={min}
+                          max={max}
+                          step={step}
+                          value={clipDraft[key] ?? fallback}
+                          disabled={selectedClip?.locked}
+                          onChange={e =>
+                            setClipDraft(c =>
+                              c ? { ...c, [key]: Number(e.target.value) } : c
+                            )
+                          }
+                          className="mt-2 w-full accent-primary"
+                        />
+                      </label>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={selectedClip?.locked}
+                      onClick={() =>
+                        void saveProjectChange(
+                          () =>
+                            commitProject(
+                              "Clip look and sound adjusted",
+                              p => ({
+                                ...p,
+                                clips: p.clips.map(c =>
+                                  c.id === clipDraft.id
+                                    ? {
+                                        ...clipDraft,
+                                        duration:
+                                          (clipDraft.outPoint -
+                                            clipDraft.inPoint) /
+                                          (clipDraft.speed ?? 1),
+                                      }
+                                    : c
+                                ),
+                              })
+                            ),
+                          "Could not save settings."
+                        )
+                      }
+                      className="w-full rounded-lg border border-primary px-3 py-2 text-sm text-primary"
+                    >
+                      Apply look and sound
+                    </button>
                     <div className="grid grid-cols-2 gap-2 border-t border-border pt-4">
                       <button
                         type="button"
@@ -2449,7 +2423,7 @@ export default function EditorPage() {
 
             {rightPanel === "assistant" && (
               <div>
-                <p className="mono-eyebrow text-primary">Accountable AI edit</p>
+                <p className="mono-eyebrow text-primary">AI assistant</p>
                 <h2 className="mt-2 text-lg font-medium">
                   Describe the change
                 </h2>
@@ -2505,6 +2479,87 @@ export default function EditorPage() {
                       />
                     </label>
                   </div>
+                  <div className="mt-3 space-y-3">
+                    <label className="block text-sm">
+                      Selection start · {formatTime(rangeStart)}
+                      <input
+                        aria-label="AI selection start"
+                        type="range"
+                        min={0}
+                        max={project.duration}
+                        step={0.05}
+                        value={rangeStart}
+                        onChange={e => {
+                          const t = Number(e.target.value);
+                          setRangeStart(t);
+                          seekTimeline(t);
+                        }}
+                        className="w-full accent-primary"
+                      />
+                    </label>
+                    <label className="block text-sm">
+                      Selection end · {formatTime(rangeEnd)}
+                      <input
+                        aria-label="AI selection end"
+                        type="range"
+                        min={0}
+                        max={project.duration}
+                        step={0.05}
+                        value={rangeEnd}
+                        onChange={e => {
+                          const t = Number(e.target.value);
+                          setRangeEnd(t);
+                          seekTimeline(t);
+                        }}
+                        className="w-full accent-primary"
+                      />
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRangeStart(playhead)}
+                        className="rounded border border-border px-2 py-1 text-xs"
+                      >
+                        Start at playhead
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRangeEnd(playhead)}
+                        className="rounded border border-border px-2 py-1 text-xs"
+                      >
+                        End at playhead
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRangeStart(0);
+                          setRangeEnd(project.duration);
+                        }}
+                        className="rounded border border-border px-2 py-1 text-xs"
+                      >
+                        Whole edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void saveProjectChange(
+                            () =>
+                              commitProject("Range removed and gap closed", p =>
+                                rippleRemove(
+                                  p,
+                                  Math.min(rangeStart, rangeEnd),
+                                  Math.max(rangeStart, rangeEnd)
+                                )
+                              ),
+                            "Could not close gap."
+                          )
+                        }
+                        className="rounded border border-border px-2 py-1 text-xs"
+                      >
+                        Cut range & close gap
+                      </button>
+                    </div>
+                  </div>
                   {selectedClip && (
                     <p className="mt-2 truncate text-[10px] text-foreground/40">
                       Selection: {selectedClip.label}
@@ -2525,7 +2580,7 @@ export default function EditorPage() {
                     ) : (
                       <Sparkles className="h-4 w-4" />
                     )}
-                    Generate edit plan · {AI_CREDIT_COSTS.editPlan} credits
+                    Propose changes · {AI_CREDIT_COSTS.editPlan} credits
                   </button>
                 </div>
 
@@ -2605,7 +2660,7 @@ export default function EditorPage() {
                             onClick={() => void acceptOperation(change)}
                             className="rounded-lg bg-primary px-2 py-2 text-xs font-medium text-primary-foreground"
                           >
-                            Approve decision
+                            Apply change
                           </button>
                           <button
                             type="button"
@@ -2623,7 +2678,7 @@ export default function EditorPage() {
                             <X className="h-3 w-3" />
                           )}
                           {change.status === "accepted"
-                            ? "approved for brief"
+                            ? "applied to timeline"
                             : change.status}
                         </p>
                       )}
@@ -2637,10 +2692,8 @@ export default function EditorPage() {
                   )}
                 </div>
                 <p className="mt-4 text-[10px] leading-4 text-foreground/35">
-                  Approval records the decision in the edit brief. AI plans
-                  never mutate media automatically; make the deterministic
-                  timeline change manually after checking the named interval and
-                  target clips.
+                  Apply changes to update the timeline. Undo restores the
+                  previous edit.
                 </p>
               </div>
             )}

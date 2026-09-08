@@ -98,6 +98,12 @@ export interface TimelineClip {
   speed?: number;
   volume?: number;
   color: string;
+  fit?: "contain" | "cover";
+  fadeIn?: number;
+  fadeOut?: number;
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
 }
 
 export interface TranscriptSegment {
@@ -132,6 +138,22 @@ export interface EditOperation {
   status: ChangeStatus;
   provenance?: ContentProvenance;
   reviewedAt?: string;
+  parameters?: {
+    sourceIn?: number;
+    destination?: number;
+    speed?: number;
+    volume?: number;
+    text?: string;
+    assetId?: string;
+    prompt?: string;
+    mediaKind?: "image" | "video";
+    fit?: "contain" | "cover";
+    fadeIn?: number;
+    fadeOut?: number;
+    brightness?: number;
+    contrast?: number;
+    saturation?: number;
+  };
 }
 
 export interface QualitySignal {
@@ -147,6 +169,7 @@ export interface EditRevision {
   id: string;
   label: string;
   createdAt: string;
+  duration?: number;
   clips: TimelineClip[];
   transcript: TranscriptSegment[];
   /** Server-rehydrated provenance for the exact transcript snapshot. */
