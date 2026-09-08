@@ -283,9 +283,10 @@ export default function Pricing() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <strong className="text-2xl">€{pack.price}</strong>
+                    <strong className="text-2xl">{pack.price} EUR / USD</strong>
                     <p className="mt-1 text-sm text-foreground/70">
-                      €{((pack.price / pack.credits) * 1000).toFixed(2)} /{" "}
+                      {((pack.price / pack.credits) * 1000).toFixed(2)} EUR /
+                      USD /{" "}
                       {Number(1000).toLocaleString(
                         isItalian ? "it-IT" : "en-IE"
                       )}
@@ -296,21 +297,8 @@ export default function Pricing() {
             </div>
             <p className="mt-4 text-sm text-foreground/70">
               {isItalian
-                ? "I prezzi mostrati includono l'IVA ove applicabile. Il checkout conferma il trattamento fiscale corretto."
-                : "Displayed prices include VAT where applicable. Checkout confirms the correct tax treatment."}
-            </p>
-            <p className="mt-3 text-xs leading-relaxed text-foreground/55">
-              {isItalian
-                ? "Prima dell’acquisto consulta "
-                : "Before purchasing, review the "}
-              <Link to="/terms" className="text-primary underline">
-                {isItalian ? "Termini" : "Terms"}
-              </Link>
-              {isItalian ? " e la " : " and "}
-              <Link to="/refunds" className="text-primary underline">
-                {isItalian ? "Policy rimborsi" : "Refund Policy"}
-              </Link>
-              .
+                ? "I prezzi mostrati sono al netto delle imposte. IVA o imposte applicabili vengono calcolate e aggiunte al checkout in base al paese del cliente."
+                : "Displayed prices exclude tax. Applicable VAT or sales tax is calculated and added at checkout based on the customer’s location."}
             </p>
           </section>
         </div>
@@ -371,17 +359,17 @@ function PlanCard({
       </p>
       <div className="mt-6 flex items-end gap-2">
         <span className="text-5xl font-semibold tracking-tight">
-          €{priceLabel}
+          {priceLabel}
         </span>
         <span className="pb-1 text-sm text-foreground/45">
-          /{isItalian ? "mese" : "month"}
+          EUR / USD · /{isItalian ? "mese" : "month"}
         </span>
       </div>
       <p className="mt-2 min-h-[20px] text-xs text-foreground/45">
         {billingCycle === "annual"
           ? isItalian
-            ? `€${annualTotalLabel} fatturati annualmente`
-            : `€${annualTotalLabel} billed annually`
+            ? `${annualTotalLabel} EUR / USD fatturati annualmente`
+            : `${annualTotalLabel} EUR / USD billed annually`
           : isItalian
             ? "Fatturazione mensile"
             : "Billed monthly"}

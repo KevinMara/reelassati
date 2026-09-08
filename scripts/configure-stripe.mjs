@@ -51,7 +51,7 @@ if (!process.argv.includes("--apply")) {
       {
         mode: "plan",
         currency: "eur",
-        taxBehavior: "inclusive",
+        taxBehavior: "exclusive",
         catalog,
         webhookUrl,
         note: "No Stripe changes made. To provision, supply STRIPE_SECRET_KEY and STRIPE_ACCOUNT_ID, then --apply --out <private.env.local>. Tax registrations and account onboarding are never created by this script.",
@@ -164,7 +164,7 @@ async function configure() {
           `Catalog product ${entry.product} is archived. Review it before creating prices.`
         );
       productIds.set(entry.product, product.id);
-      const lookupKey = `reelassati_${entry.key}_eur_${entry.cents}_v3`;
+      const lookupKey = `reelassati_${entry.key}_eur_usd_${entry.cents}_v4`;
       let price = prices.find(p => p.lookup_key === lookupKey);
       if (!price)
         price = await stripe.prices.create(
@@ -172,7 +172,10 @@ async function configure() {
             product: product.id,
             currency: "eur",
             unit_amount: entry.cents,
-            tax_behavior: "inclusive",
+            tax_behavior: "exclusive",
+            currency_options: {
+              usd: { unit_amount: entry.cents, tax_behavior: "exclusive" },
+            },
             lookup_key: lookupKey,
             ...(entry.interval
               ? { recurring: { interval: entry.interval } }
@@ -190,7 +193,9 @@ async function configure() {
         price.product !== product.id ||
         price.currency !== "eur" ||
         price.unit_amount !== entry.cents ||
-        price.tax_behavior !== "inclusive" ||
+        price.tax_behavior !== "exclusive" ||
+        price.currency_options?.usd?.unit_amount !== entry.cents ||
+        price.currency_options?.usd?.tax_behavior !== "exclusive" ||
         (price.recurring?.interval || null) !== entry.interval
       )
         throw new SetupError(
@@ -204,7 +209,7 @@ async function configure() {
     const portalParams = {
       business_profile: { headline: "Manage your REELassati plan and billing" },
       default_return_url: "https://reelassati.app/#/dashboard/billing",
-      metadata: { app: "reelassati", catalog_version: "3" },
+      metadata: { app: "reelassati", catalog_version: "4" },
       features: {
         customer_update: {
           enabled: true,

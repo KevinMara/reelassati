@@ -902,7 +902,7 @@ describe("Sites worker", () => {
         ticketDraft: null,
       });
       expect(payload.reply).toContain(
-        "Creator is €19/month with 1,000 credits"
+        "Creator is $19/month with 1,000 credits"
       );
       expect(payload.suggestedActions).toEqual(
         expect.arrayContaining([

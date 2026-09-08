@@ -1,7 +1,7 @@
 import { CreditPlanner } from "@/components/studio/CreditPlanner";
 import posthog from "@/lib/posthog";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   Check,
@@ -34,7 +34,6 @@ import {
   YAxis,
 } from "recharts";
 import { platformApi } from "@/lib/platform-api";
-import { LEGAL_TERMS_VERSION } from "@contracts/legal";
 
 const PLAN_IDS: PlanId[] = ["creator", "pro", "studio"];
 
@@ -81,29 +80,6 @@ export default function BillingPage() {
   const checkoutState = searchParams.get("checkout");
   const sessionId = searchParams.get("session_id");
   const [paymentState, setPaymentState] = useState<string>("checking");
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [immediateAccessRequested, setImmediateAccessRequested] =
-    useState(false);
-
-  const legalConsent = () => ({
-    termsVersion: LEGAL_TERMS_VERSION,
-    termsAccepted: true as const,
-    immediateAccessRequested: true as const,
-    withdrawalInformationAcknowledged: true as const,
-  });
-
-  const requirePurchaseConsent = () => {
-    if (termsAccepted && immediateAccessRequested) return true;
-    setError(
-      "Review the Terms and Refund Policy and request immediate activation before checkout."
-    );
-    document.getElementById("purchase-consent")?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-    return false;
-  };
-
   useEffect(() => {
     if (checkoutState !== "success" || !sessionId) return;
     let active = true;
@@ -199,14 +175,12 @@ export default function BillingPage() {
   );
 
   const openCheckout = async (planId: PlanId) => {
-    if (!requirePurchaseConsent()) return;
     setBusy(`plan:${planId}`);
     setError(null);
     try {
       const { checkoutUrl } = await platformApi.createSubscriptionCheckout(
         planId,
-        billingCycle,
-        legalConsent()
+        billingCycle
       );
       posthog?.capture("checkout_opened", {
         kind: "subscription",
@@ -223,14 +197,10 @@ export default function BillingPage() {
   };
 
   const openTopUp = async (topUpId: CreditTopUpId) => {
-    if (!requirePurchaseConsent()) return;
     setBusy(`topup:${topUpId}`);
     setError(null);
     try {
-      const { checkoutUrl } = await platformApi.createTopUpCheckout(
-        topUpId,
-        legalConsent()
-      );
+      const { checkoutUrl } = await platformApi.createTopUpCheckout(topUpId);
       posthog?.capture("checkout_opened", { kind: "topup", topUpId });
       window.location.assign(checkoutUrl);
     } catch (cause) {
@@ -294,12 +264,6 @@ export default function BillingPage() {
           </p>
         </div>
       ) : null}
-      {checkoutState === "cancelled" ? (
-        <div className="mb-5 rounded-xl border border-border bg-surface p-4 text-sm text-foreground/65">
-          Checkout was closed. Your current balance and invoices show any
-          completed purchases.
-        </div>
-      ) : null}
       {error ? (
         <div
           role="alert"
@@ -308,65 +272,6 @@ export default function BillingPage() {
           {error}
         </div>
       ) : null}
-      {!loading && summary && !summary.configured ? (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-          <p>
-            Secure billing is being activated. Purchases are temporarily paused;
-            no payment can be attempted until activation is complete.
-          </p>
-        </div>
-      ) : null}
-
-      <section
-        id="purchase-consent"
-        className="mb-6 rounded-2xl border border-border bg-surface p-5"
-        aria-labelledby="purchase-consent-title"
-      >
-        <h2 id="purchase-consent-title" className="font-medium">
-          Clear terms before checkout
-        </h2>
-        <p className="mt-1 text-sm leading-relaxed text-foreground/60">
-          One confirmation covers the plan or credit pack you choose next.
-        </p>
-        <div className="mt-4 grid gap-3">
-          <label className="flex items-start gap-2.5 text-sm leading-relaxed text-foreground/75">
-            <input
-              type="checkbox"
-              checked={termsAccepted}
-              onChange={event => setTermsAccepted(event.target.checked)}
-              className="mt-1 accent-primary"
-            />
-            <span>
-              I agree to the{" "}
-              <Link to="/terms" className="text-primary underline">
-                Terms of Service
-              </Link>{" "}
-              and have read the{" "}
-              <Link to="/refunds" className="text-primary underline">
-                Cancellation and Refund Policy
-              </Link>
-              .
-            </span>
-          </label>
-          <label className="flex items-start gap-2.5 text-sm leading-relaxed text-foreground/75">
-            <input
-              type="checkbox"
-              checked={immediateAccessRequested}
-              onChange={event =>
-                setImmediateAccessRequested(event.target.checked)
-              }
-              className="mt-1 accent-primary"
-            />
-            <span>
-              Activate the paid service immediately. I acknowledge the
-              withdrawal information and that use during a statutory withdrawal
-              period can affect the amount refundable where the law allows.
-            </span>
-          </label>
-        </div>
-      </section>
-
       <PlanChooser
         billingCycle={billingCycle}
         setBillingCycle={setBillingCycle}
@@ -416,7 +321,9 @@ export default function BillingPage() {
                   ) : null}
                 </div>
                 <div className="mt-5 flex items-center justify-between">
-                  <span className="font-medium">€{pack.price.toFixed(2)}</span>
+                  <span className="font-medium">
+                    {pack.price.toFixed(2)} EUR / USD
+                  </span>
                   {busy === `topup:${id}` ? (
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
                   ) : (
@@ -424,8 +331,8 @@ export default function BillingPage() {
                   )}
                 </div>
                 <p className="mt-3 text-sm text-foreground/70">
-                  €{((pack.price / pack.credits) * 1000).toFixed(2)} per 1,000
-                  credits
+                  {((pack.price / pack.credits) * 1000).toFixed(2)} EUR / USD
+                  per 1,000 credits
                 </p>
                 <p className="mt-2 text-sm text-foreground/80">
                   {id === "boost"
@@ -458,8 +365,8 @@ export default function BillingPage() {
           })}
         </div>
         <p className="mt-3 text-xs text-foreground/65">
-          Displayed prices include VAT where applicable. Checkout confirms the
-          correct tax treatment from your billing details.
+          Displayed prices exclude tax. Applicable VAT or sales tax is
+          calculated and added at checkout from your billing details.
         </p>
       </section>
 
@@ -746,16 +653,18 @@ function PlanChooser({
               </p>
               <p className="mt-5">
                 <span className="text-4xl font-semibold tracking-tight">
-                  €
                   {price.toLocaleString(undefined, {
                     maximumFractionDigits: 2,
                   })}
                 </span>
-                <span className="text-sm text-foreground/70"> / month</span>
+                <span className="text-sm text-foreground/70">
+                  {" "}
+                  EUR / USD · / month
+                </span>
               </p>
               <p className="mt-2 text-sm text-foreground/70">
                 {annual
-                  ? `€${plan.annualTotal.toLocaleString()} billed yearly · save €${plan.monthlyPrice * 2}`
+                  ? `${plan.annualTotal.toLocaleString()} EUR / USD billed yearly · save ${plan.monthlyPrice * 2} EUR / USD`
                   : "Billed monthly · cancel renewal anytime"}
               </p>
               <div className="my-6 rounded-xl border border-primary/20 bg-primary/10 p-4">
@@ -814,8 +723,9 @@ function PlanChooser({
         })}
       </div>
       <p className="mt-4 text-sm text-foreground/70">
-        Prices include VAT where applicable. Annual plans receive credits
-        monthly. Plan credits reset; purchased credits roll over.
+        Prices exclude tax; applicable taxes are added at checkout. Annual plans
+        receive credits monthly. Plan credits reset; purchased credits roll
+        over.
       </p>
       {(summary?.plan || summary?.canManageBilling) && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 text-sm">

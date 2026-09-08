@@ -21,7 +21,6 @@ import type {
   CreditTopUpId,
   PlanId,
 } from "@contracts/billing";
-import type { CheckoutLegalConsent } from "@contracts/legal";
 import { supabase } from "@/lib/supabase/client";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { platformApiUrl } from "@/lib/runtime";
@@ -474,23 +473,16 @@ export const platformApi = {
       `/api/billing/checkout-status?session_id=${encodeURIComponent(sessionId)}`
     ),
 
-  createSubscriptionCheckout: (
-    planId: PlanId,
-    billingCycle: BillingCycle,
-    legalConsent: CheckoutLegalConsent
-  ) =>
+  createSubscriptionCheckout: (planId: PlanId, billingCycle: BillingCycle) =>
     requestJson<{ checkoutUrl: string }>("/api/billing/checkout", {
       method: "POST",
-      body: JSON.stringify({ planId, billingCycle, legalConsent }),
+      body: JSON.stringify({ planId, billingCycle }),
     }),
 
-  createTopUpCheckout: (
-    topUpId: CreditTopUpId,
-    legalConsent: CheckoutLegalConsent
-  ) =>
+  createTopUpCheckout: (topUpId: CreditTopUpId) =>
     requestJson<{ checkoutUrl: string }>("/api/billing/topup-checkout", {
       method: "POST",
-      body: JSON.stringify({ topUpId, legalConsent }),
+      body: JSON.stringify({ topUpId }),
     }),
 
   createBillingPortal: () =>

@@ -4398,10 +4398,7 @@ async function handleAssets(
       .first<AssetUploadRow>();
     if (!upload) return errorResponse("Upload not found", 404);
     if (Date.parse(upload.expires_at) <= Date.now()) {
-      await env.BUCKET.resumeMultipartUpload(
-        upload.r2_key,
-        upload.upload_id
-      )
+      await env.BUCKET.resumeMultipartUpload(upload.r2_key, upload.upload_id)
         .abort()
         .catch(() => undefined);
       await env.DB.prepare("DELETE FROM asset_uploads WHERE asset_id = ?")
@@ -4454,7 +4451,10 @@ async function handleAssets(
         await env.DB.prepare("DELETE FROM asset_uploads WHERE asset_id = ?")
           .bind(assetId)
           .run();
-        return errorResponse("The uploaded file was incomplete. Try again.", 422);
+        return errorResponse(
+          "The uploaded file was incomplete. Try again.",
+          422
+        );
       }
       const asset = await insertAssetRecord(env, user, {
         id: upload.asset_id,
@@ -9174,7 +9174,7 @@ const SUPPORT_SYSTEM_PROMPT = `You are REELassati Support, the official product 
 
 OFFICIAL PRODUCT KNOWLEDGE
 - Public routes: pricing at /pricing; login at /auth/login; signup at /auth/signup; password recovery at /auth/forgot-password; support at /contact.
-- Pricing: Creator is EUR ${PUBLIC_PLAN_PRICING.Creator.monthlyPrice} monthly or EUR ${PUBLIC_PLAN_PRICING.Creator.annualTotal} annually (EUR ${annualMonthlyEquivalent("Creator").toFixed(2)}/month equivalent) with ${PUBLIC_PLAN_PRICING.Creator.monthlyCredits.toLocaleString("en-US")} credits per month, 1 brand workspace, and 2 connected social accounts. Pro is EUR ${PUBLIC_PLAN_PRICING.Pro.monthlyPrice} monthly or EUR ${PUBLIC_PLAN_PRICING.Pro.annualTotal} annually (EUR ${annualMonthlyEquivalent("Pro").toFixed(2)}/month equivalent) with ${PUBLIC_PLAN_PRICING.Pro.monthlyCredits.toLocaleString("en-US")} credits per month, 3 brand workspaces, and 6 connected social accounts. Studio is EUR ${PUBLIC_PLAN_PRICING.Studio.monthlyPrice} monthly or EUR ${PUBLIC_PLAN_PRICING.Studio.annualTotal.toLocaleString("en-US")} annually (EUR ${annualMonthlyEquivalent("Studio").toFixed(2)}/month equivalent) with ${PUBLIC_PLAN_PRICING.Studio.monthlyCredits.toLocaleString("en-US")} credits per month, 10 brand workspaces, and 12 connected social accounts. Annual billing charges the price of ${ANNUAL_BILLED_MONTHS} monthly payments. The complete Studio is included in every plan. AI tools use REELassati credits inside the platform; never quote upstream model or provider prices.
+- Pricing: Creator is EUR or USD ${PUBLIC_PLAN_PRICING.Creator.monthlyPrice} monthly or ${PUBLIC_PLAN_PRICING.Creator.annualTotal} annually with ${PUBLIC_PLAN_PRICING.Creator.monthlyCredits.toLocaleString("en-US")} credits per month, 1 brand workspace, and 2 connected social accounts. Pro is EUR or USD ${PUBLIC_PLAN_PRICING.Pro.monthlyPrice} monthly or ${PUBLIC_PLAN_PRICING.Pro.annualTotal} annually with ${PUBLIC_PLAN_PRICING.Pro.monthlyCredits.toLocaleString("en-US")} credits per month, 3 brand workspaces, and 6 connected social accounts. Studio is EUR or USD ${PUBLIC_PLAN_PRICING.Studio.monthlyPrice} monthly or ${PUBLIC_PLAN_PRICING.Studio.annualTotal.toLocaleString("en-US")} annually with ${PUBLIC_PLAN_PRICING.Studio.monthlyCredits.toLocaleString("en-US")} credits per month, 10 brand workspaces, and 12 connected social accounts. Prices exclude tax; applicable VAT or sales tax is calculated and added at checkout. Annual billing charges the price of ${ANNUAL_BILLED_MONTHS} monthly payments. The complete Studio is included in every plan. AI tools use REELassati credits inside the platform; never quote upstream model or provider prices.
 - Account access: users can sign up, log in, request a password-reset email, and set a new password from the reset link. A reset link may be expired or already used; request a fresh one and use only the newest email. Never ask for passwords, verification codes, OAuth secrets, private tokens, card data, or identity documents.
 - Uploads: workspace video, audio, and image files use multipart object storage for long-form media. Video analysis reads a temporary signed media URL. Audio transcription still depends on the transcription provider's accepted input size and format.
 - Studio: users can create projects; trim, split, move, delete, caption, adjust pacing, add B-roll/audio/style suggestions, lock clips, and review AI edit plans before applying changes. AI recommendations are proposals, not proof that an edit was applied.
@@ -9372,8 +9372,8 @@ function guidedPricingSupport(
   if (/\b(?:credits?|top[ -]?ups?|crediti|ricariche?)\b/i.test(latest)) {
     return {
       reply: italian
-        ? `Le ricariche sono: ${CREDIT_TOP_UPS.boost.credits} crediti a €${CREDIT_TOP_UPS.boost.price}, ${CREDIT_TOP_UPS.momentum.credits.toLocaleString("it-IT")} a €${CREDIT_TOP_UPS.momentum.price}, oppure ${CREDIT_TOP_UPS.scale.credits.toLocaleString("it-IT")} a €${CREDIT_TOP_UPS.scale.price}. Richiedono un piano attivo e non scadono; i crediti inclusi nel piano si aggiornano ogni mese.`
-        : `Top-ups are ${CREDIT_TOP_UPS.boost.credits} credits for €${CREDIT_TOP_UPS.boost.price}, ${CREDIT_TOP_UPS.momentum.credits.toLocaleString("en-US")} for €${CREDIT_TOP_UPS.momentum.price}, or ${CREDIT_TOP_UPS.scale.credits.toLocaleString("en-US")} for €${CREDIT_TOP_UPS.scale.price}. They require an active plan and roll over; included plan credits refresh monthly.`,
+        ? `Le ricariche sono: ${CREDIT_TOP_UPS.boost.credits} crediti a €${CREDIT_TOP_UPS.boost.price}, ${CREDIT_TOP_UPS.momentum.credits.toLocaleString("it-IT")} a €${CREDIT_TOP_UPS.momentum.price}, oppure ${CREDIT_TOP_UPS.scale.credits.toLocaleString("it-IT")} a €${CREDIT_TOP_UPS.scale.price}. Richiedono un piano attivo e non scadono; i crediti inclusi nel piano si aggiornano ogni mese. Le imposte applicabili vengono aggiunte al checkout.`
+        : `Top-ups are ${CREDIT_TOP_UPS.boost.credits} credits for $${CREDIT_TOP_UPS.boost.price}, ${CREDIT_TOP_UPS.momentum.credits.toLocaleString("en-US")} for $${CREDIT_TOP_UPS.momentum.price}, or ${CREDIT_TOP_UPS.scale.credits.toLocaleString("en-US")} for $${CREDIT_TOP_UPS.scale.price}. They require an active plan and roll over; included plan credits refresh monthly. Applicable tax is added at checkout.`,
       resolved: true,
       needsHuman: false,
       suggestedActions: [],
@@ -9385,8 +9385,8 @@ function guidedPricingSupport(
     const rate = rates[plan];
     return {
       reply: italian
-        ? `${plan} include ${rate.monthlyCredits.toLocaleString("it-IT")} crediti al mese, ${rate.scaleItalian}. Costa €${rate.monthly}/mese oppure €${rate.annualTotal.toLocaleString("it-IT")}/anno (€${rate.annualMonthly.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mese equivalente). Lo Studio completo è incluso e gli strumenti AI usano soltanto crediti REELassati. Quale fatturazione preferisci?`
-        : `${plan} includes ${rate.monthlyCredits.toLocaleString("en-US")} credits per month and ${rate.scale}. It costs €${rate.monthly}/month or €${rate.annualTotal.toLocaleString("en-US")}/year (€${rate.annualMonthly.toFixed(2)}/month equivalent). The complete Studio is included; AI tools use REELassati credits inside the platform. Which billing term do you prefer?`,
+        ? `${plan} include ${rate.monthlyCredits.toLocaleString("it-IT")} crediti al mese, ${rate.scaleItalian}. Costa €${rate.monthly}/mese oppure €${rate.annualTotal.toLocaleString("it-IT")}/anno (€${rate.annualMonthly.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mese equivalente), più imposte applicabili al checkout. Lo Studio completo è incluso e gli strumenti AI usano soltanto crediti REELassati. Quale fatturazione preferisci?`
+        : `${plan} includes ${rate.monthlyCredits.toLocaleString("en-US")} credits per month and ${rate.scale}. It costs $${rate.monthly}/month or $${rate.annualTotal.toLocaleString("en-US")}/year ($${rate.annualMonthly.toFixed(2)}/month equivalent), plus applicable tax at checkout. The complete Studio is included; AI tools use REELassati credits inside the platform. Which billing term do you prefer?`,
       resolved: false,
       needsHuman: false,
       suggestedActions: italian
@@ -9424,8 +9424,8 @@ function guidedPricingSupport(
   ) {
     return {
       reply: italian
-        ? `Mensile: Creator €19 con 1.000 crediti, Pro €59 con 4.000 crediti, Studio €149 con 12.000 crediti. Annuale, pagando ${ANNUAL_BILLED_MONTHS} mesi: Creator €190, Pro €590, Studio €1.490. Lo Studio completo è incluso in ogni piano; cambiano crediti, workspace e account collegati. Quale profilo ti descrive meglio?`
-        : `Monthly: Creator €19 with 1,000 credits, Pro €59 with 4,000 credits, and Studio €149 with 12,000 credits. Annual billing charges ${ANNUAL_BILLED_MONTHS} months: Creator €190, Pro €590, and Studio €1,490. Every plan includes the complete Studio; credits, workspaces, and connected accounts scale by plan. Which profile fits you?`,
+        ? `Mensile: Creator €19 con 1.000 crediti, Pro €59 con 4.000 crediti, Studio €149 con 12.000 crediti. Annuale, pagando ${ANNUAL_BILLED_MONTHS} mesi: Creator €190, Pro €590, Studio €1.490. Le imposte applicabili vengono aggiunte al checkout. Lo Studio completo è incluso in ogni piano; cambiano crediti, workspace e account collegati. Quale profilo ti descrive meglio?`
+        : `Monthly: Creator $19 with 1,000 credits, Pro $59 with 4,000 credits, and Studio $149 with 12,000 credits. Annual billing charges ${ANNUAL_BILLED_MONTHS} months: Creator $190, Pro $590, and Studio $1,490. Applicable tax is added at checkout. Every plan includes the complete Studio; credits, workspaces, and connected accounts scale by plan. Which profile fits you?`,
       resolved: false,
       needsHuman: false,
       suggestedActions: italian
@@ -9466,8 +9466,8 @@ function guidedPricingSupport(
 
   return {
     reply: italian
-      ? `Certo. Prima di coinvolgere il team vendite posso darti subito prezzi e piano adatto: Creator €19/mese con 1.000 crediti, Pro €59/mese con 4.000 crediti, Studio €149/mese con 12.000 crediti. Con l’annuale paghi ${ANNUAL_BILLED_MONTHS} mesi. Lo Studio completo è incluso in ogni piano; cambiano crediti, workspace e account collegati. Quale profilo ti descrive meglio?`
-      : `Yes. Before involving sales, here are the useful facts: Creator is €19/month with 1,000 credits, Pro €59/month with 4,000 credits, and Studio €149/month with 12,000 credits. Annual billing charges ${ANNUAL_BILLED_MONTHS} months. Every plan includes the complete Studio; credits, workspaces, and connected accounts scale by plan. Which profile fits you?`,
+      ? `Certo. Prima di coinvolgere il team vendite posso darti subito prezzi e piano adatto: Creator €19/mese con 1.000 crediti, Pro €59/mese con 4.000 crediti, Studio €149/mese con 12.000 crediti. Con l’annuale paghi ${ANNUAL_BILLED_MONTHS} mesi. Le imposte applicabili vengono aggiunte al checkout. Lo Studio completo è incluso in ogni piano; cambiano crediti, workspace e account collegati. Quale profilo ti descrive meglio?`
+      : `Yes. Before involving sales, here are the useful facts: Creator is $19/month with 1,000 credits, Pro $59/month with 4,000 credits, and Studio $149/month with 12,000 credits. Annual billing charges ${ANNUAL_BILLED_MONTHS} months. Applicable tax is added at checkout. Every plan includes the complete Studio; credits, workspaces, and connected accounts scale by plan. Which profile fits you?`,
     resolved: false,
     needsHuman: false,
     suggestedActions: italian
@@ -10245,8 +10245,8 @@ export function normalizeTrendItems(
       );
     const datedOutsideWindow = Boolean(
       publishedAt &&
-        (publishedTimestamp > observedTimestamp + 6 * 60 * 60 * 1000 ||
-          observedTimestamp - publishedTimestamp > TREND_MAX_AGE_MS)
+      (publishedTimestamp > observedTimestamp + 6 * 60 * 60 * 1000 ||
+        observedTimestamp - publishedTimestamp > TREND_MAX_AGE_MS)
     );
     const hasReportedPerformance = hasHyperviralSignal(normalizedMetrics);
     const hasAnyReportedMetric = Object.values(normalizedMetrics).some(

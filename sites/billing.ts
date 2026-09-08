@@ -19,10 +19,7 @@ import {
   type CreditTopUpId,
   type PlanId,
 } from "../contracts/billing";
-import {
-  LEGAL_TERMS_VERSION,
-  type CheckoutLegalConsent,
-} from "../contracts/legal";
+import { LEGAL_TERMS_VERSION } from "../contracts/legal";
 
 type D1Result = {
   success: boolean;
@@ -53,8 +50,6 @@ export type BillingEnvironment = {
   STRIPE_PORTAL_CONFIGURATION_ID?: string;
   STRIPE_TAX_MODE?: "automatic" | "managed" | "not_collecting";
   PUBLIC_APP_URL?: string;
-  LEGAL_OPERATOR_NAME?: string;
-  LEGAL_OPERATOR_ADDRESS?: string;
 };
 
 export type BillingUser = { email: string; name: string };
@@ -193,71 +188,12 @@ export async function initializeBillingSchema(
         lease_until INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (owner_email, kind)
       )`),
-      env.DB.prepare(`CREATE TABLE IF NOT EXISTS billing_legal_consents (
-        id TEXT PRIMARY KEY NOT NULL,
-        owner_email TEXT NOT NULL,
-        purchase_kind TEXT NOT NULL,
-        selection TEXT NOT NULL,
-        terms_version TEXT NOT NULL,
-        immediate_access_requested INTEGER NOT NULL,
-        withdrawal_information_acknowledged INTEGER NOT NULL,
-        accepted_at TEXT NOT NULL
-      )`),
-      env.DB.prepare(
-        "CREATE INDEX IF NOT EXISTS billing_legal_consents_owner_accepted_idx ON billing_legal_consents (owner_email, accepted_at)"
-      ),
     ]).catch(cause => {
       billingSchemaInitialization = undefined;
       throw cause;
     });
   }
   await billingSchemaInitialization;
-}
-
-function validCheckoutLegalConsent(
-  value: unknown
-): value is CheckoutLegalConsent {
-  const consent = record(value);
-  return (
-    consent?.termsVersion === LEGAL_TERMS_VERSION &&
-    consent?.termsAccepted === true &&
-    consent?.immediateAccessRequested === true &&
-    consent?.withdrawalInformationAcknowledged === true
-  );
-}
-
-async function recordCheckoutLegalConsent(
-  env: BillingEnvironment,
-  user: BillingUser,
-  kind: "subscription" | "topup",
-  selection: string,
-  value: unknown
-): Promise<Response | null> {
-  if (!validCheckoutLegalConsent(value)) {
-    return error(
-      "Review and accept the Terms and Refund Policy before checkout",
-      400
-    );
-  }
-  await initializeBillingSchema(env);
-  const now = new Date().toISOString();
-  await env.DB.prepare(
-    `INSERT INTO billing_legal_consents
-      (id, owner_email, purchase_kind, selection, terms_version,
-       immediate_access_requested, withdrawal_information_acknowledged,
-       accepted_at)
-     VALUES (?, ?, ?, ?, ?, 1, 1, ?)`
-  )
-    .bind(
-      crypto.randomUUID(),
-      user.email,
-      kind,
-      selection,
-      LEGAL_TERMS_VERSION,
-      now
-    )
-    .run();
-  return null;
 }
 
 function parsePriceConfiguration(
@@ -297,8 +233,6 @@ function parsePriceConfiguration(
 export function stripeBillingConfigured(env: BillingEnvironment): boolean {
   const prices = parsePriceConfiguration(env);
   return Boolean(
-    cleanString(env.LEGAL_OPERATOR_NAME) &&
-    cleanString(env.LEGAL_OPERATOR_ADDRESS) &&
     hasStripeKey(env.STRIPE_SECRET_KEY) &&
     cleanString(env.STRIPE_WEBHOOK_SECRET).startsWith("whsec_") &&
     /^bpc_[A-Za-z0-9]+$/.test(
@@ -336,14 +270,6 @@ async function inspectStripeReadiness(
   const checks: StripeReadiness["checks"] = [];
   const add = (id: string, ready: boolean, message: string) =>
     checks.push({ id, ready, message });
-  add(
-    "operator_identity",
-    Boolean(
-      cleanString(env.LEGAL_OPERATOR_NAME) &&
-      cleanString(env.LEGAL_OPERATOR_ADDRESS)
-    ),
-    "Public legal operator name and geographic business address"
-  );
   add(
     "api_key",
     hasStripeKey(env.STRIPE_SECRET_KEY),
@@ -401,7 +327,9 @@ async function inspectStripeReadiness(
           price.active &&
           price.currency === "eur" &&
           price.unit_amount === p.cents &&
-          price.tax_behavior === "inclusive" &&
+          price.tax_behavior === "exclusive" &&
+          price.currency_options?.usd?.unit_amount === p.cents &&
+          price.currency_options.usd.tax_behavior === "exclusive" &&
           (p.interval
             ? price.recurring?.interval === p.interval &&
               price.recurring.interval_count === 1
@@ -1113,7 +1041,7 @@ async function checkoutSession(
   // One resumable session per owner/purchase kind. A lease covers concurrent tabs,
   // and the persisted attempt ID survives a provider response or process timeout.
   const lease = crypto.randomUUID();
-  const selection = `${id}:${cycle || "once"}:${priceId}:v3`;
+  const selection = `${id}:${cycle || "once"}:${priceId}:v4`;
   await env.DB.prepare(
     `INSERT INTO billing_checkouts
     (owner_email, kind, selection, attempt_id, lease_token, lease_until)
@@ -1238,6 +1166,7 @@ async function checkoutSession(
       owner_email: user.email,
       purchase_kind: kind,
       checkout_attempt_id: state.attempt_id,
+      terms_version: LEGAL_TERMS_VERSION,
     };
     if (kind === "subscription")
       Object.assign(metadata, { plan_id: id, billing_cycle: cycle! });
@@ -1246,7 +1175,7 @@ async function checkoutSession(
         topup_id: id,
         credits: String(CREDIT_TOP_UPS[id as CreditTopUpId].credits),
         quoted_cents: String(topUpPriceCents(id as CreditTopUpId)),
-        pricing_version: "3",
+        pricing_version: "4",
       });
     const managedPayments = env.STRIPE_TAX_MODE === "managed";
     const params: Stripe.Checkout.SessionCreateParams = {
@@ -1255,8 +1184,13 @@ async function checkoutSession(
       line_items: [{ price: priceId, quantity: 1 }],
       client_reference_id: user.email,
       success_url: `${origin}/#/dashboard/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/#/dashboard/billing?checkout=cancelled`,
+      cancel_url: `${origin}/#/dashboard/billing`,
       metadata,
+      custom_text: {
+        submit: {
+          message: `By completing this purchase, you agree to the [REELassati Terms](${origin}/#/terms) and acknowledge the [Cancellation and Refund Policy](${origin}/#/refunds). Paid access starts immediately.`,
+        },
+      },
       // Keep the integration label stable across retries of a persisted attempt.
       integration_identifier: `reelassati_${kind}_${state.attempt_id
         .replace(/-/g, "")
@@ -1358,21 +1292,12 @@ export async function handleBillingApi(
     const body = (await request.json().catch(() => ({}))) as {
       planId?: unknown;
       billingCycle?: unknown;
-      legalConsent?: unknown;
     };
     const planId = cleanString(body.planId);
     const cycle = cleanString(body.billingCycle);
     if (!isPlanId(planId) || !isBillingCycle(cycle)) {
       return error("Choose a valid plan and billing cycle");
     }
-    const consentError = await recordCheckoutLegalConsent(
-      env,
-      user,
-      "subscription",
-      `${planId}:${cycle}`,
-      body.legalConsent
-    );
-    if (consentError) return consentError;
     return checkoutSession(request, env, user, "subscription", planId, cycle);
   }
   if (
@@ -1381,18 +1306,9 @@ export async function handleBillingApi(
   ) {
     const body = (await request.json().catch(() => ({}))) as {
       topUpId?: unknown;
-      legalConsent?: unknown;
     };
     const topUpId = cleanString(body.topUpId);
     if (!isCreditTopUpId(topUpId)) return error("Choose a valid credit pack");
-    const consentError = await recordCheckoutLegalConsent(
-      env,
-      user,
-      "topup",
-      topUpId,
-      body.legalConsent
-    );
-    if (consentError) return consentError;
     return checkoutSession(request, env, user, "topup", topUpId);
   }
   if (url.pathname === "/api/billing/portal" && request.method === "POST") {
@@ -1782,7 +1698,7 @@ async function processStripeEvent(
       const topUpId = cleanString(metadata.topup_id);
       if (isCreditTopUpId(topUpId)) {
         // Old Checkout sessions retain their original allowance after repricing.
-        const credits = ["2", "3"].includes(
+        const credits = ["2", "3", "4"].includes(
           cleanString(metadata.pricing_version)
         )
           ? Number(metadata.credits)

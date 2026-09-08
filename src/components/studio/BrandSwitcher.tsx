@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Building2 } from "lucide-react";
 import { platformApi } from "@/lib/platform-api";
 import { selectBrand } from "@/lib/workspace-scope";
 import { useWorkspace } from "@/providers/workspace";
@@ -44,17 +45,30 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
       className={
         manage
           ? "mb-6 rounded-xl border border-border bg-surface p-5"
-          : "min-w-0"
+          : "relative min-w-0 overflow-hidden rounded-2xl border border-primary/45 bg-gradient-to-br from-primary/20 via-primary/10 to-surface p-3.5 shadow-[0_16px_36px_-22px_hsl(var(--primary))] before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary"
       }
     >
       <label className="text-sm font-medium">
-        Brand workspace
+        <span
+          className={
+            manage
+              ? "block"
+              : "relative mb-2.5 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-primary"
+          }
+        >
+          {!manage ? (
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+              <Building2 className="h-3.5 w-3.5" aria-hidden />
+            </span>
+          ) : null}
+          Brand workspace
+        </span>
         <select
           aria-label="Active brand workspace"
           disabled={!data || saving || !!workspaceError || busy}
           value={data?.activeId || "default"}
           onChange={e => selectBrand(workspace.profile.email, e.target.value)}
-          className="mt-2 w-full rounded-lg border border-border bg-background p-2 text-sm"
+          className={`${manage ? "mt-2 border-border bg-background p-2" : "relative border-primary/40 bg-background px-3 py-3 font-semibold shadow-sm"} w-full rounded-xl border text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/15`}
         >
           {(
             data?.brands || [
