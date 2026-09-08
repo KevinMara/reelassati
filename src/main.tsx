@@ -7,17 +7,28 @@ import { initializeI18n } from "@/lib/i18n";
 import "@/lib/posthog";
 import { PostHogPageviewTracker } from "@/components/analytics/PostHogPageviewTracker";
 import App from "./App";
+import { usePrivacyPreferences } from "@/components/compliance/PrivacyChoices";
+
+function OptionalAnalytics() {
+  const preferences = usePrivacyPreferences();
+  if (!preferences?.analytics) return null;
+  return (
+    <>
+      <PostHogPageviewTracker />
+      {(["reelassati.app", "www.reelassati.app"].includes(
+        window.location.hostname
+      ) ||
+        window.location.hostname.endsWith(".vercel.app")) && <Analytics />}
+    </>
+  );
+}
 
 void initializeI18n().finally(() => {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <HashRouter>
-        <PostHogPageviewTracker />
+        <OptionalAnalytics />
         <App />
-        {(["reelassati.app", "www.reelassati.app"].includes(
-          window.location.hostname
-        ) ||
-          window.location.hostname.endsWith(".vercel.app")) && <Analytics />}
       </HashRouter>
     </StrictMode>
   );

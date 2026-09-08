@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { ReferralCapture } from "@/components/ReferralCapture";
+import { PrivacyChoices } from "@/components/compliance/PrivacyChoices";
 
 const WorkspaceProvider = lazy(() =>
   import("@/providers/workspace").then(module => ({
@@ -27,6 +28,26 @@ const TemplatesPage = lazy(() => import("./pages/TemplatesPage"));
 const AITransparency = lazy(() => import("./pages/AITransparency"));
 const ResponsibleUse = lazy(() => import("./pages/ResponsibleUse"));
 const ProvenanceDetector = lazy(() => import("./pages/ProvenanceDetector"));
+const PrivacyPolicy = lazy(() =>
+  import("./pages/Legal").then(module => ({ default: module.PrivacyPolicy }))
+);
+const TermsOfService = lazy(() =>
+  import("./pages/Legal").then(module => ({ default: module.TermsOfService }))
+);
+const CookiePolicy = lazy(() =>
+  import("./pages/Legal").then(module => ({ default: module.CookiePolicy }))
+);
+const RefundPolicy = lazy(() =>
+  import("./pages/Legal").then(module => ({ default: module.RefundPolicy }))
+);
+const AccessibilityStatement = lazy(() =>
+  import("./pages/Legal").then(module => ({
+    default: module.AccessibilityStatement,
+  }))
+);
+const LegalNotice = lazy(() =>
+  import("./pages/Legal").then(module => ({ default: module.LegalNotice }))
+);
 
 function RouteFallback() {
   return (
@@ -101,6 +122,7 @@ export default function App() {
   return (
     <AuthProvider>
       <ReferralCapture />
+      <PrivacyChoices />
       <ScrollManager />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
@@ -114,6 +136,12 @@ export default function App() {
           <Route path="/ai-transparency" element={<AITransparency />} />
           <Route path="/responsible-use" element={<ResponsibleUse />} />
           <Route path="/provenance" element={<ProvenanceDetector />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/cookies" element={<CookiePolicy />} />
+          <Route path="/refunds" element={<RefundPolicy />} />
+          <Route path="/accessibility" element={<AccessibilityStatement />} />
+          <Route path="/legal" element={<LegalNotice />} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />

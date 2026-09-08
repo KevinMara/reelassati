@@ -290,7 +290,13 @@ export default function Support() {
                 <p className="mt-2 px-1 text-[10px] text-foreground/35">
                   {isItalian
                     ? "Non inviare password, codici, chiavi API o dati di pagamento."
-                    : "Never send passwords, verification codes, API keys, or payment data."}
+                    : "Never send passwords, verification codes, API keys, or payment data."}{" "}
+                  <Link to="/privacy" className="text-primary hover:underline">
+                    {isItalian
+                      ? "Come trattiamo i messaggi"
+                      : "How messages are handled"}
+                  </Link>
+                  .
                 </p>
               </div>
             </div>

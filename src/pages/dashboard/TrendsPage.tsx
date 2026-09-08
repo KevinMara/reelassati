@@ -43,6 +43,8 @@ import type {
 import { customTrendResearchCreditCost } from "@contracts/pricing";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { usePrivacyPreferences } from "@/components/compliance/PrivacyChoices";
+import { openPrivacyPreferences } from "@/lib/privacy-consent";
 
 const HYPOTHESIS_TONE = "format-hypothesis";
 
@@ -170,7 +172,37 @@ function videoEmbedUrl(trend: TrendEvidenceItem): string | null {
 
 function TrendVideo({ trend }: { trend: TrendEvidenceItem }) {
   const embedUrl = videoEmbedUrl(trend);
+  const preferences = usePrivacyPreferences();
   if (embedUrl) {
+    if (!preferences?.externalMedia) {
+      return (
+        <div className="flex aspect-[9/12] flex-col items-center justify-center gap-3 bg-background p-6 text-center">
+          <Play className="h-8 w-8 text-primary" aria-hidden />
+          <p className="text-sm font-medium">Load the original social video</p>
+          <p className="max-w-xs text-xs leading-relaxed text-foreground/55">
+            External players can receive device and interaction data. Allow them
+            in privacy choices or open the source directly.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={openPrivacyPreferences}
+              className="rounded-full bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
+            >
+              Privacy choices
+            </button>
+            <a
+              href={trend.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full border border-border px-3 py-2 text-xs font-medium"
+            >
+              Open source
+            </a>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="aspect-[9/12] overflow-hidden bg-black">
         <iframe
@@ -191,7 +223,7 @@ function TrendVideo({ trend }: { trend: TrendEvidenceItem }) {
       rel="noreferrer"
       className="group relative flex aspect-[9/12] items-center justify-center overflow-hidden bg-background"
     >
-      {trend.thumbnailUrl ? (
+      {trend.thumbnailUrl && preferences?.externalMedia ? (
         <img
           src={trend.thumbnailUrl}
           alt=""

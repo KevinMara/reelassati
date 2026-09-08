@@ -239,7 +239,7 @@ export default function Pricing() {
                   : "More brands, accounts, or a tailored workflow: we start from your real volume."}
               </p>
               <a
-                href="mailto:support@reelassati.com?subject=REELassati%20Studio%20plan"
+                href="mailto:reelassati@gmail.com?subject=REELassati%20Studio%20plan"
                 className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-hover"
               >
                 {isItalian ? "Parliamone" : "Talk to us"}{" "}
@@ -298,6 +298,19 @@ export default function Pricing() {
               {isItalian
                 ? "I prezzi mostrati includono l'IVA ove applicabile. Il checkout conferma il trattamento fiscale corretto."
                 : "Displayed prices include VAT where applicable. Checkout confirms the correct tax treatment."}
+            </p>
+            <p className="mt-3 text-xs leading-relaxed text-foreground/55">
+              {isItalian
+                ? "Prima dell’acquisto consulta "
+                : "Before purchasing, review the "}
+              <Link to="/terms" className="text-primary underline">
+                {isItalian ? "Termini" : "Terms"}
+              </Link>
+              {isItalian ? " e la " : " and "}
+              <Link to="/refunds" className="text-primary underline">
+                {isItalian ? "Policy rimborsi" : "Refund Policy"}
+              </Link>
+              .
             </p>
           </section>
         </div>

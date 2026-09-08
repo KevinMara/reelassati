@@ -18,6 +18,7 @@ import {
   stripeReadiness,
   type BillingEnvironment,
 } from "./billing";
+import { LEGAL_TERMS_VERSION } from "../contracts/legal";
 
 const sqlite = new DatabaseSync(":memory:");
 class Statement {
@@ -58,6 +59,8 @@ const env: BillingEnvironment = {
     },
   },
   STRIPE_WEBHOOK_SECRET: "whsec_test_only",
+  LEGAL_OPERATOR_NAME: "Test Operator",
+  LEGAL_OPERATOR_ADDRESS: "1 Test Street, Test City",
   STRIPE_PRICE_IDS_JSON: JSON.stringify({
     plans: {
       creator: { monthly: "price_creator", annual: "price_annual" },
@@ -105,7 +108,7 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   sqlite.exec(
-    "DELETE FROM billing_accounts; DELETE FROM credit_accounts; DELETE FROM credit_ledger; DELETE FROM stripe_events; DELETE FROM billing_payment_adjustments; DELETE FROM billing_checkouts;"
+    "DELETE FROM billing_accounts; DELETE FROM credit_accounts; DELETE FROM credit_ledger; DELETE FROM stripe_events; DELETE FROM billing_payment_adjustments; DELETE FROM billing_checkouts; DELETE FROM billing_legal_consents;"
   );
   sqlite
     .prepare(
@@ -254,10 +257,22 @@ function stripeFixture(
   vi.stubGlobal("fetch", fetchMock);
   const call = (path: string, body?: unknown) => {
     const url = new URL(`https://reelassati.app/api/billing/${path}`);
+    const requestBody =
+      body && ["checkout", "topup-checkout"].includes(path)
+        ? {
+            ...(body as Record<string, unknown>),
+            legalConsent: {
+              termsVersion: LEGAL_TERMS_VERSION,
+              termsAccepted: true,
+              immediateAccessRequested: true,
+              withdrawalInformationAcknowledged: true,
+            },
+          }
+        : body;
     return handleBillingApi(
       new Request(
         url,
-        body ? { method: "POST", body: JSON.stringify(body) } : {}
+        requestBody ? { method: "POST", body: JSON.stringify(requestBody) } : {}
       ),
       runtime,
       { email: owner, name: "Owner" },
@@ -268,6 +283,28 @@ function stripeFixture(
 }
 
 describe("Stripe checkout readiness and customer journey", () => {
+  it("requires current terms and immediate-service consent before checkout", async () => {
+    const fixture = stripeFixture();
+    const url = new URL("https://reelassati.app/api/billing/checkout");
+    const response = await handleBillingApi(
+      new Request(url, {
+        method: "POST",
+        body: JSON.stringify({ planId: "creator", billingCycle: "monthly" }),
+      }),
+      fixture.runtime,
+      { email: owner, name: "Owner" },
+      url
+    );
+
+    expect(response.status).toBe(400);
+    expect(fixture.writes).toHaveLength(0);
+    expect(
+      sqlite
+        .prepare("SELECT COUNT(*) AS count FROM billing_legal_consents")
+        .get()
+    ).toEqual({ count: 0 });
+  });
+
   it.each([{ tax: false }, { wrongAmount: true }, { charges: false }])(
     "prevents a purchase when account, tax or catalog checks fail: %j",
     async options => {
@@ -319,10 +356,12 @@ describe("Stripe checkout readiness and customer journey", () => {
     fixture.runtime.STRIPE_TAX_MODE = "managed";
     expect((await stripeReadiness(fixture.runtime)).ready).toBe(true);
     expect(
-      (await fixture.call("checkout", {
-        planId: "pro",
-        billingCycle: "monthly",
-      })).status
+      (
+        await fixture.call("checkout", {
+          planId: "pro",
+          billingCycle: "monthly",
+        })
+      ).status
     ).toBe(200);
     const params = fixture.writes[0];
     expect(params.get("managed_payments[enabled]")).toBe("true");

@@ -492,7 +492,9 @@ describe("platform-wide functional invariants", () => {
     expect(analyzer).not.toContain("analysisAuthorized");
     expect(analyzer).not.toContain("I'm authorized to provide this video");
     expect(analyzer).toMatch(/platform\s+terms and privacy information/);
-    expect(signup).toContain("By continuing, you agree");
+    expect(signup).toContain("termsAccepted");
+    expect(signup).toContain('to="/terms"');
+    expect(signup).toContain('to="/privacy"');
   });
 
   it("keeps the editor transport connected to the actual media preview", () => {

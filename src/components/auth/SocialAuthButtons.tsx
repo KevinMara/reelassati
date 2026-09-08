@@ -2,7 +2,11 @@ import { Apple, Github } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth, type SocialProvider } from "@/hooks/useAuth";
 
-export function SocialAuthButtons() {
+export function SocialAuthButtons({
+  disabled = false,
+}: {
+  disabled?: boolean;
+}) {
   const { t } = useTranslation();
   const { availableProviders, oauthLogin, loading } = useAuth();
   if (!availableProviders.length) return null;
@@ -21,7 +25,7 @@ export function SocialAuthButtons() {
           <button
             key={provider}
             type="button"
-            disabled={loading}
+            disabled={loading || disabled}
             onClick={() => void oauthLogin(provider)}
             className="group flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-background/60 px-4 text-sm font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary-wash hover:shadow-md disabled:opacity-50"
           >

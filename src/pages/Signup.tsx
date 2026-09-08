@@ -13,7 +13,8 @@ import {
 } from "@/lib/auth-next";
 
 export default function Signup() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isItalian = i18n.resolvedLanguage?.startsWith("it");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, signup, loading, error, clearError } = useAuth();
@@ -21,6 +22,7 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const requestedNext = searchParams.get("next");
 
   useEffect(() => {
@@ -73,8 +75,34 @@ export default function Signup() {
         </div>
       ) : (
         <>
+          <label className="mt-7 flex items-start gap-2.5 rounded-xl border border-border bg-background/60 p-3 text-xs leading-relaxed text-muted-foreground">
+            <input
+              type="checkbox"
+              required
+              checked={termsAccepted}
+              onChange={event => setTermsAccepted(event.target.checked)}
+              className="mt-0.5 accent-primary"
+            />
+            <span>
+              {isItalian ? "Accetto i " : "I agree to the "}
+              <Link to="/terms" className="text-primary underline">
+                {isItalian ? "Termini di servizio" : "Terms of Service"}
+              </Link>{" "}
+              {isItalian ? "e le regole di " : "and "}
+              <Link to="/responsible-use" className="text-primary underline">
+                {isItalian ? "Uso responsabile" : "Responsible Use rules"}
+              </Link>
+              {isItalian
+                ? ", e dichiaro di aver letto l’"
+                : ", and acknowledge the "}
+              <Link to="/privacy" className="text-primary underline">
+                {isItalian ? "Informativa privacy" : "Privacy Notice"}
+              </Link>
+              .
+            </span>
+          </label>
           <div className="mt-7">
-            <SocialAuthButtons />
+            <SocialAuthButtons disabled={!termsAccepted} />
           </div>
           <form onSubmit={submit} className="space-y-4">
             <label className="block text-sm font-medium">
@@ -133,7 +161,7 @@ export default function Signup() {
             ) : null}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !termsAccepted}
               className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-medium text-primary-foreground shadow-[0_14px_30px_-16px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:opacity-50"
             >
               {loading ? "Creating account…" : t("auth.signup_btn")}
@@ -143,19 +171,14 @@ export default function Signup() {
             </button>
           </form>
           <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground">
-            By continuing, you agree to REELassati&apos;s{" "}
-            <Link
-              to="/responsible-use"
-              className="text-primary hover:underline"
-            >
-              Responsible Use terms
-            </Link>{" "}
-            and acknowledge its{" "}
+            {isItalian
+              ? "Scopri come funziona l’AI gestita in "
+              : "Learn how managed AI works in "}
             <Link
               to="/ai-transparency"
               className="text-primary hover:underline"
             >
-              AI and privacy information
+              {isItalian ? "Trasparenza AI" : "AI transparency"}
             </Link>
             .
           </p>

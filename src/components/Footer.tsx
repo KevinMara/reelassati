@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Globe, Moon, Sun } from "lucide-react";
 import { Logo } from "./Logo";
 import { useTheme } from "@/hooks/useTheme";
+import { openPrivacyPreferences } from "@/lib/privacy-consent";
 
 export function Footer() {
   const { i18n } = useTranslation();
@@ -75,7 +76,10 @@ export function Footer() {
                 label: isItalian ? "Guida rapida" : "Quick start",
                 to: "/contact",
               },
-              { label: isItalian ? "Assistente" : "Support assistant", to: "/contact" },
+              {
+                label: isItalian ? "Assistente" : "Support assistant",
+                to: "/contact",
+              },
               { label: isItalian ? "Contatto" : "Contact", to: "/contact" },
             ]}
           />
@@ -109,6 +113,49 @@ export function Footer() {
               className="transition-colors hover:text-foreground"
             >
               {isItalian ? "Verifica provenienza" : "Check provenance"}
+            </Link>
+            <Link
+              to="/privacy"
+              className="transition-colors hover:text-foreground"
+            >
+              Privacy
+            </Link>
+            <Link
+              to="/terms"
+              className="transition-colors hover:text-foreground"
+            >
+              {isItalian ? "Termini" : "Terms"}
+            </Link>
+            <Link
+              to="/refunds"
+              className="transition-colors hover:text-foreground"
+            >
+              {isItalian ? "Rimborsi" : "Refunds"}
+            </Link>
+            <Link
+              to="/cookies"
+              className="transition-colors hover:text-foreground"
+            >
+              Cookies
+            </Link>
+            <button
+              type="button"
+              onClick={openPrivacyPreferences}
+              className="transition-colors hover:text-foreground"
+            >
+              {isItalian ? "Scelte privacy" : "Privacy choices"}
+            </button>
+            <Link
+              to="/accessibility"
+              className="transition-colors hover:text-foreground"
+            >
+              {isItalian ? "Accessibilità" : "Accessibility"}
+            </Link>
+            <Link
+              to="/legal"
+              className="transition-colors hover:text-foreground"
+            >
+              {isItalian ? "Informazioni legali" : "Legal notice"}
             </Link>
           </nav>
           <div className="flex items-center gap-1 lg:ml-2">

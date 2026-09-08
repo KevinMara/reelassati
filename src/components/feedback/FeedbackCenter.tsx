@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
   PlatformApiError,
@@ -459,6 +460,15 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
             )}
             {isItalian ? "Invia report" : "Submit report"}
           </button>
+          <p className="mt-3 text-xs text-foreground/45">
+            {isItalian
+              ? "Il report include il contesto tecnico elencato sopra ed è trattato secondo l’"
+              : "The report includes the technical context listed above and is handled under the "}
+            <Link to="/privacy" className="text-primary hover:underline">
+              {isItalian ? "Informativa privacy" : "Privacy Notice"}
+            </Link>
+            .
+          </p>
         </form>
 
         <aside className="space-y-4">

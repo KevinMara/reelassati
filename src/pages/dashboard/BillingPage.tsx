@@ -1,7 +1,7 @@
 import { CreditPlanner } from "@/components/studio/CreditPlanner";
 import posthog from "@/lib/posthog";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   Check,
@@ -34,6 +34,7 @@ import {
   YAxis,
 } from "recharts";
 import { platformApi } from "@/lib/platform-api";
+import { LEGAL_TERMS_VERSION } from "@contracts/legal";
 
 const PLAN_IDS: PlanId[] = ["creator", "pro", "studio"];
 
@@ -80,6 +81,28 @@ export default function BillingPage() {
   const checkoutState = searchParams.get("checkout");
   const sessionId = searchParams.get("session_id");
   const [paymentState, setPaymentState] = useState<string>("checking");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [immediateAccessRequested, setImmediateAccessRequested] =
+    useState(false);
+
+  const legalConsent = () => ({
+    termsVersion: LEGAL_TERMS_VERSION,
+    termsAccepted: true as const,
+    immediateAccessRequested: true as const,
+    withdrawalInformationAcknowledged: true as const,
+  });
+
+  const requirePurchaseConsent = () => {
+    if (termsAccepted && immediateAccessRequested) return true;
+    setError(
+      "Review the Terms and Refund Policy and request immediate activation before checkout."
+    );
+    document.getElementById("purchase-consent")?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+    return false;
+  };
 
   useEffect(() => {
     if (checkoutState !== "success" || !sessionId) return;
@@ -176,12 +199,14 @@ export default function BillingPage() {
   );
 
   const openCheckout = async (planId: PlanId) => {
+    if (!requirePurchaseConsent()) return;
     setBusy(`plan:${planId}`);
     setError(null);
     try {
       const { checkoutUrl } = await platformApi.createSubscriptionCheckout(
         planId,
-        billingCycle
+        billingCycle,
+        legalConsent()
       );
       posthog?.capture("checkout_opened", {
         kind: "subscription",
@@ -198,10 +223,14 @@ export default function BillingPage() {
   };
 
   const openTopUp = async (topUpId: CreditTopUpId) => {
+    if (!requirePurchaseConsent()) return;
     setBusy(`topup:${topUpId}`);
     setError(null);
     try {
-      const { checkoutUrl } = await platformApi.createTopUpCheckout(topUpId);
+      const { checkoutUrl } = await platformApi.createTopUpCheckout(
+        topUpId,
+        legalConsent()
+      );
       posthog?.capture("checkout_opened", { kind: "topup", topUpId });
       window.location.assign(checkoutUrl);
     } catch (cause) {
@@ -288,6 +317,55 @@ export default function BillingPage() {
           </p>
         </div>
       ) : null}
+
+      <section
+        id="purchase-consent"
+        className="mb-6 rounded-2xl border border-border bg-surface p-5"
+        aria-labelledby="purchase-consent-title"
+      >
+        <h2 id="purchase-consent-title" className="font-medium">
+          Clear terms before checkout
+        </h2>
+        <p className="mt-1 text-sm leading-relaxed text-foreground/60">
+          One confirmation covers the plan or credit pack you choose next.
+        </p>
+        <div className="mt-4 grid gap-3">
+          <label className="flex items-start gap-2.5 text-sm leading-relaxed text-foreground/75">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={event => setTermsAccepted(event.target.checked)}
+              className="mt-1 accent-primary"
+            />
+            <span>
+              I agree to the{" "}
+              <Link to="/terms" className="text-primary underline">
+                Terms of Service
+              </Link>{" "}
+              and have read the{" "}
+              <Link to="/refunds" className="text-primary underline">
+                Cancellation and Refund Policy
+              </Link>
+              .
+            </span>
+          </label>
+          <label className="flex items-start gap-2.5 text-sm leading-relaxed text-foreground/75">
+            <input
+              type="checkbox"
+              checked={immediateAccessRequested}
+              onChange={event =>
+                setImmediateAccessRequested(event.target.checked)
+              }
+              className="mt-1 accent-primary"
+            />
+            <span>
+              Activate the paid service immediately. I acknowledge the
+              withdrawal information and that use during a statutory withdrawal
+              period can affect the amount refundable where the law allows.
+            </span>
+          </label>
+        </div>
+      </section>
 
       <PlanChooser
         billingCycle={billingCycle}

@@ -67,8 +67,6 @@ function mapUser(user: User | null): AuthUser | null {
 function identifyAnalyticsUser(user: AuthUser | null) {
   if (!user) return;
   posthog?.identify(user.id, {
-    email: user.email,
-    name: user.name,
     role: user.role,
   });
 }

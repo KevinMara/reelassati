@@ -21,13 +21,11 @@ import type {
   CreditTopUpId,
   PlanId,
 } from "@contracts/billing";
+import type { CheckoutLegalConsent } from "@contracts/legal";
 import { supabase } from "@/lib/supabase/client";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { platformApiUrl } from "@/lib/runtime";
-import {
-  DIRECT_UPLOAD_MAX_BYTES,
-  UPLOAD_PART_BYTES,
-} from "@contracts/uploads";
+import { DIRECT_UPLOAD_MAX_BYTES, UPLOAD_PART_BYTES } from "@contracts/uploads";
 
 interface ApiErrorBody {
   error?: string;
@@ -476,16 +474,23 @@ export const platformApi = {
       `/api/billing/checkout-status?session_id=${encodeURIComponent(sessionId)}`
     ),
 
-  createSubscriptionCheckout: (planId: PlanId, billingCycle: BillingCycle) =>
+  createSubscriptionCheckout: (
+    planId: PlanId,
+    billingCycle: BillingCycle,
+    legalConsent: CheckoutLegalConsent
+  ) =>
     requestJson<{ checkoutUrl: string }>("/api/billing/checkout", {
       method: "POST",
-      body: JSON.stringify({ planId, billingCycle }),
+      body: JSON.stringify({ planId, billingCycle, legalConsent }),
     }),
 
-  createTopUpCheckout: (topUpId: CreditTopUpId) =>
+  createTopUpCheckout: (
+    topUpId: CreditTopUpId,
+    legalConsent: CheckoutLegalConsent
+  ) =>
     requestJson<{ checkoutUrl: string }>("/api/billing/topup-checkout", {
       method: "POST",
-      body: JSON.stringify({ topUpId }),
+      body: JSON.stringify({ topUpId, legalConsent }),
     }),
 
   createBillingPortal: () =>
