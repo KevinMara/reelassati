@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { redactBillingError } from "./billing-diagnostics";
 import { hasStripeKey, stripeClient } from "./stripe-client";
 import type { StripeReadiness } from "../contracts/billing";
 import {
@@ -1006,7 +1007,7 @@ async function currentSubscription(env: BillingEnvironment, id: string) {
 
 function billingFailure(cause: unknown): Response {
   // SDK errors can contain request parameters. Log only allowlisted diagnostic
-  // fields and keep request payloads and provider messages out of logs.
+  // fields and redact provider explanations; never log request payloads.
   const stripeError =
     typeof cause === "object" && cause !== null
       ? (cause as Record<string, unknown>)
@@ -1018,6 +1019,7 @@ function billingFailure(cause: unknown): Response {
   console.error("Stripe operation failed", {
     type: cause instanceof Error ? cause.name : "UnknownError",
     stripeType: safeField(stripeError?.type),
+    explanation: redactBillingError(stripeError?.message),
     code: safeField(stripeError?.code),
     param: safeField(stripeError?.param),
     requestId: safeField(stripeError?.requestId),
