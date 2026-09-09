@@ -1,6 +1,6 @@
 import { CreditPlanner } from "@/components/studio/CreditPlanner";
 import posthog from "@/lib/posthog";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
@@ -80,6 +80,7 @@ export default function BillingPage() {
   const checkoutState = searchParams.get("checkout");
   const sessionId = searchParams.get("session_id");
   const [paymentState, setPaymentState] = useState<string>("checking");
+  const automaticCheckout = useRef<string | null>(null);
   useEffect(() => {
     if (checkoutState !== "success" || !sessionId) return;
     let active = true;
@@ -195,6 +196,26 @@ export default function BillingPage() {
       setBusy(null);
     }
   };
+
+  useEffect(() => {
+    if (
+      loading ||
+      !summary?.configured ||
+      summary.canUseCredits ||
+      (summary.plan &&
+        !["canceled", "incomplete_expired", "inactive"].includes(
+          summary.plan.status
+        )) ||
+      !isPlanId(selectedPlan) ||
+      !isBillingCycle(selectedCycle)
+    )
+      return;
+
+    const selection = `${selectedPlan}:${selectedCycle}`;
+    if (automaticCheckout.current === selection) return;
+    automaticCheckout.current = selection;
+    void openCheckout(selectedPlan);
+  }, [loading, selectedCycle, selectedPlan, summary]);
 
   const openTopUp = async (topUpId: CreditTopUpId) => {
     setBusy(`topup:${topUpId}`);

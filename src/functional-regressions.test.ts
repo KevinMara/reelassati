@@ -297,6 +297,8 @@ describe("platform-wide functional invariants", () => {
     expect(api).toContain('"/api/billing/checkout"');
     expect(api).toContain('"/api/billing/topup-checkout"');
     expect(api).toContain('"/api/billing/portal"');
+    expect(billingPage).toContain("automaticCheckout.current === selection");
+    expect(billingPage).toContain("void openCheckout(selectedPlan)");
     expect(server).toContain('"/api/billing/stripe-webhook"');
     expect(server).toContain("runPaidAiAction");
     expect(server).toContain("workspace.profile.credits = 0");
