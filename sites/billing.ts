@@ -1222,11 +1222,6 @@ async function checkoutSession(
       success_url: `${origin}/#/dashboard/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/#/dashboard/billing`,
       metadata,
-      custom_text: {
-        submit: {
-          message: `By completing this purchase, you agree to the [REELassati Terms](${origin}/#/terms) and acknowledge the [Cancellation and Refund Policy](${origin}/#/refunds). Paid access starts immediately.`,
-        },
-      },
       // Keep the integration label stable across retries of a persisted attempt.
       integration_identifier: `reelassati_${kind}_${state.attempt_id
         .replace(/-/g, "")
@@ -1236,6 +1231,12 @@ async function checkoutSession(
         ? { managed_payments: { enabled: true } }
         : {
             managed_payments: { enabled: false },
+            // Managed Payments rejects custom_text (including legal copy).
+            custom_text: {
+              submit: {
+                message: `By completing this purchase, you agree to the [REELassati Terms](${origin}/#/terms) and acknowledge the [Cancellation and Refund Policy](${origin}/#/refunds). Paid access starts immediately.`,
+              },
+            },
             customer_update: { address: "auto", name: "auto" } as const,
             automatic_tax: {
               enabled: env.STRIPE_TAX_MODE !== "not_collecting",
