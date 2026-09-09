@@ -199,14 +199,33 @@ export async function initializeBillingSchema(
 function parsePriceConfiguration(
   env: BillingEnvironment
 ): StripePriceConfiguration {
-  const empty: StripePriceConfiguration = {
-    plans: { creator: {}, pro: {}, studio: {} },
-    topUps: {},
+  const current: StripePriceConfiguration = {
+    plans: {
+      creator: {
+        monthly: "price_1UDkmhRq0djyYmwUA1rFFFU6",
+        annual: "price_1UDkn8Rq0djyYmwUGNP6PdD0",
+      },
+      pro: {
+        monthly: "price_1UDkm6Rq0djyYmwUSanuqbbl",
+        annual: "price_1UDkmFRq0djyYmwUcHGJaBdT",
+      },
+      studio: {
+        monthly: "price_1UDkmORq0djyYmwUfTyZ36W8",
+        annual: "price_1UDknHRq0djyYmwUjARCyvtS",
+      },
+    },
+    topUps: {
+      boost: "price_1UDkmqRq0djyYmwUsEO7aEdK",
+      momentum: "price_1UDkmXRq0djyYmwUPFsv0sql",
+      scale: "price_1UDkmyRq0djyYmwUs2evoLoN",
+    },
   };
   try {
     const parsed = record(
       JSON.parse(cleanString(env.STRIPE_PRICE_IDS_JSON, "{}"))
     );
+    // Ignore stale pre-USD catalogs; the current public USD IDs are safe defaults.
+    if (Number(parsed?.version) !== 5) return current;
     const plans = record(parsed?.plans);
     const topUps = record(parsed?.topUps || parsed?.topups);
     for (const planId of ["creator", "pro", "studio"] as const) {
@@ -214,20 +233,20 @@ function parsePriceConfiguration(
       for (const cycle of ["monthly", "annual"] as const) {
         const priceId = cleanString(plan?.[cycle]);
         if (/^price_[A-Za-z0-9]+$/.test(priceId)) {
-          empty.plans[planId][cycle] = priceId;
+          current.plans[planId][cycle] = priceId;
         }
       }
     }
     for (const topUpId of Object.keys(CREDIT_TOP_UPS) as CreditTopUpId[]) {
       const priceId = cleanString(topUps?.[topUpId]);
       if (/^price_[A-Za-z0-9]+$/.test(priceId)) {
-        empty.topUps[topUpId] = priceId;
+        current.topUps[topUpId] = priceId;
       }
     }
   } catch {
-    return empty;
+    return current;
   }
-  return empty;
+  return current;
 }
 
 export function stripeBillingConfigured(env: BillingEnvironment): boolean {

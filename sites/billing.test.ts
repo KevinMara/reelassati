@@ -60,6 +60,7 @@ const env: BillingEnvironment = {
   },
   STRIPE_WEBHOOK_SECRET: "whsec_test_only",
   STRIPE_PRICE_IDS_JSON: JSON.stringify({
+    version: 5,
     plans: {
       creator: { monthly: "price_creator", annual: "price_annual" },
       pro: { monthly: "price_pro", annual: "price_proannual" },
@@ -153,6 +154,7 @@ function stripeFixture(
     STRIPE_PORTAL_CONFIGURATION_ID: "bpc_fixture",
     PUBLIC_APP_URL: "https://reelassati.app",
     STRIPE_PRICE_IDS_JSON: JSON.stringify({
+      version: 5,
       plans: Object.fromEntries(
         ["creator", "pro", "studio"].map(id => [
           id,
