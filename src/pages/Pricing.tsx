@@ -362,7 +362,7 @@ function PlanCard({
           {priceLabel}
         </span>
         <span className="pb-1 text-sm text-foreground/45">
-          USD · /{isItalian ? "mese" : "month"}
+          USD /{isItalian ? "mese" : "month"}
         </span>
       </div>
       <p className="mt-2 min-h-[20px] text-xs text-foreground/45">

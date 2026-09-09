@@ -1005,9 +1005,26 @@ async function currentSubscription(env: BillingEnvironment, id: string) {
 }
 
 function billingFailure(cause: unknown): Response {
-  // SDK errors can contain request parameters. Keep them out of customer messages/logs.
+  // SDK errors can contain request parameters. Log only allowlisted diagnostic
+  // fields and keep request payloads and provider messages out of logs.
+  const stripeError =
+    typeof cause === "object" && cause !== null
+      ? (cause as Record<string, unknown>)
+      : null;
+  const safeField = (value: unknown) =>
+    typeof value === "string" && /^[a-zA-Z0-9_.:-]{1,160}$/.test(value)
+      ? value
+      : undefined;
   console.error("Stripe operation failed", {
     type: cause instanceof Error ? cause.name : "UnknownError",
+    stripeType: safeField(stripeError?.type),
+    code: safeField(stripeError?.code),
+    param: safeField(stripeError?.param),
+    requestId: safeField(stripeError?.requestId),
+    statusCode:
+      typeof stripeError?.statusCode === "number"
+        ? stripeError.statusCode
+        : undefined,
   });
   return error("Billing could not be opened. Try again shortly.", 502);
 }

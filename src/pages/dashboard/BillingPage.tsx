@@ -680,7 +680,7 @@ function PlanChooser({
                 </span>
                 <span className="text-sm text-foreground/70">
                   {" "}
-                  USD · / month
+                  USD / month
                 </span>
               </p>
               <p className="mt-2 text-sm text-foreground/70">
