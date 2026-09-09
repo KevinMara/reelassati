@@ -38,7 +38,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       monthlyCredits: PUBLIC_PLAN_PRICING.Creator.monthlyCredits,
       features: [
         "1 brand workspace",
-        "2 connected social accounts",
+        "1 connected social account",
         "Precision Studio and reviewable edit plans",
         "Scripts, Prompt Director, calendar, and analytics",
         "Version history and finished MP4 exports",
@@ -55,7 +55,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       featured: true,
       features: [
         "3 brand workspaces",
-        "6 connected social accounts",
+        "5 connected social accounts",
         "Everything in Creator",
         "Content library and publishing queue",
         "Content activity charts and usage tracking",
@@ -71,7 +71,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       features: [
         "10 brand workspaces",
-        "12 connected social accounts",
+        "10 connected social accounts",
         "Everything in Pro",
         "Higher generation and publishing allowances",
         "Shared library across creation tools",
@@ -90,7 +90,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       monthlyCredits: PUBLIC_PLAN_PRICING.Creator.monthlyCredits,
       features: [
         "1 workspace brand",
-        "2 account social collegati",
+        "1 account social collegato",
         "Studio di precisione e piani di montaggio revisionabili",
         "Script, Prompt Director, calendario e analytics",
         "Cronologia versioni ed export MP4",
@@ -107,7 +107,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       featured: true,
       features: [
         "3 workspace brand",
-        "6 account social collegati",
+        "5 account social collegati",
         "Tutto il piano Creator",
         "Libreria contenuti e coda di pubblicazione",
         "Grafici attività contenuti e utilizzo",
@@ -123,7 +123,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
       monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       features: [
         "10 workspace brand",
-        "12 account social collegati",
+        "10 account social collegati",
         "Tutto il piano Pro",
         "Più crediti e account social collegati",
         "Libreria condivisa tra gli strumenti creativi",
@@ -283,9 +283,9 @@ export default function Pricing() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <strong className="text-2xl">{pack.price} EUR / USD</strong>
+                    <strong className="text-2xl">{pack.price} USD</strong>
                     <p className="mt-1 text-sm text-foreground/70">
-                      {((pack.price / pack.credits) * 1000).toFixed(2)} EUR /
+                      {((pack.price / pack.credits) * 1000).toFixed(2)}
                       USD /{" "}
                       {Number(1000).toLocaleString(
                         isItalian ? "it-IT" : "en-IE"
@@ -297,8 +297,8 @@ export default function Pricing() {
             </div>
             <p className="mt-4 text-sm text-foreground/70">
               {isItalian
-                ? "I prezzi mostrati sono al netto delle imposte. IVA o imposte applicabili vengono calcolate e aggiunte al checkout in base al paese del cliente."
-                : "Displayed prices exclude tax. Applicable VAT or sales tax is calculated and added at checkout based on the customer’s location."}
+                ? "Prezzi base in USD, imposte escluse. Al checkout puoi pagare nelle valute locali disponibili; Stripe calcola e aggiunge le imposte applicabili."
+                : "Base prices are in USD, excluding tax. Checkout offers supported local currencies; Stripe calculates and adds applicable taxes."}
             </p>
           </section>
         </div>
@@ -362,14 +362,14 @@ function PlanCard({
           {priceLabel}
         </span>
         <span className="pb-1 text-sm text-foreground/45">
-          EUR / USD · /{isItalian ? "mese" : "month"}
+          USD · /{isItalian ? "mese" : "month"}
         </span>
       </div>
       <p className="mt-2 min-h-[20px] text-xs text-foreground/45">
         {billingCycle === "annual"
           ? isItalian
-            ? `${annualTotalLabel} EUR / USD fatturati annualmente`
-            : `${annualTotalLabel} EUR / USD billed annually`
+            ? `${annualTotalLabel} USD fatturati annualmente`
+            : `${annualTotalLabel} USD billed annually`
           : isItalian
             ? "Fatturazione mensile"
             : "Billed monthly"}

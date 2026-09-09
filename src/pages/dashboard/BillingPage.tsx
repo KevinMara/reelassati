@@ -322,7 +322,7 @@ export default function BillingPage() {
                 </div>
                 <div className="mt-5 flex items-center justify-between">
                   <span className="font-medium">
-                    {pack.price.toFixed(2)} EUR / USD
+                    {pack.price.toFixed(2)} USD
                   </span>
                   {busy === `topup:${id}` ? (
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -331,7 +331,7 @@ export default function BillingPage() {
                   )}
                 </div>
                 <p className="mt-3 text-sm text-foreground/70">
-                  {((pack.price / pack.credits) * 1000).toFixed(2)} EUR / USD
+                  {((pack.price / pack.credits) * 1000).toFixed(2)} USD
                   per 1,000 credits
                 </p>
                 <p className="mt-2 text-sm text-foreground/80">
@@ -659,12 +659,12 @@ function PlanChooser({
                 </span>
                 <span className="text-sm text-foreground/70">
                   {" "}
-                  EUR / USD · / month
+                  USD · / month
                 </span>
               </p>
               <p className="mt-2 text-sm text-foreground/70">
                 {annual
-                  ? `${plan.annualTotal.toLocaleString()} EUR / USD billed yearly · save ${plan.monthlyPrice * 2} EUR / USD`
+                  ? `${plan.annualTotal.toLocaleString()} USD billed yearly · save ${plan.monthlyPrice * 2} USD`
                   : "Billed monthly · cancel renewal anytime"}
               </p>
               <div className="my-6 rounded-xl border border-primary/20 bg-primary/10 p-4">

@@ -9347,7 +9347,7 @@ const SUPPORT_SYSTEM_PROMPT = `You are REELassati Support, the official product 
 
 OFFICIAL PRODUCT KNOWLEDGE
 - Public routes: pricing at /pricing; login at /auth/login; signup at /auth/signup; password recovery at /auth/forgot-password; support at /contact.
-- Pricing: Creator is EUR or USD ${PUBLIC_PLAN_PRICING.Creator.monthlyPrice} monthly or ${PUBLIC_PLAN_PRICING.Creator.annualTotal} annually with ${PUBLIC_PLAN_PRICING.Creator.monthlyCredits.toLocaleString("en-US")} credits per month, 1 brand workspace, and 2 connected social accounts. Pro is EUR or USD ${PUBLIC_PLAN_PRICING.Pro.monthlyPrice} monthly or ${PUBLIC_PLAN_PRICING.Pro.annualTotal} annually with ${PUBLIC_PLAN_PRICING.Pro.monthlyCredits.toLocaleString("en-US")} credits per month, 3 brand workspaces, and 6 connected social accounts. Studio is EUR or USD ${PUBLIC_PLAN_PRICING.Studio.monthlyPrice} monthly or ${PUBLIC_PLAN_PRICING.Studio.annualTotal.toLocaleString("en-US")} annually with ${PUBLIC_PLAN_PRICING.Studio.monthlyCredits.toLocaleString("en-US")} credits per month, 10 brand workspaces, and 12 connected social accounts. Prices exclude tax; applicable VAT or sales tax is calculated and added at checkout. Annual billing charges the price of ${ANNUAL_BILLED_MONTHS} monthly payments. The complete Studio is included in every plan. AI tools use REELassati credits inside the platform; never quote upstream model or provider prices.
+- Pricing: Creator is USD ${PUBLIC_PLAN_PRICING.Creator.monthlyPrice} monthly or ${PUBLIC_PLAN_PRICING.Creator.annualTotal} annually with ${PUBLIC_PLAN_PRICING.Creator.monthlyCredits.toLocaleString("en-US")} credits per month, 1 brand workspace, and 1 connected social account. Pro is USD ${PUBLIC_PLAN_PRICING.Pro.monthlyPrice} monthly or ${PUBLIC_PLAN_PRICING.Pro.annualTotal} annually with ${PUBLIC_PLAN_PRICING.Pro.monthlyCredits.toLocaleString("en-US")} credits per month, 3 brand workspaces, and 5 connected social accounts. Studio is USD ${PUBLIC_PLAN_PRICING.Studio.monthlyPrice} monthly or ${PUBLIC_PLAN_PRICING.Studio.annualTotal.toLocaleString("en-US")} annually with ${PUBLIC_PLAN_PRICING.Studio.monthlyCredits.toLocaleString("en-US")} credits per month, 10 brand workspaces, and 10 connected social accounts. Prices exclude tax; applicable VAT or sales tax is calculated and added at checkout. Annual billing charges the price of ${ANNUAL_BILLED_MONTHS} monthly payments. The complete Studio is included in every plan. AI tools use REELassati credits inside the platform; never quote upstream model or provider prices.
 - Account access: users can sign up, log in, request a password-reset email, and set a new password from the reset link. A reset link may be expired or already used; request a fresh one and use only the newest email. Never ask for passwords, verification codes, OAuth secrets, private tokens, card data, or identity documents.
 - Uploads: workspace video, audio, and image files use multipart object storage for long-form media. Video analysis reads a temporary signed media URL. Audio transcription still depends on the transcription provider's accepted input size and format.
 - Studio: users can create projects; trim, split, move, delete, caption, adjust pacing, add B-roll/audio/style suggestions, lock clips, and review AI edit plans before applying changes. AI recommendations are proposals, not proof that an edit was applied.
@@ -9521,24 +9521,24 @@ function guidedPricingSupport(
       annualMonthly: annualMonthlyEquivalent("Creator"),
       annualTotal: PUBLIC_PLAN_PRICING.Creator.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Creator.monthlyCredits,
-      scale: "1 brand workspace and 2 connected social accounts",
-      scaleItalian: "1 workspace brand e 2 account social collegati",
+      scale: "1 brand workspace and 1 connected social account",
+      scaleItalian: "1 workspace brand e 1 account social collegato",
     },
     Pro: {
       monthly: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
       annualMonthly: annualMonthlyEquivalent("Pro"),
       annualTotal: PUBLIC_PLAN_PRICING.Pro.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
-      scale: "3 brand workspaces and 6 connected social accounts",
-      scaleItalian: "3 workspace brand e 6 account social collegati",
+      scale: "3 brand workspaces and 5 connected social accounts",
+      scaleItalian: "3 workspace brand e 5 account social collegati",
     },
     Studio: {
       monthly: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
       annualMonthly: annualMonthlyEquivalent("Studio"),
       annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
-      scale: "10 brand workspaces and 12 connected social accounts",
-      scaleItalian: "10 workspace brand e 12 account social collegati",
+      scale: "10 brand workspaces and 10 connected social accounts",
+      scaleItalian: "10 workspace brand e 10 account social collegati",
     },
   } as const;
 
@@ -9606,11 +9606,11 @@ function guidedPricingSupport(
             {
               label: "Creator singolo",
               message:
-                "Sono un creator singolo e mi servono fino a 2 account social collegati.",
+                "Sono un creator singolo e mi servono fino a 1 account social collegato.",
             },
             {
               label: "Piccolo team",
-              message: "Gestisco fino a 3 brand e 6 account social collegati.",
+              message: "Gestisco fino a 3 brand e 5 account social collegati.",
             },
             {
               label: "Agenzia",
@@ -9621,12 +9621,12 @@ function guidedPricingSupport(
             {
               label: "Solo creator",
               message:
-                "I’m one creator and need up to 2 connected social accounts.",
+                "I’m one creator and need up to 1 connected social account.",
             },
             {
               label: "Small team",
               message:
-                "I manage up to 3 brands and 6 connected social accounts.",
+                "I manage up to 3 brands and 5 connected social accounts.",
             },
             {
               label: "Agency / clients",
@@ -9648,11 +9648,11 @@ function guidedPricingSupport(
           {
             label: "Creator singolo",
             message:
-              "Sono un creator singolo e mi servono fino a 2 account social collegati.",
+              "Sono un creator singolo e mi servono fino a 1 account social collegato.",
           },
           {
             label: "Piccolo team",
-            message: "Gestisco fino a 3 brand e 6 account social collegati.",
+            message: "Gestisco fino a 3 brand e 5 account social collegati.",
           },
           {
             label: "Agenzia",
@@ -9668,11 +9668,11 @@ function guidedPricingSupport(
           {
             label: "Solo creator",
             message:
-              "I’m one creator and need up to 2 connected social accounts.",
+              "I’m one creator and need up to 1 connected social account.",
           },
           {
             label: "Small team",
-            message: "I manage up to 3 brands and 6 connected social accounts.",
+            message: "I manage up to 3 brands and 5 connected social accounts.",
           },
           {
             label: "Agency / clients",

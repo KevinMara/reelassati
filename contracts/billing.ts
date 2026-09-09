@@ -19,6 +19,13 @@ export const CREDIT_TOP_UPS = {
 
 export type CreditTopUpId = keyof typeof CREDIT_TOP_UPS;
 
+/** Maximum modeled provider-delivery budget represented by one customer credit. */
+export const DELIVERY_COST_USD_PER_CREDIT = 0.003;
+
+export function deliveryBudgetUsd(credits: number): number {
+  return Math.max(0, credits) * DELIVERY_COST_USD_PER_CREDIT;
+}
+
 /** Subscriber-only packs: lower unit prices than every monthly or annual plan. */
 export function topUpPriceCents(id: CreditTopUpId): number {
   return CREDIT_TOP_UPS[id].price * 100;

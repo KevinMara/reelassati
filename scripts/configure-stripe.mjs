@@ -50,7 +50,7 @@ if (!process.argv.includes("--apply")) {
     JSON.stringify(
       {
         mode: "plan",
-        currency: "eur",
+        currency: "usd",
         taxBehavior: "exclusive",
         catalog,
         webhookUrl,
@@ -164,18 +164,15 @@ async function configure() {
           `Catalog product ${entry.product} is archived. Review it before creating prices.`
         );
       productIds.set(entry.product, product.id);
-      const lookupKey = `reelassati_${entry.key}_eur_usd_${entry.cents}_v4`;
+      const lookupKey = `reelassati_${entry.key}_usd_${entry.cents}_v5`;
       let price = prices.find(p => p.lookup_key === lookupKey);
       if (!price)
         price = await stripe.prices.create(
           {
             product: product.id,
-            currency: "eur",
+            currency: "usd",
             unit_amount: entry.cents,
             tax_behavior: "exclusive",
-            currency_options: {
-              usd: { unit_amount: entry.cents, tax_behavior: "exclusive" },
-            },
             lookup_key: lookupKey,
             ...(entry.interval
               ? { recurring: { interval: entry.interval } }
@@ -183,6 +180,7 @@ async function configure() {
             metadata: {
               app: "reelassati",
               catalog_id: entry.key,
+              catalog_version: "5",
               credits: String(entry.credits),
             },
           },
@@ -191,11 +189,9 @@ async function configure() {
       if (
         !price.active ||
         price.product !== product.id ||
-        price.currency !== "eur" ||
+        price.currency !== "usd" ||
         price.unit_amount !== entry.cents ||
         price.tax_behavior !== "exclusive" ||
-        price.currency_options?.usd?.unit_amount !== entry.cents ||
-        price.currency_options?.usd?.tax_behavior !== "exclusive" ||
         (price.recurring?.interval || null) !== entry.interval
       )
         throw new SetupError(

@@ -210,7 +210,7 @@ function stripeFixture(
         data = {
           id,
           active: true,
-          currency: "eur",
+          currency: "usd",
           unit_amount: price.cents + (options.wrongAmount ? 1 : 0),
           tax_behavior: "exclusive",
           currency_options: {

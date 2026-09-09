@@ -325,11 +325,9 @@ async function inspectStripeReadiness(
         const price = await stripe.prices.retrieve(p.id);
         return (
           price.active &&
-          price.currency === "eur" &&
+          price.currency === "usd" &&
           price.unit_amount === p.cents &&
           price.tax_behavior === "exclusive" &&
-          price.currency_options?.usd?.unit_amount === p.cents &&
-          price.currency_options.usd.tax_behavior === "exclusive" &&
           (p.interval
             ? price.recurring?.interval === p.interval &&
               price.recurring.interval_count === 1
@@ -1175,7 +1173,7 @@ async function checkoutSession(
         topup_id: id,
         credits: String(CREDIT_TOP_UPS[id as CreditTopUpId].credits),
         quoted_cents: String(topUpPriceCents(id as CreditTopUpId)),
-        pricing_version: "4",
+        pricing_version: "5",
       });
     const managedPayments = env.STRIPE_TAX_MODE === "managed";
     const params: Stripe.Checkout.SessionCreateParams = {
@@ -1698,7 +1696,7 @@ async function processStripeEvent(
       const topUpId = cleanString(metadata.topup_id);
       if (isCreditTopUpId(topUpId)) {
         // Old Checkout sessions retain their original allowance after repricing.
-        const credits = ["2", "3", "4"].includes(
+        const credits = ["2", "3", "4", "5"].includes(
           cleanString(metadata.pricing_version)
         )
           ? Number(metadata.credits)

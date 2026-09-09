@@ -899,7 +899,7 @@ describe("Sites worker", () => {
           {
             label: "Solo creator",
             message:
-              "I’m one creator and need up to 2 connected social accounts.",
+              "I’m one creator and need up to 1 connected social account.",
           },
           {
             label: "Compare every plan",

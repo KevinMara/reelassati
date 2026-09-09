@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AI_CREDIT_COSTS,
+  DELIVERY_COST_USD_PER_CREDIT,
   CREDIT_TOP_UPS,
   topUpPriceCents,
   imageCreditCost,
@@ -8,13 +9,19 @@ import {
   speechCreditCost,
   timedCreditCost,
   videoCreditCost,
+  deliveryBudgetUsd,
 } from "./billing";
 
 describe("billing contracts", () => {
   it("keeps the approved abundant plan allowances", () => {
+    expect(DELIVERY_COST_USD_PER_CREDIT).toBe(0.003);
+    expect(deliveryBudgetUsd(1_000)).toBe(3);
     expect(planEntitlements("creator").monthlyCredits).toBe(1_000);
     expect(planEntitlements("pro").monthlyCredits).toBe(4_000);
     expect(planEntitlements("studio").monthlyCredits).toBe(12_000);
+    expect(planEntitlements("creator").socialAccounts).toBe(1);
+    expect(planEntitlements("pro").socialAccounts).toBe(5);
+    expect(planEntitlements("studio").socialAccounts).toBe(10);
   });
 
   it("keeps every top-up cheaper per credit than every monthly and annual plan", () => {
