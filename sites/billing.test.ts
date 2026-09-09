@@ -358,7 +358,8 @@ describe("Stripe checkout readiness and customer journey", () => {
       fixture.call("checkout", { planId: "pro", billingCycle: "annual" }),
       fixture.call("checkout", { planId: "pro", billingCycle: "annual" }),
     ]);
-    expect(results.map(r => r.status).sort()).toEqual([200, 409]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 202]);
+    expect(await results.find(r => r.status === 202)!.json()).toEqual({ status: "pending", retryAfterMs: 2000 });
     expect(fixture.writes).toHaveLength(1);
     const remote = stripeFixture({ remoteSubscription: true });
     expect(

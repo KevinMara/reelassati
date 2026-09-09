@@ -81,6 +81,7 @@ export default function BillingPage() {
   const sessionId = searchParams.get("session_id");
   const [paymentState, setPaymentState] = useState<string>("checking");
   const automaticCheckout = useRef<string | null>(null);
+  const checkoutInFlight = useRef(false);
   useEffect(() => {
     if (checkoutState !== "success" || !sessionId) return;
     let active = true;
@@ -176,6 +177,8 @@ export default function BillingPage() {
   );
 
   const openCheckout = async (planId: PlanId) => {
+    if (checkoutInFlight.current) return;
+    checkoutInFlight.current = true;
     setBusy(`plan:${planId}`);
     setError(null);
     try {
@@ -190,6 +193,7 @@ export default function BillingPage() {
       });
       window.location.assign(checkoutUrl);
     } catch (cause) {
+      checkoutInFlight.current = false;
       setError(
         cause instanceof Error ? cause.message : "Checkout could not open."
       );
@@ -218,6 +222,8 @@ export default function BillingPage() {
   }, [loading, selectedCycle, selectedPlan, summary]);
 
   const openTopUp = async (topUpId: CreditTopUpId) => {
+    if (checkoutInFlight.current) return;
+    checkoutInFlight.current = true;
     setBusy(`topup:${topUpId}`);
     setError(null);
     try {
@@ -225,6 +231,7 @@ export default function BillingPage() {
       posthog?.capture("checkout_opened", { kind: "topup", topUpId });
       window.location.assign(checkoutUrl);
     } catch (cause) {
+      checkoutInFlight.current = false;
       setError(
         cause instanceof Error ? cause.message : "Checkout could not open."
       );
@@ -731,7 +738,9 @@ function PlanChooser({
                 {busy === `plan:${planId}` || busy === "portal" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
-                {disabled && !manageExisting && summary
+                {busy === `plan:${planId}` || busy === "portal"
+                  ? "Opening secure checkout…"
+                  : disabled && !manageExisting && summary
                   ? "Purchases opening soon"
                   : current
                     ? "Manage your plan"

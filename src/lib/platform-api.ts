@@ -23,6 +23,7 @@ import type {
 } from "@contracts/billing";
 import { supabase } from "@/lib/supabase/client";
 import { selectedBrand } from "@/lib/workspace-scope";
+import { waitForCheckout } from "./checkout-progress";
 import { platformApiUrl } from "@/lib/runtime";
 import { DIRECT_UPLOAD_MAX_BYTES, UPLOAD_PART_BYTES } from "@contracts/uploads";
 
@@ -474,16 +475,16 @@ export const platformApi = {
     ),
 
   createSubscriptionCheckout: (planId: PlanId, billingCycle: BillingCycle) =>
-    requestJson<{ checkoutUrl: string }>("/api/billing/checkout", {
+    waitForCheckout(() => requestJson("/api/billing/checkout", {
       method: "POST",
       body: JSON.stringify({ planId, billingCycle }),
-    }),
+    })),
 
   createTopUpCheckout: (topUpId: CreditTopUpId) =>
-    requestJson<{ checkoutUrl: string }>("/api/billing/topup-checkout", {
+    waitForCheckout(() => requestJson("/api/billing/topup-checkout", {
       method: "POST",
       body: JSON.stringify({ topUpId }),
-    }),
+    })),
 
   createBillingPortal: () =>
     requestJson<{ portalUrl: string }>("/api/billing/portal", {

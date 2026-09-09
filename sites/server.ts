@@ -11347,7 +11347,7 @@ function apiResponse(response: Response, request: Request): Response {
 }
 
 export default {
-  async fetch(request: Request, env: SitesEnvironment): Promise<Response> {
+  async fetch(request: Request, env: SitesEnvironment, ctx?: { waitUntil(promise: Promise<unknown>): void }): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api/")) {
@@ -11355,7 +11355,13 @@ export default {
         return apiResponse(new Response(null, { status: 204 }), request);
       }
       try {
-        return apiResponse(await handleApi(request, env, url), request);
+        const operation = handleApi(request, env, url);
+        if (request.method === "POST" &&
+          ["/api/billing/checkout", "/api/billing/topup-checkout"].includes(url.pathname)) {
+          // A browser reload must not cancel Stripe creation or the lease cleanup.
+          ctx?.waitUntil(operation.then(() => undefined, () => undefined));
+        }
+        return apiResponse(await operation, request);
       } catch (cause) {
         if (cause instanceof Response) return apiResponse(cause, request);
         const reference = crypto.randomUUID();

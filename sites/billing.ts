@@ -1101,10 +1101,7 @@ async function checkoutSession(
     .bind(user.email, kind, lease)
     .first<CheckoutRow>();
   if (!state)
-    return error(
-      "Checkout is already opening. Please try again in a moment.",
-      409
-    );
+    return json({ status: "pending", retryAfterMs: 2000 }, 202);
   const stripe = stripeClient(env.STRIPE_SECRET_KEY!);
   try {
     let customerId = account?.stripe_customer_id;
