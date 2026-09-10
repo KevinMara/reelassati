@@ -937,11 +937,12 @@ export default function Dashboard() {
   const path = location.pathname;
 
   const navItems: Array<
-    | { separator: true; label: string }
+    | { separator: true; label: string; compact?: boolean }
     | { group: "create"; separator?: false }
     | { icon: LucideIcon; label: string; to: string; separator?: false }
   > = [
     { icon: LayoutDashboard, label: t("nav.dashboard"), to: "/dashboard" },
+    { separator: true, label: "", compact: true },
     { icon: Flame, label: "Trends", to: "/dashboard/trends" },
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
     { group: "create" },
@@ -1055,7 +1056,12 @@ export default function Dashboard() {
               <div
                 key={`sep-${i}`}
                 role="separator"
-                className="border-t border-border mt-4 pt-3 px-3 text-xs font-medium text-foreground/70"
+                className={cn(
+                  "border-t border-border",
+                  item.compact
+                    ? "mx-1 my-1"
+                    : "mt-4 px-3 pt-3 text-xs font-medium text-foreground/70"
+                )}
               >
                 {!collapsed && item.label}
               </div>

@@ -47,7 +47,10 @@ describe("protected product and compliance invariants", () => {
       "/dashboard/status",
     ]);
     const navEntries = navBlock.slice(navBlock.indexOf("> = ["));
-    expect((navEntries.match(/separator: true/g) || []).length).toBe(3);
+    expect((navEntries.match(/separator: true/g) || []).length).toBe(4);
+    expect(navEntries).toContain(
+      '{ separator: true, label: "", compact: true }'
+    );
     expect(navEntries).toContain('{ group: "create" }');
     expect(dashboard).toContain('label="Video"');
     expect(dashboard).toContain('to="/dashboard/video"');
