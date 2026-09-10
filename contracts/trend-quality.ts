@@ -48,14 +48,24 @@ export function balancedTrendSelection(
     );
   const select = (platform: string) => {
     const brands = new Map<string, number>();
+    const sources = new Set<string>();
     return items
       .filter(t => t.platform === platform)
       .sort((a, b) => rank(b) - rank(a))
       .filter(t => {
+        let source = t.sourceUrl || t.id;
+        try {
+          const url = new URL(source);
+          source = `${url.hostname.replace(/^www\./, "")}${url.pathname.replace(/\/$/, "")}`;
+        } catch {
+          /* Existing validated IDs remain distinct. */
+        }
+        if (sources.has(source)) return false;
         const key = t.brandName.toLowerCase().trim();
         const count = brands.get(key) ?? 0;
         if (count >= 2) return false;
         brands.set(key, count + 1);
+        sources.add(source);
         return true;
       });
   };

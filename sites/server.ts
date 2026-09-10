@@ -1,3 +1,4 @@
+import { audioGenerationQuote } from "../contracts/audio-generation";
 import { pcmWaveDuration } from "../contracts/audio-chunks";
 import {
   hashMediaStream,
@@ -172,6 +173,10 @@ type SitesEnvironment = {
   KIMI_TEST_OWNER_EMAIL?: string;
   KIMI_CODE_API_KEY?: string;
   KIMI_CODE_MODEL?: string;
+  ELEVENLABS_API_KEY?: string;
+  ELEVENLABS_MUSIC_USD_PER_SECOND?: string;
+  ELEVENLABS_SFX_USD_PER_SECOND?: string;
+  ELEVENLABS_COMMERCIAL_ENABLED?: string;
   OPENROUTER_API_KEY?: string;
   OPENROUTER_TEXT_MODEL?: string;
   OPENROUTER_ANALYSIS_MODEL?: string;
@@ -553,6 +558,20 @@ function capabilities(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
     speech: Boolean(env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady),
+    musicGeneration: Boolean(
+      env.ELEVENLABS_API_KEY &&
+      env.ELEVENLABS_COMMERCIAL_ENABLED === "true" &&
+      Number(env.ELEVENLABS_MUSIC_USD_PER_SECOND) > 0 &&
+      env.BUCKET &&
+      provenanceReady
+    ),
+    soundGeneration: Boolean(
+      env.ELEVENLABS_API_KEY &&
+      env.ELEVENLABS_COMMERCIAL_ENABLED === "true" &&
+      Number(env.ELEVENLABS_SFX_USD_PER_SECOND) > 0 &&
+      env.BUCKET &&
+      provenanceReady
+    ),
     imageGeneration: Boolean(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
@@ -5345,7 +5364,7 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
+          `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
           JSON.stringify({ command: input.command, project: projectContext })
         );
         const summary = stringValue(
@@ -5458,7 +5477,7 @@ async function handleAi(
           env,
           user,
           "video-analysis",
-          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied video. Return JSON only with summary, hook {score 0..100,note}, pacing {score 0..100,note}, retention [{start,end,score,note}], and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. Each change follows the edit-plan schema: type,label,reason,start,end,confidence,intensity. Target platform: ${platformValue(input.platform)}.`,
+          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied video. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action in retention notes. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with summary, hook {score 0..100,note}, pacing {score 0..100,note}, retention [{start,end,score,note}], and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. Each change follows the edit-plan schema: type,label,reason,start,end,confidence,intensity. Target platform: ${platformValue(input.platform)}.`,
           [
             {
               type: "text",
@@ -5735,20 +5754,67 @@ async function handleAi(
     );
   }
 
-  if (url.pathname === "/api/ai/speech") {
-    if (!env.OPENROUTER_API_KEY) {
-      return errorResponse("Voice generation is temporarily unavailable", 503);
+  if (
+    ["/api/ai/speech", "/api/ai/audio", "/api/ai/audio/quote"].includes(
+      url.pathname
+    )
+  ) {
+    const generatedAudio = url.pathname !== "/api/ai/speech";
+    if (
+      generatedAudio
+        ? !env.ELEVENLABS_API_KEY ||
+          env.ELEVENLABS_COMMERCIAL_ENABLED !== "true"
+        : !env.OPENROUTER_API_KEY
+    ) {
+      return errorResponse("Audio generation is temporarily unavailable", 503);
     }
     const input = await parseJsonBody<{
       text?: string;
+      kind?: "music" | "sfx";
+      seconds?: number;
+      acceptedCredits?: number;
+      requestId?: string;
       voice?: string;
       assetName?: string;
       projectId?: string;
       rightsConfirmed?: boolean;
     }>(request);
+    const kind = input.kind === "music" ? "music" : "sfx";
+    let audioCost = 0;
+    if (generatedAudio) {
+      if (input.kind !== "music" && input.kind !== "sfx")
+        return errorResponse("Choose music or sound effects");
+      try {
+        audioCost = audioGenerationQuote(
+          kind,
+          Number(input.seconds),
+          Number(
+            kind === "music"
+              ? env.ELEVENLABS_MUSIC_USD_PER_SECOND
+              : env.ELEVENLABS_SFX_USD_PER_SECOND
+          )
+        );
+      } catch (cause) {
+        return errorResponse(
+          cause instanceof Error ? cause.message : "Invalid audio quote",
+          422
+        );
+      }
+      if (url.pathname.endsWith("/quote"))
+        return json({ credits: audioCost, seconds: input.seconds, kind });
+      if (input.acceptedCredits !== audioCost)
+        return errorResponse(
+          "The credit quote changed. Get a fresh quote before generating.",
+          409
+        );
+      if (!input.requestId || !/^[a-zA-Z0-9-]{16,80}$/.test(input.requestId))
+        return errorResponse("A valid generation request ID is required");
+    }
     assertProvenanceConfigured(env);
     const text = stringValue(input.text);
     if (!text) return errorResponse("Add the text you want voiced");
+    if (generatedAudio && text.length > 4000)
+      return errorResponse("Audio prompts are limited to 4,000 characters");
     if (text.length > 5_000) {
       return errorResponse("Voice generation is limited to 5,000 characters");
     }
@@ -5763,37 +5829,83 @@ async function handleAi(
       input.voice,
       env.OPENROUTER_TTS_VOICE || "English_Graceful_Lady"
     );
-    const model = env.OPENROUTER_TTS_MODEL || "minimax/speech-2.8-turbo";
+    const model = generatedAudio
+      ? kind === "music"
+        ? "music_v1"
+        : "eleven_text_to_sound_v2"
+      : env.OPENROUTER_TTS_MODEL || "minimax/speech-2.8-turbo";
+    const operation = generatedAudio
+      ? ("audio-generation" as const)
+      : ("speech-synthesis" as const);
+    if (generatedAudio) {
+      await env.DB.prepare(
+        "CREATE TABLE IF NOT EXISTS audio_generation_requests (owner_email TEXT NOT NULL, request_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_email, request_id))"
+      ).run();
+      const claimed = await env.DB.prepare(
+        "INSERT INTO audio_generation_requests (owner_email, request_id, created_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING"
+      )
+        .bind(user.email, input.requestId!, new Date().toISOString())
+        .run();
+      if (!claimed.meta?.changes)
+        return errorResponse(
+          "This audio request was already submitted. Check your Library before generating again.",
+          409
+        );
+    }
     return runPaidAiAction(
       env,
       user,
       {
-        cost: speechCreditCost(text.length),
-        operationKey: `speech:${crypto.randomUUID()}`,
-        category: "speech",
-        description: "Voice generation",
+        cost: generatedAudio ? audioCost : speechCreditCost(text.length),
+        operationKey: generatedAudio
+          ? `audio:${input.requestId}`
+          : `speech:${crypto.randomUUID()}`,
+        category: generatedAudio ? "audio" : "speech",
+        description: generatedAudio
+          ? `AI ${kind} generation`
+          : "Voice generation",
         metadata: { characters: text.length },
       },
       async () => {
         const invocation = await beginAiInvocation(
           env,
           user,
-          "speech-synthesis",
-          "OpenRouter",
+          operation,
+          generatedAudio ? "ElevenLabs" : "OpenRouter",
           model,
-          { text, voice, rightsConfirmed: true }
+          {
+            text,
+            voice: generatedAudio ? undefined : voice,
+            kind: generatedAudio ? kind : undefined,
+            seconds: input.seconds,
+            rightsConfirmed: true,
+          }
         );
         let buffer: ArrayBuffer;
         try {
-          const response = await fetch(`${OPENROUTER_BASE}/audio/speech`, {
+          const endpoint = generatedAudio
+            ? `https://api.elevenlabs.io/v1/${kind === "music" ? "music" : "sound-generation"}?output_format=mp3_44100_128`
+            : `${OPENROUTER_BASE}/audio/speech`;
+          const response = await fetch(endpoint, {
             method: "POST",
-            headers: openRouterHeaders(env),
-            body: JSON.stringify({
-              model,
-              input: text,
-              voice,
-              response_format: "mp3",
-            }),
+            headers: generatedAudio
+              ? {
+                  "Content-Type": "application/json",
+                  "xi-api-key": env.ELEVENLABS_API_KEY!,
+                }
+              : openRouterHeaders(env),
+            body: JSON.stringify(
+              generatedAudio
+                ? kind === "music"
+                  ? {
+                      model_id: model,
+                      prompt: text,
+                      music_length_ms: Math.round(input.seconds! * 1000),
+                      force_instrumental: true,
+                    }
+                  : { model_id: model, text, duration_seconds: input.seconds }
+                : { model, input: text, voice, response_format: "mp3" }
+            ),
           });
           if (!response.ok) {
             await failAiInvocation(
@@ -5801,7 +5913,10 @@ async function handleAi(
               invocation,
               `provider_${response.status}`
             );
-            await providerError(response, "OpenRouter");
+            await providerError(
+              response,
+              generatedAudio ? "ElevenLabs" : "OpenRouter"
+            );
           }
           buffer = await response.arrayBuffer();
         } catch (cause) {
@@ -5814,7 +5929,7 @@ async function handleAi(
           entityType: "asset",
           entityId: assetId,
           origin: "ai-generated",
-          operation: "speech-synthesis",
+          operation,
           provider: invocation.provider,
           model: invocation.model,
           content: buffer,
@@ -5854,7 +5969,7 @@ async function handleAi(
             httpMetadata: { contentType: "audio/mpeg" },
             customMetadata: {
               owner: user.email,
-              source: "openrouter-tts",
+              source: generatedAudio ? "elevenlabs-audio" : "openrouter-tts",
               provenanceToken: pendingProvenance.marking.publicToken || "",
               policyVersion: AI_COMPLIANCE_POLICY_VERSION,
               embeddedMarking: markedSpeech.method,
@@ -5907,7 +6022,7 @@ async function handleAi(
             id: assetId,
             name: generatedAssetName(
               input.assetName,
-              `Voice take ${new Date().toLocaleDateString("en-GB")}`,
+              `${generatedAudio ? kind : "Voice"} take ${new Date().toLocaleDateString("en-GB")}`,
               "mp3"
             ),
             kind: "audio",
@@ -11347,7 +11462,11 @@ function apiResponse(response: Response, request: Request): Response {
 }
 
 export default {
-  async fetch(request: Request, env: SitesEnvironment, ctx?: { waitUntil(promise: Promise<unknown>): void }): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: SitesEnvironment,
+    ctx?: { waitUntil(promise: Promise<unknown>): void }
+  ): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api/")) {
@@ -11356,10 +11475,19 @@ export default {
       }
       try {
         const operation = handleApi(request, env, url);
-        if (request.method === "POST" &&
-          ["/api/billing/checkout", "/api/billing/topup-checkout"].includes(url.pathname)) {
+        if (
+          request.method === "POST" &&
+          ["/api/billing/checkout", "/api/billing/topup-checkout"].includes(
+            url.pathname
+          )
+        ) {
           // A browser reload must not cancel Stripe creation or the lease cleanup.
-          ctx?.waitUntil(operation.then(() => undefined, () => undefined));
+          ctx?.waitUntil(
+            operation.then(
+              () => undefined,
+              () => undefined
+            )
+          );
         }
         return apiResponse(await operation, request);
       } catch (cause) {

@@ -1,4 +1,5 @@
-import { createEditorSound } from "@/lib/editor-sounds";
+import { AudioGenerator } from "./AudioGenerator";
+import { editorAudioCatalog } from "@/lib/editor-audio-catalog";
 import { useState } from "react";
 import { Film, Image, Mic2, Music2, Loader2, X } from "lucide-react";
 import type { Asset, EditProject } from "@contracts/workspace";
@@ -116,32 +117,32 @@ export function EditorCreationDock({
       setBusy(false);
     }
   }
-  async function insertSound(effect: "click" | "whoosh" | "impact" | "rise") {
+  async function insertSound(sound: (typeof editorAudioCatalog)[number]) {
     setBusy(true);
+    setMessage("");
     try {
+      const response = await fetch(`/editor-audio/${sound.file}`);
+      if (!response.ok)
+        throw new Error("Could not load this sound. Please retry.");
       const asset = await platformApi.uploadAsset(
-        createEditorSound(effect),
+        new File([await response.blob()], `${sound.name}.mp3`, {
+          type: "audio/mpeg",
+        }),
         "audio"
       );
-      await onInsert({
-        ...asset,
-        duration: effect === "click" ? 0.12 : effect === "impact" ? 0.6 : 1,
-      });
-      setMessage("Sound effect added · 0 AI credits.");
+      await onInsert({ ...asset, duration: sound.duration });
+      setMessage("Audio added · 0 AI credits.");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not insert effect.");
+      setMessage(e instanceof Error ? e.message : "Could not insert audio.");
     } finally {
       setBusy(false);
     }
   }
   return (
-    <details
-      className="mb-4 rounded-xl border border-border bg-surface p-3"
-      open={kind !== null || undefined}
+    <section
+      aria-label="Create media on timeline"
+      className="border-b border-border p-3"
     >
-      <summary className="cursor-pointer px-1 py-1 text-sm font-medium">
-        Create media in this edit
-      </summary>
       <div className="mt-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-3 text-sm font-semibold">
@@ -181,20 +182,44 @@ export function EditorCreationDock({
             </button>
             {kind === "audio" ? (
               <div>
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {(["click", "whoosh", "impact", "rise"] as const).map(
-                    effect => (
+                <AudioGenerator projectId={project.id} onInsert={onInsert} />
+                <p className="mb-3 text-sm text-foreground/70">
+                  Free audio · preview before adding · CC0 · 0 AI credits
+                </p>
+                <div className="mb-4 grid max-h-96 gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+                  {editorAudioCatalog.map(sound => (
+                    <div
+                      key={sound.id}
+                      className="min-w-0 rounded-xl border border-border bg-background p-3"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium">
+                          {sound.name}
+                        </span>
+                        <span className="text-xs text-foreground/60">
+                          {sound.duration.toFixed(1)}s
+                        </span>
+                      </div>
+                      <p className="mb-2 text-xs text-foreground/60">
+                        {sound.category} · {sound.author}
+                      </p>
+                      <audio
+                        controls
+                        preload="none"
+                        src={`/editor-audio/${sound.file}`}
+                        className="h-8 w-full"
+                        aria-label={`Preview ${sound.name}`}
+                      />
                       <button
-                        key={effect}
                         disabled={busy || !capabilities.uploads}
                         type="button"
-                        onClick={() => void insertSound(effect)}
-                        className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm capitalize"
+                        onClick={() => void insertSound(sound)}
+                        className="mt-3 rounded-lg border border-primary/30 px-3 py-2 text-sm text-primary disabled:opacity-40"
                       >
-                        {effect} · 0 credits
+                        Add at playhead · Free
                       </button>
-                    )
-                  )}
+                    </div>
+                  ))}
                 </div>
                 <p className="mb-3 text-sm text-foreground/70">
                   Use your uploaded or generated audio. Drop a licensed music or
@@ -300,6 +325,6 @@ export function EditorCreationDock({
           </div>
         )}
       </div>
-    </details>
+    </section>
   );
 }

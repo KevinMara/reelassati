@@ -46,4 +46,34 @@ describe("trend evidence quality", () => {
     ]);
     expect(balancedTrendSelection(items.slice(0, 7))).toEqual([]);
   });
+  it("does not count tracking variants of a source as independent evidence", () => {
+    const base = { brandName: "Brand", metrics: { views: 1000000 } };
+    const items = [
+      {
+        ...base,
+        id: "a",
+        platform: "instagram",
+        sourceUrl: "https://www.instagram.com/reel/ABC/?utm_source=x",
+      },
+      {
+        ...base,
+        id: "b",
+        platform: "instagram",
+        sourceUrl: "https://instagram.com/reel/ABC",
+      },
+      {
+        ...base,
+        id: "c",
+        platform: "tiktok",
+        sourceUrl: "https://www.tiktok.com/@brand/video/123",
+      },
+      {
+        ...base,
+        id: "d",
+        platform: "tiktok",
+        sourceUrl: "https://www.tiktok.com/@brand/video/456",
+      },
+    ] as TrendEvidenceItem[];
+    expect(balancedTrendSelection(items)).toHaveLength(2);
+  });
 });

@@ -942,21 +942,11 @@ export default function Dashboard() {
     | { icon: LucideIcon; label: string; to: string; separator?: false }
   > = [
     { icon: LayoutDashboard, label: t("nav.dashboard"), to: "/dashboard" },
-    {
-      separator: true,
-      label: i18n.language.startsWith("it") ? "Crea" : "Create",
-    },
-    { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
     { icon: Flame, label: "Trends", to: "/dashboard/trends" },
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
     { group: "create" },
+    { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
     { icon: Search, label: t("nav.analyze"), to: "/dashboard/analyze" },
-    {
-      separator: true,
-      label: i18n.language.startsWith("it")
-        ? "Pubblica e misura"
-        : "Publish & measure",
-    },
     { icon: Send, label: t("nav.publish"), to: "/dashboard/publish" },
     { icon: BarChart3, label: t("nav.analytics"), to: "/dashboard/analytics" },
     { separator: true, label: "Workspace" },

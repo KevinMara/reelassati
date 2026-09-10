@@ -475,16 +475,20 @@ export const platformApi = {
     ),
 
   createSubscriptionCheckout: (planId: PlanId, billingCycle: BillingCycle) =>
-    waitForCheckout(() => requestJson("/api/billing/checkout", {
-      method: "POST",
-      body: JSON.stringify({ planId, billingCycle }),
-    })),
+    waitForCheckout(() =>
+      requestJson("/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ planId, billingCycle }),
+      })
+    ),
 
   createTopUpCheckout: (topUpId: CreditTopUpId) =>
-    waitForCheckout(() => requestJson("/api/billing/topup-checkout", {
-      method: "POST",
-      body: JSON.stringify({ topUpId }),
-    })),
+    waitForCheckout(() =>
+      requestJson("/api/billing/topup-checkout", {
+        method: "POST",
+        body: JSON.stringify({ topUpId }),
+      })
+    ),
 
   createBillingPortal: () =>
     requestJson<{ portalUrl: string }>("/api/billing/portal", {
@@ -716,6 +720,26 @@ export const platformApi = {
       body: JSON.stringify({ assetId, language, projectId, audioAssetIds }),
     }),
 
+  quoteAudio: (kind: "music" | "sfx", seconds: number) =>
+    requestJson<{ credits: number }>("/api/ai/audio/quote", {
+      method: "POST",
+      body: JSON.stringify({ kind, seconds }),
+    }),
+  generateAudio: async (input: {
+    kind: "music" | "sfx";
+    seconds: number;
+    text: string;
+    acceptedCredits: number;
+    requestId: string;
+    rightsConfirmed: true;
+    projectId: string;
+  }): Promise<Asset> => {
+    const result = await requestJson<{ asset: Asset }>("/api/ai/audio", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return result.asset;
+  },
   synthesizeSpeech: async (input: {
     text: string;
     voice: string;

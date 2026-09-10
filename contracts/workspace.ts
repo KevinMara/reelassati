@@ -28,6 +28,8 @@ export interface CapabilityState {
   analysis: boolean;
   transcription: boolean;
   speech: boolean;
+  musicGeneration?: boolean;
+  soundGeneration?: boolean;
   imageGeneration: boolean;
   videoGeneration: boolean;
   publishing: boolean;

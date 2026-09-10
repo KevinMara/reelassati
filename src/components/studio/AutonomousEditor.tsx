@@ -1,3 +1,4 @@
+import { EDIT_RECIPES, auditAutomatedEdit } from "@/lib/editor-production";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Sparkles, Square } from "lucide-react";
 import type { Asset, EditProject, EditOperation } from "@contracts/workspace";
@@ -19,7 +20,11 @@ export function AutonomousEditor({
 }) {
   const { workspace, updateWorkspace, capabilities } = useWorkspace();
   const [style, setStyle] = useState("");
-  const [target, setTarget] = useState(Math.round(project.duration));
+  const [target, setTarget] = useState(project.duration);
+  const [automaticDuration, setAutomaticDuration] = useState(true);
+  const targetDuration = automaticDuration
+    ? contentDuration(project.clips)
+    : target;
   const [images, setImages] = useState(0);
   const [videos, setVideos] = useState(0);
   const [captions, setCaptions] = useState(true);
@@ -46,15 +51,14 @@ export function AutonomousEditor({
         timedCreditCost(a.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute),
       0
     );
-  const transcriptCost =
-    captions && !project.transcript.length
-      ? sources.reduce(
-          (sum, a) =>
-            sum +
-            timedCreditCost(a.duration, AI_CREDIT_COSTS.transcriptionPerMinute),
-          0
-        )
-      : 0;
+  const transcriptCost = !project.transcript.length
+    ? sources.reduce(
+        (sum, a) =>
+          sum +
+          timedCreditCost(a.duration, AI_CREDIT_COSTS.transcriptionPerMinute),
+        0
+      )
+    : 0;
   const mediaCost =
     images * AI_CREDIT_COSTS.image1K +
     videos *
@@ -89,7 +93,13 @@ export function AutonomousEditor({
     const generatedAssets: Asset[] = [];
     const resolvedMedia = new Map<string, string>();
     try {
-      const analysis: Array<{ assetId: string; summary: string }> = [];
+      const analysis: Array<{
+        assetId: string;
+        summary: string;
+        intervals: Awaited<
+          ReturnType<typeof platformApi.analyzeVideo>
+        >["retention"];
+      }> = [];
       for (const asset of sources) {
         checkpoint();
         if (asset.kind === "video") {
@@ -99,10 +109,14 @@ export function AutonomousEditor({
             platform: project.platform,
             sourceRightsConfirmed: true,
           });
-          analysis.push({ assetId: asset.id, summary: result.summary });
+          analysis.push({
+            assetId: asset.id,
+            summary: result.summary,
+            intervals: result.retention,
+          });
         }
         checkpoint();
-        if (captions && !project.transcript.length) {
+        if (!project.transcript.length) {
           setStatus(`Transcribing ${asset.name}…`);
           const { transcribeMedia } = await import("@/lib/transcribe-media");
           const result = await transcribeMedia(
@@ -142,7 +156,7 @@ export function AutonomousEditor({
       setStatus("Building the cut, pacing, captions, and visual treatment…");
       const result = await platformApi.generateEditPlan({
         project: working,
-        command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Target ${target}s. Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+        command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Target ${targetDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
         selectedClipIds: [],
         range: { start: 0, end: project.duration },
       });
@@ -247,6 +261,13 @@ export function AutonomousEditor({
           unresolved.push(op);
         }
       }
+      const problems = auditAutomatedEdit(project, working, allAssets);
+      if (problems.length)
+        throw new Error(
+          `The AI edit needs correction: ${problems.slice(0, 3).join("; ")}. Your original timeline is intact.`
+        );
+      working.duration = contentDuration(working.clips);
+      working.playhead = Math.min(working.playhead ?? 0, working.duration);
       checkpoint();
       await updateWorkspace(w => ({
         ...w,
@@ -322,27 +343,33 @@ export function AutonomousEditor({
             />
           </label>
           <div className="mt-3 flex flex-wrap gap-2">
-            {[
-              "Fast product demo",
-              "Clean editorial",
-              "Cinematic story",
-              "Natural talking head",
-            ].map(s => (
+            {(
+              Object.keys(EDIT_RECIPES) as Array<keyof typeof EDIT_RECIPES>
+            ).map(s => (
               <button
                 disabled={busy}
                 key={s}
                 type="button"
-                onClick={() => setStyle(s)}
+                onClick={() => setStyle(`${s}. ${EDIT_RECIPES[s]}`)}
                 className="rounded-lg border border-border px-3 py-2 text-sm"
               >
                 {s}
               </button>
             ))}
           </div>
-          <label className="mt-4 block text-sm">
-            Target duration · {target}s
+          <label className="mt-4 flex items-center gap-2 text-sm">
             <input
+              type="checkbox"
               disabled={busy}
+              checked={automaticDuration}
+              onChange={e => setAutomaticDuration(e.target.checked)}
+            />
+            Detect ending from content automatically
+          </label>
+          <label className="mt-4 block text-sm">
+            Target duration · {targetDuration.toFixed(1)}s
+            <input
+              disabled={busy || automaticDuration}
               aria-label="AI target duration"
               type="range"
               min={1}
@@ -397,7 +424,7 @@ export function AutonomousEditor({
               Up to {estimate.toLocaleString()} credits
             </p>
             <p className="mt-1 text-xs text-foreground/70">
-              Review {analysisCost} · captions {transcriptCost} · plan{" "}
+              Review {analysisCost} · speech timing {transcriptCost} · plan{" "}
               {AI_CREDIT_COSTS.editPlan} · optional media {mediaCost}. Only
               requested generations run. Manual editing and local export use no
               AI credits.

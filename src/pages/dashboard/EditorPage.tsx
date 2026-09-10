@@ -1,3 +1,5 @@
+import { resolveMediaDuration } from "@/lib/media-metadata";
+import { AssetThumbnail } from "@/components/studio/AssetThumbnail";
 import { useTranslation } from "react-i18next";
 import { TimelinePreview } from "@/components/studio/TimelinePreview";
 import {
@@ -121,7 +123,7 @@ function createId(prefix: string) {
 }
 
 function formatTime(seconds: number) {
-  const safeSeconds = Math.max(0, seconds);
+  const safeSeconds = Math.round(Math.max(0, seconds) * 10) / 10;
   const minutes = Math.floor(safeSeconds / 60);
   const remainder = safeSeconds - minutes * 60;
   return `${minutes}:${remainder.toFixed(1).padStart(4, "0")}`;
@@ -157,27 +159,19 @@ function getAssetKind(file: File): Asset["kind"] {
   return "video";
 }
 
-function readMediaDuration(file: File): Promise<number | undefined> {
-  if (!file.type.startsWith("video/") && !file.type.startsWith("audio/")) {
-    return Promise.resolve(undefined);
+async function readMediaDuration(file: File): Promise<number | undefined> {
+  if (!file.type.startsWith("video/") && !file.type.startsWith("audio/"))
+    return undefined;
+  const url = URL.createObjectURL(file);
+  try {
+    return await resolveMediaDuration({
+      name: file.name,
+      kind: file.type.startsWith("audio/") ? "audio" : "video",
+      url,
+    } as Asset);
+  } finally {
+    URL.revokeObjectURL(url);
   }
-
-  return new Promise(resolve => {
-    const media = document.createElement(
-      file.type.startsWith("audio/") ? "audio" : "video"
-    );
-    const objectUrl = URL.createObjectURL(file);
-    const finish = (duration?: number) => {
-      URL.revokeObjectURL(objectUrl);
-      media.remove();
-      resolve(duration);
-    };
-    media.preload = "metadata";
-    media.onloadedmetadata = () =>
-      finish(Number.isFinite(media.duration) ? media.duration : undefined);
-    media.onerror = () => finish(undefined);
-    media.src = objectUrl;
-  });
 }
 
 function deriveQualitySignals(project: EditProject): QualitySignal[] {
@@ -285,7 +279,7 @@ export default function EditorPage() {
   );
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [editMode, setEditMode] = useState<"manual" | "auto">("manual");
-  const [durationDraft, setDurationDraft] = useState<number | null>(null);
+  const [durationDraft, setDurationDraft] = useState<string | null>(null);
   const [rightPanel, setRightPanel] = useState<
     "inspect" | "transcript" | "assistant" | "preflight"
   >("inspect");
@@ -358,6 +352,7 @@ export default function EditorPage() {
       return !query || asset.name.toLowerCase().includes(query);
     });
   }, [libraryKind, librarySearch, workspace.assets]);
+  useEffect(() => setDurationDraft(null), [project?.duration]);
   const seekTimeline = useCallback(
     (nextTime: number) => {
       const duration = project?.duration ?? 0;
@@ -548,6 +543,7 @@ export default function EditorPage() {
     activityLabel: string,
     insertAt?: number
   ) => {
+    asset = { ...asset, duration: await resolveMediaDuration(asset) };
     await updateWorkspace(current => {
       const target = current.projects.find(item => item.id === targetProjectId);
       if (!target) return current;
@@ -561,7 +557,7 @@ export default function EditorPage() {
           ? asset.duration
           : asset.kind === "image"
             ? 3
-            : 5;
+            : 0;
       const track: TrackKind =
         asset.kind === "audio"
           ? "audio"
@@ -1528,7 +1524,7 @@ export default function EditorPage() {
             onClick={() => setEditMode("auto")}
             className={`rounded-lg px-4 py-2 text-sm font-medium ${editMode === "auto" ? "bg-primary text-primary-foreground" : "text-foreground/70"}`}
           >
-            {italian ? "Montaggio completo AI" : "AI complete edit"}
+            {italian ? "Auto-edit AI" : "AI auto-edit"}
           </button>
         </div>
         <details className="group min-w-0 flex-1">
@@ -1540,11 +1536,13 @@ export default function EditorPage() {
               {italian ? "Durata video" : "Video duration"}
               <input
                 aria-label="Total video duration in seconds"
-                type="number"
-                min={0.2}
-                step={0.1}
-                value={durationDraft ?? project.duration}
-                onChange={e => setDurationDraft(Number(e.target.value))}
+                type="text"
+                inputMode="decimal"
+                value={durationDraft ?? project.duration.toFixed(1)}
+                onChange={e => {
+                  const value = e.target.value.replace(/,/g, ".");
+                  if (/^\d*(\.\d?)?$/.test(value)) setDurationDraft(value);
+                }}
                 className="w-24 rounded-lg border border-border bg-background px-2 py-2 font-mono"
               />{" "}
               s
@@ -1555,7 +1553,12 @@ export default function EditorPage() {
                 void saveProjectChange(
                   () =>
                     commitProject("Video duration changed", p =>
-                      resizeTimeline(p, durationDraft ?? p.duration)
+                      resizeTimeline(
+                        p,
+                        durationDraft && Number(durationDraft) > 0
+                          ? Number(durationDraft)
+                          : p.duration
+                      )
                     ),
                   "Could not change duration."
                 )
@@ -1611,14 +1614,7 @@ export default function EditorPage() {
           }}
         />
       )}
-      <EditorCreationDock
-        project={project}
-        playhead={playhead}
-        onInsert={asset =>
-          addAssetToTimeline(asset, project.id, "Created in editor", playhead)
-        }
-      />
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
+      <div className="grid min-w-0 grid-cols-1 gap-5">
         <main className="min-w-0 space-y-4">
           <section
             {...previewDrop.dropZoneProps}
@@ -1686,6 +1682,18 @@ export default function EditorPage() {
                 : "border-border"
             }`}
           >
+            <EditorCreationDock
+              project={project}
+              playhead={playhead}
+              onInsert={asset =>
+                addAssetToTimeline(
+                  asset,
+                  project.id,
+                  "Created in editor",
+                  playhead
+                )
+              }
+            />
             <div className="flex flex-wrap items-center gap-1 border-b border-border p-2">
               <button
                 type="button"
@@ -1763,7 +1771,7 @@ export default function EditorPage() {
             </div>
 
             {libraryOpen ? (
-              <div className="border-b border-border bg-background/55 p-3">
+              <div className="m-3 rounded-xl border border-primary/30 bg-primary/10 p-4 shadow-inner">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium">
@@ -1837,11 +1845,14 @@ export default function EditorPage() {
                               : "border-border"
                           }`}
                         >
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 transition-transform group-hover:scale-105">
+                          <span className="flex h-14 w-20 shrink-0 overflow-hidden items-center justify-center rounded-md bg-primary/10 transition-transform group-hover:scale-105">
                             {busyAction === `library-${asset.id}` ? (
                               <Loader2 className="h-4 w-4 animate-spin text-primary" />
                             ) : recentlyAddedAssetId === asset.id ? (
                               <Check className="h-4 w-4 text-emerald-500" />
+                            ) : asset.kind === "image" ||
+                              asset.kind === "video" ? (
+                              <AssetThumbnail asset={asset} />
                             ) : (
                               <Icon className="h-4 w-4 text-primary" />
                             )}
@@ -2033,7 +2044,7 @@ export default function EditorPage() {
           </section>
         </main>
 
-        <aside className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface shadow-card xl:max-h-[calc(100vh-120px)]">
+        <aside className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
           <div className="grid grid-cols-4 border-b border-border p-1.5">
             {(
               [
@@ -2058,7 +2069,7 @@ export default function EditorPage() {
             ))}
           </div>
 
-          <div className="max-h-[calc(100vh-175px)] overflow-y-auto p-4">
+          <div className="p-5">
             {rightPanel === "inspect" && (
               <div>
                 <div className="mb-5">
@@ -2077,7 +2088,7 @@ export default function EditorPage() {
                     Choose a block on the timeline to edit its timing.
                   </div>
                 ) : (
-                  <div className="space-y-5">
+                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                     <label className="block">
                       <span className="mb-1.5 block text-xs text-foreground/70">
                         Clip label
@@ -2176,6 +2187,55 @@ export default function EditorPage() {
                       Apply timing
                     </button>
 
+                    <div className="flex flex-wrap gap-2 md:col-span-2 xl:col-span-3">
+                      <button
+                        type="button"
+                        disabled={selectedClip?.locked}
+                        onClick={() =>
+                          setClipDraft(c =>
+                            c
+                              ? {
+                                  ...c,
+                                  speed: 1,
+                                  volume: 1,
+                                  fadeIn: 0,
+                                  fadeOut: 0,
+                                  brightness: 0,
+                                  contrast: 1,
+                                  saturation: 1,
+                                  fit: "contain",
+                                }
+                              : c
+                          )
+                        }
+                        className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-40"
+                      >
+                        Reset look & sound
+                      </button>
+                      <button
+                        type="button"
+                        disabled={selectedClip?.locked}
+                        onClick={() =>
+                          setClipDraft(c =>
+                            c
+                              ? {
+                                  ...c,
+                                  volume: 0.2,
+                                  fadeIn: Math.min(0.5, c.duration / 2),
+                                  fadeOut: Math.min(1, c.duration / 2),
+                                }
+                              : c
+                          )
+                        }
+                        className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-40"
+                      >
+                        Music under dialogue
+                      </button>
+                      <p className="self-center text-xs text-foreground/60">
+                        Review the settings, then apply. Undo restores the
+                        previous revision.
+                      </p>
+                    </div>
                     <label className="block text-sm">
                       Framing
                       <select
@@ -2210,7 +2270,7 @@ export default function EditorPage() {
                       <label key={key} className="block text-sm">
                         {label}{" "}
                         <span className="float-right font-mono">
-                          {clipDraft[key] ?? fallback}
+                          {(clipDraft[key] ?? fallback).toFixed(1)}
                         </span>
                         <input
                           type="range"

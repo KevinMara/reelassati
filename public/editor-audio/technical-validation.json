@@ -1,0 +1,112 @@
+[
+  {
+    "file": "sfx/crisp-click.mp3",
+    "decodeOK": true,
+    "bytes": 1661
+  },
+  {
+    "file": "sfx/soft-pop.mp3",
+    "decodeOK": true,
+    "bytes": 2519
+  },
+  {
+    "file": "sfx/pluck-accent.mp3",
+    "decodeOK": true,
+    "bytes": 2288
+  },
+  {
+    "file": "sfx/success-chime.mp3",
+    "decodeOK": true,
+    "bytes": 6952
+  },
+  {
+    "file": "sfx/question-tone.mp3",
+    "decodeOK": true,
+    "bytes": 3665
+  },
+  {
+    "file": "sfx/error-tone.mp3",
+    "decodeOK": true,
+    "bytes": 2809
+  },
+  {
+    "file": "sfx/glass-ping.mp3",
+    "decodeOK": true,
+    "bytes": 7131
+  },
+  {
+    "file": "sfx/digital-glitch.mp3",
+    "decodeOK": true,
+    "bytes": 1818
+  },
+  {
+    "file": "sfx/expand-sweep.mp3",
+    "decodeOK": true,
+    "bytes": 4766
+  },
+  {
+    "file": "sfx/contract-sweep.mp3",
+    "decodeOK": true,
+    "bytes": 4296
+  },
+  {
+    "file": "sfx/opening-sweep.mp3",
+    "decodeOK": true,
+    "bytes": 6015
+  },
+  {
+    "file": "sfx/closing-sweep.mp3",
+    "decodeOK": true,
+    "bytes": 5494
+  },
+  {
+    "file": "sfx/scratch-accent.mp3",
+    "decodeOK": true,
+    "bytes": 3148
+  },
+  {
+    "file": "sfx/heavy-punch.mp3",
+    "decodeOK": true,
+    "bytes": 6899
+  },
+  {
+    "file": "sfx/soft-thump.mp3",
+    "decodeOK": true,
+    "bytes": 3377
+  },
+  {
+    "file": "sfx/metal-strike.mp3",
+    "decodeOK": true,
+    "bytes": 2416
+  },
+  {
+    "file": "sfx/wood-knock.mp3",
+    "decodeOK": true,
+    "bytes": 2649
+  },
+  {
+    "file": "sfx/bell-hit.mp3",
+    "decodeOK": true,
+    "bytes": 7823
+  },
+  {
+    "file": "music/funked-up.mp3",
+    "decodeOK": true,
+    "bytes": 1329549
+  },
+  {
+    "file": "music/8bit-bossa.mp3",
+    "decodeOK": true,
+    "bytes": 1196325
+  },
+  {
+    "file": "sfx/quick-swish.mp3",
+    "decodeOK": true,
+    "bytes": 17325
+  },
+  {
+    "file": "sfx/cloth-swoosh.mp3",
+    "decodeOK": true,
+    "bytes": 16509
+  }
+]

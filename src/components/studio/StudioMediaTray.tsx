@@ -1,3 +1,4 @@
+import { AssetThumbnail } from "./AssetThumbnail";
 import { useMemo, useState } from "react";
 import {
   Film,
@@ -76,14 +77,9 @@ export function StudioMediaTray() {
                   onClick={() => setOpen(false)}
                   className="group flex min-w-0 items-center gap-3 rounded-lg border border-transparent p-2 transition-all hover:border-primary/20 hover:bg-primary/[0.05]"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10">
-                    {asset.kind === "image" ? (
-                      <img
-                        src={asset.url}
-                        alt=""
-                        loading="lazy"
-                        className="h-full w-full object-cover"
-                      />
+                  <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10">
+                    {asset.kind === "image" || asset.kind === "video" ? (
+                      <AssetThumbnail asset={asset} />
                     ) : (
                       <Icon className="h-4 w-4 text-primary" />
                     )}
