@@ -53,7 +53,7 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
           className={
             manage
               ? "block"
-              : "relative mb-2.5 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-primary"
+              : "relative mb-2.5 flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.14em] text-primary"
           }
         >
           {!manage ? (

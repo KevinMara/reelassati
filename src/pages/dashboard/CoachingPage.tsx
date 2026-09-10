@@ -194,7 +194,7 @@ export default function CoachingPage() {
           <p className="text-sm font-medium">
             Workspace evidence, not synthetic analytics
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-foreground/55">
+          <p className="mt-1 text-xs leading-relaxed text-foreground/70">
             REELassati does not yet have verified reach, watch-time or retention
             data in this workspace, so this report will not fabricate views,
             engagement, growth or “best times.” Updated{" "}
@@ -216,26 +216,26 @@ export default function CoachingPage() {
           <div className="rounded-xl border border-border bg-surface p-4">
             <FolderKanban className="mb-3 h-4 w-4 text-primary" />
             <p className="text-2xl font-semibold">{report.projectsTouched}</p>
-            <p className="text-xs text-foreground/50">Projects touched · 7d</p>
+            <p className="text-xs text-foreground/70">Projects touched · 7d</p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
             <Activity className="mb-3 h-4 w-4 text-blue-500" />
             <p className="text-2xl font-semibold">{report.postsCreated}</p>
-            <p className="text-xs text-foreground/50">
+            <p className="text-xs text-foreground/70">
               Publication records · 7d
             </p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
             <CheckCircle2 className="mb-3 h-4 w-4 text-emerald-500" />
             <p className="text-2xl font-semibold">{report.postsPublished}</p>
-            <p className="text-xs text-foreground/50">
+            <p className="text-xs text-foreground/70">
               Confirmed published · 7d
             </p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
             <Target className="mb-3 h-4 w-4 text-orange-500" />
             <p className="text-2xl font-semibold">{report.activeGoals}</p>
-            <p className="text-xs text-foreground/50">Active goals</p>
+            <p className="text-xs text-foreground/70">Active goals</p>
           </div>
         </div>
 
@@ -278,7 +278,7 @@ export default function CoachingPage() {
                 key={item}
                 className="flex items-start gap-3 rounded-lg border border-emerald-500/10 bg-emerald-500/5 p-3"
               >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 text-[10px] font-semibold text-emerald-600">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 text-xs font-semibold text-emerald-600">
                   {index + 1}
                 </span>
                 <p className="text-sm leading-relaxed">{item}</p>

@@ -206,7 +206,7 @@ export default function ReferralPage() {
           </div>
           <div>
             <h2 className="font-medium">Your creator link</h2>
-            <p className="text-xs text-foreground/45">
+            <p className="text-xs text-foreground/70">
               Share the full link or the short creator code.
             </p>
           </div>
@@ -265,7 +265,7 @@ export default function ReferralPage() {
       <div className="grid gap-6 lg:grid-cols-[1.3fr_.7fr]">
         <section className="rounded-xl border border-border bg-surface p-6">
           <h2 className="font-medium">Reward history</h2>
-          <p className="mt-1 text-xs text-foreground/45">
+          <p className="mt-1 text-xs text-foreground/70">
             {billingReady
               ? "Paid-plan purchases verified by the billing system."
               : "Claims are saved; qualification remains locked until billing is connected."}
@@ -287,7 +287,7 @@ export default function ReferralPage() {
                     <p className="truncate text-sm font-medium">
                       {referral.referredDisplay}
                     </p>
-                    <p className="text-xs text-foreground/40">
+                    <p className="text-xs text-foreground/70">
                       {referral.status === "verified"
                         ? `Paid plan verified ${new Date(referral.qualifiedAt ?? referral.createdAt).toLocaleDateString()}`
                         : `Linked ${new Date(referral.createdAt).toLocaleDateString()} · waiting for paid plan`}
@@ -295,20 +295,20 @@ export default function ReferralPage() {
                   </div>
                   <div className="text-right">
                     <p
-                      className={`text-sm font-semibold ${referral.status === "verified" ? "text-emerald-500" : "text-foreground/40"}`}
+                      className={`text-sm font-semibold ${referral.status === "verified" ? "text-emerald-500" : "text-foreground/70"}`}
                     >
                       {referral.status === "verified"
                         ? `+${referral.creditsAwarded}`
                         : "Pending"}
                     </p>
-                    <p className="text-xs text-foreground/40">
+                    <p className="text-xs text-foreground/70">
                       {referral.dollarValue}
                     </p>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="py-10 text-center text-sm text-foreground/45">
+              <div className="py-10 text-center text-sm text-foreground/70">
                 Your first successful referral will appear here.
               </div>
             )}
@@ -317,7 +317,7 @@ export default function ReferralPage() {
 
         <section className="h-fit rounded-xl border border-border bg-surface p-6">
           <h2 className="font-medium">Have a creator code?</h2>
-          <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+          <p className="mt-1 text-xs leading-relaxed text-foreground/70">
             {billingReady
               ? "Attach it once. The reward unlocks only after your first successful paid-plan purchase."
               : "Attach it once. It remains pending until signed billing verification is available."}
@@ -349,7 +349,7 @@ export default function ReferralPage() {
           ) : null}
           <div className="mt-5 flex gap-2 border-t border-border pt-4">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-            <p className="text-[11px] leading-relaxed text-foreground/40">
+            <p className="text-xs leading-relaxed text-foreground/70">
               Credits pay for REELassati usage. The dollar amount communicates
               equivalent product value; it is not cash or a withdrawal balance.
               Opening a link, creating an account, or using the app never
@@ -391,8 +391,8 @@ function Metric({
       >
         {value}
       </p>
-      <p className="text-sm text-foreground/50">{label}</p>
-      <p className="mt-2 text-xs text-foreground/35">{detail}</p>
+      <p className="text-sm text-foreground/70">{label}</p>
+      <p className="mt-2 text-xs text-foreground/70">{detail}</p>
     </div>
   );
 }

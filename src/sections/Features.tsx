@@ -160,7 +160,7 @@ export function Features() {
           viewport={{ once: true, amount: 0.15 }}
           className="mt-16 grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 lg:grid-cols-3"
         >
-          {features.map((feature, index) => {
+          {features.map(feature => {
             const Icon = feature.icon;
             return (
               <motion.article
@@ -184,10 +184,7 @@ export function Features() {
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="mono-eyebrow text-foreground/30">
-                      0{index + 1}
-                    </span>
-                    <span className="rounded-pill bg-foreground/[0.05] px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-foreground/50">
+                    <span className="rounded-pill bg-foreground/[0.05] px-2 py-1 font-mono text-xs uppercase tracking-wider text-foreground/70">
                       {feature.status}
                     </span>
                   </div>

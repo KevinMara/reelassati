@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
-import { ArrowRight, Check, Lock, Scissors } from "lucide-react";
+import { ArrowRight, Check, Scissors } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -29,12 +30,12 @@ const COPY = {
     body: "Script, cut, caption and publish in one workspace.",
     primary: "Open the Studio",
     secondary: "Explore the product",
-    preview: "Product preview",
+    preview: "Caption & crop demo",
     selected: "Selected range",
     locked: "Opening locked",
-    plan: "3 proposed changes",
-    change: "Remove pause",
-    reason: "Tightens the first beat",
+    plan: "A clearer opening",
+    change: "Focus the frame",
+    reason: "Bring the product forward",
     approve: "Approve",
     timeline: "Timeline",
     caption: "Caption",
@@ -47,12 +48,12 @@ const COPY = {
     body: "Script, montaggio, sottotitoli e pubblicazione in un solo workspace.",
     primary: "Apri lo Studio",
     secondary: "Esplora il prodotto",
-    preview: "Anteprima prodotto",
+    preview: "Demo taglio e sottotitoli",
     selected: "Intervallo selezionato",
     locked: "Apertura bloccata",
-    plan: "3 modifiche proposte",
-    change: "Rimuovi pausa",
-    reason: "Rende più stretto il primo beat",
+    plan: "Un’apertura più chiara",
+    change: "Metti a fuoco il soggetto",
+    reason: "Porta il prodotto in primo piano",
     approve: "Approva",
     timeline: "Timeline",
     caption: "Sottotitolo",
@@ -147,6 +148,8 @@ function HeroEditorPreview({
 }: {
   copy: (typeof COPY)[keyof typeof COPY];
 }) {
+  const [finished, setFinished] = useState(true);
+  const italian = copy.preview.startsWith("Demo");
   return (
     <div
       className="cutout relative mx-auto w-full max-w-[440px] overflow-hidden"
@@ -155,49 +158,47 @@ function HeroEditorPreview({
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-primary" />
-          <span className="font-mono text-[10px] uppercase tracking-wider text-foreground/55">
+          <span className="font-mono text-xs uppercase tracking-wider text-foreground/70">
             {copy.preview}
           </span>
         </div>
-        <span className="rounded-pill bg-primary/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-primary">
+        <span className="rounded-pill bg-primary/10 px-2.5 py-1 font-mono text-xs uppercase tracking-wider text-primary">
           {copy.status}
         </span>
       </div>
 
-      <div className="grid grid-cols-[1.05fr_.95fr] gap-3 p-3">
+      <div className="grid grid-cols-[1fr_1fr] gap-3 p-3">
         <div className="relative aspect-[9/15] overflow-hidden rounded-lg border border-border bg-gradient-to-br from-primary/25 via-primary/10 to-foreground/[0.06]">
-          <div className="absolute inset-0 grain" />
-          <div
-            aria-hidden
-            className="absolute -top-8 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-primary/35 blur-3xl"
+          <img
+            src="/demo/coffee.jpg"
+            alt={
+              italian
+                ? "Cappuccino con latte art, media dimostrativo"
+                : "Latte art coffee, sample media"
+            }
+            width={1400}
+            height={2097}
+            className={`absolute inset-0 h-full w-full object-cover transition-transform duration-300 ${finished ? "scale-125" : "scale-100"}`}
+            style={{ objectPosition: "center 60%" }}
           />
-          <div
-            aria-hidden
-            className="absolute bottom-0 left-1/2 h-[63%] w-[72%] -translate-x-1/2"
-          >
-            <div className="absolute inset-x-0 bottom-0 h-[78%] rounded-t-[36%] bg-gradient-to-t from-foreground/85 via-foreground/60 to-foreground/30" />
-            <div className="absolute bottom-[60%] left-1/2 h-20 w-20 -translate-x-1/2 rounded-full bg-gradient-to-b from-foreground/70 to-foreground/50" />
-          </div>
-          <div className="absolute inset-x-4 bottom-20 text-center">
-            <span className="inline-block rounded-md bg-background/90 px-2.5 py-1 text-xs font-bold tracking-tight text-foreground shadow-subtle">
-              Make the{" "}
-              <span className="rounded-sm bg-primary px-1 text-primary-foreground">
-                first second
-              </span>{" "}
-              count.
-            </span>
-          </div>
-          <div className="absolute inset-x-2 top-2 flex items-center justify-between font-mono text-[8px] text-foreground/60">
-            <span>00:00:01:08</span>
-            <span className="inline-flex items-center gap-1">
-              <Lock className="h-2.5 w-2.5" aria-hidden /> {copy.locked}
-            </span>
-          </div>
+          {finished && (
+            <div className="absolute inset-x-3 bottom-12 text-center">
+              <span className="inline-block rounded-md bg-background/90 px-2.5 py-1 text-xs font-bold tracking-tight text-foreground shadow-subtle">
+                {italian ? "La tua" : "Your daily"}{" "}
+                <span className="rounded-sm bg-primary px-1 text-primary-foreground">
+                  {italian ? "pausa perfetta." : "perfect pause."}
+                </span>{" "}
+              </span>
+            </div>
+          )}
+          <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-1 text-xs text-white">
+            {italian ? "Media dimostrativo" : "Sample media"}
+          </span>
         </div>
 
         <div className="flex min-w-0 flex-col gap-2">
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-            <p className="font-mono text-[9px] uppercase tracking-wider text-primary">
+            <p className="font-mono text-xs uppercase tracking-wider text-primary">
               {copy.plan}
             </p>
             <div className="mt-3 flex items-start gap-2">
@@ -206,23 +207,35 @@ function HeroEditorPreview({
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold">{copy.change}</p>
-                <p className="mt-1 text-[10px] leading-relaxed text-foreground/50">
+                <p className="mt-1 text-xs leading-relaxed text-foreground/70">
                   {copy.reason}
                 </p>
               </div>
             </div>
-            <span className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-2 text-[10px] font-medium text-primary-foreground">
-              <Check className="h-3 w-3" aria-hidden /> {copy.approve}
-            </span>
+            <button
+              type="button"
+              aria-pressed={finished}
+              onClick={() => setFinished(value => !value)}
+              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-2 text-xs font-medium text-primary-foreground"
+            >
+              <Check className="h-3 w-3" aria-hidden />{" "}
+              {finished
+                ? italian
+                  ? "Vedi originale"
+                  : "View original"
+                : italian
+                  ? "Vedi risultato"
+                  : "View result"}
+            </button>
           </div>
           <div className="rounded-lg border border-border bg-surface-recessed p-3">
-            <p className="font-mono text-[9px] uppercase tracking-wider text-foreground/45">
+            <p className="font-mono text-xs uppercase tracking-wider text-foreground/70">
               {copy.selected}
             </p>
             <div className="mt-2 h-2 overflow-hidden rounded-pill bg-foreground/10">
               <div className="ml-[18%] h-full w-[42%] rounded-pill bg-primary" />
             </div>
-            <div className="mt-2 flex justify-between font-mono text-[8px] text-foreground/40">
+            <div className="mt-2 flex justify-between font-mono text-xs text-foreground/70">
               <span>00:01.2</span>
               <span>00:04.8</span>
             </div>
@@ -232,12 +245,10 @@ function HeroEditorPreview({
 
       <div className="border-t border-border px-3 pb-3 pt-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="font-mono text-[9px] uppercase tracking-wider text-foreground/45">
+          <span className="font-mono text-xs uppercase tracking-wider text-foreground/70">
             {copy.timeline}
           </span>
-          <span className="font-mono text-[9px] text-primary">
-            {copy.caption}
-          </span>
+          <span className="font-mono text-xs text-primary">{copy.caption}</span>
         </div>
         <div className="flex h-10 items-end gap-[2px] rounded-md bg-surface-recessed px-2 py-1">
           {WAVEFORM.map((height, index) => (
@@ -288,7 +299,7 @@ function MarqueeBar() {
         {doubled.map((label, index) => (
           <span
             key={`${label}-${index}`}
-            className="mono-eyebrow mx-6 inline-flex items-center text-foreground/50"
+            className="mono-eyebrow mx-6 inline-flex items-center text-foreground/70"
           >
             <span className="mr-6 h-1 w-1 rounded-full bg-primary" />
             {label}

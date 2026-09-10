@@ -341,7 +341,7 @@ export default function InterviewMe({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -18 }}
           >
-            <div className="mb-4 flex items-center justify-between text-xs text-foreground/45">
+            <div className="mb-4 flex items-center justify-between text-xs text-foreground/70">
               <span>
                 Question {questionIndex + 1} of {questions.length}
               </span>
@@ -369,7 +369,7 @@ export default function InterviewMe({
               >
                 {currentQuestion.prompt}
               </h2>
-              <div className="mt-4 flex items-start gap-2 rounded-lg bg-primary/5 p-3 text-xs leading-relaxed text-foreground/55">
+              <div className="mt-4 flex items-start gap-2 rounded-lg bg-primary/5 p-3 text-xs leading-relaxed text-foreground/70">
                 <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
                 {currentQuestion.guidance}
               </div>
@@ -435,7 +435,7 @@ export default function InterviewMe({
           >
             <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-primary" />
             <p className="text-lg font-medium">Writing from your answers…</p>
-            <p className="mt-2 text-sm text-foreground/45">
+            <p className="mt-2 text-sm text-foreground/70">
               One request, then one persisted script—sequentially.
             </p>
           </motion.div>
@@ -454,7 +454,7 @@ export default function InterviewMe({
             <article className="rounded-xl border border-border bg-surface p-6">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-primary">
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-primary">
                     {script.platform}
                   </span>
                   <h2 className="mt-3 text-xl font-semibold">{script.title}</h2>

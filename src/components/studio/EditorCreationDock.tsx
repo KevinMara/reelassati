@@ -135,161 +135,171 @@ export function EditorCreationDock({
     }
   }
   return (
-    <section className="mb-4 rounded-2xl border border-border bg-surface p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-3 text-sm font-semibold">Create in this edit</span>
-        {(
-          [
-            ["image", "Image", Image],
-            ["video", "Video", Film],
-            ["voice", "Voiceover", Mic2],
-            ["audio", "Music & sound effects", Music2],
-          ] as const
-        ).map(([id, label, Icon]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setKind(kind === id ? null : id)}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${kind === id ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-foreground/60">
-          Insert at {playhead.toFixed(1)}s
-        </span>
-      </div>
-      {kind && (
-        <div className="mt-4 border-t border-border pt-4">
-          <button
-            type="button"
-            aria-label="Close creation panel"
-            onClick={() => setKind(null)}
-            className="float-right p-2"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          {kind === "audio" ? (
-            <div>
-              <div className="mb-4 flex flex-wrap gap-2">
-                {(["click", "whoosh", "impact", "rise"] as const).map(
-                  effect => (
-                    <button
-                      key={effect}
-                      disabled={busy || !capabilities.uploads}
-                      type="button"
-                      onClick={() => void insertSound(effect)}
-                      className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm capitalize"
-                    >
-                      {effect} · 0 credits
-                    </button>
-                  )
-                )}
-              </div>
-              <p className="mb-3 text-sm text-foreground/70">
-                Use your uploaded or generated audio. Drop a licensed music or
-                sound-effect file onto the timeline to add more.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {workspace.assets
-                  .filter(a => a.kind === "audio" && a.status === "ready")
-                  .map(a => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() =>
-                        void onInsert(a).catch(e => setMessage(e.message))
-                      }
-                      className="rounded-lg border border-border p-3 text-sm"
-                    >
-                      {a.name} · Insert
-                    </button>
-                  ))}
-              </div>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
-              <textarea
-                aria-label={
-                  kind === "voice" ? "Voiceover text" : "Generation prompt"
-                }
-                value={prompt}
-                onChange={e => setPrompt(e.target.value)}
-                rows={4}
-                placeholder={
-                  kind === "voice"
-                    ? "Write the exact voiceover…"
-                    : "Describe the supporting shot you need…"
-                }
-                className="w-full rounded-xl border border-border bg-background p-3 text-sm"
-              />
-              <div className="space-y-3">
-                {kind === "video" && (
-                  <label className="block text-sm">
-                    Duration · {seconds}s
-                    <input
-                      aria-label="Generated video duration"
-                      type="range"
-                      min={3}
-                      max={15}
-                      value={seconds}
-                      onChange={e => setSeconds(Number(e.target.value))}
-                      className="w-full accent-primary"
-                    />
-                  </label>
-                )}
-                {kind === "voice" && (
-                  <select
-                    aria-label="Voice"
-                    value={voice}
-                    onChange={e => setVoice(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background p-2 text-sm"
-                  >
-                    <option value="English_Graceful_Lady">
-                      Grace · English
-                    </option>
-                    <option value="English_Trustworth_Man">
-                      James · English
-                    </option>
-                    <option value="Italian_Narrator">
-                      Narratore · Italiano
-                    </option>
-                    <option value="Italian_BraveHeroine">
-                      Sofia · Italiano
-                    </option>
-                  </select>
-                )}
-
-                <button
-                  type="button"
-                  disabled={busy || !available || !prompt.trim()}
-                  onClick={() => void generate()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground disabled:opacity-40"
-                >
-                  {busy && <Loader2 className="h-4 w-4 animate-spin" />}Generate
-                  · {cost} credits
-                </button>
-              </div>
-            </div>
-          )}
-          {jobId && (
+    <details
+      className="mb-4 rounded-xl border border-border bg-surface p-3"
+      open={kind !== null || undefined}
+    >
+      <summary className="cursor-pointer px-1 py-1 text-sm font-medium">
+        Create media in this edit
+      </summary>
+      <div className="mt-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-3 text-sm font-semibold">
+            Create in this edit
+          </span>
+          {(
+            [
+              ["image", "Image", Image],
+              ["video", "Video", Film],
+              ["voice", "Voiceover", Mic2],
+              ["audio", "Music & sound effects", Music2],
+            ] as const
+          ).map(([id, label, Icon]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setKind(kind === id ? null : id)}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${kind === id ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+          <span className="ml-auto text-xs text-foreground/60">
+            Insert at {playhead.toFixed(1)}s
+          </span>
+        </div>
+        {kind && (
+          <div className="mt-4 border-t border-border pt-4">
             <button
               type="button"
-              disabled={busy}
-              onClick={() => void checkVideo()}
-              className="mt-3 rounded-lg border border-primary px-3 py-2 text-sm text-primary"
+              aria-label="Close creation panel"
+              onClick={() => setKind(null)}
+              className="float-right p-2"
             >
-              Check video & insert
+              <X className="h-4 w-4" />
             </button>
-          )}
-          {message && (
-            <p role="status" className="mt-3 text-sm text-foreground/80">
-              {message}
-            </p>
-          )}
-        </div>
-      )}
-    </section>
+            {kind === "audio" ? (
+              <div>
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {(["click", "whoosh", "impact", "rise"] as const).map(
+                    effect => (
+                      <button
+                        key={effect}
+                        disabled={busy || !capabilities.uploads}
+                        type="button"
+                        onClick={() => void insertSound(effect)}
+                        className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm capitalize"
+                      >
+                        {effect} · 0 credits
+                      </button>
+                    )
+                  )}
+                </div>
+                <p className="mb-3 text-sm text-foreground/70">
+                  Use your uploaded or generated audio. Drop a licensed music or
+                  sound-effect file onto the timeline to add more.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {workspace.assets
+                    .filter(a => a.kind === "audio" && a.status === "ready")
+                    .map(a => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() =>
+                          void onInsert(a).catch(e => setMessage(e.message))
+                        }
+                        className="rounded-lg border border-border p-3 text-sm"
+                      >
+                        {a.name} · Insert
+                      </button>
+                    ))}
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
+                <textarea
+                  aria-label={
+                    kind === "voice" ? "Voiceover text" : "Generation prompt"
+                  }
+                  value={prompt}
+                  onChange={e => setPrompt(e.target.value)}
+                  rows={4}
+                  placeholder={
+                    kind === "voice"
+                      ? "Write the exact voiceover…"
+                      : "Describe the supporting shot you need…"
+                  }
+                  className="w-full rounded-xl border border-border bg-background p-3 text-sm"
+                />
+                <div className="space-y-3">
+                  {kind === "video" && (
+                    <label className="block text-sm">
+                      Duration · {seconds}s
+                      <input
+                        aria-label="Generated video duration"
+                        type="range"
+                        min={3}
+                        max={15}
+                        value={seconds}
+                        onChange={e => setSeconds(Number(e.target.value))}
+                        className="w-full accent-primary"
+                      />
+                    </label>
+                  )}
+                  {kind === "voice" && (
+                    <select
+                      aria-label="Voice"
+                      value={voice}
+                      onChange={e => setVoice(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+                    >
+                      <option value="English_Graceful_Lady">
+                        Grace · English
+                      </option>
+                      <option value="English_Trustworth_Man">
+                        James · English
+                      </option>
+                      <option value="Italian_Narrator">
+                        Narratore · Italiano
+                      </option>
+                      <option value="Italian_BraveHeroine">
+                        Sofia · Italiano
+                      </option>
+                    </select>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={busy || !available || !prompt.trim()}
+                    onClick={() => void generate()}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground disabled:opacity-40"
+                  >
+                    {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Generate · {cost} credits
+                  </button>
+                </div>
+              </div>
+            )}
+            {jobId && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void checkVideo()}
+                className="mt-3 rounded-lg border border-primary px-3 py-2 text-sm text-primary"
+              >
+                Check video & insert
+              </button>
+            )}
+            {message && (
+              <p role="status" className="mt-3 text-sm text-foreground/80">
+                {message}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </details>
   );
 }

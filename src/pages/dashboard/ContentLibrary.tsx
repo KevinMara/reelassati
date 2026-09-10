@@ -653,7 +653,7 @@ export default function ContentLibrary() {
                           onClick={() => void renameAsset(item)}
                           disabled={isRenaming || saving}
                           aria-label={`Rename ${item.title}`}
-                          className="rounded-md p-1.5 text-foreground/35 transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-40"
+                          className="rounded-md p-1.5 text-foreground/70 transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-40"
                         >
                           {isRenaming ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -667,7 +667,7 @@ export default function ContentLibrary() {
                         onClick={() => void deleteItem(item)}
                         disabled={isDeleting || saving}
                         aria-label={`Delete ${item.title}`}
-                        className="rounded-md p-1.5 text-foreground/35 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
+                        className="rounded-md p-1.5 text-foreground/70 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
                       >
                         {isDeleting ? (
                           <Loader2 className="h-4 w-4 animate-spin" />

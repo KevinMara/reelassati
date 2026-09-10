@@ -566,7 +566,7 @@ export default function CalendarPage() {
                               <span
                                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`}
                               />
-                              <span className="hidden truncate text-[9px] text-foreground/70 sm:block">
+                              <span className="hidden truncate text-xs text-foreground/70 sm:block">
                                 {item.event.title}
                               </span>
                             </div>
@@ -584,14 +584,14 @@ export default function CalendarPage() {
                                 ].dot
                               }`}
                             />
-                            <span className="hidden truncate text-[9px] text-foreground/60 sm:block">
+                            <span className="hidden truncate text-xs text-foreground/60 sm:block">
                               {postTitle(item.post)}
                             </span>
                           </div>
                         );
                       })}
                       {items.length > 3 ? (
-                        <p className="text-[9px] text-foreground/65">
+                        <p className="text-xs text-foreground/65">
                           +{items.length - 3} more
                         </p>
                       ) : null}
@@ -601,7 +601,7 @@ export default function CalendarPage() {
               );
             })}
           </div>
-          <p className="mt-4 text-center text-[11px] text-foreground/35">
+          <p className="mt-4 text-center text-xs text-foreground/70">
             Tip: double-click a day to create an event immediately.
           </p>
         </section>
@@ -917,7 +917,7 @@ function EventCard({
         </div>
       </div>
       {event.notes ? (
-        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-foreground/50">
+        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-foreground/70">
           {event.notes}
         </p>
       ) : null}

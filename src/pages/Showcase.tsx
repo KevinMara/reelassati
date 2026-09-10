@@ -480,7 +480,7 @@ export default function Showcase() {
           <div className="mb-10">
             <Link
               to="/"
-              className="mb-4 inline-flex items-center gap-1 text-sm text-foreground/50 transition-colors hover:text-foreground"
+              className="mb-4 inline-flex items-center gap-1 text-sm text-foreground/70 transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden />{" "}
               {language === "it" ? "Torna alla home" : "Back to home"}
@@ -543,31 +543,31 @@ export default function Showcase() {
                   <WorkflowThumbnail item={item} language={language} />
                   <div className="p-5">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-primary">
+                      <span className="font-mono text-xs uppercase tracking-wider text-primary">
                         {CATEGORY_LABELS[item.category][language]}
                       </span>
                       <Icon
-                        className="h-4 w-4 text-foreground/35"
+                        className="h-4 w-4 text-foreground/70"
                         aria-hidden
                       />
                     </div>
                     <h2 className="mt-2 text-lg font-semibold">
                       {item.title[language]}
                     </h2>
-                    <p className="mt-2 text-sm leading-relaxed text-foreground/55">
+                    <p className="mt-2 text-sm leading-relaxed text-foreground/70">
                       {item.description[language]}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-1.5">
                       {item.capabilities.map(capability => (
                         <span
                           key={capability.en}
-                          className="rounded-pill bg-primary/8 px-2 py-1 text-[10px] font-medium text-primary"
+                          className="rounded-pill bg-primary/8 px-2 py-1 text-xs font-medium text-primary"
                         >
                           {capability[language]}
                         </span>
                       ))}
                     </div>
-                    <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-medium text-foreground/55 transition-colors group-hover:text-primary">
+                    <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-medium text-foreground/70 transition-colors group-hover:text-primary">
                       {language === "it"
                         ? "Ispeziona il flusso"
                         : "Inspect the workflow"}{" "}
@@ -607,7 +607,7 @@ export default function Showcase() {
                 ref={closeButtonRef}
                 type="button"
                 onClick={closeDialog}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/50 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
                 aria-label={language === "it" ? "Chiudi" : "Close"}
               >
                 <X className="h-4 w-4" aria-hidden />
@@ -646,7 +646,7 @@ export default function Showcase() {
               </div>
 
               <div className="mt-7">
-                <p className="mono-eyebrow mb-3 text-foreground/45">
+                <p className="mono-eyebrow mb-3 text-foreground/70">
                   {language === "it"
                     ? "Decisioni revisionabili"
                     : "Reviewable decisions"}
@@ -657,14 +657,14 @@ export default function Showcase() {
                       key={`${selectedItem.id}-${step.interval}`}
                       className="grid gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-[105px_1fr]"
                     >
-                      <span className="font-mono text-[10px] text-primary">
+                      <span className="font-mono text-xs text-primary">
                         {step.interval}
                       </span>
                       <div>
                         <p className="text-sm font-medium">
                           {step.action[language]}
                         </p>
-                        <p className="mt-1 text-xs leading-relaxed text-foreground/50">
+                        <p className="mt-1 text-xs leading-relaxed text-foreground/70">
                           {step.reason[language]}
                         </p>
                       </div>
@@ -712,10 +712,10 @@ function WorkflowThumbnail({
 }) {
   return (
     <div
-      className={`relative overflow-hidden bg-gradient-to-br ${item.accent} ${large ? "h-52 rounded-xl border border-border" : "h-44 border-b border-border"}`}
+      className={`relative overflow-hidden bg-gradient-to-br ${item.accent} ${large ? "h-60 rounded-xl border border-border" : "h-56 border-b border-border"}`}
     >
       <div className="absolute inset-x-5 top-5 flex items-center justify-between">
-        <span className="rounded-pill bg-background/80 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-foreground/55 backdrop-blur">
+        <span className="rounded-pill bg-background/80 px-2.5 py-1 font-mono text-xs uppercase tracking-wider text-foreground/70 backdrop-blur">
           {item.source[language]}
         </span>
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-primary backdrop-blur">
@@ -723,21 +723,86 @@ function WorkflowThumbnail({
         </span>
       </div>
       <div className="absolute inset-x-5 bottom-5 rounded-lg border border-border bg-background/85 p-3 shadow-card backdrop-blur">
-        <div className="flex h-7 gap-1">
-          <span className="w-[18%] rounded-sm bg-foreground/10" />
-          <span className="w-[36%] rounded-sm border border-primary/30 bg-primary/25" />
-          <span className="w-[24%] rounded-sm bg-foreground/10" />
-          <span className="flex-1 rounded-sm bg-foreground/10" />
-        </div>
-        <div className="mt-2 flex items-center justify-between font-mono text-[8px] uppercase tracking-wider text-foreground/40">
-          <span>
-            {language === "it" ? "Intervallo selezionato" : "Selected range"}
-          </span>
-          <span className="inline-flex items-center gap-1 text-primary">
-            <Check className="h-2.5 w-2.5" aria-hidden />{" "}
-            {language === "it" ? "Revisionabile" : "Reviewable"}
-          </span>
-        </div>
+        {item.id === "caption-architecture" ? (
+          <div className="space-y-2 text-center">
+            <p className="text-xs text-foreground/70">00:03 — 00:06</p>
+            <p className="text-lg font-semibold">
+              {language === "it" ? "Dai risalto alle" : "Make every"}{" "}
+              <span className="rounded bg-primary px-1 text-primary-foreground">
+                {language === "it" ? "parole giuste." : "word count."}
+              </span>
+            </p>
+          </div>
+        ) : item.category === "Script" ? (
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            {(language === "it"
+              ? ["Apertura", "Dimostrazione", "Invito"]
+              : ["Hook", "Proof", "Action"]
+            ).map((label, i) => (
+              <div
+                key={label}
+                className="rounded border border-border bg-surface p-2"
+              >
+                <span className="block text-xs text-primary">0{i + 1}</span>
+                {label}
+              </div>
+            ))}
+          </div>
+        ) : item.category === "Generation" ? (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="flex-1 rounded bg-foreground/10 p-3">00:00</span>
+            <span className="flex-1 rounded border border-dashed border-primary bg-primary/10 p-3 text-center text-primary">
+              + 3.5s
+            </span>
+            <span className="flex-1 rounded bg-foreground/10 p-3">00:08</span>
+          </div>
+        ) : item.id === "quality-preflight" ? (
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {[
+              "1080 × 1920",
+              "MP4",
+              language === "it" ? "Audio" : "Audio",
+              language === "it" ? "Sottotitoli" : "Captions",
+            ].map(label => (
+              <span key={label} className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-primary" />
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : item.id === "publish-ready" ? (
+          <div className="flex items-end justify-center gap-4 text-xs">
+            <span className="rounded border border-primary/30 bg-primary/10 px-3 py-4">
+              9:16
+            </span>
+            <span className="rounded border border-border bg-surface p-3">
+              1:1
+            </span>
+            <span className="rounded border border-border bg-surface px-4 py-2">
+              16:9
+            </span>
+          </div>
+        ) : (
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-12">
+                {language === "it" ? "Prima" : "Before"}
+              </span>
+              <span className="w-1/4 rounded bg-foreground/10 p-2 line-through">
+                {language === "it" ? "Pausa" : "Pause"}
+              </span>
+              <span className="flex-1 rounded bg-primary/20 p-2">Hook</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-12">
+                {language === "it" ? "Dopo" : "After"}
+              </span>
+              <span className="flex-1 rounded bg-primary/20 p-2">
+                Hook → {language === "it" ? "Dimostrazione" : "Proof"}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -746,7 +811,7 @@ function WorkflowThumbnail({
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-surface p-4">
-      <p className="font-mono text-[9px] uppercase tracking-wider text-foreground/40">
+      <p className="font-mono text-xs uppercase tracking-wider text-foreground/70">
         {label}
       </p>
       <p className="mt-2 text-sm font-medium">{value}</p>

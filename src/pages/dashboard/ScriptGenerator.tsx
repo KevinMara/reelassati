@@ -689,7 +689,7 @@ function DirectScriptGenerator() {
                     }}
                     className="flex w-full items-center gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40"
                   >
-                    <FileText className="h-4 w-4 shrink-0 text-foreground/35" />
+                    <FileText className="h-4 w-4 shrink-0 text-foreground/70" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">
                         {script.title}
@@ -698,7 +698,7 @@ function DirectScriptGenerator() {
                         {script.platform} · {script.duration}s
                       </span>
                     </span>
-                    <Clock3 className="h-3.5 w-3.5 text-foreground/30" />
+                    <Clock3 className="h-3.5 w-3.5 text-foreground/70" />
                   </button>
                 ))}
               </div>

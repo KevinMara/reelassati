@@ -142,22 +142,22 @@ export default function Pricing() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
-      <main className="pb-20 pt-28">
+      <main className="pb-20 pt-24">
         <div className="container-page">
           <div className="mx-auto max-w-3xl text-center">
             <p className="mono-eyebrow text-primary">
               {isItalian ? "Prezzi" : "Pricing"}
             </p>
-            <h1 className="mt-5 text-4xl font-semibold md:text-6xl">
+            <h1 className="mt-3 text-4xl font-semibold md:text-5xl">
               {isItalian ? "Scegli la scala." : "Choose the scale."}{" "}
               <span className="serif-accent">
                 {isItalian ? "Mantieni il controllo." : "Keep the control."}
               </span>
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-foreground/65">
+            <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-foreground/65">
               {isItalian
-                ? "Ogni piano include strumenti creativi, libreria e pianificazione. Scegli i crediti mensili e il numero di account social. Esporta MP4 finiti e gestisci i brand inclusi nel tuo piano."
-                : "Every plan includes the creation tools, library, and planning workspace. Choose your monthly credits and connected social account allowance. Export finished MP4s and manage the brands included in your plan."}
+                ? "Tutti gli strumenti creativi. Scegli i crediti e gli account social adatti a te."
+                : "All the creation tools. Choose the credits and social accounts that fit your work."}
             </p>
 
             <div
@@ -171,7 +171,7 @@ export default function Pricing() {
                 type="button"
                 onClick={() => setBillingCycle("monthly")}
                 aria-pressed={billingCycle === "monthly"}
-                className={`rounded-pill px-5 py-2 text-sm font-medium transition-all ${billingCycle === "monthly" ? "bg-foreground text-background" : "text-foreground/55 hover:text-foreground"}`}
+                className={`rounded-pill px-5 py-2 text-sm font-medium transition-all ${billingCycle === "monthly" ? "bg-foreground text-background" : "text-foreground/70 hover:text-foreground"}`}
               >
                 {isItalian ? "Mensile" : "Monthly"}
               </button>
@@ -179,7 +179,7 @@ export default function Pricing() {
                 type="button"
                 onClick={() => setBillingCycle("annual")}
                 aria-pressed={billingCycle === "annual"}
-                className={`rounded-pill px-5 py-2 text-sm font-medium transition-all ${billingCycle === "annual" ? "bg-primary text-primary-foreground" : "text-foreground/55 hover:text-foreground"}`}
+                className={`rounded-pill px-5 py-2 text-sm font-medium transition-all ${billingCycle === "annual" ? "bg-primary text-primary-foreground" : "text-foreground/70 hover:text-foreground"}`}
               >
                 {isItalian
                   ? `Annuale · paghi ${ANNUAL_BILLED_MONTHS} mesi`
@@ -188,7 +188,7 @@ export default function Pricing() {
             </div>
           </div>
 
-          <div className="mx-auto mt-14 grid max-w-6xl items-stretch gap-5 lg:grid-cols-3">
+          <div className="mx-auto mt-8 grid max-w-6xl items-stretch gap-5 lg:grid-cols-3">
             {plans.map(plan => (
               <PlanCard
                 key={plan.name}
@@ -338,7 +338,7 @@ function PlanCard({
 
   return (
     <article
-      className={`relative flex h-full flex-col overflow-hidden rounded-2xl border p-6 shadow-card transition-all duration-300 [transform-style:preserve-3d] hover:-translate-y-1 hover:[transform:perspective(1000px)_rotateX(1deg)_translateY(-4px)] hover:shadow-card-hover ${plan.featured ? "border-primary/45 bg-primary/[0.05]" : "border-border bg-surface"}`}
+      className={`relative flex h-full flex-col overflow-hidden rounded-2xl border p-6 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover ${plan.featured ? "border-primary/45 bg-primary/[0.05]" : "border-border bg-surface"}`}
     >
       {plan.featured && (
         <div
@@ -349,23 +349,23 @@ function PlanCard({
       <div className="flex items-center justify-between gap-3">
         <p className="mono-eyebrow text-primary">{plan.name}</p>
         {plan.featured && (
-          <span className="rounded-pill bg-primary px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-primary-foreground">
+          <span className="rounded-pill bg-primary px-2.5 py-1 font-mono text-xs uppercase tracking-wider text-primary-foreground">
             {isItalian ? "Consigliato" : "Recommended"}
           </span>
         )}
       </div>
-      <p className="mt-4 min-h-[48px] text-sm leading-relaxed text-foreground/55">
+      <p className="mt-4 min-h-[48px] text-sm leading-relaxed text-foreground/70">
         {plan.description}
       </p>
       <div className="mt-6 flex items-end gap-2">
         <span className="text-5xl font-semibold tracking-tight">
           {priceLabel}
         </span>
-        <span className="pb-1 text-sm text-foreground/45">
+        <span className="pb-1 text-sm text-foreground/70">
           USD /{isItalian ? "mese" : "month"}
         </span>
       </div>
-      <p className="mt-2 min-h-[20px] text-xs text-foreground/45">
+      <p className="mt-2 min-h-[20px] text-xs text-foreground/70">
         {billingCycle === "annual"
           ? isItalian
             ? `${annualTotalLabel} USD fatturati annualmente`
@@ -380,10 +380,13 @@ function PlanCard({
           <p className="text-lg font-semibold leading-none text-foreground">
             {creditLabel}
           </p>
-          <p className="mt-1 text-xs text-foreground/55">
+          <p className="mt-1 text-xs text-foreground/70">
             {isItalian ? "crediti ogni mese" : "credits every month"}
           </p>
         </div>
+        <p className="ml-auto max-w-[130px] text-right text-sm font-medium text-foreground">
+          {plan.features[1]}
+        </p>
       </div>
       <Link
         to={checkoutPath}
@@ -393,18 +396,20 @@ function PlanCard({
         <ArrowRight className="h-4 w-4" aria-hidden />
       </Link>
       <ul className="mt-6 flex-1 space-y-3 border-t border-border pt-5">
-        {plan.features.map(item => (
-          <li
-            key={item}
-            className="flex items-start gap-2.5 text-sm leading-relaxed text-foreground/70"
-          >
-            <Check
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary"
-              aria-hidden
-            />{" "}
-            {item}
-          </li>
-        ))}
+        {plan.features
+          .filter((_, index) => index !== 1)
+          .map(item => (
+            <li
+              key={item}
+              className="flex items-start gap-2.5 text-sm leading-relaxed text-foreground/70"
+            >
+              <Check
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary"
+                aria-hidden
+              />{" "}
+              {item}
+            </li>
+          ))}
       </ul>
     </article>
   );

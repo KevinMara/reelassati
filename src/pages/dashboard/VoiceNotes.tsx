@@ -500,7 +500,7 @@ export default function VoiceNotes() {
 
             <div className="my-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-border" />
-              <span className="text-xs uppercase tracking-wider text-foreground/35">
+              <span className="text-xs uppercase tracking-wider text-foreground/70">
                 or existing asset
               </span>
               <div className="h-px flex-1 bg-border" />

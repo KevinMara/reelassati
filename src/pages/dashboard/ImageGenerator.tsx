@@ -168,7 +168,7 @@ export default function ImageGenerator() {
             placeholder="A high-contrast editorial product shot with..."
             className="mt-2 w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-relaxed"
           />
-          <p className="mt-1 text-right text-xs text-foreground/35">
+          <p className="mt-1 text-right text-xs text-foreground/70">
             {prompt.length}/4000
           </p>
 
@@ -336,7 +336,7 @@ export default function ImageGenerator() {
             <section className="rounded-xl border border-border bg-surface p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-medium">Recent images</h2>
-                <span className="text-xs uppercase tracking-wider text-foreground/35">
+                <span className="text-xs uppercase tracking-wider text-foreground/70">
                   Connected library
                 </span>
               </div>

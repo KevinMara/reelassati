@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { TimelinePreview } from "@/components/studio/TimelinePreview";
 import {
   useCallback,
@@ -268,6 +269,8 @@ function deriveQualitySignals(project: EditProject): QualitySignal[] {
 }
 
 export default function EditorPage() {
+  const { i18n } = useTranslation();
+  const italian = i18n.resolvedLanguage?.startsWith("it");
   const {
     workspace,
     capabilities,
@@ -1199,7 +1202,7 @@ export default function EditorPage() {
             </p>
           </div>
           {workspace.projects.length > 0 && (
-            <span className="text-xs text-foreground/50">
+            <span className="text-xs text-foreground/70">
               {workspace.projects.length} saved{" "}
               {workspace.projects.length === 1 ? "project" : "projects"}
             </span>
@@ -1231,7 +1234,7 @@ export default function EditorPage() {
                 <h2 className="mt-1 truncate font-medium">
                   {pendingAsset.name}
                 </h2>
-                <p className="mt-1 text-xs text-foreground/50">
+                <p className="mt-1 text-xs text-foreground/70">
                   Choose an existing project below or start a new timeline with
                   this {pendingAsset.kind} already placed.
                 </p>
@@ -1250,7 +1253,7 @@ export default function EditorPage() {
                 <button
                   type="button"
                   onClick={clearPendingAsset}
-                  className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground/55 hover:text-foreground"
+                  className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground/70 hover:text-foreground"
                 >
                   Cancel
                 </button>
@@ -1282,7 +1285,7 @@ export default function EditorPage() {
               ? "Drop files to start the edit"
               : "Upload footage to a new edit"}
           </span>
-          <span className="mt-1 text-sm text-foreground/50">
+          <span className="mt-1 text-sm text-foreground/70">
             Drop video, image, or audio here, or click to choose.
           </span>
           {uploadProgress !== null && (
@@ -1302,7 +1305,7 @@ export default function EditorPage() {
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-medium">Start from a structure</h2>
-          <span className="text-xs text-foreground/45">
+          <span className="text-xs text-foreground/70">
             No irreversible auto-edit
           </span>
         </div>
@@ -1323,7 +1326,7 @@ export default function EditorPage() {
                 <item.icon className="h-4 w-4" />
               </span>
               <span className="block font-medium">{item.name}</span>
-              <span className="mt-2 block text-sm leading-5 text-foreground/50">
+              <span className="mt-2 block text-sm leading-5 text-foreground/70">
                 {item.description}
               </span>
             </button>
@@ -1347,11 +1350,11 @@ export default function EditorPage() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="truncate font-medium">{item.title}</span>
-                    <span className="mono-eyebrow shrink-0 text-foreground/40">
+                    <span className="mono-eyebrow shrink-0 text-foreground/70">
                       {item.aspectRatio}
                     </span>
                   </div>
-                  <div className="mt-3 flex items-center gap-3 text-xs text-foreground/45">
+                  <div className="mt-3 flex items-center gap-3 text-xs text-foreground/70">
                     <span>{item.clips.length} clips</span>
                     <span>{formatTime(item.duration)}</span>
                     <span className="capitalize">{item.status}</span>
@@ -1419,7 +1422,7 @@ export default function EditorPage() {
             setPlaying(false);
             setSelectedProjectId(null);
           }}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/55 hover:text-foreground"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground"
           aria-label="Back to projects"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -1436,10 +1439,10 @@ export default function EditorPage() {
                   "The project title could not be saved."
                 );
             }}
-            className="w-full border-0 bg-transparent p-0 text-xl font-semibold outline-none placeholder:text-foreground/35"
+            className="w-full border-0 bg-transparent p-0 text-xl font-semibold outline-none placeholder:text-foreground/70"
             aria-label="Project title"
           />
-          <div className="mt-1 flex items-center gap-2 text-xs text-foreground/45">
+          <div className="mt-1 flex items-center gap-2 text-xs text-foreground/70">
             <span className="capitalize">{project.platform}</span>
             <span>·</span>
             <span>{project.aspectRatio}</span>
@@ -1452,7 +1455,7 @@ export default function EditorPage() {
             className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs sm:flex ${
               workspaceError
                 ? "bg-destructive/10 text-destructive"
-                : "bg-surface text-foreground/50"
+                : "bg-surface text-foreground/70"
             }`}
           >
             {saving ? (
@@ -1468,7 +1471,7 @@ export default function EditorPage() {
             type="button"
             disabled={revisionCursor <= 0}
             onClick={() => void undo()}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/55 hover:text-foreground disabled:opacity-30"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground disabled:opacity-30"
             aria-label="Undo"
           >
             <Undo2 className="h-4 w-4" />
@@ -1477,7 +1480,7 @@ export default function EditorPage() {
             type="button"
             disabled={revisionCursor >= project.revisions.length - 1}
             onClick={() => void redo()}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/55 hover:text-foreground disabled:opacity-30"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground disabled:opacity-30"
             aria-label="Redo"
           >
             <Redo2 className="h-4 w-4" />
@@ -1488,7 +1491,7 @@ export default function EditorPage() {
             className="flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
           >
             <Maximize2 className="h-3.5 w-3.5" />
-            Export video
+            {italian ? "Esporta video" : "Export video"}
           </button>
         </div>
       </header>
@@ -1517,7 +1520,7 @@ export default function EditorPage() {
             onClick={() => setEditMode("manual")}
             className={`rounded-lg px-4 py-2 text-sm font-medium ${editMode === "manual" ? "bg-primary text-primary-foreground" : "text-foreground/70"}`}
           >
-            Edit myself
+            {italian ? "Montaggio manuale" : "Edit myself"}
           </button>
           <button
             type="button"
@@ -1525,67 +1528,74 @@ export default function EditorPage() {
             onClick={() => setEditMode("auto")}
             className={`rounded-lg px-4 py-2 text-sm font-medium ${editMode === "auto" ? "bg-primary text-primary-foreground" : "text-foreground/70"}`}
           >
-            AI complete edit
+            {italian ? "Montaggio completo AI" : "AI complete edit"}
           </button>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          Video duration
-          <input
-            aria-label="Total video duration in seconds"
-            type="number"
-            min={0.2}
-            step={0.1}
-            value={durationDraft ?? project.duration}
-            onChange={e => setDurationDraft(Number(e.target.value))}
-            className="w-24 rounded-lg border border-border bg-background px-2 py-2 font-mono"
-          />{" "}
-          s
-        </label>
-        <button
-          type="button"
-          onClick={() =>
-            void saveProjectChange(
-              () =>
-                commitProject("Video duration changed", p =>
-                  resizeTimeline(p, durationDraft ?? p.duration)
-                ),
-              "Could not change duration."
-            )
-          }
-          className="rounded-lg border border-border px-3 py-2 text-sm"
-        >
-          Set end
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            void saveProjectChange(
-              () =>
-                commitProject("Fitted timeline to content", p => ({
-                  ...p,
-                  duration: contentDuration(p.clips),
-                })),
-              "Could not fit timeline."
-            )
-          }
-          className="rounded-lg border border-border px-3 py-2 text-sm"
-        >
-          Fit to content
-        </button>
-        <select
-          aria-label="Video aspect ratio"
-          value={project.aspectRatio}
-          onChange={e =>
-            void patchProject({
-              aspectRatio: e.target.value as EditProject["aspectRatio"],
-            })
-          }
-          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-        >
-          <option value="9:16">Vertical 9:16</option>
-          <option value="16:9">Landscape 16:9</option>
-          <option value="1:1">Square 1:1</option>
-        </select>
+        <details className="group min-w-0 flex-1">
+          <summary className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium">
+            {italian ? "Formato e durata" : "Format & duration"}
+          </summary>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              {italian ? "Durata video" : "Video duration"}
+              <input
+                aria-label="Total video duration in seconds"
+                type="number"
+                min={0.2}
+                step={0.1}
+                value={durationDraft ?? project.duration}
+                onChange={e => setDurationDraft(Number(e.target.value))}
+                className="w-24 rounded-lg border border-border bg-background px-2 py-2 font-mono"
+              />{" "}
+              s
+            </label>
+            <button
+              type="button"
+              onClick={() =>
+                void saveProjectChange(
+                  () =>
+                    commitProject("Video duration changed", p =>
+                      resizeTimeline(p, durationDraft ?? p.duration)
+                    ),
+                  "Could not change duration."
+                )
+              }
+              className="rounded-lg border border-border px-3 py-2 text-sm"
+            >
+              {italian ? "Imposta fine" : "Set end"}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                void saveProjectChange(
+                  () =>
+                    commitProject("Fitted timeline to content", p => ({
+                      ...p,
+                      duration: contentDuration(p.clips),
+                    })),
+                  "Could not fit timeline."
+                )
+              }
+              className="rounded-lg border border-border px-3 py-2 text-sm"
+            >
+              {italian ? "Adatta al contenuto" : "Fit to content"}
+            </button>
+            <select
+              aria-label="Video aspect ratio"
+              value={project.aspectRatio}
+              onChange={e =>
+                void patchProject({
+                  aspectRatio: e.target.value as EditProject["aspectRatio"],
+                })
+              }
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="9:16">Vertical 9:16</option>
+              <option value="16:9">Landscape 16:9</option>
+              <option value="1:1">Square 1:1</option>
+            </select>
+          </div>
+        </details>
       </div>
       {editMode === "auto" && (
         <AutonomousEditor
@@ -1618,9 +1628,9 @@ export default function EditorPage() {
                 : "border-white/5"
             }`}
           >
-            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-white/60 backdrop-blur">
+            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-white/60 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-[#A894FF]" />
-              Timeline preview
+              {italian ? "Anteprima timeline" : "Timeline preview"}
             </div>
             <div className="relative flex min-h-[460px] items-center justify-center p-7">
               {previewDrop.isDragging ? (
@@ -1699,7 +1709,7 @@ export default function EditorPage() {
                 )}
                 Upload
               </button>
-              <span className="hidden text-[11px] text-foreground/40 sm:inline">
+              <span className="hidden text-xs text-foreground/70 sm:inline">
                 or drop files in this timeline
               </span>
               <span className="mx-1 h-5 w-px bg-border" />
@@ -1732,11 +1742,11 @@ export default function EditorPage() {
               </button>
               <div className="ml-auto flex items-center gap-2 pr-1">
                 {uploadProgress !== null && (
-                  <span className="font-mono text-[10px] text-primary">
+                  <span className="font-mono text-xs text-primary">
                     {uploadProgress}%
                   </span>
                 )}
-                <span className="text-[10px] text-foreground/40">Zoom</span>
+                <span className="text-xs text-foreground/70">Zoom</span>
                 <input
                   type="range"
                   min={100}
@@ -1759,7 +1769,7 @@ export default function EditorPage() {
                     <p className="text-xs font-medium">
                       Connected media library
                     </p>
-                    <p className="mt-0.5 text-[10px] text-foreground/40">
+                    <p className="mt-0.5 text-xs text-foreground/70">
                       Tap any generated or uploaded asset to place it at the
                       current playhead ({formatTime(playhead)}).
                     </p>
@@ -1776,7 +1786,7 @@ export default function EditorPage() {
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <label className="relative min-w-52 flex-1">
                     <span className="sr-only">Search connected media</span>
-                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/35" />
+                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/70" />
                     <input
                       type="search"
                       value={librarySearch}
@@ -1795,10 +1805,10 @@ export default function EditorPage() {
                         type="button"
                         onClick={() => setLibraryKind(kind)}
                         aria-pressed={libraryKind === kind}
-                        className={`rounded-md px-2.5 py-1.5 text-[10px] font-medium capitalize transition-colors ${
+                        className={`rounded-md px-2.5 py-1.5 text-xs font-medium capitalize transition-colors ${
                           libraryKind === kind
                             ? "bg-primary text-primary-foreground"
-                            : "border border-border bg-surface text-foreground/55 hover:border-primary/35"
+                            : "border border-border bg-surface text-foreground/70 hover:border-primary/35"
                         }`}
                       >
                         {kind}
@@ -1840,7 +1850,7 @@ export default function EditorPage() {
                             <span className="block truncate text-xs font-medium">
                               {asset.name}
                             </span>
-                            <span className="block text-[10px] capitalize text-foreground/40">
+                            <span className="block text-xs capitalize text-foreground/70">
                               {recentlyAddedAssetId === asset.id
                                 ? `Added at ${formatTime(playhead)}`
                                 : `${asset.kind} · add at playhead`}
@@ -1851,7 +1861,7 @@ export default function EditorPage() {
                     })}
                   </div>
                 ) : (
-                  <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-foreground/45">
+                  <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-foreground/70">
                     {workspace.assets.length
                       ? "No media matches this search."
                       : "No media yet. Upload here or create video, images, and audio from Create."}
@@ -1866,7 +1876,7 @@ export default function EditorPage() {
                 style={{ width: `${timelineZoom}%` }}
               >
                 <div className="grid grid-cols-[92px_minmax(0,1fr)] border-b border-border bg-background/45">
-                  <div className="border-r border-border px-3 py-2 font-mono text-[9px] uppercase tracking-wider text-foreground/35">
+                  <div className="border-r border-border px-3 py-2 font-mono text-xs uppercase tracking-wider text-foreground/70">
                     Time
                   </div>
                   <div className="relative h-7">
@@ -1875,7 +1885,7 @@ export default function EditorPage() {
                     }).map((_, index) => (
                       <span
                         key={index}
-                        className="absolute top-1.5 -translate-x-1/2 font-mono text-[9px] text-foreground/35"
+                        className="absolute top-1.5 -translate-x-1/2 font-mono text-xs text-foreground/70"
                         style={{
                           left: `${(index * 5 * 100) / project.duration}%`,
                         }}
@@ -1928,7 +1938,7 @@ export default function EditorPage() {
                         key={track.id}
                         className="grid min-h-[58px] grid-cols-[92px_minmax(0,1fr)] border-b border-border last:border-b-0"
                       >
-                        <div className="flex items-center gap-2 border-r border-border bg-background/35 px-3 text-xs text-foreground/50">
+                        <div className="flex items-center gap-2 border-r border-border bg-background/35 px-3 text-xs text-foreground/70">
                           <track.icon className="h-3.5 w-3.5" />
                           {track.label}
                         </div>
@@ -1944,7 +1954,7 @@ export default function EditorPage() {
                                 setRightPanel("inspect");
                                 setPlayhead(clip.start);
                               }}
-                              className={`absolute inset-y-1 overflow-hidden rounded-md border px-2 text-left text-[10px] font-medium text-white shadow-sm transition ${
+                              className={`absolute inset-y-1 overflow-hidden rounded-md border px-2 text-left text-xs font-medium text-white shadow-sm transition ${
                                 selectedClipId === clip.id
                                   ? "border-white/80 ring-2 ring-primary/35"
                                   : "border-white/10 hover:border-white/40"
@@ -1972,7 +1982,7 @@ export default function EditorPage() {
                                 )}
                                 <span className="truncate">{clip.label}</span>
                               </span>
-                              <span className="mt-0.5 block truncate font-mono text-[8px] text-white/65">
+                              <span className="mt-0.5 block truncate font-mono text-xs text-white/65">
                                 {formatTime(clip.duration)}
                               </span>
                             </button>
@@ -2008,7 +2018,7 @@ export default function EditorPage() {
                   />
                 ))}
               </div>
-              <div className="mt-1.5 flex items-center justify-between text-[10px] text-foreground/40">
+              <div className="mt-1.5 flex items-center justify-between text-xs text-foreground/70">
                 <span>Structural quality map</span>
                 <button
                   type="button"
@@ -2037,10 +2047,10 @@ export default function EditorPage() {
                 key={id}
                 type="button"
                 onClick={() => setRightPanel(id)}
-                className={`rounded-lg px-2 py-2 text-[11px] font-medium transition ${
+                className={`rounded-lg px-2 py-2 text-xs font-medium transition ${
                   rightPanel === id
                     ? "bg-primary/10 text-primary"
-                    : "text-foreground/45 hover:text-foreground"
+                    : "text-foreground/70 hover:text-foreground"
                 }`}
               >
                 {label}
@@ -2056,20 +2066,20 @@ export default function EditorPage() {
                   <h2 className="mt-2 text-lg font-medium">
                     {selectedClip ? selectedClip.label : "Select a clip"}
                   </h2>
-                  <p className="mt-1 text-xs leading-5 text-foreground/45">
+                  <p className="mt-1 text-xs leading-5 text-foreground/70">
                     Range controls change the selected clip only. Apply creates
                     a reversible revision.
                   </p>
                 </div>
 
                 {!clipDraft ? (
-                  <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-foreground/45">
+                  <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-foreground/70">
                     Choose a block on the timeline to edit its timing.
                   </div>
                 ) : (
                   <div className="space-y-5">
                     <label className="block">
-                      <span className="mb-1.5 block text-xs text-foreground/50">
+                      <span className="mb-1.5 block text-xs text-foreground/70">
                         Clip label
                       </span>
                       <input
@@ -2127,7 +2137,7 @@ export default function EditorPage() {
                         className="block"
                       >
                         <span className="mb-1.5 flex items-center justify-between text-xs">
-                          <span className="text-foreground/50">
+                          <span className="text-foreground/70">
                             {control.label}
                           </span>
                           <span className="font-mono text-foreground/70">
@@ -2350,12 +2360,10 @@ export default function EditorPage() {
                               )
                             )
                           }
-                          className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-[10px]"
+                          className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
                           aria-label={`Line ${index + 1} start`}
                         />
-                        <span className="text-[10px] text-foreground/30">
-                          to
-                        </span>
+                        <span className="text-xs text-foreground/70">to</span>
                         <input
                           type="number"
                           min={0}
@@ -2370,7 +2378,7 @@ export default function EditorPage() {
                               )
                             )
                           }
-                          className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-[10px]"
+                          className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
                           aria-label={`Line ${index + 1} end`}
                         />
                         <button
@@ -2380,7 +2388,7 @@ export default function EditorPage() {
                               current.filter(item => item.id !== segment.id)
                             )
                           }
-                          className="ml-auto text-foreground/35 hover:text-destructive"
+                          className="ml-auto text-foreground/70 hover:text-destructive"
                           aria-label={`Delete line ${index + 1}`}
                         >
                           <X className="h-3.5 w-3.5" />
@@ -2399,14 +2407,14 @@ export default function EditorPage() {
                             )
                           )
                         }
-                        className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-foreground/30"
+                        className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-foreground/70"
                       />
                     </div>
                   ))}
                 </div>
 
                 {transcriptDraft.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm leading-5 text-foreground/45">
+                  <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm leading-5 text-foreground/70">
                     Add lines manually or transcribe the selected media when the
                     speech service is connected.
                   </div>
@@ -2427,7 +2435,7 @@ export default function EditorPage() {
                 <h2 className="mt-2 text-lg font-medium">
                   Describe the change
                 </h2>
-                <p className="mt-1 text-xs leading-5 text-foreground/45">
+                <p className="mt-1 text-xs leading-5 text-foreground/70">
                   The assistant proposes operations with a reason, confidence,
                   and exact interval. You stay in control.
                 </p>
@@ -2443,11 +2451,11 @@ export default function EditorPage() {
                     }}
                     rows={4}
                     placeholder="Tighten the pause after the hook, keep the product reveal locked, and make the captions calmer."
-                    className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-foreground/30"
+                    className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-foreground/70"
                   />
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <label>
-                      <span className="mb-1 block text-[10px] uppercase tracking-wider text-foreground/40">
+                      <span className="mb-1 block text-xs uppercase tracking-wider text-foreground/70">
                         Range start
                       </span>
                       <input
@@ -2463,7 +2471,7 @@ export default function EditorPage() {
                       />
                     </label>
                     <label>
-                      <span className="mb-1 block text-[10px] uppercase tracking-wider text-foreground/40">
+                      <span className="mb-1 block text-xs uppercase tracking-wider text-foreground/70">
                         Range end
                       </span>
                       <input
@@ -2561,7 +2569,7 @@ export default function EditorPage() {
                     </div>
                   </div>
                   {selectedClip && (
-                    <p className="mt-2 truncate text-[10px] text-foreground/40">
+                    <p className="mt-2 truncate text-xs text-foreground/70">
                       Selection: {selectedClip.label}
                     </p>
                   )}
@@ -2629,14 +2637,14 @@ export default function EditorPage() {
                             <p className="text-sm font-medium">
                               {change.label}
                             </p>
-                            <span className="rounded bg-surface px-1.5 py-0.5 font-mono text-[9px] uppercase text-foreground/45">
+                            <span className="rounded bg-surface px-1.5 py-0.5 font-mono text-xs uppercase text-foreground/70">
                               {change.intensity}
                             </span>
                           </div>
-                          <p className="mt-1 text-xs leading-5 text-foreground/50">
+                          <p className="mt-1 text-xs leading-5 text-foreground/70">
                             {change.reason}
                           </p>
-                          <div className="mt-2 flex items-center gap-3 font-mono text-[9px] text-foreground/40">
+                          <div className="mt-2 flex items-center gap-3 font-mono text-xs text-foreground/70">
                             <span>
                               {formatTime(change.start)}–
                               {formatTime(change.end)}
@@ -2671,7 +2679,7 @@ export default function EditorPage() {
                           </button>
                         </div>
                       ) : (
-                        <p className="mt-3 flex items-center gap-1.5 text-[10px] font-medium capitalize text-foreground/45">
+                        <p className="mt-3 flex items-center gap-1.5 text-xs font-medium capitalize text-foreground/70">
                           {change.status === "accepted" ? (
                             <Check className="h-3 w-3" />
                           ) : (
@@ -2685,13 +2693,13 @@ export default function EditorPage() {
                     </div>
                   ))}
                   {project.proposedChanges.length === 0 && (
-                    <p className="rounded-xl border border-dashed border-border p-5 text-center text-xs leading-5 text-foreground/40">
+                    <p className="rounded-xl border border-dashed border-border p-5 text-center text-xs leading-5 text-foreground/70">
                       No pending AI changes. Your manual timeline remains
                       untouched.
                     </p>
                   )}
                 </div>
-                <p className="mt-4 text-[10px] leading-4 text-foreground/35">
+                <p className="mt-4 text-xs leading-4 text-foreground/70">
                   Apply changes to update the timeline. Undo restores the
                   previous edit.
                 </p>
@@ -2704,7 +2712,7 @@ export default function EditorPage() {
                 <h2 className="mt-2 text-lg font-medium">
                   Know what needs attention
                 </h2>
-                <p className="mt-1 text-xs leading-5 text-foreground/45">
+                <p className="mt-1 text-xs leading-5 text-foreground/70">
                   These are structural checks from the current timeline, not
                   invented performance predictions.
                 </p>
@@ -2722,7 +2730,7 @@ export default function EditorPage() {
                       )}
                       <div>
                         <p className="text-xs font-medium">{check.label}</p>
-                        <p className="mt-0.5 text-[10px] text-foreground/45">
+                        <p className="mt-0.5 text-xs text-foreground/70">
                           {check.detail}
                         </p>
                       </div>
@@ -2735,7 +2743,7 @@ export default function EditorPage() {
                     <span className="text-xs font-medium">
                       Timeline signals
                     </span>
-                    <CircleGauge className="h-4 w-4 text-foreground/35" />
+                    <CircleGauge className="h-4 w-4 text-foreground/70" />
                   </div>
                   <div className="space-y-2">
                     {qualitySignals.map(signal => (
@@ -2763,10 +2771,10 @@ export default function EditorPage() {
                             }`}
                           />
                         </div>
-                        <p className="mt-1 text-[10px] leading-4 text-foreground/45">
+                        <p className="mt-1 text-xs leading-4 text-foreground/70">
                           {signal.detail}
                         </p>
-                        <p className="mt-2 font-mono text-[9px] text-foreground/35">
+                        <p className="mt-2 font-mono text-xs text-foreground/70">
                           {formatTime(signal.start)}–{formatTime(signal.end)}
                         </p>
                       </button>

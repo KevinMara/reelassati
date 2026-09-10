@@ -324,7 +324,7 @@ export default function VideoAnalyzer() {
             <p className="text-sm font-medium">
               AI analysis is temporarily unavailable
             </p>
-            <p className="mt-1 text-xs text-foreground/55">
+            <p className="mt-1 text-xs text-foreground/70">
               Uploads and saved assets remain available, but analysis will stay
               disabled until the server-side AI capability is connected.
             </p>
@@ -347,7 +347,7 @@ export default function VideoAnalyzer() {
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
                 sourceMode === "upload"
                   ? "bg-primary text-white"
-                  : "text-foreground/55"
+                  : "text-foreground/70"
               }`}
             >
               <Upload className="h-3.5 w-3.5" />
@@ -365,7 +365,7 @@ export default function VideoAnalyzer() {
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
                 sourceMode === "url"
                   ? "bg-primary text-white"
-                  : "text-foreground/55"
+                  : "text-foreground/70"
               }`}
             >
               <Link2 className="h-3.5 w-3.5" />
@@ -375,7 +375,7 @@ export default function VideoAnalyzer() {
 
           <div className="flex items-center gap-2">
             <label
-              className="text-xs text-foreground/45"
+              className="text-xs text-foreground/70"
               htmlFor="analysis-platform"
             >
               Optimize for
@@ -426,7 +426,7 @@ export default function VideoAnalyzer() {
                   <span className="block truncate text-sm font-medium">
                     {file?.name ?? "Choose a video file"}
                   </span>
-                  <span className="mt-1 block text-xs text-foreground/45">
+                  <span className="mt-1 block text-xs text-foreground/70">
                     {file
                       ? `${(file.size / 1024 / 1024).toFixed(1)} MB · uploads when analysis starts`
                       : capabilities.uploads
@@ -445,7 +445,7 @@ export default function VideoAnalyzer() {
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
-                  <p className="mt-1 text-[11px] text-foreground/40">
+                  <p className="mt-1 text-xs text-foreground/70">
                     Uploading {uploadProgress}%
                   </p>
                 </div>
@@ -480,7 +480,7 @@ export default function VideoAnalyzer() {
                   </option>
                 ))}
               </select>
-              <p className="mt-2 text-[11px] text-foreground/40">
+              <p className="mt-2 text-xs text-foreground/70">
                 Analysis receives the stored asset ID. A browser-only blob URL
                 is never sent for AI processing.
               </p>
@@ -495,7 +495,7 @@ export default function VideoAnalyzer() {
               Public HTTPS video URL
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/35" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/70" />
               <input
                 id="public-video-url"
                 type="url"
@@ -510,8 +510,8 @@ export default function VideoAnalyzer() {
               />
             </div>
             <p
-              className={`mt-2 text-[11px] ${
-                publicUrl && urlError ? "text-red-500" : "text-foreground/40"
+              className={`mt-2 text-xs ${
+                publicUrl && urlError ? "text-red-500" : "text-foreground/70"
               }`}
             >
               {publicUrl && urlError
@@ -522,11 +522,11 @@ export default function VideoAnalyzer() {
         )}
 
         <div className="mt-5 rounded-lg border border-border bg-background/60 p-3">
-          <p className="flex items-center gap-1.5 text-[11px] font-medium text-foreground/55">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-foreground/70">
             <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
             REELassati AI analysis
           </p>
-          <p className="mt-2 text-xs leading-relaxed text-foreground/55">
+          <p className="mt-2 text-xs leading-relaxed text-foreground/70">
             The selected video is processed only when you press Analyze. Use
             media you are allowed to submit; handling is covered by the platform
             terms and privacy information.
@@ -599,7 +599,7 @@ export default function VideoAnalyzer() {
                       >
                         {Math.round(signal.score)}
                       </p>
-                      <p className="mt-0.5 text-[10px] uppercase tracking-wider text-foreground/40">
+                      <p className="mt-0.5 text-xs uppercase tracking-wider text-foreground/70">
                         {signal.label}
                       </p>
                     </div>
@@ -630,13 +630,13 @@ export default function VideoAnalyzer() {
                         style={{ width: `${clampScore(item.value.score)}%` }}
                       />
                     </div>
-                    <p className="mt-3 text-xs leading-relaxed text-foreground/55">
+                    <p className="mt-3 text-xs leading-relaxed text-foreground/70">
                       {item.value.note}
                     </p>
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-[11px] text-foreground/35">
+              <p className="mt-3 text-xs text-foreground/70">
                 Scores are the AI model&apos;s assessment of this source, not
                 measured reach or a guarantee of performance.
               </p>
@@ -655,7 +655,7 @@ export default function VideoAnalyzer() {
                       className="rounded-lg border border-border bg-background p-3"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <span className="font-mono text-[11px] text-foreground/45">
+                        <span className="font-mono text-xs text-foreground/70">
                           {segment.start.toFixed(1)}s–{segment.end.toFixed(1)}s
                         </span>
                         <span
@@ -670,13 +670,13 @@ export default function VideoAnalyzer() {
                           style={{ width: `${clampScore(segment.score)}%` }}
                         />
                       </div>
-                      <p className="mt-2 text-xs leading-relaxed text-foreground/55">
+                      <p className="mt-2 text-xs leading-relaxed text-foreground/70">
                         {segment.note}
                       </p>
                     </div>
                   ))}
                   {result.retention.length === 0 ? (
-                    <p className="rounded-lg border border-border bg-background p-4 text-xs text-foreground/45">
+                    <p className="rounded-lg border border-border bg-background p-4 text-xs text-foreground/70">
                       The analyzer did not return time-based retention signals
                       for this source.
                     </p>
@@ -690,7 +690,7 @@ export default function VideoAnalyzer() {
                     <WandSparkles className="h-4 w-4 text-primary" />
                     Actionable edit plan
                   </h2>
-                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-primary">
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium uppercase tracking-wider text-primary">
                     {result.changes.length} proposed
                   </span>
                 </div>
@@ -703,25 +703,25 @@ export default function VideoAnalyzer() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium">{change.label}</p>
-                          <p className="mt-1 font-mono text-[10px] text-foreground/40">
+                          <p className="mt-1 font-mono text-xs text-foreground/70">
                             {change.start.toFixed(1)}s–{change.end.toFixed(1)}s
                             · {change.type}
                           </p>
                         </div>
-                        <span className="rounded-full bg-foreground/[0.06] px-2 py-1 text-[10px] text-foreground/50">
+                        <span className="rounded-full bg-foreground/[0.06] px-2 py-1 text-xs text-foreground/70">
                           {confidencePercent(change.confidence)}% confidence
                         </span>
                       </div>
                       <p className="mt-3 text-xs leading-relaxed text-foreground/60">
                         {change.reason}
                       </p>
-                      <p className="mt-2 text-[10px] uppercase tracking-wider text-foreground/35">
+                      <p className="mt-2 text-xs uppercase tracking-wider text-foreground/70">
                         {change.intensity} intensity · review before accepting
                       </p>
                     </article>
                   ))}
                   {result.changes.length === 0 ? (
-                    <p className="rounded-lg border border-border bg-background p-4 text-xs text-foreground/45">
+                    <p className="rounded-lg border border-border bg-background p-4 text-xs text-foreground/70">
                       No edit operations were returned. Refine the source or try
                       a different platform target.
                     </p>
@@ -774,7 +774,7 @@ export default function VideoAnalyzer() {
                             )}
                           </button>
                         </div>
-                        <p className="mt-2 text-[11px] text-foreground/40">
+                        <p className="mt-2 text-xs text-foreground/70">
                           Changes enter the editor as proposed operations.
                           Nothing is applied until you review and accept it.
                         </p>
@@ -782,7 +782,7 @@ export default function VideoAnalyzer() {
                     ) : (
                       <div className="flex items-start gap-3 rounded-lg bg-background p-4">
                         <Film className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        <p className="text-xs leading-relaxed text-foreground/55">
+                        <p className="text-xs leading-relaxed text-foreground/70">
                           Create an edit project first, then rerun or reopen
                           this analysis to queue its proposed timeline changes.
                         </p>
@@ -804,7 +804,7 @@ export default function VideoAnalyzer() {
             <h2 className="mt-4 text-lg font-medium text-foreground/65">
               Evidence before edits
             </h2>
-            <p className="mt-2 max-w-md text-sm text-foreground/45">
+            <p className="mt-2 max-w-md text-sm text-foreground/70">
               Analysis starts only after you provide a real source. Results
               include time ranges, model notes, and reviewable edit operations.
             </p>

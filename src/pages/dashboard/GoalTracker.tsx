@@ -209,12 +209,12 @@ export default function GoalTracker() {
             </div>
             <div className="min-w-0">
               <h3 className="truncate text-sm font-medium">{goal.label}</h3>
-              <p className="mt-0.5 text-xs text-foreground/45">
+              <p className="mt-0.5 text-xs text-foreground/70">
                 {meta.label}
                 {goal.platform ? ` · ${goal.platform}` : " · all platforms"}
               </p>
               {goal.deadline && (
-                <p className="mt-1 flex items-center gap-1 text-xs text-foreground/40">
+                <p className="mt-1 flex items-center gap-1 text-xs text-foreground/70">
                   <CalendarDays className="h-3 w-3" />
                   {new Date(`${goal.deadline}T12:00:00`).toLocaleDateString()}
                 </p>
@@ -242,10 +242,10 @@ export default function GoalTracker() {
           />
         </div>
         <div className="mt-2 flex items-center justify-between text-xs">
-          <span className="text-foreground/45">
+          <span className="text-foreground/70">
             {goal.current.toLocaleString()} {meta.unit}
           </span>
-          <span className="text-foreground/45">
+          <span className="text-foreground/70">
             Target {goal.target.toLocaleString()}
           </span>
         </div>
@@ -320,19 +320,19 @@ export default function GoalTracker() {
       <div className="mb-8 grid grid-cols-3 gap-4">
         <div className="rounded-xl border border-border bg-surface p-5 text-center">
           <p className="text-3xl font-semibold">{activeGoals.length}</p>
-          <p className="text-sm text-foreground/50">Active</p>
+          <p className="text-sm text-foreground/70">Active</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-5 text-center">
           <p className="text-3xl font-semibold text-emerald-500">
             {achievedGoals.length}
           </p>
-          <p className="text-sm text-foreground/50">Achieved</p>
+          <p className="text-sm text-foreground/70">Achieved</p>
         </div>
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 text-center">
           <p className="text-3xl font-semibold text-primary">
             {averageProgress}%
           </p>
-          <p className="text-sm text-foreground/50">Average progress</p>
+          <p className="text-sm text-foreground/70">Average progress</p>
         </div>
       </div>
 
@@ -461,7 +461,7 @@ export default function GoalTracker() {
       <section className="space-y-3">
         {activeGoals.map(goal => renderGoal(goal, false))}
         {activeGoals.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border py-14 text-center text-foreground/40">
+          <div className="rounded-xl border border-dashed border-border py-14 text-center text-foreground/70">
             <TrendingUp className="mx-auto mb-2 h-8 w-8" />
             <p className="text-sm">
               No active goals. Set the next measurable win.
@@ -472,7 +472,7 @@ export default function GoalTracker() {
 
       {achievedGoals.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/45">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/70">
             Achieved
           </h2>
           <div className="space-y-3">

@@ -359,8 +359,8 @@ export default function BillingPage() {
                   )}
                 </div>
                 <p className="mt-3 text-sm text-foreground/70">
-                  {((pack.price / pack.credits) * 1000).toFixed(2)} USD
-                  per 1,000 credits
+                  {((pack.price / pack.credits) * 1000).toFixed(2)} USD per
+                  1,000 credits
                 </p>
                 <p className="mt-2 text-sm text-foreground/80">
                   {id === "boost"
@@ -412,7 +412,7 @@ export default function BillingPage() {
                     : (summary?.availableCredits || 0).toLocaleString()}
                 </span>
               </div>
-              <p className="mt-2 text-sm text-foreground/55">
+              <p className="mt-2 text-sm text-foreground/70">
                 REELassati credits
               </p>
             </div>
@@ -570,7 +570,7 @@ export default function BillingPage() {
                     </p>
                   </div>
                   <span
-                    className={`font-mono text-xs font-medium ${item.amount >= 0 ? "text-emerald-500" : item.status === "released" ? "text-foreground/35 line-through" : "text-foreground"}`}
+                    className={`font-mono text-xs font-medium ${item.amount >= 0 ? "text-emerald-500" : item.status === "released" ? "text-foreground/70 line-through" : "text-foreground"}`}
                   >
                     {item.amount > 0 ? "+" : ""}
                     {item.amount.toLocaleString()}
@@ -685,10 +685,7 @@ function PlanChooser({
                     maximumFractionDigits: 2,
                   })}
                 </span>
-                <span className="text-sm text-foreground/70">
-                  {" "}
-                  USD / month
-                </span>
+                <span className="text-sm text-foreground/70"> USD / month</span>
               </p>
               <p className="mt-2 text-sm text-foreground/70">
                 {annual
@@ -741,12 +738,12 @@ function PlanChooser({
                 {busy === `plan:${planId}` || busy === "portal"
                   ? "Opening secure checkout…"
                   : disabled && !manageExisting && summary
-                  ? "Purchases opening soon"
-                  : current
-                    ? "Manage your plan"
-                    : manageExisting
-                      ? `Explore ${name} in billing`
-                      : `Choose ${name}`}
+                    ? "Purchases opening soon"
+                    : current
+                      ? "Manage your plan"
+                      : manageExisting
+                        ? `Explore ${name} in billing`
+                        : `Choose ${name}`}
               </button>
             </article>
           );

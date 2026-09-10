@@ -131,13 +131,13 @@ export default function ClientsPage() {
             Reusable creative memory
           </p>
           <h1 className="text-3xl font-semibold">Brand DNA</h1>
-          <p className="mt-2 max-w-2xl text-sm text-foreground/55">
+          <p className="mt-2 max-w-2xl text-sm text-foreground/70">
             One truthful source of creative constraints for this workspace.
             Switch brands above to keep each client’s content separate.
           </p>
         </div>
         <div className="rounded-xl border border-border bg-surface px-4 py-3 text-right">
-          <p className="mono-eyebrow text-[10px] text-foreground/45">
+          <p className="mono-eyebrow text-xs text-foreground/70">
             Definition depth
           </p>
           <p className="mt-1 text-xl font-semibold tabular-nums">
@@ -192,7 +192,7 @@ export default function ClientsPage() {
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="How the brand speaks, phrases it avoids, energy level, point of view, and proof style"
                 />
-                <span className="mt-1.5 block text-xs text-foreground/45">
+                <span className="mt-1.5 block text-xs text-foreground/70">
                   Be concrete enough that an editor can reject an off-brand
                   line.
                 </span>
@@ -314,7 +314,7 @@ export default function ClientsPage() {
                   <span className="mt-3 block text-sm font-medium">
                     {preset.label}
                   </span>
-                  <span className="mt-1 block text-xs leading-relaxed text-foreground/45">
+                  <span className="mt-1 block text-xs leading-relaxed text-foreground/70">
                     {preset.detail}
                   </span>
                 </button>
@@ -373,7 +373,7 @@ export default function ClientsPage() {
           </section>
 
           <div className="flex items-center justify-between border-t border-border pt-5">
-            <span className="text-xs text-foreground/45">
+            <span className="text-xs text-foreground/70">
               {dirty ? "Unsaved Brand DNA changes" : "Brand DNA is saved"}
             </span>
             <button
@@ -404,7 +404,7 @@ export default function ClientsPage() {
                 style={{ backgroundColor: draft.accentColor }}
               />
               <div className="flex h-full flex-col justify-end">
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/55">
+                <p className="font-mono text-xs uppercase tracking-[0.18em] text-white/55">
                   Live constraint preview
                 </p>
                 <p
@@ -430,13 +430,13 @@ export default function ClientsPage() {
             </div>
             <div className="p-5">
               <h2 className="font-medium">{draft.name || "Unnamed brand"}</h2>
-              <p className="mt-1 text-xs leading-relaxed text-foreground/50">
+              <p className="mt-1 text-xs leading-relaxed text-foreground/70">
                 {draft.audience ||
                   "Define the audience tension to make creative decisions more specific."}
               </p>
               <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg bg-background p-3">
-                  <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                  <dt className="text-xs uppercase tracking-wide text-foreground/70">
                     Projects
                   </dt>
                   <dd className="mt-1 font-semibold">
@@ -444,7 +444,7 @@ export default function ClientsPage() {
                   </dd>
                 </div>
                 <div className="rounded-lg bg-background p-3">
-                  <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                  <dt className="text-xs uppercase tracking-wide text-foreground/70">
                     Assets
                   </dt>
                   <dd className="mt-1 font-semibold">
@@ -452,7 +452,7 @@ export default function ClientsPage() {
                   </dd>
                 </div>
                 <div className="rounded-lg bg-background p-3">
-                  <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                  <dt className="text-xs uppercase tracking-wide text-foreground/70">
                     Scripts
                   </dt>
                   <dd className="mt-1 font-semibold">

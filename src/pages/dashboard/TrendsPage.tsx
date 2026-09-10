@@ -112,7 +112,7 @@ const LIFECYCLE_STYLES: Record<TrendLifecycle, string> = {
   breakout: "border-primary/30 bg-primary/10 text-primary",
   mainstream: "border-amber-400/25 bg-amber-400/10 text-amber-400",
   saturated: "border-orange-400/25 bg-orange-400/10 text-orange-400",
-  decaying: "border-foreground/15 bg-foreground/5 text-foreground/45",
+  decaying: "border-foreground/15 bg-foreground/5 text-foreground/70",
 };
 
 function createId() {
@@ -179,7 +179,7 @@ function TrendVideo({ trend }: { trend: TrendEvidenceItem }) {
         <div className="flex aspect-[9/12] flex-col items-center justify-center gap-3 bg-background p-6 text-center">
           <Play className="h-8 w-8 text-primary" aria-hidden />
           <p className="text-sm font-medium">Load the original social video</p>
-          <p className="max-w-xs text-xs leading-relaxed text-foreground/55">
+          <p className="max-w-xs text-xs leading-relaxed text-foreground/70">
             External players can receive device and interaction data. Allow them
             in privacy choices or open the source directly.
           </p>
@@ -540,13 +540,13 @@ export default function TrendsPage() {
             <p className="mono-eyebrow text-primary">
               Weekly viral intelligence
             </p>
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-emerald-400">
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-xs font-medium uppercase tracking-wide text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               Source-linked videos
             </span>
           </div>
           <h1 className="text-3xl font-semibold">Trends</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-foreground/55">
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-foreground/70">
             Weekly picks use reachable direct TikTok and Reels source pages.
             Public dates and performance appear only when indexed evidence
             exposes them; unavailable values are never invented.
@@ -580,13 +580,13 @@ export default function TrendsPage() {
         </span>
         <span className="flex-1">
           <span className="block text-sm font-medium">Custom research</span>
-          <span className="block text-xs text-foreground/45">
+          <span className="block text-xs text-foreground/70">
             Find verified viral organic brand shorts for your exact brief · 8–15
             credits
           </span>
         </span>
         <ChevronDown
-          className={`h-4 w-4 text-foreground/40 transition-transform ${showResearch ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-foreground/70 transition-transform ${showResearch ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -601,13 +601,13 @@ export default function TrendsPage() {
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Search className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-medium">Custom trend research</h2>
-                <span className="rounded-full bg-background px-2 py-1 text-[10px] text-foreground/50">
+                <span className="rounded-full bg-background px-2 py-1 text-xs text-foreground/70">
                   {researchCreditCost} credits when completed
                 </span>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <label className="text-xs">
-                  <span className="mb-1.5 block text-foreground/50">
+                  <span className="mb-1.5 block text-foreground/70">
                     Topic, niche, product, or audience
                   </span>
                   <input
@@ -618,7 +618,7 @@ export default function TrendsPage() {
                   />
                 </label>
                 <label className="text-xs">
-                  <span className="mb-1.5 block text-foreground/50">
+                  <span className="mb-1.5 block text-foreground/70">
                     Platform
                   </span>
                   <select
@@ -638,7 +638,7 @@ export default function TrendsPage() {
                   </select>
                 </label>
                 <label className="text-xs">
-                  <span className="mb-1.5 block text-foreground/50">
+                  <span className="mb-1.5 block text-foreground/70">
                     Content type
                   </span>
                   <select
@@ -656,7 +656,7 @@ export default function TrendsPage() {
                   </select>
                 </label>
                 <label className="text-xs">
-                  <span className="mb-1.5 block text-foreground/50">
+                  <span className="mb-1.5 block text-foreground/70">
                     Performance objective
                   </span>
                   <select
@@ -674,7 +674,7 @@ export default function TrendsPage() {
                   </select>
                 </label>
                 <label className="text-xs">
-                  <span className="mb-1.5 block text-foreground/50">
+                  <span className="mb-1.5 block text-foreground/70">
                     Region
                   </span>
                   <input
@@ -684,7 +684,7 @@ export default function TrendsPage() {
                   />
                 </label>
                 <label className="text-xs">
-                  <span className="mb-1.5 block text-foreground/50">
+                  <span className="mb-1.5 block text-foreground/70">
                     Language
                   </span>
                   <input
@@ -714,7 +714,7 @@ export default function TrendsPage() {
                 : `Research with ${researchCreditCost} credits`}
             </button>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/35 px-5 py-3 text-[11px] text-foreground/45">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/35 px-5 py-3 text-xs text-foreground/70">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
               {researchCreditCost} credits are used only after verified results
@@ -760,7 +760,7 @@ export default function TrendsPage() {
             className={`rounded-md px-3 py-2 text-xs font-medium transition-colors ${
               activeFeedKind === "weekly"
                 ? "bg-primary text-white shadow-sm"
-                : "text-foreground/55 hover:text-foreground"
+                : "text-foreground/70 hover:text-foreground"
             }`}
           >
             Weekly viral shorts
@@ -772,7 +772,7 @@ export default function TrendsPage() {
               className={`rounded-md px-3 py-2 text-xs font-medium transition-colors ${
                 activeFeedKind === "custom"
                   ? "bg-primary text-white shadow-sm"
-                  : "text-foreground/55 hover:text-foreground"
+                  : "text-foreground/70 hover:text-foreground"
               }`}
             >
               Your latest research
@@ -782,7 +782,7 @@ export default function TrendsPage() {
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="mono-eyebrow text-[10px] text-foreground/45">
+              <p className="mono-eyebrow text-xs text-foreground/70">
                 Organic brand posts ·{" "}
                 {activeFeed?.status === "stale"
                   ? "previous verified edition"
@@ -790,7 +790,7 @@ export default function TrendsPage() {
                 · no paid ads
               </p>
               {activeFeed ? (
-                <span className="rounded-full border border-border bg-surface px-2 py-1 text-[10px] text-foreground/45">
+                <span className="rounded-full border border-border bg-surface px-2 py-1 text-xs text-foreground/70">
                   {activeFeed.kind === "weekly"
                     ? activeFeed.status === "preparing"
                       ? "Preparing"
@@ -812,14 +812,14 @@ export default function TrendsPage() {
             </h2>
             {activeFeed?.status === "ready" ||
             activeFeed?.status === "stale" ? (
-              <p className="mt-1 text-xs text-foreground/40">
+              <p className="mt-1 text-xs text-foreground/70">
                 Updated {new Date(activeFeed.generatedAt).toLocaleString()} ·{" "}
                 {activeFeed.status === "stale"
                   ? "A new edition is awaiting verification."
                   : activeFeed.cacheNote}
               </p>
             ) : activeFeed?.status === "preparing" ? (
-              <p className="mt-1 text-xs text-foreground/40">
+              <p className="mt-1 text-xs text-foreground/70">
                 The first weekly format update is being prepared automatically.
               </p>
             ) : activeFeed?.status === "unavailable" ? (
@@ -887,11 +887,11 @@ export default function TrendsPage() {
                 <div className="relative">
                   <TrendVideo trend={trend} />
                   <div className="pointer-events-none absolute left-3 right-3 top-3 flex items-start justify-between gap-2">
-                    <span className="rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur">
+                    <span className="rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium text-white backdrop-blur">
                       {platformLabel(trend.platform)}
                     </span>
                     <span
-                      className={`rounded-full border px-2.5 py-1 text-[10px] font-medium backdrop-blur ${LIFECYCLE_STYLES[trend.lifecycle]}`}
+                      className={`rounded-full border px-2.5 py-1 text-xs font-medium backdrop-blur ${LIFECYCLE_STYLES[trend.lifecycle]}`}
                     >
                       {LIFECYCLE_LABELS[trend.lifecycle]}
                     </span>
@@ -903,7 +903,7 @@ export default function TrendsPage() {
                       <p className="truncate text-xs font-medium text-primary">
                         {trend.creator}
                       </p>
-                      <p className="mt-0.5 truncate text-[10px] uppercase tracking-wide text-foreground/40">
+                      <p className="mt-0.5 truncate text-xs uppercase tracking-wide text-foreground/70">
                         Organic promotion · {trend.brandName}
                       </p>
                       <h3 className="mt-1 line-clamp-2 text-sm font-medium leading-snug">
@@ -914,14 +914,14 @@ export default function TrendsPage() {
                       href={trend.sourceUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="shrink-0 rounded-lg border border-border p-2 text-foreground/45 hover:border-primary/30 hover:text-primary"
+                      className="shrink-0 rounded-lg border border-border p-2 text-foreground/70 hover:border-primary/30 hover:text-primary"
                       aria-label="Open original video"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-foreground/45">
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-foreground/70">
                     <span className="inline-flex items-center gap-1">
                       <Clock3 className="h-3 w-3" />{" "}
                       {relativeTime(trend.publishedAt)}
@@ -949,7 +949,7 @@ export default function TrendsPage() {
                   </div>
 
                   <div className="mt-4 rounded-xl bg-background p-3">
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-400">
+                    <p className="text-xs font-medium uppercase tracking-wide text-emerald-400">
                       Observed evidence
                     </p>
                     <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-foreground/60">
@@ -972,17 +972,17 @@ export default function TrendsPage() {
 
                   <div className="mt-3 rounded-xl border border-primary/15 bg-primary/[0.05] p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-primary">
+                      <p className="text-xs font-medium uppercase tracking-wide text-primary">
                         AI hypothesis
                       </p>
-                      <span className="text-[10px] text-foreground/40">
+                      <span className="text-xs text-foreground/70">
                         {Math.round(trend.confidence * 100)}% confidence
                       </span>
                     </div>
                     <p className="mt-2 text-xs leading-relaxed text-foreground/65">
                       {trend.hypothesis}
                     </p>
-                    <p className="mt-2 text-xs leading-relaxed text-foreground/45">
+                    <p className="mt-2 text-xs leading-relaxed text-foreground/70">
                       <span className="font-medium text-foreground/65">
                         Test:
                       </span>{" "}
@@ -1012,7 +1012,7 @@ export default function TrendsPage() {
                   ? "Your next idea can start here"
                   : "No matching evidence"}
             </h3>
-            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-foreground/45">
+            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-foreground/70">
               {activeFeed?.status === "preparing"
                 ? "REELassati updates this feed internally; no action or credits are required from you."
                 : activeFeed?.status === "unavailable"
@@ -1042,9 +1042,9 @@ export default function TrendsPage() {
             key={step}
             className="rounded-xl border border-border bg-surface p-4"
           >
-            <p className="font-mono text-[10px] text-primary">{step}</p>
+            <p className="font-mono text-xs text-primary">{step}</p>
             <p className="mt-2 text-sm font-medium">{label}</p>
-            <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+            <p className="mt-1 text-xs leading-relaxed text-foreground/70">
               {detail}
             </p>
           </div>
@@ -1159,7 +1159,7 @@ export default function TrendsPage() {
         <section>
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="mono-eyebrow text-[10px] text-foreground/45">
+              <p className="mono-eyebrow text-xs text-foreground/70">
                 Saved experiments
               </p>
               <h2 className="mt-1 font-medium">Format hypotheses</h2>
@@ -1189,7 +1189,7 @@ export default function TrendsPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-primary">
+                      <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium uppercase tracking-wide text-primary">
                         {PLATFORMS.find(
                           option => option.value === hypothesis.platform
                         )?.label || hypothesis.platform}
@@ -1203,7 +1203,7 @@ export default function TrendsPage() {
                       type="button"
                       onClick={() => void deleteHypothesis(hypothesis)}
                       disabled={saving}
-                      className="rounded-md p-2 text-foreground/35 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
+                      className="rounded-md p-2 text-foreground/70 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
                       aria-label={`Delete ${hypothesis.title}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -1211,7 +1211,7 @@ export default function TrendsPage() {
                   </div>
                   <dl className="mt-5 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-lg bg-background p-3">
-                      <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                      <dt className="text-xs uppercase tracking-wide text-foreground/70">
                         Evidence
                       </dt>
                       <dd className="mt-1 whitespace-pre-line text-xs leading-relaxed text-foreground/60">
@@ -1219,7 +1219,7 @@ export default function TrendsPage() {
                       </dd>
                     </div>
                     <div className="rounded-lg bg-background p-3">
-                      <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                      <dt className="text-xs uppercase tracking-wide text-foreground/70">
                         Pass signal
                       </dt>
                       <dd className="mt-1 text-xs leading-relaxed text-foreground/60">
@@ -1236,7 +1236,7 @@ export default function TrendsPage() {
                     </Link>
                     <Link
                       to="/dashboard/script"
-                      className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/55 hover:text-primary"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/70 hover:text-primary"
                     >
                       <FileText className="h-3.5 w-3.5" /> Write the script
                     </Link>
@@ -1248,7 +1248,7 @@ export default function TrendsPage() {
             <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center">
               <Beaker className="mx-auto h-7 w-7 text-primary" />
               <h3 className="mt-3 text-sm font-medium">No saved hypotheses</h3>
-              <p className="mt-1 text-xs text-foreground/45">
+              <p className="mt-1 text-xs text-foreground/70">
                 Use a source-linked trend above or add your own observation.
               </p>
             </div>
@@ -1257,7 +1257,7 @@ export default function TrendsPage() {
 
         <aside>
           <div className="mb-4">
-            <p className="mono-eyebrow text-[10px] text-foreground/45">
+            <p className="mono-eyebrow text-xs text-foreground/70">
               Your evidence base
             </p>
             <h2 className="mt-1 font-medium">Workspace source material</h2>
@@ -1271,7 +1271,7 @@ export default function TrendsPage() {
                   onClick={() => prefillFromSource(source)}
                   className="group w-full rounded-xl border border-border bg-surface p-4 text-left hover:border-primary/35"
                 >
-                  <span className="text-[10px] uppercase tracking-wide text-foreground/40">
+                  <span className="text-xs uppercase tracking-wide text-foreground/70">
                     {source.type}
                   </span>
                   <span className="mt-1 block text-sm font-medium">
@@ -1288,7 +1288,7 @@ export default function TrendsPage() {
             <div className="rounded-xl border border-dashed border-border bg-surface p-6">
               <Sparkles className="h-5 w-5 text-primary" />
               <p className="mt-3 text-sm font-medium">No source material yet</p>
-              <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+              <p className="mt-1 text-xs leading-relaxed text-foreground/70">
                 Scripts and edit projects will appear here as additional inputs
                 for future tests.
               </p>

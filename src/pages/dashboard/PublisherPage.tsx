@@ -100,7 +100,7 @@ function TriStateQuestion({
     <div className="rounded-lg border border-border bg-background p-3">
       <p className="text-xs font-medium leading-relaxed">{label}</p>
       {detail ? (
-        <p className="mt-1 text-[11px] leading-relaxed text-foreground/45">
+        <p className="mt-1 text-xs leading-relaxed text-foreground/70">
           {detail}
         </p>
       ) : null}
@@ -117,12 +117,12 @@ function TriStateQuestion({
               type="button"
               aria-pressed={selected}
               onClick={() => onChange(option.value)}
-              className={`rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${
+              className={`rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
                 selected
                   ? option.value === "unsure"
                     ? "border-amber-500/40 bg-amber-500/10 text-amber-600"
                     : "border-primary/40 bg-primary/10 text-primary"
-                  : "border-border bg-surface text-foreground/50 hover:border-primary/30 hover:text-foreground"
+                  : "border-border bg-surface text-foreground/70 hover:border-primary/30 hover:text-foreground"
               }`}
             >
               {option.label}
@@ -829,7 +829,7 @@ function PublisherComposer() {
               <button
                 type="button"
                 onClick={resetComposer}
-                className="text-xs text-foreground/45 hover:text-foreground"
+                className="text-xs text-foreground/70 hover:text-foreground"
               >
                 Clear draft
               </button>
@@ -853,7 +853,7 @@ function PublisherComposer() {
                         className={`rounded-lg px-3 py-2 text-xs font-medium transition-all ${
                           selected
                             ? PLATFORM_META[account.platform].badge
-                            : "border border-border bg-background text-foreground/55 hover:border-primary/45"
+                            : "border border-border bg-background text-foreground/70 hover:border-primary/45"
                         }`}
                       >
                         {account.accountName}
@@ -862,7 +862,7 @@ function PublisherComposer() {
                   })}
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-border bg-background px-4 py-3 text-sm text-foreground/45">
+                <div className="rounded-lg border border-dashed border-border bg-background px-4 py-3 text-sm text-foreground/70">
                   No connected accounts. Drafts can still be saved.
                 </div>
               )}
@@ -886,7 +886,7 @@ function PublisherComposer() {
                 rows={6}
                 className="w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/30"
               />
-              <p className="mt-1 text-right text-xs text-foreground/35">
+              <p className="mt-1 text-right text-xs text-foreground/70">
                 {caption.length.toLocaleString()} characters
               </p>
             </div>
@@ -908,7 +908,7 @@ function PublisherComposer() {
                 placeholder="#productdesign #creatortips"
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
-              <p className="mt-1 text-xs text-foreground/35">
+              <p className="mt-1 text-xs text-foreground/70">
                 Use only tags relevant to this post; REELassati does not invent
                 “optimal” tags without audience evidence.
               </p>
@@ -943,7 +943,7 @@ function PublisherComposer() {
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-foreground/35">
+              <p className="mt-1 text-xs text-foreground/70">
                 Selected media is transferred to the publishing service only
                 when you publish or schedule. Media schedules are limited to 6
                 days because delivery uploads are temporary.
@@ -973,7 +973,7 @@ function PublisherComposer() {
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                 <div>
                   <h3 className="text-sm font-semibold">Release check</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-foreground/50">
+                  <p className="mt-1 text-xs leading-relaxed text-foreground/70">
                     A final, contextual check. REELassati adds a short
                     disclosure only when this release actually requires one.
                   </p>
@@ -983,7 +983,7 @@ function PublisherComposer() {
               <div className="mt-4 flex flex-col gap-2 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-medium">Audience disclosure</p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-foreground/45">
+                  <p className="mt-0.5 text-xs leading-relaxed text-foreground/70">
                     Choose the language this release&apos;s audience will see.
                     It is independent of your Studio language.
                   </p>
@@ -1009,10 +1009,10 @@ function PublisherComposer() {
                           setDisclosureLanguage(option.value);
                           invalidateReleaseReview();
                         }}
-                        className={`rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                           selected
                             ? "bg-primary text-white shadow-sm"
-                            : "text-foreground/50 hover:text-foreground"
+                            : "text-foreground/70 hover:text-foreground"
                         }`}
                       >
                         {option.label}
@@ -1094,7 +1094,7 @@ function PublisherComposer() {
               </div>
 
               {!classificationAnswersComplete ? (
-                <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] leading-relaxed text-amber-700">
+                <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-amber-700">
                   Answer each applicable item with Yes or No before release.
                   Unsure is safe for a draft, but cannot authorize publishing.
                 </p>
@@ -1158,7 +1158,7 @@ function PublisherComposer() {
                   </select>
                   {depictsRealPersonOrVoice &&
                   rightsBasis !== "documented-consent" ? (
-                    <p className="mt-2 text-[11px] leading-relaxed text-amber-700">
+                    <p className="mt-2 text-xs leading-relaxed text-amber-700">
                       This workflow requires documented consent when an
                       identifiable person or voice is involved.
                     </p>
@@ -1174,7 +1174,7 @@ function PublisherComposer() {
                       : "Exact visible post preview"}
                   </p>
                   {disclosurePreview ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                       {previewLanguage === "it"
                         ? "Informativa inclusa"
                         : "Disclosure included"}
@@ -1187,7 +1187,7 @@ function PublisherComposer() {
                       ? "Scrivi la didascalia per vedere l'anteprima."
                       : "Write the caption to see the preview.")}
                 </div>
-                <p className="mt-2 text-[10px] leading-relaxed text-foreground/40">
+                <p className="mt-2 text-xs leading-relaxed text-foreground/70">
                   {disclosurePreview
                     ? previewLanguage === "it"
                       ? "L'informativa è mostrata prima della didascalia, al primo contatto con il contenuto."
@@ -1259,7 +1259,7 @@ function PublisherComposer() {
                 />
               </div>
             </div>
-            <p className="-mt-3 text-xs text-foreground/35">
+            <p className="-mt-3 text-xs text-foreground/70">
               Entered in your browser timezone; workspace preference:{" "}
               {workspace.profile.timezone}.
             </p>
@@ -1333,7 +1333,7 @@ function PublisherComposer() {
                 type="button"
                 onClick={() => void reconcileStatuses(true)}
                 disabled={reconciling}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground/55 hover:border-primary/40 hover:text-primary disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium text-foreground/70 hover:border-primary/40 hover:text-primary disabled:opacity-40"
               >
                 <RefreshCw
                   className={`h-3 w-3 ${reconciling ? "animate-spin" : ""}`}
@@ -1351,14 +1351,14 @@ function PublisherComposer() {
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${
                         post.status === "published"
                           ? "bg-emerald-500/10 text-emerald-600"
                           : post.status === "scheduled"
                             ? "bg-primary/10 text-primary"
                             : post.status === "failed"
                               ? "bg-red-500/10 text-red-500"
-                              : "bg-foreground/5 text-foreground/45"
+                              : "bg-foreground/5 text-foreground/70"
                       }`}
                     >
                       {post.status}
@@ -1367,7 +1367,7 @@ function PublisherComposer() {
                       <button
                         type="button"
                         onClick={() => void deleteDraft(post.id)}
-                        className="rounded p-1 text-foreground/30 hover:bg-red-500/10 hover:text-red-500"
+                        className="rounded p-1 text-foreground/70 hover:bg-red-500/10 hover:text-red-500"
                         aria-label="Delete draft"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -1376,7 +1376,7 @@ function PublisherComposer() {
                   </div>
                   {post.outgoingContent ? (
                     <div>
-                      <p className="mb-1 font-mono text-[9px] uppercase tracking-wide text-foreground/35">
+                      <p className="mb-1 font-mono text-xs uppercase tracking-wide text-foreground/70">
                         Final delivery content
                       </p>
                       <p className="line-clamp-4 whitespace-pre-line text-sm font-medium">
@@ -1389,11 +1389,11 @@ function PublisherComposer() {
                     </p>
                   )}
                   {post.complianceReview ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-medium uppercase tracking-wide">
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-medium uppercase tracking-wide">
                       <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-600">
                         Release review recorded
                       </span>
-                      <span className="rounded-full bg-foreground/5 px-2 py-1 text-foreground/50">
+                      <span className="rounded-full bg-foreground/5 px-2 py-1 text-foreground/70">
                         {post.complianceReview.disclosureLanguage === "it"
                           ? "Italian disclosure"
                           : post.complianceReview.disclosureLanguage === "en"
@@ -1413,7 +1413,7 @@ function PublisherComposer() {
                       ) : null}
                     </div>
                   ) : null}
-                  <div className="mt-3 flex items-center gap-2 text-xs text-foreground/40">
+                  <div className="mt-3 flex items-center gap-2 text-xs text-foreground/70">
                     {post.mediaAssetId ? (
                       <Image className="h-3.5 w-3.5" />
                     ) : (
@@ -1427,19 +1427,19 @@ function PublisherComposer() {
                         : "No destination"}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-foreground/35">
+                  <p className="mt-1 text-xs text-foreground/70">
                     {post.scheduledAt
                       ? new Date(post.scheduledAt).toLocaleString()
                       : new Date(post.createdAt).toLocaleDateString()}
                   </p>
                   {post.statusCheckedAt && (
-                    <p className="mt-1 text-[10px] text-foreground/30">
+                    <p className="mt-1 text-xs text-foreground/70">
                       Delivery checked{" "}
                       {new Date(post.statusCheckedAt).toLocaleString()}
                     </p>
                   )}
                   {post.failureReason && (
-                    <p className="mt-2 rounded-md bg-red-500/5 px-2 py-1.5 text-[11px] text-red-500">
+                    <p className="mt-2 rounded-md bg-red-500/5 px-2 py-1.5 text-xs text-red-500">
                       {post.failureReason}
                     </p>
                   )}
@@ -1468,7 +1468,7 @@ function PublisherComposer() {
               ))}
             </div>
           ) : (
-            <div className="py-12 text-center text-foreground/40">
+            <div className="py-12 text-center text-foreground/70">
               <Clock className="mx-auto mb-2 h-8 w-8" />
               <p className="text-sm">No drafts or scheduled posts yet.</p>
             </div>

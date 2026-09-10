@@ -329,11 +329,11 @@ function DashboardHome() {
             <h1 className="text-3xl md:text-4xl font-semibold">
               {t(greetKey)}, {user?.name || "Creator"}.
             </h1>
-            <p className="text-sm text-foreground/50 mt-2">
+            <p className="text-sm text-foreground/70 mt-2">
               What will you make impossible to scroll past today?
             </p>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs text-foreground/50 shadow-sm backdrop-blur-sm">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs text-foreground/70 shadow-sm backdrop-blur-sm">
             <span
               aria-hidden="true"
               className={cn(
@@ -366,9 +366,7 @@ function DashboardHome() {
               </span>
               <div>
                 <p className="text-xs font-medium">Weekly momentum</p>
-                <p className="text-[11px] text-foreground/45">
-                  {momentumMessage}
-                </p>
+                <p className="text-xs text-foreground/70">{momentumMessage}</p>
               </div>
             </div>
           </div>
@@ -378,7 +376,7 @@ function DashboardHome() {
               <p className="text-sm font-semibold tabular">
                 {weekActivity.length}
               </p>
-              <p className="text-[10px] uppercase tracking-wide text-foreground/40">
+              <p className="text-xs uppercase tracking-wide text-foreground/70">
                 actions this week
               </p>
             </div>
@@ -392,7 +390,7 @@ function DashboardHome() {
               <p className="text-sm font-semibold tabular">
                 {formattedTimeSaved}
               </p>
-              <p className="text-[10px] uppercase tracking-wide text-foreground/40">
+              <p className="text-xs uppercase tracking-wide text-foreground/70">
                 time reclaimed
               </p>
               <span className="sr-only">
@@ -405,7 +403,7 @@ function DashboardHome() {
             <Activity className="h-4 w-4 text-amber-500" />
             <div>
               <p className="text-sm font-semibold tabular">{activeDays}</p>
-              <p className="text-[10px] uppercase tracking-wide text-foreground/40">
+              <p className="text-xs uppercase tracking-wide text-foreground/70">
                 active days
               </p>
             </div>
@@ -423,13 +421,13 @@ function DashboardHome() {
             className="studio-stat-card group bg-surface border border-border rounded-xl p-5 shadow-card"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="mono-eyebrow text-foreground/50 text-[10px]">
+              <span className="mono-eyebrow text-foreground/70 text-xs">
                 {s.label}
               </span>
-              <s.icon className="h-4 w-4 text-foreground/40 transition-colors group-hover:text-primary" />
+              <s.icon className="h-4 w-4 text-foreground/70 transition-colors group-hover:text-primary" />
             </div>
             <div className="text-2xl font-semibold tabular">{s.value}</div>
-            <p className="text-xs text-foreground/50 mt-1">{s.sub}</p>
+            <p className="text-xs text-foreground/70 mt-1">{s.sub}</p>
           </Link>
         ))}
       </div>
@@ -456,7 +454,7 @@ function DashboardHome() {
               <div className="h-9 w-9 rounded-lg bg-primary-wash flex items-center justify-center">
                 <qs.icon className="h-4 w-4 text-primary" />
               </div>
-              <ChevronRight className="studio-action-arrow h-4 w-4 text-foreground/30 group-hover:text-primary" />
+              <ChevronRight className="studio-action-arrow h-4 w-4 text-foreground/70 group-hover:text-primary" />
             </div>
             <h3 className="font-semibold">{qs.title}</h3>
             <p className="text-sm text-foreground/60 mt-1">{qs.desc}</p>
@@ -483,11 +481,11 @@ function DashboardHome() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{item.label}</p>
-                    <p className="text-xs text-foreground/50 truncate">
+                    <p className="text-xs text-foreground/70 truncate">
                       {item.detail}
                     </p>
                   </div>
-                  <span className="text-xs text-foreground/30">
+                  <span className="text-xs text-foreground/70">
                     {formatActivityTime(item.createdAt, now)}
                   </span>
                 </div>
@@ -497,7 +495,7 @@ function DashboardHome() {
                 <p className="text-sm font-medium">
                   Your activity starts with a real action.
                 </p>
-                <p className="text-xs text-foreground/50 mt-1">
+                <p className="text-xs text-foreground/70 mt-1">
                   Upload footage or create a project to start your activity
                   history.
                 </p>
@@ -547,7 +545,7 @@ function DashboardHome() {
                 >
                   <span
                     className={cn(
-                      "text-[10px] font-bold",
+                      "text-xs font-bold",
                       item.done ? "text-white" : "text-primary"
                     )}
                   >
@@ -705,7 +703,7 @@ function StudioStatus() {
               <row.icon className="h-5 w-5 text-primary" />
               <span
                 className={cn(
-                  "text-[10px] font-mono tracking-wider uppercase px-2 py-1 rounded-full",
+                  "text-xs font-mono tracking-wider uppercase px-2 py-1 rounded-full",
                   row.ready
                     ? "bg-emerald-500/10 text-emerald-500"
                     : "bg-amber-500/10 text-amber-500"
@@ -715,7 +713,7 @@ function StudioStatus() {
               </span>
             </div>
             <h2 className="font-semibold mt-5">{row.label}</h2>
-            <p className="text-sm text-foreground/50 mt-1">{row.detail}</p>
+            <p className="text-sm text-foreground/70 mt-1">{row.detail}</p>
           </div>
         ))}
       </div>
@@ -727,7 +725,7 @@ function StudioStatus() {
           publications
         </p>
         {capabilities.missing.length ? (
-          <p className="text-xs text-foreground/45 mt-3">
+          <p className="text-xs text-foreground/70 mt-3">
             Some managed services still need setup.
           </p>
         ) : null}
@@ -741,7 +739,7 @@ function StudioStatus() {
             <h2 className="mt-2 text-lg font-semibold">
               EU public-release readiness
             </h2>
-            <p className="mt-1 max-w-2xl text-sm text-foreground/55">
+            <p className="mt-1 max-w-2xl text-sm text-foreground/70">
               Versioned controls, machine provenance and publishing gates are
               structural. This status does not claim certification or replace
               legal review.
@@ -749,7 +747,7 @@ function StudioStatus() {
           </div>
           <span
             className={cn(
-              "rounded-full px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide",
+              "rounded-full px-3 py-1.5 font-mono text-xs uppercase tracking-wide",
               compliance?.publicLaunchReady
                 ? "bg-emerald-500/10 text-emerald-600"
                 : "bg-amber-500/10 text-amber-600"
@@ -781,7 +779,7 @@ function StudioStatus() {
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-border bg-background p-4">
             <h3 className="text-sm font-semibold">Operator and intended use</h3>
-            <p className="mt-1 text-xs text-foreground/45">
+            <p className="mt-1 text-xs text-foreground/70">
               Record the exact operator facts; REELassati never invents an
               entity name or market date.
             </p>
@@ -807,7 +805,7 @@ function StudioStatus() {
                 Public platform
               </div>
             </div>
-            <label className="mt-3 block text-xs text-foreground/55">
+            <label className="mt-3 block text-xs text-foreground/70">
               First EU availability or put-into-service date
               <input
                 type="date"
@@ -852,7 +850,7 @@ function StudioStatus() {
             <h3 className="text-sm font-semibold">
               Role-specific AI operations review
             </h3>
-            <p className="mt-1 text-xs leading-relaxed text-foreground/45">
+            <p className="mt-1 text-xs leading-relaxed text-foreground/70">
               Review intended use, model limitations, synthetic-media
               disclosure, rights/consent, human editorial control and incident
               escalation. This records the owner’s review only; staff and
@@ -896,7 +894,7 @@ function StudioStatus() {
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium">{route.purpose}</p>
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-foreground/45">
+              <p className="mt-1 text-xs leading-relaxed text-foreground/70">
                 Managed by REELassati
               </p>
             </div>
@@ -939,35 +937,74 @@ export default function Dashboard() {
   const path = location.pathname;
 
   const navItems: Array<
-    | { separator: true }
+    | { separator: true; label: string }
     | { group: "create"; separator?: false }
     | { icon: LucideIcon; label: string; to: string; separator?: false }
   > = [
     { icon: LayoutDashboard, label: t("nav.dashboard"), to: "/dashboard" },
+    {
+      separator: true,
+      label: i18n.language.startsWith("it") ? "Crea" : "Create",
+    },
+    { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
     { icon: Flame, label: "Trends", to: "/dashboard/trends" },
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
     { group: "create" },
-    { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
     { icon: Search, label: t("nav.analyze"), to: "/dashboard/analyze" },
+    {
+      separator: true,
+      label: i18n.language.startsWith("it")
+        ? "Pubblica e misura"
+        : "Publish & measure",
+    },
     { icon: Send, label: t("nav.publish"), to: "/dashboard/publish" },
     { icon: BarChart3, label: t("nav.analytics"), to: "/dashboard/analytics" },
-    { separator: true },
+    { separator: true, label: "Workspace" },
     { icon: Users, label: t("nav.clients"), to: "/dashboard/clients" },
     { icon: Calendar, label: t("nav.calendar"), to: "/dashboard/calendar" },
-    { icon: Mail, label: "Weekly Coach", to: "/dashboard/coaching" },
-    { separator: true },
+    {
+      icon: Mail,
+      label: i18n.language.startsWith("it")
+        ? "Coach settimanale"
+        : "Weekly Coach",
+      to: "/dashboard/coaching",
+    },
+    { separator: true, label: "Account" },
     { icon: Library, label: t("nav.library"), to: "/dashboard/library" },
     { icon: AtSign, label: t("nav.social"), to: "/dashboard/social" },
-    { icon: Gift, label: "Refer & Earn", to: "/dashboard/referral" },
-    { icon: WalletCards, label: "Plan & credits", to: "/dashboard/billing" },
-    { separator: true },
+    {
+      icon: Gift,
+      label: i18n.language.startsWith("it")
+        ? "Invita e guadagna"
+        : "Refer & Earn",
+      to: "/dashboard/referral",
+    },
+    {
+      icon: WalletCards,
+      label: i18n.language.startsWith("it")
+        ? "Piano e crediti"
+        : "Plan & credits",
+      to: "/dashboard/billing",
+    },
+    {
+      separator: true,
+      label: i18n.language.startsWith("it") ? "Supporto" : "Support",
+    },
     {
       icon: MessageSquareWarning,
-      label: "Feedback & bugs",
+      label: i18n.language.startsWith("it")
+        ? "Feedback e problemi"
+        : "Feedback & bugs",
       to: "/dashboard/feedback",
     },
     { icon: Settings, label: t("nav.settings"), to: "/dashboard/settings" },
-    { icon: Shield, label: "Studio status", to: "/dashboard/status" },
+    {
+      icon: Shield,
+      label: i18n.language.startsWith("it")
+        ? "Stato dello studio"
+        : "Studio status",
+      to: "/dashboard/status",
+    },
   ];
 
   return (
@@ -999,7 +1036,7 @@ export default function Dashboard() {
             onClick={() => setCollapsed(!collapsed)}
             aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
             aria-expanded={!collapsed}
-            className="hidden lg:flex p-1.5 rounded-md text-foreground/40 hover:text-foreground"
+            className="hidden lg:flex p-1.5 rounded-md text-foreground/70 hover:text-foreground"
           >
             {collapsed ? (
               <ChevronRight className="h-4 w-4" />
@@ -1028,8 +1065,10 @@ export default function Dashboard() {
               <div
                 key={`sep-${i}`}
                 role="separator"
-                className="border-t border-border my-2"
-              />
+                className="border-t border-border mt-4 pt-3 px-3 text-xs font-medium text-foreground/70"
+              >
+                {!collapsed && item.label}
+              </div>
             ) : "group" in item ? (
               <div key={item.group}>
                 <button
@@ -1057,7 +1096,11 @@ export default function Dashboard() {
                   <Sparkles className="h-[18px] w-[18px] shrink-0" />
                   {!collapsed ? (
                     <>
-                      <span className="flex-1 text-left">Create</span>
+                      <span className="flex-1 text-left">
+                        {i18n.language.startsWith("it")
+                          ? "Genera media"
+                          : "Generate media"}
+                      </span>
                       <ChevronDown
                         className={cn(
                           "h-3.5 w-3.5 transition-transform",
@@ -1080,7 +1123,9 @@ export default function Dashboard() {
                     />
                     <SidebarItem
                       icon={Images}
-                      label="Images"
+                      label={
+                        i18n.language.startsWith("it") ? "Immagini" : "Images"
+                      }
                       to="/dashboard/image"
                       active={path.startsWith("/dashboard/image")}
                     />
@@ -1132,7 +1177,7 @@ export default function Dashboard() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="mono-eyebrow text-foreground/50 hidden sm:block">
+          <span className="mono-eyebrow text-foreground/70 hidden sm:block">
             Dashboard
           </span>
           <div className="flex-1" />
@@ -1167,7 +1212,7 @@ export default function Dashboard() {
                 ? "Switch to English"
                 : "Passa all’italiano"
             }
-            className="flex items-center gap-1 text-xs text-foreground/50"
+            className="flex items-center gap-1 text-xs text-foreground/70"
           >
             <Globe className="h-3.5 w-3.5" />{" "}
             {i18n.language === "it" ? "IT" : "EN"}

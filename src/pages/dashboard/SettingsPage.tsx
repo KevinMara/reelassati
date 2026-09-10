@@ -630,7 +630,7 @@ export default function SettingsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <row.icon className="h-5 w-5 text-primary" />
                       <span
-                        className={`rounded-full px-2 py-1 font-mono text-[9px] uppercase tracking-wide ${
+                        className={`rounded-full px-2 py-1 font-mono text-xs uppercase tracking-wide ${
                           row.ready
                             ? "bg-emerald-500/10 text-emerald-600"
                             : "bg-amber-500/10 text-amber-600"

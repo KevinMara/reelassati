@@ -29,9 +29,9 @@ describe("protected product and compliance invariants", () => {
     );
     expect(destinations).toEqual([
       "/dashboard",
+      "/dashboard/edit",
       "/dashboard/trends",
       "/dashboard/script",
-      "/dashboard/edit",
       "/dashboard/analyze",
       "/dashboard/publish",
       "/dashboard/analytics",
@@ -47,11 +47,11 @@ describe("protected product and compliance invariants", () => {
       "/dashboard/status",
     ]);
     const navEntries = navBlock.slice(navBlock.indexOf("> = ["));
-    expect((navEntries.match(/separator: true/g) || []).length).toBe(3);
+    expect((navEntries.match(/separator: true/g) || []).length).toBe(5);
     expect(navEntries).toContain('{ group: "create" }');
     expect(dashboard).toContain('label="Video"');
     expect(dashboard).toContain('to="/dashboard/video"');
-    expect(dashboard).toContain('label="Images"');
+    expect(dashboard).toContain('"Immagini" : "Images"');
     expect(dashboard).toContain('to="/dashboard/image"');
     expect(dashboard).toContain('label="Audio"');
     expect(dashboard).toContain('to="/dashboard/voice"');

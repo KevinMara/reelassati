@@ -489,7 +489,7 @@ export default function VideoGenerator() {
             <div className="mb-3 flex items-center gap-2">
               <Film className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-medium">Visual style</h2>
-              <span className="ml-auto text-xs uppercase tracking-wider text-foreground/35">
+              <span className="ml-auto text-xs uppercase tracking-wider text-foreground/70">
                 {VIDEO_PROMPT_TEMPLATES.length} templates
               </span>
             </div>
@@ -508,7 +508,7 @@ export default function VideoGenerator() {
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium">{item.name}</span>
-                    <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[9px] uppercase tracking-wider text-foreground/65">
+                    <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-xs uppercase tracking-wider text-foreground/65">
                       {item.category}
                     </span>
                   </span>

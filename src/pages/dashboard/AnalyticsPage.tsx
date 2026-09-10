@@ -242,7 +242,7 @@ export default function AnalyticsPage() {
       <div className="mb-8">
         <p className="mono-eyebrow mb-2 text-primary">Measured workspace</p>
         <h1 className="text-3xl font-semibold">Analytics</h1>
-        <p className="mt-2 max-w-2xl text-sm text-foreground/55">
+        <p className="mt-2 max-w-2xl text-sm text-foreground/70">
           Production and publication facts currently stored in REELassati.
           Reach, retention, and engagement are never estimated.
         </p>
@@ -256,7 +256,7 @@ export default function AnalyticsPage() {
           >
             <div className="pointer-events-none absolute -right-10 -top-12 h-24 w-24 rounded-full bg-primary/[0.06] blur-2xl transition group-hover:bg-primary/[0.11]" />
             <div className="mb-4 flex items-center justify-between">
-              <p className="mono-eyebrow text-[10px] text-foreground/45">
+              <p className="mono-eyebrow text-xs text-foreground/70">
                 {kpi.label}
               </p>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/[0.08] text-primary transition group-hover:scale-105 group-hover:bg-primary/[0.13]">
@@ -266,7 +266,7 @@ export default function AnalyticsPage() {
             <p className="relative text-3xl font-semibold tabular-nums">
               {kpi.value}
             </p>
-            <p className="mt-1 text-xs text-foreground/45">{kpi.detail}</p>
+            <p className="mt-1 text-xs text-foreground/70">{kpi.detail}</p>
           </article>
         ))}
       </div>
@@ -280,14 +280,14 @@ export default function AnalyticsPage() {
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Sparkles className="h-3.5 w-3.5" />
               </span>
-              <p className="mono-eyebrow text-[10px] text-primary">
+              <p className="mono-eyebrow text-xs text-primary">
                 Output momentum
               </p>
             </div>
             <h2 className="mt-2 text-lg font-medium">
               Your last {rangeDays} days
             </h2>
-            <p className="mt-1 text-xs text-foreground/45">
+            <p className="mt-1 text-xs text-foreground/70">
               Toggle one metric or compare several. Every point comes from your
               saved workspace records.
             </p>
@@ -306,10 +306,10 @@ export default function AnalyticsPage() {
                     type="button"
                     aria-pressed={selected}
                     onClick={() => setRangeDays(range.days)}
-                    className={`rounded-lg px-2.5 py-1.5 font-mono text-[10px] font-medium transition duration-200 ${
+                    className={`rounded-lg px-2.5 py-1.5 font-mono text-xs font-medium transition duration-200 ${
                       selected
                         ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                        : "text-foreground/45 hover:bg-surface hover:text-foreground/75"
+                        : "text-foreground/70 hover:bg-surface hover:text-foreground/75"
                     }`}
                   >
                     {range.label}
@@ -321,7 +321,7 @@ export default function AnalyticsPage() {
               <p className="text-2xl font-semibold tabular-nums text-primary">
                 {selectedTotal}
               </p>
-              <p className="text-[10px] uppercase tracking-wide text-foreground/40">
+              <p className="text-xs uppercase tracking-wide text-foreground/70">
                 selected output
               </p>
             </div>
@@ -350,7 +350,7 @@ export default function AnalyticsPage() {
                 className={`group/metric inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition duration-200 hover:-translate-y-px ${
                   selected
                     ? "border-primary/20 bg-background text-foreground shadow-sm"
-                    : "border-border/70 bg-background/35 text-foreground/45 hover:border-border hover:text-foreground/70"
+                    : "border-border/70 bg-background/35 text-foreground/70 hover:border-border hover:text-foreground/70"
                 }`}
               >
                 <span
@@ -359,7 +359,7 @@ export default function AnalyticsPage() {
                 />
                 {metric.shortLabel}
                 <span
-                  className={`font-mono text-[10px] tabular-nums ${selected ? "text-foreground/50" : "text-foreground/30"}`}
+                  className={`font-mono text-xs tabular-nums ${selected ? "text-foreground/70" : "text-foreground/70"}`}
                 >
                   {metricTotals[metric.key]}
                 </span>
@@ -426,7 +426,7 @@ export default function AnalyticsPage() {
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
           <div className="flex-1">
             <h2 className="font-medium">Audience metrics are not synced yet</h2>
-            <p className="mt-1 text-sm leading-relaxed text-foreground/55">
+            <p className="mt-1 text-sm leading-relaxed text-foreground/70">
               {capabilities.publishing
                 ? "Connected distribution is ready, but sync your social performance above to import the metrics available for your accounts."
                 : "Publishing is not connected, and no platform analytics source is available."}{" "}
@@ -447,12 +447,12 @@ export default function AnalyticsPage() {
         <section className="rounded-xl border border-border bg-surface p-6">
           <div className="mb-5 flex items-end justify-between gap-3">
             <div>
-              <p className="mono-eyebrow text-[10px] text-foreground/45">
+              <p className="mono-eyebrow text-xs text-foreground/70">
                 Distribution footprint
               </p>
               <h2 className="mt-1 font-medium">Posts by platform</h2>
             </div>
-            <span className="text-xs text-foreground/40">
+            <span className="text-xs text-foreground/70">
               Workspace records only
             </span>
           </div>
@@ -469,13 +469,13 @@ export default function AnalyticsPage() {
                       <p className="text-sm font-medium">
                         {PLATFORM_LABELS[row.platform]}
                       </p>
-                      <span className="font-mono text-xs text-foreground/45">
+                      <span className="font-mono text-xs text-foreground/70">
                         {total} {total === 1 ? "post" : "posts"}
                       </span>
                     </div>
                     <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
                       <div>
-                        <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                        <dt className="text-xs uppercase tracking-wide text-foreground/70">
                           Draft
                         </dt>
                         <dd className="mt-1 text-sm font-semibold">
@@ -483,7 +483,7 @@ export default function AnalyticsPage() {
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                        <dt className="text-xs uppercase tracking-wide text-foreground/70">
                           Scheduled
                         </dt>
                         <dd className="mt-1 text-sm font-semibold">
@@ -491,7 +491,7 @@ export default function AnalyticsPage() {
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-[10px] uppercase tracking-wide text-foreground/40">
+                        <dt className="text-xs uppercase tracking-wide text-foreground/70">
                           Published
                         </dt>
                         <dd className="mt-1 text-sm font-semibold">
@@ -508,7 +508,7 @@ export default function AnalyticsPage() {
               <p className="text-sm font-medium">
                 No platform distribution data yet
               </p>
-              <p className="mt-1 text-xs text-foreground/45">
+              <p className="mt-1 text-xs text-foreground/70">
                 Saving a draft with a connected account will create the first
                 record.
               </p>
@@ -518,7 +518,7 @@ export default function AnalyticsPage() {
 
         <section className="rounded-xl border border-border bg-surface p-6">
           <div className="mb-5">
-            <p className="mono-eyebrow text-[10px] text-foreground/45">
+            <p className="mono-eyebrow text-xs text-foreground/70">
               Verified output
             </p>
             <h2 className="mt-1 font-medium">Publication history</h2>
@@ -533,7 +533,7 @@ export default function AnalyticsPage() {
                   <p className="line-clamp-2 text-sm font-medium">
                     {post.caption.trim() || "Untitled publication"}
                   </p>
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-foreground/45">
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-foreground/70">
                     <span>
                       {post.platforms
                         .map(platform => PLATFORM_LABELS[platform])
@@ -553,7 +553,7 @@ export default function AnalyticsPage() {
               <p className="text-sm font-medium">
                 Nothing has been recorded as published
               </p>
-              <p className="mt-1 text-xs text-foreground/45">
+              <p className="mt-1 text-xs text-foreground/70">
                 Publishing history will appear after a real distribution action.
               </p>
               <Link
