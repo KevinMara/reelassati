@@ -1,7 +1,7 @@
 import { AudioGenerator } from "./AudioGenerator";
-import { editorAudioCatalog } from "@/lib/editor-audio-catalog";
+import { EditorMediaLibrary } from "./EditorMediaLibrary";
 import { useState } from "react";
-import { Film, Image, Mic2, Music2, Loader2, X } from "lucide-react";
+import { Film, Image, Mic2, Music2, Loader2 } from "lucide-react";
 import type { Asset, EditProject } from "@contracts/workspace";
 import {
   imageCreditCost,
@@ -13,17 +13,20 @@ import { useWorkspace } from "@/providers/workspace";
 
 export function EditorCreationDock({
   project,
-  playhead,
   onInsert,
+  onAssist,
+  assistCost,
 }: {
+  onAssist?: (context: string) => void;
+  assistCost?: number;
   project: EditProject;
   playhead: number;
   onInsert: (asset: Asset) => Promise<void>;
 }) {
   const { workspace, capabilities } = useWorkspace();
   const [kind, setKind] = useState<
-    "image" | "video" | "voice" | "audio" | null
-  >(null);
+    "library" | "image" | "video" | "voice" | "audio" | null
+  >("library");
   const [prompt, setPrompt] = useState("");
   const [seconds, setSeconds] = useState(5);
   const [voice, setVoice] = useState("English_Graceful_Lady");
@@ -117,110 +120,53 @@ export function EditorCreationDock({
       setBusy(false);
     }
   }
-  async function insertSound(sound: (typeof editorAudioCatalog)[number]) {
-    setBusy(true);
-    setMessage("");
-    try {
-      const response = await fetch(`/editor-audio/${sound.file}`);
-      if (!response.ok)
-        throw new Error("Could not load this sound. Please retry.");
-      const asset = await platformApi.uploadAsset(
-        new File([await response.blob()], `${sound.name}.mp3`, {
-          type: "audio/mpeg",
-        }),
-        "audio"
-      );
-      await onInsert({ ...asset, duration: sound.duration });
-      setMessage("Audio added · 0 AI credits.");
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not insert audio.");
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
-    <section
-      aria-label="Create media on timeline"
-      className="border-b border-border p-3"
-    >
-      <div className="mt-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-3 text-sm font-semibold">
-            Create in this edit
-          </span>
+    <section aria-label="Create media on timeline" className="h-full min-w-0">
+      <div>
+        <div className="flex gap-1 overflow-x-auto border-b border-border p-2">
           {(
             [
-              ["image", "Image", Image],
+              ["library", "Library", Film],
               ["video", "Video", Film],
+              ["image", "Image", Image],
               ["voice", "Voiceover", Mic2],
-              ["audio", "Music & sound effects", Music2],
+              ["audio", "Audio", Music2],
             ] as const
           ).map(([id, label, Icon]) => (
             <button
               key={id}
               type="button"
-              onClick={() => setKind(kind === id ? null : id)}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${kind === id ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
+              onClick={() => setKind(id)}
+              className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs ${kind === id ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
             >
               <Icon className="h-4 w-4" />
               {label}
             </button>
           ))}
-          <span className="ml-auto text-xs text-foreground/60">
-            Insert at {playhead.toFixed(1)}s
-          </span>
         </div>
         {kind && (
-          <div className="mt-4 border-t border-border pt-4">
-            <button
-              type="button"
-              aria-label="Close creation panel"
-              onClick={() => setKind(null)}
-              className="float-right p-2"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            {kind === "audio" ? (
+          <div className="p-3">
+            {onAssist && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  onAssist(
+                    kind === "library"
+                      ? "Recommend existing library shots to support this edit, using actual filenames."
+                      : `Suggest the best ${kind === "voice" ? "voiceover text and delivery" : kind === "audio" ? "music and sound design" : `${kind} generation prompt`} for this edit. Provide a usable prompt in the summary; do not generate media.`
+                  )
+                }
+                className="mb-3 rounded-lg border border-primary/30 px-3 py-2 text-sm text-primary"
+              >
+                AI assist · {assistCost} credits
+              </button>
+            )}
+            {kind === "library" ? (
+              <EditorMediaLibrary onInsert={onInsert} />
+            ) : kind === "audio" ? (
               <div>
                 <AudioGenerator projectId={project.id} onInsert={onInsert} />
-                <p className="mb-3 text-sm text-foreground/70">
-                  Free audio · preview before adding · CC0 · 0 AI credits
-                </p>
-                <div className="mb-4 grid max-h-96 gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
-                  {editorAudioCatalog.map(sound => (
-                    <div
-                      key={sound.id}
-                      className="min-w-0 rounded-xl border border-border bg-background p-3"
-                    >
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium">
-                          {sound.name}
-                        </span>
-                        <span className="text-xs text-foreground/60">
-                          {sound.duration.toFixed(1)}s
-                        </span>
-                      </div>
-                      <p className="mb-2 text-xs text-foreground/60">
-                        {sound.category} · {sound.author}
-                      </p>
-                      <audio
-                        controls
-                        preload="none"
-                        src={`/editor-audio/${sound.file}`}
-                        className="h-8 w-full"
-                        aria-label={`Preview ${sound.name}`}
-                      />
-                      <button
-                        disabled={busy || !capabilities.uploads}
-                        type="button"
-                        onClick={() => void insertSound(sound)}
-                        className="mt-3 rounded-lg border border-primary/30 px-3 py-2 text-sm text-primary disabled:opacity-40"
-                      >
-                        Add at playhead · Free
-                      </button>
-                    </div>
-                  ))}
-                </div>
                 <p className="mb-3 text-sm text-foreground/70">
                   Use your uploaded or generated audio. Drop a licensed music or
                   sound-effect file onto the timeline to add more.
@@ -243,7 +189,7 @@ export function EditorCreationDock({
                 </div>
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="space-y-4">
                 <textarea
                   aria-label={
                     kind === "voice" ? "Voiceover text" : "Generation prompt"

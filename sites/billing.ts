@@ -872,6 +872,29 @@ export async function releaseCreditReservation(
   ]);
 }
 
+export async function grantOperatorCredits(
+  env: BillingEnvironment,
+  email: string,
+  requestId: string
+): Promise<void> {
+  const existing = await env.DB.prepare(
+    "SELECT owner_email FROM credit_accounts WHERE owner_email = ?"
+  )
+    .bind(email)
+    .first();
+  if (!existing)
+    throw new Error("Credit account not found; no credits were granted");
+  await applyTopUpGrant(
+    env,
+    email,
+    1000,
+    `operator-grant:${email}:${requestId}`,
+    "adjustment",
+    "Operator-approved 1,000-credit grant",
+    requestId
+  );
+}
+
 export async function grantReferralCredits(
   env: BillingEnvironment,
   ownerEmail: string,
@@ -1100,8 +1123,7 @@ async function checkoutSession(
   )
     .bind(user.email, kind, lease)
     .first<CheckoutRow>();
-  if (!state)
-    return json({ status: "pending", retryAfterMs: 2000 }, 202);
+  if (!state) return json({ status: "pending", retryAfterMs: 2000 }, 202);
   const stripe = stripeClient(env.STRIPE_SECRET_KEY!);
   try {
     let customerId = account?.stripe_customer_id;

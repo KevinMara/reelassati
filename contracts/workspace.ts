@@ -82,6 +82,7 @@ export interface Asset {
   variantGroupId?: string;
   parentAssetId?: string;
   favorite?: boolean;
+  folderId?: string;
   projectId?: string;
   provenance?: ContentProvenance;
 }
@@ -179,6 +180,7 @@ export interface EditRevision {
 }
 
 export interface EditProject {
+  referenceStyleBrief?: string;
   id: string;
   title: string;
   template: string;
@@ -317,6 +319,7 @@ export interface WorkspaceDocument {
   brandKit: BrandKit;
   projects: EditProject[];
   assets: Asset[];
+  mediaFolders?: Array<{ id: string; name: string; parentId?: string }>;
   scripts: ScriptDraft[];
   accounts: PublishingAccount[];
   posts: ScheduledPost[];

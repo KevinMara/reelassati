@@ -12,6 +12,7 @@ import {
 } from "vitest";
 import {
   handleStripeWebhook,
+  grantOperatorCredits,
   initializeBillingSchema,
   billingSummary,
   handleBillingApi,
@@ -127,6 +128,26 @@ beforeEach(() => {
 });
 afterAll(() => sqlite.close());
 afterEach(() => vi.unstubAllGlobals());
+
+it("grants exactly 1,000 operator credits once per request without changing the plan", async () => {
+  await grantOperatorCredits(env, owner, "editor-grant-test");
+  await grantOperatorCredits(env, owner, "editor-grant-test");
+  expect(credits().topup_balance).toBe(1000);
+  expect(credits().included_balance).toBe(700);
+  expect(account().plan_id).toBe("creator");
+  expect(
+    sqlite
+      .prepare(
+        "SELECT COUNT(*) AS count FROM credit_ledger WHERE category = 'adjustment'"
+      )
+      .get()!.count
+  ).toBe(1);
+});
+it("does not create a new account from an operator grant typo", async () => {
+  await expect(
+    grantOperatorCredits(env, "missing@example.com", "editor-grant-test")
+  ).rejects.toThrow("Credit account not found");
+});
 
 function stripeFixture(
   options: {
@@ -329,27 +350,38 @@ describe("Stripe checkout readiness and customer journey", () => {
     expect(credits().topup_balance).toBe(0);
   });
 
-  it.each(["checkout", "topup-checkout"])("creates %s Managed Payments sessions without unsupported fields", async route => {
-    if (route === "checkout") sqlite.prepare("UPDATE billing_accounts SET status = 'inactive'").run();
-    const fixture = stripeFixture();
-    fixture.runtime.STRIPE_TAX_MODE = "managed";
-    expect((await stripeReadiness(fixture.runtime)).ready).toBe(true);
-    expect(
-      (
-        await fixture.call(route, route === "checkout" ? {
-          planId: "pro",
-          billingCycle: "monthly",
-        } : { topUpId: "boost" })
-      ).status
-    ).toBe(200);
-    const params = fixture.writes[0];
-    expect(params.get("managed_payments[enabled]")).toBe("true");
-    expect(params.has("automatic_tax[enabled]")).toBe(false);
-    expect(params.has("tax_id_collection[enabled]")).toBe(false);
-    expect(params.has("customer_update[address]")).toBe(false);
-    expect(params.has("customer_update[name]")).toBe(false);
-    expect([...params.keys()].some(key => key.startsWith("custom_text"))).toBe(false);
-  });
+  it.each(["checkout", "topup-checkout"])(
+    "creates %s Managed Payments sessions without unsupported fields",
+    async route => {
+      if (route === "checkout")
+        sqlite.prepare("UPDATE billing_accounts SET status = 'inactive'").run();
+      const fixture = stripeFixture();
+      fixture.runtime.STRIPE_TAX_MODE = "managed";
+      expect((await stripeReadiness(fixture.runtime)).ready).toBe(true);
+      expect(
+        (
+          await fixture.call(
+            route,
+            route === "checkout"
+              ? {
+                  planId: "pro",
+                  billingCycle: "monthly",
+                }
+              : { topUpId: "boost" }
+          )
+        ).status
+      ).toBe(200);
+      const params = fixture.writes[0];
+      expect(params.get("managed_payments[enabled]")).toBe("true");
+      expect(params.has("automatic_tax[enabled]")).toBe(false);
+      expect(params.has("tax_id_collection[enabled]")).toBe(false);
+      expect(params.has("customer_update[address]")).toBe(false);
+      expect(params.has("customer_update[name]")).toBe(false);
+      expect(
+        [...params.keys()].some(key => key.startsWith("custom_text"))
+      ).toBe(false);
+    }
+  );
 
   it("serializes simultaneous subscription attempts and checks existing remote subscriptions", async () => {
     sqlite.prepare("UPDATE billing_accounts SET status = 'inactive'").run();
@@ -359,7 +391,10 @@ describe("Stripe checkout readiness and customer journey", () => {
       fixture.call("checkout", { planId: "pro", billingCycle: "annual" }),
     ]);
     expect(results.map(r => r.status).sort()).toEqual([200, 202]);
-    expect(await results.find(r => r.status === 202)!.json()).toEqual({ status: "pending", retryAfterMs: 2000 });
+    expect(await results.find(r => r.status === 202)!.json()).toEqual({
+      status: "pending",
+      retryAfterMs: 2000,
+    });
     expect(fixture.writes).toHaveLength(1);
     const remote = stripeFixture({ remoteSubscription: true });
     expect(

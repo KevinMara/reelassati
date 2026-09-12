@@ -461,7 +461,10 @@ describe("platform-wide functional invariants", () => {
     expect(image).toContain("platformApi.generateImage");
     expect(video).toContain("Video name");
     expect(voice).toContain("Audio name");
-    expect(editor).toContain("Connected media library");
+    expect(editor).toContain("EditorCreationDock");
+    expect(source("./components/studio/EditorCreationDock.tsx")).toContain(
+      "EditorMediaLibrary"
+    );
     expect(editor).toContain("addAssetToTimeline");
     expect(editor).toContain("addLibraryAssetAtPlayhead");
     expect(editor).toContain('searchParams.get("asset")');

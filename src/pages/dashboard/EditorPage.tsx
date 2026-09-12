@@ -1,5 +1,4 @@
 import { resolveMediaDuration } from "@/lib/media-metadata";
-import { AssetThumbnail } from "@/components/studio/AssetThumbnail";
 import { useTranslation } from "react-i18next";
 import { TimelinePreview } from "@/components/studio/TimelinePreview";
 import {
@@ -31,7 +30,6 @@ import {
   Play,
   Plus,
   Redo2,
-  Search,
   Scissors,
   Sparkles,
   Trash2,
@@ -51,6 +49,7 @@ import {
   rippleRemove,
 } from "@/lib/edit-timeline";
 import { EditorCreationDock } from "@/components/studio/EditorCreationDock";
+import { TimelinePrompt } from "@/components/studio/TimelinePrompt";
 import { AutonomousEditor } from "@/components/studio/AutonomousEditor";
 import { RenderExportPanel } from "@/components/studio/RenderExportPanel";
 import { useSearchParams } from "react-router-dom";
@@ -70,7 +69,7 @@ import { useFileDropZone } from "@/hooks/useFileDropZone";
 import type { ContentProvenance } from "@contracts/compliance";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { validateFileSelection } from "@/lib/file-validation";
-import { AI_CREDIT_COSTS } from "@contracts/billing";
+import { AI_CREDIT_COSTS, timedCreditCost } from "@contracts/billing";
 
 const PROJECT_TEMPLATES = [
   {
@@ -220,9 +219,9 @@ function deriveQualitySignals(project: EditProject): QualitySignal[] {
   if (project.transcript.length === 0) {
     signals.push({
       id: "preflight-no-transcript",
-      label: "Captions not prepared",
+      label: "Caption coverage not checked",
       detail:
-        "Add or transcribe dialogue, then review every line before delivery.",
+        "Source footage may already contain burned-in captions. Run a visual review before deciding whether more captions are needed.",
       start: 0,
       end: duration,
       level: "attention",
@@ -305,11 +304,6 @@ export default function EditorPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [librarySearch, setLibrarySearch] = useState("");
-  const [libraryKind, setLibraryKind] = useState<
-    "all" | "video" | "image" | "audio"
-  >("all");
   const [recentlyAddedAssetId, setRecentlyAddedAssetId] = useState<
     string | null
   >(null);
@@ -338,20 +332,6 @@ export default function EditorPage() {
       ? (workspace.assets.find(asset => asset.id === assetId) ?? null)
       : null;
   }, [searchParams, workspace.assets]);
-  const filteredLibraryAssets = useMemo(() => {
-    const query = librarySearch.trim().toLowerCase();
-    return workspace.assets.filter(asset => {
-      if (
-        asset.kind !== "video" &&
-        asset.kind !== "image" &&
-        asset.kind !== "audio"
-      ) {
-        return false;
-      }
-      if (libraryKind !== "all" && asset.kind !== libraryKind) return false;
-      return !query || asset.name.toLowerCase().includes(query);
-    });
-  }, [libraryKind, librarySearch, workspace.assets]);
   useEffect(() => setDurationDraft(null), [project?.duration]);
   const seekTimeline = useCallback(
     (nextTime: number) => {
@@ -960,8 +940,12 @@ export default function EditorPage() {
     setClipDraft(restoredClip ? { ...restoredClip } : null);
   };
 
-  const runEditCommand = async () => {
-    if (!project || !command.trim()) return;
+  const runEditCommand = async (
+    override?: string,
+    localRange?: { start: number; end: number }
+  ) => {
+    const instruction = override ?? command;
+    if (!project || !instruction.trim()) return;
     setBusyAction("command");
     setCommandError(null);
     setCommandSummary("");
@@ -969,9 +953,14 @@ export default function EditorPage() {
     try {
       const result = await platformApi.generateEditPlan({
         project,
-        command: command.trim(),
-        selectedClipIds: selectedClipId ? [selectedClipId] : [],
-        range: {
+        command: instruction.trim(),
+        selectedClipIds: localRange
+          ? []
+          : selectedClipId
+            ? [selectedClipId]
+            : [],
+        localOnly: Boolean(localRange),
+        range: localRange ?? {
           start: Math.min(rangeStart, rangeEnd),
           end: Math.max(rangeStart, rangeEnd),
         },
@@ -987,7 +976,7 @@ export default function EditorPage() {
             provenance: change.provenance ?? result.provenance,
           })),
         ].slice(-240),
-        lastCommand: command.trim(),
+        lastCommand: instruction.trim(),
       }));
       setCommandSummary(result.summary);
       setCommandProvenance(result.provenance);
@@ -1001,6 +990,56 @@ export default function EditorPage() {
       setBusyAction(null);
     }
   };
+
+  const assistCost =
+    AI_CREDIT_COSTS.editPlan +
+    (previewAsset?.kind === "video"
+      ? timedCreditCost(
+          previewAsset.duration,
+          AI_CREDIT_COSTS.videoAnalysisPerMinute
+        )
+      : 0);
+  const [assistEvidence, setAssistEvidence] = useState("");
+  useEffect(() => setAssistEvidence(""), [project?.id, previewAsset?.id]);
+  async function requestAssist(context: string) {
+    if (!project || busyAction) return;
+    setRightPanel("assistant");
+    setBusyAction("assist");
+    setCommandError(null);
+    try {
+      let observations =
+        "No source video was available for visual inspection. Do not invent visual or audio observations.";
+      if (previewAsset?.kind === "video") {
+        const result = await platformApi.analyzeVideo({
+          assetId: previewAsset.id,
+          platform: project.platform,
+          sourceRightsConfirmed: true,
+          focus: context,
+        });
+        observations =
+          result.summary + "\\n" + JSON.stringify(result.retention);
+        setAssistEvidence(observations);
+      }
+      const request =
+        context +
+        ". Make reviewable suggestions only. Actual source observations: " +
+        observations +
+        ". Library metadata (not proof of file contents): " +
+        JSON.stringify(
+          workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind }))
+        );
+      setCommand(context);
+      await runEditCommand(request);
+    } catch (e) {
+      setCommandError(
+        e instanceof Error
+          ? e.message
+          : "AI assist could not inspect the footage."
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  }
 
   const acceptOperation = async (operation: EditOperation) => {
     await saveProjectChange(
@@ -1391,12 +1430,16 @@ export default function EditorPage() {
         signal =>
           signal.id === "preflight-no-visual" || signal.id.startsWith("gap-")
       ),
-      detail: "No empty frames across the cut",
+      detail:
+        "Timeline coverage only; source frames have not been visually verified",
     },
     {
-      label: "Captions reviewed",
-      passed: project.transcript.length > 0,
-      detail: `${project.transcript.length} transcript lines`,
+      label: "Caption evidence",
+      passed: false,
+      detail:
+        project.transcript.length > 0
+          ? `${project.transcript.length} editable lines. Timing and readability still need visual review.`
+          : "Not assessed: captions may already be burned into the source footage. An empty transcript does not mean captions are absent.",
     },
   ];
 
@@ -1527,11 +1570,11 @@ export default function EditorPage() {
             {italian ? "Auto-edit AI" : "AI auto-edit"}
           </button>
         </div>
-        <details className="group min-w-0 flex-1">
+        <details className="group min-w-0 flex-1 [&[open]>summary]:float-left">
           <summary className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium">
             {italian ? "Formato e durata" : "Format & duration"}
           </summary>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
+          <div className="ml-3 inline-flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm">
               {italian ? "Durata video" : "Video duration"}
               <input
@@ -1614,11 +1657,24 @@ export default function EditorPage() {
           }}
         />
       )}
-      <div className="grid min-w-0 grid-cols-1 gap-5">
-        <main className="min-w-0 space-y-4">
+      <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(250px,0.9fr)_minmax(320px,1.5fr)_minmax(290px,1fr)] xl:items-start">
+        <section
+          id="editor-media-panel"
+          className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface xl:col-start-1 xl:row-start-1 xl:h-[580px] xl:overflow-y-auto"
+        >
+          {" "}
+          <EditorCreationDock
+            onAssist={context => void requestAssist(context)}
+            assistCost={assistCost}
+            project={project}
+            playhead={playhead}
+            onInsert={addLibraryAssetAtPlayhead}
+          />
+        </section>
+        <main className="contents">
           <section
             {...previewDrop.dropZoneProps}
-            className={`relative overflow-hidden rounded-2xl border bg-[#0D0C0E] shadow-card transition-all ${
+            className={`relative min-w-0 overflow-hidden rounded-xl border xl:col-start-2 xl:row-start-1 xl:h-[580px] bg-[#0D0C0E] shadow-card transition-all ${
               previewDrop.isDragging
                 ? "border-[#A894FF] ring-4 ring-[#A894FF]/20"
                 : "border-white/5"
@@ -1628,7 +1684,7 @@ export default function EditorPage() {
               <span className="h-1.5 w-1.5 rounded-full bg-[#A894FF]" />
               {italian ? "Anteprima timeline" : "Timeline preview"}
             </div>
-            <div className="relative flex min-h-[460px] items-center justify-center p-7">
+            <div className="relative flex h-[500px] items-center justify-center p-7">
               {previewDrop.isDragging ? (
                 <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border border-dashed border-[#A894FF] bg-black/75 text-sm font-medium text-white backdrop-blur-sm">
                   Drop media into this edit
@@ -1676,28 +1732,20 @@ export default function EditorPage() {
 
           <section
             {...timelineDrop.dropZoneProps}
-            className={`overflow-hidden rounded-2xl border bg-surface shadow-card transition-all ${
+            className={`min-w-0 overflow-hidden rounded-xl border bg-surface shadow-card xl:col-span-3 xl:row-start-2 transition-all ${
               timelineDrop.isDragging
                 ? "border-primary ring-4 ring-primary/10"
                 : "border-border"
             }`}
           >
-            <EditorCreationDock
-              project={project}
-              playhead={playhead}
-              onInsert={asset =>
-                addAssetToTimeline(
-                  asset,
-                  project.id,
-                  "Created in editor",
-                  playhead
-                )
-              }
-            />
             <div className="flex flex-wrap items-center gap-1 border-b border-border p-2">
               <button
                 type="button"
-                onClick={() => setLibraryOpen(current => !current)}
+                onClick={() =>
+                  document
+                    .getElementById("editor-media-panel")
+                    ?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+                }
                 disabled={Boolean(busyAction)}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
               >
@@ -1770,117 +1818,22 @@ export default function EditorPage() {
               </div>
             </div>
 
-            {libraryOpen ? (
-              <div className="m-3 rounded-xl border border-primary/30 bg-primary/10 p-4 shadow-inner">
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium">
-                      Connected media library
-                    </p>
-                    <p className="mt-0.5 text-xs text-foreground/70">
-                      Tap any generated or uploaded asset to place it at the
-                      current playhead ({formatTime(playhead)}).
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLibraryOpen(false)}
-                    aria-label="Close media library"
-                    className="rounded-md p-1.5 hover:bg-surface"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <label className="relative min-w-52 flex-1">
-                    <span className="sr-only">Search connected media</span>
-                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/70" />
-                    <input
-                      type="search"
-                      value={librarySearch}
-                      onChange={event => setLibrarySearch(event.target.value)}
-                      placeholder="Search media"
-                      className="h-8 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-xs outline-none focus:border-primary/45"
-                    />
-                  </label>
-                  <div
-                    className="flex gap-1"
-                    aria-label="Filter connected media"
-                  >
-                    {(["all", "video", "image", "audio"] as const).map(kind => (
-                      <button
-                        key={kind}
-                        type="button"
-                        onClick={() => setLibraryKind(kind)}
-                        aria-pressed={libraryKind === kind}
-                        className={`rounded-md px-2.5 py-1.5 text-xs font-medium capitalize transition-colors ${
-                          libraryKind === kind
-                            ? "bg-primary text-primary-foreground"
-                            : "border border-border bg-surface text-foreground/70 hover:border-primary/35"
-                        }`}
-                      >
-                        {kind}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {filteredLibraryAssets.length ? (
-                  <div className="grid max-h-60 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
-                    {filteredLibraryAssets.map(asset => {
-                      const Icon =
-                        asset.kind === "image"
-                          ? ImageIcon
-                          : asset.kind === "audio"
-                            ? Music2
-                            : Film;
-                      return (
-                        <button
-                          key={asset.id}
-                          type="button"
-                          onClick={() => void addLibraryAssetAtPlayhead(asset)}
-                          disabled={Boolean(busyAction)}
-                          className={`group flex min-w-0 items-center gap-2 rounded-lg border bg-surface p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 disabled:opacity-45 ${
-                            recentlyAddedAssetId === asset.id
-                              ? "border-emerald-500/35 bg-emerald-500/[0.06]"
-                              : "border-border"
-                          }`}
-                        >
-                          <span className="flex h-14 w-20 shrink-0 overflow-hidden items-center justify-center rounded-md bg-primary/10 transition-transform group-hover:scale-105">
-                            {busyAction === `library-${asset.id}` ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                            ) : recentlyAddedAssetId === asset.id ? (
-                              <Check className="h-4 w-4 text-emerald-500" />
-                            ) : asset.kind === "image" ||
-                              asset.kind === "video" ? (
-                              <AssetThumbnail asset={asset} />
-                            ) : (
-                              <Icon className="h-4 w-4 text-primary" />
-                            )}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block truncate text-xs font-medium">
-                              {asset.name}
-                            </span>
-                            <span className="block text-xs capitalize text-foreground/70">
-                              {recentlyAddedAssetId === asset.id
-                                ? `Added at ${formatTime(playhead)}`
-                                : `${asset.kind} · add at playhead`}
-                            </span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-foreground/70">
-                    {workspace.assets.length
-                      ? "No media matches this search."
-                      : "No media yet. Upload here or create video, images, and audio from Create."}
-                  </p>
-                )}
-              </div>
-            ) : null}
-
+            <TimelinePrompt
+              key={project.id}
+              duration={project.duration}
+              busy={Boolean(busyAction)}
+              credits={AI_CREDIT_COSTS.editPlan}
+              onSend={async (text, range) => {
+                setCommand(text);
+                setRangeStart(range.start);
+                setRangeEnd(range.end);
+                setRightPanel("assistant");
+                await runEditCommand(
+                  `LOCAL RANGE EDIT ${range.start.toFixed(1)}–${range.end.toFixed(1)}s. Only propose style, audio level, caption, or existing broll changes in this interval. Do not move, delete, retime, or shift any other content. ${text}`,
+                  range
+                );
+              }}
+            />
             <div className="overflow-x-auto">
               <div
                 className="min-w-[680px]"
@@ -2044,13 +1997,13 @@ export default function EditorPage() {
           </section>
         </main>
 
-        <aside className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
+        <aside className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface shadow-card xl:col-start-3 xl:row-start-1 xl:h-[580px] xl:overflow-y-auto">
           <div className="grid grid-cols-4 border-b border-border p-1.5">
             {(
               [
-                ["inspect", "Clip"],
-                ["transcript", "Words"],
-                ["assistant", "AI plan"],
+                ["inspect", "Adjustments"],
+                ["assistant", "AI editor"],
+                ["transcript", "Transcript"],
                 ["preflight", "Checks"],
               ] as const
             ).map(([id, label]) => (
@@ -2070,6 +2023,40 @@ export default function EditorPage() {
           </div>
 
           <div className="p-5">
+            <div className="border-b border-border p-3">
+              <button
+                type="button"
+                disabled={
+                  Boolean(busyAction) ||
+                  !capabilities.ai ||
+                  (previewAsset?.kind === "video" && !capabilities.analysis)
+                }
+                onClick={() =>
+                  void requestAssist(
+                    rightPanel === "inspect"
+                      ? "Suggest specific improvements to the selected clip's supported settings, based on actual footage"
+                      : rightPanel === "transcript"
+                        ? "Review caption coverage including text already burned into source footage, transcription uncertainty, readability and timing"
+                        : rightPanel === "preflight"
+                          ? "Review visible and audible quality issues. Distinguish verified problems from unknowns; do not claim complete frame-by-frame validation"
+                          : "Recommend the strongest next editing decisions for this timeline"
+                  )
+                }
+                className="rounded-lg border border-primary/30 px-3 py-2 text-sm text-primary disabled:opacity-40"
+              >
+                AI assist · {assistCost} credits
+              </button>
+              <p className="mt-1 text-xs text-foreground/60">
+                Reviews the selected source video and proposes changes; nothing
+                is applied automatically.
+              </p>
+              {assistEvidence && (
+                <details className="mt-2 text-xs">
+                  <summary>Latest source observations</summary>
+                  <p className="mt-2 whitespace-pre-wrap">{assistEvidence}</p>
+                </details>
+              )}
+            </div>
             {rightPanel === "inspect" && (
               <div>
                 <div className="mb-5">
@@ -2088,7 +2075,7 @@ export default function EditorPage() {
                     Choose a block on the timeline to edit its timing.
                   </div>
                 ) : (
-                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
                     <label className="block">
                       <span className="mb-1.5 block text-xs text-foreground/70">
                         Clip label
@@ -2187,7 +2174,7 @@ export default function EditorPage() {
                       Apply timing
                     </button>
 
-                    <div className="flex flex-wrap gap-2 md:col-span-2 xl:col-span-3">
+                    <div className="flex flex-wrap gap-2 md:col-span-2 xl:col-span-1">
                       <button
                         type="button"
                         disabled={selectedClip?.locked}

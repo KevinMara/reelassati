@@ -1,4 +1,5 @@
 import { EDIT_RECIPES, auditAutomatedEdit } from "@/lib/editor-production";
+import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Sparkles, Square } from "lucide-react";
 import type { Asset, EditProject, EditOperation } from "@contracts/workspace";
@@ -20,6 +21,9 @@ export function AutonomousEditor({
 }) {
   const { workspace, updateWorkspace, capabilities } = useWorkspace();
   const [style, setStyle] = useState("");
+  const [referenceBrief, setReferenceBrief] = useState(
+    project.referenceStyleBrief ?? ""
+  );
   const [target, setTarget] = useState(project.duration);
   const [automaticDuration, setAutomaticDuration] = useState(true);
   const targetDuration = automaticDuration
@@ -156,7 +160,7 @@ export function AutonomousEditor({
       setStatus("Building the cut, pacing, captions, and visual treatment…");
       const result = await platformApi.generateEditPlan({
         project: working,
-        command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Target ${targetDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+        command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${targetDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
         selectedClipIds: [],
         range: { start: 0, end: project.duration },
       });
@@ -330,6 +334,30 @@ export function AutonomousEditor({
       </div>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
+          {referenceBrief && (
+            <details className="mb-2 text-xs">
+              <summary>Saved reference direction</summary>
+              <p className="mt-2 whitespace-pre-wrap">{referenceBrief}</p>
+            </details>
+          )}
+          <ReferenceStylePanel
+            onChange={brief => {
+              setReferenceBrief(brief);
+              void updateWorkspace(w => ({
+                ...w,
+                projects: w.projects.map(p =>
+                  p.id === project.id ? { ...p, referenceStyleBrief: brief } : p
+                ),
+              })).catch(e =>
+                setStatus(
+                  e instanceof Error
+                    ? e.message
+                    : "Reference direction could not be saved."
+                )
+              );
+            }}
+            disabled={busy}
+          />
           <label className="block text-sm font-medium">
             Describe the style and outcome
             <textarea
@@ -433,7 +461,12 @@ export function AutonomousEditor({
 
           <button
             type="button"
-            disabled={busy || !ready || !style.trim() || !project.clips.length}
+            disabled={
+              busy ||
+              !ready ||
+              (!style.trim() && !referenceBrief) ||
+              !project.clips.length
+            }
             onClick={() => void run()}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-medium text-primary-foreground disabled:opacity-40"
           >

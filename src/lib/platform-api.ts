@@ -672,6 +672,7 @@ export const platformApi = {
     command: string;
     selectedClipIds: string[];
     range?: { start: number; end: number };
+    localOnly?: boolean;
   }) =>
     requestJson<{
       changes: EditOperation[];
@@ -687,6 +688,7 @@ export const platformApi = {
     publicUrl?: string;
     platform: string;
     sourceRightsConfirmed: boolean;
+    focus?: string;
   }) =>
     requestJson<{
       summary: string;

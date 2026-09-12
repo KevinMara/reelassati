@@ -98,6 +98,43 @@ export function applyEditOperation(
     clips: project.clips.map(c => ({ ...c })),
     transcript: project.transcript.map(s => ({ ...s })),
   };
+  // Local look/audio adjustments must not leak to the rest of a long source clip.
+  if (op.type === "style" || op.type === "audio") {
+    next.clips = next.clips.flatMap(c => {
+      if (!targeted(c)) return [c];
+      const start = Math.max(c.start, op.start);
+      const end = Math.min(c.start + c.duration, op.end);
+      if (end <= start) {
+        targets.delete(c.id);
+        return [c];
+      }
+      const speed = c.speed ?? 1;
+      const parts: TimelineClip[] = [];
+      if (start > c.start)
+        parts.push({
+          ...c,
+          id: `${c.id}-${op.id}-before`,
+          duration: start - c.start,
+          outPoint: c.inPoint + (start - c.start) * speed,
+        });
+      parts.push({
+        ...c,
+        start,
+        duration: end - start,
+        inPoint: c.inPoint + (start - c.start) * speed,
+        outPoint: c.inPoint + (end - c.start) * speed,
+      });
+      if (end < c.start + c.duration)
+        parts.push({
+          ...c,
+          id: `${c.id}-${op.id}-after`,
+          start: end,
+          duration: c.start + c.duration - end,
+          inPoint: c.inPoint + (end - c.start) * speed,
+        });
+      return parts;
+    });
+  }
   if (op.type === "caption") {
     if (!p.text?.trim())
       throw new Error("This caption needs text before it can be applied.");
@@ -221,7 +258,9 @@ export function applyEditOperation(
       ];
     });
   }
-  next.duration = contentDuration(next.clips);
+  next.duration = ["style", "audio", "caption", "split"].includes(op.type)
+    ? project.duration
+    : contentDuration(next.clips);
   next.proposedChanges = next.proposedChanges.map(c =>
     c.id === op.id
       ? { ...c, status: "accepted", reviewedAt: new Date().toISOString() }
