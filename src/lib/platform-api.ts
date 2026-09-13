@@ -694,6 +694,9 @@ export const platformApi = {
       summary: string;
       hook: { score: number; note: string };
       pacing: { score: number; note: string };
+      review?: ReturnType<
+        typeof import("@contracts/source-review").normalizeReview
+      >;
       retention: Array<{
         start: number;
         end: number;

@@ -88,6 +88,7 @@ export interface Asset {
 }
 
 export interface TimelineClip {
+  graphic?: import("./motion-graphics").MotionGraphic;
   id: string;
   assetId?: string;
   track: TrackKind;
@@ -130,7 +131,8 @@ export interface EditOperation {
     | "pacing"
     | "broll"
     | "audio"
-    | "style";
+    | "style"
+    | "graphic";
   label: string;
   reason: string;
   start: number;
@@ -142,6 +144,7 @@ export interface EditOperation {
   provenance?: ContentProvenance;
   reviewedAt?: string;
   parameters?: {
+    graphic?: import("./motion-graphics").MotionGraphic;
     sourceIn?: number;
     destination?: number;
     speed?: number;
@@ -180,6 +183,7 @@ export interface EditRevision {
 }
 
 export interface EditProject {
+  sourceReviews?: import("./source-review").SourceReview[];
   referenceStyleBrief?: string;
   id: string;
   title: string;

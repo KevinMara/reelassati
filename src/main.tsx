@@ -8,6 +8,14 @@ import "@/lib/posthog";
 import { PostHogPageviewTracker } from "@/components/analytics/PostHogPageviewTracker";
 import App from "./App";
 import { usePrivacyPreferences } from "@/components/compliance/PrivacyChoices";
+import { hashRouteForDeepLink } from "@/lib/deep-link";
+
+const deepLink = hashRouteForDeepLink(
+  location.pathname,
+  location.search,
+  location.hash
+);
+if (deepLink) history.replaceState(null, "", deepLink);
 
 function OptionalAnalytics() {
   const preferences = usePrivacyPreferences();

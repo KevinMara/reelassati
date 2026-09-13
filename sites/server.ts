@@ -1,3 +1,5 @@
+import { normalizeGraphic } from "../contracts/motion-graphics";
+import { normalizeReview } from "../contracts/source-review";
 import { audioGenerationQuote } from "../contracts/audio-generation";
 import { normalizeMediaFolders } from "../contracts/media-folders";
 import { pcmWaveDuration } from "../contracts/audio-chunks";
@@ -3990,90 +3992,114 @@ function mapEditOperations(
   const validSelectedIds = new Set(
     selectedClipIds.filter(id => clips.some(clip => clip.id === id))
   );
-  return value.slice(0, 80).map((item, index) => {
-    const row = item && typeof item === "object" ? item : {};
-    const typed = row as Record<string, unknown>;
-    const start = boundedNumber(typed.start, 0, 0, duration);
-    const end = boundedNumber(
-      typed.end,
-      Math.min(duration, start + 2),
-      start,
-      duration
-    );
-    const type = stringValue(typed.type, "pacing") as EditOperation["type"];
-    const allowedTypes: EditOperation["type"][] = [
-      "trim",
-      "split",
-      "move",
-      "delete",
-      "caption",
-      "silence",
-      "pacing",
-      "broll",
-      "audio",
-      "style",
-    ];
-    const requestedIds = Array.isArray(typed.targetClipIds)
-      ? typed.targetClipIds.filter(
-          (id): id is string =>
-            typeof id === "string" && clips.some(c => c.id === id && !c.locked)
-        )
-      : [];
-    const targetClipIds = validSelectedIds.size
-      ? Array.from(validSelectedIds)
-      : requestedIds.length
-        ? requestedIds
-        : clips
-            .filter(
-              clip => clip.start < end && clip.start + clip.duration > start
-            )
-            .map(clip => clip.id);
-    const params = recordValue(typed.parameters) || {};
-    const parameters: NonNullable<EditOperation["parameters"]> = {};
-    for (const [key, min, max] of [
-      ["sourceIn", 0, 86400],
-      ["destination", 0, duration],
-      ["speed", 0.25, 4],
-      ["volume", 0, 2],
-      ["fadeIn", 0, 5],
-      ["fadeOut", 0, 5],
-      ["brightness", -1, 1],
-      ["contrast", 0.5, 2],
-      ["saturation", 0, 3],
-    ] as const) {
-      if (typeof params[key] === "number" && Number.isFinite(params[key]))
-        parameters[key] = boundedNumber(params[key], min, min, max);
-    }
-    if (typeof params.text === "string")
-      parameters.text = params.text.slice(0, 1000);
-    if (typeof params.prompt === "string")
-      parameters.prompt = params.prompt.slice(0, 3000);
-    if (typeof params.assetId === "string")
-      parameters.assetId = params.assetId.slice(0, 160);
-    if (params.mediaKind === "image" || params.mediaKind === "video")
-      parameters.mediaKind = params.mediaKind;
-    if (params.fit === "cover" || params.fit === "contain")
-      parameters.fit = params.fit;
-    return {
-      id: crypto.randomUUID(),
-      type: allowedTypes.includes(type) ? type : "pacing",
-      label: stringValue(typed.label, `Edit ${index + 1}`),
-      reason: stringValue(
-        typed.reason,
-        "Improves clarity for short-form viewing"
-      ),
-      start,
-      end,
-      confidence: boundedNumber(typed.confidence, 0.72, 0, 1),
-      intensity:
-        typed.intensity === "light" || typed.intensity === "aggressive"
-          ? typed.intensity
-          : "balanced",
-      targetClipIds,
-      ...(Object.keys(parameters).length ? { parameters } : {}),
-      status: "proposed",
-    };
-  });
+  return value
+    .slice(0, 80)
+    .filter(
+      item =>
+        item &&
+        typeof item === "object" &&
+        [
+          "trim",
+          "split",
+          "move",
+          "delete",
+          "caption",
+          "silence",
+          "pacing",
+          "broll",
+          "audio",
+          "style",
+          "graphic",
+        ].includes(String(item.type))
+    )
+    .map((item, index) => {
+      const row = item && typeof item === "object" ? item : {};
+      const typed = row as Record<string, unknown>;
+      const start = boundedNumber(typed.start, 0, 0, duration);
+      const end = boundedNumber(
+        typed.end,
+        Math.min(duration, start + 2),
+        start,
+        duration
+      );
+      const type = stringValue(typed.type, "pacing") as EditOperation["type"];
+      const allowedTypes: EditOperation["type"][] = [
+        "trim",
+        "split",
+        "move",
+        "delete",
+        "caption",
+        "silence",
+        "pacing",
+        "broll",
+        "audio",
+        "style",
+        "graphic",
+      ];
+      const requestedIds = Array.isArray(typed.targetClipIds)
+        ? typed.targetClipIds.filter(
+            (id): id is string =>
+              typeof id === "string" &&
+              clips.some(c => c.id === id && !c.locked)
+          )
+        : [];
+      const targetClipIds = validSelectedIds.size
+        ? Array.from(validSelectedIds)
+        : requestedIds.length
+          ? requestedIds
+          : clips
+              .filter(
+                clip => clip.start < end && clip.start + clip.duration > start
+              )
+              .map(clip => clip.id);
+      const params = recordValue(typed.parameters) || {};
+      const parameters: NonNullable<EditOperation["parameters"]> = {};
+      if (type === "graphic")
+        parameters.graphic = normalizeGraphic(params.graphic);
+      for (const [key, min, max] of [
+        ["sourceIn", 0, 86400],
+        ["destination", 0, duration],
+        ["speed", 0.25, 4],
+        ["volume", 0, 2],
+        ["fadeIn", 0, 5],
+        ["fadeOut", 0, 5],
+        ["brightness", -1, 1],
+        ["contrast", 0.5, 2],
+        ["saturation", 0, 3],
+      ] as const) {
+        if (typeof params[key] === "number" && Number.isFinite(params[key]))
+          parameters[key] = boundedNumber(params[key], min, min, max);
+      }
+      if (typeof params.text === "string")
+        parameters.text = params.text.slice(0, 1000);
+      if (typeof params.prompt === "string")
+        parameters.prompt = params.prompt.slice(0, 3000);
+      if (typeof params.assetId === "string")
+        parameters.assetId = params.assetId.slice(0, 160);
+      if (params.mediaKind === "image" || params.mediaKind === "video")
+        parameters.mediaKind = params.mediaKind;
+      if (params.fit === "cover" || params.fit === "contain")
+        parameters.fit = params.fit;
+      return {
+        id: crypto.randomUUID(),
+        type: allowedTypes.includes(type) ? type : "pacing",
+        label: stringValue(typed.label, `Edit ${index + 1}`),
+        reason: stringValue(
+          typed.reason,
+          "Improves clarity for short-form viewing"
+        ),
+        start,
+        end,
+        confidence: boundedNumber(typed.confidence, 0.72, 0, 1),
+        intensity:
+          typed.intensity === "light" || typed.intensity === "aggressive"
+            ? typed.intensity
+            : "balanced",
+        targetClipIds,
+        ...(Object.keys(parameters).length ? { parameters } : {}),
+        status: "proposed",
+      };
+    });
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -5373,7 +5399,7 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
+          `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. Graphics use type=graphic with parameters.graphic {kind:text|callout|counter|countdown|arrow|highlight,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16 (percent of canvas width),animation:none|fade|pop|slide,from:number,to:number,prefix:string,suffix:string}. Each graphic stays an editable timeline overlay. Counter numbers must come from supplied facts. Keep graphics away from faces, products and captions using observed positions; allow enough reading time and avoid decorative overload. These graphics need no media generation charge beyond this edit plan. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
           JSON.stringify({ command: input.command, project: projectContext })
         );
         const summary = stringValue(
@@ -5392,7 +5418,9 @@ async function handleAi(
           changes = changes
             .filter(
               change =>
-                ["style", "audio", "caption", "broll"].includes(change.type) &&
+                ["style", "audio", "caption", "broll", "graphic"].includes(
+                  change.type
+                ) &&
                 change.end > start &&
                 change.start < end &&
                 (change.type !== "broll" || Boolean(change.parameters?.assetId))
@@ -5504,7 +5532,7 @@ async function handleAi(
           env,
           user,
           "video-analysis",
-          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied video. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action in retention notes. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with summary, hook {score 0..100,note}, pacing {score 0..100,note}, retention [{start,end,score,note}], and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. Each change follows the edit-plan schema: type,label,reason,start,end,confidence,intensity. Target platform: ${platformValue(input.platform)}.`,
+          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied video. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action in retention notes. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with summary, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote}, hook {score 0..100,note}, pacing {score 0..100,note}, retention [{start,end,score,note}], and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. Each change follows the edit-plan schema: type,label,reason,start,end,confidence,intensity. Target platform: ${platformValue(input.platform)}.`,
           [
             {
               type: "text",
@@ -5559,6 +5587,7 @@ async function handleAi(
             note: stringValue(pacing.note, "Review pauses and shot length"),
           },
           retention,
+          review: normalizeReview(output.review),
           changes: mapEditOperations(output.changes, 600).map(change => ({
             ...change,
             provenance,

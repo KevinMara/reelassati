@@ -1,3 +1,5 @@
+import { GraphicComposer } from "./GraphicComposer";
+import type { MotionGraphic } from "@contracts/motion-graphics";
 import { AudioGenerator } from "./AudioGenerator";
 import { EditorMediaLibrary } from "./EditorMediaLibrary";
 import { useState } from "react";
@@ -16,16 +18,18 @@ export function EditorCreationDock({
   onInsert,
   onAssist,
   assistCost,
+  onGraphic,
 }: {
   onAssist?: (context: string) => void;
   assistCost?: number;
+  onGraphic: (graphic: MotionGraphic, seconds: number) => Promise<void>;
   project: EditProject;
   playhead: number;
   onInsert: (asset: Asset) => Promise<void>;
 }) {
   const { workspace, capabilities } = useWorkspace();
   const [kind, setKind] = useState<
-    "library" | "image" | "video" | "voice" | "audio" | null
+    "library" | "image" | "video" | "voice" | "audio" | "graphics" | null
   >("library");
   const [prompt, setPrompt] = useState("");
   const [seconds, setSeconds] = useState(5);
@@ -130,7 +134,8 @@ export function EditorCreationDock({
               ["video", "Video", Film],
               ["image", "Image", Image],
               ["voice", "Voiceover", Mic2],
-              ["audio", "Audio", Music2],
+              ["audio", "Sounds", Music2],
+              ["graphics", "Graphics", Image],
             ] as const
           ).map(([id, label, Icon]) => (
             <button
@@ -154,16 +159,20 @@ export function EditorCreationDock({
                   onAssist(
                     kind === "library"
                       ? "Recommend existing library shots to support this edit, using actual filenames."
-                      : `Suggest the best ${kind === "voice" ? "voiceover text and delivery" : kind === "audio" ? "music and sound design" : `${kind} generation prompt`} for this edit. Provide a usable prompt in the summary; do not generate media.`
+                      : kind === "graphics"
+                        ? "Propose executable graphic operations for this footage: editable text, callouts, counters, countdowns, arrows or highlights. Base numbers on supplied facts; use observed timestamps and keep faces and captions clear."
+                        : `Suggest the best ${kind === "voice" ? "voiceover text and delivery" : kind === "audio" ? "music and sound design" : `${kind} generation prompt`} for this edit. Provide a usable prompt in the summary; do not generate media.`
                   )
                 }
                 className="mb-3 rounded-lg border border-primary/30 px-3 py-2 text-sm text-primary"
               >
-                AI assist · {assistCost} credits
+                AI suggestions · {assistCost} credits
               </button>
             )}
             {kind === "library" ? (
               <EditorMediaLibrary onInsert={onInsert} />
+            ) : kind === "graphics" ? (
+              <GraphicComposer onSave={onGraphic} />
             ) : kind === "audio" ? (
               <div>
                 <AudioGenerator projectId={project.id} onInsert={onInsert} />

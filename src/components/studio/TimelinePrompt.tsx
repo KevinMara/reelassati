@@ -19,8 +19,8 @@ export function TimelinePrompt({
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const anchor = useRef<number | null>(null);
-  const low = Math.min(start, end),
-    high = Math.max(start, end);
+  const low = Math.max(0, Math.min(duration, start, end)),
+    high = Math.max(low, Math.min(duration, Math.max(start, end)));
   return (
     <div className="border-b border-border bg-primary/5 p-3">
       <button
@@ -48,9 +48,13 @@ export function TimelinePrompt({
                 0,
                 Math.min(duration, ((e.clientX - r.left) / r.width) * duration)
               );
-              anchor.current = t;
-              setStart(t);
-              setEnd(Math.min(duration, t + 0.1));
+              const edge = (e.target as HTMLElement)
+                .closest("[data-range-edge]")
+                ?.getAttribute("data-range-edge");
+              anchor.current =
+                edge === "start" ? high : edge === "end" ? low : t;
+              setStart(anchor.current);
+              setEnd(edge ? t : Math.min(duration, t + 0.1));
               setOpen(false);
               e.currentTarget.setPointerCapture(e.pointerId);
             }}
@@ -78,10 +82,43 @@ export function TimelinePrompt({
             <span
               className="absolute inset-y-0 bg-primary/30"
               style={{
-                left: `${(low / duration) * 100}%`,
-                width: `${Math.max(0.2, ((high - low) / duration) * 100)}%`,
+                left: `${(low / Math.max(0.1, duration)) * 100}%`,
+                width: `${Math.max(0.2, ((high - low) / Math.max(0.1, duration)) * 100)}%`,
               }}
             />
+            {(["start", "end"] as const).map(edge => (
+              <button
+                key={edge}
+                type="button"
+                role="slider"
+                data-range-edge={edge}
+                aria-label={`Selected range ${edge}`}
+                aria-valuemin={0}
+                aria-valuemax={duration}
+                aria-valuenow={edge === "start" ? low : high}
+                disabled={busy}
+                className="absolute inset-y-0 z-10 w-3 -translate-x-1/2 cursor-ew-resize rounded border-2 border-primary bg-surface"
+                style={{
+                  left: `${((edge === "start" ? low : high) / Math.max(0.1, duration)) * 100}%`,
+                }}
+                onKeyDown={e => {
+                  if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+                  e.preventDefault();
+                  const delta = e.key === "ArrowLeft" ? -0.1 : 0.1;
+                  setStart(
+                    edge === "start"
+                      ? Math.max(0, Math.min(high, low + delta))
+                      : low
+                  );
+                  setEnd(
+                    edge === "end"
+                      ? Math.min(duration, Math.max(low, high + delta))
+                      : high
+                  );
+                  setOpen(true);
+                }}
+              />
+            ))}
             <span className="absolute left-2 top-2 text-xs">0.0s</span>
             <span className="absolute right-2 top-2 text-xs">
               {duration.toFixed(1)}s
@@ -113,7 +150,7 @@ export function TimelinePrompt({
                   min={0}
                   max={duration}
                   step={0.1}
-                  value={start}
+                  value={Math.min(start, duration)}
                   onChange={e => setStart(Number(e.target.value))}
                   className="w-full accent-primary"
                 />
@@ -126,7 +163,7 @@ export function TimelinePrompt({
                   min={0}
                   max={duration}
                   step={0.1}
-                  value={end}
+                  value={Math.min(end, duration)}
                   onChange={e => setEnd(Number(e.target.value))}
                   className="w-full accent-primary"
                 />
@@ -141,8 +178,8 @@ export function TimelinePrompt({
               />
               <p className="text-xs text-foreground/60">
                 Local mode supports color, framing, fades, audio level, captions
-                and existing overlays. Timing changes that affect the rest of
-                the edit need the main AI editor.
+                editable graphics and existing overlays. Timing changes that
+                affect the rest of the edit need the main AI editor.
               </p>
               <button
                 type="submit"

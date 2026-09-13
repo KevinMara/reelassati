@@ -1,3 +1,4 @@
+import { normalizeGraphic } from "@contracts/motion-graphics";
 import type {
   EditOperation,
   EditProject,
@@ -87,7 +88,7 @@ export function applyEditOperation(
   const targets = new Set(op.targetClipIds);
   const targeted = (c: TimelineClip) => targets.has(c.id) && !c.locked;
   if (
-    !["caption", "broll", "silence"].includes(op.type) &&
+    !["caption", "broll", "silence", "graphic"].includes(op.type) &&
     !project.clips.some(targeted)
   )
     throw new Error(
@@ -135,7 +136,29 @@ export function applyEditOperation(
       return parts;
     });
   }
-  if (op.type === "caption") {
+  if (op.type === "graphic") {
+    const graphic = normalizeGraphic(p.graphic);
+    if (
+      !graphic ||
+      ![op.start, op.end].every(Number.isFinite) ||
+      op.start < 0 ||
+      op.end > project.duration ||
+      op.end <= op.start
+    )
+      throw new Error("Choose a graphic and a valid time range.");
+    next.clips.push({
+      id: op.id,
+      track: "overlay",
+      label: op.label,
+      start: op.start,
+      duration: op.end - op.start,
+      inPoint: 0,
+      outPoint: op.end - op.start,
+      locked: false,
+      color: graphic.background,
+      graphic,
+    });
+  } else if (op.type === "caption") {
     if (!p.text?.trim())
       throw new Error("This caption needs text before it can be applied.");
     next.transcript.push({
@@ -258,7 +281,9 @@ export function applyEditOperation(
       ];
     });
   }
-  next.duration = ["style", "audio", "caption", "split"].includes(op.type)
+  next.duration = ["style", "audio", "caption", "split", "graphic"].includes(
+    op.type
+  )
     ? project.duration
     : contentDuration(next.clips);
   next.proposedChanges = next.proposedChanges.map(c =>

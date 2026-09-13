@@ -54,13 +54,19 @@ export function AudioGenerator({
       <h3 className="mb-3 font-medium">
         Generate music & sound effects with AI
       </h3>
-      <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_120px]">
+      <div className="grid min-w-0 gap-3">
         <select
           aria-label="Audio generation type"
           disabled={busy}
           value={kind}
           onChange={e => {
             setKind(e.target.value as "music" | "sfx");
+            setSeconds(s =>
+              Math.min(
+                e.target.value === "music" ? 60 : 30,
+                Math.max(e.target.value === "music" ? 3 : 0.5, s)
+              )
+            );
             setQuote(null);
           }}
           className="rounded-lg border border-border bg-surface p-2"
@@ -87,9 +93,9 @@ export function AudioGenerator({
             type="range"
             aria-label="AI audio duration"
             disabled={busy}
-            min={3}
+            min={kind === "music" ? 3 : 0.5}
             max={kind === "music" ? 60 : 30}
-            step={1}
+            step={0.5}
             value={seconds}
             onChange={e => {
               setSeconds(Number(e.target.value));
@@ -114,8 +120,8 @@ export function AudioGenerator({
       </button>
       {!ready && (
         <p className="mt-2 text-sm text-foreground/70">
-          AI audio generation is not available yet. You can use the free audio
-          below.
+          AI audio generation is not available yet. Upload your own music or
+          sound effects through Library.
         </p>
       )}
       {message && (

@@ -5,7 +5,7 @@ import { platformApi } from "@/lib/platform-api";
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { validateFileSelection } from "@/lib/file-validation";
 
-const aspects = [
+const editAspects = [
   "Cut pacing",
   "Framing and color",
   "Caption treatment",
@@ -15,11 +15,23 @@ const aspects = [
 export function ReferenceStylePanel({
   onChange,
   disabled,
+  purpose = "edit",
 }: {
   onChange: (brief: string) => void;
   disabled: boolean;
+  purpose?: "edit" | "script";
 }) {
   const { workspace, updateWorkspace, capabilities } = useWorkspace();
+  const aspects =
+    purpose === "script"
+      ? [
+          "Hook structure",
+          "Story beats",
+          "Sentence pacing",
+          "Proof and payoff",
+          "Call to action",
+        ]
+      : editAspects;
   const [assetId, setAssetId] = useState("");
   const [url, setUrl] = useState("");
   const [selected, setSelected] = useState(aspects);
@@ -78,7 +90,11 @@ export function ReferenceStylePanel({
       const response = await platformApi.analyzeVideo({
         assetId: assetId || undefined,
         publicUrl: assetId ? undefined : url.trim(),
-        platform: "instagram",
+        platform: url.includes("tiktok.com")
+          ? "tiktok"
+          : url.includes("youtu")
+            ? "youtube"
+            : "instagram",
         sourceRightsConfirmed: rights,
         focus: `Create a reference-style brief for ONLY these aspects: ${selected.join(", ")}. Describe observed timing, visual treatment, and sound placement with timestamps. Distinguish observations from unknowns. Do not copy dialogue, melody, or copyrighted assets. If the video cannot be inspected, say so; do not invent a style.`,
       });
@@ -98,7 +114,9 @@ export function ReferenceStylePanel({
   return (
     <details className="my-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
       <summary className="cursor-pointer text-sm font-medium">
-        Match a reference style
+        {purpose === "script"
+          ? "Learn from a reference hook or script"
+          : "Match a reference style"}
       </summary>
       <fieldset
         disabled={busy || disabled}

@@ -1,4 +1,6 @@
 import type { Asset, EditProject } from "@contracts/workspace";
+import { normalizeGraphic } from "@contracts/motion-graphics";
+import { graphicAssEvents } from "./graphic-ass";
 
 const number = (n: number) => Number(n.toFixed(4));
 function time(seconds: number) {
@@ -14,14 +16,26 @@ export function buildRenderPlan(
   resolution: 720 | 1080 = 720
 ) {
   const mediaClips = project.clips
-    .filter(c => c.track !== "captions")
+    .filter(c => c.track !== "captions" && !c.graphic)
     .sort(
       (a, b) => Number(a.track === "overlay") - Number(b.track === "overlay")
     );
-  if (!mediaClips.length) throw new Error("Add media to your timeline first.");
+  if (!mediaClips.length && !project.clips.some(c => c.graphic))
+    throw new Error("Add media to your timeline first.");
   const duration = project.duration;
   if (!Number.isFinite(duration) || duration <= 0)
     throw new Error("Choose a positive video duration.");
+  for (const clip of project.clips.filter(c => c.graphic)) {
+    if (
+      !normalizeGraphic(clip.graphic) ||
+      ![clip.start, clip.duration].every(Number.isFinite) ||
+      clip.start < 0 ||
+      clip.duration <= 0
+    )
+      throw new Error(
+        "A graphic has invalid settings or timing. Review it before exporting."
+      );
+  }
   const sources = new Map(assets.map(a => [a.id, a]));
   const used = [...new Set(mediaClips.map(c => c.assetId))].map(id =>
     sources.get(id || "")
@@ -125,15 +139,18 @@ export function buildRenderPlan(
   const captions = project.transcript.filter(
     s => s.text.trim() && s.end > s.start && s.start < duration
   );
+  const graphics = graphicAssEvents(project.clips, width, height, duration);
   const ass =
-    `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Default,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,40,40,${Math.round(height * 0.14)},1\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n` +
+    `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Default,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,40,40,${Math.round(height * 0.14)},1\nStyle: Callout,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H006F5AD8,&H006F5AD8,-1,0,0,0,100,100,0,0,3,8,0,5,0,0,0,1\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n` +
     captions
       .map(
         s =>
           `Dialogue: 0,${time(s.start)},${time(Math.min(duration, s.end))},Default,,0,0,0,,${s.text.replace(/[{}\\]/g, "").replace(/\r?\n/g, "\\N")}`
       )
-      .join("\n");
-  if (captions.length) {
+      .join("\n") +
+    "\n" +
+    graphics;
+  if (captions.length || graphics) {
     filters.push(`[${visual}]subtitles=captions.ass:fontsdir=.[video]`);
     visual = "video";
   }

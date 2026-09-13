@@ -1,3 +1,4 @@
+import { normalizeReview } from "@contracts/source-review";
 import { EDIT_RECIPES, auditAutomatedEdit } from "@/lib/editor-production";
 import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { useEffect, useRef, useState } from "react";
@@ -55,14 +56,15 @@ export function AutonomousEditor({
         timedCreditCost(a.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute),
       0
     );
-  const transcriptCost = !project.transcript.length
-    ? sources.reduce(
-        (sum, a) =>
-          sum +
-          timedCreditCost(a.duration, AI_CREDIT_COSTS.transcriptionPerMinute),
-        0
-      )
-    : 0;
+  const transcriptCost =
+    captions && !project.transcript.length
+      ? sources.reduce(
+          (sum, a) =>
+            sum +
+            timedCreditCost(a.duration, AI_CREDIT_COSTS.transcriptionPerMinute),
+          0
+        )
+      : 0;
   const mediaCost =
     images * AI_CREDIT_COSTS.image1K +
     videos *
@@ -113,6 +115,18 @@ export function AutonomousEditor({
             platform: project.platform,
             sourceRightsConfirmed: true,
           });
+          working.sourceReviews = [
+            ...(working.sourceReviews ?? []).filter(
+              r => r.assetId !== asset.id
+            ),
+            {
+              assetId: asset.id,
+              reviewedAt: new Date().toISOString(),
+              summary: result.summary,
+              ...normalizeReview(result.review),
+              moments: result.retention,
+            },
+          ];
           analysis.push({
             assetId: asset.id,
             summary: result.summary,
@@ -120,7 +134,13 @@ export function AutonomousEditor({
           });
         }
         checkpoint();
-        if (!project.transcript.length) {
+        if (
+          captions &&
+          !project.transcript.length &&
+          !working.sourceReviews?.some(
+            r => r.assetId === asset.id && r.captions === "present"
+          )
+        ) {
           setStatus(`Transcribing ${asset.name}…`);
           const { transcribeMedia } = await import("@/lib/transcribe-media");
           const result = await transcribeMedia(
@@ -160,7 +180,7 @@ export function AutonomousEditor({
       setStatus("Building the cut, pacing, captions, and visual treatment…");
       const result = await platformApi.generateEditPlan({
         project: working,
-        command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${targetDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+        command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${targetDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
         selectedClipIds: [],
         range: { start: 0, end: project.duration },
       });
@@ -238,7 +258,21 @@ export function AutonomousEditor({
       const allAssets = [...workspace.assets, ...generatedAssets];
       const unresolved: EditOperation[] = [];
       // Work backwards for source-time cuts so earlier operations keep their time coordinates.
-      const ordered = [...result.changes].sort((a, b) => b.start - a.start);
+      const ordered = [...result.changes]
+        .filter(
+          op =>
+            op.type !== "caption" ||
+            (captions &&
+              !project.clips.some(
+                c =>
+                  c.start < op.end &&
+                  c.start + c.duration > op.start &&
+                  working.sourceReviews?.some(
+                    r => r.assetId === c.assetId && r.captions === "present"
+                  )
+              ))
+        )
+        .sort((a, b) => b.start - a.start);
       for (const op of ordered) {
         const execution = resolvedMedia.has(op.id)
           ? {

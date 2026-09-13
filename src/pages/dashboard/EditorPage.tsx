@@ -1,3 +1,5 @@
+import { normalizeReview } from "@contracts/source-review";
+import { GraphicComposer } from "@/components/studio/GraphicComposer";
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { useTranslation } from "react-i18next";
 import { TimelinePreview } from "@/components/studio/TimelinePreview";
@@ -216,7 +218,10 @@ function deriveQualitySignals(project: EditProject): QualitySignal[] {
     }
   }
 
-  if (project.transcript.length === 0) {
+  if (
+    project.transcript.length === 0 &&
+    !project.sourceReviews?.some(r => r.captions === "present")
+  ) {
     signals.push({
       id: "preflight-no-transcript",
       label: "Caption coverage not checked",
@@ -991,14 +996,24 @@ export default function EditorPage() {
     }
   };
 
+  const assistSources =
+    rightPanel === "preflight" || rightPanel === "transcript"
+      ? workspace.assets.filter(
+          a =>
+            a.kind === "video" &&
+            project?.clips.some(c => c.assetId === a.id && c.track !== "audio")
+        )
+      : previewAsset?.kind === "video"
+        ? [previewAsset]
+        : [];
   const assistCost =
     AI_CREDIT_COSTS.editPlan +
-    (previewAsset?.kind === "video"
-      ? timedCreditCost(
-          previewAsset.duration,
-          AI_CREDIT_COSTS.videoAnalysisPerMinute
-        )
-      : 0);
+    assistSources.reduce(
+      (sum, a) =>
+        sum +
+        timedCreditCost(a.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute),
+      0
+    );
   const [assistEvidence, setAssistEvidence] = useState("");
   useEffect(() => setAssistEvidence(""), [project?.id, previewAsset?.id]);
   async function requestAssist(context: string) {
@@ -1009,16 +1024,32 @@ export default function EditorPage() {
     try {
       let observations =
         "No source video was available for visual inspection. Do not invent visual or audio observations.";
-      if (previewAsset?.kind === "video") {
+      const observedSources: string[] = [];
+      for (const source of assistSources) {
         const result = await platformApi.analyzeVideo({
-          assetId: previewAsset.id,
+          assetId: source.id,
           platform: project.platform,
           sourceRightsConfirmed: true,
           focus: context,
         });
-        observations =
-          result.summary + "\\n" + JSON.stringify(result.retention);
+        observedSources.push(
+          `${source.name}: ${result.summary}\n${JSON.stringify(result.review)}\n${JSON.stringify(result.retention)}`
+        );
+        observations = observedSources.join("\n\n");
         setAssistEvidence(observations);
+        await patchProject(p => ({
+          ...p,
+          sourceReviews: [
+            ...(p.sourceReviews ?? []).filter(r => r.assetId !== source.id),
+            {
+              assetId: source.id,
+              reviewedAt: new Date().toISOString(),
+              summary: result.summary,
+              ...normalizeReview(result.review),
+              moments: result.retention,
+            },
+          ],
+        }));
       }
       const request =
         context +
@@ -1408,6 +1439,18 @@ export default function EditorPage() {
     );
   }
 
+  const videoSources = workspace.assets.filter(
+    a =>
+      a.kind === "video" &&
+      project.clips.some(c => c.assetId === a.id && c.track !== "audio")
+  );
+  const reviews = videoSources.map(a =>
+    project.sourceReviews?.find(r => r.assetId === a.id)
+  );
+  const captionsObserved =
+    reviews.length > 0 && reviews.every(r => r?.captions === "present");
+  const captionsAbsent =
+    reviews.length > 0 && reviews.every(r => r?.captions === "absent");
   const preflightChecks = [
     {
       label: "Media on timeline",
@@ -1435,11 +1478,15 @@ export default function EditorPage() {
     },
     {
       label: "Caption evidence",
-      passed: false,
+      passed: captionsObserved || project.transcript.length > 0,
       detail:
         project.transcript.length > 0
           ? `${project.transcript.length} editable lines. Timing and readability still need visual review.`
-          : "Not assessed: captions may already be burned into the source footage. An empty transcript does not mean captions are absent.",
+          : captionsObserved
+            ? "Source captions detected in the reviewed footage. Check the final export for readability."
+            : captionsAbsent
+              ? "The visual review found no source captions. Add captions from speech if needed."
+              : "Not fully assessed. Run AI suggestions in Checks to inspect the source footage.",
     },
   ];
 
@@ -1669,6 +1716,23 @@ export default function EditorPage() {
             project={project}
             playhead={playhead}
             onInsert={addLibraryAssetAtPlayhead}
+            onGraphic={async (graphic, seconds) => {
+              await commitProject("Added motion graphic", p =>
+                applyEditOperation(p, {
+                  id: crypto.randomUUID(),
+                  type: "graphic",
+                  label: graphic.text || graphic.kind,
+                  reason: "Manually added graphic",
+                  start: playhead,
+                  end: Math.min(p.duration, playhead + seconds),
+                  confidence: 1,
+                  intensity: "balanced",
+                  targetClipIds: [],
+                  status: "proposed",
+                  parameters: { graphic },
+                })
+              );
+            }}
           />
         </section>
         <main className="contents">
@@ -1829,7 +1893,7 @@ export default function EditorPage() {
                 setRangeEnd(range.end);
                 setRightPanel("assistant");
                 await runEditCommand(
-                  `LOCAL RANGE EDIT ${range.start.toFixed(1)}–${range.end.toFixed(1)}s. Only propose style, audio level, caption, or existing broll changes in this interval. Do not move, delete, retime, or shift any other content. ${text}`,
+                  `LOCAL RANGE EDIT ${range.start.toFixed(1)}–${range.end.toFixed(1)}s. Only propose style, audio level, caption, editable graphic, or existing broll changes in this interval. Do not move, delete, retime, or shift any other content. ${text}`,
                   range
                 );
               }}
@@ -2029,7 +2093,7 @@ export default function EditorPage() {
                 disabled={
                   Boolean(busyAction) ||
                   !capabilities.ai ||
-                  (previewAsset?.kind === "video" && !capabilities.analysis)
+                  (assistSources.length > 0 && !capabilities.analysis)
                 }
                 onClick={() =>
                   void requestAssist(
@@ -2044,11 +2108,11 @@ export default function EditorPage() {
                 }
                 className="rounded-lg border border-primary/30 px-3 py-2 text-sm text-primary disabled:opacity-40"
               >
-                AI assist · {assistCost} credits
+                AI suggestions · {assistCost} credits
               </button>
               <p className="mt-1 text-xs text-foreground/60">
-                Reviews the selected source video and proposes changes; nothing
-                is applied automatically.
+                Reviews source footage and proposes changes; nothing is applied
+                automatically.
               </p>
               {assistEvidence && (
                 <details className="mt-2 text-xs">
@@ -2476,6 +2540,25 @@ export default function EditorPage() {
               </div>
             )}
 
+            {rightPanel === "inspect" && selectedClip?.graphic && (
+              <div className="p-4">
+                <GraphicComposer
+                  key={selectedClip.id}
+                  initial={selectedClip.graphic}
+                  busy={selectedClip.locked}
+                  onSave={async graphic => {
+                    await commitProject("Updated motion graphic", p => ({
+                      ...p,
+                      clips: p.clips.map(c =>
+                        c.id === selectedClip.id && !c.locked
+                          ? { ...c, graphic }
+                          : c
+                      ),
+                    }));
+                  }}
+                />
+              </div>
+            )}
             {rightPanel === "assistant" && (
               <div>
                 <p className="mono-eyebrow text-primary">AI assistant</p>
@@ -2765,6 +2848,33 @@ export default function EditorPage() {
                 </p>
 
                 <div className="mt-5 space-y-2">
+                  {videoSources.map(a => {
+                    const r = project.sourceReviews?.find(
+                      item => item.assetId === a.id
+                    );
+                    return (
+                      <div
+                        key={a.id}
+                        className="rounded-lg border border-border p-3 text-xs"
+                      >
+                        <p className="font-medium">{a.name}</p>
+                        <p className="mt-1">
+                          {r
+                            ? r.captionNote
+                            : "Source captions have not been assessed."}
+                        </p>
+                        {r && (
+                          <>
+                            <p className="mt-1">{r.audioNote}</p>
+                            <p className="mt-1 text-foreground/60">
+                              AI review ·{" "}
+                              {new Date(r.reviewedAt).toLocaleString()}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                   {preflightChecks.map(check => (
                     <div
                       key={check.label}

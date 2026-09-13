@@ -37,15 +37,33 @@ export function EditorMediaLibrary({
   const input = useRef<HTMLInputElement>(null);
   const folders = workspace.mediaFolders ?? [];
   const currentFolder = folders.find(f => f.id === folderId);
+  const reviewedContent = useMemo(() => {
+    const index = new Map<string, string[]>();
+    for (const project of workspace.projects) {
+      for (const review of project.sourceReviews ?? []) {
+        index.set(review.assetId, [
+          ...(index.get(review.assetId) ?? []),
+          review.summary,
+          ...review.moments.map(
+            m => `${m.start.toFixed(1)}–${m.end.toFixed(1)}s: ${m.note}`
+          ),
+        ]);
+      }
+    }
+    return index;
+  }, [workspace.projects]);
   const assets = useMemo(
     () =>
       workspace.assets
         .filter(
           a =>
             ["video", "image", "audio"].includes(a.kind) &&
-            (a.folderId ?? "") === folderId &&
+            (query.trim() || (a.folderId ?? "") === folderId) &&
             (kind === "all" || a.kind === kind) &&
-            a.name.toLowerCase().includes(query.toLowerCase())
+            [a.name, ...(reviewedContent.get(a.id) ?? [])]
+              .join(" ")
+              .toLowerCase()
+              .includes(query.trim().toLowerCase())
         )
         .sort((a, b) =>
           sort === "name"
@@ -58,7 +76,7 @@ export function EditorMediaLibrary({
                   ? a.createdAt.localeCompare(b.createdAt)
                   : b.createdAt.localeCompare(a.createdAt)
         ),
-    [workspace.assets, folderId, kind, query, sort]
+    [workspace.assets, folderId, kind, query, sort, reviewedContent]
   );
   async function action(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -352,6 +370,12 @@ export function EditorMediaLibrary({
             </div>
           ))}
       </div>
+      {query.trim() && (
+        <p className="mb-2 text-xs text-foreground/60">
+          Searching all folders and saved AI observations. Unreviewed footage is
+          matched by filename.
+        </p>
+      )}
       <div className={view === "grid" ? "grid grid-cols-2 gap-2" : "space-y-2"}>
         {assets.map(asset => (
           <div
@@ -387,6 +411,21 @@ export function EditorMediaLibrary({
                 {asset.duration ? ` · ${asset.duration.toFixed(1)}s` : ""}
               </p>
             </div>
+            {query.trim() &&
+              reviewedContent
+                .get(asset.id)
+                ?.filter(note =>
+                  note.toLowerCase().includes(query.trim().toLowerCase())
+                )
+                .slice(0, 2)
+                .map((note, i) => (
+                  <p
+                    key={i}
+                    className="mt-1 line-clamp-3 text-xs text-foreground/65"
+                  >
+                    {note}
+                  </p>
+                ))}
             <select
               disabled={busy}
               aria-label={`Move ${asset.name} to folder`}

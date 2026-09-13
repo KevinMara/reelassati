@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { MotionGraphicLayer } from "./MotionGraphicLayer";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
 
 function MediaLayer({
@@ -118,6 +119,7 @@ export function TimelinePreview({
       className="relative mx-auto w-full overflow-hidden bg-black"
       style={{
         aspectRatio: project.aspectRatio.replace(":", "/"),
+        containerType: "inline-size",
         maxHeight: "65vh",
         maxWidth:
           project.aspectRatio === "9:16"
@@ -128,6 +130,8 @@ export function TimelinePreview({
       }}
     >
       {active.map(c => {
+        if (c.graphic)
+          return <MotionGraphicLayer key={c.id} clip={c} time={time} />;
         const asset = assets.find(a => a.id === c.assetId);
         return asset ? (
           <MediaLayer

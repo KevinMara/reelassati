@@ -495,3 +495,9 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+@font-face {
+  font-family: "Editor Sans";
+  src: url("/fonts/DejaVuSans.ttf") format("truetype");
+  font-display: swap;
+}

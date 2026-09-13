@@ -76,8 +76,10 @@ export async function renderVideo(
         : await platformApi.downloadAssetBlob(asset.id, options.signal);
       sourceBlobs.push({ name: `input-${i}`, data });
     }
-    await ffmpeg.createDir("/sources");
-    await ffmpeg.mount(FFFSType.WORKERFS, { blobs: sourceBlobs }, "/sources");
+    if (sourceBlobs.length) {
+      await ffmpeg.createDir("/sources");
+      await ffmpeg.mount(FFFSType.WORKERFS, { blobs: sourceBlobs }, "/sources");
+    }
     for (const [i, asset] of firstPlan.inputs.entries()) {
       let hasAudio = false;
       const probe = ({ message }: { message: string }) => {

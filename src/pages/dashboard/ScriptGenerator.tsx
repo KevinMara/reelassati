@@ -1,3 +1,4 @@
+import { ReferenceStylePanel } from "@/components/studio/ReferenceStylePanel";
 import { lazy, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
@@ -116,6 +117,7 @@ function createEvent(
 }
 
 function DirectScriptGenerator() {
+  const [referenceBrief, setReferenceBrief] = useState("");
   const { workspace, capabilities, loading, saving, updateWorkspace } =
     useWorkspace();
   const [searchParams] = useSearchParams();
@@ -190,6 +192,9 @@ function DirectScriptGenerator() {
         ? `Audience: ${workspace.brandKit.audience}`
         : "",
       resolvedHook ? `Preferred opening direction: ${resolvedHook}` : "",
+      referenceBrief
+        ? `Reference structure: ${referenceBrief}. Write original wording using this structure; do not copy claims or dialogue.`
+        : "",
     ]
       .filter(Boolean)
       .join("\n");
@@ -299,6 +304,11 @@ function DirectScriptGenerator() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
         <div className="space-y-5">
+          <ReferenceStylePanel
+            purpose="script"
+            onChange={setReferenceBrief}
+            disabled={false}
+          />
           <section className="rounded-xl border border-border bg-surface p-6">
             <label
               className="mb-2 block text-sm font-medium"
