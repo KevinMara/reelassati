@@ -31,7 +31,14 @@ export async function readMusicAudio(response: Response): Promise<ArrayBuffer> {
       return;
     }
     if (!data) return;
-    const row = JSON.parse(data);
+    let row: { error?: unknown; choices?: Array<{ delta?: { audio?: { data?: unknown } } }> };
+    try {
+      row = JSON.parse(data);
+      if (!row || typeof row !== "object" || (row.choices !== undefined && !Array.isArray(row.choices)))
+        throw new Error("Invalid event");
+    } catch {
+      throw new MusicGenerationError("The music provider returned an unreadable response. Please retry.");
+    }
     if (row.error)
       throw new MusicGenerationError(
         "The music provider could not complete this generation. Your credits will be returned."
@@ -39,7 +46,11 @@ export async function readMusicAudio(response: Response): Promise<ArrayBuffer> {
     for (const choice of row.choices ?? []) {
       const value = choice.delta?.audio?.data;
       if (typeof value !== "string" || !value) continue;
-      const bytes = Uint8Array.from(atob(value), c => c.charCodeAt(0));
+      let decoded: string;
+      try { decoded = atob(value); }
+      catch { throw new MusicGenerationError("The music provider returned damaged audio. Please retry."); }
+      const bytes = new Uint8Array(decoded.length);
+      for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
       total += bytes.byteLength;
       if (total > 16 * 1024 * 1024)
         throw new MusicGenerationError(
@@ -66,6 +77,8 @@ export async function readMusicAudio(response: Response): Promise<ArrayBuffer> {
     }
     pending += decoder.decode();
     if (pending.trim()) event(pending.trim());
+    if (!total && done)
+      throw new MusicGenerationError("The music provider completed the request without audio. Please retry.");
     if (!total || !done)
       throw new MusicGenerationError(
         "The music stream was incomplete. Please retry."

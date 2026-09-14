@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import {
+  MusicGenerationError,
   finishMusicWave,
   musicQuote,
   readMusicAudio,
@@ -36,6 +37,12 @@ it("quotes the full music generation, even when the requested excerpt is shorter
   expect(musicQuote(30)).toBe(15);
   for (const value of [0, 31, NaN, Infinity])
     expect(() => musicQuote(value)).toThrow();
+});
+it("reports malformed, corrupted, and empty provider output without leaking response contents", async () => {
+  for (const data of ['data: not-json\n', 'data: null\n', 'data: {"choices":{}}\n',
+    'data: {"choices":[{"delta":{"audio":{"data":"%broken"}}}]}\n', 'data: [DONE]\n']) {
+    await expect(readMusicAudio(new Response(data))).rejects.toBeInstanceOf(MusicGenerationError);
+  }
 });
 it("reads audio SSE split across network chunks and rejects incomplete/provider-failed streams", async () => {
   const a = btoa("RIFF"),

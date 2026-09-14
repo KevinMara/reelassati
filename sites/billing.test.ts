@@ -626,14 +626,18 @@ describe("Stripe entitlement integrity with actual SQLite", () => {
         id,
         new Date().toISOString()
       );
+    insert.run("music", owner, -15, "audio", "settled", "music", "Music", new Date().toISOString());
+    insert.run("failed-music", owner, -15, "audio", "released", "failed-music", "Music", new Date().toISOString());
     const summary = await billingSummary(env, { email: owner, name: "Owner" });
-    expect(summary.usage?.daily).toEqual([
+    expect(summary.usage?.daily).toEqual(expect.arrayContaining([
+      { date: new Date().toISOString().slice(0, 10), category: "audio", credits: 15 },
       {
         date: new Date().toISOString().slice(0, 10),
         category: "script",
         credits: 150,
       },
-    ]);
+    ]));
+    expect(summary.usage?.daily).toHaveLength(2);
     expect(summary.recentActivity).toHaveLength(20);
     const empty = await billingSummary(env, {
       email: "empty@example.com",

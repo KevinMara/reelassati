@@ -950,7 +950,7 @@ export async function billingSummary(
       `SELECT substr(created_at, 1, 10) AS date, category, SUM(-amount) AS credits
       FROM credit_ledger WHERE owner_email = ? AND created_at >= ? AND created_at <= ?
       AND status = 'settled' AND amount < 0
-      AND category IN ('video', 'image', 'speech', 'script', 'analysis', 'transcription', 'edit-plan', 'trend-research')
+      AND category IN ('video', 'image', 'speech', 'audio', 'script', 'analysis', 'transcription', 'edit-plan', 'trend-research')
       GROUP BY substr(created_at, 1, 10), category ORDER BY date`
     )
       .bind(user.email, usageSince.toISOString(), usageThrough)
