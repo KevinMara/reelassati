@@ -5,20 +5,25 @@ import {
   type MotionGraphic,
 } from "@contracts/motion-graphics";
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
+import { GraphicMotionEditor } from "./GraphicMotionEditor";
 import type { TimelineClip } from "@contracts/workspace";
 export function GraphicComposer({
   initial,
   onSave,
   busy = false,
+  duration = 3,
 }: {
   initial?: MotionGraphic;
   onSave: (graphic: MotionGraphic, seconds: number) => Promise<void>;
   busy?: boolean;
+  duration?: number;
 }) {
-  const [g, setG] = useState<MotionGraphic>(
-    initial ?? normalizeGraphic({ kind: "callout", text: "Your key message" })!
+  const [g, setG] = useState<MotionGraphic>(() =>
+    normalizeGraphic(initial ?? { kind: "callout", text: "Your key message" })!
   );
-  const [seconds, setSeconds] = useState(3);
+  const [requestedSeconds, setSeconds] = useState(duration);
+  const seconds = initial ? duration : requestedSeconds;
+  const [previewPosition, setPreviewPosition] = useState(0.5);
   const [saving, setSaving] = useState(false),
     [error, setError] = useState("");
   const patch = (key: keyof MotionGraphic, value: string | number) =>
@@ -58,7 +63,10 @@ export function GraphicComposer({
         className="relative aspect-video overflow-hidden rounded-lg bg-black"
         style={{ containerType: "inline-size" }}
       >
-        <MotionGraphicLayer clip={clip} time={seconds * 0.5} />
+        <MotionGraphicLayer
+          clip={clip}
+          time={previewPosition * Math.max(1 / 30, seconds - 1 / 30)}
+        />
       </div>
       <label className="block text-sm">
         Graphic
@@ -146,6 +154,7 @@ export function GraphicComposer({
           ["x", "Horizontal position", 10, 90],
           ["y", "Vertical position", 10, 90],
           ["size", "Text size", 2, 16],
+          ["rotation", "Rotation", -360, 360],
         ] as const
       ).map(([key, label, min, max]) => (
         <label key={key} className="block text-sm">
@@ -156,7 +165,8 @@ export function GraphicComposer({
             max={max}
             step={1}
             className="block w-full accent-primary"
-            value={g[key]}
+            value={g[key] ?? 0}
+            disabled={Boolean(g.motion?.length) && key !== "size"}
             onChange={e => patch(key, Number(e.target.value))}
           />
         </label>
@@ -173,6 +183,13 @@ export function GraphicComposer({
           ))}
         </select>
       </label>
+      <GraphicMotionEditor
+        graphic={g}
+        duration={seconds}
+        position={previewPosition}
+        onPosition={setPreviewPosition}
+        onChange={setG}
+      />
       {!initial && (
         <label className="block text-sm">
           Duration · {seconds.toFixed(1)}s

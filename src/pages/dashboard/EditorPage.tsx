@@ -2545,6 +2545,7 @@ export default function EditorPage() {
                 <GraphicComposer
                   key={selectedClip.id}
                   initial={selectedClip.graphic}
+                  duration={selectedClip.duration}
                   busy={selectedClip.locked}
                   onSave={async graphic => {
                     await commitProject("Updated motion graphic", p => ({

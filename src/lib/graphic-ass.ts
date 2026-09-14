@@ -34,7 +34,7 @@ export function graphicAssEvents(
       const alpha = Math.round((1 - f.opacity) * 255)
         .toString(16)
         .padStart(2, "0");
-      let tags = `\\an5\\pos(${Math.round((g.x * width) / 100)},${Math.round((f.y * height) / 100)})\\fs${Math.round((width * g.size) / 100)}\\fscx${Math.round(f.scale * 100)}\\fscy${Math.round(f.scale * 100)}\\1c${assColor(g.color)}\\alpha&H${alpha}&\\shad0`;
+      let tags = `\\an5\\pos(${Math.round((f.x * width) / 100)},${Math.round((f.y * height) / 100)})\\frz${-Math.round(f.rotation * 1000) / 1000}\\fs${Math.round((width * g.size) / 100)}\\fscx${Math.round(f.scale * 100)}\\fscy${Math.round(f.scale * 100)}\\1c${assColor(g.color)}\\alpha&H${alpha}&\\shad0`;
       let text = escapeAss(f.text);
       if (g.kind === "highlight") {
         const w = Math.round(width * 0.4),

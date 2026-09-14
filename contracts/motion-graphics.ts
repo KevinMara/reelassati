@@ -7,6 +7,13 @@ export const GRAPHIC_KINDS = [
   "highlight",
 ] as const;
 export type GraphicKind = (typeof GRAPHIC_KINDS)[number];
+export interface GraphicKeyframe {
+  at: number;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+}
 export interface MotionGraphic {
   kind: GraphicKind;
   text: string;
@@ -20,6 +27,8 @@ export interface MotionGraphic {
   to: number;
   prefix: string;
   suffix: string;
+  rotation?: number;
+  motion?: GraphicKeyframe[];
 }
 const bounded = (v: unknown, fallback: number, min: number, max: number) =>
   typeof v === "number" && Number.isFinite(v)
@@ -35,6 +44,25 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
     typeof t === "string"
       ? t.replace(/[\u0000-\u001f]/g, " ").slice(0, max)
       : "";
+  const motion = new Map<number, GraphicKeyframe>();
+  if (Array.isArray(v.motion))
+    for (const raw of v.motion.slice(0, 120)) {
+      if (
+        !raw ||
+        typeof raw !== "object" ||
+        typeof raw.at !== "number" ||
+        !Number.isFinite(raw.at)
+      )
+        continue;
+      const at = bounded(raw.at, 0, 0, 1);
+      motion.set(at, {
+        at,
+        x: bounded(raw.x, bounded(v.x, 50, 10, 90), 0, 100),
+        y: bounded(raw.y, bounded(v.y, 30, 10, 90), 0, 100),
+        scale: bounded(raw.scale, 1, 0.1, 4),
+        rotation: bounded(raw.rotation, 0, -720, 720),
+      });
+    }
   return {
     kind: v.kind as GraphicKind,
     text: text(v.text, 180),
@@ -50,6 +78,10 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
     to: bounded(v.to, 100, -1e9, 1e9),
     prefix: text(v.prefix, 12),
     suffix: text(v.suffix, 12),
+    rotation: bounded(v.rotation, 0, -720, 720),
+    ...(motion.size
+      ? { motion: [...motion.values()].sort((a, b) => a.at - b.at) }
+      : {}),
   };
 }
 /** Same frame clock for scrubbed preview and exported counters. */
@@ -75,10 +107,32 @@ export function graphicFrame(
   const t = Math.floor(Math.max(0, elapsed) * 30) / 30;
   const enter = Math.min(1, t / 0.2),
     leave = Math.min(1, Math.max(0, duration - t) / 0.15);
+  const points = g.motion;
+  let pose = { x: g.x, y: g.y, scale: 1, rotation: g.rotation ?? 0 };
+  if (points?.length) {
+    const progress = Math.min(1, t / Math.max(1 / 30, duration - 1 / 30));
+    const right = points.findIndex(point => point.at >= progress);
+    if (right === 0) pose = points[0];
+    else if (right < 0) pose = points[points.length - 1];
+    else {
+      const a = points[right - 1],
+        b = points[right];
+      const fraction = (progress - a.at) / (b.at - a.at);
+      const mix = (from: number, to: number) => from + (to - from) * fraction;
+      pose = {
+        x: mix(a.x, b.x),
+        y: mix(a.y, b.y),
+        scale: mix(a.scale, b.scale),
+        rotation: mix(a.rotation, b.rotation),
+      };
+    }
+  }
   return {
     text: graphicText(g, t, duration),
     opacity: g.animation === "none" ? 1 : Math.min(enter, leave),
-    scale: g.animation === "pop" ? 0.8 + 0.2 * enter : 1,
-    y: g.y + (g.animation === "slide" ? (1 - enter) * 6 : 0),
+    scale: pose.scale * (g.animation === "pop" ? 0.8 + 0.2 * enter : 1),
+    x: pose.x,
+    rotation: pose.rotation,
+    y: pose.y + (g.animation === "slide" ? (1 - enter) * 6 : 0),
   };
 }

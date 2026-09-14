@@ -14,9 +14,9 @@ export function MotionGraphicLayer({
     <div
       className="pointer-events-none absolute z-10 text-center font-bold"
       style={{
-        left: `${g.x}%`,
+        left: `${f.x}%`,
         top: `${f.y}%`,
-        transform: `translate(-50%,-50%) scale(${f.scale})`,
+        transform: `translate(-50%,-50%) rotate(${f.rotation}deg) scale(${f.scale})`,
         opacity: f.opacity,
         color: g.color,
         fontFamily: '"Editor Sans", sans-serif',
