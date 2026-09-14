@@ -5532,7 +5532,7 @@ async function handleAi(
           env,
           user,
           "video-analysis",
-          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied video. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action in retention notes. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with summary, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote}, hook {score 0..100,note}, pacing {score 0..100,note}, retention [{start,end,score,note}], and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. Each change follows the edit-plan schema: type,label,reason,start,end,confidence,intensity. Target platform: ${platformValue(input.platform)}.`,
+          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied video. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action in retention notes. For ending, identify the source timestamp after the last complete spoken phrase AND meaningful visual action, preserving intentional closing holds, CTAs, music and outros. Set completed true and trailingContent empty only when you observed the entire remaining tail and it contains no meaningful content; otherwise use unknown. Never infer an ending from sampled frames or a missing transcript. Set ending to null if timing or coverage cannot be established. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with summary, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote,ending:{time,confidence:0..1,completed:boolean,trailingContent:empty|meaningful|unknown,note}}, hook {score 0..100,note}, pacing {score 0..100,note}, retention [{start,end,score,note}], and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. Each change follows the edit-plan schema: type,label,reason,start,end,confidence,intensity. Target platform: ${platformValue(input.platform)}.`,
           [
             {
               type: "text",
@@ -5587,7 +5587,7 @@ async function handleAi(
             note: stringValue(pacing.note, "Review pauses and shot length"),
           },
           retention,
-          review: normalizeReview(output.review),
+          review: normalizeReview(output.review, analysisDuration),
           changes: mapEditOperations(output.changes, 600).map(change => ({
             ...change,
             provenance,

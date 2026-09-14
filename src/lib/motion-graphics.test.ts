@@ -8,6 +8,7 @@ import { normalizeReview } from "@contracts/source-review";
 import type { EditProject, EditOperation } from "@contracts/workspace";
 import { applyEditOperation } from "./edit-timeline";
 import { buildRenderPlan } from "./render-plan";
+import { verifyExportMetadata } from "./export-verification";
 
 const project = {
   duration: 3,
@@ -160,6 +161,29 @@ it.skipIf(!nativeAvailable)(
         )
       );
       expect(Number(probe.format.duration)).toBeCloseTo(3, 1);
+      expect(verifyExportMetadata(probe, plan)).toMatchObject({
+        width: 720,
+        height: 720,
+        duration: 3,
+      });
+      execFileSync(
+        "ffmpeg",
+        [
+          "-v",
+          "error",
+          "-xerror",
+          "-i",
+          "output.mp4",
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a?",
+          "-f",
+          "null",
+          "-",
+        ],
+        { cwd: dir, timeout: 60000 }
+      );
       expect(probe.streams[0]).toMatchObject({
         codec_name: "h264",
         width: 720,

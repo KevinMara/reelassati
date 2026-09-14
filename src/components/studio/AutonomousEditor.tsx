@@ -1,5 +1,9 @@
 import { normalizeReview } from "@contracts/source-review";
-import { EDIT_RECIPES, auditAutomatedEdit } from "@/lib/editor-production";
+import {
+  EDIT_RECIPES,
+  auditAutomatedEdit,
+  trimObservedEnding,
+} from "@/lib/editor-production";
 import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Sparkles, Square } from "lucide-react";
@@ -177,12 +181,17 @@ export function AutonomousEditor({
         }
       }
       checkpoint();
+      if (automaticDuration)
+        working = trimObservedEnding(working, workspace.assets);
+      const plannedDuration = automaticDuration
+        ? contentDuration(working.clips)
+        : targetDuration;
       setStatus("Building the cut, pacing, captions, and visual treatment…");
       const result = await platformApi.generateEditPlan({
         project: working,
-        command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${targetDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+        command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${plannedDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
         selectedClipIds: [],
-        range: { start: 0, end: project.duration },
+        range: { start: 0, end: working.duration },
       });
       working.proposedChanges = [
         ...working.proposedChanges.filter(c => c.status !== "proposed"),

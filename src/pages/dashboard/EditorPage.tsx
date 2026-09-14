@@ -2866,6 +2866,11 @@ export default function EditorPage() {
                         {r && (
                           <>
                             <p className="mt-1">{r.audioNote}</p>
+                            <p className="mt-1">
+                              {r.ending
+                                ? `Observed ending · ${r.ending.time.toFixed(1)}s: ${r.ending.note}`
+                                : "The content ending has not been established."}
+                            </p>
                             <p className="mt-1 text-foreground/60">
                               AI review ·{" "}
                               {new Date(r.reviewedAt).toLocaleString()}

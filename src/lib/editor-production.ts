@@ -1,4 +1,57 @@
 import type { Asset, EditProject } from "@contracts/workspace";
+import { contentDuration, resizeTimeline } from "./edit-timeline";
+import { normalizeReview } from "@contracts/source-review";
+
+/** Trim only an observed empty tail; all unassessed or intentional layers hold the end. */
+export function trimObservedEnding(
+  project: EditProject,
+  assets: Asset[]
+): EditProject {
+  const originalEnd = contentDuration(project.clips);
+  let ending = 0;
+  for (const clip of project.clips) {
+    const finish = clip.start + clip.duration;
+    const asset = assets.find(a => a.id === clip.assetId);
+    const review = normalizeReview(
+      project.sourceReviews?.find(r => r.assetId === clip.assetId),
+      asset?.duration
+    ).ending;
+    if (
+      clip.locked ||
+      asset?.kind !== "video" ||
+      !review ||
+      !review.completed ||
+      review.confidence < 0.9 ||
+      review.trailingContent !== "empty" ||
+      review.time < clip.inPoint ||
+      review.time >= clip.outPoint
+    ) {
+      ending = Math.max(ending, finish);
+      continue;
+    }
+    // Source seconds must be mapped into timeline seconds, including speed and trim.
+    ending = Math.max(
+      ending,
+      Math.min(
+        finish,
+        clip.start + (review.time - clip.inPoint) / (clip.speed ?? 1) + 0.2
+      )
+    );
+  }
+  // Complete the entire last transcribed phrase, even if visual analysis ended earlier.
+  ending = Math.max(ending, ...project.transcript.map(s => s.end + 0.2));
+  ending = Math.min(originalEnd, ending);
+  if (!Number.isFinite(ending) || ending < 0.2 || originalEnd - ending < 0.25)
+    return project;
+  const resized = resizeTimeline(project, ending);
+  // Avoid even floating-point normalization of a protected clip's source bounds.
+  resized.clips = resized.clips.map(
+    c =>
+      project.clips.find(original => original.id === c.id && original.locked) ??
+      c
+  );
+  return resized;
+}
 
 export const EDIT_RECIPES = {
   "Fast product demo":
@@ -18,6 +71,8 @@ export function auditAutomatedEdit(
   assets: Asset[]
 ): string[] {
   const problems: string[] = [];
+  if (before.clips.length && !after.clips.length)
+    problems.push("The edit removed every clip");
   for (const locked of before.clips.filter(c => c.locked)) {
     if (
       JSON.stringify(after.clips.find(c => c.id === locked.id)) !==

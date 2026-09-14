@@ -2,6 +2,7 @@ import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "./platform-api";
 import { buildRenderPlan } from "./render-plan";
+import { verifyExportMetadata } from "./export-verification";
 
 export async function renderVideo(
   project: EditProject,
@@ -92,15 +93,15 @@ export async function renderVideo(
     }
     const plan = buildRenderPlan(project, assets, audioIds, options.resolution);
     await ffmpeg.writeFile("captions.ass", plan.ass);
-    ffmpeg.on("progress", ({ time }) =>
+    const renderProgress = ({ time }: { time: number }) =>
       options.onProgress(
         Math.max(
           15,
           Math.min(95, 15 + Math.round((time / 1_000_000 / plan.duration) * 80))
         ),
         "Rendering your video"
-      )
-    );
+      );
+    ffmpeg.on("progress", renderProgress);
     const code = await ffmpeg.exec(
       plan.args.map(arg => (/^input-\d+$/.test(arg) ? `/sources/${arg}` : arg))
     );
@@ -108,6 +109,45 @@ export async function renderVideo(
     if (code !== 0)
       throw new Error(
         "The video could not be rendered. Try 720p, a shorter timeline, or replace an unsupported source file."
+      );
+    ffmpeg.off("progress", renderProgress);
+    options.onProgress(96, "Checking exported duration and picture");
+    const probeCode = await ffmpeg.ffprobe([
+      "-v",
+      "error",
+      "-show_format",
+      "-show_streams",
+      "-of",
+      "json",
+      "output.mp4",
+      "-o",
+      "export-probe.json",
+    ]);
+    if (probeCode !== 0)
+      throw new Error(
+        "The exported file could not be checked. Your project is still saved."
+      );
+    const probeFile = await ffmpeg.readFile("export-probe.json", "utf8");
+    const verified = verifyExportMetadata(JSON.parse(String(probeFile)), plan);
+    options.onProgress(98, "Checking video and audio playback");
+    const decodeCode = await ffmpeg.exec([
+      "-v",
+      "error",
+      "-xerror",
+      "-i",
+      "output.mp4",
+      "-map",
+      "0:v:0",
+      "-map",
+      "0:a?",
+      "-f",
+      "null",
+      "-",
+    ]);
+    options.signal.throwIfAborted();
+    if (decodeCode !== 0)
+      throw new Error(
+        "The exported file has a playback error. Your project is saved; please retry export."
       );
     const result = await ffmpeg.readFile("output.mp4");
     if (typeof result === "string" || result.byteLength === 0)
@@ -123,9 +163,7 @@ export async function renderVideo(
       file: new File([new Uint8Array(result).buffer], `${name}.mp4`, {
         type: "video/mp4",
       }),
-      width: plan.width,
-      height: plan.height,
-      duration: plan.duration,
+      ...verified,
     };
   } finally {
     options.signal.removeEventListener("abort", cancel);
