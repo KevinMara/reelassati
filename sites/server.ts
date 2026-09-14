@@ -1,5 +1,6 @@
 import {
   MUSIC_MODEL,
+  MusicGenerationError,
   musicQuote,
   readMusicAudio,
   finishMusicWave,
@@ -6004,7 +6005,15 @@ async function handleAi(
               )
             : await response.arrayBuffer();
         } catch (cause) {
-          await failAiInvocation(env, invocation, "provider_failure");
+          await failAiInvocation(
+            env,
+            invocation,
+            cause instanceof MusicGenerationError
+              ? cause.message.slice(0, 80)
+              : "provider_failure"
+          );
+          if (cause instanceof MusicGenerationError)
+            throw errorResponse(cause.message, 502);
           throw cause;
         }
         const assetId = crypto.randomUUID();

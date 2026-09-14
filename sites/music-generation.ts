@@ -1,16 +1,21 @@
 import { DELIVERY_COST_USD_PER_CREDIT } from "../contracts/billing";
 
+export class MusicGenerationError extends Error {}
+
 export const MUSIC_MODEL = "google/lyria-3-clip-preview";
 export function musicQuote(seconds: number): number {
   if (!Number.isFinite(seconds) || seconds < 3 || seconds > 30)
-    throw new Error("Choose a music duration between 3 and 30 seconds.");
+    throw new MusicGenerationError(
+      "Choose a music duration between 3 and 30 seconds."
+    );
   // Published $0.04/clip plus funding/delivery allowance; the full generation is billed even when trimmed.
   return Math.ceil(0.045 / DELIVERY_COST_USD_PER_CREDIT);
 }
 
 /** Read OpenRouter audio deltas across arbitrary SSE/network boundaries. */
 export async function readMusicAudio(response: Response): Promise<ArrayBuffer> {
-  if (!response.body) throw new Error("Music generation returned no audio.");
+  if (!response.body)
+    throw new MusicGenerationError("Music generation returned no audio.");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const parts: Uint8Array[] = [];
@@ -28,7 +33,7 @@ export async function readMusicAudio(response: Response): Promise<ArrayBuffer> {
     if (!data) return;
     const row = JSON.parse(data);
     if (row.error)
-      throw new Error(
+      throw new MusicGenerationError(
         "The music provider could not complete this generation. Your credits will be returned."
       );
     for (const choice of row.choices ?? []) {
@@ -37,7 +42,7 @@ export async function readMusicAudio(response: Response): Promise<ArrayBuffer> {
       const bytes = Uint8Array.from(atob(value), c => c.charCodeAt(0));
       total += bytes.byteLength;
       if (total > 16 * 1024 * 1024)
-        throw new Error(
+        throw new MusicGenerationError(
           "The generated music exceeded the supported file size."
         );
       parts.push(bytes);
@@ -49,7 +54,9 @@ export async function readMusicAudio(response: Response): Promise<ArrayBuffer> {
       if (chunk.done) break;
       received += chunk.value.byteLength;
       if (received > 24 * 1024 * 1024)
-        throw new Error("The music response exceeded the supported size.");
+        throw new MusicGenerationError(
+          "The music response exceeded the supported size."
+        );
       pending += decoder.decode(chunk.value, { stream: true });
       let newline: number;
       while ((newline = pending.indexOf("\n")) >= 0) {
@@ -60,7 +67,9 @@ export async function readMusicAudio(response: Response): Promise<ArrayBuffer> {
     pending += decoder.decode();
     if (pending.trim()) event(pending.trim());
     if (!total || !done)
-      throw new Error("The music stream was incomplete. Please retry.");
+      throw new MusicGenerationError(
+        "The music stream was incomplete. Please retry."
+      );
     const bytes = new Uint8Array(total);
     let offset = 0;
     for (const part of parts) {
@@ -85,7 +94,9 @@ export function finishMusicWave(
   const text = (offset: number) =>
     new TextDecoder().decode(input.subarray(offset, offset + 4));
   if (input.length < 44 || text(0) !== "RIFF" || text(8) !== "WAVE")
-    throw new Error("The music provider did not return a supported WAV file.");
+    throw new MusicGenerationError(
+      "The music provider did not return a supported WAV file."
+    );
   let channels = 0,
     rate = 0,
     dataStart = 0,
@@ -93,14 +104,14 @@ export function finishMusicWave(
   for (let offset = 12; offset + 8 <= input.length;) {
     const length = view.getUint32(offset + 4, true);
     if (offset + 8 + length > input.length)
-      throw new Error("The generated music is truncated.");
+      throw new MusicGenerationError("The generated music is truncated.");
     if (text(offset) === "fmt ") {
       if (
         length < 16 ||
         view.getUint16(offset + 8, true) !== 1 ||
         view.getUint16(offset + 22, true) !== 16
       )
-        throw new Error(
+        throw new MusicGenerationError(
           "The music provider returned an unsupported sample format."
         );
       channels = view.getUint16(offset + 10, true);
@@ -112,7 +123,9 @@ export function finishMusicWave(
         view.getUint16(offset + 20, true) !== channels * 2 ||
         view.getUint32(offset + 16, true) !== rate * channels * 2
       )
-        throw new Error("The generated music has invalid audio settings.");
+        throw new MusicGenerationError(
+          "The generated music has invalid audio settings."
+        );
     }
     if (text(offset) === "data") {
       dataStart = offset + 8;
@@ -124,7 +137,7 @@ export function finishMusicWave(
   const frames = Math.round(seconds * rate),
     size = frames * channels * 2;
   if (!rate || !dataStart || !size || dataSize < size)
-    throw new Error(
+    throw new MusicGenerationError(
       "The generated music is shorter than requested. Please retry."
     );
   const output = input.slice(0, dataStart + size);
