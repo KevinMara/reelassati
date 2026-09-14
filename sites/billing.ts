@@ -51,9 +51,23 @@ export type BillingEnvironment = {
   STRIPE_PORTAL_CONFIGURATION_ID?: string;
   STRIPE_TAX_MODE?: "automatic" | "managed" | "not_collecting";
   PUBLIC_APP_URL?: string;
+  AI_CREDIT_ACCESS_EMAIL?: string;
 };
 
 export type BillingUser = { email: string; name: string };
+
+/** Server-configured access for one approved credit-funded testing account. */
+function operatorCreditAccess(
+  env: BillingEnvironment,
+  user: BillingUser
+): boolean {
+  const configured = env.AI_CREDIT_ACCESS_EMAIL?.trim().toLowerCase();
+  return Boolean(
+    configured &&
+    configured.includes("@") &&
+    configured === user.email.trim().toLowerCase()
+  );
+}
 
 type CreditAccountRow = {
   included_balance: number;
@@ -762,7 +776,8 @@ export async function reserveCredits(
   await migrateLegacyCredits(env, user.email);
   await applyDueAnnualCreditRenewals(env, user.email);
   const subscription = await billingAccount(env, user.email);
-  if (!activeSubscription(subscription)) return null;
+  if (!activeSubscription(subscription) && !operatorCreditAccess(env, user))
+    return null;
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   await env.DB.batch([
@@ -966,7 +981,13 @@ export async function billingSummary(
     includedCredits: Math.max(0, credits.included_balance),
     topUpCredits: Math.max(0, credits.topup_balance),
     adjustmentDebt: Math.max(0, -credits.topup_balance),
-    canUseCredits: activeSubscription(subscription),
+    canUseCredits:
+      activeSubscription(subscription) || operatorCreditAccess(env, user),
+    creditAccess: activeSubscription(subscription)
+      ? "subscription"
+      : operatorCreditAccess(env, user)
+        ? "operator"
+        : "none",
     canManageBilling:
       hasStripeKey(env.STRIPE_SECRET_KEY) &&
       Boolean(subscription?.stripe_customer_id),
@@ -974,7 +995,7 @@ export async function billingSummary(
     topUps: (Object.keys(CREDIT_TOP_UPS) as CreditTopUpId[]).map(id => ({
       ...CREDIT_TOP_UPS[id],
       price: topUpPriceCents(id) / 100,
-      available: readiness.ready,
+      available: readiness.ready && activeSubscription(subscription),
     })),
     usage: { through: usageThrough, daily: usage.results },
     recentActivity: activity.results.map(item => ({

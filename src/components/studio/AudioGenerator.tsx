@@ -62,10 +62,7 @@ export function AudioGenerator({
           onChange={e => {
             setKind(e.target.value as "music" | "sfx");
             setSeconds(s =>
-              Math.min(
-                e.target.value === "music" ? 60 : 30,
-                Math.max(e.target.value === "music" ? 3 : 0.5, s)
-              )
+              Math.min(30, Math.max(e.target.value === "music" ? 3 : 0.5, s))
             );
             setQuote(null);
           }}
@@ -94,7 +91,7 @@ export function AudioGenerator({
             aria-label="AI audio duration"
             disabled={busy}
             min={kind === "music" ? 3 : 0.5}
-            max={kind === "music" ? 60 : 30}
+            max={30}
             step={0.5}
             value={seconds}
             onChange={e => {

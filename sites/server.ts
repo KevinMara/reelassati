@@ -1,3 +1,9 @@
+import {
+  MUSIC_MODEL,
+  musicQuote,
+  readMusicAudio,
+  finishMusicWave,
+} from "./music-generation";
 import { normalizeGraphic } from "../contracts/motion-graphics";
 import { normalizeReview } from "../contracts/source-review";
 import { audioGenerationQuote } from "../contracts/audio-generation";
@@ -174,6 +180,7 @@ type SitesEnvironment = {
   DB: D1Database;
   BUCKET: R2Bucket;
   KIMI_TEST_MODE?: string;
+  AI_CREDIT_ACCESS_EMAIL?: string;
   KIMI_TEST_OWNER_EMAIL?: string;
   KIMI_CODE_API_KEY?: string;
   KIMI_CODE_MODEL?: string;
@@ -563,11 +570,7 @@ function capabilities(
     ),
     speech: Boolean(env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady),
     musicGeneration: Boolean(
-      env.ELEVENLABS_API_KEY &&
-      env.ELEVENLABS_COMMERCIAL_ENABLED === "true" &&
-      Number(env.ELEVENLABS_MUSIC_USD_PER_SECOND) > 0 &&
-      env.BUCKET &&
-      provenanceReady
+      env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
     soundGeneration: Boolean(
       env.ELEVENLABS_API_KEY &&
@@ -5816,14 +5819,6 @@ async function handleAi(
     )
   ) {
     const generatedAudio = url.pathname !== "/api/ai/speech";
-    if (
-      generatedAudio
-        ? !env.ELEVENLABS_API_KEY ||
-          env.ELEVENLABS_COMMERCIAL_ENABLED !== "true"
-        : !env.OPENROUTER_API_KEY
-    ) {
-      return errorResponse("Audio generation is temporarily unavailable", 503);
-    }
     const input = await parseJsonBody<{
       text?: string;
       kind?: "music" | "sfx";
@@ -5836,20 +5831,34 @@ async function handleAi(
       rightsConfirmed?: boolean;
     }>(request);
     const kind = input.kind === "music" ? "music" : "sfx";
+    const openRouterMusic = generatedAudio && kind === "music";
+    const provider =
+      !generatedAudio || openRouterMusic ? "OpenRouter" : "ElevenLabs";
+    const audioContentType = openRouterMusic ? "audio/wav" : "audio/mpeg";
+    const audioExtension = openRouterMusic ? "wav" : "mp3";
+    if (
+      provider === "OpenRouter"
+        ? !env.OPENROUTER_API_KEY
+        : !env.ELEVENLABS_API_KEY ||
+          env.ELEVENLABS_COMMERCIAL_ENABLED !== "true"
+    )
+      return errorResponse("Audio generation is temporarily unavailable", 503);
     let audioCost = 0;
     if (generatedAudio) {
       if (input.kind !== "music" && input.kind !== "sfx")
         return errorResponse("Choose music or sound effects");
       try {
-        audioCost = audioGenerationQuote(
-          kind,
-          Number(input.seconds),
-          Number(
-            kind === "music"
-              ? env.ELEVENLABS_MUSIC_USD_PER_SECOND
-              : env.ELEVENLABS_SFX_USD_PER_SECOND
-          )
-        );
+        audioCost = openRouterMusic
+          ? musicQuote(Number(input.seconds))
+          : audioGenerationQuote(
+              kind,
+              Number(input.seconds),
+              Number(
+                kind === "music"
+                  ? env.ELEVENLABS_MUSIC_USD_PER_SECOND
+                  : env.ELEVENLABS_SFX_USD_PER_SECOND
+              )
+            );
       } catch (cause) {
         return errorResponse(
           cause instanceof Error ? cause.message : "Invalid audio quote",
@@ -5887,7 +5896,7 @@ async function handleAi(
     );
     const model = generatedAudio
       ? kind === "music"
-        ? "music_v1"
+        ? MUSIC_MODEL
         : "eleven_text_to_sound_v2"
       : env.OPENROUTER_TTS_MODEL || "minimax/speech-2.8-turbo";
     const operation = generatedAudio
@@ -5927,7 +5936,7 @@ async function handleAi(
           env,
           user,
           operation,
-          generatedAudio ? "ElevenLabs" : "OpenRouter",
+          provider,
           model,
           {
             text,
@@ -5939,28 +5948,45 @@ async function handleAi(
         );
         let buffer: ArrayBuffer;
         try {
-          const endpoint = generatedAudio
-            ? `https://api.elevenlabs.io/v1/${kind === "music" ? "music" : "sound-generation"}?output_format=mp3_44100_128`
-            : `${OPENROUTER_BASE}/audio/speech`;
+          const endpoint = openRouterMusic
+            ? `${OPENROUTER_BASE}/chat/completions`
+            : generatedAudio
+              ? `https://api.elevenlabs.io/v1/${kind === "music" ? "music" : "sound-generation"}?output_format=mp3_44100_128`
+              : `${OPENROUTER_BASE}/audio/speech`;
           const response = await fetch(endpoint, {
             method: "POST",
-            headers: generatedAudio
-              ? {
-                  "Content-Type": "application/json",
-                  "xi-api-key": env.ELEVENLABS_API_KEY!,
-                }
-              : openRouterHeaders(env),
+            headers:
+              generatedAudio && !openRouterMusic
+                ? {
+                    "Content-Type": "application/json",
+                    "xi-api-key": env.ELEVENLABS_API_KEY!,
+                  }
+                : openRouterHeaders(env),
+            signal: AbortSignal.timeout(180000),
             body: JSON.stringify(
-              generatedAudio
-                ? kind === "music"
-                  ? {
-                      model_id: model,
-                      prompt: text,
-                      music_length_ms: Math.round(input.seconds! * 1000),
-                      force_instrumental: true,
-                    }
-                  : { model_id: model, text, duration_seconds: input.seconds }
-                : { model, input: text, voice, response_format: "mp3" }
+              openRouterMusic
+                ? {
+                    model,
+                    modalities: ["text", "audio"],
+                    audio: { format: "wav" },
+                    stream: true,
+                    messages: [
+                      {
+                        role: "user",
+                        content: `Create original instrumental background music for a short video. No vocals or spoken words. Resolve the musical phrase by ${input.seconds} seconds, leaving room for speech. Creative brief: ${text}`,
+                      },
+                    ],
+                  }
+                : generatedAudio
+                  ? kind === "music"
+                    ? {
+                        model_id: model,
+                        prompt: text,
+                        music_length_ms: Math.round(input.seconds! * 1000),
+                        force_instrumental: true,
+                      }
+                    : { model_id: model, text, duration_seconds: input.seconds }
+                  : { model, input: text, voice, response_format: "mp3" }
             ),
           });
           if (!response.ok) {
@@ -5969,18 +5995,20 @@ async function handleAi(
               invocation,
               `provider_${response.status}`
             );
-            await providerError(
-              response,
-              generatedAudio ? "ElevenLabs" : "OpenRouter"
-            );
+            await providerError(response, provider);
           }
-          buffer = await response.arrayBuffer();
+          buffer = openRouterMusic
+            ? finishMusicWave(
+                await readMusicAudio(response),
+                Number(input.seconds)
+              )
+            : await response.arrayBuffer();
         } catch (cause) {
           await failAiInvocation(env, invocation, "provider_failure");
           throw cause;
         }
         const assetId = crypto.randomUUID();
-        const r2Key = `users/${encodeURIComponent(user.email)}/generated/${assetId}.mp3`;
+        const r2Key = `users/${encodeURIComponent(user.email)}/generated/${assetId}.${audioExtension}`;
         const pendingProvenance = await createProvenanceRecord(env, user, {
           entityType: "asset",
           entityId: assetId,
@@ -5998,7 +6026,7 @@ async function handleAi(
         });
         const markedSpeech = embedMediaProvenanceMarker(
           buffer,
-          "audio/mpeg",
+          audioContentType,
           pendingProvenance.marking.publicToken || ""
         );
         if (!markedSpeech) {
@@ -6022,10 +6050,14 @@ async function handleAi(
         }
         try {
           await env.BUCKET.put(r2Key, markedSpeech.bytes, {
-            httpMetadata: { contentType: "audio/mpeg" },
+            httpMetadata: { contentType: audioContentType },
             customMetadata: {
               owner: user.email,
-              source: generatedAudio ? "elevenlabs-audio" : "openrouter-tts",
+              source: openRouterMusic
+                ? "openrouter-music"
+                : generatedAudio
+                  ? "elevenlabs-audio"
+                  : "openrouter-tts",
               provenanceToken: pendingProvenance.marking.publicToken || "",
               policyVersion: AI_COMPLIANCE_POLICY_VERSION,
               embeddedMarking: markedSpeech.method,
@@ -6079,10 +6111,10 @@ async function handleAi(
             name: generatedAssetName(
               input.assetName,
               `${generatedAudio ? kind : "Voice"} take ${new Date().toLocaleDateString("en-GB")}`,
-              "mp3"
+              audioExtension
             ),
             kind: "audio",
-            contentType: "audio/mpeg",
+            contentType: audioContentType,
             size: markedSpeech.bytes.byteLength,
             r2Key,
           });

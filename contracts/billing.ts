@@ -141,6 +141,7 @@ export interface BillingSummary {
   topUpCredits: number;
   adjustmentDebt?: number;
   canUseCredits: boolean;
+  creditAccess?: "subscription" | "operator" | "none";
   canManageBilling?: boolean;
   plan: null | {
     id: PlanId;

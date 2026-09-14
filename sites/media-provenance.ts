@@ -10,7 +10,62 @@ const ID3_OWNER = encoder.encode("com.reelassati.provenance");
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,96}$/;
 
 export type EmbeddedMediaMarkingMethod =
-  "mp4-uuid-box" | "mp3-id3v2-private-frame" | "png-text-chunk";
+  | "mp4-uuid-box"
+  | "mp3-id3v2-private-frame"
+  | "png-text-chunk"
+  | "wav-provenance-chunk";
+
+function wave(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= 44 &&
+    decoder.decode(bytes.subarray(0, 4)) === "RIFF" &&
+    decoder.decode(bytes.subarray(8, 12)) === "WAVE" &&
+    new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(
+      4,
+      true
+    ) ===
+      bytes.length - 8
+  );
+}
+function embedWave(bytes: Uint8Array, token: string): EmbeddedMediaMark {
+  const data = encoder.encode(`${AI_BINARY_MARKER_PREFIX}${token}`);
+  const chunk = new Uint8Array(8 + data.length + (data.length % 2));
+  chunk.set(encoder.encode("rlst"));
+  new DataView(chunk.buffer).setUint32(4, data.length, true);
+  chunk.set(data, 8);
+  const output = concatBytes(bytes, chunk);
+  new DataView(output.buffer).setUint32(4, output.length - 8, true);
+  return { bytes: arrayBuffer(output), method: "wav-provenance-chunk" };
+}
+function inspectWave(bytes: Uint8Array): InspectedMediaMark | null {
+  if (!wave(bytes)) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
+  for (let offset = 12; offset + 8 <= bytes.length;) {
+    const length = view.getUint32(offset + 4, true),
+      end = offset + 8 + length + (length % 2);
+    if (end > bytes.length) return null;
+    if (decoder.decode(bytes.subarray(offset, offset + 4)) === "rlst") {
+      const value = decoder.decode(
+        bytes.subarray(offset + 8, offset + 8 + length)
+      );
+      if (!value.startsWith(AI_BINARY_MARKER_PREFIX)) return null;
+      const token = value.slice(AI_BINARY_MARKER_PREFIX.length);
+      if (!TOKEN_PATTERN.test(token)) return null;
+      const original = concatBytes(
+        bytes.subarray(0, offset),
+        bytes.subarray(end)
+      );
+      new DataView(original.buffer).setUint32(4, original.length - 8, true);
+      return {
+        token,
+        unmarkedBytes: arrayBuffer(original),
+        method: "wav-provenance-chunk",
+      };
+    }
+    offset = end;
+  }
+  return null;
+}
 
 export interface EmbeddedMediaMark {
   bytes: ArrayBuffer;
@@ -198,6 +253,8 @@ export function embedMediaProvenanceMarker(
   const bytes = new Uint8Array(value);
   if (isMp4(bytes, contentType)) return embedMp4(bytes, token);
   if (isMp3(bytes, contentType)) return embedMp3(bytes, token);
+  if (contentType === "audio/wav" && wave(bytes))
+    return embedWave(bytes, token);
   if (isPng(bytes, contentType)) return embedPng(bytes, token);
   return null;
 }
@@ -349,5 +406,10 @@ export function inspectMediaProvenanceMarker(
   value: ArrayBuffer
 ): InspectedMediaMark | null {
   const bytes = new Uint8Array(value);
-  return inspectMp4(bytes) || inspectMp3(bytes) || inspectPng(bytes);
+  return (
+    inspectMp4(bytes) ||
+    inspectMp3(bytes) ||
+    inspectPng(bytes) ||
+    inspectWave(bytes)
+  );
 }

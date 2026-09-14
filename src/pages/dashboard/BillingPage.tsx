@@ -205,7 +205,7 @@ export default function BillingPage() {
     if (
       loading ||
       !summary?.configured ||
-      summary.canUseCredits ||
+      (summary.canUseCredits && summary.creditAccess !== "operator") ||
       (summary.plan &&
         !["canceled", "incomplete_expired", "inactive"].includes(
           summary.plan.status
@@ -310,6 +310,15 @@ export default function BillingPage() {
         summary={summary}
         onManage={openPortal}
       />
+      {summary?.creditAccess === "operator" && (
+        <p
+          role="status"
+          className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm"
+        >
+          AI access is enabled for this account. Generations use your available
+          credits; no paid subscription is active.
+        </p>
+      )}
 
       <section className="mt-5 rounded-2xl border border-border bg-surface p-6 sm:p-8">
         <div className="flex items-center gap-3">
@@ -384,7 +393,9 @@ export default function BillingPage() {
                     ? "Opening…"
                     : summary && !summary.configured
                       ? "Purchases opening soon"
-                      : summary && !summary.canUseCredits
+                      : summary &&
+                          (!summary.canUseCredits ||
+                            summary.creditAccess === "operator")
                         ? "Active plan required"
                         : "Add credits"}
                 </button>

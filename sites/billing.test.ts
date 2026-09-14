@@ -17,6 +17,8 @@ import {
   billingSummary,
   handleBillingApi,
   stripeReadiness,
+  reserveCredits,
+  releaseCreditReservation,
   type BillingEnvironment,
 } from "./billing";
 import { LEGAL_TERMS_VERSION } from "../contracts/legal";
@@ -128,6 +130,60 @@ beforeEach(() => {
 });
 afterAll(() => sqlite.close());
 afterEach(() => vi.unstubAllGlobals());
+
+it("enables only the approved account without inventing a subscription or free credits", async () => {
+  sqlite
+    .prepare(
+      "UPDATE billing_accounts SET status = 'inactive' WHERE owner_email = ?"
+    )
+    .run(owner);
+  const runtime = { ...env, AI_CREDIT_ACCESS_EMAIL: owner };
+  const summary = await billingSummary(runtime, {
+    email: owner,
+    name: "Owner",
+  });
+  expect(summary.canUseCredits).toBe(true);
+  expect(summary.creditAccess).toBe("operator");
+  expect(summary.plan?.status).toBe("inactive");
+  expect(summary.availableCredits).toBe(700);
+  expect(summary.topUps.every(p => !p.available)).toBe(true);
+  expect(
+    (await billingSummary(env, { email: owner, name: "Owner" })).canUseCredits
+  ).toBe(false);
+  expect(
+    (
+      await billingSummary(runtime, {
+        email: "other@example.com",
+        name: "Other",
+      })
+    ).canUseCredits
+  ).toBe(false);
+  const input = {
+    cost: 15,
+    operationKey: "operator-paid-analysis",
+    category: "analysis",
+    description: "Analysis",
+  };
+  const reserved = await reserveCredits(
+    runtime,
+    { email: owner, name: "Owner" },
+    input
+  );
+  expect(reserved).not.toBeNull();
+  expect(credits().included_balance).toBe(685);
+  await reserveCredits(runtime, { email: owner, name: "Owner" }, input);
+  expect(credits().included_balance).toBe(685);
+  expect(
+    await reserveCredits(
+      runtime,
+      { email: owner, name: "Owner" },
+      { ...input, operationKey: "over-budget", cost: 1000 }
+    )
+  ).toBeNull();
+  await releaseCreditReservation(runtime, reserved!);
+  expect(credits().included_balance).toBe(700);
+  expect(account().status).toBe("inactive");
+});
 
 it("grants exactly 1,000 operator credits once per request without changing the plan", async () => {
   await grantOperatorCredits(env, owner, "editor-grant-test");
