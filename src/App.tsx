@@ -4,6 +4,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { ReferralCapture } from "@/components/ReferralCapture";
 import { PrivacyChoices } from "@/components/compliance/PrivacyChoices";
+import { PublicPageGuide } from "@/components/help/PageGuide";
 
 const WorkspaceProvider = lazy(() =>
   import("@/providers/workspace").then(module => ({
@@ -124,6 +125,7 @@ export default function App() {
       <ReferralCapture />
       <PrivacyChoices />
       <ScrollManager />
+      <PublicPageGuide />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<Home />} />

@@ -176,6 +176,8 @@ export interface QualitySignal {
 }
 
 export interface EditRevision {
+  storyBeats?: import("./story-beats").StoryBeat[];
+  aspectRatio?: EditProject["aspectRatio"];
   captionStyle?: string;
   id: string;
   label: string;
@@ -188,6 +190,8 @@ export interface EditRevision {
 }
 
 export interface EditProject {
+  storyBeats?: import("./story-beats").StoryBeat[];
+  editorChat?: import("./editor-chat").EditorChatState;
   /** Selected revision; preserves undo/redo after navigation and batched imports. */
   revisionIndex?: number;
   /** Caption preset shared by the scrubbed preview and exported subtitles. */

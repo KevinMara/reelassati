@@ -51,3 +51,5 @@ coverage/
 .wrangler/
 
 /public/vendor/render/
+
+/public/vendor/pdfjs/

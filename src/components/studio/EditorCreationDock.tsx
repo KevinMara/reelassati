@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Files,
   Film,
   Image,
-  Mic2,
+  Captions,
   Music2,
   Shapes,
   Loader2,
@@ -29,16 +29,21 @@ import { VoiceSelector } from "./VoiceSelector";
 import { EditorSoundLibrary } from "./EditorSoundLibrary";
 import { EditorPresetLibrary } from "./EditorPresetLibrary";
 
-type DockKind = "library" | "image" | "video" | "voice" | "audio" | "graphics";
+export type DockKind =
+  "library" | "image" | "video" | "audio" | "captions" | "graphics";
 
 export function EditorCreationDock({
   project,
   onAssist,
-  assistCost,
+  activeTool,
+  onToolChange,
+  captions,
   onGraphic,
 }: {
   onAssist?: (context: string) => void;
-  assistCost?: number;
+  activeTool: DockKind;
+  onToolChange: (kind: DockKind) => void;
+  captions: ReactNode;
   onGraphic: (graphic: MotionGraphic, seconds: number) => Promise<void>;
   project: EditProject;
   playhead: number;
@@ -46,7 +51,9 @@ export function EditorCreationDock({
 }) {
   const { workspace, capabilities } = useWorkspace();
   const generation = useEditorGenerations(project.id);
-  const [kind, setKind] = useState<DockKind>("library");
+  const [audioMode, setAudioMode] = useState<"voice" | "sounds">("voice");
+  const kind =
+    activeTool === "audio" && audioMode === "voice" ? "voice" : activeTool;
   const [prompts, setPrompts] = useState({ video: "", image: "", voice: "" });
   const [seconds, setSeconds] = useState(5);
   const [voice, setVoice] = useState("English_Graceful_Lady");
@@ -173,8 +180,8 @@ export function EditorCreationDock({
             ["library", "Library", Files],
             ["video", "Video", Film],
             ["image", "Image", Image],
-            ["voice", "Voiceover", Mic2],
-            ["audio", "Sounds", Music2],
+            ["audio", "Audio", Music2],
+            ["captions", "Captions", Captions],
             ["graphics", "Graphics", Shapes],
           ] as const
         ).map(([id, label, Icon]) => (
@@ -182,22 +189,41 @@ export function EditorCreationDock({
             key={id}
             type="button"
             role="tab"
-            tabIndex={kind === id ? 0 : -1}
-            aria-selected={kind === id}
+            tabIndex={activeTool === id ? 0 : -1}
+            aria-selected={activeTool === id}
             aria-controls={`media-panel-${project.id}`}
             onClick={() => {
-              setKind(id);
+              onToolChange(id);
               setMessage("");
             }}
-            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-[11px] transition-colors ${kind === id ? "border-primary/60 bg-primary/10 text-primary" : "border-transparent text-foreground/65 hover:bg-foreground/5 hover:text-foreground"}`}
+            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-sm transition-colors ${activeTool === id ? "border-primary/60 bg-primary/10 text-primary" : "border-transparent text-foreground/65 hover:bg-foreground/5 hover:text-foreground"}`}
           >
-            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
           </button>
         ))}
       </div>
       <div role="tabpanel" id={`media-panel-${project.id}`} className="p-3">
-        {onAssist && (
+        {activeTool === "audio" && (
+          <div
+            className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-background p-1"
+            role="group"
+            aria-label="Audio tools"
+          >
+            {(["voice", "sounds"] as const).map(tab => (
+              <button
+                type="button"
+                key={tab}
+                aria-pressed={audioMode === tab}
+                onClick={() => setAudioMode(tab)}
+                className={`rounded-md px-2 py-2 text-sm ${audioMode === tab ? "bg-primary/15 text-primary" : "text-foreground/65"}`}
+              >
+                {tab === "voice" ? "Voiceover" : "Music & SFX"}
+              </button>
+            ))}
+          </div>
+        )}
+        {onAssist && activeTool !== "captions" && (
           <button
             type="button"
             onClick={() =>
@@ -211,11 +237,13 @@ export function EditorCreationDock({
             }
             className="ai-magic mb-4 inline-flex items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-xs text-primary"
           >
-            AI suggestions · {assistCost} credits
+            Ask Reel for suggestions
             <WandSparkles size={14} />
           </button>
         )}
-        {kind === "library" ? (
+        {kind === "captions" ? (
+          captions
+        ) : kind === "library" ? (
           <EditorMediaLibrary />
         ) : kind === "graphics" ? (
           <div className="space-y-4">

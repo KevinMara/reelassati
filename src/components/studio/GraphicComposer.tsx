@@ -234,7 +234,7 @@ export function GraphicComposer({
         </fieldset>
       )}
       <label className="block text-sm" htmlFor={`${controlId}-animation`}>
-        Animation
+        Entrance and exit
         <CompactSelect
           id={`${controlId}-animation`}
           aria-label="Graphic animation"

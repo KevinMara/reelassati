@@ -1,3 +1,4 @@
+import "./prepare-pdf-reference.mjs";
 import { build } from "esbuild";
 import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";

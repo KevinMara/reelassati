@@ -1,5 +1,8 @@
+import { CompactSelect } from "@/components/ui/compact-select";
 import {
   graphicFrame,
+  graphicEasingProgress,
+  type GraphicEasing,
   normalizeGraphic,
   type MotionGraphic,
   type GraphicKeyframe,
@@ -20,6 +23,11 @@ export function GraphicMotionEditor({
 }) {
   const points = graphic.motion ?? [];
   const selected = points.find(p => Math.abs(p.at - position) < 0.00001);
+  const next = selected && points.find(point => point.at > selected.at);
+  const curve = Array.from({ length: 33 }, (_, index) => {
+    const progress = index / 32;
+    return `${index ? "L" : "M"}${progress * 72},${28 - graphicEasingProgress(progress, selected?.easing) * 24}`;
+  }).join(" ");
   const frame = graphicFrame(
     { ...graphic, animation: "none" },
     position * Math.max(1 / 30, duration - 1 / 30),
@@ -126,6 +134,57 @@ export function GraphicMotionEditor({
               </label>
             ))}
           </div>
+          {next && (
+            <div className="space-y-2 rounded-lg bg-foreground/[0.03] p-2.5">
+              <label className="block text-xs">
+                Motion to next keyframe
+                <CompactSelect
+                  aria-label="Keyframe easing"
+                  value={selected.easing ?? "linear"}
+                  onValueChange={value =>
+                    save(
+                      points.map(point =>
+                        point === selected
+                          ? { ...point, easing: value as GraphicEasing }
+                          : point
+                      )
+                    )
+                  }
+                  options={[
+                    { value: "linear", label: "Steady speed" },
+                    { value: "ease-in", label: "Start slowly" },
+                    { value: "ease-out", label: "Land softly" },
+                    { value: "ease-in-out", label: "Smooth start and finish" },
+                    { value: "hold", label: "Hold, then jump" },
+                  ]}
+                />
+              </label>
+              <div className="flex items-center gap-3 text-[11px] text-foreground/60">
+                <svg
+                  viewBox="0 0 76 32"
+                  className="h-8 w-[76px] shrink-0 text-primary"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M0 28 H72 M0 28 V4"
+                    fill="none"
+                    stroke="currentColor"
+                    opacity="0.2"
+                  />
+                  <path
+                    d={curve}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                </svg>
+                <span>
+                  Applies until {(next.at * duration).toFixed(1)}s. Scrub the
+                  preview to see the motion.
+                </span>
+              </div>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => save(points.filter(p => p !== selected))}

@@ -3,12 +3,11 @@ import { WandSparkles } from "lucide-react";
 export function TimelinePrompt({
   duration,
   busy,
-  credits,
   onSend,
 }: {
   duration: number;
   busy: boolean;
-  credits: number;
+  credits?: number;
   onSend: (
     prompt: string,
     range: { start: number; end: number }
@@ -37,7 +36,7 @@ export function TimelinePrompt({
         <>
           <p className="my-2 text-xs text-foreground/70">
             Drag across this time ruler, adjust the range, then describe the
-            change. Changes remain reviewable.
+            change. Send the selection to Reel.
           </p>
           <div
             role="group"
@@ -188,7 +187,7 @@ export function TimelinePrompt({
                 disabled={busy || !prompt.trim() || high - low < 0.1}
                 className="ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs disabled:opacity-40"
               >
-                Suggest range edit · {credits} credits
+                Send to Reel
                 <WandSparkles aria-hidden="true" className="h-3.5 w-3.5" />
               </button>
             </form>

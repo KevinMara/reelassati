@@ -667,6 +667,12 @@ export const platformApi = {
       body: JSON.stringify(input),
     }),
 
+  editorChat: (input: import("@contracts/editor-chat").EditorChatRequest) =>
+    requestJson<import("@contracts/editor-chat").EditorChatResponse>(
+      "/api/ai/editor-chat",
+      { method: "POST", body: JSON.stringify(input) }
+    ),
+
   generateEditPlan: (input: {
     project: EditProject;
     command: string;
@@ -683,13 +689,18 @@ export const platformApi = {
       body: JSON.stringify(input),
     }),
 
-  analyzeVideo: (input: {
-    assetId?: string;
-    publicUrl?: string;
-    platform: string;
-    sourceRightsConfirmed: boolean;
-    focus?: string;
-  }) =>
+  analyzeVideo: (
+    input: {
+      assetId?: string;
+      analysisAssetId?: string;
+      analysisFramesPerSecond?: number;
+      publicUrl?: string;
+      platform: string;
+      sourceRightsConfirmed: boolean;
+      focus?: string;
+    },
+    signal?: AbortSignal
+  ) =>
     requestJson<{
       summary: string;
       hook: { score: number; note: string };
@@ -707,6 +718,7 @@ export const platformApi = {
       provenance: ContentProvenance;
     }>("/api/ai/analyze", {
       method: "POST",
+      signal,
       body: JSON.stringify(input),
     }),
 
@@ -747,6 +759,7 @@ export const platformApi = {
     return result.asset;
   },
   synthesizeSpeech: async (input: {
+    requestId?: string;
     text: string;
     voice: string;
     assetName?: string;
@@ -761,6 +774,7 @@ export const platformApi = {
   },
 
   generateImage: async (input: {
+    requestId?: string;
     prompt: string;
     assetName: string;
     aspectRatio: "1:1" | "4:3" | "3:4" | "16:9" | "9:16";

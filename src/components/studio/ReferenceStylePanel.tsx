@@ -89,7 +89,7 @@ export function ReferenceStylePanel({
     setError("");
     invalidate();
     try {
-      const response = await platformApi.analyzeVideo({
+      const analysisInput = {
         assetId: assetId || undefined,
         publicUrl: assetId ? undefined : url.trim(),
         platform: url.includes("tiktok.com")
@@ -99,7 +99,16 @@ export function ReferenceStylePanel({
             : "instagram",
         sourceRightsConfirmed: rights,
         focus: `Create a reference-style brief for ONLY these aspects: ${selected.join(", ")}. Describe observed timing, visual treatment, and sound placement with timestamps. Distinguish observations from unknowns. Do not copy dialogue, melody, or copyrighted assets. If the video cannot be inspected, say so; do not invent a style.`,
-      });
+      };
+      if (!rights)
+        throw new Error(
+          "Confirm that you may submit this reference for analysis."
+        );
+      const response = asset
+        ? await (
+            await import("@/lib/analyze-media")
+          ).analyzeMedia(asset, analysisInput.platform, analysisInput.focus)
+        : await platformApi.analyzeVideo(analysisInput);
       const brief = `Selected reference aspects: ${selected.join(", ")}. Observed reference: ${response.summary}. Timestamped evidence: ${JSON.stringify(response.retention)}. Match these stylistic patterns using the user's own footage and licensed media, not literal copied assets. Unsupported effects must be reported, not claimed as applied.`;
       setResult(response.summary);
       onChange(brief);

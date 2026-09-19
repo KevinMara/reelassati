@@ -45,6 +45,8 @@ export function restoreEditorRevision(
     transcript: structuredClone(revision.transcript),
     transcriptProvenance: revision.transcriptProvenance,
     captionStyle: revision.captionStyle,
+    aspectRatio: revision.aspectRatio ?? project.aspectRatio,
+    storyBeats: revision.storyBeats,
     duration,
     playhead: Math.min(project.playhead, duration),
     activeAssetId: revision.clips.some(c => c.assetId === project.activeAssetId)

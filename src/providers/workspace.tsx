@@ -14,6 +14,7 @@ import {
   type WorkspaceDocument,
 } from "@contracts/workspace";
 import { platformApi, PlatformApiError } from "@/lib/platform-api";
+import { reconcileAcknowledgedWorkspace } from "@/lib/workspace-save-reconcile";
 
 const EMPTY_CAPABILITIES: CapabilityState = {
   persistence: false,
@@ -31,6 +32,8 @@ const EMPTY_CAPABILITIES: CapabilityState = {
 
 interface WorkspaceContextValue {
   workspace: WorkspaceDocument;
+  /** Read synchronously inside async tasks; rendered state may be one update behind. */
+  getWorkspaceSnapshot: () => WorkspaceDocument;
   capabilities: CapabilityState;
   loading: boolean;
   saving: boolean;
@@ -65,9 +68,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const readyRef = useRef(false);
   const saveConflictRef = useRef(false);
 
-  useEffect(() => {
-    currentRef.current = workspace;
-  }, [workspace]);
+  // Every mutation below writes this ref before publishing React state. Never
+  // mirror an older render back into it: in-flight editing reads the latest ref.
+  const getWorkspaceSnapshot = useCallback(() => currentRef.current, []);
 
   const refresh = useCallback(async () => {
     let succeeded = false;
@@ -161,19 +164,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             revision: serverRevisionRef.current,
           });
           serverRevisionRef.current = result.workspace.revision;
-          if (mutation === mutationRef.current) {
-            currentRef.current = result.workspace;
-            setWorkspace(result.workspace);
-          } else {
-            currentRef.current = {
-              ...currentRef.current,
-              revision: result.workspace.revision,
-            };
-            setWorkspace(current => ({
-              ...current,
-              revision: result.workspace.revision,
-            }));
-          }
+          const reconciled = reconcileAcknowledgedWorkspace(
+            currentRef.current,
+            result.workspace,
+            mutation,
+            mutationRef.current
+          );
+          currentRef.current = reconciled;
+          setWorkspace(reconciled);
           setUnsaved(false);
           setError(null);
           return result.workspace;
@@ -221,6 +219,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       workspace,
+      getWorkspaceSnapshot,
       capabilities,
       loading,
       saving,
@@ -231,6 +230,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }),
     [
       workspace,
+      getWorkspaceSnapshot,
       capabilities,
       loading,
       saving,

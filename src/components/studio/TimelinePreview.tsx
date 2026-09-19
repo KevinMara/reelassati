@@ -116,12 +116,12 @@ export function TimelinePreview({
       style={{
         aspectRatio: project.aspectRatio.replace(":", "/"),
         containerType: "inline-size",
-        maxHeight: "65vh",
+        maxHeight: "100%",
         maxWidth:
           project.aspectRatio === "9:16"
-            ? "360px"
+            ? "min(360px, calc(434px * 9 / 16))"
             : project.aspectRatio === "1:1"
-              ? "560px"
+              ? "434px"
               : "100%",
       }}
     >

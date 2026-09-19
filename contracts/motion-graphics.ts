@@ -10,12 +10,38 @@ export const GRAPHIC_KINDS = [
   "spatial-orbit",
 ] as const;
 export type GraphicKind = (typeof GRAPHIC_KINDS)[number];
+export const GRAPHIC_EASINGS = [
+  "linear",
+  "ease-in",
+  "ease-out",
+  "ease-in-out",
+  "hold",
+] as const;
+export type GraphicEasing = (typeof GRAPHIC_EASINGS)[number];
+
+/** A bounded curve shared by preview, exported frames and control previews. */
+export function graphicEasingProgress(
+  progress: number,
+  easing: GraphicEasing = "linear"
+): number {
+  const t = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
+  if (t === 0 || t === 1) return t;
+  if (easing === "ease-in") return t * t * t;
+  if (easing === "ease-out") return 1 - Math.pow(1 - t, 3);
+  if (easing === "ease-in-out")
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  if (easing === "hold") return 0;
+  return t;
+}
+
 export interface GraphicKeyframe {
   at: number;
   x: number;
   y: number;
   scale: number;
   rotation: number;
+  /** Interpolation from this keyframe to the next. Existing paths remain linear. */
+  easing?: GraphicEasing;
 }
 export interface MotionGraphic {
   kind: GraphicKind;
@@ -71,6 +97,9 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
         y: bounded(raw.y, bounded(v.y, 30, 10, 90), 0, 100),
         scale: bounded(raw.scale, 1, 0.1, 4),
         rotation: bounded(raw.rotation, 0, -720, 720),
+        ...(GRAPHIC_EASINGS.includes(raw.easing as GraphicEasing)
+          ? { easing: raw.easing as GraphicEasing }
+          : {}),
       });
     }
   return {
@@ -149,7 +178,10 @@ export function graphicFrame(
     else {
       const a = points[right - 1],
         b = points[right];
-      const fraction = (progress - a.at) / (b.at - a.at);
+      const fraction = graphicEasingProgress(
+        (progress - a.at) / (b.at - a.at),
+        a.easing
+      );
       const mix = (from: number, to: number) => from + (to - from) * fraction;
       pose = {
         x: mix(a.x, b.x),

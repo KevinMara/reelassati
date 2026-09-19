@@ -62,6 +62,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { platformApi } from "@/lib/platform-api";
 import type { ComplianceStatus } from "@contracts/compliance";
 import { StudioMediaTray } from "@/components/studio/StudioMediaTray";
+import { PageGuideButton } from "@/components/help/PageGuide";
 
 function formatActivityTime(timestamp: string, now: number): string {
   const time = new Date(timestamp).getTime();
@@ -1177,6 +1178,7 @@ export default function Dashboard() {
             Dashboard
           </span>
           <div className="flex-1" />
+          <PageGuideButton compact />
           <CreditBalanceChip refreshKey={path} />
           <StudioMediaTray key={path} />
           <Link

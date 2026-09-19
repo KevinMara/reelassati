@@ -5,11 +5,15 @@ import {
 } from "@/lib/editor-history";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { CaptionFileTools } from "@/components/studio/CaptionFileTools";
-import { normalizeReview } from "@contracts/source-review";
 import { GraphicComposer } from "@/components/studio/GraphicComposer";
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { useTranslation } from "react-i18next";
 import { EditorPresetLibrary } from "@/components/studio/EditorPresetLibrary";
+import {
+  buildStoryBeatEvidence,
+  storyBeatsAreCurrent,
+} from "@contracts/story-beats";
+import { StoryBeatStrip } from "@/components/studio/StoryBeatStrip";
 import { TimelineTracks } from "@/components/studio/TimelineTracks";
 import {
   allocateTimelineLane,
@@ -49,7 +53,6 @@ import {
   Plus,
   Redo2,
   Scissors,
-  Sparkles,
   Trash2,
   Undo2,
   Unlock,
@@ -57,22 +60,32 @@ import {
   Volume2,
   VolumeX,
   WandSparkles,
+  Settings2,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import {
   applyEditOperation,
   contentDuration,
   resizeTimeline,
-  rippleRemove,
 } from "@/lib/edit-timeline";
-import { EditorCreationDock } from "@/components/studio/EditorCreationDock";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { EditorChat } from "@/components/studio/EditorChat";
+import {
+  EditorCreationDock,
+  type DockKind,
+} from "@/components/studio/EditorCreationDock";
 import { TimelinePrompt } from "@/components/studio/TimelinePrompt";
 import { AutonomousEditor } from "@/components/studio/AutonomousEditor";
 import { RenderExportPanel } from "@/components/studio/RenderExportPanel";
 import { useSearchParams } from "react-router-dom";
 import type {
   Asset,
-  EditOperation,
   EditProject,
   EditRevision,
   TimelineClip,
@@ -85,7 +98,7 @@ import { useFileDropZone } from "@/hooks/useFileDropZone";
 import type { ContentProvenance } from "@contracts/compliance";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { validateFileSelection } from "@/lib/file-validation";
-import { AI_CREDIT_COSTS, timedCreditCost } from "@contracts/billing";
+import { AI_CREDIT_COSTS } from "@contracts/billing";
 
 const PROJECT_TEMPLATES = [
   {
@@ -139,6 +152,8 @@ function snapshotProject(project: EditProject, label: string): EditRevision {
     createdAt: new Date().toISOString(),
     duration: project.duration,
     captionStyle: project.captionStyle,
+    aspectRatio: project.aspectRatio,
+    storyBeats: project.storyBeats,
     clips: project.clips.map(clip => ({ ...clip })),
     transcript: project.transcript.map(segment => ({ ...segment })),
     ...(project.transcriptProvenance
@@ -190,25 +205,27 @@ export default function EditorPage() {
     null
   );
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState<"manual" | "auto">("manual");
   const [durationDraft, setDurationDraft] = useState<string | null>(null);
-  const [rightPanel, setRightPanel] = useState<
-    "inspect" | "transcript" | "assistant"
-  >("inspect");
+  const [leftTool, setLeftTool] = useState<DockKind>("library");
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [canvasOpen, setCanvasOpen] = useState(false);
+  const [autoEditOpen, setAutoEditOpen] = useState(false);
+  const [chatSeed, setChatSeed] = useState<{
+    text: string;
+    id: number;
+    range?: { start: number; end: number };
+  }>();
   const [clipDraft, setClipDraft] = useState<TimelineClip | null>(null);
   const [transcriptDraft, setTranscriptDraft] = useState<TranscriptSegment[]>(
     []
   );
+  const transcriptBase = useRef<{ projectId: string; value: string } | null>(
+    null
+  );
+  const [transcriptConflict, setTranscriptConflict] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
-  const [command, setCommand] = useState("");
-  const [commandSummary, setCommandSummary] = useState("");
-  const [commandProvenance, setCommandProvenance] =
-    useState<ContentProvenance | null>(null);
-  const [commandError, setCommandError] = useState<string | null>(null);
   const [transcriptionProvenance, setTranscriptionProvenance] =
     useState<ContentProvenance | null>(null);
-  const [rangeStart, setRangeStart] = useState(0);
-  const [rangeEnd, setRangeEnd] = useState(5);
   const [rawPlayhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [timelineZoom, setTimelineZoom] = useState(100);
@@ -227,6 +244,24 @@ export default function EditorPage() {
     () => workspace.projects.find(item => item.id === selectedProjectId),
     [selectedProjectId, workspace.projects]
   );
+  useEffect(() => {
+    if (!project) return;
+    const next = JSON.stringify(project.transcript);
+    const previous = transcriptBase.current;
+    if (
+      !previous ||
+      previous.projectId !== project.id ||
+      previous.value === JSON.stringify(transcriptDraft) ||
+      next === JSON.stringify(transcriptDraft)
+    ) {
+      setTranscriptDraft(project.transcript.map(segment => ({ ...segment })));
+      setTranscriptionProvenance(project.transcriptProvenance ?? null);
+      transcriptBase.current = { projectId: project.id, value: next };
+      setTranscriptConflict(false);
+    } else if (previous.value !== next) setTranscriptConflict(true);
+    // Draft keystrokes should not trigger synchronization from the saved transcript.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id, project?.transcript, project?.transcriptProvenance]);
   const revisionCursor = currentRevisionIndex(project);
   const playhead = Math.min(rawPlayhead, project?.duration ?? rawPlayhead);
   const selectedClip = useMemo(
@@ -262,15 +297,16 @@ export default function EditorPage() {
 
   const openProject = (item: EditProject) => {
     const firstClip = item.clips[0] ?? null;
+    transcriptBase.current = {
+      projectId: item.id,
+      value: JSON.stringify(item.transcript),
+    };
+    setTranscriptConflict(false);
     setSelectedProjectId(item.id);
     setDurationDraft(null);
     setTitleDraft(item.title);
     setPlayhead(item.playhead);
-    setRangeStart(item.playhead);
-    setRangeEnd(Math.min(item.duration, item.playhead + 5));
     setTranscriptDraft(item.transcript.map(segment => ({ ...segment })));
-    setCommandSummary("");
-    setCommandProvenance(null);
     setTranscriptionProvenance(item.transcriptProvenance ?? null);
     setSelectedClipId(firstClip?.id ?? null);
     setClipDraft(firstClip ? { ...firstClip } : null);
@@ -424,12 +460,16 @@ export default function EditorPage() {
             transcript: item.transcript,
             duration: item.duration,
             captionStyle: item.captionStyle,
+            aspectRatio: item.aspectRatio,
+            storyBeats: item.storyBeats,
           }) ===
           JSON.stringify({
             clips: next.clips,
             transcript: next.transcript,
             duration: next.duration,
             captionStyle: next.captionStyle,
+            aspectRatio: next.aspectRatio,
+            storyBeats: next.storyBeats,
           });
         if (unchanged) return item;
         return {
@@ -1084,163 +1124,18 @@ export default function EditorPage() {
     return () => window.removeEventListener("keydown", handleKeyboard);
   });
 
-  const runEditCommand = async (
-    override?: string,
-    localRange?: { start: number; end: number }
-  ) => {
-    const instruction = override ?? command;
-    if (!project || !instruction.trim()) return;
-    setBusyAction("command");
-    setCommandError(null);
-    setCommandSummary("");
-    setCommandProvenance(null);
-    try {
-      const result = await platformApi.generateEditPlan({
-        project,
-        command: instruction.trim(),
-        selectedClipIds: localRange
-          ? []
-          : selectedClipId
-            ? [selectedClipId]
-            : [],
-        localOnly: Boolean(localRange),
-        range: localRange ?? {
-          start: Math.min(rangeStart, rangeEnd),
-          end: Math.max(rangeStart, rangeEnd),
-        },
-      });
-      await patchProject(current => ({
-        ...current,
-        proposedChanges: [
-          ...current.proposedChanges.filter(
-            change => change.status !== "proposed"
-          ),
-          ...result.changes.map(change => ({
-            ...change,
-            provenance: change.provenance ?? result.provenance,
-          })),
-        ].slice(-240),
-        lastCommand: instruction.trim(),
-      }));
-      setCommandSummary(result.summary);
-      setCommandProvenance(result.provenance);
-    } catch (cause) {
-      setCommandError(
-        cause instanceof Error
-          ? cause.message
-          : "The edit plan could not be generated."
-      );
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const assistSources =
-    rightPanel === "transcript"
-      ? workspace.assets.filter(
-          a =>
-            a.kind === "video" &&
-            project?.clips.some(c => c.assetId === a.id && c.track !== "audio")
-        )
-      : previewAsset?.kind === "video"
-        ? [previewAsset]
-        : [];
-  const assistCost =
-    AI_CREDIT_COSTS.editPlan +
-    assistSources.reduce(
-      (sum, a) =>
-        sum +
-        timedCreditCost(a.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute),
-      0
-    );
-  const [assistEvidence, setAssistEvidence] = useState("");
-  useEffect(() => setAssistEvidence(""), [project?.id, previewAsset?.id]);
-  async function requestAssist(context: string) {
-    if (!project || busyAction) return;
-    setRightPanel("assistant");
-    setBusyAction("assist");
-    setCommandError(null);
-    try {
-      let observations =
-        "No source video was available for visual inspection. Do not invent visual or audio observations.";
-      const observedSources: string[] = [];
-      for (const source of assistSources) {
-        const result = await platformApi.analyzeVideo({
-          assetId: source.id,
-          platform: project.platform,
-          sourceRightsConfirmed: true,
-          focus: context,
-        });
-        observedSources.push(
-          `${source.name}: ${result.summary}\n${JSON.stringify(result.review)}\n${JSON.stringify(result.retention)}`
-        );
-        observations = observedSources.join("\n\n");
-        setAssistEvidence(observations);
-        await patchProject(p => ({
-          ...p,
-          sourceReviews: [
-            ...(p.sourceReviews ?? []).filter(r => r.assetId !== source.id),
-            {
-              assetId: source.id,
-              reviewedAt: new Date().toISOString(),
-              summary: result.summary,
-              ...normalizeReview(result.review),
-              moments: result.retention,
-            },
-          ],
-        }));
-      }
-      const request =
-        context +
-        ". Make reviewable suggestions only. Actual source observations: " +
-        observations +
-        ". Library metadata (not proof of file contents): " +
-        JSON.stringify(
-          workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind }))
-        );
-      setCommand(context);
-      await runEditCommand(request);
-    } catch (e) {
-      setCommandError(
-        e instanceof Error
-          ? e.message
-          : "AI assist could not inspect the footage."
-      );
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  const acceptOperation = async (operation: EditOperation) => {
-    await saveProjectChange(
-      () =>
-        commitProject(`Approved decision: ${operation.label}`, current =>
-          applyEditOperation(current, operation)
-        ),
-      "The approved edit decision could not be saved."
-    );
-  };
-
-  const rejectOperation = async (operation: EditOperation) => {
-    await saveProjectChange(
-      () =>
-        patchProject(current => ({
-          ...current,
-          proposedChanges: current.proposedChanges.map(change =>
-            change.id === operation.id
-              ? {
-                  ...change,
-                  status: "rejected",
-                  reviewedAt: new Date().toISOString(),
-                }
-              : change
-          ),
-        })),
-      "The rejected edit decision could not be saved."
-    );
-  };
-
   const saveTranscript = async () => {
+    if (
+      project &&
+      transcriptBase.current?.projectId === project.id &&
+      transcriptBase.current.value !== JSON.stringify(project.transcript)
+    ) {
+      setTranscriptConflict(true);
+      setLocalError(
+        "Captions changed while you were editing. Load the saved captions before applying another revision."
+      );
+      return;
+    }
     const saved = await saveProjectChange(
       () =>
         commitProject("Transcript updated", current => ({
@@ -1578,6 +1473,574 @@ export default function EditorPage() {
     );
   }
 
+  const inspectorContent = (
+    <>
+      {
+        <div>
+          <div className="mb-5">
+            <p className="mono-eyebrow text-primary">Clip inspector</p>
+            <h2 className="mt-2 text-lg font-medium">
+              {selectedClip ? selectedClip.label : "Select a clip"}
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-foreground/70">
+              Range controls change the selected clip only. Apply creates a
+              reversible revision.
+            </p>
+          </div>
+
+          {!clipDraft ? (
+            <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-foreground/70">
+              Choose a block on the timeline to edit its timing.
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
+              <label className="block">
+                <span className="mb-1.5 block text-xs text-foreground/70">
+                  Clip label
+                </span>
+                <input
+                  value={clipDraft.label}
+                  disabled={selectedClip?.locked}
+                  onChange={event =>
+                    setClipDraft(current =>
+                      current
+                        ? { ...current, label: event.target.value }
+                        : current
+                    )
+                  }
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
+                />
+              </label>
+              {(
+                [
+                  {
+                    key: "start",
+                    label: "Timeline start",
+                    min: 0,
+                    max: Math.max(project.duration, clipDraft.start + 1),
+                  },
+                  {
+                    key: "duration",
+                    label: "Visible duration",
+                    min: timingLimits!.minimumDuration,
+                    max: timingLimits!.maximumDuration,
+                  },
+                  {
+                    key: "inPoint",
+                    label: "Source in",
+                    min: 0,
+                    max: Math.max(
+                      0,
+                      timingLimits!.outPoint - timingLimits!.minimumSourceSpan
+                    ),
+                  },
+                  {
+                    key: "outPoint",
+                    label: "Source out",
+                    min:
+                      timingLimits!.inPoint + timingLimits!.minimumSourceSpan,
+                    max: timingLimits!.sourceLimit,
+                  },
+                ] as const
+              ).map(control => (
+                <label
+                  key={control.key}
+                  htmlFor={`clip-${control.key}`}
+                  aria-label={control.label}
+                  className="block"
+                >
+                  <span className="mb-1.5 flex items-center justify-between text-xs">
+                    <span className="text-foreground/70">{control.label}</span>
+                    <span className="font-mono text-foreground/70">
+                      {formatTime(clipDraft[control.key])}
+                    </span>
+                  </span>
+                  <input
+                    id={`clip-${control.key}`}
+                    type="range"
+                    min={control.min}
+                    max={control.max}
+                    step="any"
+                    value={clipDraft[control.key]}
+                    disabled={selectedClip?.locked}
+                    onChange={event =>
+                      setClipDraft(current => {
+                        if (!current) return current;
+                        const value = Number(event.target.value);
+                        const speed = current.speed ?? 1;
+                        if (control.key === "duration")
+                          return {
+                            ...current,
+                            duration: value,
+                            outPoint: current.inPoint + value * speed,
+                          };
+                        if (control.key === "inPoint")
+                          return {
+                            ...current,
+                            inPoint: value,
+                            duration: (current.outPoint - value) / speed,
+                          };
+                        if (control.key === "outPoint")
+                          return {
+                            ...current,
+                            outPoint: value,
+                            duration: (value - current.inPoint) / speed,
+                          };
+                        return { ...current, start: value };
+                      })
+                    }
+                    className="h-1 w-full accent-primary disabled:opacity-40"
+                  />
+                </label>
+              ))}
+
+              <button
+                type="button"
+                disabled={selectedClip?.locked}
+                onClick={() => void applyClipDraft()}
+                className="w-full rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-40"
+              >
+                Apply timing
+              </button>
+
+              <div className="flex flex-wrap gap-2 md:col-span-2 xl:col-span-1">
+                <button
+                  type="button"
+                  disabled={selectedClip?.locked}
+                  onClick={() =>
+                    setClipDraft(c =>
+                      c
+                        ? {
+                            ...c,
+                            speed: 1,
+                            duration: c.outPoint - c.inPoint,
+                            volume: 1,
+                            fadeIn: 0,
+                            fadeOut: 0,
+                            brightness: 0,
+                            contrast: 1,
+                            saturation: 1,
+                            fit: "contain",
+                          }
+                        : c
+                    )
+                  }
+                  className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-40"
+                >
+                  Reset look & sound
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedClip?.locked}
+                  onClick={() =>
+                    setClipDraft(c =>
+                      c
+                        ? {
+                            ...c,
+                            volume: 0.2,
+                            fadeIn: Math.min(0.5, c.duration / 2),
+                            fadeOut: Math.min(1, c.duration / 2),
+                          }
+                        : c
+                    )
+                  }
+                  className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-40"
+                >
+                  Music under dialogue
+                </button>
+                <p className="self-center text-xs text-foreground/60">
+                  Review the settings, then apply. Undo restores the previous
+                  revision.
+                </p>
+              </div>
+              <label className="block text-sm">
+                Framing
+                <CompactSelect
+                  aria-label="Framing"
+                  value={clipDraft.fit ?? "contain"}
+                  disabled={selectedClip?.locked}
+                  onValueChange={value =>
+                    setClipDraft(c =>
+                      c ? { ...c, fit: value as "contain" | "cover" } : c
+                    )
+                  }
+                  options={[
+                    { value: "contain", label: "Fit whole shot" },
+                    { value: "cover", label: "Fill frame" },
+                  ]}
+                  className="mt-2"
+                />
+              </label>
+              {(
+                [
+                  ["speed", "Playback speed", 0.25, 4, 0.05, 1],
+                  ["volume", "Volume", 0, 2, 0.05, 1],
+                  ["fadeIn", "Fade in (seconds)", 0, 3, 0.1, 0],
+                  ["fadeOut", "Fade out (seconds)", 0, 3, 0.1, 0],
+                  ["brightness", "Brightness", -0.5, 0.5, 0.05, 0],
+                  ["contrast", "Contrast", 0.5, 2, 0.05, 1],
+                  ["saturation", "Saturation", 0, 2, 0.05, 1],
+                ] as const
+              ).map(([key, label, min, max, step, fallback]) => (
+                <label key={key} className="block text-sm">
+                  {label}{" "}
+                  <span className="float-right font-mono">
+                    {(clipDraft[key] ?? fallback).toFixed(1)}
+                  </span>
+                  <input
+                    type="range"
+                    aria-label={label}
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={clipDraft[key] ?? fallback}
+                    disabled={selectedClip?.locked}
+                    onChange={e =>
+                      setClipDraft(c =>
+                        c
+                          ? {
+                              ...c,
+                              [key]: Number(e.target.value),
+                              ...(key === "speed"
+                                ? {
+                                    duration:
+                                      (c.outPoint - c.inPoint) /
+                                      Number(e.target.value),
+                                  }
+                                : {}),
+                            }
+                          : c
+                      )
+                    }
+                    className="mt-2 w-full accent-primary"
+                  />
+                </label>
+              ))}
+              <button
+                type="button"
+                disabled={selectedClip?.locked}
+                onClick={() =>
+                  void saveProjectChange(
+                    () =>
+                      commitProject("Clip look and sound adjusted", p => ({
+                        ...p,
+                        clips: p.clips.map(c =>
+                          c.id === clipDraft.id && !c.locked
+                            ? normalizeClipTiming(
+                                clipDraft,
+                                previewAsset,
+                                p.duration
+                              )
+                            : c
+                        ),
+                      })),
+                    "Could not save settings."
+                  )
+                }
+                className="w-full rounded-lg border border-primary px-3 py-2 text-sm text-primary"
+              >
+                Apply look and sound
+              </button>
+              <div className="grid grid-cols-2 gap-2 border-t border-border pt-4">
+                <button
+                  type="button"
+                  onClick={() => void toggleClipProperty("locked")}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs hover:bg-background"
+                >
+                  {selectedClip?.locked ? (
+                    <Unlock className="h-3.5 w-3.5" />
+                  ) : (
+                    <Lock className="h-3.5 w-3.5" />
+                  )}
+                  {selectedClip?.locked ? "Unlock" : "Lock"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void toggleClipProperty("muted")}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs hover:bg-background"
+                >
+                  {selectedClip?.muted ? (
+                    <Volume2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <VolumeX className="h-3.5 w-3.5" />
+                  )}
+                  {selectedClip?.muted ? "Unmute" : "Mute"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      }
+
+      {selectedClip && clipLaneKind(selectedClip) === "video" && (
+        <details className="mt-4 rounded-xl border border-border p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Looks & transitions
+          </summary>
+          <div className="mt-3">
+            <EditorPresetLibrary
+              mode="looks"
+              disabled={selectedClip.locked || Boolean(busyAction)}
+              onClipLook={preset =>
+                void saveProjectChange(
+                  () =>
+                    commitProject(`Applied ${preset.name}`, current => ({
+                      ...current,
+                      clips: current.clips.map(c =>
+                        c.id === selectedClip.id && !c.locked
+                          ? { ...c, ...preset.settings }
+                          : c
+                      ),
+                    })),
+                  "The look could not be applied."
+                )
+              }
+              onFadePreset={settings =>
+                void saveProjectChange(
+                  () =>
+                    commitProject("Applied clip transition", current => ({
+                      ...current,
+                      clips: current.clips.map(c =>
+                        c.id === selectedClip.id && !c.locked
+                          ? { ...c, ...settings }
+                          : c
+                      ),
+                    })),
+                  "The transition could not be applied."
+                )
+              }
+            />
+          </div>
+        </details>
+      )}
+
+      {selectedClip?.graphic && (
+        <div className="p-4">
+          <GraphicComposer
+            key={selectedClip.id}
+            initial={selectedClip.graphic}
+            duration={selectedClip.duration}
+            busy={selectedClip.locked}
+            onSave={async graphic => {
+              await commitProject("Updated motion graphic", p => ({
+                ...p,
+                clips: p.clips.map(c =>
+                  c.id === selectedClip.id && !c.locked ? { ...c, graphic } : c
+                ),
+              }));
+            }}
+          />
+        </div>
+      )}
+    </>
+  );
+  const captionsContent = (
+    <>
+      {
+        <div>
+          <details className="mb-4 rounded-xl border border-border p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Caption style library
+            </summary>
+            <div className="mt-3">
+              <EditorPresetLibrary
+                mode="captions"
+                selectedCaptionId={project.captionStyle}
+                onCaptionPreset={id =>
+                  void saveProjectChange(
+                    () =>
+                      commitProject("Caption style changed", current => ({
+                        ...current,
+                        captionStyle: id,
+                      })),
+                    "Caption style could not be saved."
+                  )
+                }
+              />
+            </div>
+          </details>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="mono-eyebrow text-primary">Editable transcript</p>
+              <h2 className="mt-2 text-lg font-medium">
+                Words are edit points
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={addTranscriptSegment}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-background"
+              aria-label="Add transcript line"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {transcriptConflict && (
+            <div
+              role="status"
+              className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm"
+            >
+              Captions changed while you had an unsaved draft. Your draft is
+              kept here for comparison.
+              <button
+                type="button"
+                className="mt-2 block font-medium underline"
+                onClick={() => {
+                  setTranscriptDraft(
+                    project.transcript.map(segment => ({ ...segment }))
+                  );
+                  setTranscriptionProvenance(
+                    project.transcriptProvenance ?? null
+                  );
+                  transcriptBase.current = {
+                    projectId: project.id,
+                    value: JSON.stringify(project.transcript),
+                  };
+                  setTranscriptConflict(false);
+                }}
+              >
+                Load saved captions
+              </button>
+            </div>
+          )}
+          <div className="mb-4">
+            <CaptionFileTools
+              segments={transcriptDraft}
+              duration={project.duration}
+              onImport={segments => {
+                setTranscriptDraft(segments);
+                setTranscriptionProvenance(null);
+                void saveProjectChange(
+                  () =>
+                    commitProject("Captions imported", current => ({
+                      ...current,
+                      transcript: segments,
+                      transcriptProvenance: undefined,
+                    })),
+                  "Imported captions could not be saved."
+                );
+              }}
+            />
+          </div>
+
+          {capabilities.transcription && previewAsset && (
+            <button
+              type="button"
+              disabled={busyAction === "transcribe"}
+              onClick={() => void transcribeActiveAsset()}
+              className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+            >
+              {busyAction === "transcribe" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <AudioLines className="h-3.5 w-3.5" />
+              )}
+              Transcribe active media
+            </button>
+          )}
+
+          {transcriptionProvenance ? (
+            <div className="mb-4">
+              <AiProvenanceBadge provenance={transcriptionProvenance} compact />
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            {transcriptDraft.map((segment, index) => (
+              <div
+                key={segment.id}
+                className="rounded-xl border border-border bg-background/55 p-3"
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={segment.start}
+                    onChange={event =>
+                      mutateTranscript(current =>
+                        current.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? {
+                                ...item,
+                                start: Number(event.target.value),
+                              }
+                            : item
+                        )
+                      )
+                    }
+                    className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
+                    aria-label={`Line ${index + 1} start`}
+                  />
+                  <span className="text-xs text-foreground/70">to</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={segment.end}
+                    onChange={event =>
+                      mutateTranscript(current =>
+                        current.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? { ...item, end: Number(event.target.value) }
+                            : item
+                        )
+                      )
+                    }
+                    className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
+                    aria-label={`Line ${index + 1} end`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      mutateTranscript(current =>
+                        current.filter(item => item.id !== segment.id)
+                      )
+                    }
+                    className="ml-auto text-foreground/70 hover:text-destructive"
+                    aria-label={`Delete line ${index + 1}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <textarea
+                  value={segment.text}
+                  rows={2}
+                  placeholder="Type the spoken line"
+                  onChange={event =>
+                    mutateTranscript(current =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, text: event.target.value }
+                          : item
+                      )
+                    )
+                  }
+                  className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-foreground/70"
+                />
+              </div>
+            ))}
+          </div>
+
+          {transcriptDraft.length === 0 && (
+            <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm leading-5 text-foreground/70">
+              Add lines manually or transcribe the selected media when the
+              speech service is connected.
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => void saveTranscript()}
+            className="mt-4 w-full rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
+          >
+            Save transcript revision
+          </button>
+        </div>
+      }
+    </>
+  );
+
   return (
     <div className="min-w-0">
       <input
@@ -1687,30 +2150,346 @@ export default function EditorPage() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-3">
-        <div className="flex rounded-xl bg-background p-1">
-          <button
-            type="button"
-            aria-pressed={editMode === "manual"}
-            onClick={() => setEditMode("manual")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium ${editMode === "manual" ? "bg-primary text-primary-foreground" : "text-foreground/70"}`}
+      <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(240px,0.85fr)_minmax(300px,1.35fr)_minmax(310px,1fr)] xl:items-start">
+        <section
+          id="editor-media-panel"
+          className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface xl:col-start-1 xl:row-start-1 xl:h-[620px] xl:overflow-y-auto"
+        >
+          {" "}
+          <EditorCreationDock
+            onAssist={context => setChatSeed({ text: context, id: Date.now() })}
+            activeTool={leftTool}
+            onToolChange={setLeftTool}
+            captions={captionsContent}
+            project={project}
+            playhead={playhead}
+            onInsert={addLibraryAssetAtPlayhead}
+            onGraphic={async (graphic, seconds) => {
+              await commitProject("Added motion graphic", p =>
+                applyEditOperation(p, {
+                  id: createId("graphic-operation"),
+                  type: "graphic",
+                  label: graphic.text || graphic.kind,
+                  reason: "Manually added graphic",
+                  start: playhead,
+                  end: Math.min(p.duration, playhead + seconds),
+                  confidence: 1,
+                  intensity: "balanced",
+                  targetClipIds: [],
+                  status: "proposed",
+                  parameters: { graphic },
+                })
+              );
+            }}
+          />
+        </section>
+        <main className="contents">
+          <section
+            {...previewDrop.dropZoneProps}
+            className={`relative min-w-0 overflow-hidden rounded-xl border xl:col-start-2 xl:row-start-1 xl:h-[620px] bg-[#0D0C0E] shadow-card transition-all ${
+              previewDrop.isDragging
+                ? "border-[#A894FF] ring-4 ring-[#A894FF]/20"
+                : "border-white/5"
+            }`}
           >
-            {italian ? "Montaggio manuale" : "Edit myself"}
-          </button>
-          <button
-            type="button"
-            aria-pressed={editMode === "auto"}
-            onClick={() => setEditMode("auto")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium ${editMode === "auto" ? "bg-primary text-primary-foreground" : "text-foreground/70"}`}
+            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-white/60 backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#A894FF]" />
+              {italian ? "Anteprima timeline" : "Timeline preview"}
+            </div>
+            <div className="relative flex h-[490px] items-center justify-center p-7">
+              {previewDrop.isDragging ? (
+                <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border border-dashed border-[#A894FF] bg-black/75 text-sm font-medium text-white backdrop-blur-sm">
+                  Drop media into this edit
+                </div>
+              ) : null}
+              <TimelinePreview
+                project={project}
+                assets={workspace.assets}
+                time={playhead}
+                playing={playing}
+              />
+            </div>
+            <div className="flex items-center justify-center gap-3 border-t border-white/10 bg-black/30 px-4 py-2.5 text-white">
+              <button
+                type="button"
+                onClick={() => void toggleTimelinePlayback()}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/15"
+                aria-label={playing ? "Pause timeline" : "Play timeline"}
+              >
+                {playing ? (
+                  <Pause className="h-3.5 w-3.5 fill-current" />
+                ) : (
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                )}
+              </button>
+              <span className="w-24 font-mono text-xs text-white/65">
+                {formatTime(playhead)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={project.duration}
+                step={0.05}
+                value={playhead}
+                onChange={event => seekTimeline(Number(event.target.value))}
+                onPointerUp={persistPlayhead}
+                className="h-1 w-full max-w-md accent-[#8A76EA]"
+                aria-label="Playhead"
+              />
+              <span className="w-20 text-right font-mono text-xs text-white/40">
+                {formatTime(project.duration)}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-3 py-2 text-sm text-white/70">
+              <button
+                type="button"
+                onClick={() => setCanvasOpen(true)}
+                className="rounded-lg px-2 py-1.5 hover:bg-white/10"
+              >
+                {project.aspectRatio} · {project.duration.toFixed(1)}s{" "}
+                <Settings2 className="ml-1 inline h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={!selectedClip}
+                onClick={() => setInspectorOpen(true)}
+                className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/10 disabled:opacity-40"
+              >
+                <SlidersHorizontal className="h-4 w-4 shrink-0" />
+                <span className="max-w-36 truncate">
+                  {selectedClip?.label || "Select a clip"}
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <section
+            {...timelineDrop.dropZoneProps}
+            className={`min-w-0 overflow-hidden rounded-xl border bg-surface shadow-card xl:col-span-3 xl:row-start-2 transition-all ${
+              timelineDrop.isDragging
+                ? "border-primary ring-4 ring-primary/10"
+                : "border-border"
+            }`}
           >
-            {italian ? "Auto-edit AI" : "AI auto-edit"}
-          </button>
-        </div>
-        <details className="group min-w-0 flex-1 [&[open]>summary]:float-left">
-          <summary className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium">
-            {italian ? "Formato e durata" : "Format & duration"}
-          </summary>
-          <div className="ml-3 inline-flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-1 border-b border-border p-2">
+              <button
+                type="button"
+                onClick={() =>
+                  document
+                    .getElementById("editor-media-panel")
+                    ?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+                }
+                disabled={Boolean(busyAction)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <Library className="h-3.5 w-3.5" />
+                Add from library
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={Boolean(busyAction)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {busyAction === "upload" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5" />
+                )}
+                Upload
+              </button>
+              <span className="hidden text-xs text-foreground/70 sm:inline">
+                or drop files in this timeline
+              </span>
+              <span className="mx-1 h-5 w-px bg-border" />
+              <button
+                type="button"
+                disabled={!selectedClip}
+                onClick={() => setInspectorOpen(true)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-background disabled:opacity-30"
+              >
+                <SlidersHorizontal size={15} />
+                Adjust clip
+              </button>
+              <button
+                type="button"
+                disabled={!selectedClip || selectedClip.locked}
+                title="Split at playhead (S)"
+                onClick={() => void splitSelectedClip()}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-30"
+              >
+                <Scissors className="h-3.5 w-3.5" />
+                Split
+              </button>
+              <button
+                type="button"
+                disabled={!selectedClip}
+                title="Duplicate (Ctrl/⌘ D)"
+                onClick={() => void duplicateSelectedClip()}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-30"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Duplicate
+              </button>
+              <button
+                type="button"
+                disabled={!selectedClip || selectedClip.locked}
+                title="Delete selected clip (Delete)"
+                onClick={() => void deleteSelectedClip()}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-30"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+              <div className="ml-auto flex items-center gap-2 pr-1">
+                {uploadProgress !== null && (
+                  <span className="font-mono text-xs text-primary">
+                    {uploadProgress}%
+                  </span>
+                )}
+                <span className="text-xs text-foreground/70">Zoom</span>
+                <input
+                  type="range"
+                  min={100}
+                  max={260}
+                  step={20}
+                  value={timelineZoom}
+                  onChange={event =>
+                    setTimelineZoom(Number(event.target.value))
+                  }
+                  className="h-1 w-20 accent-primary"
+                  aria-label="Timeline zoom"
+                />
+              </div>
+            </div>
+
+            <StoryBeatStrip
+              beats={project.storyBeats ?? []}
+              duration={project.duration}
+              time={playhead}
+              hasEvidence={buildStoryBeatEvidence(project).length > 0}
+              stale={
+                Boolean(project.storyBeats?.length) &&
+                !storyBeatsAreCurrent(
+                  project.storyBeats ?? [],
+                  buildStoryBeatEvidence(project)
+                )
+              }
+              onSeek={seekTimeline}
+              onChange={async storyBeats => {
+                await commitProject("Story sections updated", p => ({
+                  ...p,
+                  storyBeats,
+                }));
+              }}
+              onGenerate={() => {
+                setChatSeed({
+                  text: "Find the hook, body, proof and payoff in this footage and divide it into clearly named story sections. Use the actual speech and visual evidence.",
+                  id: Date.now(),
+                });
+                document
+                  .getElementById("editor-chat-panel")
+                  ?.scrollIntoView({ block: "nearest" });
+              }}
+            />
+            <TimelinePrompt
+              key={project.id}
+              duration={project.duration}
+              busy={Boolean(busyAction)}
+              credits={AI_CREDIT_COSTS.editPlan}
+              onSend={async (text, range) => {
+                setChatSeed({ text, range, id: Date.now() });
+                document
+                  .getElementById("editor-chat-panel")
+                  ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              }}
+            />
+            <TimelineTracks
+              project={project}
+              assets={workspace.assets}
+              time={playhead}
+              zoom={timelineZoom}
+              selectedClipId={selectedClipId}
+              disabled={Boolean(busyAction)}
+              onSeek={seekTimeline}
+              onSelect={(clip, time) => {
+                setSelectedClipId(clip.id);
+                setClipDraft({ ...clip });
+
+                seekTimeline(time);
+              }}
+              onAssetDrop={(asset, time, lane) =>
+                dropLibraryAsset(asset, time, lane)
+              }
+              onFilesDrop={async (files, time, lane) => {
+                const selection = validateFileSelection(files, {
+                  multiple: true,
+                  purpose: "media",
+                });
+                if (selection.error) {
+                  setLocalError(selection.error);
+                  return;
+                }
+                await addUploadedFiles(selection.files, project.id, time, lane);
+              }}
+              onMove={moveTimelineClip}
+              onTrim={async clip => {
+                await saveProjectChange(
+                  () =>
+                    commitProject("Clip trimmed", current => ({
+                      ...current,
+                      clips: current.clips.map(c =>
+                        c.id === clip.id && !c.locked ? clip : c
+                      ),
+                    })),
+                  "The clip could not be trimmed."
+                );
+                setClipDraft(clip);
+              }}
+              onCaptionSelect={time => {
+                setLeftTool("captions");
+                seekTimeline(time);
+              }}
+            />
+            <div className="border-t border-border px-3 py-2 text-[10px] text-foreground/50">
+              Space play/pause · S split · Delete remove · Ctrl/⌘ C/V copy/paste
+              · Ctrl/⌘ D duplicate · Ctrl/⌘ Z undo
+            </div>
+          </section>
+        </main>
+
+        <aside
+          id="editor-chat-panel"
+          className="min-w-0 overflow-hidden rounded-xl border border-primary/20 bg-surface xl:col-start-3 xl:row-start-1 xl:h-[620px]"
+        >
+          <EditorChat
+            key={project.id}
+            project={project}
+            playhead={playhead}
+            selectedClipId={selectedClipId}
+            seed={chatSeed}
+            onSeek={seekTimeline}
+            onAutoEdit={() => setAutoEditOpen(true)}
+          />
+        </aside>
+      </div>
+
+      <Dialog open={inspectorOpen} onOpenChange={setInspectorOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+          <DialogTitle>Adjust clip</DialogTitle>
+          <DialogDescription>
+            Timing, sound, appearance and motion for the selected clip.
+          </DialogDescription>
+          {inspectorContent}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={canvasOpen} onOpenChange={setCanvasOpen}>
+        <DialogContent>
+          <DialogTitle>Canvas & duration</DialogTitle>
+          <DialogDescription>
+            Choose your format and where the edit ends.
+          </DialogDescription>{" "}
+          <div className="grid gap-4">
             <label className="flex items-center gap-2 text-sm">
               {italian ? "Durata video" : "Video duration"}
               <input
@@ -1778,1164 +2557,23 @@ export default function EditorPage() {
               className="w-40"
             />
           </div>
-        </details>
-      </div>
-      {editMode === "auto" && (
-        <AutonomousEditor
-          key={project.id}
-          project={project}
-          onFinished={() => {
-            setEditMode("manual");
-            setTranscriptDraft(
-              project.transcript.map(segment => ({ ...segment }))
-            );
-            setRightPanel("inspect");
-          }}
-        />
-      )}
-      <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(250px,0.9fr)_minmax(320px,1.5fr)_minmax(290px,1fr)] xl:items-start">
-        <section
-          id="editor-media-panel"
-          className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface xl:col-start-1 xl:row-start-1 xl:h-[580px] xl:overflow-y-auto"
-        >
-          {" "}
-          <EditorCreationDock
-            onAssist={context => void requestAssist(context)}
-            assistCost={assistCost}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={autoEditOpen} onOpenChange={setAutoEditOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
+          <DialogTitle>AI auto-edit</DialogTitle>
+          <DialogDescription>
+            Build a complete edit from your footage and a reference style.
+          </DialogDescription>
+          <AutonomousEditor
+            key={project.id}
             project={project}
-            playhead={playhead}
-            onInsert={addLibraryAssetAtPlayhead}
-            onGraphic={async (graphic, seconds) => {
-              await commitProject("Added motion graphic", p =>
-                applyEditOperation(p, {
-                  id: createId("graphic-operation"),
-                  type: "graphic",
-                  label: graphic.text || graphic.kind,
-                  reason: "Manually added graphic",
-                  start: playhead,
-                  end: Math.min(p.duration, playhead + seconds),
-                  confidence: 1,
-                  intensity: "balanced",
-                  targetClipIds: [],
-                  status: "proposed",
-                  parameters: { graphic },
-                })
-              );
+            onFinished={() => {
+              setAutoEditOpen(false);
             }}
           />
-        </section>
-        <main className="contents">
-          <section
-            {...previewDrop.dropZoneProps}
-            className={`relative min-w-0 overflow-hidden rounded-xl border xl:col-start-2 xl:row-start-1 xl:h-[580px] bg-[#0D0C0E] shadow-card transition-all ${
-              previewDrop.isDragging
-                ? "border-[#A894FF] ring-4 ring-[#A894FF]/20"
-                : "border-white/5"
-            }`}
-          >
-            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-white/60 backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#A894FF]" />
-              {italian ? "Anteprima timeline" : "Timeline preview"}
-            </div>
-            <div className="relative flex h-[500px] items-center justify-center p-7">
-              {previewDrop.isDragging ? (
-                <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border border-dashed border-[#A894FF] bg-black/75 text-sm font-medium text-white backdrop-blur-sm">
-                  Drop media into this edit
-                </div>
-              ) : null}
-              <TimelinePreview
-                project={project}
-                assets={workspace.assets}
-                time={playhead}
-                playing={playing}
-              />
-            </div>
-            <div className="flex items-center justify-center gap-3 border-t border-white/10 bg-black/30 px-4 py-2.5 text-white">
-              <button
-                type="button"
-                onClick={() => void toggleTimelinePlayback()}
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/15"
-                aria-label={playing ? "Pause timeline" : "Play timeline"}
-              >
-                {playing ? (
-                  <Pause className="h-3.5 w-3.5 fill-current" />
-                ) : (
-                  <Play className="h-3.5 w-3.5 fill-current" />
-                )}
-              </button>
-              <span className="w-24 font-mono text-xs text-white/65">
-                {formatTime(playhead)}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={project.duration}
-                step={0.05}
-                value={playhead}
-                onChange={event => seekTimeline(Number(event.target.value))}
-                onPointerUp={persistPlayhead}
-                className="h-1 w-full max-w-md accent-[#8A76EA]"
-                aria-label="Playhead"
-              />
-              <span className="w-20 text-right font-mono text-xs text-white/40">
-                {formatTime(project.duration)}
-              </span>
-            </div>
-          </section>
-
-          <section
-            {...timelineDrop.dropZoneProps}
-            className={`min-w-0 overflow-hidden rounded-xl border bg-surface shadow-card xl:col-span-3 xl:row-start-2 transition-all ${
-              timelineDrop.isDragging
-                ? "border-primary ring-4 ring-primary/10"
-                : "border-border"
-            }`}
-          >
-            <div className="flex flex-wrap items-center gap-1 border-b border-border p-2">
-              <button
-                type="button"
-                onClick={() =>
-                  document
-                    .getElementById("editor-media-panel")
-                    ?.scrollIntoView({ block: "nearest", behavior: "smooth" })
-                }
-                disabled={Boolean(busyAction)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                <Library className="h-3.5 w-3.5" />
-                Add from library
-              </button>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={Boolean(busyAction)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {busyAction === "upload" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Upload className="h-3.5 w-3.5" />
-                )}
-                Upload
-              </button>
-              <span className="hidden text-xs text-foreground/70 sm:inline">
-                or drop files in this timeline
-              </span>
-              <span className="mx-1 h-5 w-px bg-border" />
-              <button
-                type="button"
-                disabled={!selectedClip || selectedClip.locked}
-                title="Split at playhead (S)"
-                onClick={() => void splitSelectedClip()}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-30"
-              >
-                <Scissors className="h-3.5 w-3.5" />
-                Split
-              </button>
-              <button
-                type="button"
-                disabled={!selectedClip}
-                title="Duplicate (Ctrl/⌘ D)"
-                onClick={() => void duplicateSelectedClip()}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-30"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                Duplicate
-              </button>
-              <button
-                type="button"
-                disabled={!selectedClip || selectedClip.locked}
-                title="Delete selected clip (Delete)"
-                onClick={() => void deleteSelectedClip()}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-30"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </button>
-              <div className="ml-auto flex items-center gap-2 pr-1">
-                {uploadProgress !== null && (
-                  <span className="font-mono text-xs text-primary">
-                    {uploadProgress}%
-                  </span>
-                )}
-                <span className="text-xs text-foreground/70">Zoom</span>
-                <input
-                  type="range"
-                  min={100}
-                  max={260}
-                  step={20}
-                  value={timelineZoom}
-                  onChange={event =>
-                    setTimelineZoom(Number(event.target.value))
-                  }
-                  className="h-1 w-20 accent-primary"
-                  aria-label="Timeline zoom"
-                />
-              </div>
-            </div>
-
-            <TimelinePrompt
-              key={project.id}
-              duration={project.duration}
-              busy={Boolean(busyAction)}
-              credits={AI_CREDIT_COSTS.editPlan}
-              onSend={async (text, range) => {
-                setCommand(text);
-                setRangeStart(range.start);
-                setRangeEnd(range.end);
-                setRightPanel("assistant");
-                await runEditCommand(
-                  `LOCAL RANGE EDIT ${range.start.toFixed(1)}–${range.end.toFixed(1)}s. Only propose style, audio level, caption, editable graphic, or existing broll changes in this interval. Do not move, delete, retime, or shift any other content. ${text}`,
-                  range
-                );
-              }}
-            />
-            <TimelineTracks
-              project={project}
-              assets={workspace.assets}
-              time={playhead}
-              zoom={timelineZoom}
-              selectedClipId={selectedClipId}
-              disabled={Boolean(busyAction)}
-              onSeek={seekTimeline}
-              onSelect={(clip, time) => {
-                setSelectedClipId(clip.id);
-                setClipDraft({ ...clip });
-                setRightPanel("inspect");
-                seekTimeline(time);
-              }}
-              onAssetDrop={(asset, time, lane) =>
-                dropLibraryAsset(asset, time, lane)
-              }
-              onFilesDrop={async (files, time, lane) => {
-                const selection = validateFileSelection(files, {
-                  multiple: true,
-                  purpose: "media",
-                });
-                if (selection.error) {
-                  setLocalError(selection.error);
-                  return;
-                }
-                await addUploadedFiles(selection.files, project.id, time, lane);
-              }}
-              onMove={moveTimelineClip}
-              onTrim={async clip => {
-                await saveProjectChange(
-                  () =>
-                    commitProject("Clip trimmed", current => ({
-                      ...current,
-                      clips: current.clips.map(c =>
-                        c.id === clip.id && !c.locked ? clip : c
-                      ),
-                    })),
-                  "The clip could not be trimmed."
-                );
-                setClipDraft(clip);
-              }}
-              onCaptionSelect={time => {
-                setRightPanel("transcript");
-                seekTimeline(time);
-              }}
-            />
-            <div className="border-t border-border px-3 py-2 text-[10px] text-foreground/50">
-              Space play/pause · S split · Delete remove · Ctrl/⌘ C/V copy/paste
-              · Ctrl/⌘ D duplicate · Ctrl/⌘ Z undo
-            </div>
-          </section>
-        </main>
-
-        <aside className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface shadow-card xl:col-start-3 xl:row-start-1 xl:h-[580px] xl:overflow-y-auto">
-          <div className="grid grid-cols-3 border-b border-border p-1.5">
-            {(
-              [
-                ["inspect", "Adjustments"],
-                ["assistant", "AI editor"],
-                ["transcript", "Captions"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setRightPanel(id)}
-                className={`rounded-lg px-2 py-2 text-xs font-medium transition ${
-                  rightPanel === id
-                    ? "bg-primary/10 text-primary"
-                    : "text-foreground/70 hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="p-5">
-            <div className="border-b border-border p-3">
-              <button
-                type="button"
-                disabled={
-                  Boolean(busyAction) ||
-                  !capabilities.ai ||
-                  (assistSources.length > 0 && !capabilities.analysis)
-                }
-                onClick={() =>
-                  void requestAssist(
-                    rightPanel === "inspect"
-                      ? "Suggest specific improvements to the selected clip's supported settings, based on actual footage"
-                      : rightPanel === "transcript"
-                        ? "Review caption coverage including text already burned into source footage, transcription uncertainty, readability and timing"
-                        : "Recommend the strongest next editing decisions for this timeline"
-                  )
-                }
-                className="ai-magic inline-flex items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-sm text-primary disabled:opacity-40"
-              >
-                AI suggestions · {assistCost} credits{" "}
-                <WandSparkles className="h-3.5 w-3.5" />
-              </button>
-              <p className="mt-1 text-xs text-foreground/60">
-                Reviews source footage and proposes changes; nothing is applied
-                automatically.
-              </p>
-              {assistEvidence && (
-                <details className="mt-2 text-xs">
-                  <summary>Latest source observations</summary>
-                  <p className="mt-2 whitespace-pre-wrap">{assistEvidence}</p>
-                </details>
-              )}
-            </div>
-            {rightPanel === "inspect" && (
-              <div>
-                <div className="mb-5">
-                  <p className="mono-eyebrow text-primary">Clip inspector</p>
-                  <h2 className="mt-2 text-lg font-medium">
-                    {selectedClip ? selectedClip.label : "Select a clip"}
-                  </h2>
-                  <p className="mt-1 text-xs leading-5 text-foreground/70">
-                    Range controls change the selected clip only. Apply creates
-                    a reversible revision.
-                  </p>
-                </div>
-
-                {!clipDraft ? (
-                  <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-foreground/70">
-                    Choose a block on the timeline to edit its timing.
-                  </div>
-                ) : (
-                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
-                    <label className="block">
-                      <span className="mb-1.5 block text-xs text-foreground/70">
-                        Clip label
-                      </span>
-                      <input
-                        value={clipDraft.label}
-                        disabled={selectedClip?.locked}
-                        onChange={event =>
-                          setClipDraft(current =>
-                            current
-                              ? { ...current, label: event.target.value }
-                              : current
-                          )
-                        }
-                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
-                      />
-                    </label>
-                    {(
-                      [
-                        {
-                          key: "start",
-                          label: "Timeline start",
-                          min: 0,
-                          max: Math.max(project.duration, clipDraft.start + 1),
-                        },
-                        {
-                          key: "duration",
-                          label: "Visible duration",
-                          min: timingLimits!.minimumDuration,
-                          max: timingLimits!.maximumDuration,
-                        },
-                        {
-                          key: "inPoint",
-                          label: "Source in",
-                          min: 0,
-                          max: Math.max(
-                            0,
-                            timingLimits!.outPoint -
-                              timingLimits!.minimumSourceSpan
-                          ),
-                        },
-                        {
-                          key: "outPoint",
-                          label: "Source out",
-                          min:
-                            timingLimits!.inPoint +
-                            timingLimits!.minimumSourceSpan,
-                          max: timingLimits!.sourceLimit,
-                        },
-                      ] as const
-                    ).map(control => (
-                      <label
-                        key={control.key}
-                        htmlFor={`clip-${control.key}`}
-                        aria-label={control.label}
-                        className="block"
-                      >
-                        <span className="mb-1.5 flex items-center justify-between text-xs">
-                          <span className="text-foreground/70">
-                            {control.label}
-                          </span>
-                          <span className="font-mono text-foreground/70">
-                            {formatTime(clipDraft[control.key])}
-                          </span>
-                        </span>
-                        <input
-                          id={`clip-${control.key}`}
-                          type="range"
-                          min={control.min}
-                          max={control.max}
-                          step="any"
-                          value={clipDraft[control.key]}
-                          disabled={selectedClip?.locked}
-                          onChange={event =>
-                            setClipDraft(current => {
-                              if (!current) return current;
-                              const value = Number(event.target.value);
-                              const speed = current.speed ?? 1;
-                              if (control.key === "duration")
-                                return {
-                                  ...current,
-                                  duration: value,
-                                  outPoint: current.inPoint + value * speed,
-                                };
-                              if (control.key === "inPoint")
-                                return {
-                                  ...current,
-                                  inPoint: value,
-                                  duration: (current.outPoint - value) / speed,
-                                };
-                              if (control.key === "outPoint")
-                                return {
-                                  ...current,
-                                  outPoint: value,
-                                  duration: (value - current.inPoint) / speed,
-                                };
-                              return { ...current, start: value };
-                            })
-                          }
-                          className="h-1 w-full accent-primary disabled:opacity-40"
-                        />
-                      </label>
-                    ))}
-
-                    <button
-                      type="button"
-                      disabled={selectedClip?.locked}
-                      onClick={() => void applyClipDraft()}
-                      className="w-full rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-40"
-                    >
-                      Apply timing
-                    </button>
-
-                    <div className="flex flex-wrap gap-2 md:col-span-2 xl:col-span-1">
-                      <button
-                        type="button"
-                        disabled={selectedClip?.locked}
-                        onClick={() =>
-                          setClipDraft(c =>
-                            c
-                              ? {
-                                  ...c,
-                                  speed: 1,
-                                  duration: c.outPoint - c.inPoint,
-                                  volume: 1,
-                                  fadeIn: 0,
-                                  fadeOut: 0,
-                                  brightness: 0,
-                                  contrast: 1,
-                                  saturation: 1,
-                                  fit: "contain",
-                                }
-                              : c
-                          )
-                        }
-                        className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-40"
-                      >
-                        Reset look & sound
-                      </button>
-                      <button
-                        type="button"
-                        disabled={selectedClip?.locked}
-                        onClick={() =>
-                          setClipDraft(c =>
-                            c
-                              ? {
-                                  ...c,
-                                  volume: 0.2,
-                                  fadeIn: Math.min(0.5, c.duration / 2),
-                                  fadeOut: Math.min(1, c.duration / 2),
-                                }
-                              : c
-                          )
-                        }
-                        className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-40"
-                      >
-                        Music under dialogue
-                      </button>
-                      <p className="self-center text-xs text-foreground/60">
-                        Review the settings, then apply. Undo restores the
-                        previous revision.
-                      </p>
-                    </div>
-                    <label className="block text-sm">
-                      Framing
-                      <CompactSelect
-                        aria-label="Framing"
-                        value={clipDraft.fit ?? "contain"}
-                        disabled={selectedClip?.locked}
-                        onValueChange={value =>
-                          setClipDraft(c =>
-                            c ? { ...c, fit: value as "contain" | "cover" } : c
-                          )
-                        }
-                        options={[
-                          { value: "contain", label: "Fit whole shot" },
-                          { value: "cover", label: "Fill frame" },
-                        ]}
-                        className="mt-2"
-                      />
-                    </label>
-                    {(
-                      [
-                        ["speed", "Playback speed", 0.25, 4, 0.05, 1],
-                        ["volume", "Volume", 0, 2, 0.05, 1],
-                        ["fadeIn", "Fade in (seconds)", 0, 3, 0.1, 0],
-                        ["fadeOut", "Fade out (seconds)", 0, 3, 0.1, 0],
-                        ["brightness", "Brightness", -0.5, 0.5, 0.05, 0],
-                        ["contrast", "Contrast", 0.5, 2, 0.05, 1],
-                        ["saturation", "Saturation", 0, 2, 0.05, 1],
-                      ] as const
-                    ).map(([key, label, min, max, step, fallback]) => (
-                      <label key={key} className="block text-sm">
-                        {label}{" "}
-                        <span className="float-right font-mono">
-                          {(clipDraft[key] ?? fallback).toFixed(1)}
-                        </span>
-                        <input
-                          type="range"
-                          aria-label={label}
-                          min={min}
-                          max={max}
-                          step={step}
-                          value={clipDraft[key] ?? fallback}
-                          disabled={selectedClip?.locked}
-                          onChange={e =>
-                            setClipDraft(c =>
-                              c
-                                ? {
-                                    ...c,
-                                    [key]: Number(e.target.value),
-                                    ...(key === "speed"
-                                      ? {
-                                          duration:
-                                            (c.outPoint - c.inPoint) /
-                                            Number(e.target.value),
-                                        }
-                                      : {}),
-                                  }
-                                : c
-                            )
-                          }
-                          className="mt-2 w-full accent-primary"
-                        />
-                      </label>
-                    ))}
-                    <button
-                      type="button"
-                      disabled={selectedClip?.locked}
-                      onClick={() =>
-                        void saveProjectChange(
-                          () =>
-                            commitProject(
-                              "Clip look and sound adjusted",
-                              p => ({
-                                ...p,
-                                clips: p.clips.map(c =>
-                                  c.id === clipDraft.id && !c.locked
-                                    ? normalizeClipTiming(
-                                        clipDraft,
-                                        previewAsset,
-                                        p.duration
-                                      )
-                                    : c
-                                ),
-                              })
-                            ),
-                          "Could not save settings."
-                        )
-                      }
-                      className="w-full rounded-lg border border-primary px-3 py-2 text-sm text-primary"
-                    >
-                      Apply look and sound
-                    </button>
-                    <div className="grid grid-cols-2 gap-2 border-t border-border pt-4">
-                      <button
-                        type="button"
-                        onClick={() => void toggleClipProperty("locked")}
-                        className="flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs hover:bg-background"
-                      >
-                        {selectedClip?.locked ? (
-                          <Unlock className="h-3.5 w-3.5" />
-                        ) : (
-                          <Lock className="h-3.5 w-3.5" />
-                        )}
-                        {selectedClip?.locked ? "Unlock" : "Lock"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void toggleClipProperty("muted")}
-                        className="flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs hover:bg-background"
-                      >
-                        {selectedClip?.muted ? (
-                          <Volume2 className="h-3.5 w-3.5" />
-                        ) : (
-                          <VolumeX className="h-3.5 w-3.5" />
-                        )}
-                        {selectedClip?.muted ? "Unmute" : "Mute"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {rightPanel === "inspect" &&
-              selectedClip &&
-              clipLaneKind(selectedClip) === "video" && (
-                <details className="mt-4 rounded-xl border border-border p-3">
-                  <summary className="cursor-pointer text-sm font-medium">
-                    Looks & transitions
-                  </summary>
-                  <div className="mt-3">
-                    <EditorPresetLibrary
-                      mode="looks"
-                      disabled={selectedClip.locked || Boolean(busyAction)}
-                      onClipLook={preset =>
-                        void saveProjectChange(
-                          () =>
-                            commitProject(
-                              `Applied ${preset.name}`,
-                              current => ({
-                                ...current,
-                                clips: current.clips.map(c =>
-                                  c.id === selectedClip.id && !c.locked
-                                    ? { ...c, ...preset.settings }
-                                    : c
-                                ),
-                              })
-                            ),
-                          "The look could not be applied."
-                        )
-                      }
-                      onFadePreset={settings =>
-                        void saveProjectChange(
-                          () =>
-                            commitProject(
-                              "Applied clip transition",
-                              current => ({
-                                ...current,
-                                clips: current.clips.map(c =>
-                                  c.id === selectedClip.id && !c.locked
-                                    ? { ...c, ...settings }
-                                    : c
-                                ),
-                              })
-                            ),
-                          "The transition could not be applied."
-                        )
-                      }
-                    />
-                  </div>
-                </details>
-              )}
-
-            {rightPanel === "transcript" && (
-              <div>
-                <details className="mb-4 rounded-xl border border-border p-3">
-                  <summary className="cursor-pointer text-sm font-medium">
-                    Caption style library
-                  </summary>
-                  <div className="mt-3">
-                    <EditorPresetLibrary
-                      mode="captions"
-                      selectedCaptionId={project.captionStyle}
-                      onCaptionPreset={id =>
-                        void saveProjectChange(
-                          () =>
-                            commitProject("Caption style changed", current => ({
-                              ...current,
-                              captionStyle: id,
-                            })),
-                          "Caption style could not be saved."
-                        )
-                      }
-                    />
-                  </div>
-                </details>
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="mono-eyebrow text-primary">
-                      Editable transcript
-                    </p>
-                    <h2 className="mt-2 text-lg font-medium">
-                      Words are edit points
-                    </h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addTranscriptSegment}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-background"
-                    aria-label="Add transcript line"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                <div className="mb-4">
-                  <CaptionFileTools
-                    segments={transcriptDraft}
-                    duration={project.duration}
-                    onImport={segments => {
-                      setTranscriptDraft(segments);
-                      setTranscriptionProvenance(null);
-                      void saveProjectChange(
-                        () =>
-                          commitProject("Captions imported", current => ({
-                            ...current,
-                            transcript: segments,
-                            transcriptProvenance: undefined,
-                          })),
-                        "Imported captions could not be saved."
-                      );
-                    }}
-                  />
-                </div>
-
-                {capabilities.transcription && previewAsset && (
-                  <button
-                    type="button"
-                    disabled={busyAction === "transcribe"}
-                    onClick={() => void transcribeActiveAsset()}
-                    className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
-                  >
-                    {busyAction === "transcribe" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <AudioLines className="h-3.5 w-3.5" />
-                    )}
-                    Transcribe active media
-                  </button>
-                )}
-
-                {transcriptionProvenance ? (
-                  <div className="mb-4">
-                    <AiProvenanceBadge
-                      provenance={transcriptionProvenance}
-                      compact
-                    />
-                  </div>
-                ) : null}
-
-                <div className="space-y-2">
-                  {transcriptDraft.map((segment, index) => (
-                    <div
-                      key={segment.id}
-                      className="rounded-xl border border-border bg-background/55 p-3"
-                    >
-                      <div className="mb-2 flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={segment.start}
-                          onChange={event =>
-                            mutateTranscript(current =>
-                              current.map((item, itemIndex) =>
-                                itemIndex === index
-                                  ? {
-                                      ...item,
-                                      start: Number(event.target.value),
-                                    }
-                                  : item
-                              )
-                            )
-                          }
-                          className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
-                          aria-label={`Line ${index + 1} start`}
-                        />
-                        <span className="text-xs text-foreground/70">to</span>
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={segment.end}
-                          onChange={event =>
-                            mutateTranscript(current =>
-                              current.map((item, itemIndex) =>
-                                itemIndex === index
-                                  ? { ...item, end: Number(event.target.value) }
-                                  : item
-                              )
-                            )
-                          }
-                          className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
-                          aria-label={`Line ${index + 1} end`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            mutateTranscript(current =>
-                              current.filter(item => item.id !== segment.id)
-                            )
-                          }
-                          className="ml-auto text-foreground/70 hover:text-destructive"
-                          aria-label={`Delete line ${index + 1}`}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                      <textarea
-                        value={segment.text}
-                        rows={2}
-                        placeholder="Type the spoken line"
-                        onChange={event =>
-                          mutateTranscript(current =>
-                            current.map((item, itemIndex) =>
-                              itemIndex === index
-                                ? { ...item, text: event.target.value }
-                                : item
-                            )
-                          )
-                        }
-                        className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-foreground/70"
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                {transcriptDraft.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm leading-5 text-foreground/70">
-                    Add lines manually or transcribe the selected media when the
-                    speech service is connected.
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => void saveTranscript()}
-                  className="mt-4 w-full rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
-                >
-                  Save transcript revision
-                </button>
-              </div>
-            )}
-
-            {rightPanel === "inspect" && selectedClip?.graphic && (
-              <div className="p-4">
-                <GraphicComposer
-                  key={selectedClip.id}
-                  initial={selectedClip.graphic}
-                  duration={selectedClip.duration}
-                  busy={selectedClip.locked}
-                  onSave={async graphic => {
-                    await commitProject("Updated motion graphic", p => ({
-                      ...p,
-                      clips: p.clips.map(c =>
-                        c.id === selectedClip.id && !c.locked
-                          ? { ...c, graphic }
-                          : c
-                      ),
-                    }));
-                  }}
-                />
-              </div>
-            )}
-            {rightPanel === "assistant" && (
-              <div>
-                <p className="mono-eyebrow text-primary">AI assistant</p>
-                <h2 className="mt-2 text-lg font-medium">
-                  Describe the change
-                </h2>
-                <p className="mt-1 text-xs leading-5 text-foreground/70">
-                  The assistant proposes operations with a reason, confidence,
-                  and exact interval. You stay in control.
-                </p>
-
-                <div className="mt-4 rounded-xl border border-border bg-background/55 p-3">
-                  <textarea
-                    value={command}
-                    onChange={event => {
-                      setCommand(event.target.value);
-                      setCommandSummary("");
-                      setCommandProvenance(null);
-                      setCommandError(null);
-                    }}
-                    rows={4}
-                    placeholder="Tighten the pause after the hook, keep the product reveal locked, and make the captions calmer."
-                    className="w-full resize-none bg-transparent text-sm leading-5 outline-none placeholder:text-foreground/70"
-                  />
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <label>
-                      <span className="mb-1 block text-xs uppercase tracking-wider text-foreground/70">
-                        Range start
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={project.duration}
-                        step={0.1}
-                        value={rangeStart}
-                        onChange={event =>
-                          setRangeStart(Number(event.target.value))
-                        }
-                        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 font-mono text-xs"
-                      />
-                    </label>
-                    <label>
-                      <span className="mb-1 block text-xs uppercase tracking-wider text-foreground/70">
-                        Range end
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={project.duration}
-                        step={0.1}
-                        value={rangeEnd}
-                        onChange={event =>
-                          setRangeEnd(Number(event.target.value))
-                        }
-                        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 font-mono text-xs"
-                      />
-                    </label>
-                  </div>
-                  <div className="mt-3 space-y-3">
-                    <label className="block text-sm">
-                      Selection start · {formatTime(rangeStart)}
-                      <input
-                        aria-label="AI selection start"
-                        type="range"
-                        min={0}
-                        max={project.duration}
-                        step={0.05}
-                        value={rangeStart}
-                        onChange={e => {
-                          const t = Number(e.target.value);
-                          setRangeStart(t);
-                          seekTimeline(t);
-                        }}
-                        className="w-full accent-primary"
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      Selection end · {formatTime(rangeEnd)}
-                      <input
-                        aria-label="AI selection end"
-                        type="range"
-                        min={0}
-                        max={project.duration}
-                        step={0.05}
-                        value={rangeEnd}
-                        onChange={e => {
-                          const t = Number(e.target.value);
-                          setRangeEnd(t);
-                          seekTimeline(t);
-                        }}
-                        className="w-full accent-primary"
-                      />
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setRangeStart(playhead)}
-                        className="rounded border border-border px-2 py-1 text-xs"
-                      >
-                        Start at playhead
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRangeEnd(playhead)}
-                        className="rounded border border-border px-2 py-1 text-xs"
-                      >
-                        End at playhead
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRangeStart(0);
-                          setRangeEnd(project.duration);
-                        }}
-                        className="rounded border border-border px-2 py-1 text-xs"
-                      >
-                        Whole edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void saveProjectChange(
-                            () =>
-                              commitProject("Range removed and gap closed", p =>
-                                rippleRemove(
-                                  p,
-                                  Math.min(rangeStart, rangeEnd),
-                                  Math.max(rangeStart, rangeEnd)
-                                )
-                              ),
-                            "Could not close gap."
-                          )
-                        }
-                        className="rounded border border-border px-2 py-1 text-xs"
-                      >
-                        Cut range & close gap
-                      </button>
-                    </div>
-                  </div>
-                  {selectedClip && (
-                    <p className="mt-2 truncate text-xs text-foreground/70">
-                      Selection: {selectedClip.label}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    disabled={
-                      !capabilities.ai ||
-                      !command.trim() ||
-                      busyAction === "command"
-                    }
-                    onClick={() => void runEditCommand()}
-                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {busyAction === "command" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    Propose changes · {AI_CREDIT_COSTS.editPlan} credits
-                  </button>
-                </div>
-
-                {!capabilities.ai && (
-                  <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-foreground/60">
-                    AI planning is not connected yet. Timeline editing,
-                    revisions, transcript work, and edit-brief export remain
-                    available.
-                  </div>
-                )}
-                {commandError && (
-                  <div className="mt-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs leading-5 text-destructive">
-                    {commandError}
-                  </div>
-                )}
-                {commandSummary && (
-                  <div className="mt-3 rounded-lg border border-primary/15 bg-primary/5 p-3 text-xs leading-5 text-foreground/70">
-                    {commandSummary}
-                    <div className="mt-2">
-                      <AiProvenanceBadge
-                        provenance={commandProvenance || undefined}
-                        compact
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-5 space-y-3">
-                  {project.proposedChanges.map(change => (
-                    <div
-                      key={change.id}
-                      className={`rounded-xl border p-3 ${
-                        change.status === "accepted"
-                          ? "border-emerald-500/20 bg-emerald-500/5"
-                          : change.status === "rejected"
-                            ? "border-border bg-background/35 opacity-55"
-                            : "border-primary/20 bg-primary/[0.035]"
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface text-primary">
-                          <WandSparkles className="h-3.5 w-3.5" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-medium">
-                              {change.label}
-                            </p>
-                            <span className="rounded bg-surface px-1.5 py-0.5 font-mono text-xs uppercase text-foreground/70">
-                              {change.intensity}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs leading-5 text-foreground/70">
-                            {change.reason}
-                          </p>
-                          <div className="mt-2 flex items-center gap-3 font-mono text-xs text-foreground/70">
-                            <span>
-                              {formatTime(change.start)}–
-                              {formatTime(change.end)}
-                            </span>
-                            <span>
-                              {Math.round(change.confidence * 100)}% confidence
-                            </span>
-                          </div>
-                          <div className="mt-2">
-                            <AiProvenanceBadge
-                              provenance={change.provenance}
-                              compact
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      {change.status === "proposed" ? (
-                        <div className="mt-3 grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void acceptOperation(change)}
-                            className="rounded-lg bg-primary px-2 py-2 text-xs font-medium text-primary-foreground"
-                          >
-                            Apply change
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void rejectOperation(change)}
-                            className="rounded-lg border border-border px-2 py-2 text-xs font-medium hover:bg-background"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <p className="mt-3 flex items-center gap-1.5 text-xs font-medium capitalize text-foreground/70">
-                          {change.status === "accepted" ? (
-                            <Check className="h-3 w-3" />
-                          ) : (
-                            <X className="h-3 w-3" />
-                          )}
-                          {change.status === "accepted"
-                            ? "applied to timeline"
-                            : change.status}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  {project.proposedChanges.length === 0 && (
-                    <p className="rounded-xl border border-dashed border-border p-5 text-center text-xs leading-5 text-foreground/70">
-                      No pending AI changes. Your manual timeline remains
-                      untouched.
-                    </p>
-                  )}
-                </div>
-                <p className="mt-4 text-xs leading-4 text-foreground/70">
-                  Apply changes to update the timeline. Undo restores the
-                  previous edit.
-                </p>
-              </div>
-            )}
-          </div>
-        </aside>
-      </div>
-
+        </DialogContent>
+      </Dialog>
       {exportOpen && (
         <RenderExportPanel
           project={project}

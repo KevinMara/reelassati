@@ -116,11 +116,13 @@ export function AutonomousEditor({
         checkpoint();
         if (asset.kind === "video") {
           setStatus(`Reviewing ${asset.name}…`);
-          const result = await platformApi.analyzeVideo({
-            assetId: asset.id,
-            platform: project.platform,
-            sourceRightsConfirmed: true,
-          });
+          const { analyzeMedia } = await import("@/lib/analyze-media");
+          const result = await analyzeMedia(
+            asset,
+            project.platform,
+            undefined,
+            setStatus
+          );
           working.sourceReviews = [
             ...(working.sourceReviews ?? []).filter(
               r => r.assetId !== asset.id

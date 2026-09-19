@@ -1819,6 +1819,19 @@ describe("Sites worker", () => {
       expect(response.status).toBe(200);
       expect(providerUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
       expect(providerBody.model).toBe("google/gemini-2.5-flash");
+      expect(providerBody.messages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            content: expect.arrayContaining([
+              expect.objectContaining({
+                type: "video_url",
+                video_url: { url: "https://media.example.com/test.mp4" },
+              }),
+            ]),
+          }),
+        ])
+      );
     } finally {
       globalThis.fetch = originalFetch;
     }

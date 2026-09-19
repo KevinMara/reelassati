@@ -1,3 +1,4 @@
+import { resolveMediaDuration } from "@/lib/media-metadata";
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -202,17 +203,29 @@ export default function VideoAnalyzer() {
     setQueued(false);
 
     try {
-      const asset = sourceMode === "upload" ? await resolveSourceAsset() : null;
+      let asset = sourceMode === "upload" ? await resolveSourceAsset() : null;
       if (sourceMode === "upload" && !asset) {
         throw new Error("Select or upload a video before running analysis.");
       }
 
-      const analysis = await platformApi.analyzeVideo({
-        assetId: asset?.id,
-        publicUrl: sourceMode === "url" ? publicUrl.trim() : undefined,
-        platform,
-        sourceRightsConfirmed: true,
-      });
+      if (asset && !asset.duration) {
+        asset = { ...asset, duration: await resolveMediaDuration(asset) };
+        const readyAsset = asset;
+        setSourceAsset(readyAsset);
+        await updateWorkspace(w => ({
+          ...w,
+          assets: w.assets.map(a => (a.id === readyAsset.id ? readyAsset : a)),
+        }));
+      }
+      const analysis = asset
+        ? await (
+            await import("@/lib/analyze-media")
+          ).analyzeMedia(asset, platform)
+        : await platformApi.analyzeVideo({
+            publicUrl: publicUrl.trim(),
+            platform,
+            sourceRightsConfirmed: true,
+          });
       setResult(analysis);
       posthog?.capture("video_analysis_completed", {
         source_type: sourceMode,
