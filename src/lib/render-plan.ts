@@ -1,13 +1,10 @@
+import { captionAssStyle, captionAssEvents } from "./caption-rendering";
+import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import type { Asset, EditProject } from "@contracts/workspace";
 import { normalizeGraphic } from "@contracts/motion-graphics";
 import { graphicAssEvents } from "./graphic-ass";
 
 const number = (n: number) => Number(n.toFixed(4));
-function time(seconds: number) {
-  const cs = Math.round(Math.max(0, seconds) * 100);
-  return `${Math.floor(cs / 360000)}:${String(Math.floor(cs / 6000) % 60).padStart(2, "0")}:${String(Math.floor(cs / 100) % 60).padStart(2, "0")}.${String(cs % 100).padStart(2, "0")}`;
-}
-
 /** Pure, deterministic FFmpeg plan, also exercised against native FFmpeg. */
 export function buildRenderPlan(
   project: EditProject,
@@ -17,9 +14,7 @@ export function buildRenderPlan(
 ) {
   const mediaClips = project.clips
     .filter(c => c.track !== "captions" && !c.graphic)
-    .sort(
-      (a, b) => Number(a.track === "overlay") - Number(b.track === "overlay")
-    );
+    .sort(compareTimelineLayers);
   if (!mediaClips.length && !project.clips.some(c => c.graphic))
     throw new Error("Add media to your timeline first.");
   const duration = project.duration;
@@ -94,7 +89,7 @@ export function buildRenderPlan(
       const fit =
         clip.fit === "cover"
           ? `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`
-          : `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`;
+          : `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0`;
       const bounded = (
         value: number | undefined,
         fallback: number,
@@ -107,16 +102,16 @@ export function buildRenderPlan(
       const grade = `eq=brightness=${bounded(clip.brightness, 0, -0.5, 0.5)}:contrast=${bounded(clip.contrast, 1, 0.5, 2)}:saturation=${bounded(clip.saturation, 1, 0, 3)}`;
       const fades = [
         clip.fadeIn
-          ? `fade=t=in:st=0:d=${number(Math.min(clip.duration, bounded(clip.fadeIn, 0, 0, 5)))}`
+          ? `fade=t=in:st=0:d=${number(Math.min(clip.duration, bounded(clip.fadeIn, 0, 0, 5)))}:alpha=1`
           : "",
         clip.fadeOut
-          ? `fade=t=out:st=${number(Math.max(0, clip.duration - bounded(clip.fadeOut, 0, 0, 5)))}:d=${number(Math.min(clip.duration, bounded(clip.fadeOut, 0, 0, 5)))}`
+          ? `fade=t=out:st=${number(Math.max(0, clip.duration - bounded(clip.fadeOut, 0, 0, 5)))}:d=${number(Math.min(clip.duration, bounded(clip.fadeOut, 0, 0, 5)))}:alpha=1`
           : "",
       ]
         .filter(Boolean)
         .join(",");
       filters.push(
-        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},${fit},setsar=1,fps=30,${grade}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
+        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=30,${grade}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
       );
       filters.push(
         `[${visual}][v${index}]overlay=eof_action=pass:repeatlast=0:enable='gte(t,${number(clip.start)})*lt(t,${number(clip.start + clip.duration)})'[layer${index}]`
@@ -141,13 +136,8 @@ export function buildRenderPlan(
   );
   const graphics = graphicAssEvents(project.clips, width, height, duration);
   const ass =
-    `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Default,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,40,40,${Math.round(height * 0.14)},1\nStyle: Callout,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H006F5AD8,&H006F5AD8,-1,0,0,0,100,100,0,0,3,8,0,5,0,0,0,1\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n` +
-    captions
-      .map(
-        s =>
-          `Dialogue: 0,${time(s.start)},${time(Math.min(duration, s.end))},Default,,0,0,0,,${s.text.replace(/[{}\\]/g, "").replace(/\r?\n/g, "\\N")}`
-      )
-      .join("\n") +
+    `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Default,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,40,40,${Math.round(height * 0.14)},1\nStyle: Callout,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H006F5AD8,&H006F5AD8,-1,0,0,0,100,100,0,0,3,8,0,5,0,0,0,1\n${captionAssStyle(project.captionStyle, width, height)}\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n` +
+    captionAssEvents(captions, project.captionStyle, duration) +
     "\n" +
     graphics;
   if (captions.length || graphics) {

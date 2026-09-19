@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { WandSparkles } from "lucide-react";
 export function TimelinePrompt({
   duration,
   busy,
@@ -27,9 +28,10 @@ export function TimelinePrompt({
         type="button"
         aria-pressed={enabled}
         onClick={() => setEnabled(!enabled)}
-        className="text-xs font-medium text-primary"
+        className="ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"
       >
         {enabled ? "Close range prompt" : "Edit a time range with AI"}
+        <WandSparkles aria-hidden="true" className="h-3.5 w-3.5" />
       </button>
       {enabled && (
         <>
@@ -184,9 +186,10 @@ export function TimelinePrompt({
               <button
                 type="submit"
                 disabled={busy || !prompt.trim() || high - low < 0.1}
-                className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-40"
+                className="ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs disabled:opacity-40"
               >
                 Suggest range edit · {credits} credits
+                <WandSparkles aria-hidden="true" className="h-3.5 w-3.5" />
               </button>
             </form>
           )}

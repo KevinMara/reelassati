@@ -738,6 +738,7 @@ export const platformApi = {
     requestId: string;
     rightsConfirmed: true;
     projectId: string;
+    assetName?: string;
   }): Promise<Asset> => {
     const result = await requestJson<{ asset: Asset }>("/api/ai/audio", {
       method: "POST",
@@ -799,6 +800,13 @@ export const platformApi = {
   videoJob: (id: string) =>
     requestJson<{ job: GenerationJob; asset?: Asset }>(
       `/api/video/jobs/${encodeURIComponent(id)}`
+    ),
+
+  /** Retrieve an existing provider output; this endpoint never starts a new generation. */
+  recoverVideoJob: (id: string) =>
+    requestJson<{ job: GenerationJob; asset?: Asset }>(
+      `/api/video/jobs/${encodeURIComponent(id)}/recover`,
+      { method: "POST" }
     ),
 
   publishingAccounts: () =>

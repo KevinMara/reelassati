@@ -5,6 +5,9 @@ export const GRAPHIC_KINDS = [
   "countdown",
   "arrow",
   "highlight",
+  "spatial-title",
+  "spatial-cube",
+  "spatial-orbit",
 ] as const;
 export type GraphicKind = (typeof GRAPHIC_KINDS)[number];
 export interface GraphicKeyframe {
@@ -29,6 +32,13 @@ export interface MotionGraphic {
   suffix: string;
   rotation?: number;
   motion?: GraphicKeyframe[];
+  spatial?: {
+    pitch: number;
+    yaw: number;
+    depth: number;
+    turns: number;
+    perspective: number;
+  };
 }
 const bounded = (v: unknown, fallback: number, min: number, max: number) =>
   typeof v === "number" && Number.isFinite(v)
@@ -79,6 +89,28 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
     prefix: text(v.prefix, 12),
     suffix: text(v.suffix, 12),
     rotation: bounded(v.rotation, 0, -720, 720),
+    ...(String(v.kind).startsWith("spatial-")
+      ? {
+          spatial: (() => {
+            const s =
+              v.spatial && typeof v.spatial === "object"
+                ? (v.spatial as Record<string, unknown>)
+                : {};
+            return {
+              pitch: bounded(s.pitch, -18, -70, 70),
+              yaw: bounded(s.yaw, -25, -70, 70),
+              depth: bounded(s.depth, 0.2, 0.02, 0.65),
+              turns: bounded(
+                s.turns,
+                v.kind === "spatial-title" ? 0 : 0.4,
+                -3,
+                3
+              ),
+              perspective: bounded(s.perspective, 5, 3, 12),
+            };
+          })(),
+        }
+      : {}),
     ...(motion.size
       ? { motion: [...motion.values()].sort((a, b) => a.at - b.at) }
       : {}),

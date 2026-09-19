@@ -1,3 +1,5 @@
+import { v4 as createUuid } from "uuid";
+import { appendEditorRevisions } from "@/lib/editor-history";
 import { normalizeReview } from "@contracts/source-review";
 import {
   EDIT_RECIPES,
@@ -212,7 +214,7 @@ export function AutonomousEditor({
           videosUsed++;
           setStatus(`Generating supporting video ${videosUsed}/${videos}…`);
           const created = await platformApi.createVideo({
-            requestId: crypto.randomUUID(),
+            requestId: createUuid(),
             assetName: op.label,
             prompt: op.parameters.prompt,
             duration: 5,
@@ -320,31 +322,46 @@ export function AutonomousEditor({
         ...w,
         projects: w.projects.map(p => {
           if (p.id !== project.id) return p;
-          if (JSON.stringify(p.clips) !== originalClips)
+          if (
+            JSON.stringify(p.clips) !== originalClips ||
+            JSON.stringify(p.transcript) !== JSON.stringify(project.transcript)
+          )
             throw new Error(
               "Your timeline changed during the edit. AI media is saved; run again on the current version."
             );
           const before = {
-            id: crypto.randomUUID(),
+            id: createUuid(),
             label: "Before autonomous edit",
             createdAt: new Date().toISOString(),
             clips: p.clips,
             transcript: p.transcript,
             duration: p.duration,
+            captionStyle: p.captionStyle,
             transcriptProvenance: p.transcriptProvenance,
           };
           const after = {
-            id: crypto.randomUUID(),
+            id: createUuid(),
             label: "Autonomous edit",
             createdAt: new Date().toISOString(),
             clips: working.clips,
             transcript: working.transcript,
             duration: contentDuration(working.clips),
+            captionStyle: p.captionStyle,
           };
+          const hasChanges =
+            JSON.stringify([
+              before.clips,
+              before.transcript,
+              before.duration,
+            ]) !==
+            JSON.stringify([after.clips, after.transcript, after.duration]);
           return {
             ...working,
             updatedAt: new Date().toISOString(),
-            revisions: [...p.revisions, before, after].slice(-24),
+            captionStyle: p.captionStyle,
+            ...(hasChanges
+              ? appendEditorRevisions(p, [before, after], before)
+              : { revisions: p.revisions, revisionIndex: p.revisionIndex }),
             lastCommand: style,
           };
         }),
@@ -535,7 +552,10 @@ export function AutonomousEditor({
         </div>
       </div>
       {status && (
-        <p role="status" className="mt-4 text-sm leading-6">
+        <p
+          role="status"
+          className={`mt-4 text-sm leading-6 ${busy ? "ai-status-text" : ""}`}
+        >
           {status}
         </p>
       )}

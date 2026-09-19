@@ -169,4 +169,113 @@ describe("timeline rendering", () => {
     },
     65000
   );
+  it.skipIf(!nativeAvailable)(
+    "composites numbered image/video lanes in order and keeps uncovered lower pixels visible",
+    () => {
+      const dir = mkdtempSync(join(tmpdir(), "reelassati-layers-"));
+      try {
+        execFileSync("ffmpeg", [
+          "-v",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "color=red:s=160x90:d=1:r=30",
+          "-c:v",
+          "libx264",
+          join(dir, "red.mp4"),
+        ]);
+        execFileSync("ffmpeg", [
+          "-v",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "color=blue:s=40x40",
+          "-frames:v",
+          "1",
+          "-threads",
+          "1",
+          join(dir, "blue.png"),
+        ]);
+        const layerAssets = [
+          { ...assets[0], id: "red" },
+          { ...assets[0], id: "blue", kind: "image", contentType: "image/png" },
+        ] as Asset[];
+        const layered = {
+          ...project,
+          aspectRatio: "16:9",
+          duration: 1,
+          transcript: [],
+          clips: [
+            {
+              id: "top",
+              assetId: "blue",
+              track: "video",
+              lane: 3,
+              start: 0.25,
+              inPoint: 0,
+              outPoint: 0.5,
+              duration: 0.5,
+              fit: "contain",
+              fadeIn: 0.2,
+            },
+            {
+              id: "base",
+              assetId: "red",
+              track: "video",
+              lane: 1,
+              start: 0,
+              inPoint: 0,
+              outPoint: 1,
+              duration: 1,
+              fit: "cover",
+            },
+          ],
+        } as unknown as EditProject;
+        const plan = buildRenderPlan(layered, layerAssets, new Set());
+        for (const [index, asset] of plan.inputs.entries())
+          copyFileSync(
+            join(dir, asset.id === "red" ? "red.mp4" : "blue.png"),
+            join(dir, `input-${index}`)
+          );
+        writeFileSync(join(dir, "captions.ass"), plan.ass);
+        execFileSync("ffmpeg", ["-v", "error", ...plan.args], {
+          cwd: dir,
+          timeout: 30000,
+        });
+        const pixel = (t: string, x: number) =>
+          execFileSync("ffmpeg", [
+            "-v",
+            "error",
+            "-ss",
+            t,
+            "-i",
+            join(dir, "output.mp4"),
+            "-vf",
+            `crop=2:2:${x}:360,format=rgb24`,
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+          ]);
+        const before = pixel("0.1", 640),
+          during = pixel("0.6", 640),
+          fading = pixel("0.35", 640),
+          edge = pixel("0.4", 100),
+          after = pixel("0.9", 640);
+        expect(before[0]).toBeGreaterThan(200);
+        expect(during[2]).toBeGreaterThan(200);
+        expect(during[0]).toBeLessThan(30);
+        expect(fading[0]).toBeGreaterThan(40);
+        expect(fading[2]).toBeGreaterThan(40);
+        expect(edge[0]).toBeGreaterThan(200);
+        expect(after[0]).toBeGreaterThan(200);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    40000
+  );
 });

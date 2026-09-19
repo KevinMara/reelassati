@@ -1,5 +1,10 @@
 import type { TimelineClip } from "@contracts/workspace";
 import { graphicFrame, normalizeGraphic } from "@contracts/motion-graphics";
+import {
+  isSpatialGraphic,
+  spatialGraphicFrame,
+} from "@contracts/spatial-graphics";
+import { clipLaneKind, clipLaneNumber } from "./timeline-lanes";
 export function assTime(seconds: number) {
   const cs = Math.round(Math.max(0, seconds) * 100);
   return `${Math.floor(cs / 360000)}:${String(Math.floor(cs / 6000) % 60).padStart(2, "0")}:${String(Math.floor(cs / 100) % 60).padStart(2, "0")}.${String(cs % 100).padStart(2, "0")}`;
@@ -20,17 +25,72 @@ export function graphicAssEvents(
     const g = normalizeGraphic(clip.graphic);
     if (!g || clip.start >= duration || clip.duration <= 0) continue;
     const end = Math.min(duration, clip.start + clip.duration);
+    const layer =
+      (clipLaneKind(clip) === "text" ? 2000 : 1000) + clipLaneNumber(clip);
+    const graphicDuration =
+      clip.graphicDuration ?? clip.outPoint ?? clip.duration;
+    const graphicElapsed = (elapsed: number) =>
+      clip.inPoint + elapsed * (clip.speed ?? 1);
+    if (isSpatialGraphic(g)) {
+      let previousPaths: string[] = [],
+        previousKey = "",
+        since = clip.start;
+      const emitSpatial = (until: number) => {
+        if (until <= since) return;
+        for (const path of previousPaths)
+          events.push(
+            `Dialogue: ${layer},${assTime(since)},${assTime(until)},Default,,0,0,0,,${path}`
+          );
+      };
+      for (let frame = 0; frame < Math.ceil((end - clip.start) * 30); frame++) {
+        const start = clip.start + frame / 30;
+        const spatial = spatialGraphicFrame(
+          g,
+          graphicElapsed(frame / 30),
+          graphicDuration
+        );
+        const alpha = Math.round((1 - spatial.opacity) * 255)
+          .toString(16)
+          .padStart(2, "0");
+        const paths: string[] = [];
+        for (const face of spatial.opacity <= 0 ? [] : spatial.faces) {
+          const path = face.contours
+            .map(
+              points =>
+                points
+                  .map(
+                    ([x, y], index) =>
+                      `${index ? "l" : "m"} ${Math.round((spatial.x * width) / 100 + (x * width) / 6)} ${Math.round((spatial.y * height) / 100 + (y * width) / 6)}`
+                  )
+                  .join(" ") + " c"
+            )
+            .join(" ");
+          if (!path) continue;
+          const tags = `\\an7\\pos(0,0)\\bord0\\shad0\\1c${assColor(face.color)}\\alpha&H${alpha}&\\p1`;
+          paths.push(`{${tags}}${path}`);
+        }
+        const key = paths.join("\n");
+        if (key !== previousKey) {
+          emitSpatial(start);
+          previousPaths = paths;
+          previousKey = key;
+          since = start;
+        }
+      }
+      emitSpatial(end);
+      continue;
+    }
     let previous = "",
       since = clip.start;
     const emit = (until: number) => {
       if (previous && until > since)
         events.push(
-          `Dialogue: 2,${assTime(since)},${assTime(until)},${g.kind === "callout" ? "Callout" : "Default"},,0,0,0,,${previous}`
+          `Dialogue: ${layer},${assTime(since)},${assTime(until)},${g.kind === "callout" ? "Callout" : "Default"},,0,0,0,,${previous}`
         );
     };
     for (let frame = 0; frame < Math.ceil((end - clip.start) * 30); frame++) {
       const t = clip.start + frame / 30;
-      const f = graphicFrame(g, frame / 30, clip.duration);
+      const f = graphicFrame(g, graphicElapsed(frame / 30), graphicDuration);
       const alpha = Math.round((1 - f.opacity) * 255)
         .toString(16)
         .padStart(2, "0");

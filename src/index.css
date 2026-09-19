@@ -2,6 +2,113 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes ai-color-flow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes ai-soft-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.12);
+  }
+  50% {
+    box-shadow:
+      0 0 18px hsl(var(--primary) / 0.25),
+      inset 0 0 10px hsl(var(--primary) / 0.05);
+  }
+}
+
+/* Thin scroll affordances preserve scrolling without crowding editor panels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--foreground) / 0.22) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--foreground) / 0.2);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--foreground) / 0.38);
+}
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.ai-magic {
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--primary) / 0.5);
+  background: linear-gradient(
+    110deg,
+    hsl(var(--primary) / 0.23),
+    hsl(198 80% 60% / 0.12),
+    hsl(306 70% 65% / 0.18),
+    hsl(var(--primary) / 0.23)
+  );
+  background-size: 280% 100%;
+  animation:
+    ai-color-flow 7s ease-in-out infinite,
+    ai-soft-glow 4s ease-in-out infinite;
+}
+.ai-magic:hover:not(:disabled) {
+  border-color: hsl(var(--primary) / 0.9);
+}
+.ai-magic:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 3px;
+}
+.ai-magic:disabled {
+  animation-play-state: paused;
+  box-shadow: none;
+}
+.ai-status-text {
+  color: hsl(var(--primary));
+  background: linear-gradient(
+    110deg,
+    hsl(var(--primary)),
+    hsl(195 80% 40%),
+    hsl(290 68% 55%),
+    hsl(var(--primary))
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 16px hsl(var(--primary) / 0.3);
+  animation: ai-color-flow 3.5s ease-in-out infinite;
+}
+.dark .ai-status-text {
+  background-image: linear-gradient(
+    110deg,
+    hsl(var(--primary)),
+    #8bdcec,
+    #d2a8fa,
+    hsl(var(--primary))
+  );
+}
+@media (forced-colors: active) {
+  .ai-status-text {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+    text-shadow: none;
+  }
+}
+
 @keyframes float {
   0%,
   100% {

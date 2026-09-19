@@ -1,3 +1,9 @@
+import {
+  allocateTimelineLane,
+  clipLaneKind,
+  clipLaneNumber,
+  preserveGraphicDuration,
+} from "./timeline-lanes";
 import { normalizeGraphic } from "@contracts/motion-graphics";
 import type {
   EditOperation,
@@ -22,7 +28,7 @@ export function rippleRemove(
       "Unlock the clips after this point before closing the gap."
     );
   }
-  const clips = project.clips.flatMap(c => {
+  const clips = project.clips.map(preserveGraphicDuration).flatMap(c => {
     const finish = c.start + c.duration;
     if (finish <= start) return [c];
     if (c.start >= end) return [{ ...c, start: c.start - length }];
@@ -64,6 +70,7 @@ export function resizeTimeline(project: EditProject, end: number): EditProject {
     duration: end,
     playhead: Math.min(project.playhead, end),
     clips: project.clips
+      .map(preserveGraphicDuration)
       .filter(c => c.start < end)
       .map(c => ({
         ...c,
@@ -96,7 +103,7 @@ export function applyEditOperation(
     );
   let next = {
     ...project,
-    clips: project.clips.map(c => ({ ...c })),
+    clips: project.clips.map(c => ({ ...preserveGraphicDuration(c) })),
     transcript: project.transcript.map(s => ({ ...s })),
   };
   // Local look/audio adjustments must not leak to the rest of a long source clip.
@@ -157,6 +164,14 @@ export function applyEditOperation(
       locked: false,
       color: graphic.background,
       graphic,
+      lane: allocateTimelineLane(
+        next.clips,
+        graphic.kind === "text" || graphic.kind === "callout"
+          ? "text"
+          : "graphics",
+        op.start,
+        op.end - op.start
+      ),
     });
   } else if (op.type === "caption") {
     if (!p.text?.trim())
@@ -174,7 +189,14 @@ export function applyEditOperation(
       id: op.id,
       assetId: p.assetId,
       label: op.label,
-      track: "overlay",
+      track: "video",
+      lane: allocateTimelineLane(
+        next.clips,
+        "video",
+        op.start,
+        op.end - op.start,
+        2
+      ),
       start: op.start,
       duration: op.end - op.start,
       inPoint: 0,
@@ -253,7 +275,8 @@ export function applyEditOperation(
       const original = project.clips.find(
         c =>
           targeted(c) &&
-          c.track !== "overlay" &&
+          (clipLaneKind(c) === "video" || clipLaneKind(c) === "audio") &&
+          clipLaneNumber(c) === 1 &&
           segment.start >= c.start &&
           segment.start < c.start + c.duration
       );

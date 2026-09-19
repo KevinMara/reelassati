@@ -1,0 +1,336 @@
+{
+  "verified": "2026-09-15",
+  "method": "FFprobe metadata and complete FFmpeg float PCM decode; amplitude/duration validation. No human listening review or virality claim.",
+  "files": [
+    {
+      "id": "swish-01",
+      "bytes": 22428,
+      "duration": 0.126032,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -16.94
+    },
+    {
+      "id": "swish-02",
+      "bytes": 17100,
+      "duration": 0.095828,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -16.05
+    },
+    {
+      "id": "swish-03",
+      "bytes": 25924,
+      "duration": 0.14585,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -12.97
+    },
+    {
+      "id": "swish-04",
+      "bytes": 25920,
+      "duration": 0.145828,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -16.47
+    },
+    {
+      "id": "swish-05",
+      "bytes": 22612,
+      "duration": 0.127075,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -15.84
+    },
+    {
+      "id": "swish-06",
+      "bytes": 24540,
+      "duration": 0.138005,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -16.55
+    },
+    {
+      "id": "swish-07",
+      "bytes": 33268,
+      "duration": 0.187483,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -15.19
+    },
+    {
+      "id": "swish-08",
+      "bytes": 27300,
+      "duration": 0.153651,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -15.99
+    },
+    {
+      "id": "swish-09",
+      "bytes": 34924,
+      "duration": 0.196871,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -17.18
+    },
+    {
+      "id": "swish-10",
+      "bytes": 22244,
+      "duration": 0.124989,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -18.18
+    },
+    {
+      "id": "swish-11",
+      "bytes": 18572,
+      "duration": 0.104172,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -15.77
+    },
+    {
+      "id": "swish-12",
+      "bytes": 13608,
+      "duration": 0.076032,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -16.44
+    },
+    {
+      "id": "swish-13",
+      "bytes": 12692,
+      "duration": 0.070839,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -15.52
+    },
+    {
+      "id": "recorded-bing1",
+      "bytes": 63690,
+      "duration": 0.719819,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -14.06
+    },
+    {
+      "id": "recorded-bong1",
+      "bytes": 186574,
+      "duration": 2.113016,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -21.3
+    },
+    {
+      "id": "recorded-clink1",
+      "bytes": 27848,
+      "duration": 0.313469,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.55,
+      "rmsDbFS": -20.94
+    },
+    {
+      "id": "recorded-clink2",
+      "bytes": 22728,
+      "duration": 0.25542,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -18.13
+    },
+    {
+      "id": "recorded-clink3",
+      "bytes": 25800,
+      "duration": 0.290249,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -16.82
+    },
+    {
+      "id": "recorded-thud2",
+      "bytes": 51404,
+      "duration": 0.580499,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -6.74,
+      "rmsDbFS": -28.86
+    },
+    {
+      "id": "recorded-thud3",
+      "bytes": 37068,
+      "duration": 0.417959,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.3,
+      "rmsDbFS": -22.26
+    },
+    {
+      "id": "qubodupimpactmeat01",
+      "bytes": 44302,
+      "duration": 0.5,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -24.23
+    },
+    {
+      "id": "qubodupimpactmeat02",
+      "bytes": 44302,
+      "duration": 0.5,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -20.71
+    },
+    {
+      "id": "qubodupimpactmetal",
+      "bytes": 44044,
+      "duration": 0.497098,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -24.18
+    },
+    {
+      "id": "qubodupimpactstone",
+      "bytes": 44044,
+      "duration": 0.497098,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -22.44
+    },
+    {
+      "id": "qubodupimpactwood",
+      "bytes": 40042,
+      "duration": 0.451746,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -20.28
+    },
+    {
+      "id": "air-whoosh-loop",
+      "bytes": 925694,
+      "duration": 5.246599,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -10.23,
+      "rmsDbFS": -25.73
+    },
+    {
+      "id": "cinematic-percussion",
+      "bytes": 289836,
+      "duration": 12.042449,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.23,
+      "rmsDbFS": -11.21
+    },
+    {
+      "id": "chill-lofi",
+      "bytes": 2957450,
+      "duration": 123.193469,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.24,
+      "rmsDbFS": -20.33
+    },
+    {
+      "id": "lofi-hip-hop",
+      "bytes": 3605073,
+      "duration": 150.177959,
+      "sampleRate": 44100,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.26,
+      "rmsDbFS": -22.66
+    },
+    {
+      "id": "subtle-bass",
+      "bytes": 1457168,
+      "duration": 60.682449,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.26,
+      "rmsDbFS": -15.0
+    },
+    {
+      "id": "midnight-cruiser",
+      "bytes": 3467125,
+      "duration": 144.432,
+      "sampleRate": 48000,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.2,
+      "rmsDbFS": -15.82
+    },
+    {
+      "id": "enchanted-tiki-86",
+      "bytes": 2819518,
+      "duration": 117.446531,
+      "sampleRate": 44100,
+      "channels": 2,
+      "decoded": true,
+      "peakDbFS": -2.15,
+      "rmsDbFS": -15.27
+    },
+    {
+      "id": "wilhelm-original-takes",
+      "bytes": 3770704,
+      "duration": 39.275438,
+      "sampleRate": 48000,
+      "channels": 1,
+      "decoded": true,
+      "peakDbFS": -2.0,
+      "rmsDbFS": -21.9
+    }
+  ]
+}

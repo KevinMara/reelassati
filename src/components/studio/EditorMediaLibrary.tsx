@@ -1,28 +1,29 @@
 import { useMemo, useRef, useState } from "react";
+import { v4 as createUuid } from "uuid";
 import {
   FolderPlus,
   Upload,
   LayoutGrid,
   List,
-  Plus,
-  Music2,
   ArrowLeft,
   Folder,
   Pencil,
   Trash2,
 } from "lucide-react";
-import type { Asset } from "@contracts/workspace";
 import { useWorkspace } from "@/providers/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { validateFileSelection } from "@/lib/file-validation";
-import { AssetThumbnail } from "./AssetThumbnail";
+import { LibraryAssetCard } from "./LibraryAssetCard";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-export function EditorMediaLibrary({
-  onInsert,
-}: {
-  onInsert: (asset: Asset) => Promise<void>;
-}) {
+export function EditorMediaLibrary() {
   const { workspace, updateWorkspace, capabilities } = useWorkspace();
   const [folderId, setFolderId] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -133,7 +134,7 @@ export function EditorMediaLibrary({
           }));
       }
       setMessage(
-        "Uploaded to your library. Choose + to add a file to the timeline."
+        "Uploaded to Library. Drag a thumbnail onto the timeline to place it."
       );
     });
   }
@@ -151,7 +152,7 @@ export function EditorMediaLibrary({
             : [
                 ...(w.mediaFolders ?? []),
                 {
-                  id: crypto.randomUUID(),
+                  id: createUuid(),
                   name,
                   parentId: folderId || undefined,
                 },
@@ -181,7 +182,7 @@ export function EditorMediaLibrary({
         if (!busy && capabilities.uploads && e.dataTransfer.files.length)
           void upload(Array.from(e.dataTransfer.files));
       }}
-      className={`min-h-80 p-3 ${dragging ? "bg-primary/15 ring-2 ring-inset ring-primary" : ""}`}
+      className={`min-h-80 ${dragging ? "bg-primary/15 ring-2 ring-inset ring-primary" : ""}`}
     >
       <input
         ref={input}
@@ -250,7 +251,7 @@ export function EditorMediaLibrary({
           {currentFolder?.name ?? "Media library"}
         </span>
         <span className="ml-auto text-xs text-foreground/60">
-          {assets.length} files
+          {assets.length} {assets.length === 1 ? "file" : "files"}
         </span>
       </div>
       {editingFolder && (
@@ -262,7 +263,9 @@ export function EditorMediaLibrary({
           className="mb-3 flex gap-2"
         >
           <input
-            autoFocus
+            ref={node => {
+              node?.focus();
+            }}
             aria-label="Folder name"
             value={folderName}
             maxLength={100}
@@ -294,28 +297,55 @@ export function EditorMediaLibrary({
         className="mb-2 w-full rounded-lg border border-border bg-background p-2 text-sm"
       />
       <div className="mb-3 grid grid-cols-2 gap-2">
-        <select
-          aria-label="Media type"
-          value={kind}
-          onChange={e => setKind(e.target.value)}
-          className="rounded-lg border border-border bg-background p-2 text-sm"
-        >
-          {["all", "video", "image", "audio"].map(k => (
-            <option key={k} value={k}>
-              {k === "all" ? "All types" : k}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="Sort files"
-          value={sort}
-          onChange={e => setSort(e.target.value)}
-          className="rounded-lg border border-border bg-background p-2 text-sm"
-        >
-          {["newest", "oldest", "name", "duration", "size"].map(k => (
-            <option key={k}>{k}</option>
-          ))}
-        </select>
+        <Select value={kind} onValueChange={setKind}>
+          <SelectTrigger
+            aria-label="Media type"
+            size="sm"
+            className="w-full min-w-0 border-border bg-background text-xs"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent
+            position="popper"
+            className="border-border bg-surface text-foreground"
+          >
+            {[
+              ["all", "All types"],
+              ["video", "Video"],
+              ["image", "Image"],
+              ["audio", "Audio"],
+            ].map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={sort} onValueChange={setSort}>
+          <SelectTrigger
+            aria-label="Sort files"
+            size="sm"
+            className="w-full min-w-0 border-border bg-background text-xs"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent
+            position="popper"
+            className="border-border bg-surface text-foreground"
+          >
+            {[
+              ["newest", "Newest first"],
+              ["oldest", "Oldest first"],
+              ["name", "Name"],
+              ["duration", "Duration"],
+              ["size", "File size"],
+            ].map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="mb-3 space-y-1">
         {folders
@@ -376,41 +406,31 @@ export function EditorMediaLibrary({
           matched by filename.
         </p>
       )}
+      <p className="mb-3 text-[11px] text-foreground/45">
+        Click to preview · drag to place on the timeline
+      </p>
       <div className={view === "grid" ? "grid grid-cols-2 gap-2" : "space-y-2"}>
         {assets.map(asset => (
           <div
             key={asset.id}
-            className={`min-w-0 rounded-lg border border-border bg-background/50 p-2 ${view === "list" ? "flex flex-wrap items-center gap-2" : ""}`}
+            className="min-w-0 rounded-lg border border-border bg-background/50 p-2"
           >
-            <button
-              type="button"
-              title={`Add ${asset.name} at playhead`}
-              disabled={busy || asset.status !== "ready"}
-              onClick={() => void action(() => onInsert(asset))}
-              className={`relative flex items-center justify-center overflow-hidden rounded-md bg-primary/10 ${view === "grid" ? "aspect-video w-full" : "h-10 w-14 shrink-0"}`}
-            >
-              {asset.kind === "audio" ? (
-                <Music2 className="text-primary" />
-              ) : (
-                <AssetThumbnail asset={asset} />
-              )}
-              <Plus
-                size={18}
-                className="absolute bottom-1 right-1 rounded bg-black/65 text-white"
-              />
-            </button>
-            <div className="min-w-0 flex-1">
-              <p
-                title={asset.name}
-                className="mt-1 truncate text-xs font-medium"
-              >
-                {asset.name}
-              </p>
-              <p className="text-xs text-foreground/60">
-                {asset.kind}
-                {asset.duration ? ` · ${asset.duration.toFixed(1)}s` : ""}
-              </p>
-            </div>
+            <LibraryAssetCard
+              asset={asset}
+              view={view}
+              onRename={async name => {
+                await platformApi.renameAsset(asset.id, name);
+                await updateWorkspace(w => ({
+                  ...w,
+                  assets: w.assets.map(a =>
+                    a.id === asset.id ? { ...a, name } : a
+                  ),
+                  editorGenerations: w.editorGenerations?.map(g =>
+                    g.assetId === asset.id ? { ...g, name } : g
+                  ),
+                }));
+              }}
+            />
             {query.trim() &&
               reviewedContent
                 .get(asset.id)
@@ -426,32 +446,47 @@ export function EditorMediaLibrary({
                     {note}
                   </p>
                 ))}
-            <select
+            <Select
               disabled={busy}
-              aria-label={`Move ${asset.name} to folder`}
-              value={asset.folderId ?? ""}
-              onChange={e => {
-                const destination = e.target.value;
+              value={asset.folderId || "__root"}
+              onValueChange={destination => {
                 void action(() =>
                   updateWorkspace(w => ({
                     ...w,
                     assets: w.assets.map(a =>
                       a.id === asset.id
-                        ? { ...a, folderId: destination || undefined }
+                        ? {
+                            ...a,
+                            folderId:
+                              destination === "__root"
+                                ? undefined
+                                : destination,
+                          }
                         : a
                     ),
                   }))
                 );
               }}
-              className="mt-2 w-full rounded border border-border bg-surface p-1 text-xs"
             >
-              <option value="">Root folder</option>
-              {folders.map(f => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                aria-label={`Move ${asset.name} to folder`}
+                size="sm"
+                className="mt-2 w-full min-w-0 border-border text-[11px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent
+                position="popper"
+                className="border-border bg-surface text-foreground"
+              >
+                <SelectItem value="__root">Root folder</SelectItem>
+                {folders.map(f => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         ))}
       </div>

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useId, useState } from "react";
+import { CompactSelect } from "@/components/ui/compact-select";
 import {
   GRAPHIC_KINDS,
   normalizeGraphic,
@@ -7,19 +8,29 @@ import {
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
 import { GraphicMotionEditor } from "./GraphicMotionEditor";
 import type { TimelineClip } from "@contracts/workspace";
+import {
+  isSpatialGraphic,
+  spatialTitleText,
+} from "@contracts/spatial-graphics";
 export function GraphicComposer({
   initial,
+  draft,
   onSave,
   busy = false,
   duration = 3,
 }: {
   initial?: MotionGraphic;
+  /** Preset seed for a new graphic, preserving the editable duration and insert action. */
+  draft?: MotionGraphic;
   onSave: (graphic: MotionGraphic, seconds: number) => Promise<void>;
   busy?: boolean;
   duration?: number;
 }) {
+  const controlId = useId();
   const [g, setG] = useState<MotionGraphic>(() =>
-    normalizeGraphic(initial ?? { kind: "callout", text: "Your key message" })!
+    normalizeGraphic(
+      initial ?? draft ?? { kind: "callout", text: "Your key message" }
+    )!
   );
   const [requestedSeconds, setSeconds] = useState(duration);
   const seconds = initial ? duration : requestedSeconds;
@@ -27,7 +38,7 @@ export function GraphicComposer({
   const [saving, setSaving] = useState(false),
     [error, setError] = useState("");
   const patch = (key: keyof MotionGraphic, value: string | number) =>
-    setG({ ...g, [key]: value });
+    setG(normalizeGraphic({ ...g, [key]: value })!);
   const field =
     "w-full rounded-lg border border-border bg-background p-2 text-sm";
   const clip: TimelineClip = {
@@ -68,30 +79,37 @@ export function GraphicComposer({
           time={previewPosition * Math.max(1 / 30, seconds - 1 / 30)}
         />
       </div>
-      <label className="block text-sm">
+      <label className="block text-sm" htmlFor={`${controlId}-type`}>
         Graphic
-        <select
+        <CompactSelect
+          id={`${controlId}-type`}
           aria-label="Graphic type"
-          className={field}
           value={g.kind}
-          onChange={e => patch("kind", e.target.value)}
-        >
-          {GRAPHIC_KINDS.map(k => (
-            <option key={k} value={k}>
-              {k[0].toUpperCase() + k.slice(1)}
-            </option>
-          ))}
-        </select>
+          onValueChange={value => patch("kind", value)}
+          options={GRAPHIC_KINDS.map(k => ({
+            value: k,
+            label: k.startsWith("spatial-")
+              ? `3D ${k.slice(8)}`
+              : k[0].toUpperCase() + k.slice(1),
+          }))}
+        />
       </label>
-      {["text", "callout"].includes(g.kind) && (
+      {["text", "callout", "spatial-title"].includes(g.kind) && (
         <label className="block text-sm">
           Text
           <textarea
-            maxLength={180}
+            maxLength={g.kind === "spatial-title" ? 28 : 180}
             className={field}
             value={g.text}
             onChange={e => patch("text", e.target.value)}
           />
+          {g.kind === "spatial-title" &&
+            spatialTitleText(g.text) !== g.text.trim() && (
+              <span className="text-xs text-foreground/60">
+                3D titles support Latin characters and symbols. Use Text for
+                other scripts.
+              </span>
+            )}
         </label>
       )}
       {g.kind === "counter" && (
@@ -153,7 +171,7 @@ export function GraphicComposer({
         [
           ["x", "Horizontal position", 10, 90],
           ["y", "Vertical position", 10, 90],
-          ["size", "Text size", 2, 16],
+          ["size", isSpatialGraphic(g) ? "Object size" : "Text size", 2, 16],
           ["rotation", "Rotation", -360, 360],
         ] as const
       ).map(([key, label, min, max]) => (
@@ -171,17 +189,62 @@ export function GraphicComposer({
           />
         </label>
       ))}
-      <label className="block text-sm">
-        Animation
-        <select
-          className={field}
-          value={g.animation}
-          onChange={e => patch("animation", e.target.value)}
-        >
-          {["none", "fade", "pop", "slide"].map(a => (
-            <option key={a}>{a}</option>
+      {isSpatialGraphic(g) && g.spatial && (
+        <fieldset className="space-y-2 rounded-xl border border-border p-3">
+          <legend className="px-1 text-sm font-medium">3D appearance</legend>
+          {(
+            [
+              ["pitch", "Tilt", -70, 70, 1],
+              ["yaw", "Turn", -70, 70, 1],
+              ["depth", "Extrusion", 0.02, 0.65, 0.01],
+              [
+                "turns",
+                g.kind === "spatial-title" ? "Rocking cycles" : "Revolutions",
+                -3,
+                3,
+                0.1,
+              ],
+              ["perspective", "Camera distance", 3, 12, 0.1],
+            ] as const
+          ).map(([key, label, min, max, step]) => (
+            <label key={key} className="block text-xs text-foreground/80">
+              <span className="flex justify-between">
+                <span>{label}</span>
+                <span className="tabular-nums">{g.spatial![key]}</span>
+              </span>
+              <input
+                aria-label={`3D ${label}`}
+                className="block w-full accent-primary"
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={g.spatial![key]}
+                onChange={e =>
+                  setG(
+                    normalizeGraphic({
+                      ...g,
+                      spatial: { ...g.spatial, [key]: Number(e.target.value) },
+                    })!
+                  )
+                }
+              />
+            </label>
           ))}
-        </select>
+        </fieldset>
+      )}
+      <label className="block text-sm" htmlFor={`${controlId}-animation`}>
+        Animation
+        <CompactSelect
+          id={`${controlId}-animation`}
+          aria-label="Graphic animation"
+          value={g.animation}
+          onValueChange={value => patch("animation", value)}
+          options={["none", "fade", "pop", "slide"].map(value => ({
+            value,
+            label: value[0].toUpperCase() + value.slice(1),
+          }))}
+        />
       </label>
       <GraphicMotionEditor
         graphic={g}

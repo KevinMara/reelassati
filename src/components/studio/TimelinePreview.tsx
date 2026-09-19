@@ -1,3 +1,5 @@
+import { CaptionLayer } from "./CaptionLayer";
+import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import { useEffect, useRef } from "react";
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
@@ -70,7 +72,7 @@ function MediaLayer({
       <img
         src={asset.url}
         alt={asset.name}
-        className="absolute inset-0 h-full w-full bg-black"
+        className="absolute inset-0 h-full w-full"
         style={style}
       />
     );
@@ -83,7 +85,7 @@ function MediaLayer({
       playsInline
       preload="auto"
       aria-label={asset.name}
-      className="absolute inset-0 h-full w-full bg-black"
+      className="absolute inset-0 h-full w-full"
       style={style}
     >
       <track kind="captions" />
@@ -107,13 +109,7 @@ export function TimelinePreview({
       c =>
         c.start <= time && c.start + c.duration > time && c.track !== "captions"
     )
-    .sort(
-      (a, b) => Number(a.track === "overlay") - Number(b.track === "overlay")
-    );
-  const caption = project.transcript
-    .filter(s => s.start <= time && s.end > time)
-    .map(s => s.text)
-    .join(" ");
+    .sort(compareTimelineLayers);
   return (
     <div
       className="relative mx-auto w-full overflow-hidden bg-black"
@@ -150,11 +146,11 @@ export function TimelinePreview({
             : "Add footage from your Library or upload it below"}
         </p>
       )}
-      {caption && (
-        <div className="pointer-events-none absolute inset-x-[8%] bottom-[14%] text-center text-lg font-bold leading-tight text-white [text-shadow:0_2px_3px_black,1px_0_black,-1px_0_black]">
-          {caption}
-        </div>
-      )}
+      <CaptionLayer
+        segments={project.transcript}
+        presetId={project.captionStyle}
+        time={time}
+      />
     </div>
   );
 }

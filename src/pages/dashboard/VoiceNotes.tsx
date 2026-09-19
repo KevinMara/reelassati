@@ -1,4 +1,4 @@
-import { VoicePreview } from "@/components/studio/VoicePreview";
+import { VoiceSelector } from "@/components/studio/VoiceSelector";
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
@@ -636,43 +636,14 @@ export default function VoiceNotes() {
             >
               Voice
             </label>
-            <select
+            <VoiceSelector
               id="voice-id"
               value={voiceId}
-              onChange={event => {
-                setVoiceId(event.target.value);
+              onChange={voice => {
+                setVoiceId(voice);
                 invalidateVoiceAttestation();
               }}
-              className="w-full rounded-lg border border-border bg-background p-3 text-sm"
-            >
-              <optgroup label="English">
-                <option value="English_Graceful_Lady">
-                  Grace · polished and clear
-                </option>
-                <option value="English_CalmWoman">
-                  Calm · gentle delivery
-                </option>
-                <option value="English_Trustworth_Man">
-                  Trust · steady delivery
-                </option>
-                <option value="English_Diligent_Man">
-                  Focus · direct delivery
-                </option>
-              </optgroup>
-              <optgroup label="Italiano">
-                <option value="Italian_Narrator">Narratore · racconto</option>
-                <option value="Italian_BraveHeroine">
-                  Eroina · espressiva
-                </option>
-              </optgroup>
-              <optgroup label="Français">
-                <option value="French_MaleNarrator">Narrateur · récit</option>
-              </optgroup>
-              <optgroup label="Deutsch">
-                <option value="German_FriendlyMan">Freundlich · locker</option>
-              </optgroup>
-            </select>
-            <VoicePreview key={voiceId} voice={voiceId} />
+            />
             <p className="mt-2 text-sm text-foreground/70">
               Choose the voice that fits your story. Your generated audio stays
               in this brand’s Library.

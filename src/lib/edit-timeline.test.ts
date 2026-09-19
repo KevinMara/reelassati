@@ -85,4 +85,28 @@ describe("executable editing", () => {
       "text"
     );
   });
+  it("splits retimed graphics without restarting their source animation", () => {
+    const source = {
+      ...clip,
+      graphic: { kind: "text" },
+      speed: 2,
+      outPoint: 22,
+    } as TimelineClip;
+    const result = applyEditOperation(
+      { ...project, clips: [source] },
+      op({ type: "split", start: 4 })
+    );
+    expect(result.clips[0]).toMatchObject({
+      graphicDuration: 22,
+      inPoint: 2,
+      outPoint: 10,
+      duration: 4,
+    });
+    expect(result.clips[1]).toMatchObject({
+      graphicDuration: 22,
+      inPoint: 10,
+      outPoint: 22,
+      duration: 6,
+    });
+  });
 });

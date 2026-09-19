@@ -2,7 +2,7 @@ import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "./platform-api";
 import { buildRenderPlan } from "./render-plan";
-import { verifyExportMetadata } from "./export-verification";
+import { probeExportMetadata } from "./export-probe";
 
 export async function renderVideo(
   project: EditProject,
@@ -112,23 +112,7 @@ export async function renderVideo(
       );
     ffmpeg.off("progress", renderProgress);
     options.onProgress(96, "Checking exported duration and picture");
-    const probeCode = await ffmpeg.ffprobe([
-      "-v",
-      "error",
-      "-show_format",
-      "-show_streams",
-      "-of",
-      "json",
-      "output.mp4",
-      "-o",
-      "export-probe.json",
-    ]);
-    if (probeCode !== 0)
-      throw new Error(
-        "The exported file could not be checked. Your project is still saved."
-      );
-    const probeFile = await ffmpeg.readFile("export-probe.json", "utf8");
-    const verified = verifyExportMetadata(JSON.parse(String(probeFile)), plan);
+    const verified = await probeExportMetadata(ffmpeg, plan);
     options.onProgress(98, "Checking video and audio playback");
     const decodeCode = await ffmpeg.exec([
       "-v",

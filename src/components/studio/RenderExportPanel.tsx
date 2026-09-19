@@ -11,6 +11,7 @@ import {
 import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { CompactSelect } from "@/components/ui/compact-select";
 
 export function RenderExportPanel({
   project,
@@ -160,15 +161,17 @@ export function RenderExportPanel({
         <p className="font-medium">{project.title}</p>
         <label className="text-sm">
           Resolution
-          <select
+          <CompactSelect
+            aria-label="Resolution"
             disabled={busy || hasRender}
-            value={resolution}
-            onChange={e => setResolution(Number(e.target.value) as 720 | 1080)}
-            className="mt-2 w-full rounded-lg border border-border bg-background p-3"
-          >
-            <option value={720}>720p · faster export</option>
-            <option value={1080}>1080p · more detail</option>
-          </select>
+            value={String(resolution)}
+            onValueChange={value => setResolution(Number(value) as 720 | 1080)}
+            className="mt-2"
+            options={[
+              { value: "720", label: "720p · faster export" },
+              { value: "1080", label: "1080p · more detail" },
+            ]}
+          />
         </label>
         <p className="text-sm text-foreground/70">
           {project.aspectRatio} canvas · up to 3 minutes. Keep this page open

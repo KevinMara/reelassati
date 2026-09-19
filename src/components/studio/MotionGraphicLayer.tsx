@@ -1,5 +1,10 @@
 import { graphicFrame, normalizeGraphic } from "@contracts/motion-graphics";
 import type { TimelineClip } from "@contracts/workspace";
+import {
+  isSpatialGraphic,
+  spatialGraphicFrame,
+  spatialSvgPath,
+} from "@contracts/spatial-graphics";
 export function MotionGraphicLayer({
   clip,
   time,
@@ -9,7 +14,39 @@ export function MotionGraphicLayer({
 }) {
   const g = normalizeGraphic(clip.graphic);
   if (!g) return null;
-  const f = graphicFrame(g, time - clip.start, clip.duration);
+  const elapsed = clip.inPoint + (time - clip.start) * (clip.speed ?? 1);
+  const graphicDuration =
+    clip.graphicDuration ?? clip.outPoint ?? clip.duration;
+  if (isSpatialGraphic(g)) {
+    const spatial = spatialGraphicFrame(g, elapsed, graphicDuration);
+    return (
+      <div
+        className="pointer-events-none absolute z-10 aspect-square w-full"
+        style={{
+          left: `${spatial.x}%`,
+          top: `${spatial.y}%`,
+          transform: "translate(-50%,-50%)",
+          opacity: spatial.opacity,
+        }}
+      >
+        <svg
+          viewBox="-3 -3 6 6"
+          className="h-full w-full overflow-visible"
+          aria-label={`3D ${g.kind.slice(8)}`}
+        >
+          {spatial.faces.map((face, index) => (
+            <path
+              key={index}
+              d={spatialSvgPath(face.contours)}
+              fill={face.color}
+              fillRule="nonzero"
+            />
+          ))}
+        </svg>
+      </div>
+    );
+  }
+  const f = graphicFrame(g, elapsed, graphicDuration);
   return (
     <div
       className="pointer-events-none absolute z-10 text-center font-bold"

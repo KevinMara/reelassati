@@ -48,5 +48,6 @@ coverage/
 
 # Vercel
 .vercel
+.wrangler/
 
 /public/vendor/render/

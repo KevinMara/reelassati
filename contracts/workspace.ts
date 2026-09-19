@@ -89,9 +89,13 @@ export interface Asset {
 
 export interface TimelineClip {
   graphic?: import("./motion-graphics").MotionGraphic;
+  /** Original animation span, preserved when a graphic is cut or trimmed. */
+  graphicDuration?: number;
   id: string;
   assetId?: string;
   track: TrackKind;
+  /** One-based lane within the visual, audio, text or graphic track family. */
+  lane?: number;
   label: string;
   start: number;
   duration: number;
@@ -172,6 +176,7 @@ export interface QualitySignal {
 }
 
 export interface EditRevision {
+  captionStyle?: string;
   id: string;
   label: string;
   createdAt: string;
@@ -183,6 +188,10 @@ export interface EditRevision {
 }
 
 export interface EditProject {
+  /** Selected revision; preserves undo/redo after navigation and batched imports. */
+  revisionIndex?: number;
+  /** Caption preset shared by the scrubbed preview and exported subtitles. */
+  captionStyle?: string;
   sourceReviews?: import("./source-review").SourceReview[];
   referenceStyleBrief?: string;
   id: string;
@@ -304,6 +313,8 @@ export interface GenerationJob {
   prompt?: string;
   progress: number;
   resultAssetId?: string;
+  /** Existing provider output can be downloaded again without a new generation. */
+  canRecover?: boolean;
   error?: string;
   createdAt: string;
   updatedAt: string;
@@ -330,6 +341,7 @@ export interface WorkspaceDocument {
   calendarEvents: CalendarEvent[];
   goals: Goal[];
   jobs: GenerationJob[];
+  editorGenerations?: import("./editor-generations").EditorGeneration[];
   activity: WorkspaceEvent[];
   updatedAt: string;
 }

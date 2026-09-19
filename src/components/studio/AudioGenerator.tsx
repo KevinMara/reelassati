@@ -1,14 +1,17 @@
 import { useState } from "react";
-import type { Asset } from "@contracts/workspace";
+import { CompactSelect } from "@/components/ui/compact-select";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 
 export function AudioGenerator({
-  projectId,
-  onInsert,
+  onGenerate,
 }: {
-  projectId: string;
-  onInsert: (asset: Asset) => Promise<void>;
+  onGenerate: (input: {
+    kind: "music" | "sfx";
+    seconds: number;
+    text: string;
+    acceptedCredits: number;
+  }) => Promise<void>;
 }) {
   const { capabilities } = useWorkspace();
   const [kind, setKind] = useState<"music" | "sfx">("music");
@@ -28,18 +31,10 @@ export function AudioGenerator({
       if (quote === null) {
         setQuote((await platformApi.quoteAudio(kind, seconds)).credits);
       } else {
-        const asset = await platformApi.generateAudio({
-          kind,
-          seconds,
-          text,
-          acceptedCredits: quote,
-          requestId: crypto.randomUUID(),
-          rightsConfirmed: true,
-          projectId,
-        });
-        // Store generated output in Library even if timeline insertion is interrupted.
-        await onInsert(asset);
-        setMessage("Generated audio added to your timeline and Library.");
+        await onGenerate({ kind, seconds, text, acceptedCredits: quote });
+        setMessage(
+          "Generation started. Your audio will appear in Generated files and Library."
+        );
         setQuote(null);
       }
     } catch (e) {
@@ -50,27 +45,28 @@ export function AudioGenerator({
     }
   }
   return (
-    <div className="mb-5 rounded-xl border border-primary/30 bg-background p-4">
-      <h3 className="mb-3 font-medium">
+    <div className="mb-4 rounded-xl border border-border bg-background/50 p-3">
+      <h3 className="mb-3 text-sm font-medium">
         Generate music & sound effects with AI
       </h3>
       <div className="grid min-w-0 gap-3">
-        <select
+        <CompactSelect
           aria-label="Audio generation type"
           disabled={busy}
           value={kind}
-          onChange={e => {
-            setKind(e.target.value as "music" | "sfx");
+          onValueChange={value => {
+            setKind(value as "music" | "sfx");
             setSeconds(s =>
-              Math.min(30, Math.max(e.target.value === "music" ? 3 : 0.5, s))
+              Math.min(30, Math.max(value === "music" ? 3 : 0.5, s))
             );
             setQuote(null);
           }}
-          className="rounded-lg border border-border bg-surface p-2"
-        >
-          <option value="music">Instrumental music</option>
-          <option value="sfx">Sound effect</option>
-        </select>
+          options={[
+            { value: "music", label: "Instrumental music" },
+            { value: "sfx", label: "Sound effect" },
+          ]}
+          className="w-full"
+        />
         <textarea
           aria-label="Describe generated audio"
           disabled={busy}
@@ -117,8 +113,9 @@ export function AudioGenerator({
       </button>
       {!ready && (
         <p className="mt-2 text-sm text-foreground/70">
-          AI audio generation is not available yet. Upload your own music or
-          sound effects through Library.
+          {kind === "music" ? "Music generation" : "Sound-effect generation"} is
+          not available yet. You can use the free sounds below or upload audio
+          to Library.
         </p>
       )}
       {message && (

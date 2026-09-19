@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { WandSparkles } from "lucide-react";
+import { CompactSelect } from "@/components/ui/compact-select";
 import { AI_CREDIT_COSTS, timedCreditCost } from "@contracts/billing";
 import { useWorkspace } from "@/providers/workspace";
 import { platformApi } from "@/lib/platform-api";
@@ -116,7 +118,7 @@ export function ReferenceStylePanel({
       <summary className="cursor-pointer text-sm font-medium">
         {purpose === "script"
           ? "Learn from a reference hook or script"
-          : "Match a reference style"}
+          : "Match a reference style or video"}
       </summary>
       <fieldset
         disabled={busy || disabled}
@@ -127,24 +129,20 @@ export function ReferenceStylePanel({
           expose playable video; private or unsupported links need an upload.
           This matches observed style, not an exact copy of effects or audio.
         </p>
-        <select
+        <CompactSelect
           aria-label="Reference video"
           value={assetId}
-          onChange={e => {
-            setAssetId(e.target.value);
+          onValueChange={value => {
+            setAssetId(value);
             invalidate();
           }}
-          className="w-full rounded-lg border border-border bg-background p-2 text-sm"
-        >
-          <option value="">Use a link or upload a reference</option>
-          {workspace.assets
-            .filter(a => a.kind === "video" && a.status === "ready")
-            .map(a => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-        </select>
+          options={[
+            { value: "", label: "Use a link or upload a reference" },
+            ...workspace.assets
+              .filter(a => a.kind === "video" && a.status === "ready")
+              .map(a => ({ value: a.id, label: a.name })),
+          ]}
+        />
         <input
           type="url"
           aria-label="Reference video link"
@@ -214,13 +212,14 @@ export function ReferenceStylePanel({
             !capabilities.analysis
           }
           onClick={() => void analyze()}
-          className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-40"
+          className="ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm disabled:opacity-40"
         >
           Analyze reference · {cost} credits
+          <WandSparkles aria-hidden="true" className="h-3.5 w-3.5" />
         </button>
       </fieldset>
       {busy && (
-        <p role="status" className="mt-2 text-xs">
+        <p role="status" className="ai-status-text mt-2 text-xs">
           Inspecting reference…
         </p>
       )}

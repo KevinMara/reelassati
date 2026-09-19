@@ -1,9 +1,16 @@
-import { GraphicComposer } from "./GraphicComposer";
-import type { MotionGraphic } from "@contracts/motion-graphics";
-import { AudioGenerator } from "./AudioGenerator";
-import { EditorMediaLibrary } from "./EditorMediaLibrary";
 import { useState } from "react";
-import { Film, Image, Mic2, Music2, Loader2 } from "lucide-react";
+import {
+  Files,
+  Film,
+  Image,
+  Mic2,
+  Music2,
+  Shapes,
+  Loader2,
+  WandSparkles,
+} from "lucide-react";
+import type { MotionGraphic } from "@contracts/motion-graphics";
+import type { GraphicPreset } from "@contracts/editor-presets";
 import type { Asset, EditProject } from "@contracts/workspace";
 import {
   imageCreditCost,
@@ -12,10 +19,20 @@ import {
 } from "@contracts/billing";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { CompactSelect } from "@/components/ui/compact-select";
+import { GraphicComposer } from "./GraphicComposer";
+import { AudioGenerator } from "./AudioGenerator";
+import { EditorMediaLibrary } from "./EditorMediaLibrary";
+import { EditorGenerationTray } from "./EditorGenerationTray";
+import { useEditorGenerations } from "./useEditorGenerations";
+import { VoiceSelector } from "./VoiceSelector";
+import { EditorSoundLibrary } from "./EditorSoundLibrary";
+import { EditorPresetLibrary } from "./EditorPresetLibrary";
+
+type DockKind = "library" | "image" | "video" | "voice" | "audio" | "graphics";
 
 export function EditorCreationDock({
   project,
-  onInsert,
   onAssist,
   assistCost,
   onGraphic,
@@ -28,16 +45,26 @@ export function EditorCreationDock({
   onInsert: (asset: Asset) => Promise<void>;
 }) {
   const { workspace, capabilities } = useWorkspace();
-  const [kind, setKind] = useState<
-    "library" | "image" | "video" | "voice" | "audio" | "graphics" | null
-  >("library");
-  const [prompt, setPrompt] = useState("");
+  const generation = useEditorGenerations(project.id);
+  const [kind, setKind] = useState<DockKind>("library");
+  const [prompts, setPrompts] = useState({ video: "", image: "", voice: "" });
   const [seconds, setSeconds] = useState(5);
   const [voice, setVoice] = useState("English_Graceful_Lady");
-  const [busy, setBusy] = useState(false);
+  const [count, setCount] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
-  const [jobId, setJobId] = useState<string | null>(null);
-  const cost =
+  const [graphicMode, setGraphicMode] = useState<"presets" | "custom">(
+    "presets"
+  );
+  const [graphicPreset, setGraphicPreset] = useState<{
+    preset: GraphicPreset;
+    revision: number;
+  } | null>(null);
+  const prompt =
+    kind === "video" || kind === "image" || kind === "voice"
+      ? prompts[kind]
+      : "";
+  const unitCost =
     kind === "video"
       ? videoCreditCost({
           duration: seconds,
@@ -54,231 +81,308 @@ export function EditorCreationDock({
       : kind === "voice"
         ? capabilities.speech
         : capabilities.videoGeneration;
+
   async function generate() {
-    setBusy(true);
+    if (kind !== "video" && kind !== "image" && kind !== "voice") return;
+    const selectedKind = kind;
+    const text = prompt.trim();
+    if (!text || submitting || !available) return;
+    setSubmitting(true);
     setMessage("");
     try {
-      if (kind === "video") {
-        const result = await platformApi.createVideo({
-          requestId: crypto.randomUUID(),
-          assetName: prompt.slice(0, 60),
-          prompt,
-          duration: seconds,
-          resolution: "720p",
-          generateAudio: false,
-          aspectRatio: project.aspectRatio,
-          projectId: project.id,
-          rightsConfirmed: true,
-          referenceContainsRealPerson: false,
-          realPersonConsentConfirmed: false,
-        });
-        setJobId(result.job.id);
-        setMessage(
-          "Video is generating. You can keep editing; check here to insert it when ready."
-        );
-      } else {
-        const asset =
-          kind === "voice"
-            ? await platformApi.synthesizeSpeech({
-                text: prompt,
-                voice,
-                assetName: "Editor voiceover",
-                projectId: project.id,
-                rightsConfirmed: true,
-              })
-            : await platformApi.generateImage({
-                prompt,
-                assetName: prompt.slice(0, 60),
+      await generation.start(
+        selectedKind,
+        record =>
+          selectedKind === "video"
+            ? platformApi.createVideo({
+                requestId: record.id,
+                assetName: record.outputName,
+                prompt: text,
+                duration: seconds,
+                resolution: "720p",
+                generateAudio: false,
                 aspectRatio: project.aspectRatio,
-                resolution: "1K",
+                projectId: project.id,
                 rightsConfirmed: true,
                 referenceContainsRealPerson: false,
                 realPersonConsentConfirmed: false,
-              });
-        await onInsert(asset);
-        setMessage("Added to your timeline and Library.");
-        setPrompt("");
-      }
+              })
+            : selectedKind === "voice"
+              ? platformApi.synthesizeSpeech({
+                  text,
+                  voice,
+                  assetName: record.outputName,
+                  projectId: project.id,
+                  rightsConfirmed: true,
+                })
+              : platformApi.generateImage({
+                  prompt: text,
+                  assetName: record.outputName,
+                  aspectRatio: project.aspectRatio,
+                  resolution: "1K",
+                  rightsConfirmed: true,
+                  referenceContainsRealPerson: false,
+                  realPersonConsentConfirmed: false,
+                }),
+        count
+      );
+      setMessage(
+        `${count === 1 ? "Generation" : `${count} generations`} started. You can keep creating while your files finish.`
+      );
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Generation failed.");
+      setMessage(
+        e instanceof Error ? e.message : "Could not start generation."
+      );
     } finally {
-      setBusy(false);
+      setSubmitting(false);
     }
   }
-  async function checkVideo() {
-    if (!jobId) return;
-    setBusy(true);
-    try {
-      const result = await platformApi.videoJob(jobId);
-      if (result.asset) {
-        await onInsert(result.asset);
-        setJobId(null);
-        setMessage("Video inserted at the playhead.");
-      } else
-        setMessage(
-          `Video: ${result.job.status}. Your generation remains available in the Library.`
-        );
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not check video.");
-    } finally {
-      setBusy(false);
-    }
-  }
+
   return (
-    <section aria-label="Create media on timeline" className="h-full min-w-0">
-      <div>
-        <div className="flex gap-1 overflow-x-auto border-b border-border p-2">
-          {(
-            [
-              ["library", "Library", Film],
-              ["video", "Video", Film],
-              ["image", "Image", Image],
-              ["voice", "Voiceover", Mic2],
-              ["audio", "Sounds", Music2],
-              ["graphics", "Graphics", Image],
-            ] as const
-          ).map(([id, label, Icon]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setKind(id)}
-              className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs ${kind === id ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </button>
-          ))}
-        </div>
-        {kind && (
-          <div className="p-3">
-            {onAssist && (
+    <section aria-label="Create and manage media" className="h-full min-w-0">
+      <div
+        role="tablist"
+        tabIndex={-1}
+        aria-label="Media tools"
+        onKeyDown={e => {
+          const tabs = Array.from(
+            e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+          );
+          const index = tabs.indexOf(e.target as HTMLButtonElement);
+          if (index < 0) return;
+          const next =
+            e.key === "Home"
+              ? 0
+              : e.key === "End"
+                ? tabs.length - 1
+                : ["ArrowRight", "ArrowDown"].includes(e.key)
+                  ? (index + 1) % tabs.length
+                  : ["ArrowLeft", "ArrowUp"].includes(e.key)
+                    ? (index - 1 + tabs.length) % tabs.length
+                    : -1;
+          if (next < 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          tabs[next].focus();
+          tabs[next].click();
+        }}
+        className="grid grid-cols-3 gap-1 border-b border-border p-2"
+      >
+        {(
+          [
+            ["library", "Library", Files],
+            ["video", "Video", Film],
+            ["image", "Image", Image],
+            ["voice", "Voiceover", Mic2],
+            ["audio", "Sounds", Music2],
+            ["graphics", "Graphics", Shapes],
+          ] as const
+        ).map(([id, label, Icon]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            tabIndex={kind === id ? 0 : -1}
+            aria-selected={kind === id}
+            aria-controls={`media-panel-${project.id}`}
+            onClick={() => {
+              setKind(id);
+              setMessage("");
+            }}
+            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-[11px] transition-colors ${kind === id ? "border-primary/60 bg-primary/10 text-primary" : "border-transparent text-foreground/65 hover:bg-foreground/5 hover:text-foreground"}`}
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0" />
+            {label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`media-panel-${project.id}`} className="p-3">
+        {onAssist && (
+          <button
+            type="button"
+            onClick={() =>
+              onAssist(
+                kind === "library"
+                  ? "Recommend existing library shots to support this edit, using actual filenames."
+                  : kind === "graphics"
+                    ? "Propose executable graphic operations for this footage: editable text, callouts, counters, countdowns, arrows or highlights. Base numbers on supplied facts; use observed timestamps and keep faces and captions clear."
+                    : `Suggest the best ${kind === "voice" ? "voiceover text and delivery" : kind === "audio" ? "music and sound design" : `${kind} generation prompt`} for this edit. Provide a usable prompt in the summary; do not generate media.`
+              )
+            }
+            className="ai-magic mb-4 inline-flex items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-xs text-primary"
+          >
+            AI suggestions · {assistCost} credits
+            <WandSparkles size={14} />
+          </button>
+        )}
+        {kind === "library" ? (
+          <EditorMediaLibrary />
+        ) : kind === "graphics" ? (
+          <div className="space-y-4">
+            <div className="flex rounded-lg bg-background/60 p-1">
               <button
                 type="button"
-                disabled={busy}
-                onClick={() =>
-                  onAssist(
-                    kind === "library"
-                      ? "Recommend existing library shots to support this edit, using actual filenames."
-                      : kind === "graphics"
-                        ? "Propose executable graphic operations for this footage: editable text, callouts, counters, countdowns, arrows or highlights. Base numbers on supplied facts; use observed timestamps and keep faces and captions clear."
-                        : `Suggest the best ${kind === "voice" ? "voiceover text and delivery" : kind === "audio" ? "music and sound design" : `${kind} generation prompt`} for this edit. Provide a usable prompt in the summary; do not generate media.`
-                  )
-                }
-                className="mb-3 rounded-lg border border-primary/30 px-3 py-2 text-sm text-primary"
+                onClick={() => setGraphicMode("presets")}
+                className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "presets" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
               >
-                AI suggestions · {assistCost} credits
+                Preset library
               </button>
+              <button
+                type="button"
+                onClick={() => setGraphicMode("custom")}
+                className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "custom" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
+              >
+                Customize
+              </button>
+            </div>
+            {graphicMode === "presets" && (
+              <EditorPresetLibrary
+                mode="graphics"
+                onGraphicPreset={preset => {
+                  setGraphicPreset(current => ({
+                    preset,
+                    revision: (current?.revision ?? 0) + 1,
+                  }));
+                  setGraphicMode("custom");
+                }}
+              />
             )}
-            {kind === "library" ? (
-              <EditorMediaLibrary onInsert={onInsert} />
-            ) : kind === "graphics" ? (
-              <GraphicComposer onSave={onGraphic} />
-            ) : kind === "audio" ? (
-              <div>
-                <AudioGenerator projectId={project.id} onInsert={onInsert} />
-                <p className="mb-3 text-sm text-foreground/70">
-                  Use your uploaded or generated audio. Drop a licensed music or
-                  sound-effect file onto the timeline to add more.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {workspace.assets
-                    .filter(a => a.kind === "audio" && a.status === "ready")
-                    .map(a => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() =>
-                          void onInsert(a).catch(e => setMessage(e.message))
-                        }
-                        className="rounded-lg border border-border p-3 text-sm"
-                      >
-                        {a.name} · Insert
-                      </button>
-                    ))}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <textarea
-                  aria-label={
-                    kind === "voice" ? "Voiceover text" : "Generation prompt"
-                  }
-                  value={prompt}
-                  onChange={e => setPrompt(e.target.value)}
-                  rows={4}
-                  placeholder={
-                    kind === "voice"
-                      ? "Write the exact voiceover…"
-                      : "Describe the supporting shot you need…"
-                  }
-                  className="w-full rounded-xl border border-border bg-background p-3 text-sm"
-                />
-                <div className="space-y-3">
-                  {kind === "video" && (
-                    <label className="block text-sm">
-                      Duration · {seconds}s
-                      <input
-                        aria-label="Generated video duration"
-                        type="range"
-                        min={3}
-                        max={15}
-                        value={seconds}
-                        onChange={e => setSeconds(Number(e.target.value))}
-                        className="w-full accent-primary"
-                      />
-                    </label>
-                  )}
-                  {kind === "voice" && (
-                    <select
-                      aria-label="Voice"
-                      value={voice}
-                      onChange={e => setVoice(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background p-2 text-sm"
-                    >
-                      <option value="English_Graceful_Lady">
-                        Grace · English
-                      </option>
-                      <option value="English_Trustworth_Man">
-                        James · English
-                      </option>
-                      <option value="Italian_Narrator">
-                        Narratore · Italiano
-                      </option>
-                      <option value="Italian_BraveHeroine">
-                        Sofia · Italiano
-                      </option>
-                    </select>
-                  )}
-
+            <div hidden={graphicMode !== "custom"}>
+              {graphicPreset && (
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate font-medium">
+                    {graphicPreset.preset.name}
+                  </span>
                   <button
                     type="button"
-                    disabled={busy || !available || !prompt.trim()}
-                    onClick={() => void generate()}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground disabled:opacity-40"
+                    onClick={() => setGraphicPreset(null)}
+                    className="shrink-0 text-primary"
                   >
-                    {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Generate · {cost} credits
+                    Start blank
                   </button>
                 </div>
-              </div>
+              )}
+              <GraphicComposer
+                key={
+                  graphicPreset
+                    ? `${project.id}:${graphicPreset.preset.id}:${graphicPreset.revision}`
+                    : `${project.id}:blank`
+                }
+                draft={graphicPreset?.preset.graphic}
+                duration={graphicPreset?.preset.duration ?? 3}
+                onSave={onGraphic}
+              />
+            </div>
+          </div>
+        ) : kind === "audio" ? (
+          <>
+            <AudioGenerator
+              onGenerate={input =>
+                generation.start(input.kind, record =>
+                  platformApi.generateAudio({
+                    ...input,
+                    requestId: record.id,
+                    assetName: record.outputName,
+                    projectId: project.id,
+                    rightsConfirmed: true,
+                  })
+                )
+              }
+            />
+            <EditorSoundLibrary />
+          </>
+        ) : (
+          <div className="space-y-3">
+            <label
+              className="block text-xs font-medium text-foreground/65"
+              htmlFor={`generation-prompt-${project.id}`}
+            >
+              {kind === "voice" ? "Voiceover script" : `Describe your ${kind}`}
+            </label>
+            <textarea
+              id={`generation-prompt-${project.id}`}
+              aria-label={
+                kind === "voice" ? "Voiceover text" : "Generation prompt"
+              }
+              value={prompt}
+              onChange={e =>
+                setPrompts(values => ({ ...values, [kind]: e.target.value }))
+              }
+              rows={4}
+              placeholder={
+                kind === "voice"
+                  ? "Write the exact words you want spoken…"
+                  : "Describe the subject, setting, lighting, and style…"
+              }
+              className="w-full resize-y rounded-xl border border-border bg-background p-3 text-sm"
+            />
+            {kind === "video" && (
+              <label className="block text-xs">
+                Duration · {seconds.toFixed(1)}s
+                <input
+                  aria-label="Generated video duration"
+                  type="range"
+                  min={3}
+                  max={15}
+                  value={seconds}
+                  onChange={e => setSeconds(Number(e.target.value))}
+                  className="mt-2 w-full accent-primary"
+                />
+              </label>
             )}
-            {jobId && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void checkVideo()}
-                className="mt-3 rounded-lg border border-primary px-3 py-2 text-sm text-primary"
-              >
-                Check video & insert
-              </button>
+            {kind === "voice" && (
+              <VoiceSelector value={voice} onChange={setVoice} />
             )}
-            {message && (
-              <p role="status" className="mt-3 text-sm text-foreground/80">
-                {message}
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-foreground/65">
+                Files to create
+              </span>
+              <CompactSelect
+                aria-label="Number of generated files"
+                value={String(count)}
+                onValueChange={value => setCount(Number(value))}
+                options={[1, 2, 3, 4].map(value => ({
+                  value: String(value),
+                  label: String(value),
+                }))}
+                className="w-20"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={submitting || !available || !prompt.trim()}
+              onClick={() => void generate()}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Generate {count > 1 ? `${count} files · ` : "· "}
+              {unitCost * count} credits
+            </button>
+            {!available && (
+              <p className="text-xs text-foreground/55">
+                This generation service is not available yet. Your existing
+                files remain available in Library.
               </p>
             )}
           </div>
         )}
+        {(message || generation.message) && (
+          <p
+            role="status"
+            className="mt-3 text-xs leading-relaxed text-foreground/65"
+          >
+            {generation.message || message}
+          </p>
+        )}
+        <EditorGenerationTray
+          records={generation.records}
+          assets={workspace.assets}
+          jobs={workspace.jobs}
+          checking={generation.checking}
+          onCheck={generation.check}
+          onRename={generation.rename}
+          onRecoverVideo={generation.recoverVideo}
+        />
       </div>
     </section>
   );

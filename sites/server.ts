@@ -3,18 +3,20 @@ import {
   MusicGenerationError,
   musicQuote,
   readMusicAudio,
-  finishMusicWave,
+  finishMusicAudio,
 } from "./music-generation";
 import { normalizeGraphic } from "../contracts/motion-graphics";
 import { normalizeReview } from "../contracts/source-review";
 import { audioGenerationQuote } from "../contracts/audio-generation";
 import { normalizeMediaFolders } from "../contracts/media-folders";
+import { normalizeEditorGenerations } from "../contracts/editor-generations";
 import { pcmWaveDuration } from "../contracts/audio-chunks";
 import {
   hashMediaStream,
   inspectMp4Stream,
   mediaParts,
   mp4Marker,
+  storeMediaParts,
 } from "./media-streams";
 import {
   balancedTrendSelection,
@@ -2120,6 +2122,7 @@ function normalizeWorkspace(
     calendarEvents: normalizeCalendarEvents(candidate.calendarEvents),
     goals: Array.isArray(candidate.goals) ? candidate.goals : [],
     jobs: Array.isArray(candidate.jobs) ? candidate.jobs : [],
+    editorGenerations: normalizeEditorGenerations(candidate.editorGenerations),
     activity: Array.isArray(candidate.activity) ? candidate.activity : [],
     updatedAt:
       typeof candidate.updatedAt === "string"
@@ -3397,12 +3400,17 @@ async function listOwnerJobs(
   const result = await env.DB.prepare(
     `SELECT id, owner_email, provider_job_id, project_id, prompt, status,
             progress, result_asset_id, error, payload, finalizing_at,
-            created_at, updated_at
+            created_at, updated_at, brand_id
      FROM generation_jobs WHERE owner_email = ? AND brand_id = ? ORDER BY created_at DESC`
   )
     .bind(user.email, user.brandId || "default")
     .all<JobRow>();
-  return result.results.map(jobFromRow);
+  return Promise.all(
+    result.results.map(async row => ({
+      ...jobFromRow(row),
+      canRecover: Boolean(await videoRecoveryEvidence(env, user, row)),
+    }))
+  );
 }
 
 function parseRange(
@@ -4422,6 +4430,63 @@ const SAFE_VIDEO_JOB_ERRORS = new Set([
   "The generated output could not be marked and verified",
 ]);
 
+const RECOVERABLE_VIDEO_STORAGE_FAILURES = new Set([
+  "output_marking_or_storage_failure",
+  "video_download_failure",
+  "video_store_source_failure",
+]);
+
+/** Recovery is only for transport/storage failures before any provenance was
+ * created. Never reset a failed mark, moderation decision, or conflicting identity. */
+async function videoRecoveryEvidence(
+  env: SitesEnvironment,
+  user: AuthenticatedUser,
+  row: JobRow
+) {
+  if (
+    row.owner_email !== user.email ||
+    (row.brand_id || "default") !== (user.brandId || "default") ||
+    row.status !== "failed" ||
+    !row.provider_job_id ||
+    row.result_asset_id ||
+    row.error !== "The generated output could not be marked and verified"
+  )
+    return null;
+  let payload: Record<string, unknown>;
+  try {
+    payload = recordValue(JSON.parse(row.payload)) || {};
+  } catch {
+    return null;
+  }
+  const invocationId = stringValue(payload.invocationId);
+  if (
+    !invocationId ||
+    payload.rightsConfirmed !== true ||
+    (payload.referenceContainsRealPerson === true &&
+      payload.realPersonConsentConfirmed !== true)
+  )
+    return null;
+  const [invocation, provenance] = await Promise.all([
+    env.DB.prepare(
+      "SELECT id,error_code FROM ai_invocations WHERE id = ? AND owner_email = ? AND purpose = 'video-generation' AND provider = 'OpenRouter' AND status = 'failed'"
+    )
+      .bind(invocationId, user.email)
+      .first<{ id: string; error_code: string | null }>(),
+    provenanceByEntity(env, user, "asset", `video-${row.id}`),
+  ]);
+  if (
+    provenance ||
+    !invocation?.error_code ||
+    !RECOVERABLE_VIDEO_STORAGE_FAILURES.has(invocation.error_code)
+  )
+    return null;
+  return {
+    invocationId: invocation.id,
+    errorCode: invocation.error_code,
+    payload,
+  };
+}
+
 function safeVideoJobError(value: string | null): string | undefined {
   const error = stringValue(value);
   if (!error) return undefined;
@@ -5403,7 +5468,7 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. Graphics use type=graphic with parameters.graphic {kind:text|callout|counter|countdown|arrow|highlight,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16 (percent of canvas width),animation:none|fade|pop|slide,from:number,to:number,prefix:string,suffix:string}. Graphics may additionally set rotation (-720..720 degrees, clockwise) and motion:[{at:0..1,x:0..100,y:0..100,scale:0.1..4,rotation:-720..720}]. Motion keyframes use fractions of the graphic duration, are interpolated in preview and export, and should use few deliberate points. These are designed motion paths, not inferred object tracking; do not claim tracking without tracked observations. Each graphic stays an editable timeline overlay. Counter numbers must come from supplied facts. Keep graphics away from faces, products and captions using observed positions; allow enough reading time and avoid decorative overload. These graphics need no media generation charge beyond this edit plan. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
+          `You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. Graphics use type=graphic with parameters.graphic {kind:text|callout|counter|countdown|arrow|highlight|spatial-title|spatial-cube|spatial-orbit,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16 (percent of canvas width),animation:none|fade|pop|slide,from:number,to:number,prefix:string,suffix:string}. Spatial graphics additionally accept spatial:{pitch:-70..70,yaw:-70..70,depth:0.02..0.65,turns:-3..3,perspective:3..12}. Spatial titles contain at most 28 Latin characters or symbols; use a short, readable title. Cube and orbit use turns for full revolutions; titles use it for restrained rocking. These are editable projected 3D objects with consistent preview/export, not footage camera tracking, arbitrary model imports or Adobe After Effects projects. Graphics may additionally set rotation (-720..720 degrees, clockwise) and motion:[{at:0..1,x:0..100,y:0..100,scale:0.1..4,rotation:-720..720}]. Motion keyframes use fractions of the graphic duration, are interpolated in preview and export, and should use few deliberate points. These are designed motion paths, not inferred object tracking; do not claim tracking without tracked observations. Each graphic stays an editable timeline overlay. Counter numbers must come from supplied facts. Keep graphics away from faces, products and captions using observed positions; allow enough reading time and avoid decorative overload. These graphics need no media generation charge beyond this edit plan. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
           JSON.stringify({ command: input.command, project: projectContext })
         );
         const summary = stringValue(
@@ -5835,8 +5900,9 @@ async function handleAi(
     const openRouterMusic = generatedAudio && kind === "music";
     const provider =
       !generatedAudio || openRouterMusic ? "OpenRouter" : "ElevenLabs";
-    const audioContentType = openRouterMusic ? "audio/wav" : "audio/mpeg";
-    const audioExtension = openRouterMusic ? "wav" : "mp3";
+    let audioContentType = "audio/mpeg";
+    let audioExtension = "mp3";
+    let audioDuration: number | undefined;
     if (
       provider === "OpenRouter"
         ? !env.OPENROUTER_API_KEY
@@ -5969,7 +6035,7 @@ async function handleAi(
                 ? {
                     model,
                     modalities: ["text", "audio"],
-                    audio: { format: "wav" },
+                    audio: { format: "mp3" },
                     stream: true,
                     messages: [
                       {
@@ -5998,19 +6064,29 @@ async function handleAi(
             );
             await providerError(response, provider);
           }
-          buffer = openRouterMusic
-            ? finishMusicWave(
-                await readMusicAudio(response),
-                Number(input.seconds)
-              )
-            : await response.arrayBuffer();
+          if (openRouterMusic) {
+            const finished = finishMusicAudio(
+              await readMusicAudio(response),
+              Number(input.seconds)
+            );
+            buffer = finished.bytes;
+            audioContentType = finished.contentType;
+            audioExtension = finished.extension;
+            audioDuration = finished.duration;
+          } else {
+            buffer = await response.arrayBuffer();
+          }
         } catch (cause) {
           await failAiInvocation(
             env,
             invocation,
             cause instanceof MusicGenerationError
               ? cause.message.slice(0, 80)
-              : "provider_failure"
+              : cause instanceof Response
+                ? `provider_${cause.status}`
+                : cause instanceof Error && cause.name === "TimeoutError"
+                  ? "provider_timeout"
+                  : "provider_failure"
           );
           if (cause instanceof MusicGenerationError)
             throw errorResponse(cause.message, 502);
@@ -6160,7 +6236,18 @@ async function handleAi(
             { status: 500, headers: { "Content-Type": "application/json" } }
           );
         }
-        return json({ asset: { ...asset, provenance } }, 201);
+        return json(
+          {
+            asset: {
+              ...asset,
+              ...(audioDuration === undefined
+                ? {}
+                : { duration: audioDuration }),
+              provenance,
+            },
+          },
+          201
+        );
       }
     );
   }
@@ -6178,7 +6265,14 @@ async function handleVideoJobs(
     return errorResponse("Video generation is temporarily unavailable", 503);
   }
   await initializeSchema(env);
-  const id = url.pathname.split("/").filter(Boolean)[3];
+  const routeParts = url.pathname.split("/").filter(Boolean);
+  const id = routeParts[3];
+  const recoveryRequest =
+    request.method === "POST" &&
+    routeParts[4] === "recover" &&
+    routeParts.length === 5;
+  if (routeParts.length > 4 && !recoveryRequest)
+    return errorResponse("Video job action not found", 404);
   if (id) {
     const scoped = await env.DB.prepare(
       "SELECT brand_id FROM generation_jobs WHERE id = ? AND owner_email = ?"
@@ -6599,7 +6693,7 @@ async function handleVideoJobs(
     }
   }
 
-  if (request.method !== "GET" || !id) {
+  if ((!recoveryRequest && request.method !== "GET") || !id) {
     return errorResponse("Video job not found", 404);
   }
 
@@ -6609,6 +6703,94 @@ async function handleVideoJobs(
     .bind(id, user.email)
     .first<JobRow>();
   if (!row) return errorResponse("Video job not found", 404);
+
+  if (recoveryRequest && row.status === "failed") {
+    const recovery = await videoRecoveryEvidence(env, user, row);
+    if (!recovery)
+      return errorResponse(
+        "This video cannot be recovered automatically. Only a failed download can be retried; generation and verification failures need a new request.",
+        409
+      );
+    assertProvenanceConfigured(env);
+    const providerStatus = await fetch(
+      `${OPENROUTER_BASE}/videos/${encodeURIComponent(row.provider_job_id!)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+          "HTTP-Referer": "https://reelassati.chatgpt.site",
+          "X-Title": "REELassati",
+        },
+        signal: AbortSignal.timeout(30000),
+      }
+    );
+    if (!providerStatus.ok) await providerError(providerStatus, "OpenRouter");
+    const status = (await providerStatus.json()) as { status?: string };
+    if (status.status !== "completed")
+      return errorResponse(
+        "The provider no longer has a completed video available to recover. No generation was started and no credits were charged.",
+        409
+      );
+    const now = new Date().toISOString();
+    const recoveryPayload = JSON.stringify({
+      ...recovery.payload,
+      recovery: {
+        attemptId: crypto.randomUUID(),
+        startedAt: now,
+        originalError: recovery.errorCode,
+        additionalCredits: 0,
+      },
+    });
+    // The original reservation remains released. Recovery only downloads the
+    // existing provider output and must never reserve or debit credits again.
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE generation_jobs SET status = 'in_progress',progress = 90,error = NULL,finalizing_at = NULL,payload = ?,updated_at = ?
+        WHERE id = ? AND owner_email = ? AND brand_id = ? AND status = 'failed' AND result_asset_id IS NULL
+        AND EXISTS (SELECT 1 FROM ai_invocations WHERE id = ? AND owner_email = ? AND status = 'failed' AND error_code = ?)
+        AND NOT EXISTS (SELECT 1 FROM ai_provenance_records WHERE owner_email = ? AND entity_type = 'asset' AND entity_id = ?)`
+      ).bind(
+        recoveryPayload,
+        now,
+        id,
+        user.email,
+        user.brandId || "default",
+        recovery.invocationId,
+        user.email,
+        recovery.errorCode,
+        user.email,
+        `video-${id}`
+      ),
+      env.DB.prepare(
+        `UPDATE ai_invocations SET status = 'in_progress',error_code = NULL,completed_at = NULL WHERE id = ? AND owner_email = ? AND status = 'failed' AND error_code = ?
+        AND EXISTS (SELECT 1 FROM generation_jobs WHERE id = ? AND owner_email = ? AND status = 'in_progress' AND payload = ?)`
+      ).bind(
+        recovery.invocationId,
+        user.email,
+        recovery.errorCode,
+        id,
+        user.email,
+        recoveryPayload
+      ),
+    ]);
+    row = await env.DB.prepare(
+      "SELECT * FROM generation_jobs WHERE id = ? AND owner_email = ?"
+    )
+      .bind(id, user.email)
+      .first<JobRow>();
+    if (!row) return errorResponse("Video job not found", 404);
+  } else if (recoveryRequest && row.status !== "completed") {
+    let payload: Record<string, unknown> = {};
+    try {
+      payload = recordValue(JSON.parse(row.payload)) || {};
+    } catch {
+      /* checked below */
+    }
+    if (!recordValue(payload.recovery))
+      return errorResponse(
+        "This video is still generating. Use Check video to refresh it.",
+        409
+      );
+  }
 
   if (
     row.status === "pending" &&
@@ -6673,25 +6855,28 @@ async function handleVideoJobs(
       jobPayload = {};
     }
     if (statusPayload.status === "completed" && !row.result_asset_id) {
-      const leaseCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      const leaseCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const lease = await env.DB.prepare(
         `
         UPDATE generation_jobs
         SET finalizing_at = ?, status = 'in_progress', progress = 92,
             updated_at = ?
         WHERE id = ? AND owner_email = ? AND result_asset_id IS NULL
+          AND status IN ('pending', 'in_progress')
           AND (finalizing_at IS NULL OR finalizing_at < ?)
       `
       )
         .bind(now, now, id, user.email, leaseCutoff)
         .run();
       if ((lease.meta?.changes || 0) === 1) {
+        let finalizationStage = "download";
         try {
           const assetId = `video-${id}`;
           const r2Key = `users/${encodeURIComponent(
             user.email
           )}/generated/${assetId}.mp4`;
-          let storedVideo = await env.BUCKET.get(r2Key);
+          const sourceKey = `${r2Key}.source`;
+          let storedVideo = await env.BUCKET.get(sourceKey);
           if (!storedVideo) {
             const contentResponse = await fetch(
               `${OPENROUTER_BASE}/videos/${encodeURIComponent(
@@ -6703,6 +6888,7 @@ async function handleVideoJobs(
                   "HTTP-Referer": "https://reelassati.chatgpt.site",
                   "X-Title": "REELassati",
                 },
+                signal: AbortSignal.timeout(180000),
               }
             );
             if (!contentResponse.ok) {
@@ -6714,26 +6900,39 @@ async function handleVideoJobs(
             const reportedSize = Number(
               contentResponse.headers.get("content-length") || "0"
             );
-            await env.BUCKET.put(r2Key, contentResponse.body, {
-              httpMetadata: { contentType: "video/mp4" },
-              customMetadata: {
-                owner: user.email,
-                source: "openrouter-video",
-                providerJobId: row.provider_job_id,
-              },
-            });
-            storedVideo = await env.BUCKET.get(r2Key);
-            if (!storedVideo && reportedSize <= 0) {
+            finalizationStage = "store-source";
+            const sourceUpload = await env.BUCKET.createMultipartUpload(
+              sourceKey,
+              {
+                httpMetadata: { contentType: "video/mp4" },
+                customMetadata: {
+                  owner: user.email,
+                  source: "openrouter-video",
+                  providerJobId: row.provider_job_id,
+                },
+              }
+            );
+            const saved = await storeMediaParts(
+              sourceUpload,
+              contentResponse.body,
+              {
+                partSize: UPLOAD_PART_BYTES,
+                maxBytes: 1024 * 1024 * 1024,
+                ...(reportedSize > 0 &&
+                !contentResponse.headers.get("content-encoding")
+                  ? { expectedBytes: reportedSize }
+                  : {}),
+              }
+            );
+            storedVideo = await env.BUCKET.get(sourceKey);
+            if (!storedVideo || storedVideo.size !== saved.size) {
               throw new Error("Generated video storage could not be verified");
             }
           }
-          const videoObject = storedVideo || (await env.BUCKET.get(r2Key));
+          const videoObject = storedVideo;
           if (!videoObject)
             throw new Error("Generated video bytes are missing");
-          const videoBytes = await videoObject.arrayBuffer();
-          const existingEmbeddedMark = inspectMediaProvenanceMarker(videoBytes);
-          const unmarkedVideoBytes =
-            existingEmbeddedMark?.unmarkedBytes || videoBytes;
+          finalizationStage = "provenance";
           const pendingProvenance = await createProvenanceRecord(env, user, {
             entityType: "asset",
             entityId: assetId,
@@ -6744,7 +6943,7 @@ async function handleVideoJobs(
               jobPayload.model,
               env.OPENROUTER_VIDEO_MODEL || "kwaivgi/kling-v3.0-std"
             ),
-            content: unmarkedVideoBytes,
+            content: videoObject.body,
             embeddedMediaMarker: true,
             metadata: {
               invocationId: stringValue(jobPayload.invocationId) || null,
@@ -6759,23 +6958,11 @@ async function handleVideoJobs(
                 jobPayload.realPersonConsentConfirmed === true,
             },
           });
-          const markedVideo = embedMediaProvenanceMarker(
-            videoBytes,
-            "video/mp4",
-            pendingProvenance.marking.publicToken || ""
-          );
-          if (!markedVideo) {
-            await failProvenanceRecord(
-              env,
-              user,
-              pendingProvenance.recordId,
-              "asset",
-              assetId,
-              "unsupported-or-invalid-video-marker"
-            );
-            throw new Error("Generated video output marking failed");
-          }
-          await env.BUCKET.put(r2Key, markedVideo.bytes, {
+          finalizationStage = "mark-and-store";
+          const source = await env.BUCKET.get(sourceKey);
+          if (!source || source.etag !== videoObject.etag)
+            throw new Error("Generated video changed while it was being saved");
+          const markedUpload = await env.BUCKET.createMultipartUpload(r2Key, {
             httpMetadata: { contentType: "video/mp4" },
             customMetadata: {
               owner: user.email,
@@ -6783,19 +6970,38 @@ async function handleVideoJobs(
               providerJobId: row.provider_job_id,
               provenanceToken: pendingProvenance.marking.publicToken || "",
               policyVersion: AI_COMPLIANCE_POLICY_VERSION,
-              embeddedMarking: markedVideo.method,
+              embeddedMarking: "mp4-uuid-box",
             },
           });
+          const markedVideo = await storeMediaParts(markedUpload, source.body, {
+            partSize: UPLOAD_PART_BYTES,
+            maxBytes: 1024 * 1024 * 1024,
+            expectedBytes: source.size,
+            suffix: mp4Marker(pendingProvenance.marking.publicToken || ""),
+          });
+          finalizationStage = "verify";
           const markedVideoObject = await env.BUCKET.get(r2Key);
-          if (!markedVideoObject) {
+          if (
+            !markedVideoObject ||
+            markedVideoObject.size !== markedVideo.size
+          ) {
             throw new Error("Marked video storage is missing");
           }
           const provenance = await finalizeEmbeddedProvenance(
             env,
             user,
             pendingProvenance,
-            await markedVideoObject.arrayBuffer()
+            markedVideoObject.body
           );
+          const savedProvenance = await provenanceByEntity(
+            env,
+            user,
+            "asset",
+            assetId
+          );
+          if (!savedProvenance || savedProvenance.marking_status !== "verified")
+            throw new Error("Verified video provenance is missing");
+          finalizationStage = "asset-record";
           let asset = await getAssetRow(env, user, assetId).then(existing =>
             existing ? rowToAsset(existing) : null
           );
@@ -6808,14 +7014,14 @@ async function handleVideoJobs(
                 "mp4"
               ),
               contentType: "video/mp4",
-              size: markedVideo.bytes.byteLength,
+              size: markedVideo.size,
               r2Key,
             });
           } else {
             await env.DB.prepare(
               "UPDATE assets SET bytes = ? WHERE id = ? AND owner_email = ?"
             )
-              .bind(markedVideo.bytes.byteLength, asset.id, user.email)
+              .bind(markedVideo.size, asset.id, user.email)
               .run();
           }
           if (!asset) throw new Error("Generated video metadata is missing");
@@ -6826,44 +7032,62 @@ async function handleVideoJobs(
                 scheme: AI_PROVENANCE_SCHEME,
                 policyVersion: AI_COMPLIANCE_POLICY_VERSION,
                 publicToken: provenance.marking.publicToken,
-                contentSha256: await sha256Hex(unmarkedVideoBytes),
+                contentSha256: savedProvenance.content_sha256,
               })
             ),
             { httpMetadata: { contentType: "application/json" } }
           );
+          finalizationStage = "commit";
           const invocationId = stringValue(jobPayload.invocationId);
-          if (invocationId) {
-            await completeAiInvocation(
-              env,
-              {
-                id: invocationId,
-                provider: "OpenRouter",
-                model: provenance.model,
-                purpose: "video-generation",
-              },
-              await sha256Hex(unmarkedVideoBytes)
-            );
-          }
-          await env.DB.prepare(
-            `
+          const completedReservation = reservationFromJobPayload(jobPayload);
+          await env.DB.batch([
+            env.DB.prepare(
+              `
             UPDATE generation_jobs
             SET status = 'completed', progress = 100, result_asset_id = ?,
                 finalizing_at = NULL, updated_at = ?
             WHERE id = ? AND owner_email = ? AND result_asset_id IS NULL
           `
-          )
-            .bind(asset.id, now, id, user.email)
-            .run();
-          const completedReservation = reservationFromJobPayload(jobPayload);
-          if (completedReservation) {
-            await settleCreditReservation(env, completedReservation);
-          }
+            ).bind(asset.id, now, id, user.email),
+            ...(invocationId
+              ? [
+                  env.DB.prepare(
+                    "UPDATE ai_invocations SET output_sha256 = ?, status = 'completed', completed_at = ? WHERE id = ? AND owner_email = ? AND status = 'in_progress'"
+                  ).bind(
+                    await sha256Hex(savedProvenance.content_sha256 || ""),
+                    now,
+                    invocationId,
+                    user.email
+                  ),
+                ]
+              : []),
+            ...(completedReservation
+              ? [
+                  env.DB.prepare(
+                    "UPDATE credit_ledger SET status = 'settled', settled_at = ? WHERE id = ? AND owner_email = ? AND status = 'reserved'"
+                  ).bind(now, completedReservation.id, user.email),
+                ]
+              : []),
+          ]);
+          await env.BUCKET.delete(sourceKey).catch(() => undefined);
         } catch (cause) {
+          logProviderFailure("OpenRouter", "video-finalization", {
+            providerCode: `video_${finalizationStage.replaceAll("-", "_")}_failure`,
+            status:
+              cause instanceof Error
+                ? cause.name
+                : cause instanceof Response
+                  ? `HTTP_${cause.status}`
+                  : "unknown",
+          });
           const failedAssetId = `video-${id}`;
           const failedR2Key = `users/${encodeURIComponent(
             user.email
           )}/generated/${failedAssetId}.mp4`;
           await env.BUCKET.delete(failedR2Key).catch(() => undefined);
+          await env.BUCKET.delete(`${failedR2Key}.source`).catch(
+            () => undefined
+          );
           await env.BUCKET.delete(`${failedR2Key}.provenance.json`).catch(
             () => undefined
           );
@@ -6899,7 +7123,7 @@ async function handleVideoJobs(
                 model: stringValue(jobPayload.model, "unknown"),
                 purpose: "video-generation",
               },
-              "output_marking_or_storage_failure"
+              `video_${finalizationStage.replaceAll("-", "_")}_failure`
             );
           }
           const failedReservation = reservationFromJobPayload(jobPayload);
@@ -6932,30 +7156,12 @@ async function handleVideoJobs(
         "video-generation-status",
         { status: statusPayload.status }
       );
-      const invocationId = stringValue(jobPayload.invocationId);
-      if (invocationId) {
-        await failAiInvocation(
-          env,
-          {
-            id: invocationId,
-            provider: "OpenRouter",
-            model: stringValue(jobPayload.model, "unknown"),
-            purpose: "video-generation",
-          },
-          `provider_${statusPayload.status}`
-        );
-      }
-      const failedReservation = reservationFromJobPayload(jobPayload);
-      if (failedReservation) {
-        await releaseCreditReservation(env, failedReservation).catch(
-          () => undefined
-        );
-      }
-      await env.DB.prepare(
+      const failed = await env.DB.prepare(
         `
         UPDATE generation_jobs
         SET status = 'failed', progress = 100, error = ?, updated_at = ?
-        WHERE id = ? AND owner_email = ?
+        WHERE id = ? AND owner_email = ? AND result_asset_id IS NULL
+          AND status IN ('pending', 'in_progress') AND finalizing_at IS NULL
       `
       )
         .bind(
@@ -6968,12 +7174,36 @@ async function handleVideoJobs(
           user.email
         )
         .run();
+      // A slower status response must not fail a video that another request
+      // has already saved or is currently finalizing.
+      if ((failed.meta?.changes || 0) === 1) {
+        const invocationId = stringValue(jobPayload.invocationId);
+        if (invocationId) {
+          await failAiInvocation(
+            env,
+            {
+              id: invocationId,
+              provider: "OpenRouter",
+              model: stringValue(jobPayload.model, "unknown"),
+              purpose: "video-generation",
+            },
+            `provider_${statusPayload.status}`
+          );
+        }
+        const failedReservation = reservationFromJobPayload(jobPayload);
+        if (failedReservation) {
+          await releaseCreditReservation(env, failedReservation).catch(
+            () => undefined
+          );
+        }
+      }
     } else {
       await env.DB.prepare(
         `
         UPDATE generation_jobs
         SET status = ?, progress = ?, updated_at = ?
-        WHERE id = ? AND owner_email = ?
+        WHERE id = ? AND owner_email = ? AND result_asset_id IS NULL
+          AND status IN ('pending', 'in_progress') AND finalizing_at IS NULL
       `
       )
         .bind(
@@ -6999,7 +7229,10 @@ async function handleVideoJobs(
     ? await provenanceByEntity(env, user, "asset", asset.id)
     : null;
   return json({
-    job: jobFromRow(row as JobRow),
+    job: {
+      ...jobFromRow(row as JobRow),
+      canRecover: Boolean(row && (await videoRecoveryEvidence(env, user, row))),
+    },
     ...(asset
       ? {
           asset: {

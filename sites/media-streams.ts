@@ -62,6 +62,8 @@ export async function* mediaParts(
   suffix: Uint8Array,
   partSize: number
 ) {
+  if (!Number.isSafeInteger(partSize) || partSize < 1)
+    throw new Error("Media part size must be a positive integer");
   const reader = body.getReader();
   let part = new Uint8Array(partSize);
   let filled = 0;
@@ -86,6 +88,61 @@ export async function* mediaParts(
     }
     if (filled) yield part.slice(0, filled);
   } finally {
+    await reader.cancel().catch(() => undefined);
     reader.releaseLock();
+  }
+}
+
+export interface MediaMultipartUpload {
+  uploadPart(
+    partNumber: number,
+    value: Uint8Array
+  ): Promise<{ etag: string; partNumber: number }>;
+  complete(
+    parts: { etag: string; partNumber: number }[]
+  ): Promise<{ size: number }>;
+  abort(): Promise<void>;
+}
+
+/** R2 put() rejects streams with no runtime-known length. Upload bounded byte
+ * arrays instead; this works for chunked provider downloads and avoids buffering
+ * several copies of a video in the Worker's memory. */
+export async function storeMediaParts(
+  upload: MediaMultipartUpload,
+  body: ReadableStream<Uint8Array>,
+  options: {
+    partSize: number;
+    maxBytes: number;
+    expectedBytes?: number;
+    suffix?: Uint8Array;
+  }
+) {
+  const suffix = options.suffix ?? new Uint8Array();
+  const parts: { etag: string; partNumber: number }[] = [];
+  let size = 0;
+  try {
+    for await (const part of mediaParts(body, suffix, options.partSize)) {
+      size += part.length;
+      if (size > options.maxBytes + suffix.length)
+        throw new Error("The generated media exceeds the supported file size");
+      parts.push(await upload.uploadPart(parts.length + 1, part));
+    }
+    const sourceSize = size - suffix.length;
+    if (sourceSize <= 0)
+      throw new Error("The generated media download was empty");
+    if (
+      options.expectedBytes !== undefined &&
+      sourceSize !== options.expectedBytes
+    )
+      throw new Error("The generated media download was incomplete");
+    const completed = await upload.complete(parts);
+    if (completed.size !== size)
+      throw new Error(
+        "The stored media size did not match the downloaded file"
+      );
+    return { size, sourceSize };
+  } catch (error) {
+    await upload.abort().catch(() => undefined);
+    throw error;
   }
 }
