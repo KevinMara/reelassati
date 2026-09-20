@@ -328,8 +328,11 @@ describe("platform-wide functional invariants", () => {
       "Account services are temporarily unavailable. Please try again in a moment."
     );
     expect(api).toContain(
-      "Authorization: `Bearer ${data.session.access_token}`"
+      "Authorization: `Bearer ${activeSession.access_token}`"
     );
+    expect(api).toContain("recoverRejectedSession");
+    expect(api).toContain("response.status === 401");
+    expect(source("./providers/workspace.tsx")).toContain('"Sign in"');
   });
 
   it("rejects HTML fallbacks and reports real upload progress", () => {

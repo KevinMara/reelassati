@@ -22,6 +22,7 @@ import type {
   PlanId,
 } from "@contracts/billing";
 import { supabase } from "@/lib/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { waitForCheckout } from "./checkout-progress";
 import { platformApiUrl } from "@/lib/runtime";
@@ -45,25 +46,77 @@ export class PlatformApiError extends Error {
   }
 }
 
+const SESSION_REFRESH_BUFFER_MS = 60_000;
+let sessionRefresh: Promise<Session | null> | null = null;
+
+function sessionExpiresSoon(session: Session) {
+  return Boolean(
+    session.expires_at &&
+    session.expires_at * 1000 <= Date.now() + SESSION_REFRESH_BUFFER_MS
+  );
+}
+
+async function refreshRequestSession(): Promise<Session | null> {
+  if (!sessionRefresh) {
+    sessionRefresh = supabase.auth
+      .refreshSession()
+      .then(({ data, error }) => (error ? null : data.session))
+      .catch(() => null)
+      .finally(() => {
+        sessionRefresh = null;
+      });
+  }
+  return sessionRefresh;
+}
+
+async function requestSession(): Promise<Session | null> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session) return null;
+  return sessionExpiresSoon(data.session)
+    ? refreshRequestSession()
+    : data.session;
+}
+
+async function recoverRejectedSession(
+  rejectedAccessToken: string
+): Promise<Session | null> {
+  const { data } = await supabase.auth.getSession();
+  if (
+    data.session &&
+    data.session.access_token !== rejectedAccessToken &&
+    !sessionExpiresSoon(data.session)
+  ) {
+    return data.session;
+  }
+  return refreshRequestSession();
+}
+
 async function requestJson<T>(
   path: string,
   init?: RequestInit,
   direct = false
 ): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const response = await fetch(direct ? path : platformApiUrl(path), {
-    ...init,
-    headers: {
-      ...(init?.body instanceof FormData
-        ? {}
-        : { "Content-Type": "application/json" }),
-      ...(data.session?.access_token
-        ? { Authorization: `Bearer ${data.session.access_token}` }
-        : {}),
-      "X-Reelassati-Brand": selectedBrand(data.session?.user.email),
-      ...init?.headers,
-    },
-  });
+  let session = await requestSession();
+  const send = (activeSession: Session | null) =>
+    fetch(direct ? path : platformApiUrl(path), {
+      ...init,
+      headers: {
+        ...(init?.body instanceof FormData
+          ? {}
+          : { "Content-Type": "application/json" }),
+        ...(activeSession?.access_token
+          ? { Authorization: `Bearer ${activeSession.access_token}` }
+          : {}),
+        "X-Reelassati-Brand": selectedBrand(activeSession?.user.email),
+        ...init?.headers,
+      },
+    });
+
+  let response = await send(session);
+  if (response.status === 401 && session?.access_token) {
+    session = await recoverRejectedSession(session.access_token);
+    response = await send(session);
+  }
 
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   const responseText = await response.text();
@@ -122,19 +175,19 @@ async function uploadForm<T>(
   form: FormData,
   onProgress?: (percent: number) => void
 ): Promise<T> {
-  const { data } = await supabase.auth.getSession();
+  const session = await requestSession();
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     request.open("POST", platformApiUrl(path));
-    if (data.session?.access_token) {
+    if (session?.access_token) {
       request.setRequestHeader(
         "Authorization",
-        `Bearer ${data.session.access_token}`
+        `Bearer ${session.access_token}`
       );
     }
     request.setRequestHeader(
       "X-Reelassati-Brand",
-      selectedBrand(data.session?.user.email)
+      selectedBrand(session?.user.email)
     );
     request.responseType = "text";
     onProgress?.(0);

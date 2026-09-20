@@ -1,11 +1,70 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { platformApi, PlatformApiError } from "./platform-api";
+import { supabase } from "@/lib/supabase/client";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("platform API transport", () => {
+  it("refreshes a rejected browser session once and retries with the new token", async () => {
+    vi.stubGlobal("sessionStorage", { getItem: () => null });
+    const user = { email: "creator@example.com" };
+    const staleSession = {
+      access_token: "stale-token",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user,
+    };
+    const freshSession = {
+      access_token: "fresh-token",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user,
+    };
+    vi.spyOn(supabase.auth, "getSession").mockResolvedValue({
+      data: { session: staleSession },
+      error: null,
+    } as never);
+    const refresh = vi
+      .spyOn(supabase.auth, "refreshSession")
+      .mockResolvedValue({
+        data: { session: freshSession, user },
+        error: null,
+      } as never);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          { error: "Sign in to access this workspace" },
+          { status: 401 }
+        )
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          user: {
+            id: "creator@example.com",
+            email: "creator@example.com",
+            name: "Creator",
+            role: "member",
+          },
+          capabilities: {},
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(platformApi.session()).resolves.toMatchObject({
+      user: { email: "creator@example.com" },
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
+      Authorization: "Bearer stale-token",
+    });
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({
+      Authorization: "Bearer fresh-token",
+    });
+  });
+
   it("keeps public-domain support requests on the Vercel function", async () => {
     vi.stubGlobal("window", {
       location: { hostname: "www.reelassati.app" },

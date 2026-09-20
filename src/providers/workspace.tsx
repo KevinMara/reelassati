@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   createEmptyWorkspace,
   type CapabilityState,
@@ -15,6 +16,8 @@ import {
 } from "@contracts/workspace";
 import { platformApi, PlatformApiError } from "@/lib/platform-api";
 import { reconcileAcknowledgedWorkspace } from "@/lib/workspace-save-reconcile";
+import { useAuth } from "@/hooks/useAuth";
+import { rememberAuthNext, safeDashboardNext } from "@/lib/auth-next";
 
 const EMPTY_CAPABILITIES: CapabilityState = {
   persistence: false,
@@ -49,6 +52,9 @@ interface WorkspaceContextValue {
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
+  const { logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [workspace, setWorkspace] = useState<WorkspaceDocument>(() =>
     createEmptyWorkspace("creator@reelassati.local")
   );
@@ -58,6 +64,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authenticationRequired, setAuthenticationRequired] = useState(false);
+  const [openingSignIn, setOpeningSignIn] = useState(false);
   const [saveConflict, setSaveConflict] = useState(false);
   const [unsaved, setUnsaved] = useState(false);
   const currentRef = useRef(workspace);
@@ -76,6 +84,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     let succeeded = false;
     setLoading(true);
     setError(null);
+    setAuthenticationRequired(false);
     try {
       const result = await platformApi.workspace();
       mutationRef.current += 1;
@@ -90,6 +99,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setUnsaved(false);
       succeeded = true;
     } catch (cause) {
+      setAuthenticationRequired(
+        cause instanceof PlatformApiError && cause.status === 401
+      );
       setError(
         cause instanceof Error ? cause.message : "Could not load the workspace"
       );
@@ -114,6 +126,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       })
       .catch((cause: unknown) => {
         if (!active) return;
+        setAuthenticationRequired(
+          cause instanceof PlatformApiError && cause.status === 401
+        );
         setError(
           cause instanceof Error
             ? cause.message
@@ -257,26 +272,67 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }, []);
 
+  const openSignIn = useCallback(async () => {
+    const next = safeDashboardNext(`${location.pathname}${location.search}`);
+    rememberAuthNext(next);
+    setOpeningSignIn(true);
+    try {
+      await logout();
+    } catch {
+      // The local auth state is cleared by logout's finally block even when
+      // the remote session is already invalid.
+    } finally {
+      navigate(`/auth/login?next=${encodeURIComponent(next)}`, {
+        replace: true,
+      });
+    }
+  }, [location.pathname, location.search, logout, navigate]);
+
   return (
     <WorkspaceContext.Provider value={value}>
       {!loading && !ready ? (
         <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
           <section className="w-full max-w-lg rounded-2xl border border-border bg-surface p-7 shadow-card">
-            <p className="mono-eyebrow text-primary">Workspace protected</p>
+            <p className="mono-eyebrow text-primary">
+              {authenticationRequired
+                ? "Sign-in required"
+                : "Workspace protected"}
+            </p>
             <h1 className="mt-3 text-2xl font-semibold">
-              Your studio did not load.
+              {authenticationRequired
+                ? "Your session has expired."
+                : "Your studio did not load."}
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-foreground/60">
-              {error ||
-                "REELassati blocked editing so an empty placeholder cannot overwrite your real workspace."}
+              {authenticationRequired
+                ? "Sign in again to reopen this exact page. Your workspace and media are safe."
+                : error ||
+                  "REELassati blocked editing so an empty placeholder cannot overwrite your real workspace."}
             </p>
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="mt-6 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover"
-            >
-              Retry workspace
-            </button>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {authenticationRequired ? (
+                <button
+                  type="button"
+                  onClick={() => void openSignIn()}
+                  disabled={openingSignIn}
+                  className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-wait disabled:opacity-60"
+                >
+                  {openingSignIn ? "Opening sign in…" : "Sign in"}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void refresh()}
+                disabled={loading || openingSignIn}
+                className={`${
+                  authenticationRequired
+                    ? "border border-border bg-background text-foreground hover:border-primary/40"
+                    : "bg-primary text-white hover:bg-primary-hover"
+                } rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-wait disabled:opacity-60`}
+              >
+                Try again
+              </button>
+            </div>
           </section>
         </main>
       ) : (

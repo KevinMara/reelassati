@@ -283,9 +283,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     setError(null);
-    await supabase.auth.signOut();
-    posthog?.reset();
-    setUser(null);
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } finally {
+      posthog?.reset();
+      setRecoverySession(false);
+      setUser(null);
+      setLoading(false);
+    }
   }, []);
 
   const value = useMemo(
