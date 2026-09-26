@@ -34,6 +34,7 @@ export function chatSnapshot(
     duration: project.duration,
     aspectRatio: project.aspectRatio,
     captionStyle: project.captionStyle,
+    captionAppearance: project.captionAppearance,
     storyBeats: project.storyBeats,
     clips: structuredClone(project.clips),
     transcript: structuredClone(project.transcript),
@@ -55,6 +56,7 @@ export function recordChatEdit(
       p.duration,
       p.aspectRatio,
       p.captionStyle,
+      p.captionAppearance,
       p.storyBeats,
     ]);
   if (projection(before) === projection(after)) return after;
@@ -136,6 +138,7 @@ export function mapChatTranscript(
         .map(s => ({
           ...s,
           id: `chat-caption-${clip.id}-${s.id}`,
+          sourceClipId: clip.id,
           start: clip.start + Math.max(0, s.start - clip.inPoint) / speed,
           end: Math.min(
             clip.start + clip.duration,
@@ -198,7 +201,12 @@ export function applyChatAction(
         ? resizeTimeline(project, action.duration)
         : { ...project };
     if (action.aspectRatio) next.aspectRatio = action.aspectRatio;
-    if (action.captionStyle) next.captionStyle = action.captionStyle;
+    if (action.captionStyle) {
+      next.captionStyle = action.captionStyle;
+      next.captionAppearance = undefined;
+    }
+    if (action.captionAppearance)
+      next.captionAppearance = action.captionAppearance;
   } else if (action.kind === "seek") {
     return {
       ...project,

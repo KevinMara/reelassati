@@ -173,6 +173,19 @@
 }
 
 @layer base {
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.45em;
+    padding: 0.05em 0.35em;
+    border: 1px solid hsl(var(--foreground) / 0.2);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: hsl(var(--background));
+    font: inherit;
+    font-size: 0.9em;
+  }
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 3px;
@@ -607,4 +620,29 @@
   font-family: "Editor Sans";
   src: url("/fonts/DejaVuSans.ttf") format("truetype");
   font-display: swap;
+}
+
+/* Solid elevated surfaces separate transient controls in both themes. */
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="select-content"],
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
+  background: hsl(var(--popover));
+  border-color: hsl(var(--foreground) / 0.2);
+  box-shadow:
+    0 20px 60px hsl(0 0% 0% / 0.28),
+    0 0 0 1px hsl(var(--foreground) / 0.05);
+}
+.dark [data-slot="popover-content"],
+.dark [data-slot="dropdown-menu-content"],
+.dark [data-slot="dropdown-menu-sub-content"],
+.dark [data-slot="select-content"],
+.dark [data-slot="dialog-content"],
+.dark [data-slot="alert-dialog-content"] {
+  background: hsl(30 5% 16%);
+  box-shadow:
+    0 24px 70px hsl(0 0% 0% / 0.65),
+    0 0 0 1px hsl(0 0% 100% / 0.07);
 }

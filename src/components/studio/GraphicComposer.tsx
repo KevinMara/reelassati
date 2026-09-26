@@ -1,4 +1,5 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { Play, Pause } from "lucide-react";
 import { CompactSelect } from "@/components/ui/compact-select";
 import {
   GRAPHIC_KINDS,
@@ -28,13 +29,26 @@ export function GraphicComposer({
 }) {
   const controlId = useId();
   const [g, setG] = useState<MotionGraphic>(() =>
-    normalizeGraphic(
-      initial ?? draft ?? { kind: "callout", text: "Your key message" }
-    )!
+    normalizeGraphic(initial ?? draft ?? { kind: "text", text: "" })!
   );
   const [requestedSeconds, setSeconds] = useState(duration);
   const seconds = initial ? duration : requestedSeconds;
   const [previewPosition, setPreviewPosition] = useState(0.5);
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    if (!playing) return;
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      setPreviewPosition(
+        (((now - start) / 1000) % Math.max(0.1, seconds)) /
+          Math.max(0.1, seconds)
+      );
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [playing, seconds]);
   const [saving, setSaving] = useState(false),
     [error, setError] = useState("");
   const patch = (key: keyof MotionGraphic, value: string | number) =>
@@ -58,6 +72,13 @@ export function GraphicComposer({
       className="space-y-3"
       onSubmit={e => {
         e.preventDefault();
+        if (
+          ["text", "callout", "spatial-title"].includes(g.kind) &&
+          !g.text.trim()
+        ) {
+          setError("Write the words for your graphic before adding it.");
+          return;
+        }
         setSaving(true);
         setError("");
         void onSave(g, seconds)
@@ -79,6 +100,18 @@ export function GraphicComposer({
           time={previewPosition * Math.max(1 / 30, seconds - 1 / 30)}
         />
       </div>
+      <button
+        type="button"
+        onClick={() => setPlaying(value => !value)}
+        className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs"
+      >
+        {playing ? (
+          <Pause className="size-3.5" />
+        ) : (
+          <Play className="size-3.5" />
+        )}
+        {playing ? "Pause motion preview" : "Play motion preview"}
+      </button>
       <label className="block text-sm" htmlFor={`${controlId}-type`}>
         Graphic
         <CompactSelect
@@ -98,6 +131,7 @@ export function GraphicComposer({
         <label className="block text-sm">
           Text
           <textarea
+            placeholder="Write your title or callout…"
             maxLength={g.kind === "spatial-title" ? 28 : 180}
             className={field}
             value={g.text}

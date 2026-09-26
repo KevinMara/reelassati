@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Search, Type, SlidersHorizontal } from "lucide-react";
 import {
   CAPTION_PRESETS,
@@ -185,16 +185,29 @@ function GraphicCard({
   disabled: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
+  const [previewTime, setPreviewTime] = useState(0.8);
+  useEffect(() => {
+    if (
+      !hovered ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return;
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      setPreviewTime(((now - start) / 1000) % preset.duration);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [hovered, preset.duration]);
   const clip = {
     id: preset.id,
     start: 0,
     duration: preset.duration,
-    graphic: {
-      ...preset.graphic,
-      y: 50,
-      motion: undefined,
-      size: Math.min(12, preset.graphic.size * 1.4),
-    },
+    inPoint: 0,
+    outPoint: preset.duration,
+    graphic: preset.graphic,
   } as TimelineClip;
   return (
     <button
@@ -204,6 +217,8 @@ function GraphicCard({
       title={preset.description}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       className="min-w-0 rounded-xl border border-border p-2 text-left transition hover:border-primary/60 disabled:opacity-50"
     >
       <div
@@ -212,7 +227,7 @@ function GraphicCard({
       >
         <MotionGraphicLayer
           clip={clip}
-          time={hovered ? Math.min(1.2, preset.duration / 2) : 0.8}
+          time={hovered ? previewTime : Math.min(0.8, preset.duration / 2)}
         />
       </div>
       <div className="mt-2 truncate text-xs font-medium">{preset.name}</div>

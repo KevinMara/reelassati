@@ -302,6 +302,7 @@ export function normalizeEditorChatState(
       role: row.role,
       text: string(row.text, 6000),
       createdAt: row.createdAt,
+      ...(row.planApproved === true ? { planApproved: true } : {}),
       ...(string(row.requestId) ? { requestId: string(row.requestId) } : {}),
       ...(Array.isArray(row.references)
         ? { references: references(row.references) }
@@ -384,9 +385,13 @@ export function normalizeEditorChatState(
   }
   return {
     mode: value.mode === "auto" ? "auto" : "ask",
-    maxCredits: finite(value.maxCredits)
-      ? Math.max(5, Math.min(100000, Math.floor(value.maxCredits)))
-      : 100,
+    preferencesVersion: 2,
+    maxCredits:
+      value.maxCredits === 100 && value.preferencesVersion !== 2
+        ? 200
+        : finite(value.maxCredits)
+          ? Math.max(5, Math.min(100000, Math.floor(value.maxCredits)))
+          : 200,
     messages,
   };
 }

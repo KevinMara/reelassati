@@ -107,8 +107,55 @@ export const CAPTION_PRESETS: readonly CaptionPreset[] = [
   ),
 ];
 
-export function getCaptionPreset(id?: string): CaptionPreset {
-  return CAPTION_PRESETS.find(p => p.id === id) ?? CAPTION_PRESETS[0];
+export type CaptionAppearance = Partial<
+  Pick<
+    CaptionPreset,
+    | "color"
+    | "outlineColor"
+    | "size"
+    | "bold"
+    | "uppercase"
+    | "outline"
+    | "position"
+    | "margin"
+    | "maxCharacters"
+  >
+> & { background?: string | null };
+
+export function getCaptionPreset(
+  id?: string,
+  appearance?: CaptionAppearance
+): CaptionPreset {
+  const base = CAPTION_PRESETS.find(p => p.id === id) ?? CAPTION_PRESETS[0];
+  if (!appearance || typeof appearance !== "object") return base;
+  const result = { ...base };
+  for (const key of ["color", "outlineColor"] as const)
+    if (
+      typeof appearance[key] === "string" &&
+      /^#[a-f\d]{6}$/i.test(appearance[key]!)
+    )
+      result[key] = appearance[key]!;
+  if (appearance.background === null) result.background = undefined;
+  else if (
+    typeof appearance.background === "string" &&
+    /^#[a-f\d]{6}$/i.test(appearance.background)
+  )
+    result.background = appearance.background;
+  for (const [key, min, max] of [
+    ["size", 2, 12],
+    ["outline", 0, 2],
+    ["margin", 2, 40],
+    ["maxCharacters", 12, 64],
+  ] as const) {
+    const value = appearance[key];
+    if (typeof value === "number" && Number.isFinite(value))
+      result[key] = Math.max(min, Math.min(max, value));
+  }
+  for (const key of ["bold", "uppercase"] as const)
+    if (typeof appearance[key] === "boolean") result[key] = appearance[key]!;
+  if (appearance.position === "top" || appearance.position === "bottom")
+    result.position = appearance.position;
+  return result;
 }
 
 /** Advances extracted from our bundled DejaVu Sans; see public/fonts/DejaVuSans-LICENSE.txt. */

@@ -6,6 +6,7 @@ import {
   Captions,
   Music2,
   Shapes,
+  SlidersHorizontal,
   Loader2,
   WandSparkles,
 } from "lucide-react";
@@ -30,7 +31,7 @@ import { EditorSoundLibrary } from "./EditorSoundLibrary";
 import { EditorPresetLibrary } from "./EditorPresetLibrary";
 
 export type DockKind =
-  "library" | "image" | "video" | "audio" | "captions" | "graphics";
+  "library" | "image" | "video" | "audio" | "captions" | "graphics" | "effects";
 
 export function EditorCreationDock({
   project,
@@ -38,12 +39,14 @@ export function EditorCreationDock({
   activeTool,
   onToolChange,
   captions,
+  effects,
   onGraphic,
 }: {
   onAssist?: (context: string) => void;
   activeTool: DockKind;
   onToolChange: (kind: DockKind) => void;
   captions: ReactNode;
+  effects: ReactNode;
   onGraphic: (graphic: MotionGraphic, seconds: number) => Promise<void>;
   project: EditProject;
   playhead: number;
@@ -183,6 +186,7 @@ export function EditorCreationDock({
             ["audio", "Audio", Music2],
             ["captions", "Captions", Captions],
             ["graphics", "Graphics", Shapes],
+            ["effects", "Looks & transitions", SlidersHorizontal],
           ] as const
         ).map(([id, label, Icon]) => (
           <button
@@ -196,7 +200,7 @@ export function EditorCreationDock({
               onToolChange(id);
               setMessage("");
             }}
-            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-sm transition-colors ${activeTool === id ? "border-primary/60 bg-primary/10 text-primary" : "border-transparent text-foreground/65 hover:bg-foreground/5 hover:text-foreground"}`}
+            className={`${id === "effects" ? "col-span-3" : ""} flex min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-sm transition-colors ${activeTool === id ? "border-primary/60 bg-primary/10 text-primary" : "border-transparent text-foreground/65 hover:bg-foreground/5 hover:text-foreground"}`}
           >
             <Icon className="h-4 w-4 shrink-0" />
             {label}
@@ -204,6 +208,7 @@ export function EditorCreationDock({
         ))}
       </div>
       <div role="tabpanel" id={`media-panel-${project.id}`} className="p-3">
+        {activeTool === "effects" && effects}
         {activeTool === "audio" && (
           <div
             className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-background p-1"

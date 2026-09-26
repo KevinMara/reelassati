@@ -124,7 +124,8 @@ export function timeAtTimelinePointer(
 export function trimTimelineClip(
   clip: TimelineClip,
   side: "start" | "end",
-  time: number
+  time: number,
+  sourceLimit = clip.outPoint
 ): TimelineClip {
   if (clip.locked) return clip;
   clip = preserveGraphicDuration(clip);
@@ -146,7 +147,7 @@ export function trimTimelineClip(
   // Outward extension is limited to the known source out-point, avoiding invented media duration.
   const end = Math.max(
     clip.start + minimum,
-    Math.min(time, clip.start + (clip.outPoint - clip.inPoint) / speed)
+    Math.min(time, clip.start + (sourceLimit - clip.inPoint) / speed)
   );
   return {
     ...clip,

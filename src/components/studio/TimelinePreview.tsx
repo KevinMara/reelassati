@@ -1,8 +1,11 @@
+import { colorGradeMatrix } from "@/lib/color-grade";
 import { CaptionLayer } from "./CaptionLayer";
 import { compareTimelineLayers } from "@/lib/timeline-lanes";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
+
+let previewAudioContext: AudioContext | undefined;
 
 function MediaLayer({
   clip,
@@ -16,6 +19,21 @@ function MediaLayer({
   playing: boolean;
 }) {
   const ref = useRef<HTMLMediaElement | null>(null);
+  const gainRef = useRef<
+    { source: MediaElementAudioSourceNode; gain: GainNode } | undefined
+  >(undefined);
+  const gradeId = useId().replace(/:/g, "");
+  useEffect(() => {
+    const nodes = gainRef.current;
+    if (nodes && previewAudioContext) {
+      nodes.source.connect(nodes.gain);
+      nodes.gain.connect(previewAudioContext.destination);
+    }
+    return () => {
+      gainRef.current?.source.disconnect();
+      gainRef.current?.gain.disconnect();
+    };
+  }, []);
   const elapsed = time - clip.start;
   useEffect(() => {
     const media = ref.current;
@@ -38,7 +56,23 @@ function MediaLayer({
           clip.fadeOut ? (clip.start + clip.duration - time) / clip.fadeOut : 1
         )
       );
-      media.volume = Math.min(1, Math.max(0, volume * fade));
+      if (playing && !gainRef.current && typeof AudioContext !== "undefined") {
+        try {
+          previewAudioContext ??= new AudioContext();
+          const source = previewAudioContext.createMediaElementSource(media);
+          const gain = previewAudioContext.createGain();
+          source.connect(gain);
+          gain.connect(previewAudioContext.destination);
+          gainRef.current = { source, gain };
+        } catch {
+          /* Keep native playback when Web Audio is unavailable. */
+        }
+      }
+      if (gainRef.current) {
+        media.volume = 1;
+        gainRef.current.gain.gain.value = Math.max(0, volume * fade);
+        if (playing) void previewAudioContext?.resume().catch(() => undefined);
+      } else media.volume = Math.min(1, Math.max(0, volume * fade));
       media.muted = !!clip.muted;
       if (playing) void media.play().catch(() => undefined);
       else media.pause();
@@ -55,11 +89,24 @@ function MediaLayer({
   const style = {
     objectFit: clip.fit ?? "contain",
     opacity: Math.max(0, opacity),
-    filter: `brightness(${1 + (clip.brightness ?? 0)}) contrast(${clip.contrast ?? 1}) saturate(${clip.saturation ?? 1})`,
+    filter: `url(#${gradeId})`,
   } as const;
+  const grade = (
+    <svg aria-hidden="true" className="pointer-events-none absolute h-0 w-0">
+      <defs>
+        <filter id={gradeId} colorInterpolationFilters="sRGB">
+          <feColorMatrix
+            type="matrix"
+            values={colorGradeMatrix(clip).join(" ")}
+          />
+        </filter>
+      </defs>
+    </svg>
+  );
   if (asset.kind === "audio" || clip.track === "audio")
     return (
       <audio
+        crossOrigin="anonymous"
         ref={el => {
           ref.current = el;
         }}
@@ -69,27 +116,34 @@ function MediaLayer({
     );
   if (asset.kind === "image")
     return (
-      <img
-        src={asset.url}
-        alt={asset.name}
-        className="absolute inset-0 h-full w-full"
-        style={style}
-      />
+      <>
+        {grade}
+        <img
+          src={asset.url}
+          alt={asset.name}
+          className="absolute inset-0 h-full w-full"
+          style={style}
+        />
+      </>
     );
   return (
-    <video
-      ref={el => {
-        ref.current = el;
-      }}
-      src={asset.url}
-      playsInline
-      preload="auto"
-      aria-label={asset.name}
-      className="absolute inset-0 h-full w-full"
-      style={style}
-    >
-      <track kind="captions" />
-    </video>
+    <>
+      {grade}
+      <video
+        crossOrigin="anonymous"
+        ref={el => {
+          ref.current = el;
+        }}
+        src={asset.url}
+        playsInline
+        preload="auto"
+        aria-label={asset.name}
+        className="absolute inset-0 h-full w-full"
+        style={style}
+      >
+        <track kind="captions" />
+      </video>
+    </>
   );
 }
 
@@ -98,11 +152,15 @@ export function TimelinePreview({
   assets,
   time,
   playing,
+  zoom = 1,
+  pan = { x: 0, y: 0 },
 }: {
   project: EditProject;
   assets: Asset[];
   time: number;
   playing: boolean;
+  zoom?: number;
+  pan?: { x: number; y: number };
 }) {
   const active = project.clips
     .filter(
@@ -114,6 +172,8 @@ export function TimelinePreview({
     <div
       className="relative mx-auto w-full overflow-hidden bg-black"
       style={{
+        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+        pointerEvents: "none",
         aspectRatio: project.aspectRatio.replace(":", "/"),
         containerType: "inline-size",
         maxHeight: "100%",
@@ -149,6 +209,7 @@ export function TimelinePreview({
       <CaptionLayer
         segments={project.transcript}
         presetId={project.captionStyle}
+        appearance={project.captionAppearance}
         time={time}
       />
     </div>

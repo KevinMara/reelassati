@@ -6,6 +6,8 @@ import {
   normalizeGraphic,
   type MotionGraphic,
   type GraphicKeyframe,
+  MOTION_CHOREOGRAPHIES,
+  choreographGraphic,
 } from "@contracts/motion-graphics";
 
 export function GraphicMotionEditor({
@@ -39,6 +41,21 @@ export function GraphicMotionEditor({
   return (
     <fieldset className="space-y-3 rounded-lg border border-border p-3">
       <legend className="px-1 text-sm font-medium">Motion path</legend>
+      <div className="grid grid-cols-2 gap-2">
+        {MOTION_CHOREOGRAPHIES.map(p => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => {
+              onChange(choreographGraphic(graphic, p.id));
+              onPosition(0.18);
+            }}
+            className="rounded-lg border border-border px-2 py-2 text-left text-xs hover:border-primary/60"
+          >
+            {p.name}
+          </button>
+        ))}
+      </div>
       <label className="block text-xs">
         Preview · {(position * duration).toFixed(1)}s
         <input
@@ -80,6 +97,7 @@ export function GraphicMotionEditor({
             y: frame.y,
             scale: frame.scale,
             rotation: frame.rotation,
+            opacity: frame.opacity,
           };
           // Preserve the initial pose when the first keyframe is inserted later in the clip.
           save(
@@ -109,6 +127,7 @@ export function GraphicMotionEditor({
                 ["y", "Vertical %", 0, 100, 1],
                 ["scale", "Scale", 0.1, 4, 0.1],
                 ["rotation", "Rotation °", -720, 720, 1],
+                ["opacity", "Opacity", 0, 1, 0.05],
               ] as const
             ).map(([key, label, min, max, step]) => (
               <label key={key} className="text-xs">
@@ -119,7 +138,7 @@ export function GraphicMotionEditor({
                   min={min}
                   max={max}
                   step={step}
-                  value={selected[key]}
+                  value={selected[key] ?? 1}
                   className="mt-1 w-full rounded border border-border bg-background p-2"
                   onChange={e =>
                     save(

@@ -27,7 +27,9 @@ export function AutonomousEditor({
   onFinished: () => void;
 }) {
   const { workspace, updateWorkspace, capabilities } = useWorkspace();
-  const [style, setStyle] = useState("");
+  const [style, setStyle] = useState(
+    `Clean editorial. ${EDIT_RECIPES["Clean editorial"]}`
+  );
   const [referenceBrief, setReferenceBrief] = useState(
     project.referenceStyleBrief ?? ""
   );
@@ -172,6 +174,7 @@ export function AutonomousEditor({
                 )
                 .map(s => ({
                   ...s,
+                  sourceClipId: clip.id,
                   id: `${clip.id}-${s.id}`,
                   start:
                     clip.start + Math.max(0, s.start - clip.inPoint) / speed,
@@ -339,6 +342,7 @@ export function AutonomousEditor({
             transcript: p.transcript,
             duration: p.duration,
             captionStyle: p.captionStyle,
+            captionAppearance: p.captionAppearance,
             transcriptProvenance: p.transcriptProvenance,
           };
           const after = {
@@ -349,6 +353,7 @@ export function AutonomousEditor({
             transcript: working.transcript,
             duration: contentDuration(working.clips),
             captionStyle: p.captionStyle,
+            captionAppearance: p.captionAppearance,
           };
           const hasChanges =
             JSON.stringify([
@@ -361,6 +366,7 @@ export function AutonomousEditor({
             ...working,
             updatedAt: new Date().toISOString(),
             captionStyle: p.captionStyle,
+            captionAppearance: p.captionAppearance,
             ...(hasChanges
               ? appendEditorRevisions(p, [before, after], before)
               : { revisions: p.revisions, revisionIndex: p.revisionIndex }),
@@ -402,24 +408,6 @@ export function AutonomousEditor({
               <p className="mt-2 whitespace-pre-wrap">{referenceBrief}</p>
             </details>
           )}
-          <ReferenceStylePanel
-            onChange={brief => {
-              setReferenceBrief(brief);
-              void updateWorkspace(w => ({
-                ...w,
-                projects: w.projects.map(p =>
-                  p.id === project.id ? { ...p, referenceStyleBrief: brief } : p
-                ),
-              })).catch(e =>
-                setStatus(
-                  e instanceof Error
-                    ? e.message
-                    : "Reference direction could not be saved."
-                )
-              );
-            }}
-            disabled={busy}
-          />
           <label className="block text-sm font-medium">
             Describe the style and outcome
             <textarea
@@ -447,6 +435,34 @@ export function AutonomousEditor({
               </button>
             ))}
           </div>
+          <details className="mt-4 rounded-xl border border-border bg-surface p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Match a reference style or video · optional
+            </summary>
+            <div className="mt-3">
+              {" "}
+              <ReferenceStylePanel
+                onChange={brief => {
+                  setReferenceBrief(brief);
+                  void updateWorkspace(w => ({
+                    ...w,
+                    projects: w.projects.map(p =>
+                      p.id === project.id
+                        ? { ...p, referenceStyleBrief: brief }
+                        : p
+                    ),
+                  })).catch(e =>
+                    setStatus(
+                      e instanceof Error
+                        ? e.message
+                        : "Reference direction could not be saved."
+                    )
+                  );
+                }}
+                disabled={busy}
+              />
+            </div>
+          </details>
           <label className="mt-4 flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -481,34 +497,50 @@ export function AutonomousEditor({
             />
             Transcribe and caption footage
           </label>
-          <label className="flex items-center justify-between gap-2 text-sm">
-            New images, up to
-            <input
-              disabled={busy}
-              aria-label="Maximum generated images"
-              type="number"
-              min={0}
-              value={images}
-              onChange={e =>
-                setImages(Math.max(0, Math.floor(Number(e.target.value) || 0)))
-              }
-              className="w-16 rounded border border-border bg-background p-2"
-            />
-          </label>
-          <label className="flex items-center justify-between gap-2 text-sm">
-            New 5s videos, up to
-            <input
-              disabled={busy}
-              aria-label="Maximum generated videos"
-              type="number"
-              min={0}
-              value={videos}
-              onChange={e =>
-                setVideos(Math.max(0, Math.floor(Number(e.target.value) || 0)))
-              }
-              className="w-16 rounded border border-border bg-background p-2"
-            />
-          </label>
+          <details className="rounded-xl border border-border p-3">
+            <summary className="cursor-pointer text-sm">
+              Create extra images or videos · optional
+            </summary>
+            <p className="my-3 text-xs leading-relaxed text-foreground/60">
+              Your own footage is used by default. Allow paid new assets only
+              when you want supporting shots.
+            </p>
+            <div className="space-y-3">
+              {" "}
+              <label className="flex items-center justify-between gap-2 text-sm">
+                New images, up to
+                <input
+                  disabled={busy}
+                  aria-label="Maximum generated images"
+                  type="number"
+                  min={0}
+                  value={images}
+                  onChange={e =>
+                    setImages(
+                      Math.max(0, Math.floor(Number(e.target.value) || 0))
+                    )
+                  }
+                  className="w-16 rounded border border-border bg-background p-2"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-2 text-sm">
+                New 5s videos, up to
+                <input
+                  disabled={busy}
+                  aria-label="Maximum generated videos"
+                  type="number"
+                  min={0}
+                  value={videos}
+                  onChange={e =>
+                    setVideos(
+                      Math.max(0, Math.floor(Number(e.target.value) || 0))
+                    )
+                  }
+                  className="w-16 rounded border border-border bg-background p-2"
+                />
+              </label>
+            </div>
+          </details>
           <div className="border-t border-border pt-3">
             <p className="text-2xl font-semibold">
               Up to {estimate.toLocaleString()} credits
@@ -530,7 +562,7 @@ export function AutonomousEditor({
               !project.clips.length
             }
             onClick={() => void run()}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-medium text-primary-foreground disabled:opacity-40"
+            className="ai-magic flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium disabled:opacity-40"
           >
             {busy ? (
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -63,9 +63,11 @@ export function prepareChatReplanRequest(
     // An AI-generated continuation is not a new user instruction or permission for extras.
     prompt: parent.request.prompt,
     mode: parent.mode || parent.request.mode,
+    taskPreset: parent.request.taskPreset,
+    executionMode: parent.request.executionMode,
     maxCredits: Math.max(
       5,
-      (parent.maxCredits ?? 100) - (parent.usedCredits ?? 0) + action.credits
+      (parent.maxCredits ?? 200) - (parent.usedCredits ?? 0) + action.credits
     ),
     range: parent.range,
     selectedClipIds: parent.selectedClipIds,
@@ -135,7 +137,7 @@ export function mergeChatReplan(
       message: response.message,
       actions,
       totalCredits,
-      budgetExceeded: totalCredits > (parent.maxCredits ?? 100),
+      budgetExceeded: totalCredits > (parent.maxCredits ?? 200),
       provenance: response.provenance,
       projectUpdatedAt: response.projectUpdatedAt,
       blockedReasons: [

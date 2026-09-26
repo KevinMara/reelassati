@@ -7,6 +7,7 @@ import {
 } from "react";
 import {
   ArrowUp,
+  ClipboardList,
   Check,
   CheckCheck,
   ChevronDown,
@@ -36,6 +37,12 @@ import {
   type EditorChatMessage,
   type EditorChatReference,
 } from "@contracts/editor-chat";
+import { editorChatRunStatus } from "@contracts/editor-chat";
+import {
+  EDITOR_TASK_PRESETS,
+  editorTaskPreset,
+  type EditorTaskPresetId,
+} from "@contracts/editor-chat-presets";
 import type { EditProject } from "@contracts/workspace";
 import { useEditorChat } from "./useEditorChat";
 import { useWorkspace } from "@/providers/workspace";
@@ -69,24 +76,24 @@ const STARTERS = [
   {
     icon: Subtitles,
     label: "Add captions",
-    text: "Add accurate, readable captions to my video.",
+    preset: "captions",
   },
   {
     icon: WandSparkles,
     label: "Create a graphic",
-    text: "Create a motion graphic for ",
+    preset: "motion",
   },
   {
     icon: Film,
     label: "Match a reference",
-    text: "Match the editing style of my attached reference. ",
+    preset: "reference",
   },
   {
     icon: Scissors,
     label: "Shape the story",
-    text: "Organize my footage into a clear hook, body, and payoff. Preserve the meaning of what I say.",
+    preset: "story",
   },
-];
+] as const;
 const ACCEPT_FILES =
   "image/*,video/*,audio/*,text/plain,application/pdf,.pdf,.md,.json,.csv,.srt,.vtt";
 const LIBRARY_DRAG_TYPE = "application/x-reelassati-asset-id";
@@ -132,6 +139,15 @@ export function EditorChat({
   const chat = useEditorChat(project, { onSeek });
   const { workspace } = useWorkspace();
   const [prompt, setPrompt] = useState("");
+  const [taskPreset, setTaskPreset] = useState<EditorTaskPresetId>();
+  const [executionMode, setExecutionMode] = useState<"plan" | "execute">(
+    "execute"
+  );
+  const [excludedClip, setExcludedClip] = useState<string>();
+  const contextClip =
+    selectedClipId !== excludedClip
+      ? project.clips.find(c => c.id === selectedClipId)
+      : undefined;
   const [references, setReferences] = useState<EditorChatReference[]>([]);
   const [range, setRange] = useState<TimeRange>();
   const [attachBusy, setAttachBusy] = useState(false);
@@ -154,6 +170,8 @@ export function EditorChat({
     if (previousProjectId.current === project.id) return;
     previousProjectId.current = project.id;
     setPrompt("");
+    setTaskPreset(undefined);
+    setExcludedClip(undefined);
     setReferences([]);
     setRange(undefined);
     setLocalError("");
@@ -300,20 +318,24 @@ export function EditorChat({
     followLatest.current = true;
     const sentRefs = references;
     const sentRange = range;
+    const sentPreset = taskPreset;
     setPrompt("");
     setReferences([]);
     setRange(undefined);
+    setTaskPreset(undefined);
     try {
       await chat.send(
         text,
         sentRefs,
         sentRange,
-        selectedClipId ? [selectedClipId] : undefined
+        contextClip ? [contextClip.id] : undefined,
+        { taskPreset: sentPreset, executionMode }
       );
     } catch (error) {
       setPrompt(current => current || text);
       addReferences(sentRefs);
       setRange(sentRange);
+      setTaskPreset(sentPreset);
       setLocalError(
         error instanceof Error
           ? error.message
@@ -321,8 +343,8 @@ export function EditorChat({
       );
     }
   }
-  function starter(text: string) {
-    setPrompt(text);
+  function starter(id: EditorTaskPresetId) {
+    setTaskPreset(id);
     input.current?.focus();
   }
   const busyChoice = chat.busy || !!workingChoice;
@@ -448,6 +470,33 @@ export function EditorChat({
           </PopoverContent>
         </Popover>
       </header>
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
+        <button
+          type="button"
+          onClick={onAutoEdit}
+          className="ai-magic flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold"
+        >
+          <Sparkles className="size-4" /> AI auto-edit
+        </button>
+        <button
+          type="button"
+          aria-pressed={executionMode === "plan"}
+          onClick={() => {
+            setExecutionMode(current =>
+              current === "plan" ? "execute" : "plan"
+            );
+            input.current?.focus();
+          }}
+          className={cn(
+            "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm",
+            executionMode === "plan"
+              ? "border-primary/50 bg-primary/15 text-primary"
+              : "border-border text-foreground/70 hover:bg-foreground/5"
+          )}
+        >
+          <ClipboardList className="size-4" /> Plan
+        </button>
+      </div>
 
       <div
         ref={scroller}
@@ -540,7 +589,7 @@ export function EditorChat({
                 <button
                   key={item.label}
                   type="button"
-                  onClick={() => starter(item.text)}
+                  onClick={() => starter(item.preset)}
                   className="flex min-h-16 flex-col items-start gap-2 rounded-xl border border-border bg-background/40 p-3 text-left text-xs text-foreground/75 transition-colors hover:border-primary/50 hover:bg-primary/5"
                 >
                   <item.icon className="size-4 text-primary" />
@@ -578,6 +627,14 @@ export function EditorChat({
                           </span>
                         ))}
                       </div>
+                    )}
+                    {message.request?.taskPreset && (
+                      <p className="mt-2 text-xs text-primary">
+                        {editorTaskPreset(message.request.taskPreset)?.label}
+                        {message.request.executionMode === "plan"
+                          ? " · Plan first"
+                          : ""}
+                      </p>
                     )}
                     {message.range && (
                       <button
@@ -650,21 +707,47 @@ export function EditorChat({
                     <RunControls
                       message={message}
                       busy={busyChoice}
-                      onResume={newCap =>
+                      onResume={(newCap, applyPlan) =>
                         void runChoice(`resume:${message.id}`, () =>
-                          chat.resume(message.id, newCap)
+                          chat.resume(message.id, newCap, applyPlan)
                         )
                       }
                     />
-                    {message.status === "completed" && (
-                      <div className="mt-2 flex items-center gap-1 text-[10px] text-foreground/45">
-                        <CheckCheck className="size-3" />
-                        Finished
-                        {typeof message.usedCredits === "number"
-                          ? ` · up to ${message.usedCredits} credits`
-                          : ""}
-                      </div>
-                    )}
+                    {message.status !== "planning" &&
+                      message.status !== "running" &&
+                      message.plan &&
+                      editorChatRunStatus(
+                        message.plan.actions,
+                        message.plan.blockedReasons
+                      ) === "failed" && (
+                        <p
+                          role="status"
+                          className="mt-3 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-300"
+                        >
+                          <CircleAlert className="size-3.5" />
+                          {message.plan.actions.some(
+                            a => a.status === "completed"
+                          )
+                            ? "Partly completed · review the steps above"
+                            : "Needs attention · review the steps above"}
+                        </p>
+                      )}
+                    {message.status === "completed" &&
+                      message.plan &&
+                      editorChatRunStatus(
+                        message.plan.actions,
+                        message.plan.blockedReasons
+                      ) === "completed" && (
+                        <div className="mt-2 flex items-center gap-1 text-[10px] text-foreground/45">
+                          <CheckCheck className="size-3" />
+                          {message.plan.actions.length
+                            ? "Finished"
+                            : "No changes made"}
+                          {typeof message.usedCredits === "number"
+                            ? ` · up to ${message.usedCredits} credits`
+                            : ""}
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
@@ -687,7 +770,7 @@ export function EditorChat({
           onSubmit={event => void send(event)}
           className="rounded-xl border border-border bg-background/65 p-2.5 focus-within:border-primary/55 focus-within:ring-1 focus-within:ring-primary/15"
         >
-          {(range || selectedClipId) && (
+          {(range || contextClip || taskPreset || executionMode === "plan") && (
             <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[10px] text-primary">
               {range && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 py-1 pl-1.5 pr-1">
@@ -703,11 +786,43 @@ export function EditorChat({
                   </button>
                 </span>
               )}
-              {selectedClipId && (
-                <span className="max-w-full truncate rounded-md bg-primary/10 px-1.5 py-1">
-                  Selected:{" "}
-                  {project.clips.find(clip => clip.id === selectedClipId)
-                    ?.label ?? "clip"}
+              {executionMode === "plan" && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs">
+                  <ClipboardList className="size-3" /> Plan first
+                  <button
+                    type="button"
+                    aria-label="Exit planning mode"
+                    onClick={() => setExecutionMode("execute")}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              )}
+              {taskPreset && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs">
+                  <WandSparkles className="size-3" />
+                  {editorTaskPreset(taskPreset)?.label}
+                  <button
+                    type="button"
+                    aria-label="Remove task preset"
+                    onClick={() => setTaskPreset(undefined)}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              )}
+              {contextClip && (
+                <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs">
+                  <span className="truncate" title={contextClip.label}>
+                    Target: {contextClip.graphic?.text || contextClip.label}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Remove clip from chat context"
+                    onClick={() => setExcludedClip(contextClip.id)}
+                  >
+                    <X className="size-3" />
+                  </button>
                 </span>
               )}
             </div>
@@ -742,7 +857,13 @@ export function EditorChat({
           <textarea
             ref={input}
             aria-label="Message Reel"
-            placeholder="Ask Reel to edit your video…"
+            placeholder={
+              taskPreset
+                ? editorTaskPreset(taskPreset)?.hint
+                : executionMode === "plan"
+                  ? "Describe the result. Reel will make a plan for you to review…"
+                  : "Ask Reel to edit your video…"
+            }
             value={prompt}
             onChange={event => setPrompt(event.target.value)}
             rows={3}
@@ -792,43 +913,36 @@ export function EditorChat({
                   Start with a task
                 </DropdownMenuLabel>
                 <DropdownMenuItem
-                  onSelect={() => starter("Create a motion graphic for ")}
+                  onSelect={() => {
+                    setExecutionMode("plan");
+                    input.current?.focus();
+                  }}
                 >
-                  <WandSparkles />
-                  Motion graphics
+                  <ClipboardList /> Plan before editing
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    starter("Add accurate, readable captions to my video.")
-                  }
-                >
-                  <Subtitles />
-                  Captions
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => starter("Generate an image of ")}
-                >
-                  <Image />
-                  Generate an image
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    starter("Create a voiceover or soundtrack for ")
-                  }
-                >
-                  <Music2 />
-                  Voice and audio
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    starter(
-                      "Match the editing style of my attached reference. "
-                    )
-                  }
-                >
-                  <Film />
-                  Match a reference style or video
-                </DropdownMenuItem>
+                {EDITOR_TASK_PRESETS.filter(
+                  preset => preset.id !== "range"
+                ).map(preset => (
+                  <DropdownMenuItem
+                    key={preset.id}
+                    onSelect={() => starter(preset.id)}
+                  >
+                    {preset.id === "captions" ? (
+                      <Subtitles />
+                    ) : preset.id === "image" ? (
+                      <Image />
+                    ) : preset.id === "audio" ? (
+                      <Music2 />
+                    ) : preset.id === "reference" ? (
+                      <Film />
+                    ) : preset.id === "story" ? (
+                      <Scissors />
+                    ) : (
+                      <WandSparkles />
+                    )}
+                    {preset.label}
+                  </DropdownMenuItem>
+                ))}
                 <DropdownMenuItem
                   disabled={project.duration <= 0}
                   onSelect={() => {
@@ -836,6 +950,7 @@ export function EditorChat({
                       0,
                       Math.min(playhead, project.duration - 0.1)
                     );
+                    setTaskPreset("range");
                     setRange({
                       start,
                       end: Math.min(project.duration, start + 5),
@@ -1114,7 +1229,7 @@ function RunControls({
 }: {
   message: EditorChatMessage;
   busy: boolean;
-  onResume: (cap?: number) => void;
+  onResume: (cap?: number, applyPlan?: boolean) => void;
 }) {
   const plan = message.plan;
   if (!plan)
@@ -1147,10 +1262,38 @@ function RunControls({
         <button
           type="button"
           disabled={busy}
-          onClick={() => onResume(quotedTotal)}
+          onClick={() =>
+            onResume(quotedTotal, message.request?.executionMode === "plan")
+          }
           className="mt-2 rounded-lg border border-amber-500/30 px-3 py-1.5 text-xs font-medium disabled:opacity-40"
         >
-          Set limit to {quotedTotal} & continue
+          Set limit to {quotedTotal} &{" "}
+          {message.request?.executionMode === "plan" && !message.planApproved
+            ? "apply plan"
+            : "continue"}
+        </button>
+      </div>
+    );
+  if (
+    message.request?.executionMode === "plan" &&
+    !message.planApproved &&
+    remaining
+  )
+    return (
+      <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+        <p className="text-sm font-medium">Your plan is ready to review</p>
+        <p className="mt-1 text-xs leading-relaxed text-foreground/65">
+          {plan.actions.length} steps · up to {quotedTotal} credits including
+          planning. Nothing has been changed. Optional extras follow your
+          approval preference.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onResume(undefined, true)}
+          className="ai-magic mt-3 rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-40"
+        >
+          Apply plan
         </button>
       </div>
     );

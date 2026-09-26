@@ -6,12 +6,14 @@ export function CaptionLayer({
   segments,
   presetId,
   time,
+  appearance,
 }: {
   segments: readonly TranscriptSegment[];
   presetId?: string;
   time: number;
+  appearance?: import("@contracts/editor-presets").CaptionAppearance;
 }) {
-  const p = getCaptionPreset(presetId);
+  const p = getCaptionPreset(presetId, appearance);
   const active = segments.filter(
     s => s.start <= time && s.end > time && s.text.trim()
   );

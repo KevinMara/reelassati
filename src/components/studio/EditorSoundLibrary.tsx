@@ -138,7 +138,7 @@ export function EditorSoundLibrary() {
             className="w-full"
           />
           <p className="text-[11px] leading-relaxed text-foreground/50">
-            Free to use and export · no AI credits
+            Free to use · no AI credits
           </p>
           <div className="space-y-2">
             {entries.map(entry => {

@@ -1,4 +1,12 @@
-import { useRef, useState, type DragEvent, type PointerEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type PointerEvent,
+} from "react";
+import { EditorInfo } from "./EditorInfo";
 import {
   Film,
   Shapes,
@@ -14,6 +22,7 @@ import {
   TIMELINE_CLIP_DRAG_TYPE,
   clipLaneKind,
   clipLaneNumber,
+  clipTimingLimits,
   timelineLanes,
   timelineClipColor,
   timeAtTimelinePointer,
@@ -49,9 +58,12 @@ type Props = {
   time: number;
   zoom: number;
   selectedClipId: string | null;
+  selectedClipIds?: string[];
   disabled?: boolean;
+  snapping: boolean;
+  onSnappingChange(value: boolean): void;
   onSeek(time: number): void;
-  onSelect(clip: TimelineClip, time: number): void;
+  onSelect(clip: TimelineClip, time: number, additive?: boolean): void;
   onAssetDrop(asset: Asset, time: number, lane: TimelineLane): Promise<void>;
   onFilesDrop(files: File[], time: number, lane: TimelineLane): Promise<void>;
   onMove(clip: TimelineClip, time: number, lane: TimelineLane): Promise<void>;
@@ -65,7 +77,10 @@ export function TimelineTracks({
   time,
   zoom,
   selectedClipId,
+  selectedClipIds = selectedClipId ? [selectedClipId] : [],
   disabled,
+  snapping,
+  onSnappingChange,
   onSeek,
   onSelect,
   onAssetDrop,
@@ -76,7 +91,37 @@ export function TimelineTracks({
 }: Props) {
   const [drop, setDrop] = useState<{ lane: string; time: number } | null>(null);
   const [trimDraft, setTrimDraft] = useState<TimelineClip | null>(null);
-  const [snapping, setSnapping] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState(900);
+  const canvasWidth = Math.max(240, 104 + ((viewport - 104) * zoom) / 100);
+  const previousWidth = useRef(canvasWidth);
+  const pixelsPerSecond = (canvasWidth - 104) / project.duration;
+  const tickStep =
+    [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600].find(
+      step => step * pixelsPerSecond >= 70
+    ) ?? 7200;
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(entries =>
+      setViewport(entries[0].contentRect.width)
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const oldWidth = previousWidth.current;
+    const oldPlayhead = 98 + (time / project.duration) * (oldWidth - 104);
+    const visible =
+      oldPlayhead >= element.scrollLeft &&
+      oldPlayhead <= element.scrollLeft + viewport;
+    const anchor = visible ? oldPlayhead : element.scrollLeft + viewport / 2;
+    const fraction = (anchor - 98) / Math.max(1, oldWidth - 104);
+    element.scrollLeft += 98 + fraction * (canvasWidth - 104) - anchor;
+    previousWidth.current = canvasWidth;
+  }, [canvasWidth, viewport]);
   const [snapGuide, setSnapGuide] = useState<TimelineSnapPoint | null>(null);
   const draggedClip = useRef<{ id: string; offset: number } | null>(null);
   const lanes = timelineLanes(project.clips);
@@ -94,7 +139,7 @@ export function TimelineTracks({
         project.clips,
         project.duration,
         time,
-        new Set([clip.id])
+        new Set(selectedClipIds.includes(clip.id) ? selectedClipIds : [clip.id])
       ),
       pixelsPerSecond: rowWidth / project.duration,
       enabled: snapping && !altKey,
@@ -168,6 +213,23 @@ export function TimelineTracks({
     const row = handle.closest<HTMLElement>("[data-timeline-lane]");
     if (!row) return;
     const rect = row.getBoundingClientRect();
+    const sourceLimit = clipTimingLimits(
+      original,
+      assets.find(a => a.id === original.assetId),
+      project.duration
+    ).sourceLimit;
+    const nextStart = Math.min(
+      project.duration,
+      ...project.clips
+        .filter(
+          c =>
+            c.id !== original.id &&
+            clipLaneKind(c) === clipLaneKind(original) &&
+            clipLaneNumber(c) === clipLaneNumber(original) &&
+            c.start >= original.start + original.duration - 0.001
+        )
+        .map(c => c.start)
+    );
     const previousEnd = Math.max(
       0,
       ...project.clips
@@ -211,9 +273,12 @@ export function TimelineTracks({
         maximum:
           side === "start"
             ? original.start + original.duration - minimumSpan
-            : original.start + (original.outPoint - original.inPoint) / speed,
+            : Math.min(
+                nextStart,
+                original.start + (sourceLimit - original.inPoint) / speed
+              ),
       });
-      draft = trimTimelineClip(original, side, result.time);
+      draft = trimTimelineClip(original, side, result.time, sourceLimit);
       const actualEdge =
         side === "start" ? draft.start : draft.start + draft.duration;
       setSnapGuide(
@@ -247,7 +312,7 @@ export function TimelineTracks({
           type="button"
           aria-pressed={snapping}
           onClick={() => {
-            setSnapping(value => !value);
+            onSnappingChange(!snapping);
             setSnapGuide(null);
           }}
           title="Align moved clips and trimmed edges with the playhead and other clips. Hold Alt for exact placement."
@@ -256,8 +321,15 @@ export function TimelineTracks({
           <Magnet className="h-3.5 w-3.5" />
           Clip snapping {snapping ? "on" : "off"}
         </button>
-        <span className="text-[10px] text-foreground/45">
-          Hold Alt for precise placement
+        <span className="inline-flex items-center text-xs text-foreground/55">
+          Hold <kbd className="mx-1">Alt</kbd> to bypass snapping
+          <EditorInfo label="Clip snapping">
+            Dragging normally aligns a nearby clip edge with another edge or the
+            playhead. Hold <kbd>Alt</kbd> / <kbd>Option</kbd> while moving or
+            trimming to place it exactly under your pointer. If no edge is
+            close, both behave the same. New Library files always drop at your
+            pointer.
+          </EditorInfo>
         </span>
         <span
           role="status"
@@ -270,10 +342,11 @@ export function TimelineTracks({
         </span>
       </div>
       <div
+        ref={scrollRef}
         className="editor-timeline-scroll overflow-x-auto"
         aria-label="Editing timeline"
       >
-        <div className="min-w-[680px]" style={{ width: `${zoom}%` }}>
+        <div style={{ width: canvasWidth }}>
           <div className="grid grid-cols-[92px_minmax(0,1fr)] border-b border-border bg-background/45">
             <div className="border-r border-border px-3 py-2 font-mono text-xs uppercase tracking-wider text-foreground/60">
               Time
@@ -283,14 +356,21 @@ export function TimelineTracks({
               onPointerDown={e => onSeek(pointerTime(e))}
             >
               {Array.from(
-                { length: Math.floor(project.duration / 5) + 1 },
+                {
+                  length: Math.min(
+                    2000,
+                    Math.floor(project.duration / tickStep) + 1
+                  ),
+                },
                 (_, i) => (
                   <span
                     key={i}
                     className="pointer-events-none absolute top-1.5 -translate-x-1/2 font-mono text-[10px] text-foreground/65"
-                    style={{ left: `${(i * 500) / project.duration}%` }}
+                    style={{
+                      left: `${(i * tickStep * 100) / project.duration}%`,
+                    }}
                   >
-                    {i * 5}s
+                    {Number((i * tickStep).toFixed(1))}s
                   </span>
                 )
               )}
@@ -451,7 +531,7 @@ export function TimelineTracks({
                           type="button"
                           draggable={!clip.locked && !disabled}
                           aria-label={`${clip.label}, ${names[lane.kind]} ${lane.number}, ${fmt(clip.start)} to ${fmt(clip.start + clip.duration)}`}
-                          aria-pressed={selectedClipId === clip.id}
+                          aria-pressed={selectedClipIds.includes(clip.id)}
                           onDragStart={e => {
                             if (clip.locked) {
                               e.preventDefault();
@@ -496,10 +576,11 @@ export function TimelineTracks({
                                     row.left,
                                     row.width,
                                     project.duration
-                                  )
+                                  ),
+                              e.shiftKey
                             );
                           }}
-                          className={`absolute inset-y-1 overflow-hidden rounded-md border px-2 text-left text-xs font-medium text-white shadow-sm ${selectedClipId === clip.id ? "border-white/80 ring-2 ring-primary/35" : "border-white/10 hover:border-white/40"}`}
+                          className={`absolute inset-y-1 overflow-hidden rounded-md border px-2 text-left text-xs font-medium text-white shadow-sm ${selectedClipIds.includes(clip.id) ? "border-white/80 ring-2 ring-primary/35" : "border-white/10 hover:border-white/40"}`}
                           style={{
                             left: `${(clip.start / project.duration) * 100}%`,
                             width: `${Math.max(0.4, (clip.duration / project.duration) * 100)}%`,

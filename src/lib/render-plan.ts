@@ -1,3 +1,4 @@
+import { colorGradeFilter } from "./color-grade";
 import { captionAssStyle, captionAssEvents } from "./caption-rendering";
 import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import type { Asset, EditProject } from "@contracts/workspace";
@@ -99,7 +100,7 @@ export function buildRenderPlan(
         Number.isFinite(value)
           ? Math.min(max, Math.max(min, value!))
           : fallback;
-      const grade = `eq=brightness=${bounded(clip.brightness, 0, -0.5, 0.5)}:contrast=${bounded(clip.contrast, 1, 0.5, 2)}:saturation=${bounded(clip.saturation, 1, 0, 3)}`;
+      const grade = colorGradeFilter(clip);
       const fades = [
         clip.fadeIn
           ? `fade=t=in:st=0:d=${number(Math.min(clip.duration, bounded(clip.fadeIn, 0, 0, 5)))}:alpha=1`
@@ -136,8 +137,13 @@ export function buildRenderPlan(
   );
   const graphics = graphicAssEvents(project.clips, width, height, duration);
   const ass =
-    `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Default,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,40,40,${Math.round(height * 0.14)},1\nStyle: Callout,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H006F5AD8,&H006F5AD8,-1,0,0,0,100,100,0,0,3,8,0,5,0,0,0,1\n${captionAssStyle(project.captionStyle, width, height)}\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n` +
-    captionAssEvents(captions, project.captionStyle, duration) +
+    `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Default,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,40,40,${Math.round(height * 0.14)},1\nStyle: Callout,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H006F5AD8,&H006F5AD8,-1,0,0,0,100,100,0,0,3,8,0,5,0,0,0,1\n${captionAssStyle(project.captionStyle, width, height, project.captionAppearance)}\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n` +
+    captionAssEvents(
+      captions,
+      project.captionStyle,
+      duration,
+      project.captionAppearance
+    ) +
     "\n" +
     graphics;
   if (captions.length || graphics) {

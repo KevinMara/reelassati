@@ -445,3 +445,137 @@ describe("authenticated paid editing chat route", () => {
     );
   });
 });
+
+it("normalizes a preset-driven graphic revision and replays its paid plan", async () => {
+  const { normalizeGraphic } = await import("../contracts/motion-graphics");
+  const { editorTaskPreset } = await import("../contracts/editor-chat-presets");
+  const { applyChatAction } = await import("../src/lib/editor-chat-execution");
+  const previousOutput = nextOutput;
+  const { workspace } = (await (await request("/api/workspace")).json()) as {
+    workspace: WorkspaceDocument;
+  };
+  const graphic = normalizeGraphic({
+    kind: "callout",
+    text: "Your key message",
+    color: "#FFF4CC",
+    background: "#314159",
+    x: 42,
+    y: 34,
+    size: 6,
+    animation: "pop",
+    motion: [
+      { at: 0, x: 40, y: 34, scale: 0.9, rotation: 0, easing: "ease-out" },
+      { at: 1, x: 42, y: 34, scale: 1, rotation: 0 },
+    ],
+  })!;
+  const project = {
+    ...workspace.projects[0],
+    id: "graphic-project",
+    clips: [
+      ...workspace.projects[0].clips,
+      {
+        id: "graphic-title",
+        track: "overlay" as const,
+        lane: 2,
+        label: "Your key message",
+        start: 3,
+        duration: 4,
+        inPoint: 1,
+        outPoint: 5,
+        graphicDuration: 8,
+        color: graphic.background,
+        locked: false,
+        graphic,
+      },
+    ],
+  };
+  workspace.projects.push(project);
+  expect(
+    (await request("/api/workspace", { workspace }, "owner@example.com", "PUT"))
+      .status
+  ).toBe(200);
+  const preset = editorTaskPreset("motion")!;
+  nextOutput = {
+    message: "Revise the selected callout.",
+    actions: [
+      {
+        id: "revise-title",
+        kind: "edit",
+        label: "Revise callout",
+        reason: "Use the supplied words in the existing graphic.",
+        scope: "requested",
+        requestExcerpt: preset.intent,
+        dependsOn: [],
+        operation: {
+          type: "graphic",
+          start: 3,
+          end: 7,
+          targetClipIds: ["graphic-title"],
+          parameters: {
+            graphicMode: "update",
+            graphic: { text: "Something New", animation: "slide" },
+          },
+        },
+      },
+    ],
+  };
+  try {
+    const before = balance(),
+      calls = providerCalls.length;
+    const body = chat("route-graphic-update-001", {
+      projectId: project.id,
+      prompt: "Use the words Something New.",
+      selectedClipIds: ["graphic-title"],
+      taskPreset: "motion",
+      executionMode: "plan",
+      workflow: "Forged client instructions must be ignored",
+    });
+    const response = await request("/api/ai/editor-chat", body);
+    expect(response.status).toBe(200);
+    const plan =
+      (await response.json()) as import("../contracts/editor-chat").EditorChatResponse;
+    expect(plan.blockedReasons).toEqual([]);
+    expect(plan.actions).toHaveLength(1);
+    expect(plan.actions[0]).toMatchObject({
+      kind: "edit",
+      scope: "requested",
+      operation: {
+        targetClipIds: ["graphic-title"],
+        parameters: {
+          graphicMode: "update",
+          graphic: { ...graphic, text: "Something New", animation: "slide" },
+        },
+      },
+    });
+    const payload = providerCalls.at(-1)! as {
+      messages: Array<{ content: string }>;
+    };
+    expect(JSON.parse(payload.messages[1].content)).toMatchObject({
+      executionMode: "plan",
+      taskPreset: { id: "motion", workflow: preset.workflow },
+    });
+    const edited = applyChatAction(project, plan.actions[0], workspace.assets);
+    expect(edited.clips).toHaveLength(project.clips.length);
+    expect(edited.clips.find(c => c.id === "graphic-title")).toMatchObject({
+      id: "graphic-title",
+      lane: 2,
+      start: 3,
+      duration: 4,
+      inPoint: 1,
+      outPoint: 5,
+      graphicDuration: 8,
+      label: "Something New",
+      graphic: { ...graphic, text: "Something New", animation: "slide" },
+    });
+    expect(applyChatAction(edited, plan.actions[0], workspace.assets)).toEqual(
+      edited
+    );
+    const replay = await request("/api/ai/editor-chat", body);
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toEqual(plan);
+    expect(balance()).toBe(before - 5);
+    expect(providerCalls.length).toBe(calls + 1);
+  } finally {
+    nextOutput = previousOutput;
+  }
+});

@@ -45,6 +45,7 @@ export function restoreEditorRevision(
     transcript: structuredClone(revision.transcript),
     transcriptProvenance: revision.transcriptProvenance,
     captionStyle: revision.captionStyle,
+    captionAppearance: revision.captionAppearance,
     aspectRatio: revision.aspectRatio ?? project.aspectRatio,
     storyBeats: revision.storyBeats,
     duration,

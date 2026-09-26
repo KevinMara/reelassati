@@ -1,7 +1,6 @@
+import { captionOwner } from "./editor-manual";
 import {
   allocateTimelineLane,
-  clipLaneKind,
-  clipLaneNumber,
   preserveGraphicDuration,
 } from "./timeline-lanes";
 import { normalizeGraphic } from "@contracts/motion-graphics";
@@ -123,6 +122,7 @@ export function applyEditOperation(
           ...c,
           id: `${c.id}-${op.id}-before`,
           duration: start - c.start,
+          fadeOut: 0,
           outPoint: c.inPoint + (start - c.start) * speed,
         });
       parts.push({
@@ -131,6 +131,8 @@ export function applyEditOperation(
         duration: end - start,
         inPoint: c.inPoint + (start - c.start) * speed,
         outPoint: c.inPoint + (end - c.start) * speed,
+        fadeIn: start > c.start ? 0 : c.fadeIn,
+        fadeOut: end < c.start + c.duration ? 0 : c.fadeOut,
       });
       if (end < c.start + c.duration)
         parts.push({
@@ -139,6 +141,7 @@ export function applyEditOperation(
           start: end,
           duration: c.start + c.duration - end,
           inPoint: c.inPoint + (end - c.start) * speed,
+          fadeIn: 0,
         });
       return parts;
     });
@@ -153,26 +156,49 @@ export function applyEditOperation(
       op.end <= op.start
     )
       throw new Error("Choose a graphic and a valid time range.");
-    next.clips.push({
-      id: op.id,
-      track: "overlay",
-      label: op.label,
-      start: op.start,
-      duration: op.end - op.start,
-      inPoint: 0,
-      outPoint: op.end - op.start,
-      locked: false,
-      color: graphic.background,
-      graphic,
-      lane: allocateTimelineLane(
-        next.clips,
-        graphic.kind === "text" || graphic.kind === "callout"
-          ? "text"
-          : "graphics",
-        op.start,
-        op.end - op.start
-      ),
-    });
+    if (p.graphicMode === "update") {
+      const matches = next.clips.filter(c => targeted(c) && c.graphic);
+      if (matches.length !== 1 || op.targetClipIds.length !== 1)
+        throw new Error("Choose one unlocked motion graphic to update.");
+      const target = matches[0];
+      if (
+        op.start > target.start + 0.001 ||
+        op.end < target.start + target.duration - 0.001
+      )
+        throw new Error(
+          "Select the whole graphic to change its text or animation."
+        );
+      next.clips = next.clips.map(c =>
+        c.id === target.id
+          ? {
+              ...c,
+              graphic,
+              label: graphic.text.trim() || op.label,
+              color: graphic.background,
+            }
+          : c
+      );
+    } else
+      next.clips.push({
+        id: op.id,
+        track: "overlay",
+        label: op.label,
+        start: op.start,
+        duration: op.end - op.start,
+        inPoint: 0,
+        outPoint: op.end - op.start,
+        locked: false,
+        color: graphic.background,
+        graphic,
+        lane: allocateTimelineLane(
+          next.clips,
+          graphic.kind === "text" || graphic.kind === "callout"
+            ? "text"
+            : "graphics",
+          op.start,
+          op.end - op.start
+        ),
+      });
   } else if (op.type === "caption") {
     if (!p.text?.trim())
       throw new Error("This caption needs text before it can be applied.");
@@ -216,13 +242,14 @@ export function applyEditOperation(
       if (!targeted(c) || offset <= 0 || offset >= c.duration) return [c];
       const source = c.inPoint + offset * (c.speed ?? 1);
       return [
-        { ...c, duration: offset, outPoint: source },
+        { ...c, duration: offset, outPoint: source, fadeOut: 0 },
         {
           ...c,
           id: `${c.id}-${op.id}`,
           start: op.start,
           duration: c.duration - offset,
           inPoint: source,
+          fadeIn: 0,
         },
       ];
     });
@@ -273,12 +300,7 @@ export function applyEditOperation(
   if (["trim", "move", "pacing", "delete"].includes(op.type)) {
     next.transcript = next.transcript.flatMap(segment => {
       const original = project.clips.find(
-        c =>
-          targeted(c) &&
-          (clipLaneKind(c) === "video" || clipLaneKind(c) === "audio") &&
-          clipLaneNumber(c) === 1 &&
-          segment.start >= c.start &&
-          segment.start < c.start + c.duration
+        c => targeted(c) && c.id === captionOwner(project, segment)?.id
       );
       if (!original) return [segment];
       const edited = next.clips.find(c => c.id === original.id);

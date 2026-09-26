@@ -116,6 +116,7 @@ export interface TimelineClip {
 
 export interface TranscriptSegment {
   id: string;
+  sourceClipId?: string;
   start: number;
   end: number;
   text: string;
@@ -148,6 +149,7 @@ export interface EditOperation {
   provenance?: ContentProvenance;
   reviewedAt?: string;
   parameters?: {
+    graphicMode?: "create" | "update";
     graphic?: import("./motion-graphics").MotionGraphic;
     sourceIn?: number;
     destination?: number;
@@ -179,6 +181,7 @@ export interface EditRevision {
   storyBeats?: import("./story-beats").StoryBeat[];
   aspectRatio?: EditProject["aspectRatio"];
   captionStyle?: string;
+  captionAppearance?: import("./editor-presets").CaptionAppearance;
   id: string;
   label: string;
   createdAt: string;
@@ -196,6 +199,7 @@ export interface EditProject {
   revisionIndex?: number;
   /** Caption preset shared by the scrubbed preview and exported subtitles. */
   captionStyle?: string;
+  captionAppearance?: import("./editor-presets").CaptionAppearance;
   sourceReviews?: import("./source-review").SourceReview[];
   referenceStyleBrief?: string;
   id: string;

@@ -4087,8 +4087,48 @@ function mapEditOperations(
               .map(clip => clip.id);
       const params = recordValue(typed.parameters) || {};
       const parameters: NonNullable<EditOperation["parameters"]> = {};
-      if (type === "graphic")
-        parameters.graphic = normalizeGraphic(params.graphic);
+      if (type === "graphic") {
+        if (
+          params.graphicMode !== undefined &&
+          params.graphicMode !== "create" &&
+          params.graphicMode !== "update"
+        )
+          throw new Error("Choose create or update for a motion graphic.");
+        parameters.graphicMode =
+          params.graphicMode === "update" ? "update" : "create";
+        if (
+          parameters.graphicMode === "update" &&
+          requestedIds.length &&
+          validSelectedIds.size &&
+          (requestedIds.length !== 1 || !validSelectedIds.has(requestedIds[0]))
+        )
+          throw new Error(
+            "The graphic target does not match your selected clip. Select the intended graphic first."
+          );
+        const target =
+          parameters.graphicMode === "update" && targetClipIds.length === 1
+            ? clips.find(
+                c => c.id === targetClipIds[0] && c.graphic && !c.locked
+              )
+            : undefined;
+        const patch = recordValue(params.graphic);
+        parameters.graphic = normalizeGraphic(
+          target && patch
+            ? {
+                ...target.graphic,
+                ...patch,
+                ...(patch.spatial
+                  ? {
+                      spatial: {
+                        ...target.graphic?.spatial,
+                        ...recordValue(patch.spatial),
+                      },
+                    }
+                  : {}),
+              }
+            : patch
+        );
+      }
       for (const [key, min, max] of [
         ["sourceIn", 0, 86400],
         ["destination", 0, duration],

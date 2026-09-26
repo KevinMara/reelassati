@@ -1,6 +1,7 @@
 import type { ContentProvenance } from "./compliance";
 import type { EditOperation } from "./workspace";
 import type { StoryBeat } from "./story-beats";
+import type { EditorTaskPresetId } from "./editor-chat-presets";
 
 export const EDITOR_ASSISTANT_NAME = "Reel";
 export type EditorChatMode = "ask" | "auto";
@@ -23,6 +24,8 @@ export interface EditorChatRequest {
   projectId: string;
   prompt: string;
   mode: EditorChatMode;
+  executionMode?: "plan" | "execute";
+  taskPreset?: EditorTaskPresetId;
   /** Whole-run ceiling, including this planning invocation. Never an automatic debit. */
   maxCredits: number;
   selectedClipIds?: string[];
@@ -86,6 +89,7 @@ export type EditorChatAction = EditorChatActionBase &
         aspectRatio?: "9:16" | "16:9" | "1:1";
         duration?: number;
         captionStyle?: string;
+        captionAppearance?: import("./editor-presets").CaptionAppearance;
       }
     | { kind: "history"; direction: "undo" | "redo" }
     | { kind: "seek"; time: number }
@@ -125,12 +129,43 @@ export interface EditorChatMessage {
   range?: { start: number; end: number };
   selectedClipIds?: string[];
   request?: EditorChatRequest;
+  /** Separate from optional-extra approvals: a plan must be explicitly applied. */
+  planApproved?: boolean;
 }
 
 export interface EditorChatState {
   mode: EditorChatMode;
   maxCredits: number;
   messages: EditorChatMessage[];
+  preferencesVersion?: number;
+}
+
+export function editorChatRunStatus(
+  actions: EditorChatAction[],
+  blockedReasons: string[],
+  stopped = false
+): EditorChatMessage["status"] {
+  if (stopped) return "stopped";
+  if (
+    actions.some(a =>
+      ["pending", "awaiting-approval", "interrupted", "running"].includes(
+        a.status
+      )
+    )
+  )
+    return "ready";
+  return blockedReasons.length ||
+    actions.some(a => ["failed", "blocked"].includes(a.status))
+    ? "failed"
+    : "completed";
+}
+
+export function editorChatCanExecute(
+  message: Pick<EditorChatMessage, "request" | "planApproved">
+): boolean {
+  return (
+    message.request?.executionMode !== "plan" || message.planApproved === true
+  );
 }
 
 /** Approval of scope is separate from authority to spend credits. */

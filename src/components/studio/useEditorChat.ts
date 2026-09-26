@@ -2,7 +2,7 @@ import {
   applyChatCatalogAudio,
   resolveChatCatalogAudio,
 } from "@/lib/editor-chat-catalog-audio";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import type {
   Asset,
@@ -16,6 +16,12 @@ import type {
   EditorChatState,
 } from "@contracts/editor-chat";
 import { AI_CREDIT_COSTS } from "@contracts/billing";
+import {
+  editorChatRunStatus,
+  editorChatCanExecute,
+  type EditorChatRequest,
+} from "@contracts/editor-chat";
+import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 import { normalizeReview } from "@contracts/source-review";
 import { useWorkspace } from "@/providers/workspace";
 import { platformApi } from "@/lib/platform-api";
@@ -49,7 +55,8 @@ import {
 
 const DEFAULT_CHAT: EditorChatState = {
   mode: "ask",
-  maxCredits: 100,
+  maxCredits: 200,
+  preferencesVersion: 2,
   messages: [],
 };
 const activeProjects = new Set<string>();
@@ -63,7 +70,10 @@ export function useEditorChat(
   const resultChecks = useRef(new Set<string>());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const state = project.editorChat ?? DEFAULT_CHAT;
+  const state = useMemo(
+    () => normalizeEditorChatState(project.editorChat) ?? DEFAULT_CHAT,
+    [project.editorChat]
+  );
   const getProject = () => {
     const p = getWorkspaceSnapshot().projects.find(p => p.id === project.id);
     if (!p) throw new Error("This project is no longer available.");
@@ -86,7 +96,12 @@ export function useEditorChat(
       ...w,
       projects: w.projects.map(p =>
         p.id === project.id
-          ? { ...p, editorChat: transform(p.editorChat ?? DEFAULT_CHAT) }
+          ? {
+              ...p,
+              editorChat: transform(
+                normalizeEditorChatState(p.editorChat) ?? DEFAULT_CHAT
+              ),
+            }
           : p
       ),
     }));
@@ -581,6 +596,8 @@ export function useEditorChat(
 
   async function run(messageId: string) {
     if (activeProjects.has(project.id)) return;
+    const pendingPlan = getMessage(messageId);
+    if (!editorChatCanExecute(pendingPlan)) return;
     activeProjects.add(project.id);
     stopRequested.current = false;
     setBusy(true);
@@ -591,7 +608,7 @@ export function useEditorChat(
         if (stopRequested.current) break;
         const m = getMessage(messageId);
         const actions = m.plan?.actions ?? [];
-        const remaining = (m.maxCredits ?? 100) - (m.usedCredits ?? 5);
+        const remaining = (m.maxCredits ?? 200) - (m.usedCredits ?? 5);
         const action = actions.find(a =>
           canRunChatAction(a, actions, m.mode ?? "ask", remaining)
         );
@@ -675,18 +692,13 @@ export function useEditorChat(
             ? { ...a, status: "awaiting-approval" as const }
             : a;
         });
-        const unfinished = actions.some(a =>
-          ["pending", "awaiting-approval", "interrupted"].includes(a.status)
-        );
         return {
           ...m,
-          status: stopRequested.current
-            ? "stopped"
-            : unfinished
-              ? "ready"
-              : actions.some(a => ["failed", "blocked"].includes(a.status))
-                ? "failed"
-                : "completed",
+          status: editorChatRunStatus(
+            actions,
+            m.plan?.blockedReasons ?? [],
+            stopRequested.current
+          ),
           plan: m.plan ? { ...m.plan, actions } : undefined,
         };
       });
@@ -706,7 +718,8 @@ export function useEditorChat(
     prompt: string,
     references: EditorChatReference[] = [],
     range?: { start: number; end: number },
-    selectedClipIds: string[] = []
+    selectedClipIds: string[] = [],
+    options: Pick<EditorChatRequest, "executionMode" | "taskPreset"> = {}
   ) {
     if (!prompt.trim() || activeProjects.has(project.id)) return;
     activeProjects.add(project.id);
@@ -716,12 +729,14 @@ export function useEditorChat(
     const id = uuid();
     const assistantId = `${id}-reel`;
     try {
-      const settings = getProject().editorChat ?? DEFAULT_CHAT;
+      const settings =
+        normalizeEditorChatState(getProject().editorChat) ?? DEFAULT_CHAT;
       const history = settings.messages
         .filter(m => m.text)
         .slice(-12)
         .map(m => ({ role: m.role, text: m.text.slice(0, 2000) }));
       const request = {
+        ...options,
         requestId: id,
         projectId: project.id,
         prompt: prompt.trim(),
@@ -743,6 +758,7 @@ export function useEditorChat(
             text: prompt.trim(),
             createdAt: new Date().toISOString(),
             references,
+            request,
           },
           {
             id: assistantId,
@@ -785,7 +801,8 @@ export function useEditorChat(
       getWorkspaceSnapshot()
         .projects.find(p => p.id === project.id)
         ?.editorChat?.messages.find(m => m.id === assistantId)?.plan &&
-      !stopRequested.current
+      !stopRequested.current &&
+      options.executionMode !== "plan"
     )
       await run(assistantId);
   }
@@ -931,7 +948,7 @@ export function useEditorChat(
     }
   }
 
-  async function resume(messageId: string, newCap?: number) {
+  async function resume(messageId: string, newCap?: number, applyPlan = false) {
     if (busy || activeProjects.has(project.id)) return;
     if (newCap !== undefined)
       await changeMessage(messageId, m => ({
@@ -967,6 +984,10 @@ export function useEditorChat(
         activeProjects.delete(project.id);
         setBusy(false);
       }
+    }
+    if (m.request?.executionMode === "plan" && !m.planApproved) {
+      if (!applyPlan || !m.plan) return;
+      await changeMessage(messageId, item => ({ ...item, planApproved: true }));
     }
     await run(messageId);
   }
@@ -1086,7 +1107,7 @@ export function useEditorChat(
     setPreferences: async (
       patch: Partial<Pick<EditorChatState, "mode" | "maxCredits">>
     ) => {
-      await changeChat(s => ({ ...s, ...patch }));
+      await changeChat(s => ({ ...s, ...patch, preferencesVersion: 2 }));
     },
   };
 }

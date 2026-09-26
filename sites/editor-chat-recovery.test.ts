@@ -252,6 +252,7 @@ describe("saved paid captions recovery", () => {
     expect(recovered.transcript).toEqual([
       {
         id: "chat-caption-clip-a-s1",
+        sourceClipId: "clip-a",
         start: 1,
         end: 3,
         text: "Actual saved speech",

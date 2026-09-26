@@ -2,6 +2,7 @@ import {
   captionLines,
   getCaptionPreset,
   type CaptionPreset,
+  type CaptionAppearance,
 } from "@contracts/editor-presets";
 import type { TranscriptSegment } from "@contracts/workspace";
 import { assTime, escapeAss } from "./graphic-ass";
@@ -12,9 +13,10 @@ const assColor = (hex: string) =>
 export function captionAssStyle(
   presetId: string | undefined,
   width: number,
-  height: number
+  height: number,
+  appearance?: CaptionAppearance
 ) {
-  const p = getCaptionPreset(presetId);
+  const p = getCaptionPreset(presetId, appearance);
   const border = p.background ?? p.outlineColor;
   return `Style: Caption,DejaVu Sans,${((width * p.size) / 100).toFixed(2)},${assColor(p.color)},${assColor(p.color)},${assColor(border)},${assColor(border)},${p.bold ? -1 : 0},0,0,0,100,100,0,0,${p.background ? 3 : 1},${((width * p.outline) / 100).toFixed(2)},0,${p.position === "top" ? 8 : 2},${Math.round(width * 0.08)},${Math.round(width * 0.08)},${Math.round((height * p.margin) / 100)},1`;
 }
@@ -22,9 +24,10 @@ export function captionAssStyle(
 export function captionAssEvents(
   segments: readonly TranscriptSegment[],
   presetId: string | undefined,
-  duration: number
+  duration: number,
+  appearance?: CaptionAppearance
 ) {
-  const preset = getCaptionPreset(presetId);
+  const preset = getCaptionPreset(presetId, appearance);
   return segments
     .filter(
       s =>

@@ -40,6 +40,7 @@ export interface GraphicKeyframe {
   y: number;
   scale: number;
   rotation: number;
+  opacity?: number;
   /** Interpolation from this keyframe to the next. Existing paths remain linear. */
   easing?: GraphicEasing;
 }
@@ -97,6 +98,9 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
         y: bounded(raw.y, bounded(v.y, 30, 10, 90), 0, 100),
         scale: bounded(raw.scale, 1, 0.1, 4),
         rotation: bounded(raw.rotation, 0, -720, 720),
+        ...(typeof raw.opacity === "number"
+          ? { opacity: bounded(raw.opacity, 1, 0, 1) }
+          : {}),
         ...(GRAPHIC_EASINGS.includes(raw.easing as GraphicEasing)
           ? { easing: raw.easing as GraphicEasing }
           : {}),
@@ -169,7 +173,13 @@ export function graphicFrame(
   const enter = Math.min(1, t / 0.2),
     leave = Math.min(1, Math.max(0, duration - t) / 0.15);
   const points = g.motion;
-  let pose = { x: g.x, y: g.y, scale: 1, rotation: g.rotation ?? 0 };
+  let pose: Omit<GraphicKeyframe, "at"> = {
+    x: g.x,
+    y: g.y,
+    scale: 1,
+    rotation: g.rotation ?? 0,
+    opacity: 1,
+  };
   if (points?.length) {
     const progress = Math.min(1, t / Math.max(1 / 30, duration - 1 / 30));
     const right = points.findIndex(point => point.at >= progress);
@@ -188,15 +198,68 @@ export function graphicFrame(
         y: mix(a.y, b.y),
         scale: mix(a.scale, b.scale),
         rotation: mix(a.rotation, b.rotation),
+        opacity: mix(a.opacity ?? 1, b.opacity ?? 1),
       };
     }
   }
   return {
     text: graphicText(g, t, duration),
-    opacity: g.animation === "none" ? 1 : Math.min(enter, leave),
+    opacity:
+      (pose.opacity ?? 1) *
+      (g.animation === "none" ? 1 : Math.min(enter, leave)),
     scale: pose.scale * (g.animation === "pop" ? 0.8 + 0.2 * enter : 1),
     x: pose.x,
     rotation: pose.rotation,
     y: pose.y + (g.animation === "slide" ? (1 - enter) * 6 : 0),
   };
+}
+
+export const MOTION_CHOREOGRAPHIES = [
+  { id: "rise", name: "Rise & settle" },
+  { id: "slide", name: "Slide & hold" },
+  { id: "focus", name: "Soft focus" },
+  { id: "punch", name: "Punch in" },
+  { id: "drift", name: "Slow drift" },
+  { id: "fade", name: "Editorial fade" },
+] as const;
+export function choreographGraphic(
+  g: MotionGraphic,
+  id: (typeof MOTION_CHOREOGRAPHIES)[number]["id"]
+): MotionGraphic {
+  const pose = {
+    x: g.x,
+    y: g.y,
+    scale: 1,
+    rotation: g.rotation ?? 0,
+    opacity: 1,
+  };
+  const intro =
+    id === "rise"
+      ? { y: Math.min(100, g.y + 10) }
+      : id === "slide"
+        ? { x: Math.max(0, g.x - 15) }
+        : id === "focus"
+          ? { scale: 0.88 }
+          : id === "punch"
+            ? { scale: 1.2 }
+            : id === "drift"
+              ? { x: Math.max(0, g.x - 5) }
+              : {};
+  const hold = id === "drift" ? { x: Math.min(100, g.x + 5) } : {};
+  return normalizeGraphic({
+    ...g,
+    animation: "none",
+    motion: [
+      { at: 0, ...pose, ...intro, opacity: 0, easing: "ease-out" },
+      { at: 0.18, ...pose, easing: id === "drift" ? "linear" : "hold" },
+      { at: 0.82, ...pose, ...hold, easing: "ease-in" },
+      {
+        at: 1,
+        ...pose,
+        ...hold,
+        ...(id === "rise" ? { y: Math.max(0, g.y - 4) } : {}),
+        opacity: 0,
+      },
+    ],
+  })!;
 }
