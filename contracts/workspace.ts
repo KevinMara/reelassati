@@ -88,6 +88,10 @@ export interface Asset {
 }
 
 export interface TimelineClip {
+  visual?: import("./clip-visual").ClipVisual;
+  /** Source clock retained across trims, splits, and speed changes. */
+  visualStart?: number;
+  visualDuration?: number;
   graphic?: import("./motion-graphics").MotionGraphic;
   /** Original animation span, preserved when a graphic is cut or trimmed. */
   graphicDuration?: number;
@@ -114,7 +118,13 @@ export interface TimelineClip {
   saturation?: number;
 }
 
+export interface TranscriptWord {
+  text: string;
+  start: number;
+  end: number;
+}
 export interface TranscriptSegment {
+  words?: TranscriptWord[];
   id: string;
   sourceClipId?: string;
   start: number;
@@ -149,6 +159,7 @@ export interface EditOperation {
   provenance?: ContentProvenance;
   reviewedAt?: string;
   parameters?: {
+    visual?: Partial<import("./clip-visual").ClipVisual>;
     graphicMode?: "create" | "update";
     graphic?: import("./motion-graphics").MotionGraphic;
     sourceIn?: number;

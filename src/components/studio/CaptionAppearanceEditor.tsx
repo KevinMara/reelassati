@@ -59,6 +59,7 @@ export function CaptionAppearanceEditor({
           [
             ["color", "Text color"],
             ["outlineColor", "Outline color"],
+            ["activeColor", "Active word color"],
           ] as const
         ).map(([key, label]) => (
           <label key={key} className="text-xs text-foreground/70">
@@ -72,6 +73,23 @@ export function CaptionAppearanceEditor({
           </label>
         ))}
       </div>
+      <CompactSelect
+        aria-label="Caption animation"
+        value={p.animation}
+        onValueChange={animation =>
+          patch({ animation: animation as "none" | "active-word" })
+        }
+        options={[
+          { value: "none", label: "Whole phrase" },
+          { value: "active-word", label: "Highlight spoken word" },
+        ]}
+      />
+      {p.animation === "active-word" && (
+        <p className="text-sm text-foreground/65">
+          Uses measured word timings from transcription. Imported subtitles or
+          edited lines without word timings display the whole phrase.
+        </p>
+      )}
       <CompactSelect
         aria-label="Caption position"
         value={p.position}

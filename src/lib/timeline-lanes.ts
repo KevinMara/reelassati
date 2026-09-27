@@ -158,6 +158,12 @@ export function trimTimelineClip(
 
 /** Preserve the source animation clock when a clip is shortened or split. */
 export function preserveGraphicDuration(clip: TimelineClip): TimelineClip {
+  if (clip.visual && clip.visualDuration === undefined)
+    clip = {
+      ...clip,
+      visualStart: clip.inPoint,
+      visualDuration: clip.outPoint - clip.inPoint,
+    };
   return clip.graphic && clip.graphicDuration === undefined
     ? { ...clip, graphicDuration: clip.outPoint ?? clip.duration }
     : clip;

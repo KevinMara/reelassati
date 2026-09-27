@@ -2,6 +2,8 @@ import { normalizeGraphic, type MotionGraphic } from "./motion-graphics";
 import fontMetrics from "./caption-font-metrics.json";
 
 export interface CaptionPreset {
+  animation: "none" | "active-word";
+  activeColor: string;
   id: string;
   name: string;
   description: string;
@@ -26,6 +28,8 @@ const caption = (
   id,
   name,
   description,
+  animation: "none",
+  activeColor: "#FFE34A",
   color: "#FFFFFF",
   outlineColor: "#101010",
   size: 4.5,
@@ -40,6 +44,36 @@ const caption = (
 
 /** Original presets; fonts are bundled locally and no asset subscription is required. */
 export const CAPTION_PRESETS: readonly CaptionPreset[] = [
+  caption(
+    "kinetic",
+    "Word focus",
+    "Highlight each spoken word using measured speech timing.",
+    { animation: "active-word", size: 5, maxCharacters: 26, outline: 0.45 }
+  ),
+  caption(
+    "word-mint",
+    "Mint rhythm",
+    "Clean white type with a mint highlight on the active word.",
+    {
+      animation: "active-word",
+      activeColor: "#7AF5CF",
+      size: 4.6,
+      maxCharacters: 30,
+    }
+  ),
+  caption(
+    "word-punch",
+    "Word punch",
+    "Bold uppercase captions with a bright active-word accent.",
+    {
+      animation: "active-word",
+      activeColor: "#FF8B64",
+      uppercase: true,
+      size: 5.6,
+      maxCharacters: 22,
+      outline: 0.5,
+    }
+  ),
   caption("classic", "Classic", "Clear white subtitles with a dark outline."),
   caption(
     "bold",
@@ -119,6 +153,8 @@ export type CaptionAppearance = Partial<
     | "position"
     | "margin"
     | "maxCharacters"
+    | "animation"
+    | "activeColor"
   >
 > & { background?: string | null };
 
@@ -126,10 +162,10 @@ export function getCaptionPreset(
   id?: string,
   appearance?: CaptionAppearance
 ): CaptionPreset {
-  const base = CAPTION_PRESETS.find(p => p.id === id) ?? CAPTION_PRESETS[0];
+  const base = CAPTION_PRESETS.find(p => p.id === id) ?? CAPTION_PRESETS.find(p => p.id === "classic")!;
   if (!appearance || typeof appearance !== "object") return base;
   const result = { ...base };
-  for (const key of ["color", "outlineColor"] as const)
+  for (const key of ["color", "outlineColor", "activeColor"] as const)
     if (
       typeof appearance[key] === "string" &&
       /^#[a-f\d]{6}$/i.test(appearance[key]!)
@@ -155,6 +191,8 @@ export function getCaptionPreset(
     if (typeof appearance[key] === "boolean") result[key] = appearance[key]!;
   if (appearance.position === "top" || appearance.position === "bottom")
     result.position = appearance.position;
+  if (appearance.animation === "none" || appearance.animation === "active-word")
+    result.animation = appearance.animation;
   return result;
 }
 

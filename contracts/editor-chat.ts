@@ -26,6 +26,8 @@ export interface EditorChatRequest {
   mode: EditorChatMode;
   executionMode?: "plan" | "execute";
   taskPreset?: EditorTaskPresetId;
+  /** Marker-only workflow; never executes timeline edits. */
+  task?: "story-sections";
   /** Whole-run ceiling, including this planning invocation. Never an automatic debit. */
   maxCredits: number;
   selectedClipIds?: string[];

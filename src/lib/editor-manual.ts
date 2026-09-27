@@ -1,3 +1,4 @@
+import { mapTranscriptTime } from "@contracts/transcript-timing";
 import type {
   Asset,
   EditProject,
@@ -76,7 +77,21 @@ export function replaceTimelineClip(
             (sourceEnd - replacement.inPoint) / (replacement.speed ?? 1)
         );
         return end > start
-          ? [{ ...segment, sourceClipId: id, start, end }]
+          ? [
+              {
+                ...mapTranscriptTime(
+                  segment,
+                  t =>
+                    replacement.start +
+                    (original.inPoint +
+                      (t - original.start) * (original.speed ?? 1) -
+                      replacement.inPoint) /
+                      (replacement.speed ?? 1),
+                  { start, end }
+                ),
+                sourceClipId: id,
+              },
+            ]
           : [];
       })
     : project.transcript;
@@ -187,9 +202,7 @@ export function moveClipGroup(
   const transcript = project.transcript.flatMap(segment => {
     const owner = captionOwner(project, segment);
     const original = group.find(c => c.id === owner?.id);
-    return original
-      ? [{ ...segment, start: segment.start + delta, end: segment.end + delta }]
-      : [segment];
+    return original ? [mapTranscriptTime(segment, t => t + delta)] : [segment];
   });
   return {
     ...project,
@@ -248,7 +261,7 @@ export function pasteClipGroup(
     const delta = clone.start - source[index].start;
     return [
       {
-        ...segment,
+        ...mapTranscriptTime(segment, t => t + delta),
         id: makeId(),
         sourceClipId: clone.id,
         start: segment.start + delta,

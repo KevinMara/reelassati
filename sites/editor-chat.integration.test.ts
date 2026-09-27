@@ -579,3 +579,204 @@ it("normalizes a preset-driven graphic revision and replays its paid plan", asyn
     nextOutput = previousOutput;
   }
 });
+
+it("normalizes flat trim/delete instructions and rejects unknown targets without expanding scope", async () => {
+  const previous = nextOutput;
+  const workspace = (
+    (await (await request("/api/workspace")).json()) as {
+      workspace: WorkspaceDocument;
+    }
+  ).workspace;
+  const template = workspace.projects.find(p => p.id === "project")!;
+  const project = {
+    ...template,
+    id: "shape-check",
+    clips: [
+      ...template.clips,
+      {
+        id: "placeholder",
+        assetId: "image",
+        label: "Placeholder",
+        track: "video" as const,
+        start: 3,
+        duration: 2,
+        inPoint: 0,
+        outPoint: 2,
+        locked: false,
+        color: "#999",
+      },
+    ],
+  };
+  workspace.projects.push(project);
+  expect(
+    (await request("/api/workspace", { workspace }, "owner@example.com", "PUT"))
+      .status
+  ).toBe(200);
+  const base = {
+    label: "Edit",
+    reason: "Requested",
+    scope: "requested",
+    requestExcerpt: "Trim main video and delete placeholder",
+    dependsOn: [],
+    kind: "edit",
+  };
+  const ops = [
+    {
+      type: "trim",
+      start: 0,
+      end: 28,
+      targetClipIds: ["clip"],
+      parameters: { sourceIn: 0 },
+    },
+    { type: "delete", start: 3, end: 5, targetClipIds: ["placeholder"] },
+  ];
+  try {
+    for (const flattened of [false, true]) {
+      nextOutput = {
+        message: "Planned",
+        actions: ops.map((operation, i) => ({
+          ...base,
+          id: `edit-${i}`,
+          ...(flattened ? operation : { operation }),
+        })),
+      };
+      const response = await request(
+        "/api/ai/editor-chat",
+        chat(`shape-${flattened}-0123456789`, {
+          projectId: project.id,
+          prompt: base.requestExcerpt,
+          selectedClipIds: ["clip"],
+        })
+      );
+      expect(response.status).toBe(200);
+      const plan = (await response.json()) as {
+        blockedReasons: string[];
+        actions: Array<{
+          operation: { type: string; targetClipIds: string[] };
+        }>;
+      };
+      expect(plan.blockedReasons).toEqual([]);
+      expect(plan.actions.map(a => a.operation.type)).toEqual([
+        "trim",
+        "delete",
+      ]);
+      expect(plan.actions[1].operation.targetClipIds).toEqual(["placeholder"]);
+    }
+    const before = balance();
+    nextOutput = {
+      message: "Planned",
+      actions: [
+        {
+          ...base,
+          id: "bad",
+          operation: {
+            type: "delete",
+            start: 0,
+            end: 30,
+            targetClipIds: ["unknown"],
+          },
+        },
+      ],
+    };
+    const bad = await request(
+      "/api/ai/editor-chat",
+      chat("shape-missing-0123456789", {
+        projectId: project.id,
+        prompt: base.requestExcerpt,
+      })
+    );
+    expect(bad.status).toBe(422);
+    expect(balance()).toBe(before);
+    nextOutput = { message: "Will trim", operations: ops };
+    const malformed = await request(
+      "/api/ai/editor-chat",
+      chat("shape-envelope-0123456789", {
+        projectId: project.id,
+        prompt: base.requestExcerpt,
+      })
+    );
+    expect(malformed.status).toBe(422);
+    expect(balance()).toBe(before);
+  } finally {
+    nextOutput = previous;
+  }
+});
+
+it("finds evidence-bound markers directly and never permits cuts or unrelated actions", async () => {
+  const previous = nextOutput;
+  const workspace = (
+    (await (await request("/api/workspace")).json()) as {
+      workspace: WorkspaceDocument;
+    }
+  ).workspace;
+  const template = workspace.projects.find(p => p.id === "project")!;
+  const project = {
+    ...template,
+    id: "sections-direct",
+    transcript: [
+      { id: "hook", text: "What causes this problem?", start: 0, end: 3 },
+      { id: "body", text: "Here is how it works", start: 3, end: 12 },
+    ],
+  };
+  workspace.projects.push(project);
+  expect(
+    (await request("/api/workspace", { workspace }, "owner@example.com", "PUT"))
+      .status
+  ).toBe(200);
+  try {
+    nextOutput = {
+      message: "Found sections",
+      actions: [
+        {
+          id: "sections",
+          kind: "story-beats",
+          label: "Story sections",
+          reason: "Reference navigation",
+          scope: "requested",
+          requestExcerpt:
+            "Find story sections as timeline reference markers only.",
+          dependsOn: [],
+          splitClips: true,
+          beats: [
+            { kind: "hook", label: "Hook", evidenceIds: ["transcript:hook"] },
+            { kind: "body", label: "Body", evidenceIds: ["transcript:body"] },
+          ],
+        },
+      ],
+    };
+    const response = await request(
+      "/api/ai/editor-chat",
+      chat("sections-direct-0123456789", {
+        projectId: project.id,
+        prompt: "Find story sections as timeline reference markers only.",
+        task: "story-sections",
+        executionMode: "plan",
+      })
+    );
+    expect(response.status).toBe(200);
+    const plan =
+      (await response.json()) as import("../contracts/editor-chat").EditorChatResponse;
+    expect(plan.actions).toHaveLength(1);
+    expect(plan.actions[0]).toMatchObject({
+      kind: "story-beats",
+      beats: [
+        { start: 0, end: 3 },
+        { start: 3, end: 12 },
+      ],
+    });
+    expect(plan.actions[0]).not.toHaveProperty("splitClips");
+    const before = balance();
+    nextOutput = previous;
+    const wrong = await request(
+      "/api/ai/editor-chat",
+      chat("sections-unrelated-0123456789", {
+        projectId: project.id,
+        task: "story-sections",
+      })
+    );
+    expect(wrong.status).toBe(422);
+    expect(balance()).toBe(before);
+  } finally {
+    nextOutput = previous;
+  }
+});

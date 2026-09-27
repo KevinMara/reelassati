@@ -1,3 +1,4 @@
+import { mapChatTranscript } from "@/lib/editor-chat-execution";
 import { v4 as createUuid } from "uuid";
 import { appendEditorRevisions } from "@/lib/editor-history";
 import { normalizeReview } from "@contracts/source-review";
@@ -161,30 +162,9 @@ export function AutonomousEditor({
           );
           if (result.provenance)
             working.transcriptProvenance = result.provenance;
-          for (const clip of project.clips.filter(
-            c => c.assetId === asset.id && !c.muted
-          )) {
-            const speed = clip.speed ?? 1;
-            working.transcript.push(
-              ...result.segments
-                .filter(
-                  s =>
-                    s.end > clip.inPoint &&
-                    s.start < clip.inPoint + clip.duration * speed
-                )
-                .map(s => ({
-                  ...s,
-                  sourceClipId: clip.id,
-                  id: `${clip.id}-${s.id}`,
-                  start:
-                    clip.start + Math.max(0, s.start - clip.inPoint) / speed,
-                  end: Math.min(
-                    clip.start + clip.duration,
-                    clip.start + (s.end - clip.inPoint) / speed
-                  ),
-                }))
-            );
-          }
+          working.transcript.push(
+            ...mapChatTranscript(project, asset.id, result.segments)
+          );
         }
       }
       checkpoint();

@@ -3,6 +3,7 @@ import type { EditProject } from "@contracts/workspace";
 import type { EditorChatAction } from "@contracts/editor-chat";
 import {
   applyChatCompletion,
+  chooseChatActions,
   changeChatScopeDecision,
   mergeChatTranscript,
 } from "./editor-chat-safety";
@@ -203,4 +204,30 @@ describe("time-range caption edits", () => {
     ]);
     expect(new Set(result.map(segment => segment.id)).size).toBe(3);
   });
+});
+
+it("batch decisions can queue later extras while the first action is running", () => {
+  const base = savedAction(fixture("pending"));
+  const actions = [
+    {
+      ...base,
+      id: "running",
+      status: "running",
+      scope: "extra",
+      runtime: { startedAt: "now" },
+    },
+    { ...base, id: "one", scope: "extra" },
+    { ...base, id: "two", scope: "extra" },
+    { ...base, id: "three", scope: "extra" },
+  ] as EditorChatAction[];
+  const next = chooseChatActions(actions, {
+    running: "skip",
+    one: "approve",
+    two: "skip",
+    three: "approve",
+  });
+  expect(next[0]).toEqual(actions[0]);
+  expect(next[1].runtime?.approved).toBe(true);
+  expect(next[2].status).toBe("skipped");
+  expect(next[3].runtime?.approved).toBe(true);
 });

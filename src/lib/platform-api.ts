@@ -726,6 +726,23 @@ export const platformApi = {
       { method: "POST", body: JSON.stringify(input) }
     ),
 
+  findStorySections: (projectId: string, requestId: string) =>
+    requestJson<import("@contracts/editor-chat").EditorChatResponse>(
+      "/api/ai/editor-chat",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          projectId,
+          requestId,
+          prompt: "Find story sections as timeline reference markers only.",
+          mode: "ask",
+          executionMode: "plan",
+          maxCredits: 5,
+          task: "story-sections",
+        }),
+      }
+    ),
+
   generateEditPlan: (input: {
     project: EditProject;
     command: string;

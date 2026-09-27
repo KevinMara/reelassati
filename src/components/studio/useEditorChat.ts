@@ -3,6 +3,7 @@ import {
   resolveChatCatalogAudio,
 } from "@/lib/editor-chat-catalog-audio";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { chooseChatActions } from "@/lib/editor-chat-safety";
 import { v4 as uuid } from "uuid";
 import type {
   Asset,
@@ -43,7 +44,6 @@ import { resolveMediaDuration } from "@/lib/media-metadata";
 import { validateFileSelection } from "@/lib/file-validation";
 import {
   applyChatCompletion,
-  changeChatScopeDecision,
   mergeChatTranscript,
 } from "@/lib/editor-chat-safety";
 
@@ -68,6 +68,7 @@ export function useEditorChat(
   const { workspace, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
   const stopRequested = useRef(false);
   const resultChecks = useRef(new Set<string>());
+  const queuedMessages = useRef(new Set<string>());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const state = useMemo(
@@ -80,7 +81,9 @@ export function useEditorChat(
     return p;
   };
   const getMessage = (id: string) => {
-    const message = getProject().editorChat?.messages.find(m => m.id === id);
+    const message = getWorkspaceSnapshot()
+      .projects.find(p => p.id === project.id)
+      ?.editorChat?.messages.find(m => m.id === id);
     if (!message) throw new Error("The saved chat action could not be found.");
     return message;
   };
@@ -140,8 +143,10 @@ export function useEditorChat(
 
   useEffect(() => {
     stopRequested.current = false;
+    const queue = queuedMessages.current;
     return () => {
       stopRequested.current = true;
+      queue.clear();
     };
   }, [project.id]);
 
@@ -595,7 +600,10 @@ export function useEditorChat(
   }
 
   async function run(messageId: string) {
-    if (activeProjects.has(project.id)) return;
+    if (activeProjects.has(project.id)) {
+      queuedMessages.current.add(messageId);
+      return;
+    }
     const pendingPlan = getMessage(messageId);
     if (!editorChatCanExecute(pendingPlan)) return;
     activeProjects.add(project.id);
@@ -634,28 +642,45 @@ export function useEditorChat(
           }));
           continue;
         }
-        await changeMessage(messageId, item => ({
-          ...item,
-          usedCredits: (item.usedCredits ?? 5) + action.credits,
-          plan: item.plan
-            ? {
-                ...item.plan,
-                actions: item.plan.actions.map(a =>
-                  a.id === action.id
-                    ? {
-                        ...a,
-                        status: "running",
-                        runtime: {
-                          ...a.runtime,
-                          startedAt: new Date().toISOString(),
-                          detail: a.label,
-                        },
-                      }
-                    : a
-                ),
-              }
-            : undefined,
-        }));
+        let claimed = false;
+        await changeMessage(messageId, item => {
+          const currentActions = item.plan?.actions ?? [];
+          const currentAction = currentActions.find(a => a.id === action.id);
+          if (
+            !currentAction ||
+            !canRunChatAction(
+              currentAction,
+              currentActions,
+              item.mode ?? "ask",
+              (item.maxCredits ?? 200) - (item.usedCredits ?? 5)
+            )
+          )
+            return item;
+          claimed = true;
+          return {
+            ...item,
+            usedCredits: (item.usedCredits ?? 5) + action.credits,
+            plan: item.plan
+              ? {
+                  ...item.plan,
+                  actions: item.plan.actions.map(a =>
+                    a.id === action.id
+                      ? {
+                          ...a,
+                          status: "running",
+                          runtime: {
+                            ...a.runtime,
+                            startedAt: new Date().toISOString(),
+                            detail: a.label,
+                          },
+                        }
+                      : a
+                  ),
+                }
+              : undefined,
+          };
+        });
+        if (!claimed) continue;
         try {
           await execute(messageId, action);
         } catch (cause) {
@@ -711,7 +736,36 @@ export function useEditorChat(
     } finally {
       activeProjects.delete(project.id);
       setBusy(false);
+      queueMicrotask(drainDecisions);
     }
+  }
+
+  function drainDecisions() {
+    if (activeProjects.has(project.id) || stopRequested.current) return;
+    while (queuedMessages.current.size) {
+      const id = queuedMessages.current.values().next().value!;
+      queuedMessages.current.delete(id);
+      const message = getWorkspaceSnapshot()
+        .projects.find(p => p.id === project.id)
+        ?.editorChat?.messages.find(m => m.id === id);
+      if (!message || !editorChatCanExecute(message)) continue;
+      void run(id).catch(cause => setError(String(cause)));
+      return;
+    }
+  }
+
+  async function decide(
+    messageId: string,
+    decisions: Record<string, "approve" | "skip">
+  ) {
+    await changeMessage(messageId, m => ({
+      ...m,
+      plan: m.plan
+        ? { ...m.plan, actions: chooseChatActions(m.plan.actions, decisions) }
+        : undefined,
+    }));
+    queuedMessages.current.add(messageId);
+    drainDecisions();
   }
 
   async function send(
@@ -796,6 +850,7 @@ export function useEditorChat(
     } finally {
       activeProjects.delete(project.id);
       setBusy(false);
+      queueMicrotask(drainDecisions);
     }
     if (
       getWorkspaceSnapshot()
@@ -825,8 +880,7 @@ export function useEditorChat(
           status: "pending",
           error: undefined,
         }));
-        activeProjects.delete(project.id);
-        await run(messageId);
+        queuedMessages.current.add(messageId);
       } catch (cause) {
         setError(
           cause instanceof Error
@@ -836,6 +890,7 @@ export function useEditorChat(
       } finally {
         activeProjects.delete(project.id);
         setBusy(false);
+        queueMicrotask(drainDecisions);
       }
       return;
     }
@@ -945,6 +1000,7 @@ export function useEditorChat(
     } finally {
       activeProjects.delete(project.id);
       setBusy(false);
+      queueMicrotask(drainDecisions);
     }
   }
 
@@ -955,7 +1011,7 @@ export function useEditorChat(
         ...m,
         maxCredits: Math.max(5, Math.min(100000, Math.floor(newCap))),
       }));
-    const m = getMessage(messageId);
+    let m = getMessage(messageId);
     if (!m.plan) {
       if (!m.request) {
         setError(
@@ -983,8 +1039,10 @@ export function useEditorChat(
       } finally {
         activeProjects.delete(project.id);
         setBusy(false);
+        queueMicrotask(drainDecisions);
       }
     }
+    m = getMessage(messageId);
     if (m.request?.executionMode === "plan" && !m.planApproved) {
       if (!applyPlan || !m.plan) return;
       await changeMessage(messageId, item => ({ ...item, planApproved: true }));
@@ -992,18 +1050,10 @@ export function useEditorChat(
     await run(messageId);
   }
   async function approve(messageId: string, actionId: string) {
-    if (activeProjects.has(project.id)) return;
-    await changeAction(messageId, actionId, a =>
-      changeChatScopeDecision(a, "approve")
-    );
-    await run(messageId);
+    await decide(messageId, { [actionId]: "approve" });
   }
   async function skip(messageId: string, actionId: string) {
-    if (activeProjects.has(project.id)) return;
-    await changeAction(messageId, actionId, a =>
-      changeChatScopeDecision(a, "skip")
-    );
-    await run(messageId);
+    await decide(messageId, { [actionId]: "skip" });
   }
   async function reviewSavedSuggestion(operationId: string, accept: boolean) {
     if (busy || activeProjects.has(project.id)) return;
@@ -1096,6 +1146,7 @@ export function useEditorChat(
     error,
     send,
     approve,
+    decide,
     skip,
     resume,
     recover,

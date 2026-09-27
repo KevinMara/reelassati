@@ -29,6 +29,12 @@ import {
   finishMusicAudio,
 } from "./music-generation";
 import { normalizeGraphic } from "../contracts/motion-graphics";
+import { normalizeVisual } from "../contracts/clip-visual";
+import {
+  normalizeTranscriptWords,
+  providerTranscriptSegments,
+  type ProviderTranscript,
+} from "../contracts/transcript-timing";
 import { normalizeReview } from "../contracts/source-review";
 import { audioGenerationQuote } from "../contracts/audio-generation";
 import { normalizeMediaFolders } from "../contracts/media-folders";
@@ -2376,11 +2382,18 @@ function normalizeTranscriptSegments(value: unknown): TranscriptSegment[] {
         boundedNumber(candidate.end, start + 0.1, 0, 100_000)
       );
       const speaker = stringValue(candidate.speaker);
+      const sourceClipId = stringValue(candidate.sourceClipId);
+      const words = normalizeTranscriptWords(
+        stringValue(candidate.text),
+        candidate.words
+      );
       return {
         id: stringValue(candidate.id, `segment-${index + 1}`),
         start,
         end,
         text: stringValue(candidate.text),
+        ...(sourceClipId ? { sourceClipId } : {}),
+        ...(words ? { words } : {}),
         ...(speaker ? { speaker } : {}),
         ...(candidate.emphasis === true ? { emphasis: true } : {}),
       };
@@ -4153,6 +4166,31 @@ function mapEditOperations(
         parameters.mediaKind = params.mediaKind;
       if (params.fit === "cover" || params.fit === "contain")
         parameters.fit = params.fit;
+      if (type === "style" && recordValue(params.visual)) {
+        const patch = recordValue(params.visual)!;
+        const normalized = normalizeVisual(patch);
+        parameters.visual = Object.fromEntries(
+          Object.keys(patch)
+            .filter(key => key in normalized)
+            .map(key => {
+              const value = normalized[key as keyof typeof normalized];
+              const nested = recordValue(patch[key]);
+              return [
+                key,
+                nested && ["crop", "entrance", "exit"].includes(key)
+                  ? Object.fromEntries(
+                      Object.keys(nested)
+                        .filter(k => k in (value as object))
+                        .map(k => [
+                          k,
+                          (value as unknown as Record<string, unknown>)[k],
+                        ])
+                    )
+                  : value,
+              ];
+            })
+        );
+      }
       return {
         id: crypto.randomUUID(),
         type: allowedTypes.includes(type) ? type : "pacing",
@@ -5238,17 +5276,22 @@ async function handleAi(
     if (!currentCapabilities.ai)
       return errorResponse("Reel is temporarily unavailable", 503);
     const storyEvidence = buildStoryBeatEvidence(project);
+    if (input.task === "story-sections" && !storyEvidence.length)
+      return errorResponse(
+        "Analyze the source footage before finding story sections.",
+        422
+      );
+    const systemPrompt =
+      input.task === "story-sections"
+        ? EDITOR_CHAT_SYSTEM_PROMPT +
+          "\nMARKER-ONLY TASK: Return exactly one story-beats action. Assign meaningful editorial sections from storyEvidence and cite their exact evidenceIds. Distinguish hook, body, proof, payoff, CTA only where supported; do not force every kind. No analysis, captions, edits, generated media, settings, replan or other actions. These are reference markers only. Use the user's prompt as requestExcerpt."
+        : EDITOR_CHAT_SYSTEM_PROMPT;
     const context: EditorChatContext = {
       request: input,
       project,
       assets: workspace.assets,
       normalizeOperations: value =>
-        mapEditOperations(
-          value,
-          project.duration,
-          project.clips,
-          input.selectedClipIds || []
-        ),
+        mapEditOperations(value, project.duration, project.clips, []),
       quoteAudio: (kind, seconds) =>
         kind === "music"
           ? musicQuote(seconds)
@@ -5431,11 +5474,11 @@ async function handleAi(
             },
           },
           async () => {
-            const { output, invocation } = await chatJson(
+            let { output, invocation } = await chatJson(
               env,
               user,
               "edit-planning",
-              EDITOR_CHAT_SYSTEM_PROMPT,
+              systemPrompt,
               mediaParts.length
                 ? [
                     { type: "text", text: JSON.stringify(modelContext) },
@@ -5446,7 +5489,81 @@ async function handleAi(
                 ? env.OPENROUTER_ANALYSIS_MODEL || "google/gemini-2.5-flash"
                 : undefined
             );
-            const plan = normalizeEditorChatPlan(output, context);
+            let plan = normalizeEditorChatPlan(output, context);
+            const malformed = (p: typeof plan) =>
+              p.blockedReasons.some(reason =>
+                /invalid edit instruction|without a target clip|missing or locked clip|selected range|valid timeline range|non-empty time range|prerequisite.*out of order|unsupported|cannot execute this action type/i.test(
+                  reason
+                )
+              );
+            const invalidEnvelope = (value: unknown) =>
+              !Array.isArray(recordValue(value)?.actions);
+            if (malformed(plan) || invalidEnvelope(output)) {
+              // One shape repair shares the original reservation and durable request ID.
+              // Nothing executes until all instructions have been validated.
+              const originalActionIds = Array.isArray(
+                recordValue(output)?.actions
+              )
+                ? (recordValue(output)!.actions as unknown[])
+                    .map(a => stringValue(recordValue(a)?.id))
+                    .filter(Boolean)
+                : [];
+              const repaired = await chatJson(
+                env,
+                user,
+                "edit-planning",
+                systemPrompt +
+                  "\nRepair the invalid instruction envelope in the supplied draft. Preserve the original requested intent, exact valid targets, scope and timing. Use nested operation objects. Never invent replacement targets or widen the selected range. Keep action IDs stable and preserve every requested step; if a step cannot be represented safely, leave it in the draft so validation can reject the whole attempted repair. Return the entire corrected JSON plan.",
+                mediaParts.length
+                  ? [
+                      {
+                        type: "text",
+                        text: JSON.stringify({
+                          context: modelContext,
+                          draft: output,
+                          validation: plan.blockedReasons,
+                        }),
+                      },
+                      ...mediaParts,
+                    ]
+                  : JSON.stringify({
+                      context: modelContext,
+                      draft: output,
+                      validation: plan.blockedReasons,
+                    }),
+                mediaParts.length
+                  ? env.OPENROUTER_ANALYSIS_MODEL || "google/gemini-2.5-flash"
+                  : undefined
+              );
+              output = repaired.output;
+              invocation = repaired.invocation;
+              plan = normalizeEditorChatPlan(output, context);
+              if (
+                malformed(plan) ||
+                invalidEnvelope(output) ||
+                !plan.actions.length ||
+                originalActionIds.some(
+                  id =>
+                    !((recordValue(output)?.actions as unknown[]) ?? []).some(
+                      a => stringValue(recordValue(a)?.id) === id
+                    )
+                )
+              )
+                return errorResponse(
+                  "Reel could not form a valid edit instruction. Nothing was changed and the planning credits were released. Try naming the clip and change you want.",
+                  422
+                );
+            }
+            if (
+              input.task === "story-sections" &&
+              (plan.actions.length !== 1 ||
+                plan.actions[0].kind !== "story-beats" ||
+                plan.blockedReasons.length)
+            )
+              return errorResponse(
+                "The footage did not yield reliable story sections. No markers were changed and the planning credits were released.",
+                422
+              );
             const changes = plan.actions.flatMap(action =>
               action.kind === "edit" ? [action.operation] : []
             );
@@ -6197,7 +6314,7 @@ async function handleAi(
         );
         let payload: {
           text?: string;
-          segments?: Array<{ start?: number; end?: number; text?: string }>;
+          segments?: TranscriptSegment[];
         };
         try {
           payload = { text: "", segments: [] };
@@ -6218,7 +6335,7 @@ async function handleAi(
                   },
                   ...(input.language ? { language: input.language } : {}),
                   response_format: "verbose_json",
-                  timestamp_granularities: ["segment"],
+                  timestamp_granularities: ["segment", "word"],
                 }),
               }
             );
@@ -6230,26 +6347,12 @@ async function handleAi(
               );
               await providerError(response, "OpenRouter");
             }
-            const result = (await response.json()) as typeof payload;
+            const result = (await response.json()) as ProviderTranscript;
             payload.text = [payload.text, result.text]
               .filter(Boolean)
               .join("\n");
-            const segments = result.segments?.length
-              ? result.segments
-              : result.text
-                ? [{ start: 0, end: part.duration || 0.1, text: result.text }]
-                : [];
             payload.segments!.push(
-              ...segments.map(segment => ({
-                ...segment,
-                start: offset + Math.max(0, Number(segment.start) || 0),
-                end:
-                  offset +
-                  Math.min(
-                    part.duration || Infinity,
-                    Math.max(0.1, Number(segment.end) || part.duration || 0.1)
-                  ),
-              }))
+              ...providerTranscriptSegments(result, part.duration, offset)
             );
             offset += part.duration;
           }
@@ -6262,6 +6365,7 @@ async function handleAi(
         const segments = normalizeTranscriptSegments(
           (payload.segments || []).length > 0
             ? (payload.segments || []).map(segment => ({
+                ...segment,
                 id: crypto.randomUUID(),
                 start: boundedNumber(segment.start, 0, 0, 100_000),
                 end: boundedNumber(segment.end, 0.1, 0, 100_000),

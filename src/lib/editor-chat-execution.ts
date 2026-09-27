@@ -1,3 +1,4 @@
+import { mapTranscriptTime } from "@contracts/transcript-timing";
 import type {
   Asset,
   EditProject,
@@ -136,7 +137,7 @@ export function mapChatTranscript(
             s.start < clip.inPoint + clip.duration * speed
         )
         .map(s => ({
-          ...s,
+          ...mapTranscriptTime(s, t => clip.start + (t - clip.inPoint) / speed),
           id: `chat-caption-${clip.id}-${s.id}`,
           sourceClipId: clip.id,
           start: clip.start + Math.max(0, s.start - clip.inPoint) / speed,

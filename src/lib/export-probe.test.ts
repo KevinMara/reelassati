@@ -1,3 +1,6 @@
+import { visualRenderFilter } from "./visual-rendering";
+import { normalizeVisual } from "@contracts/clip-visual";
+import type { TimelineClip } from "@contracts/workspace";
 import {
   afterAll,
   beforeAll,
@@ -84,6 +87,65 @@ describe("the installed browser WASM export verifier", () => {
     if (typeof bytes === "string") throw new Error("Expected encoded bytes");
     validMp4 = bytes.slice();
   }, 15000);
+
+  it("renders transformed alpha and the maximum keyframe path in the installed browser engine", () => {
+    const base = {
+      id: "visual",
+      start: 0,
+      duration: 1,
+      inPoint: 0,
+      outPoint: 1,
+      visual: normalizeVisual({ flipX: true }),
+    } as TimelineClip;
+    for (const [name, clip] of [
+      ["flip", base],
+      [
+        "animated",
+        {
+          ...base,
+          visual: normalizeVisual({
+            mask: "rounded",
+            keyframes: Array.from({ length: 24 }, (_, i) => ({
+              at: i / 23,
+              x: i - 12,
+              y: 12 - i,
+              scale: 0.5 + i / 24,
+              rotation: i * 4,
+              opacity: 0.5 + i / 48,
+            })),
+            entrance: { kind: "zoom", duration: 0.2 },
+            exit: { kind: "slide-right", duration: 0.2 },
+          }),
+        },
+      ],
+    ] as const) {
+      const filter = visualRenderFilter(clip);
+      expect(filter.length).toBeLessThan(120000);
+      core.exec(
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=red:s=8x8:d=1:r=2,format=rgba",
+        "-vf",
+        filter,
+        "-frames:v",
+        "2",
+        "-f",
+        "rawvideo",
+        `${name}.rgba`
+      );
+      expect(core.ret).toBe(0);
+      core.reset();
+      const bytes = core.FS.readFile(`${name}.rgba`) as Uint8Array;
+      expect(bytes.length).toBe(512);
+      if (name === "flip")
+        expect(
+          [...bytes].filter((_, i) => i % 4 === 3).every(alpha => alpha === 255)
+        ).toBe(true);
+    }
+  });
 
   beforeEach(() => {
     core.FS.writeFile("output.mp4", validMp4);

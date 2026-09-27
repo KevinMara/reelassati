@@ -48,7 +48,7 @@ export interface StoryBeatStripProps {
   generateLabel?: string;
   onSeek(time: number): void;
   onChange?(beats: StoryBeat[]): void | Promise<void>;
-  /** Delegate to the real chat action/quote flow; this component performs no AI calls. */
+  /** Find reference markers directly; never seeds or submits an editor chat prompt. */
   onGenerate?(): void;
 }
 
@@ -214,7 +214,7 @@ export function StoryBeatStrip({
         <p className="py-2 text-xs leading-relaxed text-muted-foreground">
           {hasEvidence
             ? "Find the hook, main idea and payoff in your footage."
-            : "Add footage and ask AI to find its sections using speech or visual analysis."}
+            : "Add footage, then find its story sections. These markers help you navigate without cutting the video."}
         </p>
       )}
       {draft && onChange && (

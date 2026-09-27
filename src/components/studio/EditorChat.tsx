@@ -45,6 +45,7 @@ import {
 } from "@contracts/editor-chat-presets";
 import type { EditProject } from "@contracts/workspace";
 import { useEditorChat } from "./useEditorChat";
+import { canChooseChatAction } from "@/lib/editor-chat-safety";
 import { useWorkspace } from "@/providers/workspace";
 import { cn } from "@/lib/utils";
 import { CompactSelect } from "@/components/ui/compact-select";
@@ -156,8 +157,12 @@ export function EditorChat({
   const [referenceUrl, setReferenceUrl] = useState("");
   const [urlOpen, setUrlOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [budgetInput, setBudgetInput] = useState(String(chat.state.maxCredits));
+  const [budgetDraft, setBudgetInput] = useState<string | null>(null);
+  const budgetInput = budgetDraft ?? String(chat.state.maxCredits);
   const [workingChoice, setWorkingChoice] = useState<string>();
+  const [selectedActions, setSelectedActions] = useState<Set<string>>(
+    new Set()
+  );
   const input = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -176,6 +181,8 @@ export function EditorChat({
     setRange(undefined);
     setLocalError("");
     lastSeed.current = undefined;
+    setSelectedActions(new Set());
+    setBudgetInput(null);
   }, [project.id]);
   useEffect(() => {
     if (!seed || seed.id === lastSeed.current) return;
@@ -184,9 +191,7 @@ export function EditorChat({
     setRange(seed.range);
     input.current?.focus();
   }, [seed]);
-  useEffect(() => {
-    setBudgetInput(String(chat.state.maxCredits));
-  }, [chat.state.maxCredits]);
+
   useEffect(() => {
     if (followLatest.current && scroller.current)
       scroller.current.scrollTop = scroller.current.scrollHeight;
@@ -399,9 +404,9 @@ export function EditorChat({
             className="w-72 rounded-xl border-border bg-surface text-foreground"
           >
             <h3 className="mb-3 text-sm font-semibold">How Reel works</h3>
-            <label className="mb-1.5 block text-xs text-foreground/60">
+            <p className="mb-1.5 block text-xs text-foreground/60">
               Optional improvements
-            </label>
+            </p>
             <CompactSelect
               aria-label="Approval mode"
               value={chat.state.mode}
@@ -670,11 +675,107 @@ export function EditorChat({
                     )}
                     {!!message.plan?.actions.length && (
                       <div className="mt-3 space-y-2">
+                        {message.plan.actions.filter(canChooseChatAction)
+                          .length > 1 && (
+                          <div className="space-y-2 rounded-xl border border-border bg-background/60 p-3">
+                            <div className="flex items-center justify-between text-sm">
+                              <span>
+                                {
+                                  message.plan.actions.filter(
+                                    a =>
+                                      canChooseChatAction(a) &&
+                                      selectedActions.has(a.id)
+                                  ).length
+                                }{" "}
+                                selected
+                              </span>
+                              <button
+                                type="button"
+                                className="text-primary"
+                                onClick={() =>
+                                  setSelectedActions(current => {
+                                    const next = new Set(current);
+                                    const eligible =
+                                      message.plan!.actions.filter(
+                                        canChooseChatAction
+                                      );
+                                    const all = eligible.every(a =>
+                                      next.has(a.id)
+                                    );
+                                    eligible.forEach(a =>
+                                      all ? next.delete(a.id) : next.add(a.id)
+                                    );
+                                    return next;
+                                  })
+                                }
+                              >
+                                Select all / clear
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(["approve", "skip"] as const).map(decision => (
+                                <button
+                                  key={decision}
+                                  type="button"
+                                  disabled={
+                                    !!workingChoice ||
+                                    !message.plan!.actions.some(
+                                      a =>
+                                        canChooseChatAction(a) &&
+                                        selectedActions.has(a.id)
+                                    )
+                                  }
+                                  className="rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-2 text-xs text-primary disabled:opacity-40"
+                                  onClick={() =>
+                                    void runChoice(
+                                      `batch:${message.id}`,
+                                      async () => {
+                                        const decisions = Object.fromEntries(
+                                          message
+                                            .plan!.actions.filter(
+                                              canChooseChatAction
+                                            )
+                                            .map(a => [
+                                              a.id,
+                                              selectedActions.has(a.id)
+                                                ? decision
+                                                : decision === "approve"
+                                                  ? "skip"
+                                                  : "approve",
+                                            ])
+                                        );
+                                        await chat.decide(
+                                          message.id,
+                                          decisions
+                                        );
+                                        setSelectedActions(new Set());
+                                      }
+                                    )
+                                  }
+                                >
+                                  {decision === "approve"
+                                    ? "Include selected · skip rest"
+                                    : "Skip selected · include rest"}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {message.plan.actions.map(action => (
                           <ActionCard
                             key={action.id}
                             action={action}
                             busy={busyChoice}
+                            choiceBusy={!!workingChoice}
+                            selected={selectedActions.has(action.id)}
+                            onSelect={() =>
+                              setSelectedActions(current => {
+                                const next = new Set(current);
+                                if (next.has(action.id)) next.delete(action.id);
+                                else next.add(action.id);
+                                return next;
+                              })
+                            }
                             working={workingChoice === action.id}
                             onApprove={() =>
                               void runChoice(action.id, () =>
@@ -877,7 +978,7 @@ export function EditorChat({
                 void send();
               }
             }}
-            className="max-h-40 min-h-16 w-full resize-none border-0 bg-transparent text-sm leading-relaxed outline-none placeholder:text-foreground/35"
+            className="max-h-40 min-h-16 w-full resize-none border-0 bg-transparent font-sans text-[14px] font-normal leading-6 tracking-normal outline-none placeholder:font-normal placeholder:text-foreground/40"
           />
           <div className="mt-1 flex items-center gap-1.5">
             <DropdownMenu>
@@ -1089,6 +1190,9 @@ function ActionCard({
   onApprove,
   onSkip,
   onRecover,
+  choiceBusy,
+  selected,
+  onSelect,
 }: {
   action: EditorChatAction;
   busy: boolean;
@@ -1096,8 +1200,11 @@ function ActionCard({
   onApprove: () => void;
   onSkip: () => void;
   onRecover: () => void;
+  choiceBusy: boolean;
+  selected: boolean;
+  onSelect: () => void;
 }) {
-  const needsChoice = action.status === "awaiting-approval";
+  const needsChoice = canChooseChatAction(action);
   const recoverable =
     ["interrupted", "failed"].includes(action.status) &&
     (action.kind === "catalog-audio" ||
@@ -1125,16 +1232,26 @@ function ActionCard({
       )}
     >
       <div className="flex items-start gap-2">
-        <Icon
-          className={cn(
-            "mt-0.5 size-3.5 shrink-0",
-            action.status === "running" || working
-              ? "animate-spin text-primary"
-              : action.status === "completed"
-                ? "text-emerald-500"
-                : "text-foreground/40"
-          )}
-        />
+        {needsChoice ? (
+          <input
+            type="checkbox"
+            aria-label={`Select ${action.label}`}
+            checked={selected}
+            onChange={onSelect}
+            className="mt-1 size-4 shrink-0 appearance-none rounded-full border border-foreground/35 checked:border-primary checked:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          />
+        ) : (
+          <Icon
+            className={cn(
+              "mt-0.5 size-3.5 shrink-0",
+              action.status === "running" || working
+                ? "animate-spin text-primary"
+                : action.status === "completed"
+                  ? "text-emerald-500"
+                  : "text-foreground/40"
+            )}
+          />
+        )}
         <div className="min-w-0 flex-1">
           <p
             className={cn(
@@ -1175,15 +1292,17 @@ function ActionCard({
           <div className="mt-2 flex gap-2">
             <button
               type="button"
-              disabled={busy}
+              disabled={choiceBusy || action.runtime?.approved}
               onClick={onApprove}
               className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
             >
-              Include it{action.credits ? ` · ${action.credits} cr` : ""}
+              {action.runtime?.approved
+                ? "Included · queued"
+                : `Include it${action.credits ? ` · ${action.credits} cr` : ""}`}
             </button>
             <button
               type="button"
-              disabled={busy}
+              disabled={choiceBusy}
               onClick={onSkip}
               className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground/60 hover:bg-foreground/5 disabled:opacity-40"
             >

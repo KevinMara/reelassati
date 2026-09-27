@@ -1,4 +1,5 @@
-import { captionLines, getCaptionPreset } from "@contracts/editor-presets";
+import { getCaptionPreset } from "@contracts/editor-presets";
+import { captionRuns } from "@contracts/caption-runs";
 import type { TranscriptSegment } from "@contracts/workspace";
 import { captionTextCss } from "@/lib/caption-rendering";
 
@@ -25,7 +26,14 @@ export function CaptionLayer({
     >
       {active.map(segment => (
         <span key={segment.id} style={captionTextCss(p)}>
-          {captionLines(segment.text, p)}
+          {captionRuns(segment, p, time).map((run, i) => (
+            <span
+              key={i}
+              style={run.active ? { color: p.activeColor } : undefined}
+            >
+              {run.text}
+            </span>
+          ))}
         </span>
       ))}
     </div>

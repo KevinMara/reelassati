@@ -91,6 +91,18 @@ export function EditorShortcuts({
             </section>
           ) : null;
         })}
+        <section className="rounded-xl border border-border bg-background/60 p-4 text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">Selecting and moving clips</h3>
+          Hold <kbd>Shift</kbd> and click to add or remove clips from the
+          selection. Drag a selected clip to move the group. Copy, duplicate and
+          delete work on the selection. Unlock clips before moving or deleting
+          them.
+          <p className="mt-3">
+            Snapping aligns clip edges with nearby clips and the playhead. Hold{" "}
+            <kbd>Alt</kbd> / <kbd>Option</kbd> while dragging for exact
+            placement.
+          </p>
+        </section>
         {!found.length && (
           <p className="py-4 text-sm text-foreground/60">
             No matching shortcut.

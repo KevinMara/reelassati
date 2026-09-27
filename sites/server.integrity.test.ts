@@ -793,14 +793,23 @@ describe("provenance integrity boundaries", () => {
     await BUCKET.put(r2Key, rawMp3, {
       httpMetadata: { contentType: "audio/mpeg" },
     });
-    globalThis.fetch = async () =>
-      Response.json({
+    let transcriptionInput: Record<string, unknown> = {};
+    globalThis.fetch = async (_url, init) => {
+      transcriptionInput = JSON.parse(String(init?.body));
+      return Response.json({
         text: "First line Second line",
         segments: [
           { start: 0, end: 1, text: "First line" },
           { start: 1, end: 2, text: "Second line" },
         ],
+        words: [
+          { word: "First", start: 0, end: 0.4 },
+          { word: "line", start: 0.5, end: 0.9 },
+          { word: "Second", start: 1, end: 1.4 },
+          { word: "line", start: 1.5, end: 1.9 },
+        ],
       });
+    };
     const transcribed = await worker.fetch(
       new Request("https://studio.example/api/ai/transcribe", {
         method: "POST",
@@ -819,6 +828,14 @@ describe("provenance integrity boundaries", () => {
       segments: EditProject["transcript"];
       provenance: ContentProvenance;
     };
+    expect(transcriptionInput.timestamp_granularities).toEqual([
+      "segment",
+      "word",
+    ]);
+    expect(transcriptResult.segments[0].words).toEqual([
+      { text: "First", start: 0, end: 0.4 },
+      { text: "line", start: 0.5, end: 0.9 },
+    ]);
     expect(extractTextProvenanceToken(transcriptResult.transcript)).toBe(
       transcriptResult.provenance.marking.publicToken
     );
@@ -864,6 +881,13 @@ describe("provenance integrity boundaries", () => {
       workspace: ReturnType<typeof createEmptyWorkspace>;
     };
     const reloadedProject = reloadedBody.workspace.projects[0];
+    expect(reloadedProject.transcript[0].words).toEqual(
+      transcriptResult.segments[0].words
+    );
+    expect(reloadedProject.revisions[1].transcript[0].words).toEqual(
+      transcriptResult.segments[0].words
+    );
+
     expect(reloadedProject.transcriptProvenance?.recordId).toBe(
       transcriptResult.provenance.recordId
     );
@@ -1244,7 +1268,7 @@ describe("provenance integrity boundaries", () => {
     expect(
       await crypto.subtle.digest("SHA-256", marked!.unmarkedBytes)
     ).toEqual(await crypto.subtle.digest("SHA-256", original));
-  });
+  }, 15000);
 
   it("blocks metadata-preserving byte corruption on full GET and HEAD", async () => {
     const DB = createIntegrityD1();

@@ -1,4 +1,5 @@
 import { colorGradeMatrix } from "@/lib/color-grade";
+import { visualFrame } from "@contracts/clip-visual";
 import { CaptionLayer } from "./CaptionLayer";
 import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import { useEffect, useId, useRef } from "react";
@@ -86,11 +87,43 @@ function MediaLayer({
     clip.fadeIn ? elapsed / clip.fadeIn : 1,
     clip.fadeOut ? (clip.duration - elapsed) / clip.fadeOut : 1
   );
+  const frame = visualFrame(clip, time);
+  const crop = frame.visual.crop;
   const style = {
     objectFit: clip.fit ?? "contain",
-    opacity: Math.max(0, opacity),
     filter: `url(#${gradeId})`,
   } as const;
+  const transformStyle = {
+    transform: `translate(${frame.x}%, ${frame.y}%) rotate(${frame.rotation}deg) scale(${frame.scale * (frame.visual.flipX ? -1 : 1)},${frame.scale * (frame.visual.flipY ? -1 : 1)})`,
+    opacity: Math.max(0, opacity) * frame.opacity,
+  };
+  const maskStyle = {
+    clipPath:
+      frame.visual.mask === "ellipse"
+        ? "ellipse(50% 50% at 50% 50%)"
+        : frame.visual.mask === "rounded"
+          ? `inset(0 round ${frame.visual.radius}%)`
+          : undefined,
+  };
+  const revealStyle = {
+    clipPath: `inset(${frame.reveal.top}% ${frame.reveal.right}% ${frame.reveal.bottom}% ${frame.reveal.left}%)`,
+  };
+  const wrap = (media: React.ReactNode) => (
+    <div className="absolute inset-0" style={revealStyle}>
+      <div className="absolute inset-0" style={transformStyle}>
+        <div className="absolute inset-0" style={maskStyle}>
+          <div
+            className="absolute inset-0"
+            style={{
+              clipPath: `inset(${crop.top}% ${crop.right}% ${crop.bottom}% ${crop.left}%)`,
+            }}
+          >
+            {media}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
   const grade = (
     <svg aria-hidden="true" className="pointer-events-none absolute h-0 w-0">
       <defs>
@@ -118,31 +151,35 @@ function MediaLayer({
     return (
       <>
         {grade}
-        <img
-          src={asset.url}
-          alt={asset.name}
-          className="absolute inset-0 h-full w-full"
-          style={style}
-        />
+        {wrap(
+          <img
+            src={asset.url}
+            alt={asset.name}
+            className="absolute inset-0 h-full w-full"
+            style={style}
+          />
+        )}
       </>
     );
   return (
     <>
       {grade}
-      <video
-        crossOrigin="anonymous"
-        ref={el => {
-          ref.current = el;
-        }}
-        src={asset.url}
-        playsInline
-        preload="auto"
-        aria-label={asset.name}
-        className="absolute inset-0 h-full w-full"
-        style={style}
-      >
-        <track kind="captions" />
-      </video>
+      {wrap(
+        <video
+          crossOrigin="anonymous"
+          ref={el => {
+            ref.current = el;
+          }}
+          src={asset.url}
+          playsInline
+          preload="auto"
+          aria-label={asset.name}
+          className="absolute inset-0 h-full w-full"
+          style={style}
+        >
+          <track kind="captions" />
+        </video>
+      )}
     </>
   );
 }

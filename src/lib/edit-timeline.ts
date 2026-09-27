@@ -1,9 +1,11 @@
+import { mapTranscriptTime } from "@contracts/transcript-timing";
 import { captionOwner } from "./editor-manual";
 import {
   allocateTimelineLane,
   preserveGraphicDuration,
 } from "./timeline-lanes";
 import { normalizeGraphic } from "@contracts/motion-graphics";
+import { patchVisual } from "@contracts/clip-visual";
 import type {
   EditOperation,
   EditProject,
@@ -50,8 +52,7 @@ export function rippleRemove(
   });
   const transcript = project.transcript.flatMap(s => {
     if (s.end <= start) return [s];
-    if (s.start >= end)
-      return [{ ...s, start: s.start - length, end: s.end - length }];
+    if (s.start >= end) return [mapTranscriptTime(s, t => t - length)];
     return [];
   });
   return { ...project, clips, transcript, duration: contentDuration(clips) };
@@ -81,7 +82,7 @@ export function resizeTimeline(project: EditProject, end: number): EditProject {
       })),
     transcript: project.transcript
       .filter(s => s.start < end)
-      .map(s => ({ ...s, end: Math.min(s.end, end) })),
+      .map(s => mapTranscriptTime(s, t => t, { start: 0, end })),
   };
 }
 
@@ -293,6 +294,13 @@ export function applyEditOperation(
           brightness: p.brightness ?? c.brightness,
           contrast: p.contrast ?? c.contrast,
           saturation: p.saturation ?? c.saturation,
+          ...(p.visual
+            ? {
+                visual: patchVisual(c, p.visual),
+                visualStart: c.visualStart ?? c.inPoint,
+                visualDuration: c.visualDuration ?? c.outPoint - c.inPoint,
+              }
+            : {}),
         };
       return c;
     });
@@ -319,7 +327,15 @@ export function applyEditOperation(
         return [];
       return [
         {
-          ...segment,
+          ...mapTranscriptTime(
+            segment,
+            t =>
+              edited.start +
+              (original.inPoint +
+                (t - original.start) * (original.speed ?? 1) -
+                edited.inPoint) /
+                (edited.speed ?? 1)
+          ),
           start: Math.max(edited.start, start),
           end: Math.min(edited.start + edited.duration, end),
         },

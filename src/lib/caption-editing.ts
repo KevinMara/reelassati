@@ -1,3 +1,4 @@
+import { normalizeTranscriptWords } from "@contracts/transcript-timing";
 import type { TranscriptSegment } from "@contracts/workspace";
 
 export function splitCaption(
@@ -17,8 +18,25 @@ export function splitCaption(
       "Place the text cursor between the words where this caption should split."
     );
   return [
-    { ...segment, text: left, end: time },
-    { ...segment, id, text: right, start: time },
+    {
+      ...segment,
+      text: left,
+      end: time,
+      words: normalizeTranscriptWords(
+        left,
+        segment.words?.filter(w => w.start < time)
+      ),
+    },
+    {
+      ...segment,
+      id,
+      text: right,
+      start: time,
+      words: normalizeTranscriptWords(
+        right,
+        segment.words?.filter(w => w.end > time)
+      ),
+    },
   ];
 }
 export function mergeCaptions(
@@ -30,6 +48,12 @@ export function mergeCaptions(
     start: Math.min(first.start, second.start),
     end: Math.max(first.end, second.end),
     text: `${first.text.trim()} ${second.text.trim()}`.trim(),
+    words: normalizeTranscriptWords(
+      `${first.text} ${second.text}`,
+      first.words && second.words
+        ? [...first.words, ...second.words]
+        : undefined
+    ),
   };
 }
 export function captionIssues(

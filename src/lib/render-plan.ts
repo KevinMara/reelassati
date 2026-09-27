@@ -1,4 +1,5 @@
 import { colorGradeFilter } from "./color-grade";
+import { visualRenderFilter } from "./visual-rendering";
 import { captionAssStyle, captionAssEvents } from "./caption-rendering";
 import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import type { Asset, EditProject } from "@contracts/workspace";
@@ -101,6 +102,7 @@ export function buildRenderPlan(
           ? Math.min(max, Math.max(min, value!))
           : fallback;
       const grade = colorGradeFilter(clip);
+      const transform = visualRenderFilter(clip);
       const fades = [
         clip.fadeIn
           ? `fade=t=in:st=0:d=${number(Math.min(clip.duration, bounded(clip.fadeIn, 0, 0, 5)))}:alpha=1`
@@ -112,7 +114,7 @@ export function buildRenderPlan(
         .filter(Boolean)
         .join(",");
       filters.push(
-        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=30,${grade}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
+        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=30,${grade}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
       );
       filters.push(
         `[${visual}][v${index}]overlay=eof_action=pass:repeatlast=0:enable='gte(t,${number(clip.start)})*lt(t,${number(clip.start + clip.duration)})'[layer${index}]`

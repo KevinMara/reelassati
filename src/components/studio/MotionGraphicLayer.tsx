@@ -1,3 +1,4 @@
+import { graphicTextLines } from "@contracts/graphic-layout";
 import { graphicFrame, normalizeGraphic } from "@contracts/motion-graphics";
 import type { TimelineClip } from "@contracts/workspace";
 import {
@@ -59,8 +60,8 @@ export function MotionGraphicLayer({
         fontFamily: '"Editor Sans", sans-serif',
         fontSize: `${g.size}cqw`,
         lineHeight: 1.2,
-        whiteSpace: "pre-wrap",
-        maxWidth: "90%",
+        whiteSpace: "pre",
+
         textShadow: g.kind === "text" ? "0 1px 2px black" : undefined,
         background: g.kind === "callout" ? g.background : undefined,
         padding: g.kind === "callout" ? "1.5cqw" : undefined,
@@ -83,7 +84,7 @@ export function MotionGraphicLayer({
           />
         </svg>
       ) : g.kind === "highlight" ? null : (
-        f.text
+        graphicTextLines(f.text, g.size)
       )}
     </div>
   );

@@ -1,11 +1,12 @@
 import {
-  captionLines,
   getCaptionPreset,
   type CaptionPreset,
   type CaptionAppearance,
 } from "@contracts/editor-presets";
 import type { TranscriptSegment } from "@contracts/workspace";
 import { assTime, escapeAss } from "./graphic-ass";
+import { captionRuns } from "@contracts/caption-runs";
+import { normalizeTranscriptWords } from "@contracts/transcript-timing";
 
 const assColor = (hex: string) =>
   `&H00${hex.slice(5, 7)}${hex.slice(3, 5)}${hex.slice(1, 3)}`;
@@ -37,10 +38,36 @@ export function captionAssEvents(
         s.end > Math.max(0, s.start) &&
         s.start < duration
     )
-    .map(
-      s =>
-        `Dialogue: 100000,${assTime(Math.max(0, s.start))},${assTime(Math.min(duration, s.end))},Caption,,0,0,0,,${escapeAss(captionLines(s.text, preset))}`
-    )
+    .flatMap(s => {
+      const start = Math.max(0, s.start),
+        end = Math.min(duration, s.end);
+      const words =
+        preset.animation === "active-word"
+          ? normalizeTranscriptWords(s.text, s.words)
+          : undefined;
+      const points = [
+        ...new Set(
+          [
+            start,
+            end,
+            ...(words
+              ?.flatMap(w => [w.start, w.end])
+              .filter(t => t > start && t < end) ?? []),
+          ].map(t => Math.round(t * 100) / 100)
+        ),
+      ].sort((a, b) => a - b);
+      return points.slice(0, -1).map((a, i) => {
+        const b = points[i + 1];
+        const text = captionRuns(s, preset, (a + b) / 2)
+          .map(run =>
+            run.active
+              ? `{\\c${assColor(preset.activeColor)}&}${escapeAss(run.text)}{\\c${assColor(preset.color)}&}`
+              : escapeAss(run.text)
+          )
+          .join("");
+        return `Dialogue: 100000,${assTime(a)},${assTime(b)},Caption,,0,0,0,,${text}`;
+      });
+    })
     .join("\n");
 }
 

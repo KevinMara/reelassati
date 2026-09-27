@@ -10,6 +10,7 @@ import { clipTimingLimits } from "@/lib/timeline-lanes";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { GraphicComposer } from "./GraphicComposer";
 import { EditorInfo } from "./EditorInfo";
+import { VisualControls } from "./VisualControls";
 
 export function ClipInspector({
   draft,
@@ -21,6 +22,8 @@ export function ClipInspector({
   onToggle,
   onGraphic,
   onDetach,
+  time,
+  onSeek,
 }: {
   draft: TimelineClip | null;
   setDraft: Dispatch<SetStateAction<TimelineClip | null>>;
@@ -31,6 +34,8 @@ export function ClipInspector({
   onToggle: (key: "locked" | "muted") => Promise<void>;
   onGraphic: (graphic: MotionGraphic) => Promise<void>;
   onDetach: () => Promise<void>;
+  time: number;
+  onSeek: (time: number) => void;
 }) {
   const [tab, setTab] = useState(draft ? "timing" : "project");
   const bounds = draft ? clipTimingLimits(draft, asset, duration) : undefined;
@@ -112,6 +117,9 @@ export function ClipInspector({
         {[
           ["timing", "Timing"],
           ["appearance", "Picture"],
+          ...(asset && asset.kind !== "audio" && draft?.track !== "audio"
+            ? [["transform", "Motion & crop"]]
+            : []),
           ["audio", "Sound"],
           ...(draft?.graphic ? [["graphic", "Graphic"]] : []),
           ["project", "Canvas & duration"],
@@ -237,6 +245,14 @@ export function ClipInspector({
                 treatments.
               </p>
             </>
+          )}
+          {tab === "transform" && (
+            <VisualControls
+              clip={draft}
+              time={time}
+              onChange={setDraft}
+              onSeek={onSeek}
+            />
           )}
           {tab === "audio" && (
             <>

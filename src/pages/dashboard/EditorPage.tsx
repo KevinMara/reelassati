@@ -1,3 +1,6 @@
+import { normalizeReview } from "@contracts/source-review";
+import { mapChatTranscript } from "@/lib/editor-chat-execution";
+import { normalizeTranscriptWords } from "@contracts/transcript-timing";
 import {
   appendEditorRevisions,
   currentRevisionIndex,
@@ -38,6 +41,7 @@ import { TimelineTracks } from "@/components/studio/TimelineTracks";
 import {
   allocateTimelineLane,
   clipLaneKind,
+  clipLaneNumber,
   trimTimelineClip,
   normalizeClipTiming,
   preserveGraphicDuration,
@@ -77,7 +81,6 @@ import {
   WandSparkles,
   Keyboard,
   ZoomIn,
-  Sparkles,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -217,6 +220,7 @@ export default function EditorPage() {
     saving,
     error: workspaceError,
     updateWorkspace,
+    getWorkspaceSnapshot,
   } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -259,6 +263,8 @@ export default function EditorPage() {
   const [playing, setPlaying] = useState(false);
   const [timelineZoom, setTimelineZoom] = useState(100);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [findingSections, setFindingSections] = useState(false);
+  const sectionsLock = useRef(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -519,6 +525,92 @@ export default function EditorPage() {
         };
       }),
     }));
+  };
+
+  const findStorySections = async () => {
+    if (!project || sectionsLock.current) return;
+    const projectId = project.id;
+    const latest = () =>
+      getWorkspaceSnapshot().projects.find(p => p.id === projectId);
+    sectionsLock.current = true;
+    setFindingSections(true);
+    setLocalError(null);
+    try {
+      if (!buildStoryBeatEvidence(latest()!).length) {
+        const mainClips = latest()!.clips.filter(
+          c => clipLaneKind(c) === "video" && clipLaneNumber(c) === 1
+        );
+        const ids = [...new Set(mainClips.map(c => c.assetId).filter(Boolean))];
+        const assets = getWorkspaceSnapshot().assets.filter(
+          a => ids.includes(a.id) && a.kind === "video"
+        );
+        if (!assets.length)
+          throw new Error(
+            "Add source video or a transcript to find story sections."
+          );
+        if (assets.length > 19)
+          throw new Error(
+            "This timeline needs more source analysis than one request allows. Analyze the main footage first, then find sections."
+          );
+        const { analyzeMedia } = await import("@/lib/analyze-media");
+        for (const asset of assets) {
+          const result = await analyzeMedia(
+            asset,
+            project.platform,
+            "Identify the actual hook, main explanation, proof and payoff with measured source timestamps. Describe speech and visual content accurately; these observations will locate reference markers, not change the edit."
+          );
+          await updateWorkspace(w => ({
+            ...w,
+            projects: w.projects.map(p =>
+              p.id !== projectId
+                ? p
+                : {
+                    ...p,
+                    sourceReviews: [
+                      ...(p.sourceReviews ?? []).filter(
+                        r => r.assetId !== asset.id
+                      ),
+                      {
+                        assetId: asset.id,
+                        reviewedAt: new Date().toISOString(),
+                        summary: result.summary,
+                        ...normalizeReview(result.review),
+                        moments: result.retention,
+                      },
+                    ],
+                  }
+            ),
+          }));
+        }
+      }
+      const response = await platformApi.findStorySections(
+        projectId,
+        crypto.randomUUID()
+      );
+      const markerAction = response.actions.find(a => a.kind === "story-beats");
+      if (!markerAction || markerAction.kind !== "story-beats")
+        throw new Error(
+          "No reliable story sections were found in this footage."
+        );
+      await commitProject("Story sections found", p => {
+        if (
+          !storyBeatsAreCurrent(markerAction.beats, buildStoryBeatEvidence(p))
+        )
+          throw new Error(
+            "The footage changed while sections were being found. Refresh sections for the current edit."
+          );
+        return { ...p, storyBeats: markerAction.beats };
+      });
+    } catch (cause) {
+      setLocalError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not find sections. Try again."
+      );
+    } finally {
+      sectionsLock.current = false;
+      setFindingSections(false);
+    }
   };
 
   const saveProjectChange = async <Result,>(
@@ -1333,28 +1425,10 @@ export default function EditorPage() {
         workspace.profile.contentLanguage,
         project.id
       );
-      const sourceClips = project.clips.filter(
-        c => c.assetId === previewAsset.id && !c.muted
-      );
-      const mapped = sourceClips.flatMap(clip =>
+      const mapped = mapChatTranscript(
+        project,
+        previewAsset.id,
         result.segments
-          .filter(
-            segment =>
-              segment.end > clip.inPoint &&
-              segment.start < clip.inPoint + clip.duration * (clip.speed ?? 1)
-          )
-          .map(segment => ({
-            ...segment,
-            id: `${clip.id}-${segment.id}`,
-            sourceClipId: clip.id,
-            start:
-              clip.start +
-              Math.max(0, segment.start - clip.inPoint) / (clip.speed ?? 1),
-            end: Math.min(
-              clip.start + clip.duration,
-              clip.start + (segment.end - clip.inPoint) / (clip.speed ?? 1)
-            ),
-          }))
       );
       setTranscriptDraft(mapped);
       setTranscriptionProvenance(result.provenance ?? null);
@@ -1733,6 +1807,8 @@ export default function EditorPage() {
   const inspectorContent = (
     <ClipInspector
       draft={clipDraft}
+      time={playhead}
+      onSeek={seekTimeline}
       setDraft={setClipDraft}
       asset={previewAsset}
       duration={project.duration}
@@ -1959,7 +2035,14 @@ export default function EditorPage() {
                     mutateTranscript(current =>
                       current.map((item, itemIndex) =>
                         itemIndex === index
-                          ? { ...item, text: event.target.value }
+                          ? {
+                              ...item,
+                              text: event.target.value,
+                              words: normalizeTranscriptWords(
+                                event.target.value,
+                                item.words
+                              ),
+                            }
                           : item
                       )
                     )
@@ -2105,13 +2188,6 @@ export default function EditorPage() {
             <span>{formatTime(project.duration)}</span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setAutoEditOpen(true)}
-          className="ai-magic flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
-        >
-          <Sparkles className="size-4" /> AI auto-edit
-        </button>
         <div className="flex items-center gap-2">
           <span
             className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs sm:flex ${
@@ -2129,24 +2205,6 @@ export default function EditorPage() {
             )}
             {saving ? "Saving" : workspaceError ? "Save failed" : "Saved"}
           </span>
-          <button
-            type="button"
-            disabled={revisionCursor <= 0}
-            onClick={() => void undo()}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground disabled:opacity-30"
-            aria-label="Undo"
-          >
-            <Undo2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            disabled={revisionCursor >= project.revisions.length - 1}
-            onClick={() => void redo()}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground disabled:opacity-30"
-            aria-label="Redo"
-          >
-            <Redo2 className="h-4 w-4" />
-          </button>
           <button
             type="button"
             onClick={() => setExportOpen(true)}
@@ -2404,15 +2462,7 @@ export default function EditorPage() {
                 Add from library
               </button>
               <span className="mx-1 h-5 w-px bg-border" />
-              <button
-                type="button"
-                disabled={!selectedClip}
-                onClick={() => setInspectorOpen(true)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-background disabled:opacity-30"
-              >
-                <SlidersHorizontal size={15} />
-                Adjust clip
-              </button>
+
               <button
                 type="button"
                 disabled={!selectedClip || selectedClip.locked}
@@ -2444,13 +2494,27 @@ export default function EditorPage() {
                 Delete
                 {selectedClips.length > 1 ? ` (${selectedClips.length})` : ""}
               </button>
-              <EditorInfo label="Selecting multiple clips">
-                Hold <kbd>Shift</kbd> and click to add or remove clips from the
-                selection. Drag a selected clip to move the group together.
-                Copy, duplicate and delete work on the selection. Locked clips
-                must be unlocked before moving or deleting the group.
-              </EditorInfo>
+
               <div className="ml-auto flex items-center gap-2 pr-1">
+                <button
+                  type="button"
+                  disabled={revisionCursor <= 0}
+                  onClick={() => void undo()}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground disabled:opacity-30"
+                  aria-label="Undo"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={revisionCursor >= project.revisions.length - 1}
+                  onClick={() => void redo()}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground disabled:opacity-30"
+                  aria-label="Redo"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+
                 {uploadProgress !== null && (
                   <span className="font-mono text-xs text-primary">
                     {uploadProgress}%
@@ -2510,15 +2574,8 @@ export default function EditorPage() {
                   storyBeats,
                 }));
               }}
-              onGenerate={() => {
-                setChatSeed({
-                  text: "Find the hook, body, proof and payoff in this footage and divide it into clearly named story sections. Use the actual speech and visual evidence.",
-                  id: Date.now(),
-                });
-                document
-                  .getElementById("editor-chat-panel")
-                  ?.scrollIntoView({ block: "nearest" });
-              }}
+              busy={findingSections}
+              onGenerate={() => void findStorySections()}
             />
             <TimelinePrompt
               key={project.id}
@@ -2613,6 +2670,39 @@ export default function EditorPage() {
           <DialogDescription>
             Clip settings, canvas and the end of your edit.
           </DialogDescription>
+          {clipDraft && (
+            <div className="rounded-xl border border-border bg-black p-3">
+              <div className="mx-auto max-w-[280px]">
+                <TimelinePreview
+                  project={{
+                    ...project,
+                    clips: project.clips.map(c =>
+                      c.id === clipDraft.id ? clipDraft : c
+                    ),
+                  }}
+                  assets={workspace.assets}
+                  time={Math.min(
+                    playhead,
+                    clipDraft.start + clipDraft.duration - 0.0001
+                  )}
+                  playing={false}
+                />
+              </div>
+              <label className="mt-3 flex items-center gap-3 text-sm text-white">
+                <span className="tabular-nums">{playhead.toFixed(1)}s</span>
+                <input
+                  aria-label="Adjustment preview time"
+                  type="range"
+                  min={0}
+                  max={project.duration}
+                  step={1 / 30}
+                  value={playhead}
+                  onChange={e => seekTimeline(Number(e.target.value))}
+                  className="w-full accent-primary"
+                />
+              </label>
+            </div>
+          )}
           {inspectorContent}
         </DialogContent>
       </Dialog>

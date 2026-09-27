@@ -1,3 +1,4 @@
+import { mapTranscriptTime } from "@contracts/transcript-timing";
 import type { EditProject } from "@contracts/workspace";
 import type {
   EditorChatAction,
@@ -125,6 +126,29 @@ export function changeChatScopeDecision(
   return { ...action, status: "skipped" };
 }
 
+export function canChooseChatAction(action: EditorChatAction): boolean {
+  return (
+    action.scope === "extra" &&
+    ["pending", "awaiting-approval"].includes(action.status) &&
+    !action.runtime?.startedAt &&
+    !action.runtime?.generationId &&
+    !action.runtime?.jobId &&
+    !action.runtime?.assetId
+  );
+}
+
+/** Captured eligible IDs are revalidated inside one canonical workspace mutation. */
+export function chooseChatActions(
+  actions: EditorChatAction[],
+  decisions: Record<string, "approve" | "skip">
+): EditorChatAction[] {
+  return actions.map(action =>
+    decisions[action.id] && canChooseChatAction(action)
+      ? changeChatScopeDecision(action, decisions[action.id])
+      : action
+  );
+}
+
 /** Clamp a mapped source transcript without replacing captions outside the requested range. */
 export function mergeChatTranscript(
   project: EditProject,
@@ -136,7 +160,7 @@ export function mergeChatTranscript(
   const end = range?.end ?? project.duration;
   const mapped = incoming
     .map(segment => ({
-      ...segment,
+      ...mapTranscriptTime(segment, t => t),
       start: Math.max(start, segment.start),
       end: Math.min(end, segment.end),
     }))
