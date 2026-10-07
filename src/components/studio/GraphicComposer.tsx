@@ -146,6 +146,105 @@ export function GraphicComposer({
             )}
         </label>
       )}
+      {!isSpatialGraphic(g) &&
+        ![
+          "rectangle",
+          "ellipse",
+          "star",
+          "line",
+          "arrow",
+          "highlight",
+        ].includes(g.kind) && (
+          <>
+            <CompactSelect
+              aria-label="Graphic composition"
+              value={g.composition ?? "plain"}
+              onValueChange={value => patch("composition", value)}
+              options={[
+                { value: "plain", label: "Plain title / label" },
+                { value: "lower-third", label: "Name + role with accent bar" },
+                { value: "chapter", label: "Chapter with top rule" },
+                { value: "quote", label: "Quote + attribution" },
+                { value: "statistic", label: "Statistic + explanation" },
+                { value: "progress", label: "Timed progress indicator" },
+              ]}
+            />
+            <label className="block text-sm">
+              Supporting text
+              <input
+                className={field}
+                maxLength={120}
+                value={g.secondaryText ?? ""}
+                placeholder="Role, attribution, or a short explanation…"
+                onChange={e => patch("secondaryText", e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              Accent color
+              <input
+                type="color"
+                aria-label="Graphic accent color"
+                value={g.accent ?? g.color}
+                onChange={e => patch("accent", e.target.value)}
+              />
+            </label>
+          </>
+        )}
+      {(["rectangle", "ellipse", "star", "line"].includes(g.kind) ||
+        g.composition === "progress") && (
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              ["width", "Shape width %", 1, 90, 30],
+              ["height", "Shape height % of width", 0.2, 60, 12],
+              ["strokeWidth", "Stroke width %", 0, 4, 0],
+            ] as const
+          )
+            .filter(
+              ([key]) =>
+                key !== "strokeWidth" || ["rectangle", "line"].includes(g.kind)
+            )
+            .map(([key, label, min, max, fallback]) => (
+              <label key={key} className="text-sm">
+                {label}
+                <input
+                  className={field}
+                  type="number"
+                  step={0.1}
+                  min={min}
+                  max={max}
+                  value={g[key] ?? fallback}
+                  onChange={e => patch(key, Number(e.target.value))}
+                />
+              </label>
+            ))}
+        </div>
+      )}
+      {(g.kind === "callout" || g.kind === "rectangle") && (
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              ["padding", "Card padding", 1.5],
+              ["cornerRadius", "Corner radius", 0],
+            ] as const
+          )
+            .filter(([key]) => key !== "padding" || g.kind === "callout")
+            .map(([key, label, fallback]) => (
+              <label key={key} className="text-sm">
+                {label}
+                <input
+                  className={field}
+                  type="number"
+                  min={0}
+                  max={6}
+                  step={0.1}
+                  value={g[key] ?? fallback}
+                  onChange={e => patch(key, Number(e.target.value))}
+                />
+              </label>
+            ))}
+        </div>
+      )}
       {g.kind === "counter" && (
         <div className="grid grid-cols-2 gap-2">
           {(["from", "to"] as const).map(k => (

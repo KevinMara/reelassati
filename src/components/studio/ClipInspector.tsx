@@ -24,6 +24,7 @@ export function ClipInspector({
   onDetach,
   time,
   onSeek,
+  tracking,
 }: {
   draft: TimelineClip | null;
   setDraft: Dispatch<SetStateAction<TimelineClip | null>>;
@@ -36,6 +37,7 @@ export function ClipInspector({
   onDetach: () => Promise<void>;
   time: number;
   onSeek: (time: number) => void;
+  tracking?: ReactNode;
 }) {
   const [tab, setTab] = useState(draft ? "timing" : "project");
   const bounds = draft ? clipTimingLimits(draft, asset, duration) : undefined;
@@ -332,13 +334,16 @@ export function ClipInspector({
             </div>
           )}
           {tab === "graphic" && draft.graphic ? (
-            <GraphicComposer
-              key={JSON.stringify(draft.graphic)}
-              initial={draft.graphic}
-              duration={draft.duration}
-              busy={draft.locked}
-              onSave={onGraphic}
-            />
+            <>
+              <GraphicComposer
+                key={JSON.stringify(draft.graphic)}
+                initial={draft.graphic}
+                duration={draft.duration}
+                busy={draft.locked}
+                onSave={onGraphic}
+              />
+              {tracking}
+            </>
           ) : (
             <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
               <p className="text-xs text-foreground/60">

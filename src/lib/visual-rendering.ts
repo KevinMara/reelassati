@@ -107,5 +107,44 @@ export function visualRenderFilter(clip: TimelineClip): string {
     v.entrance.kind === "none" &&
     v.exit.kind === "none";
   if (identity) return "";
+  const plainGeometry =
+    !v.keyframes.length &&
+    v.x === 0 &&
+    v.y === 0 &&
+    v.scale === 1 &&
+    v.rotation === 0 &&
+    !v.flipX &&
+    !v.flipY &&
+    !Object.values(v.crop).some(Boolean) &&
+    v.mask === "none";
+  if (
+    plainGeometry &&
+    [v.entrance.kind, v.exit.kind].every(
+      kind => kind === "none" || kind === "dissolve"
+    )
+  ) {
+    const filters = ["format=rgba", "settb=AVTB"];
+    if (v.opacity !== 1) filters.push(`colorchannelmixer=aa=${n(v.opacity)}`);
+    for (const [type, effect] of [
+      ["in", v.entrance],
+      ["out", v.exit],
+    ] as const) {
+      if (effect.kind === "none") continue;
+      const duration = Math.min(effect.duration, span / 2);
+      const anchor =
+        type === "in"
+          ? (effect.at ?? clock.start)
+          : (effect.at ?? clock.start + clock.duration);
+      const start =
+        (anchor - clip.inPoint) / speed - (type === "out" ? duration : 0);
+      const phase = Math.max(0, -start);
+      if (phase) filters.push(`setpts=PTS+${n(phase)}/TB`);
+      filters.push(
+        `fade=t=${type}:st=${n(Math.max(0, start))}:d=${n(duration)}:alpha=1`
+      );
+      if (phase) filters.push(`setpts=PTS-${n(phase)}/TB`);
+    }
+    return filters.join(",");
+  }
   return `format=gbrap,geq=r='${coords}r(ld(0)-0.5,ld(1)-0.5)':g='${coords}g(ld(0)-0.5,ld(1)-0.5)':b='${coords}b(ld(0)-0.5,ld(1)-0.5)':a='${coords}alpha(ld(0)-0.5,ld(1)-0.5)*(${opacity})*(${crop})*(${mask})${reveals.length ? `*${reveals.join("*")}` : ""}',format=rgba`;
 }

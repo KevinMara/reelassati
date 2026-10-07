@@ -249,9 +249,15 @@ export function useEditorChat(
 
   async function execute(messageId: string, action: EditorChatAction) {
     if (
-      ["edit", "insert", "settings", "history", "seek", "story-beats"].includes(
-        action.kind
-      )
+      [
+        "edit",
+        "adjacent-transition",
+        "insert",
+        "settings",
+        "history",
+        "seek",
+        "story-beats",
+      ].includes(action.kind)
     ) {
       await finishAction(
         messageId,
@@ -630,6 +636,7 @@ export function useEditorChat(
             "history",
             "transcribe",
             "story-beats",
+            "adjacent-transition",
           ].includes(action.kind) ||
             (action.kind === "catalog-audio" && action.insert)) &&
           m.plan?.projectUpdatedAt !== getProject().updatedAt

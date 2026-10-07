@@ -2,6 +2,7 @@ import {
   catalogAudioPlacement,
   findCatalogAudio,
 } from "./editor-catalog-audio";
+import { visualTransitions } from "./clip-visual";
 import type {
   EditorChatAction,
   EditorChatMessage,
@@ -118,6 +119,18 @@ function actionValue(
       op.end < op.start ||
       op.end > 86400 ||
       !Array.isArray(op.targetClipIds)
+    )
+      return undefined;
+  } else if (kind === "adjacent-transition") {
+    if (
+      !string(value.outgoingId) ||
+      !string(value.incomingId) ||
+      value.outgoingId === value.incomingId ||
+      !finite(value.duration) ||
+      value.duration < 0.05 ||
+      value.duration > 5 ||
+      !visualTransitions.some(t => t.value === value.transition) ||
+      value.credits !== 0
     )
       return undefined;
   } else if (kind === "transcribe") {

@@ -6,7 +6,6 @@ import {
   type DragEvent,
   type PointerEvent,
 } from "react";
-import { EditorInfo } from "./EditorInfo";
 import {
   Film,
   Shapes,
@@ -15,6 +14,10 @@ import {
   Lock,
   VolumeX,
   Magnet,
+  Unlock,
+  Volume2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
 import {
@@ -69,6 +72,10 @@ type Props = {
   onMove(clip: TimelineClip, time: number, lane: TimelineLane): Promise<void>;
   onTrim(clip: TimelineClip): Promise<void>;
   onCaptionSelect(time: number): void;
+  onTrackToggle?(
+    lane: TimelineLane,
+    property: "locked" | "muted" | "hidden"
+  ): Promise<void>;
 };
 
 export function TimelineTracks({
@@ -88,6 +95,7 @@ export function TimelineTracks({
   onMove,
   onTrim,
   onCaptionSelect,
+  onTrackToggle,
 }: Props) {
   const [drop, setDrop] = useState<{ lane: string; time: number } | null>(null);
   const [trimDraft, setTrimDraft] = useState<TimelineClip | null>(null);
@@ -315,22 +323,12 @@ export function TimelineTracks({
             onSnappingChange(!snapping);
             setSnapGuide(null);
           }}
-          title="Align moved clips and trimmed edges with the playhead and other clips. Hold Alt for exact placement."
+          title="Align moved clips and trimmed edges with the playhead and other clips."
           className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${snapping ? "bg-primary/15 text-primary" : "text-foreground/50 hover:bg-foreground/5"}`}
         >
           <Magnet className="h-3.5 w-3.5" />
           Clip snapping {snapping ? "on" : "off"}
         </button>
-        <span className="inline-flex items-center text-xs text-foreground/55">
-          Hold <kbd className="mx-1">Alt</kbd> to bypass snapping
-          <EditorInfo label="Clip snapping">
-            Dragging normally aligns a nearby clip edge with another edge or the
-            playhead. Hold <kbd>Alt</kbd> / <kbd>Option</kbd> while moving or
-            trimming to place it exactly under your pointer. If no edge is
-            close, both behave the same. New Library files always drop at your
-            pointer.
-          </EditorInfo>
-        </span>
         <span
           role="status"
           aria-live="polite"
@@ -424,11 +422,70 @@ export function TimelineTracks({
                   key={key}
                   className={`grid grid-cols-[92px_minmax(0,1fr)] border-b border-border last:border-b-0 ${emptyDestination && lane.number > 1 ? "min-h-[38px]" : "min-h-[62px]"}`}
                 >
-                  <div className="flex items-center gap-2 border-r border-border bg-background/35 px-3 text-[11px] text-foreground/65">
-                    <Icon className="h-3.5 w-3.5 shrink-0" />
-                    <span>
-                      {names[lane.kind]} {lane.number}
-                    </span>
+                  <div className="flex flex-col justify-center gap-1 border-r border-border bg-background/35 px-2 text-[11px] text-foreground/65">
+                    <div className="flex items-center gap-1">
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        {names[lane.kind]} {lane.number}
+                      </span>
+                    </div>
+                    {clips.length > 0 && onTrackToggle && (
+                      <div className="flex items-center gap-1">
+                        {(
+                          [
+                            "locked",
+                            ...(lane.kind === "video" || lane.kind === "audio"
+                              ? ["muted"]
+                              : []),
+                            ...(lane.kind !== "audio" &&
+                            lane.kind !== "captions"
+                              ? ["hidden"]
+                              : []),
+                          ] as const
+                        ).map(raw => {
+                          const property = raw as "locked" | "muted" | "hidden";
+                          const eligible =
+                            property === "muted"
+                              ? clips.filter(c => !c.transitionHandle)
+                              : clips;
+                          const active =
+                            eligible.length > 0 &&
+                            eligible.every(c => c[property]);
+                          const Control =
+                            property === "locked"
+                              ? active
+                                ? Lock
+                                : Unlock
+                              : property === "muted"
+                                ? active
+                                  ? VolumeX
+                                  : Volume2
+                                : active
+                                  ? EyeOff
+                                  : Eye;
+                          const label = `${property === "locked" ? (active ? "Unlock" : "Lock") : property === "muted" ? (active ? "Unmute" : "Mute") : active ? "Show" : "Hide"} clips in ${names[lane.kind]} ${lane.number}`;
+                          return (
+                            <button
+                              key={property}
+                              type="button"
+                              title={label}
+                              aria-label={label}
+                              aria-pressed={active}
+                              disabled={
+                                disabled ||
+                                !eligible.length ||
+                                (property !== "locked" &&
+                                  clips.some(c => c.locked))
+                              }
+                              onClick={() => void onTrackToggle(lane, property)}
+                              className={`rounded p-1 hover:bg-foreground/10 disabled:opacity-30 ${active ? "text-primary" : "text-foreground/55"}`}
+                            >
+                              <Control className="size-3" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div
                     data-timeline-lane={key}

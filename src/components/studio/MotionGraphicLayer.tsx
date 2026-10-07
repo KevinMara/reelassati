@@ -1,4 +1,9 @@
-import { graphicTextLines } from "@contracts/graphic-layout";
+import { useEffect, useRef, useState } from "react";
+import {
+  graphicTextLines,
+  graphicShapes,
+  graphicCardLayout,
+} from "@contracts/graphic-layout";
 import { graphicFrame, normalizeGraphic } from "@contracts/motion-graphics";
 import type { TimelineClip } from "@contracts/workspace";
 import {
@@ -13,6 +18,20 @@ export function MotionGraphicLayer({
   clip: TimelineClip;
   time: number;
 }) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [ratio, setRatio] = useState(1);
+  useEffect(() => {
+    const node = canvasRef.current;
+    if (!node) return;
+    const measure = () => {
+      const box = node.getBoundingClientRect();
+      if (box.width > 0 && box.height > 0) setRatio(box.height / box.width);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [clip.graphic?.kind]);
   const g = normalizeGraphic(clip.graphic);
   if (!g) return null;
   const elapsed = clip.inPoint + (time - clip.start) * (clip.speed ?? 1);
@@ -48,44 +67,96 @@ export function MotionGraphicLayer({
     );
   }
   const f = graphicFrame(g, elapsed, graphicDuration);
+  const shapes = graphicShapes(g, elapsed, graphicDuration);
+  const lines = graphicTextLines(f.text, g.size).split("\n");
+  const layout = graphicCardLayout(f.text, g.size, g.padding, g.secondaryText);
+  const primary = ![
+    "rectangle",
+    "ellipse",
+    "star",
+    "line",
+    "arrow",
+    "highlight",
+  ].includes(g.kind);
   return (
-    <div
-      className="pointer-events-none absolute z-10 text-center font-bold"
-      style={{
-        left: `${f.x}%`,
-        top: `${f.y}%`,
-        transform: `translate(-50%,-50%) rotate(${f.rotation}deg) scale(${f.scale})`,
-        opacity: f.opacity,
-        color: g.color,
-        fontFamily: '"Editor Sans", sans-serif',
-        fontSize: `${g.size}cqw`,
-        lineHeight: 1.2,
-        whiteSpace: "pre",
-
-        textShadow: g.kind === "text" ? "0 1px 2px black" : undefined,
-        background: g.kind === "callout" ? g.background : undefined,
-        padding: g.kind === "callout" ? "1.5cqw" : undefined,
-        width:
-          g.kind === "highlight"
-            ? "40%"
-            : g.kind === "arrow"
-              ? "25%"
-              : undefined,
-        height: g.kind === "highlight" ? "15%" : undefined,
-        border:
-          g.kind === "highlight" ? "0.42cqw solid currentColor" : undefined,
-      }}
-    >
-      {g.kind === "arrow" ? (
-        <svg viewBox="0 0 100 48" aria-label="Arrow">
-          <path
-            fill="currentColor"
-            d="M0 19.2 H65 V0 L100 24 L65 48 V28.8 H0 Z"
-          />
-        </svg>
-      ) : g.kind === "highlight" ? null : (
-        graphicTextLines(f.text, g.size)
-      )}
+    <div ref={canvasRef} className="pointer-events-none absolute inset-0 z-10">
+      <svg
+        viewBox={`0 0 1000 ${1000 * ratio}`}
+        className="h-full w-full overflow-visible"
+        aria-label={g.text || g.kind}
+      >
+        <g
+          opacity={f.opacity}
+          transform={`translate(${f.x * 10} ${f.y * 10 * ratio}) rotate(${f.rotation}) scale(${f.scale})`}
+        >
+          {shapes.map((shape, index) => (
+            <polygon
+              key={index}
+              points={shape.points
+                .map(([x, y]) => `${x * 10},${y * 10}`)
+                .join(" ")}
+              fill={shape.color}
+            />
+          ))}
+          {g.kind === "arrow" && (
+            <path
+              fill={g.color}
+              d="M-125 -12 H37.5 V-60 L125 0 L37.5 60 V12 H-125 Z"
+            />
+          )}
+          {g.kind === "highlight" && (
+            <rect
+              x={-200}
+              y={-75 * ratio}
+              width={400}
+              height={150 * ratio}
+              fill="none"
+              stroke={g.color}
+              strokeWidth={4.2}
+            />
+          )}
+          {primary && (
+            <text
+              fill={g.color}
+              fontFamily="Editor Sans, DejaVu Sans, sans-serif"
+              fontWeight={700}
+              fontSize={g.size * 10}
+              textAnchor="middle"
+              dominantBaseline="central"
+            >
+              {lines.map((line, index) => (
+                <tspan
+                  key={index}
+                  x={0}
+                  y={(index - (lines.length - 1) / 2) * g.size * 12}
+                >
+                  {line}
+                </tspan>
+              ))}
+            </text>
+          )}
+          {g.secondaryText && (
+            <text
+              fill={g.accent ?? g.color}
+              fontFamily="Editor Sans, DejaVu Sans, sans-serif"
+              fontWeight={400}
+              fontSize={g.size * 6}
+              textAnchor="middle"
+              dominantBaseline="central"
+            >
+              {layout.secondaryLines.map((line, i) => (
+                <tspan
+                  key={i}
+                  x={0}
+                  y={(layout.secondaryY + i * g.size * 0.72) * 10}
+                >
+                  {line}
+                </tspan>
+              ))}
+            </text>
+          )}
+        </g>
+      </svg>
     </div>
   );
 }

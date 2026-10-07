@@ -109,7 +109,10 @@ function MediaLayer({
     clipPath: `inset(${frame.reveal.top}% ${frame.reveal.right}% ${frame.reveal.bottom}% ${frame.reveal.left}%)`,
   };
   const wrap = (media: React.ReactNode) => (
-    <div className="absolute inset-0" style={revealStyle}>
+    <div
+      className="absolute inset-0"
+      style={{ ...revealStyle, visibility: clip.hidden ? "hidden" : undefined }}
+    >
       <div className="absolute inset-0" style={transformStyle}>
         <div className="absolute inset-0" style={maskStyle}>
           <div
@@ -202,7 +205,10 @@ export function TimelinePreview({
   const active = project.clips
     .filter(
       c =>
-        c.start <= time && c.start + c.duration > time && c.track !== "captions"
+        c.start <= time &&
+        c.start + c.duration > time &&
+        c.track !== "captions" &&
+        !(c.graphic && c.hidden)
     )
     .sort(compareTimelineLayers);
   return (

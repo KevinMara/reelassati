@@ -1,8 +1,16 @@
 import { normalizeGraphic, type MotionGraphic } from "./motion-graphics";
 import fontMetrics from "./caption-font-metrics.json";
 
+export const CAPTION_ANIMATIONS = [
+  "none",
+  "active-word",
+  "word-reveal",
+  "word-only",
+  "word-pulse",
+] as const;
+export type CaptionAnimation = (typeof CAPTION_ANIMATIONS)[number];
 export interface CaptionPreset {
-  animation: "none" | "active-word";
+  animation: CaptionAnimation;
   activeColor: string;
   id: string;
   name: string;
@@ -44,6 +52,30 @@ const caption = (
 
 /** Original presets; fonts are bundled locally and no asset subscription is required. */
 export const CAPTION_PRESETS: readonly CaptionPreset[] = [
+  caption(
+    "reveal",
+    "Spoken reveal",
+    "Words appear as spoken, preserving the phrase layout.",
+    { animation: "word-reveal", size: 5.2, maxCharacters: 24, outline: 0.4 }
+  ),
+  caption(
+    "spotlight",
+    "Word spotlight",
+    "One measured word at a time, with pauses left clear.",
+    { animation: "word-only", size: 7.5, uppercase: true, outline: 0.45 }
+  ),
+  caption(
+    "pulse",
+    "Speech pulse",
+    "A restrained phrase pulse follows each measured word onset.",
+    {
+      animation: "word-pulse",
+      size: 5.2,
+      activeColor: "#7AF5CF",
+      outline: 0.4,
+      maxCharacters: 26,
+    }
+  ),
   caption(
     "kinetic",
     "Word focus",
@@ -162,7 +194,9 @@ export function getCaptionPreset(
   id?: string,
   appearance?: CaptionAppearance
 ): CaptionPreset {
-  const base = CAPTION_PRESETS.find(p => p.id === id) ?? CAPTION_PRESETS.find(p => p.id === "classic")!;
+  const base =
+    CAPTION_PRESETS.find(p => p.id === id) ??
+    CAPTION_PRESETS.find(p => p.id === "classic")!;
   if (!appearance || typeof appearance !== "object") return base;
   const result = { ...base };
   for (const key of ["color", "outlineColor", "activeColor"] as const)
@@ -191,8 +225,8 @@ export function getCaptionPreset(
     if (typeof appearance[key] === "boolean") result[key] = appearance[key]!;
   if (appearance.position === "top" || appearance.position === "bottom")
     result.position = appearance.position;
-  if (appearance.animation === "none" || appearance.animation === "active-word")
-    result.animation = appearance.animation;
+  if (CAPTION_ANIMATIONS.includes(appearance.animation as CaptionAnimation))
+    result.animation = appearance.animation!;
   return result;
 }
 
@@ -277,6 +311,144 @@ const graphic = (
 });
 
 export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
+  graphic(
+    "nameplate",
+    "Accent nameplate",
+    "A name and role card with a separate accent rail.",
+    {
+      kind: "callout",
+      composition: "lower-third",
+      text: "ALEX MORGAN",
+      secondaryText: "Creative director",
+      accent: "#7AF5CF",
+      background: "#141B24",
+      size: 4.2,
+      y: 75,
+      animation: "slide",
+      padding: 2,
+      cornerRadius: 0.6,
+    },
+    5
+  ),
+  graphic(
+    "chapter-rule",
+    "Chapter rule",
+    "A compact chapter card with a colored rule and supporting heading.",
+    {
+      kind: "callout",
+      composition: "chapter",
+      text: "01 · THE IDEA",
+      secondaryText: "How it started",
+      accent: "#7AF5CF",
+      background: "#171C28",
+      size: 4.5,
+      y: 25,
+      animation: "fade",
+      padding: 2,
+    },
+    4
+  ),
+  graphic(
+    "stat-proof",
+    "Proof statistic",
+    "An animated statistic with its explanation on a second line.",
+    {
+      kind: "counter",
+      composition: "statistic",
+      from: 0,
+      to: 42,
+      suffix: "%",
+      secondaryText: "Your measured result",
+      accent: "#7AF5CF",
+      size: 10,
+      y: 42,
+      animation: "pop",
+    },
+    4
+  ),
+  graphic(
+    "quote-credit",
+    "Attributed quote",
+    "A pull quote with an accent rule and separate attribution.",
+    {
+      kind: "text",
+      composition: "quote",
+      text: "Make every second count.",
+      secondaryText: "Your attribution",
+      accent: "#EFC978",
+      color: "#FFF1D8",
+      size: 4.8,
+      y: 40,
+      animation: "fade",
+    },
+    5
+  ),
+  graphic(
+    "progress-title",
+    "Story progress",
+    "A progress rail follows the graphic's source clock.",
+    {
+      kind: "text",
+      composition: "progress",
+      text: "THE PROCESS",
+      size: 4,
+      y: 20,
+      width: 48,
+      background: "#333C4C",
+      accent: "#7AF5CF",
+      animation: "fade",
+    },
+    6
+  ),
+  graphic(
+    "shape-rect",
+    "Rectangle",
+    "Editable filled rectangle, rounded corners or frame.",
+    {
+      kind: "rectangle",
+      width: 32,
+      height: 16,
+      cornerRadius: 1,
+      color: "#6551C9",
+      animation: "fade",
+    }
+  ),
+  graphic(
+    "shape-ellipse",
+    "Ellipse",
+    "Editable circular or elliptical accent.",
+    {
+      kind: "ellipse",
+      width: 20,
+      height: 20,
+      color: "#7AF5CF",
+      animation: "pop",
+    }
+  ),
+  graphic(
+    "shape-star",
+    "Star",
+    "A vector star with independent width and height.",
+    {
+      kind: "star",
+      width: 20,
+      height: 20,
+      color: "#EFC978",
+      animation: "pop",
+    }
+  ),
+  graphic(
+    "shape-line",
+    "Accent line",
+    "A line with editable length, thickness, rotation and motion.",
+    {
+      kind: "line",
+      width: 40,
+      strokeWidth: 0.6,
+      color: "#7AF5CF",
+      animation: "slide",
+    }
+  ),
   graphic(
     "spatial-title",
     "Dimensional title",

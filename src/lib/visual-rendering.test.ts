@@ -43,6 +43,37 @@ function pixel(c: TimelineClip, time: number, x: number, y: number) {
   return [...output.subarray((y * 80 + x) * 4, (y * 80 + x) * 4 + 4)];
 }
 describe("footage transforms and visual transitions", () => {
+  it("starts centered dissolves at half alpha for fractional-frame durations", () => {
+    for (const duration of [0.05, 0.15, 0.35]) {
+      const c = {
+        ...clip,
+        inPoint: 1,
+        outPoint: 3,
+        visualStart: 1,
+        visualDuration: 2,
+        visual: normalizeVisual({
+          entrance: { kind: "dissolve", duration, at: 1 - duration / 2 },
+        }),
+      };
+      const output = execFileSync("ffmpeg", [
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=red:s=16x16:r=30:d=1,format=rgba",
+        "-vf",
+        visualRenderFilter(c),
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "pipe:1",
+      ]);
+      expect(output[3]).toBeGreaterThanOrEqual(126);
+      expect(output[3]).toBeLessThanOrEqual(128);
+    }
+  });
   it("preserves source animation across trims, splits and speed changes", () => {
     const original = preserveGraphicDuration({
       ...clip,

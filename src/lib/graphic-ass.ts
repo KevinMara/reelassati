@@ -1,4 +1,9 @@
-import { graphicTextLines } from "@contracts/graphic-layout";
+import {
+  graphicTextLines,
+  graphicShapes,
+  graphicShapePixels,
+  graphicCardLayout,
+} from "@contracts/graphic-layout";
 import type { TimelineClip } from "@contracts/workspace";
 import { graphicFrame, normalizeGraphic } from "@contracts/motion-graphics";
 import {
@@ -24,7 +29,8 @@ export function graphicAssEvents(
   const events: string[] = [];
   for (const clip of clips) {
     const g = normalizeGraphic(clip.graphic);
-    if (!g || clip.start >= duration || clip.duration <= 0) continue;
+    if (!g || clip.hidden || clip.start >= duration || clip.duration <= 0)
+      continue;
     const end = Math.min(duration, clip.start + clip.duration);
     const layer =
       (clipLaneKind(clip) === "text" ? 2000 : 1000) + clipLaneNumber(clip);
@@ -82,12 +88,24 @@ export function graphicAssEvents(
       continue;
     }
     let previous = "",
+      previousShapes: string[] = [],
+      previousSecondary = "",
       since = clip.start;
     const emit = (until: number) => {
-      if (previous && until > since)
-        events.push(
-          `Dialogue: ${layer},${assTime(since)},${assTime(until)},${g.kind === "callout" ? "Callout" : "Default"},,0,0,0,,${previous}`
-        );
+      if (until > since) {
+        for (const shape of previousShapes)
+          events.push(
+            `Dialogue: ${layer},${assTime(since)},${assTime(until)},Default,,0,0,0,,${shape}`
+          );
+        if (previousSecondary)
+          events.push(
+            `Dialogue: ${layer},${assTime(since)},${assTime(until)},Default,,0,0,0,,${previousSecondary}`
+          );
+        if (previous)
+          events.push(
+            `Dialogue: ${layer},${assTime(since)},${assTime(until)},Default,,0,0,0,,${previous}`
+          );
+      }
     };
     for (let frame = 0; frame < Math.ceil((end - clip.start) * 30); frame++) {
       const t = clip.start + frame / 30;
@@ -108,12 +126,49 @@ export function graphicAssEvents(
           h = Math.round(width * 0.12);
         tags += "\\bord0\\p1";
         text = `m 0 ${Math.round(h * 0.4)} l ${Math.round(w * 0.65)} ${Math.round(h * 0.4)} ${Math.round(w * 0.65)} 0 ${w} ${Math.round(h * 0.5)} ${Math.round(w * 0.65)} ${h} ${Math.round(w * 0.65)} ${Math.round(h * 0.6)} 0 ${Math.round(h * 0.6)}`;
-      } else if (g.kind === "callout")
-        tags += `\\bord${Math.round(width * 0.015)}\\3c${assColor(g.background)}\\3a&H${alpha}&\\shad0`;
-      const payload = `{${tags}}${text}`;
-      if (payload !== previous) {
+      } else tags += "\\bord0";
+      const shapes = graphicShapes(
+        g,
+        graphicElapsed(frame / 30),
+        graphicDuration
+      ).map(shape => {
+        const points = graphicShapePixels(shape.points, f, width, height);
+        const path =
+          points
+            .map(
+              ([x, y], index) =>
+                `${index ? "l" : "m"} ${x.toFixed(2)} ${y.toFixed(2)}`
+            )
+            .join(" ") + " c";
+        return `{\\an7\\pos(0,0)\\bord0\\shad0\\1c${assColor(shape.color)}\\alpha&H${alpha}&\\p1}${path}`;
+      });
+      const shapeOnly = ["rectangle", "ellipse", "star", "line"].includes(
+        g.kind
+      );
+      const payload = shapeOnly ? "" : `{${tags}}${text}`;
+      let secondary = "";
+      if (g.secondaryText) {
+        const layout = graphicCardLayout(
+          f.text,
+          g.size,
+          g.padding,
+          g.secondaryText
+        );
+        const offset =
+          layout.secondaryY +
+          (layout.secondaryLines.length - 1) * g.size * 0.36;
+        const [[x, y]] = graphicShapePixels([[0, offset]], f, width, height);
+        secondary = `{\\an5\\pos(${x.toFixed(2)},${y.toFixed(2)})\\frz${-f.rotation}\\fs${width * g.size * 0.006}\\fscx${f.scale * 100}\\fscy${f.scale * 100}\\b0\\bord0\\shad0\\1c${assColor(g.accent ?? g.color)}\\alpha&H${alpha}&}${escapeAss(layout.secondaryLines.join("\n"))}`;
+      }
+      if (
+        payload !== previous ||
+        shapes.join("\n") !== previousShapes.join("\n") ||
+        secondary !== previousSecondary
+      ) {
         emit(t);
         previous = payload;
+        previousShapes = shapes;
+        previousSecondary = secondary;
         since = t;
       }
     }

@@ -1,3 +1,4 @@
+import { isPrimaryFootage } from "@contracts/timeline-layers";
 import { normalizeReview } from "@contracts/source-review";
 import { mapChatTranscript } from "@/lib/editor-chat-execution";
 import { normalizeTranscriptWords } from "@contracts/transcript-timing";
@@ -15,10 +16,19 @@ import {
 } from "@/lib/caption-editing";
 import { CaptionFileTools } from "@/components/studio/CaptionFileTools";
 import { ClipInspector } from "@/components/studio/ClipInspector";
+import { ObjectTrackingPanel } from "@/components/studio/ObjectTrackingPanel";
+import { ShotTransitionPanel } from "@/components/studio/ShotTransitionPanel";
+import {
+  applyAdjacentTransition,
+  removeAdjacentTransition,
+  transitionFreeClip,
+} from "@contracts/adjacent-transition";
 import { EditorInfo } from "@/components/studio/EditorInfo";
 import { EditorShortcuts } from "@/components/studio/EditorShortcuts";
 import {
   replaceTimelineClip,
+  splitClipGroup,
+  toggleTimelineLane,
   detachClipAudio,
   moveClipGroup,
   deleteClipGroup,
@@ -44,7 +54,6 @@ import {
   clipLaneNumber,
   trimTimelineClip,
   normalizeClipTiming,
-  preserveGraphicDuration,
   type TimelineLane,
 } from "@/lib/timeline-lanes";
 import { TimelinePreview } from "@/components/studio/TimelinePreview";
@@ -88,6 +97,7 @@ import {
   applyEditOperation,
   contentDuration,
   resizeTimeline,
+  rippleDeleteSelection,
 } from "@/lib/edit-timeline";
 import {
   Dialog,
@@ -478,13 +488,22 @@ export default function EditorPage() {
           duration:
             transformed.duration !== item.duration
               ? transformed.duration
-              : transformed.clips.length !== item.clips.length ||
-                  transformed.clips.some(
-                    (clip, index) =>
-                      clip.id !== item.clips[index]?.id ||
-                      clip.start !== item.clips[index]?.start ||
-                      clip.duration !== item.clips[index]?.duration
-                  )
+              : transformed.clips.filter(c => !c.transitionHandle).length !==
+                    item.clips.filter(c => !c.transitionHandle).length ||
+                  transformed.clips
+                    .filter(c => !c.transitionHandle)
+                    .some(
+                      (clip, index) =>
+                        clip.id !==
+                          item.clips.filter(c => !c.transitionHandle)[index]
+                            ?.id ||
+                        clip.start !==
+                          item.clips.filter(c => !c.transitionHandle)[index]
+                            ?.start ||
+                        clip.duration !==
+                          item.clips.filter(c => !c.transitionHandle)[index]
+                            ?.duration
+                    )
                 ? transformed.clips.length > item.clips.length &&
                   item.clips.length > 0
                   ? Math.max(
@@ -537,9 +556,7 @@ export default function EditorPage() {
     setLocalError(null);
     try {
       if (!buildStoryBeatEvidence(latest()!).length) {
-        const mainClips = latest()!.clips.filter(
-          c => clipLaneKind(c) === "video" && clipLaneNumber(c) === 1
-        );
+        const mainClips = latest()!.clips.filter(isPrimaryFootage);
         const ids = [...new Set(mainClips.map(c => c.assetId).filter(Boolean))];
         const assets = getWorkspaceSnapshot().assets.filter(
           a => ids.includes(a.id) && a.kind === "video"
@@ -988,64 +1005,22 @@ export default function EditorPage() {
   };
 
   const splitSelectedClip = async () => {
-    if (!selectedClip || selectedClip.locked) return;
-    const relativeSplit = playhead - selectedClip.start;
-    const minimumSplitSpan = Math.min(0.001, selectedClip.duration / 3);
-    if (
-      relativeSplit < minimumSplitSpan ||
-      relativeSplit > selectedClip.duration - minimumSplitSpan
-    ) {
-      setLocalError(
-        "Place the playhead inside the selected clip before splitting."
-      );
-      return;
-    }
-    const rightId = createId("clip");
+    if (!selectedClips.length || selectionLocked) return;
+    let ids: string[] = [];
     const saved = await saveProjectChange(
       () =>
-        commitProject("Clip split", current => ({
-          ...current,
-          transcript: current.transcript.map(segment =>
-            segment.sourceClipId === selectedClip.id &&
-            segment.start >= playhead
-              ? { ...segment, sourceClipId: rightId }
-              : segment
-          ),
-          clips: current.clips.flatMap(clip => {
-            if (clip.id !== selectedClip.id) return [clip];
-            clip = preserveGraphicDuration(clip);
-            const left = {
-              ...clip,
-              duration: relativeSplit,
-              fadeOut: 0,
-              outPoint: clip.inPoint + relativeSplit * (clip.speed ?? 1),
-            };
-            const right = {
-              ...clip,
-              id: rightId,
-              label: `${clip.label} · B`,
-              fadeIn: 0,
-              start: playhead,
-              duration: clip.duration - relativeSplit,
-              inPoint: clip.inPoint + relativeSplit * (clip.speed ?? 1),
-            };
-            return [left, right];
-          }),
-        })),
+        commitProject("Selection split", current => {
+          const result = splitClipGroup(current, selectedIds, playhead, () =>
+            createId("clip")
+          );
+          ids = result.ids;
+          return result.project;
+        }),
       "The clip could not be split."
     );
     if (!saved) return;
-    setSelectedClipId(rightId);
-    setExtraSelection([]);
-    setClipDraft({
-      ...selectedClip,
-      id: rightId,
-      label: `${selectedClip.label} · B`,
-      fadeIn: 0,
-      start: playhead,
-      duration: selectedClip.duration - relativeSplit,
-      inPoint: selectedClip.inPoint + relativeSplit * (selectedClip.speed ?? 1),
-    });
+    setSelectedClipId(ids[0]);
+    setExtraSelection(ids.slice(1));
     setLocalError(null);
   };
 
@@ -1093,6 +1068,39 @@ export default function EditorPage() {
     setClipDraft(null);
   };
 
+  const rippleDeleteSelected = async () => {
+    if (!selectedClips.length || selectionLocked) return;
+    const saved = await saveProjectChange(
+      () =>
+        commitProject("Ripple deleted selected time across all tracks", p =>
+          rippleDeleteSelection(p, selectedIds)
+        ),
+      "The selected time could not be removed."
+    );
+    if (saved) {
+      setSelectedClipId(null);
+      setExtraSelection([]);
+      setClipDraft(null);
+    }
+  };
+  const nudgeSelection = async (delta: number) => {
+    if (!selectedClip || selectionLocked) return;
+    await saveProjectChange(
+      () =>
+        commitProject("Nudged selection", p => {
+          const anchor = p.clips.find(c => c.id === selectedClip.id);
+          if (!anchor) throw new Error("Select a clip to nudge.");
+          return moveClipGroup(
+            p,
+            selectedIds,
+            anchor.id,
+            anchor.start + delta,
+            clipLaneNumber(anchor)
+          );
+        }),
+      "Could not nudge the selection."
+    );
+  };
   const toggleClipProperty = async (property: "locked" | "muted") => {
     if (!selectedClip || (property === "muted" && selectedClip.locked)) return;
     const saved = await saveProjectChange(
@@ -1256,12 +1264,20 @@ export default function EditorPage() {
         };
       else if (modifier && key === "c" && selectedClip)
         action = () => {
-          clipboardRef.current = structuredClone(selectedClips);
+          clipboardRef.current = structuredClone(
+            selectedClips
+              .filter(c => !c.transitionHandle)
+              .map(c => transitionFreeClip(project, c))
+          );
           clipboardTranscript.current = structuredClone(project.transcript);
         };
       else if (modifier && key === "x" && selectedClip && !selectionLocked)
         action = async () => {
-          clipboardRef.current = structuredClone(selectedClips);
+          clipboardRef.current = structuredClone(
+            selectedClips
+              .filter(c => !c.transitionHandle)
+              .map(c => transitionFreeClip(project, c))
+          );
           clipboardTranscript.current = structuredClone(project.transcript);
           await deleteSelectedClip();
         };
@@ -1275,7 +1291,17 @@ export default function EditorPage() {
         (key === "delete" || key === "backspace") &&
         selectedClip
       )
-        action = deleteSelectedClip;
+        action = event.shiftKey ? rippleDeleteSelected : deleteSelectedClip;
+      else if (
+        !modifier &&
+        event.altKey &&
+        ["arrowleft", "arrowright"].includes(key) &&
+        selectedClip
+      )
+        action = () =>
+          nudgeSelection(
+            (key === "arrowright" ? 1 : -1) * (event.shiftKey ? 1 : 1 / 30)
+          );
       else if (!modifier && !event.altKey && key === "s" && selectedClip)
         action = splitSelectedClip;
       else if (!modifier && !event.altKey && event.shiftKey && key === "d")
@@ -1771,37 +1797,55 @@ export default function EditorPage() {
         onClipLook={preset =>
           void saveProjectChange(
             () =>
-              commitProject(`Applied ${preset.name}`, current => ({
-                ...current,
-                clips: current.clips.map(c =>
-                  c.id === selectedClip?.id && !c.locked
-                    ? { ...c, ...preset.settings }
-                    : c
-                ),
-              })),
+              commitProject(`Applied ${preset.name}`, current =>
+                selectedClip
+                  ? replaceTimelineClip(current, selectedClip.id, {
+                      ...current.clips.find(c => c.id === selectedClip.id)!,
+                      ...preset.settings,
+                    })
+                  : current
+              ),
             "The look could not be applied."
           )
         }
         onFadePreset={settings =>
           void saveProjectChange(
             () =>
-              commitProject("Applied clip transition", current => ({
-                ...current,
-                clips: current.clips.map(c =>
-                  c.id === selectedClip?.id && !c.locked
-                    ? { ...c, ...settings }
-                    : c
-                ),
-              })),
+              commitProject("Applied clip transition", current =>
+                selectedClip
+                  ? replaceTimelineClip(current, selectedClip.id, {
+                      ...current.clips.find(c => c.id === selectedClip.id)!,
+                      ...settings,
+                    })
+                  : current
+              ),
             "The transition could not be applied."
           )
         }
       />
-      <EditorInfo label="Transitions between shots">
-        Use entrance and exit fades for a single shot. For an overlapping
-        dissolve, place the incoming clip on a higher video lane and fade it in
-        over the outgoing clip.
-      </EditorInfo>
+      <ShotTransitionPanel
+        clip={selectedClip ?? undefined}
+        project={project}
+        disabled={!selectedClip || selectionLocked || Boolean(busyAction)}
+        onApply={async (incomingId, kind, duration) => {
+          if (!selectedClip) return;
+          await commitProject(`Applied ${kind} between shots`, p =>
+            applyAdjacentTransition(
+              p,
+              workspace.assets,
+              selectedClip.id,
+              incomingId,
+              kind,
+              duration
+            )
+          );
+        }}
+        onRemove={async (outgoingId, incomingId) => {
+          await commitProject("Removed shot transition", p =>
+            removeAdjacentTransition(p, outgoingId, incomingId)
+          );
+        }}
+      />
     </div>
   );
   const inspectorContent = (
@@ -1826,6 +1870,47 @@ export default function EditorPage() {
           ),
         }));
       }}
+      tracking={
+        selectedClip?.graphic && (
+          <ObjectTrackingPanel
+            key={`${selectedClip.id}:${JSON.stringify(selectedClip)}`}
+            project={project}
+            clip={selectedClip}
+            assets={workspace.assets}
+            onApply={async (result, expectedSource) => {
+              const expectedGraphic = selectedClip;
+              const expectedAspectRatio = project.aspectRatio;
+              await commitProject(
+                "Applied observed region tracking",
+                current => {
+                  const source = current.clips.find(
+                    c => c.id === expectedSource.id
+                  );
+                  const graphic = current.clips.find(
+                    c => c.id === expectedGraphic.id
+                  );
+                  if (
+                    !graphic ||
+                    graphic.locked ||
+                    current.aspectRatio !== expectedAspectRatio ||
+                    JSON.stringify(source) !== JSON.stringify(expectedSource) ||
+                    JSON.stringify(graphic) !== JSON.stringify(expectedGraphic)
+                  )
+                    throw new Error(
+                      "The source or graphic changed during tracking. Track the current version again."
+                    );
+                  return {
+                    ...current,
+                    clips: current.clips.map(c =>
+                      c.id === graphic.id ? result : c
+                    ),
+                  };
+                }
+              );
+            }}
+          />
+        )
+      }
     />
   );
   const captionsContent = (
@@ -2092,6 +2177,16 @@ export default function EditorPage() {
                   {index < transcriptDraft.length - 1 && (
                     <button
                       type="button"
+                      disabled={
+                        segment.sourceClipId !==
+                        transcriptDraft[index + 1]?.sourceClipId
+                      }
+                      title={
+                        segment.sourceClipId !==
+                        transcriptDraft[index + 1]?.sourceClipId
+                          ? "Keep captions from different source clips separate."
+                          : undefined
+                      }
                       onClick={() =>
                         mutateTranscript(rows =>
                           rows.flatMap((row, i) =>
@@ -2465,7 +2560,7 @@ export default function EditorPage() {
 
               <button
                 type="button"
-                disabled={!selectedClip || selectedClip.locked}
+                disabled={!selectedClips.length || selectionLocked}
                 title="Split at playhead (S)"
                 onClick={() => void splitSelectedClip()}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-30"
@@ -2493,6 +2588,15 @@ export default function EditorPage() {
                 <Trash2 className="h-3.5 w-3.5" />
                 Delete
                 {selectedClips.length > 1 ? ` (${selectedClips.length})` : ""}
+              </button>
+              <button
+                type="button"
+                disabled={!selectedClips.length || selectionLocked}
+                title="Remove the selected time intervals across all unlocked tracks and close the gaps (Shift + Delete)"
+                onClick={() => void rippleDeleteSelected()}
+                className="rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-30"
+              >
+                Ripple delete
               </button>
 
               <div className="ml-auto flex items-center gap-2 pr-1">
@@ -2596,6 +2700,16 @@ export default function EditorPage() {
               zoom={timelineZoom}
               snapping={snapping}
               onSnappingChange={setSnapping}
+              onTrackToggle={async (lane, property) => {
+                await saveProjectChange(
+                  () =>
+                    commitProject(
+                      `Changed ${lane.kind} ${lane.number} ${property}`,
+                      p => toggleTimelineLane(p, lane, property)
+                    ),
+                  "The track’s clips could not be changed."
+                );
+              }}
               selectedClipId={selectedClipId}
               selectedClipIds={selectedIds}
               disabled={Boolean(busyAction)}

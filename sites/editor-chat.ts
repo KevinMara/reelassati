@@ -26,6 +26,12 @@ import type {
   EditorChatResponse,
 } from "../contracts/editor-chat";
 import type { StoryBeat } from "../contracts/story-beats";
+import { applyAdjacentTransition } from "../contracts/adjacent-transition";
+import {
+  normalizeVisual,
+  visualTransitions,
+  type VisualTransition,
+} from "../contracts/clip-visual";
 
 const object = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -358,13 +364,14 @@ Every edit MUST be a complete nested action. Examples (replace IDs and times wit
 Do not place type or targetClipIds beside kind. Do not use an operation string. Explicit IDs must exist; never guess IDs. Selected clips are context, not permission to change every clip. A selected time range is a hard boundary; plan only in-range actions and explain when a broader request needs the range cleared. Never emit actions you already know violate it.
 Kinds and fields:
 Graphic creation versus revision: use operation.type="graphic" and parameters.graphicMode="create" to add one. To revise an existing graphic use parameters.graphicMode="update", targetClipIds:[the exact unlocked graphic ID], start/end covering that graphic, and parameters.graphic with the fields to change. Existing design fields are preserved. For example replace a callout's words with {type:"graphic",targetClipIds:["actual-id"],start:0,end:3,parameters:{graphicMode:"update",graphic:{text:"Something New",animation:"slide",motion:[{at:0,x:35,y:30,scale:0.9,rotation:0,easing:"ease-out"},{at:0.2,x:50,y:30,scale:1,rotation:0,easing:"hold"},{at:0.85,x:50,y:30,scale:1,rotation:0,easing:"ease-in"},{at:1,x:65,y:30,scale:0.95,rotation:0}]}}}. Use actual target times. Do not invent update-graphic, animate, motion-path or text-replace operation types. To change a graphic's timing, use trim/move separately. A selected video is not a graphic target; new graphics use create.
-- edit: operation follows {type:trim|split|move|delete|caption|silence|pacing|broll|audio|style|graphic,label,reason,start,end,confidence:0..1,intensity:light|balanced|aggressive,targetClipIds,parameters}. Only unlocked clips can be changed. Respect the selected range. Caption text must match supplied transcript or exactly requested words, with evidence-based timing; to caption untranscribed speech use transcribe. Never infer silence from a missing transcript. broll can use parameters.assetId of existing image/video ONLY; paid generation has its own generate action. trim sourceIn is a source-media offset, move destination an absolute timeline time, pacing speed 0.25..4, audio volume 0..2. style supports fit:cover|contain,fadeIn/fadeOut:0..3,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2. For footage transforms use parameters.visual:{x/y:-100..100 (percent offset from canvas center),scale:0.1..4,rotation:-720..720,opacity:0..1,flipX/flipY:boolean,crop:{top/right/bottom/left:0..45 percent of fitted canvas},mask:none|ellipse|rounded,radius:0..50,keyframes:[{at:0..1,x,y,scale,rotation,opacity,easing:linear|ease-in|ease-out|ease-in-out|hold}],entrance/exit:{kind:none|dissolve|wipe-left|wipe-right|wipe-up|wipe-down|slide-left|slide-right|zoom,duration:0.05..5}}. Visual transitions leave audio unchanged. A dissolve needs overlapping video lanes; do not claim a fade on adjacent non-overlapping clips is a cross-dissolve. Preserve existing keyframes when making unrelated style changes. graphic parameters.graphic supports kind:text|callout|counter|countdown|arrow|highlight|spatial-title|spatial-cube|spatial-orbit,text,color:#RRGGBB,background:#RRGGBB,x/y:10..90,size:2..16,animation:none|fade|pop|slide,from,to,prefix,suffix,rotation:-720..720,motion:[{at:0..1,x/y:0..100,scale:0.1..4,rotation:-720..720,opacity:0..1,easing:linear|ease-in|ease-out|ease-in-out|hold}]. Spatial graphics support spatial:{pitch/yaw:-70..70,depth:0.02..0.65,turns:-3..3,perspective:3..12}; spatial title at most 28 Latin characters. They are editable projected shapes, not tracked footage, arbitrary GLB models or Adobe project execution.
+- edit: operation follows {type:trim|split|move|delete|caption|silence|pacing|broll|audio|style|graphic,label,reason,start,end,confidence:0..1,intensity:light|balanced|aggressive,targetClipIds,parameters}. Only unlocked clips can be changed. Respect the selected range. Caption text must match supplied transcript or exactly requested words, with evidence-based timing; to caption untranscribed speech use transcribe. Never infer silence from a missing transcript. broll can use parameters.assetId of existing image/video ONLY; paid generation has its own generate action. trim sourceIn is a source-media offset, move destination an absolute timeline time, pacing speed 0.25..4, audio volume 0..2. style supports fit:cover|contain,fadeIn/fadeOut:0..3,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2. For footage transforms use parameters.visual:{x/y:-100..100 (percent offset from canvas center),scale:0.1..4,rotation:-720..720,opacity:0..1,flipX/flipY:boolean,crop:{top/right/bottom/left:0..45 percent of fitted canvas},mask:none|ellipse|rounded,radius:0..50,keyframes:[{at:0..1,x,y,scale,rotation,opacity,easing:linear|ease-in|ease-out|ease-in-out|hold}],entrance/exit:{kind:none|dissolve|wipe-left|wipe-right|wipe-up|wipe-down|slide-left|slide-right|zoom,duration:0.05..5}}. Visual transitions leave audio unchanged. For a transition at an adjacent cut, use adjacent-transition with measured source handles; for existing overlapping video, use visual entrance/exit. A single-clip fade is not a cross-dissolve. Preserve existing keyframes when making unrelated style changes. graphic parameters.graphic supports kind:text|callout|counter|countdown|arrow|highlight|rectangle|ellipse|star|line|spatial-title|spatial-cube|spatial-orbit,text,color:#RRGGBB,background:#RRGGBB,x/y:10..90,size:2..16,animation:none|fade|pop|slide,from,to,prefix,suffix,rotation:-720..720,motion:[{at:0..1,x/y:0..100,scale:0.1..4,rotation:-720..720,opacity:0..1,easing:linear|ease-in|ease-out|ease-in-out|hold}]. Graphic compositions support composition:plain|lower-third|chapter|quote|statistic|progress,secondaryText (up to120 characters),accent:#RRGGBB,padding/cornerRadius:0..6,width:1..90,height:0.2..60 (both shape dimensions percent of canvas width),strokeWidth:0..4 (rectangle/line). Use a nameplate with a real name/role, a proof statistic with an actual measured value, or an attributed quote only when provided. Spatial graphics support spatial:{pitch/yaw:-70..70,depth:0.02..0.65,turns:-3..3,perspective:3..12}; spatial title at most 28 Latin characters. They are editable projected shapes, not tracked footage, arbitrary GLB models or Adobe project execution.
+- adjacent-transition: outgoingId and incomingId must be exact IDs of two adjacent unlocked video shots; transition:none|dissolve|wipe-left|wipe-right|wipe-up|wipe-down|slide-left|slide-right|zoom,duration:0.05..5. Use none to remove an existing generated transition before moving, trimming, splitting, deleting or restyling either shot; depend on that removal action. This zero-credit action centers a visual transition on the cut using unused source handles, keeping speech/caption clocks and total edit length fixed. Both shots need measured media durations and enough handles. No other video may overlap the incoming body; conflicting source-audio fades must be removed explicitly first. Do not fabricate or silently extend source footage.
 - transcribe: assetIds of source video/audio files, optional language, replace:boolean. Produces timed captions from actual audio, mapped to the timeline by the executor. One action may include multiple sources. If no source speech asset exists, explain and emit no action; never generate dummy captions.
 - analyze: assetId of an owned video OR publicUrl exactly supplied in the user references/latest prompt, focus. Never invent or transform a URL. Actual media analysis happens during execution, not this planning call. Social webpage links can fail if the provider cannot retrieve their video; explain upload is needed in that case and never claim you watched them. If an edit depends on new observations, emit analyze followed by replan dependent on it instead of guessing.
 - generate: media:image|video|speech|music|sfx,prompt,name,seconds for video/music/sfx,voice for speech from supplied voiceIds, optional language. Image is 1K; video 720p with no generated audio, 3–15 integer seconds. Music 5–30 seconds; SFX 0.5–30 seconds. Speech prompt is the exact words to speak, not directions; preserve the language. Output goes to Library by default. Only include insert:{start,duration?} if the command explicitly asks to place/add it in this edit; do not automatically insert assets merely requested for generation. Do not use a real-person voice likeness or claim reference identity.
 - catalog-audio: catalogId from supplied freeAudioCatalog; optional insert:{start,duration?}. Uses an existing bundled CC0 sound/music file, with zero action credits and no audio-generation provider. Prefer this for a whoosh, impact, transition sound, or music bed when a catalog entry fits; never label it newly generated. Use available names/tags to choose, not invented sonic details. Omit insert when only asked to save/find a sound: it goes to Library. Include insert only when asked to add/place sound in the edit. Default duration is bounded by source length and remaining edit/selected range; never stretch or silently loop it. Explicitly requested original/custom generation still uses generate, subject to provider availability. Optional extra sound placements retain extra scope and approval.
 - insert: owned assetId,start,duration?; only actual image/video/audio assets. Reuses the real asset without generation cost.
-- settings: aspectRatio:9:16|16:9|1:1,duration,captionStyle from supplied captionStyles; captionAppearance supports animation:none|active-word (active-word requires measured word timestamps; transcribe first if absent),activeColor:#RRGGBB,color/outlineColor/background:#RRGGBB (background:null removes the box),size:2..12 percent of width,bold:boolean,uppercase:boolean,outline:0..2,position:top|bottom,margin:2..40 percent,maxCharacters:12..64. Use these controls for specific styling requests, preserving untouched appearance fields. Do not shorten a project if that would cut locked clips or truncate content outside a requested range.
+- settings: aspectRatio:9:16|16:9|1:1,duration,captionStyle from supplied captionStyles; captionAppearance supports animation:none|active-word|word-reveal|word-only|word-pulse (every word animation requires measured word timestamps; transcribe first if absent),activeColor:#RRGGBB,color/outlineColor/background:#RRGGBB (background:null removes the box),size:2..12 percent of width,bold:boolean,uppercase:boolean,outline:0..2,position:top|bottom,margin:2..40 percent,maxCharacters:12..64. Use these controls for specific styling requests, preserving untouched appearance fields. Do not shorten a project if that would cut locked clips or truncate content outside a requested range.
 - history: direction:undo|redo. Do not combine with other mutation actions in one response.
 - seek: time in seconds. Moves the playhead without editing.
 - replan: prompt containing the original request and reason to use newly obtained evidence. Must depend on analyze/transcribe. Costs another 5 credits; avoid unless decisions truly need the new evidence. At most one, last action. No recursive replan loop.
@@ -590,6 +597,69 @@ export function normalizeEditorChatPlan(
             );
         }
         action = { ...base, kind: "edit", operation };
+      } else if (row.kind === "adjacent-transition") {
+        const outgoingId = text(row.outgoingId, 160),
+          incomingId = text(row.incomingId, 160);
+        const outgoing = project.clips.find(c => c.id === outgoingId),
+          incoming = project.clips.find(c => c.id === incomingId);
+        if (!outgoing || !incoming)
+          throw new Error(
+            "Use the exact IDs of two available adjacent video shots."
+          );
+        if (
+          request.selectedClipIds?.length &&
+          [outgoingId, incomingId].some(
+            id => !request.selectedClipIds!.includes(id)
+          )
+        )
+          throw new Error(
+            "This transition targets a shot outside your selection."
+          );
+        const transition = row.transition as VisualTransition;
+        if (
+          !visualTransitions.some(t => t.value === transition) ||
+          typeof row.duration !== "number" ||
+          !Number.isFinite(row.duration)
+        )
+          throw new Error(
+            "Choose a supported transition and an explicit duration."
+          );
+        if (
+          transition !== "none" &&
+          request.range &&
+          (incoming.start - row.duration / 2 < request.range.start ||
+            incoming.start + row.duration / 2 > request.range.end)
+        )
+          throw new Error(
+            "The transition handles extend outside your selected range."
+          );
+        if (
+          request.range &&
+          (transition === "none" ||
+            normalizeVisual(outgoing.visual).exit.kind !== "none" ||
+            normalizeVisual(incoming.visual).entrance.kind !== "none") &&
+          (request.range.start > outgoing.start ||
+            request.range.end < incoming.start + incoming.duration)
+        )
+          throw new Error(
+            "This pair already has an entrance or exit effect. Select the whole shots before replacing those effects."
+          );
+        applyAdjacentTransition(
+          project,
+          assets,
+          outgoingId,
+          incomingId,
+          transition,
+          row.duration
+        );
+        action = {
+          ...base,
+          kind: "adjacent-transition",
+          outgoingId,
+          incomingId,
+          transition,
+          duration: row.duration,
+        };
       } else if (row.kind === "transcribe") {
         const assetIds = uniqueStrings(row.assetIds, 20);
         if (

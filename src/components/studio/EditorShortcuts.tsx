@@ -17,6 +17,18 @@ export const EDITOR_SHORTCUTS = [
   ["Clips", "Delete selected clip", "Delete", "Backspace"],
   [
     "Clips",
+    "Ripple delete selected time across all tracks",
+    "Shift + Delete",
+    "Shift + Backspace",
+  ],
+  [
+    "Clips",
+    "Nudge selection one frame / one second",
+    "Alt/Option + ← / →",
+    "Shift + Alt/Option + ← / →",
+  ],
+  [
+    "Clips",
     "Copy / cut / paste at playhead",
     "Ctrl/⌘ + C",
     "Ctrl/⌘ + X",
@@ -97,6 +109,10 @@ export function EditorShortcuts({
           selection. Drag a selected clip to move the group. Copy, duplicate and
           delete work on the selection. Unlock clips before moving or deleting
           them.
+          <p className="mt-3">
+            Ripple delete removes the selected time intervals from every
+            unlocked track and closes the gaps. Undo restores the complete edit.
+          </p>
           <p className="mt-3">
             Snapping aligns clip edges with nearby clips and the playhead. Hold{" "}
             <kbd>Alt</kbd> / <kbd>Option</kbd> while dragging for exact

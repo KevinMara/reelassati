@@ -50,7 +50,7 @@ describe("executable editing", () => {
   });
   it("ripple-cuts source offsets and keeps later captions aligned", () => {
     const cut = rippleRemove(project, 2, 5);
-    expect(cut.duration).toBe(7);
+    expect(cut.duration).toBe(37);
     expect(cut.clips[1]).toMatchObject({ start: 2, inPoint: 7, duration: 5 });
     expect(cut.transcript[0]).toMatchObject({ start: 4, end: 5 });
   });

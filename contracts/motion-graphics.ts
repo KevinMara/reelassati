@@ -5,6 +5,10 @@ export const GRAPHIC_KINDS = [
   "countdown",
   "arrow",
   "highlight",
+  "rectangle",
+  "ellipse",
+  "star",
+  "line",
   "spatial-title",
   "spatial-cube",
   "spatial-orbit",
@@ -58,6 +62,15 @@ export interface MotionGraphic {
   prefix: string;
   suffix: string;
   rotation?: number;
+  secondaryText?: string;
+  composition?:
+    "plain" | "lower-third" | "chapter" | "quote" | "statistic" | "progress";
+  padding?: number;
+  cornerRadius?: number;
+  width?: number;
+  height?: number;
+  strokeWidth?: number;
+  accent?: string;
   motion?: GraphicKeyframe[];
   spatial?: {
     pitch: number;
@@ -122,6 +135,37 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
     prefix: text(v.prefix, 12),
     suffix: text(v.suffix, 12),
     rotation: bounded(v.rotation, 0, -720, 720),
+    ...(typeof v.secondaryText === "string"
+      ? { secondaryText: text(v.secondaryText, 120) }
+      : {}),
+    ...([
+      "plain",
+      "lower-third",
+      "chapter",
+      "quote",
+      "statistic",
+      "progress",
+    ].includes(String(v.composition))
+      ? { composition: v.composition as MotionGraphic["composition"] }
+      : {}),
+    ...(typeof v.padding === "number"
+      ? { padding: bounded(v.padding, 1.5, 0, 6) }
+      : {}),
+    ...(typeof v.cornerRadius === "number"
+      ? { cornerRadius: bounded(v.cornerRadius, 0, 0, 6) }
+      : {}),
+    ...(typeof v.width === "number"
+      ? { width: bounded(v.width, 30, 1, 90) }
+      : {}),
+    ...(typeof v.height === "number"
+      ? { height: bounded(v.height, 12, 0.2, 60) }
+      : {}),
+    ...(typeof v.strokeWidth === "number"
+      ? { strokeWidth: bounded(v.strokeWidth, 0, 0, 4) }
+      : {}),
+    ...(typeof v.accent === "string"
+      ? { accent: color(v.accent, "#7AF5CF") }
+      : {}),
     ...(String(v.kind).startsWith("spatial-")
       ? {
           spatial: (() => {
@@ -167,9 +211,12 @@ export function graphicText(
 export function graphicFrame(
   g: MotionGraphic,
   elapsed: number,
-  duration: number
+  duration: number,
+  quantize = true
 ) {
-  const t = Math.floor(Math.max(0, elapsed) * 30) / 30;
+  const t = quantize
+    ? Math.floor(Math.max(0, elapsed) * 30) / 30
+    : Math.max(0, elapsed);
   const enter = Math.min(1, t / 0.2),
     leave = Math.min(1, Math.max(0, duration - t) / 0.15);
   const points = g.motion;

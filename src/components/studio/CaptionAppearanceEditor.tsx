@@ -2,8 +2,9 @@ import { useState } from "react";
 import {
   getCaptionPreset,
   type CaptionAppearance,
+  type CaptionAnimation,
 } from "@contracts/editor-presets";
-import { CaptionLayer } from "./CaptionLayer";
+import { CaptionStylePreview } from "./CaptionStylePreview";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { EditorInfo } from "./EditorInfo";
 
@@ -20,6 +21,7 @@ export function CaptionAppearanceEditor({
 }) {
   const [draft, setDraft] = useState<CaptionAppearance>(appearance ?? {});
   const [busy, setBusy] = useState(false);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
   const p = getCaptionPreset(presetId, draft);
   const patch = (value: CaptionAppearance) =>
     setDraft(d => ({ ...d, ...value }));
@@ -36,24 +38,24 @@ export function CaptionAppearanceEditor({
           settings. Burned-in source captions cannot be restyled here.
         </EditorInfo>
       </h3>
-      <div
-        className="relative aspect-video overflow-hidden rounded-lg bg-[#252A32]"
-        style={{ containerType: "inline-size" }}
+      <CaptionStylePreview
+        presetId={presetId}
+        appearance={draft}
+        animate={previewPlaying}
+      />
+      <button
+        type="button"
+        aria-pressed={previewPlaying}
+        onClick={() => setPreviewPlaying(v => !v)}
+        className="rounded-lg border border-border px-3 py-2 text-xs"
       >
-        <CaptionLayer
-          presetId={presetId}
-          appearance={draft}
-          time={1}
-          segments={[
-            {
-              id: "sample",
-              start: 0,
-              end: 3,
-              text: sample || "Make every word count",
-            },
-          ]}
-        />
-      </div>
+        {previewPlaying ? "Pause style sample" : "Play style sample"}
+      </button>
+      {sample && (
+        <p className="truncate text-xs text-foreground/60">
+          Current text: {sample}
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         {(
           [
@@ -77,14 +79,17 @@ export function CaptionAppearanceEditor({
         aria-label="Caption animation"
         value={p.animation}
         onValueChange={animation =>
-          patch({ animation: animation as "none" | "active-word" })
+          patch({ animation: animation as CaptionAnimation })
         }
         options={[
           { value: "none", label: "Whole phrase" },
           { value: "active-word", label: "Highlight spoken word" },
+          { value: "word-reveal", label: "Reveal words as spoken" },
+          { value: "word-only", label: "One word at a time" },
+          { value: "word-pulse", label: "Pulse with speech" },
         ]}
       />
-      {p.animation === "active-word" && (
+      {p.animation !== "none" && (
         <p className="text-sm text-foreground/65">
           Uses measured word timings from transcription. Imported subtitles or
           edited lines without word timings display the whole phrase.

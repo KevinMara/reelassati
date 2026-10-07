@@ -1,4 +1,10 @@
+import { isPrimaryFootage } from "@contracts/timeline-layers";
 import { mapTranscriptTime } from "@contracts/transcript-timing";
+import { projectSplitCaptions } from "./editor-manual";
+import {
+  applyAdjacentTransition,
+  assertNoShotTransition,
+} from "@contracts/adjacent-transition";
 import type {
   Asset,
   EditProject,
@@ -19,8 +25,7 @@ import {
 } from "./editor-history";
 import {
   allocateTimelineLane,
-  clipLaneKind,
-  clipLaneNumber,
+  preserveGraphicDuration,
 } from "./timeline-lanes";
 
 export function chatSnapshot(
@@ -186,6 +191,15 @@ export function applyChatAction(
       },
       action.operation
     );
+  } else if (action.kind === "adjacent-transition") {
+    next = applyAdjacentTransition(
+      project,
+      assets,
+      action.outgoingId,
+      action.incomingId,
+      action.transition,
+      action.duration
+    );
   } else if (action.kind === "insert") {
     const asset = assets.find(a => a.id === action.assetId);
     if (!asset) throw new Error("The requested file is no longer in Library.");
@@ -216,16 +230,13 @@ export function applyChatAction(
   } else if (action.kind === "story-beats") {
     next = { ...project, storyBeats: action.beats };
     if (action.splitClips) {
+      const splits: Array<{ original: TimelineClip; pieces: TimelineClip[] }> =
+        [];
       const boundaries = [
         ...new Set(action.beats.flatMap(beat => [beat.start, beat.end])),
       ].sort((a, b) => a - b);
       next.clips = project.clips.flatMap(clip => {
-        if (
-          clip.locked ||
-          clipLaneKind(clip) !== "video" ||
-          clipLaneNumber(clip) !== 1
-        )
-          return [clip];
+        if (clip.locked || !isPrimaryFootage(clip)) return [clip];
         const cuts = [
           clip.start,
           ...boundaries.filter(
@@ -234,7 +245,10 @@ export function applyChatAction(
           ),
           clip.start + clip.duration,
         ];
-        return cuts.slice(0, -1).map((start, index) => {
+        const original = clip;
+        if (cuts.length > 2) assertNoShotTransition(project, [clip.id]);
+        clip = preserveGraphicDuration(clip);
+        const pieces = cuts.slice(0, -1).map((start, index) => {
           const end = cuts[index + 1];
           const beat = action.beats.find(
             b => start >= b.start - 0.001 && end <= b.end + 0.001
@@ -251,7 +265,10 @@ export function applyChatAction(
             fadeOut: index === cuts.length - 2 ? clip.fadeOut : 0,
           };
         });
+        if (pieces.length > 1) splits.push({ original, pieces });
+        return pieces;
       });
+      next.transcript = projectSplitCaptions(project, splits);
     }
   }
   return recordChatEdit(project, next, action.id, action.label);

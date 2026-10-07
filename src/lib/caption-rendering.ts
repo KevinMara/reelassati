@@ -5,7 +5,7 @@ import {
 } from "@contracts/editor-presets";
 import type { TranscriptSegment } from "@contracts/workspace";
 import { assTime, escapeAss } from "./graphic-ass";
-import { captionRuns } from "@contracts/caption-runs";
+import { captionRuns, captionPulse } from "@contracts/caption-runs";
 import { normalizeTranscriptWords } from "@contracts/transcript-timing";
 
 const assColor = (hex: string) =>
@@ -42,7 +42,7 @@ export function captionAssEvents(
       const start = Math.max(0, s.start),
         end = Math.min(duration, s.end);
       const words =
-        preset.animation === "active-word"
+        preset.animation !== "none"
           ? normalizeTranscriptWords(s.text, s.words)
           : undefined;
       const points = [
@@ -53,6 +53,20 @@ export function captionAssEvents(
             ...(words
               ?.flatMap(w => [w.start, w.end])
               .filter(t => t > start && t < end) ?? []),
+            ...(preset.animation === "word-pulse" && words
+              ? Array.from(
+                  {
+                    length: Math.max(
+                      0,
+                      Math.ceil(end * 30) - Math.ceil(start * 30)
+                    ),
+                  },
+                  (_, i) =>
+                    Math.floor(
+                      ((Math.ceil(start * 30) + i) / 30) * 100 + 1e-7
+                    ) / 100
+                )
+              : []),
           ].map(t => Math.round(t * 100) / 100)
         ),
       ].sort((a, b) => a - b);
@@ -60,12 +74,17 @@ export function captionAssEvents(
         const b = points[i + 1];
         const text = captionRuns(s, preset, (a + b) / 2)
           .map(run =>
-            run.active
-              ? `{\\c${assColor(preset.activeColor)}&}${escapeAss(run.text)}{\\c${assColor(preset.color)}&}`
-              : escapeAss(run.text)
+            run.hidden
+              ? `{\\alpha&HFF&}${escapeAss(run.text)}{\\alpha&H00&}`
+              : run.active
+                ? `{\\c${assColor(preset.activeColor)}&}${escapeAss(run.text)}{\\c${assColor(preset.color)}&}`
+                : escapeAss(run.text)
           )
           .join("");
-        return `Dialogue: 100000,${assTime(a)},${assTime(b)},Caption,,0,0,0,,${text}`;
+        const scale = (captionPulse(s, preset, (a + b) / 2) * 100).toFixed(3);
+        return text
+          ? `Dialogue: 100000,${assTime(a)},${assTime(b)},Caption,,0,0,0,,{\\fscx${scale}\\fscy${scale}}${text}`
+          : "";
       });
     })
     .join("\n");

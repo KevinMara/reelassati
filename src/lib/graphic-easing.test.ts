@@ -132,7 +132,9 @@ describe("graphic motion easing", () => {
       graphicDuration: span,
     };
     const trimmedAss = graphicAssEvents([trimmed], 720, 720, span);
-    expect(trimmedAss.split("\n")[0]).toContain(
+    expect(
+      trimmedAss.split("\n").find(line => line.includes("\\fs"))
+    ).toContain(
       `\\pos(${Math.round(frame.x * 7.2)},${Math.round(frame.y * 7.2)})`
     );
   });

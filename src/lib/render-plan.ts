@@ -87,7 +87,7 @@ export function buildRenderPlan(
     args.push("-i", `input-${inputs.indexOf(asset)}`);
     const end = number(clip.inPoint + clip.duration * speed);
     const trim = `start=${number(clip.inPoint)}:end=${end}`;
-    if (clip.track !== "audio" && asset.kind !== "audio") {
+    if (!clip.hidden && clip.track !== "audio" && asset.kind !== "audio") {
       const fit =
         clip.fit === "cover"
           ? `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`

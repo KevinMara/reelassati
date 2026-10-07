@@ -43,6 +43,10 @@ export function mergeCaptions(
   first: TranscriptSegment,
   second: TranscriptSegment
 ): TranscriptSegment {
+  if (first.sourceClipId !== second.sourceClipId)
+    throw new Error(
+      "These captions belong to different source clips. Keep them separate so they follow their own footage."
+    );
   return {
     ...first,
     start: Math.min(first.start, second.start),

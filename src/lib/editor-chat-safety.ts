@@ -159,12 +159,8 @@ export function mergeChatTranscript(
   const start = range?.start ?? 0;
   const end = range?.end ?? project.duration;
   const mapped = incoming
-    .map(segment => ({
-      ...mapTranscriptTime(segment, t => t),
-      start: Math.max(start, segment.start),
-      end: Math.min(end, segment.end),
-    }))
-    .filter(segment => segment.end > segment.start);
+    .map(segment => mapTranscriptTime(segment, t => t, { start, end }))
+    .filter(segment => segment.end > segment.start && segment.text.trim());
   const ids = new Set(mapped.map(segment => segment.id));
   const kept = project.transcript.flatMap(segment => {
     if (!replace && !ids.has(segment.id)) return [segment];
@@ -173,14 +169,30 @@ export function mergeChatTranscript(
     // Preserve both outside portions if one existing segment crosses the selected range.
     return [
       ...(segment.start < start
-        ? [{ ...segment, id: `${segment.id}-before-${start}`, end: start }]
+        ? [
+            {
+              ...mapTranscriptTime(segment, t => t, {
+                start: segment.start,
+                end: start,
+              }),
+              id: `${segment.id}-before-${start}`,
+            },
+          ]
         : []),
       ...(segment.end > end
-        ? [{ ...segment, id: `${segment.id}-after-${end}`, start: end }]
+        ? [
+            {
+              ...mapTranscriptTime(segment, t => t, {
+                start: end,
+                end: segment.end,
+              }),
+              id: `${segment.id}-after-${end}`,
+            },
+          ]
         : []),
     ];
   });
-  return [...kept, ...mapped].sort(
-    (left, right) => left.start - right.start || left.end - right.end
-  );
+  return [...kept, ...mapped]
+    .filter(segment => segment.text.trim() && segment.end > segment.start)
+    .sort((left, right) => left.start - right.start || left.end - right.end);
 }

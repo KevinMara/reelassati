@@ -73,6 +73,7 @@ export function buildStoryBeatEvidence(
     });
   }
   for (const clip of project.clips) {
+    if (clip.transitionHandle) continue;
     if (
       !clip.assetId ||
       (clip.track !== "video" &&

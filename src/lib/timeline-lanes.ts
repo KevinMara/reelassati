@@ -1,29 +1,18 @@
 import type { Asset, TimelineClip } from "@contracts/workspace";
 
-export type TimelineLaneKind =
-  "video" | "audio" | "text" | "graphics" | "captions";
+import {
+  clipLaneKind,
+  clipLaneNumber,
+  type TimelineLaneKind,
+} from "@contracts/timeline-layers";
+export {
+  clipLaneKind,
+  clipLaneNumber,
+  type TimelineLaneKind,
+} from "@contracts/timeline-layers";
 export type TimelineLane = { kind: TimelineLaneKind; number: number };
 export const LIBRARY_ASSET_DRAG_TYPE = "application/x-reelassati-asset-id";
 export const TIMELINE_CLIP_DRAG_TYPE = "application/x-reelassati-clip";
-
-export function clipLaneKind(clip: TimelineClip): TimelineLaneKind {
-  if (clip.track === "audio") return "audio";
-  if (clip.track === "captions") return "captions";
-  if (clip.graphic)
-    return clip.graphic.kind === "text" || clip.graphic.kind === "callout"
-      ? "text"
-      : "graphics";
-  return "video";
-}
-
-/** Legacy overlay media remains above the first video lane; existing projects need no migration. */
-export function clipLaneNumber(clip: TimelineClip): number {
-  return Number.isInteger(clip.lane) && clip.lane! > 0
-    ? clip.lane!
-    : clip.track === "overlay" && !clip.graphic
-      ? 2
-      : 1;
-}
 
 export function laneForClip(clip: TimelineClip): TimelineLane {
   return { kind: clipLaneKind(clip), number: clipLaneNumber(clip) };

@@ -1,5 +1,5 @@
 import { getCaptionPreset } from "@contracts/editor-presets";
-import { captionRuns } from "@contracts/caption-runs";
+import { captionRuns, captionPulse } from "@contracts/caption-runs";
 import type { TranscriptSegment } from "@contracts/workspace";
 import { captionTextCss } from "@/lib/caption-rendering";
 
@@ -25,11 +25,22 @@ export function CaptionLayer({
       style={{ [p.position]: `${p.margin}%` }}
     >
       {active.map(segment => (
-        <span key={segment.id} style={captionTextCss(p)}>
+        <span
+          key={segment.id}
+          style={{
+            ...captionTextCss(p),
+            transform: `scale(${captionPulse(segment, p, time)})`,
+            transformOrigin:
+              p.position === "top" ? "center top" : "center bottom",
+          }}
+        >
           {captionRuns(segment, p, time).map((run, i) => (
             <span
               key={i}
-              style={run.active ? { color: p.activeColor } : undefined}
+              style={{
+                ...(run.active ? { color: p.activeColor } : {}),
+                ...(run.hidden ? { visibility: "hidden" } : {}),
+              }}
             >
               {run.text}
             </span>

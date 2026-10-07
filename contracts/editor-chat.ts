@@ -63,6 +63,13 @@ export type EditorChatAction = EditorChatActionBase &
   (
     | { kind: "edit"; operation: EditOperation }
     | {
+        kind: "adjacent-transition";
+        outgoingId: string;
+        incomingId: string;
+        transition: import("./clip-visual").VisualTransition;
+        duration: number;
+      }
+    | {
         kind: "transcribe";
         assetIds: string[];
         language?: string;

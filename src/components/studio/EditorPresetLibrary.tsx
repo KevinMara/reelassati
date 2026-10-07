@@ -9,7 +9,7 @@ import {
   type ClipLookPreset,
 } from "@contracts/editor-presets";
 import type { TimelineClip } from "@contracts/workspace";
-import { captionTextCss } from "@/lib/caption-rendering";
+import { CaptionStylePreview } from "./CaptionStylePreview";
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
 
 export interface EditorPresetLibraryProps {
@@ -33,6 +33,7 @@ export function EditorPresetLibrary({
   disabled = false,
 }: EditorPresetLibraryProps) {
   const [query, setQuery] = useState("");
+  const [hoveredCaption, setHoveredCaption] = useState<string>();
   const match = (p: { name: string; description: string }) =>
     `${p.name} ${p.description}`.toLowerCase().includes(query.toLowerCase());
   const heading =
@@ -76,17 +77,16 @@ export function EditorPresetLibrary({
               className="group relative min-w-0 rounded-xl border border-border p-2 text-left transition hover:border-primary/60 aria-pressed:border-primary aria-pressed:bg-primary/5 disabled:opacity-50"
             >
               <div
-                className="relative flex aspect-[1.8] items-center justify-center overflow-hidden rounded-md bg-[#252A32]"
-                style={{ containerType: "inline-size" }}
+                onMouseEnter={() => setHoveredCaption(p.id)}
+                onMouseLeave={() => setHoveredCaption(undefined)}
+                onFocus={() => setHoveredCaption(p.id)}
+                onBlur={() => setHoveredCaption(undefined)}
               >
-                <span
-                  style={{
-                    ...captionTextCss(p),
-                    fontSize: `${p.size * 2.6}cqw`,
-                  }}
-                >
-                  {p.uppercase ? "YOUR STORY" : "Your story"}
-                </span>
+                <CaptionStylePreview
+                  presetId={p.id}
+                  compact
+                  animate={hoveredCaption === p.id}
+                />
               </div>
               <div className="mt-2 flex items-center justify-between gap-1">
                 <span className="truncate text-xs font-medium">{p.name}</span>

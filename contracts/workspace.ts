@@ -100,6 +100,17 @@ export interface TimelineClip {
   track: TrackKind;
   /** One-based lane within the visual, audio, text or graphic track family. */
   lane?: number;
+  /** Preserve primary-story identity when a transition raises the visual lane. */
+  primaryFootage?: boolean;
+  /** Silent visual source handle; excluded from speech and story evidence. */
+  transitionHandle?: boolean;
+  /** Reversible generated transition; timing edits require removing it first. */
+  shotTransition?: {
+    outgoingId: string;
+    incomingId: string;
+    incomingEntrance: import("./clip-visual").ClipVisual["entrance"];
+    outgoingExit: import("./clip-visual").ClipVisual["exit"];
+  };
   label: string;
   start: number;
   duration: number;
@@ -107,6 +118,8 @@ export interface TimelineClip {
   outPoint: number;
   locked: boolean;
   muted?: boolean;
+  /** Hide picture/graphics while retaining source audio. */
+  hidden?: boolean;
   speed?: number;
   volume?: number;
   color: string;
