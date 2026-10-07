@@ -103,6 +103,7 @@ let nextOutput: Record<string, unknown> = {
   ],
 };
 let providerGate: Promise<void> | undefined;
+let providerFailure: { status: number; payload: unknown } | undefined;
 async function request(
   path: string,
   body?: unknown,
@@ -186,6 +187,10 @@ beforeAll(async () => {
         });
       providerCalls.push(JSON.parse(String(init?.body || "{}")));
       if (providerGate) await providerGate;
+      if (providerFailure)
+        return Response.json(providerFailure.payload, {
+          status: providerFailure.status,
+        });
       return Response.json({
         choices: [{ message: { content: JSON.stringify(nextOutput) } }],
       });
@@ -275,6 +280,128 @@ afterAll(() => {
 });
 
 describe("authenticated paid editing chat route", () => {
+  it("releases all planning credits on upstream billing failure and replays the sanitized failure without another provider call", async () => {
+    const originalAccount = sqlite
+      .prepare(
+        "SELECT included_balance,topup_balance FROM credit_accounts WHERE owner_email='owner@example.com'"
+      )
+      .get()!;
+    sqlite
+      .prepare(
+        "UPDATE credit_accounts SET included_balance=3,topup_balance=17 WHERE owner_email='owner@example.com'"
+      )
+      .run();
+    const before = balance(),
+      calls = providerCalls.length;
+    const body = chat("route-provider-billing-failure", { maxCredits: 5 });
+    const failureLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    providerFailure = {
+      status: 402,
+      payload: {
+        error:
+          "provider balance depleted; private diagnostic detail must not reach the client",
+      },
+    };
+    try {
+      const first = await request("/api/ai/editor-chat", body);
+      expect(first.status).toBe(503);
+      const firstBody = await first.json();
+      expect(firstBody.error).toContain("service billing issue");
+      expect(firstBody.reference).toMatch(
+        /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
+      );
+      expect(firstBody.error).toContain(firstBody.reference);
+      expect(JSON.stringify(firstBody)).not.toMatch(
+        /private diagnostic|depleted|OpenRouter|Kimi|api.?key|credits|charged|refunded/i
+      );
+      expect(failureLog).toHaveBeenCalledWith(
+        "REELassati provider operation failed",
+        expect.objectContaining({ status: 402, reference: firstBody.reference })
+      );
+      expect(balance()).toBe(before);
+      const ledger = sqlite
+        .prepare(
+          "SELECT amount,included_amount,topup_amount,status FROM credit_ledger WHERE owner_email='owner@example.com' AND json_extract(metadata_json,'$.requestId')=?"
+        )
+        .all(body.requestId);
+      expect(ledger).toEqual([
+        {
+          amount: -5,
+          included_amount: -3,
+          topup_amount: -2,
+          status: "released",
+        },
+      ]);
+      expect(
+        sqlite
+          .prepare(
+            "SELECT included_balance,topup_balance FROM credit_accounts WHERE owner_email='owner@example.com'"
+          )
+          .get()
+      ).toEqual({ included_balance: 3, topup_balance: 17 });
+      const replay = await request("/api/ai/editor-chat", body);
+      expect(replay.status).toBe(503);
+      expect(replay.headers.get("X-REELassati-Replayed")).toBe("true");
+      expect(await replay.json()).toEqual(firstBody);
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before);
+      expect(
+        sqlite
+          .prepare(
+            "SELECT COUNT(*) AS count FROM credit_ledger WHERE owner_email='owner@example.com' AND json_extract(metadata_json,'$.requestId')=?"
+          )
+          .get(body.requestId)?.count
+      ).toBe(1);
+    } finally {
+      providerFailure = undefined;
+      failureLog.mockRestore();
+      sqlite
+        .prepare(
+          "UPDATE credit_accounts SET included_balance=?,topup_balance=? WHERE owner_email='owner@example.com'"
+        )
+        .run(
+          originalAccount.included_balance as number,
+          originalAccount.topup_balance as number
+        );
+    }
+  });
+
+  it("keeps actual customer credit shortages as 402 without calling the provider", async () => {
+    const account = sqlite
+      .prepare(
+        "SELECT included_balance,topup_balance FROM credit_accounts WHERE owner_email='owner@example.com'"
+      )
+      .get()!;
+    const calls = providerCalls.length;
+    sqlite
+      .prepare(
+        "UPDATE credit_accounts SET included_balance=0,topup_balance=0 WHERE owner_email='owner@example.com'"
+      )
+      .run();
+    try {
+      const failure = await request(
+        "/api/ai/editor-chat",
+        chat("route-customer-credit-shortage", { maxCredits: 5 })
+      );
+      expect(failure.status).toBe(402);
+      expect(await failure.json()).toMatchObject({
+        error: "You need 5 credits for this action.",
+        availableCredits: 0,
+      });
+      expect(providerCalls.length).toBe(calls);
+      expect(balance()).toBe(0);
+    } finally {
+      sqlite
+        .prepare(
+          "UPDATE credit_accounts SET included_balance=?,topup_balance=? WHERE owner_email='owner@example.com'"
+        )
+        .run(
+          account.included_balance as number,
+          account.topup_balance as number
+        );
+    }
+  });
+
   it("uses the saved owner project and replays a normalized plan without another debit or provider call", async () => {
     const before = balance();
     const calls = providerCalls.length;

@@ -21,7 +21,11 @@
 
 ## Validation and remaining scope
 
-The release is checked with unit and server integration tests, native FFmpeg output, the installed browser FFmpeg/WASM core, TypeScript checks and a production build. Deployment status and exact source files are checked separately. This is not a claim of authenticated browser or paid-provider end-to-end verification.
+The release is checked with unit and server integration tests, native FFmpeg output, the installed browser FFmpeg/WASM core, TypeScript checks and a production build. Deployment status and exact source files are checked separately.
+
+Authenticated browser verification on 7 October used a new isolated project. Existing graphic text was updated without adding another item; video was trimmed to eight seconds; verified free catalog music was placed and trimmed; independent image, voice, SFX and graphic clips were deleted, restored through Undo, and removed again through Redo. Save/reopen preserved both retained clips, the eight-second project end and the 0.8-second video/music fades. The MP4 completed Library upload and save, and the downloaded output contains 240 H.264 frames at 720 × 1280 / 30 fps plus AAC, with an exact eight-second container duration.
+
+The live AI planning request was rejected by OpenRouter with upstream HTTP 402; the account's balance was restored. Provider billing failures now return a sanitized service-unavailable message with a support reference, while customer credit shortages keep HTTP 402. Regression tests cover split-bucket refunds and cached failure recovery without a second provider call or debit. This does not establish successful paid-provider end-to-end editing while provider billing is unavailable.
 
 Native Adobe After Effects project rendering requires a supported licensed renderer. Projected graphics and bounded 2D region tracking do not implement arbitrary tracked 3D scenes, person matting or full professional editor parity. Footage search uses recorded evidence rather than semantic embeddings. Provider quality and private-account operations still require their actual account/provider checks.
 

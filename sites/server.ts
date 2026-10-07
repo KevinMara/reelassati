@@ -15,6 +15,7 @@ import {
   type EditorChatContext,
 } from "./editor-chat";
 import { modelUserContent, type ModelContentPart } from "./model-content";
+import { publicProviderFailure } from "./provider-failure";
 import {
   buildStoryBeatEvidence,
   normalizeStoryBeats,
@@ -3768,14 +3769,8 @@ async function providerError(
   const reference = logProviderFailure(provider, "provider-request", {
     status,
   });
-  const failure = json(
-    {
-      error:
-        "REELassati could not complete this request. Retry once; if it continues, contact support.",
-      reference,
-    },
-    status
-  );
+  const publicFailure = publicProviderFailure(provider, status, reference);
+  const failure = json(publicFailure.body, publicFailure.status);
   providerFailureMetadata.set(failure, {
     provider,
     status,
