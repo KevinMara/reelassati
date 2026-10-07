@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import {
   extractTextProvenanceToken,
   withoutTextProvenanceMarker,
@@ -10,10 +11,14 @@ import {
   type EditOperation,
   type EditProject,
   type ScriptDraft,
+  type TimelineClip,
 } from "../contracts/workspace";
+import { normalizeEditorSavedStyles } from "../contracts/editor-style-library";
 import {
   embedMediaProvenanceMarker,
   inspectMediaProvenanceMarker,
+  readWebmSegmentHeader,
+  ebmlSize,
 } from "./media-provenance";
 import worker from "./server";
 
@@ -526,6 +531,126 @@ async function generateSpeech(
   return ((await response.json()) as { asset: Asset }).asset;
 }
 
+let nativeWebmAvailable = false;
+try {
+  execFileSync("ffmpeg", ["-version"], { stdio: "ignore" });
+  nativeWebmAvailable = true;
+} catch {
+  /* Optional native fixture, like the renderer tests. */
+}
+let webmFixture: Uint8Array | undefined;
+function realWebm(unknownSegment = false): Uint8Array {
+  webmFixture ??= new Uint8Array(
+    execFileSync("ffmpeg", [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=blue:s=64x64:r=10:d=0.3",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=330:sample_rate=48000:duration=0.3",
+      "-c:v",
+      "libvpx",
+      "-threads",
+      "1",
+      "-deadline",
+      "realtime",
+      "-cpu-used",
+      "8",
+      "-b:v",
+      "100k",
+      "-c:a",
+      "libopus",
+      "-f",
+      "webm",
+      "pipe:1",
+    ])
+  );
+  const bytes = webmFixture.slice();
+  const segment = readWebmSegmentHeader(bytes)!;
+  if (!unknownSegment)
+    bytes.set(
+      ebmlSize(bytes.length - segment.dataOffset, segment.sizeLength),
+      segment.sizeOffset
+    );
+  return bytes;
+}
+
+function persistRenderProject(
+  DB: ReturnType<typeof createIntegrityD1>,
+  source?: Asset
+) {
+  const workspace = createEmptyWorkspace("creator@example.com");
+  const now = new Date().toISOString();
+  if (source) workspace.assets = [source];
+  workspace.projects = [
+    {
+      id: "webm-project",
+      title: "WebM render",
+      template: "blank",
+      status: "editing",
+      platform: "tiktok",
+      aspectRatio: "9:16",
+      duration: 0.3,
+      playhead: 0,
+      createdAt: now,
+      updatedAt: now,
+      clips: source
+        ? [
+            {
+              id: "voice",
+              assetId: source.id,
+              label: "Voice",
+              track: "audio",
+              start: 0,
+              inPoint: 0,
+              duration: 0.3,
+              locked: false,
+              muted: false,
+            },
+          ]
+        : [],
+      transcript: [],
+      proposedChanges: [],
+      qualitySignals: [],
+      revisions: [],
+    },
+  ];
+  DB.state.workspaces.push({
+    owner_email: "creator@example.com",
+    document: JSON.stringify(workspace),
+    revision: 0,
+    updated_at: now,
+  });
+}
+
+async function uploadWebm(
+  env: ReturnType<typeof testEnv>,
+  bytes: Uint8Array,
+  projectId: string | null = "webm-project"
+) {
+  const form = new FormData();
+  form.set(
+    "file",
+    new File([bytes.slice().buffer], "Finished.webm", { type: "video/webm" })
+  );
+  form.set("kind", "video");
+  if (projectId) form.set("render_project_id", projectId);
+  const request = new Request("https://studio.example/api/assets", {
+    method: "POST",
+    headers: { "oai-authenticated-user-email": "creator@example.com" },
+    body: form,
+  });
+  request.headers.set(
+    "content-length",
+    String((await request.clone().arrayBuffer()).byteLength)
+  );
+  return worker.fetch(request, env as never);
+}
+
 function operationProjection(operation: EditOperation) {
   return {
     id: operation.id,
@@ -551,6 +676,235 @@ async function sha256(value: string): Promise<string> {
 }
 
 describe("provenance integrity boundaries", () => {
+  it.skipIf(!nativeWebmAvailable)(
+    "retains editor styles, project FPS/mixer, linked groups and gain envelopes through signed workspace PUT, stored JSON and GET",
+    async () => {
+      const DB = createIntegrityD1(),
+        BUCKET = createMemoryBucket(),
+        env = testEnv(DB, BUCKET);
+      const source = await generateSpeech(DB, BUCKET);
+      const footageUpload = await uploadWebm(env, realWebm(), null);
+      expect(footageUpload.status).toBe(201);
+      const footage = ((await footageUpload.json()) as { asset: Asset }).asset;
+      const workspace = createEmptyWorkspace("creator@example.com", "Creator");
+      const now = new Date().toISOString();
+      const clips: TimelineClip[] = [
+        {
+          id: "linked-picture",
+          assetId: footage.id,
+          track: "video",
+          lane: 2,
+          label: "Picture",
+          start: 1,
+          duration: 5,
+          inPoint: 2,
+          outPoint: 7,
+          locked: false,
+          muted: true,
+          color: "#22d3ee",
+          groupId: "group-scene-a",
+          linkId: "link-scene-a",
+        },
+        {
+          id: "linked-voice",
+          assetId: source.id,
+          track: "audio",
+          lane: 2,
+          label: "Voice",
+          start: 1,
+          duration: 5,
+          inPoint: 2,
+          outPoint: 7,
+          locked: false,
+          muted: false,
+          color: "#a855f7",
+          groupId: "group-scene-a",
+          linkId: "link-scene-a",
+          audioMix: {
+            pan: -0.35,
+            gainKeys: [
+              { at: 2, gain: 0.25 },
+              { at: 3.5, gain: 1.2 },
+              { at: 7, gain: 0 },
+            ],
+          },
+        },
+      ];
+      const project: EditProject = {
+        id: "persist-editor-project",
+        title: "Persistent editor settings",
+        template: "blank",
+        status: "editing",
+        platform: "tiktok",
+        aspectRatio: "9:16",
+        duration: 7,
+        playhead: 2,
+        createdAt: now,
+        updatedAt: now,
+        frameRate: 60,
+        trackSettings: [
+          { kind: "video", number: 2, name: "Main picture", soloPicture: true },
+          {
+            kind: "audio",
+            number: 2,
+            name: "Voice mixer",
+            gain: 0.65,
+            soloSound: true,
+          },
+        ],
+        clips,
+        transcript: [],
+        proposedChanges: [],
+        qualitySignals: [],
+        revisions: [
+          {
+            id: "snapshot-a",
+            label: "Mixer snapshot",
+            createdAt: now,
+            duration: 7,
+            frameRate: 24,
+            trackSettings: [
+              {
+                kind: "audio",
+                number: 2,
+                name: "Previous voice mixer",
+                gain: 0.8,
+                soloSound: false,
+              },
+            ],
+            clips: structuredClone(clips),
+            transcript: [],
+          },
+        ],
+      };
+      workspace.assets = [source, footage];
+      workspace.projects = [project];
+      workspace.editorStyles = normalizeEditorSavedStyles([
+        {
+          id: "style-caption",
+          name: "Brand captions",
+          type: "captions",
+          captionStyle: "classic",
+          captionAppearance: {
+            color: "#22d3ee",
+            size: 54,
+            animation: "word-only",
+            maxCharacters: 25,
+          },
+        },
+        {
+          id: "style-graphic",
+          name: "Brand lower third",
+          type: "graphic",
+          graphicDuration: 5,
+          graphic: {
+            kind: "callout",
+            text: "Authored title",
+            secondaryText: "Authored subtitle",
+            composition: "lower-third",
+            x: 32,
+            y: 72,
+            color: "#ffffff",
+            background: "#111111",
+            accent: "#22d3ee",
+            animation: "slide",
+            motion: [
+              {
+                at: 0,
+                x: 0,
+                y: 72,
+                scale: 1,
+                rotation: 0,
+                opacity: 0,
+                easing: "ease-out",
+              },
+              { at: 1, x: 32, y: 72, scale: 1, rotation: 0, opacity: 1 },
+            ],
+          },
+        },
+        {
+          id: "style-look",
+          name: "Warm look",
+          type: "look",
+          settings: {
+            brightness: 0.1,
+            contrast: 1.2,
+            saturation: 0.8,
+            fit: "cover",
+            visual: { x: 12, y: -6, scale: 1.2, opacity: 0.9, flipX: true },
+          },
+        },
+      ]);
+      expect(workspace.editorStyles).toHaveLength(3);
+      const saved = await worker.fetch(
+        new Request("https://studio.example/api/workspace", {
+          method: "PUT",
+          headers: authHeaders,
+          body: JSON.stringify({ workspace }),
+        }),
+        env as never
+      );
+      expect(saved.status).toBe(200);
+      const savedWorkspace = (
+        (await saved.json()) as {
+          workspace: ReturnType<typeof createEmptyWorkspace>;
+        }
+      ).workspace;
+      const persisted = JSON.parse(
+        String(DB.state.workspaces[0].document)
+      ) as ReturnType<typeof createEmptyWorkspace>;
+      const loaded = await worker.fetch(
+        new Request("https://studio.example/api/workspace", {
+          headers: authHeaders,
+        }),
+        env as never
+      );
+      expect(loaded.status).toBe(200);
+      const reloaded = (
+        (await loaded.json()) as {
+          workspace: ReturnType<typeof createEmptyWorkspace>;
+        }
+      ).workspace;
+      for (const actual of [savedWorkspace, persisted, reloaded]) {
+        expect(actual.editorStyles).toEqual(workspace.editorStyles);
+        expect(actual.projects[0]).toMatchObject({
+          frameRate: 60,
+          trackSettings: project.trackSettings,
+          clips,
+          revisions: project.revisions,
+        });
+        expect(
+          actual.assets.find(asset => asset.id === source.id)?.provenance
+            ?.recordId
+        ).toBe(source.provenance?.recordId);
+        expect(actual.projects[0].clips[1].audioMix).toEqual({
+          pan: -0.35,
+          gainKeys: [
+            { at: 2, gain: 0.25 },
+            { at: 3.5, gain: 1.2 },
+            { at: 7, gain: 0 },
+          ],
+        });
+      }
+      // The new fields must preserve the existing whole-document size limit.
+      const oversized = structuredClone(reloaded);
+      oversized.projects[0].referenceStyleBrief = "x".repeat(2_100_000);
+      const rejected = await worker.fetch(
+        new Request("https://studio.example/api/workspace", {
+          method: "PUT",
+          headers: authHeaders,
+          body: JSON.stringify({ workspace: oversized }),
+        }),
+        env as never
+      );
+      expect(rejected.status).toBe(413);
+      expect(
+        JSON.parse(String(DB.state.workspaces[0].document)).editorStyles
+      ).toEqual(workspace.editorStyles);
+      expect(DB.state.provenance).toHaveLength(1);
+    }
+  );
+
   it("binds displayed script fields and never preserves a stale signed badge", async () => {
     const DB = createIntegrityD1();
     const BUCKET = createMemoryBucket();
@@ -1269,6 +1623,136 @@ describe("provenance integrity boundaries", () => {
       await crypto.subtle.digest("SHA-256", marked!.unmarkedBytes)
     ).toEqual(await crypto.subtle.digest("SHA-256", original));
   }, 15000);
+
+  it.skipIf(!nativeWebmAvailable)(
+    "saves actual finite and unknown-Segment WebM timelines with server-derived AI provenance and verified downloads",
+    async () => {
+      for (const unknownSegment of [false, true]) {
+        const DB = createIntegrityD1(),
+          BUCKET = createMemoryBucket(),
+          env = testEnv(DB, BUCKET);
+        const source = await generateSpeech(DB, BUCKET);
+        persistRenderProject(DB, source);
+        const original = realWebm(unknownSegment);
+        const upload = await uploadWebm(env, original);
+        expect(upload.status).toBe(201);
+        const { asset } = (await upload.json()) as { asset: Asset };
+        expect(asset.contentType).toBe("video/webm");
+        expect(asset.provenance).toMatchObject({
+          origin: "ai-manipulated",
+          operation: "timeline-render",
+          marking: { status: "verified" },
+        });
+        const row = DB.state.assets.find(a => a.id === asset.id)!;
+        const object = BUCKET.objects.get(String(row.r2_key))!;
+        expect(object.httpMetadata?.contentType).toBe("video/webm");
+        expect(object.customMetadata?.embeddedMarking).toBe("webm-simple-tag");
+        const delivery = await worker.fetch(
+          new Request(`https://studio.example${asset.url}`),
+          env as never
+        );
+        expect(delivery.status).toBe(200);
+        expect(delivery.headers.get("Content-Type")).toBe("video/webm");
+        expect(delivery.headers.get("X-REELassati-AI-Origin")).toBe(
+          "ai-manipulated"
+        );
+        const inspected = inspectMediaProvenanceMarker(
+          await delivery.arrayBuffer()
+        );
+        expect(inspected?.token).toBe(asset.provenance?.marking.publicToken);
+        expect(new Uint8Array(inspected!.unmarkedBytes)).toEqual(original);
+        const head = await worker.fetch(
+          new Request(`https://studio.example${asset.url}`, { method: "HEAD" }),
+          env as never
+        );
+        expect(head.status).toBe(200);
+        expect(head.headers.get("Content-Length")).toBe(String(asset.size));
+        const range = await worker.fetch(
+          new Request(`https://studio.example${asset.url}`, {
+            headers: { range: "bytes=0-3" },
+          }),
+          env as never
+        );
+        expect(range.status).toBe(206);
+        expect(new Uint8Array(await range.arrayBuffer())).toEqual(
+          original.slice(0, 4)
+        );
+      }
+    }
+  );
+
+  it.skipIf(!nativeWebmAvailable)(
+    "saves non-AI WebM without inventing AI provenance and rejects a false WebM MIME",
+    async () => {
+      const DB = createIntegrityD1(),
+        BUCKET = createMemoryBucket(),
+        env = testEnv(DB, BUCKET);
+      persistRenderProject(DB);
+      const original = realWebm();
+      const saved = await uploadWebm(env, original);
+      expect(saved.status).toBe(201);
+      const { asset } = (await saved.json()) as { asset: Asset };
+      expect(asset.contentType).toBe("video/webm");
+      expect(asset.provenance).toBeUndefined();
+      expect(DB.state.provenance).toHaveLength(0);
+      const delivery = await worker.fetch(
+        new Request(`https://studio.example${asset.url}`),
+        env as never
+      );
+      expect(delivery.status).toBe(200);
+      expect(new Uint8Array(await delivery.arrayBuffer())).toEqual(original);
+      const falseMime = await uploadWebm(env, new Uint8Array([1, 2, 3, 4]));
+      expect(falseMime.status).toBe(422);
+      expect(DB.state.assets).toHaveLength(1);
+      expect(BUCKET.objects.size).toBe(1);
+    }
+  );
+
+  it.skipIf(!nativeWebmAvailable)(
+    "blocks WebM owner changes, byte corruption and removed marks even when the old signed record/metadata remain",
+    async () => {
+      for (const attack of ["owner", "content", "strip"]) {
+        const DB = createIntegrityD1(),
+          BUCKET = createMemoryBucket(),
+          env = testEnv(DB, BUCKET);
+        persistRenderProject(DB, await generateSpeech(DB, BUCKET));
+        const upload = await uploadWebm(env, realWebm());
+        expect(upload.status).toBe(201);
+        const { asset } = (await upload.json()) as { asset: Asset };
+        const row = DB.state.assets.find(a => a.id === asset.id)!;
+        const key = String(row.r2_key),
+          object = BUCKET.objects.get(key)!;
+        if (attack === "owner")
+          object.customMetadata!.owner = "another@example.com";
+        else if (attack === "strip") {
+          const original = inspectMediaProvenanceMarker(
+            object.bytes.slice().buffer
+          )!.unmarkedBytes;
+          BUCKET.overwritePreservingMetadata(key, original);
+          // Match the altered row size too: the marker/signature gate must still reject it.
+          row.bytes = original.byteLength;
+        } else {
+          const bytes = object.bytes.slice();
+          bytes[readWebmSegmentHeader(bytes)!.dataOffset + 30] ^= 1;
+          BUCKET.overwritePreservingMetadata(key, bytes.buffer);
+        }
+        const response = await worker.fetch(
+          new Request(`https://studio.example${asset.url}`),
+          env as never
+        );
+        expect(response.status).toBe(423);
+        expect(
+          DB.state.provenance.find(p => p.entity_id === asset.id)
+            ?.marking_status
+        ).toBe("failed");
+        expect(
+          DB.state.events.some(
+            e => e.event_type === "asset.generated-delivery-blocked"
+          )
+        ).toBe(true);
+      }
+    }
+  );
 
   it("blocks metadata-preserving byte corruption on full GET and HEAD", async () => {
     const DB = createIntegrityD1();

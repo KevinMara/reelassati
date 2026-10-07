@@ -98,6 +98,10 @@ export interface TimelineClip {
   id: string;
   assetId?: string;
   track: TrackKind;
+  /** Persistent selection group. Independent of an audio/video source link. */
+  groupId?: string;
+  /** Explicitly linked, aligned audio/video members; copies use fresh links. */
+  linkId?: string;
   /** One-based lane within the visual, audio, text or graphic track family. */
   lane?: number;
   /** Preserve primary-story identity when a transition raises the visual lane. */
@@ -122,6 +126,7 @@ export interface TimelineClip {
   hidden?: boolean;
   speed?: number;
   volume?: number;
+  audioMix?: import("./audio-mix").ClipAudioMix;
   color: string;
   fit?: "contain" | "cover";
   fadeIn?: number;
@@ -202,6 +207,8 @@ export interface QualitySignal {
 }
 
 export interface EditRevision {
+  frameRate?: import("./export-settings").ExportFrameRate;
+  trackSettings?: import("./timeline-mixer").TimelineTrackSettings[];
   storyBeats?: import("./story-beats").StoryBeat[];
   aspectRatio?: EditProject["aspectRatio"];
   captionStyle?: string;
@@ -217,6 +224,8 @@ export interface EditRevision {
 }
 
 export interface EditProject {
+  frameRate?: import("./export-settings").ExportFrameRate;
+  trackSettings?: import("./timeline-mixer").TimelineTrackSettings[];
   storyBeats?: import("./story-beats").StoryBeat[];
   editorChat?: import("./editor-chat").EditorChatState;
   /** Selected revision; preserves undo/redo after navigation and batched imports. */
@@ -360,6 +369,7 @@ export interface GenerationJob {
 }
 
 export interface WorkspaceDocument {
+  editorStyles?: import("./editor-style-library").EditorSavedStyle[];
   version: 1;
   revision: number;
   profile: WorkspaceProfile;

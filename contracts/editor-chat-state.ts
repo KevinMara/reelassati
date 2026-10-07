@@ -3,6 +3,7 @@ import {
   findCatalogAudio,
 } from "./editor-catalog-audio";
 import { visualTransitions } from "./clip-visual";
+import { exportFrameRates, type ExportFrameRate } from "./export-settings";
 import type {
   EditorChatAction,
   EditorChatMessage,
@@ -192,6 +193,13 @@ function actionValue(
     )
       return undefined;
   } else if (kind === "settings") {
+    // Check the original value: bounded copying omits nonfinite numbers, which
+    // must not turn corrupt FPS into an apparently valid legacy absence.
+    if (
+      original.frameRate !== undefined &&
+      !exportFrameRates.includes(original.frameRate as ExportFrameRate)
+    )
+      return undefined;
     if (
       value.aspectRatio !== undefined &&
       !["9:16", "16:9", "1:1"].includes(String(value.aspectRatio))
@@ -373,6 +381,20 @@ export function normalizeEditorChatState(
             .filter(reason => typeof reason === "string")
             .slice(0, 24)
         : [];
+      if (
+        originalPlan.actions.some(rawAction => {
+          const action = record(rawAction);
+          return (
+            action?.kind === "settings" &&
+            action.frameRate !== undefined &&
+            !exportFrameRates.includes(action.frameRate as ExportFrameRate)
+          );
+        })
+      ) {
+        const reason = "Choose a frame rate of 24, 25, 30 or 60 fps.";
+        if (!(plan.blockedReasons as string[]).includes(reason))
+          (plan.blockedReasons as string[]).push(reason);
+      }
       message.plan = plan as unknown as EditorChatResponse;
     }
     const request = record(bounded(row.request));

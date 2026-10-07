@@ -14,6 +14,9 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { probeExportMetadata } from "./export-probe";
+import { buildRenderPlan } from "./render-plan";
+import { verifyExportContainer } from "./export-verification";
+import type { EditProject, Asset } from "@contracts/workspace";
 
 type WasmCore = {
   ret: number;
@@ -36,6 +39,7 @@ type WasmCore = {
 
 describe("the installed browser WASM export verifier", () => {
   let core: WasmCore;
+  let makeCore: () => Promise<WasmCore>;
   let validMp4: Uint8Array;
   let lastProbeCode: number;
   const expected = { width: 64, height: 64, duration: 0.5 };
@@ -64,9 +68,11 @@ describe("the installed browser WASM export verifier", () => {
     const createCore = require(corePath) as (options: {
       wasmBinary: Uint8Array;
     }) => Promise<WasmCore>;
-    core = await createCore({
-      wasmBinary: readFileSync(join(dirname(corePath), "ffmpeg-core.wasm")),
-    });
+    const wasmBinary = readFileSync(
+      join(dirname(corePath), "ffmpeg-core.wasm")
+    );
+    makeCore = () => createCore({ wasmBinary });
+    core = await makeCore();
     core.setLogger(() => {});
     core.exec(
       "-v",
@@ -185,6 +191,275 @@ describe("the installed browser WASM export verifier", () => {
     );
     expect(lastProbeCode).toBe(-1);
   });
+
+  it("the shipped WASM core exports and fully decodes every FPS and real 4K in both containers", async () => {
+    const originalCore = core;
+    try {
+      const assets = [
+        { id: "source", kind: "video", status: "ready" },
+      ] as Asset[];
+      for (const resolution of [720, 2160] as const)
+        for (const format of ["mp4", "webm"] as const)
+          for (const frameRate of resolution === 2160
+            ? ([24] as const)
+            : ([24, 25, 30, 60] as const)) {
+            // renderVideo creates and terminates a fresh core for each export.
+            core = await makeCore();
+            core.setLogger(() => {});
+            core.FS.writeFile("input-0", validMp4);
+            const duration = resolution === 2160 ? 2 / 24 : 0.2;
+            const project: EditProject = {
+              id: "wasm-export-project",
+              title: "WASM export fixture",
+              template: "blank",
+              status: "editing",
+              platform: "youtube",
+              playhead: 0,
+              createdAt: "2026-10-07T00:00:00.000Z",
+              updatedAt: "2026-10-07T00:00:00.000Z",
+              proposedChanges: [],
+              qualitySignals: [],
+              revisions: [],
+              aspectRatio: "16:9",
+              duration,
+              frameRate,
+              transcript: [],
+              clips: [
+                {
+                  id: "clip",
+                  label: "Source shot",
+                  color: "#4f46e5",
+                  assetId: "source",
+                  track: "video",
+                  start: 0,
+                  duration,
+                  inPoint: 0,
+                  outPoint: duration,
+                  fit: "cover",
+                  locked: false,
+                },
+              ],
+            };
+            const plan = buildRenderPlan(project, assets, new Set(), {
+              resolution,
+              format,
+            });
+            try {
+              core.exec(...plan.args);
+            } catch (error) {
+              throw new Error(
+                `WASM ${resolution}p ${format} ${frameRate}fps failed`,
+                { cause: error }
+              );
+            }
+            expect(core.ret).toBe(0);
+            core.reset();
+            await expect(
+              probeExportMetadata(engine, plan)
+            ).resolves.toMatchObject({
+              width: plan.width,
+              height: plan.height,
+            });
+            verifyExportContainer(
+              core.FS.readFile(plan.filename) as Uint8Array,
+              format
+            );
+            core.exec(
+              "-v",
+              "error",
+              "-xerror",
+              "-i",
+              plan.filename,
+              "-map",
+              "0:v:0",
+              "-map",
+              "0:a:0",
+              "-f",
+              "null",
+              "-"
+            );
+            expect(core.ret).toBe(0);
+            core.reset();
+            core.FS.unlink(plan.filename);
+          }
+    } finally {
+      core = originalCore;
+    }
+  }, 45000);
+
+  it("exports moving source gain, pan and track gain in MP4 and WebM using the shipped audio filters", async () => {
+    const originalCore = core;
+    const logs: string[] = [];
+    const runCore = (phase: string, args: string[]) => {
+      try {
+        core.exec(...args);
+      } catch (cause) {
+        throw new Error(
+          `Shipped audio regression failed during ${phase}: ${logs.join("\n")}`,
+          {
+            cause,
+          }
+        );
+      }
+      expect(core.ret).toBe(0);
+      core.reset();
+    };
+    runCore("tone generation", [
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=880:sample_rate=48000:duration=0.6",
+      "-c:a",
+      "pcm_s16le",
+      "tone.wav",
+    ]);
+    const tone = (core.FS.readFile("tone.wav") as Uint8Array).slice();
+    const assets = [
+      { id: "source", kind: "video", status: "ready" },
+      { id: "tone", kind: "audio", status: "ready" },
+    ] as Asset[];
+    const project: EditProject = {
+      id: "wasm-audio-project",
+      title: "Moving audio export fixture",
+      template: "blank",
+      status: "editing",
+      platform: "youtube",
+      playhead: 0,
+      createdAt: "2026-10-07T00:00:00.000Z",
+      updatedAt: "2026-10-07T00:00:00.000Z",
+      proposedChanges: [],
+      qualitySignals: [],
+      revisions: [],
+      aspectRatio: "16:9",
+      duration: 0.5,
+      frameRate: 25,
+      transcript: [],
+      trackSettings: [{ kind: "audio", number: 1, gain: 0.5 }],
+      clips: [
+        {
+          id: "picture",
+          label: "Source picture",
+          color: "#4f46e5",
+          assetId: "source",
+          track: "video",
+          start: 0,
+          duration: 0.5,
+          inPoint: 0,
+          outPoint: 0.5,
+          fit: "cover",
+          locked: false,
+        },
+        {
+          id: "sound",
+          label: "Moving source gain",
+          color: "#157D98",
+          assetId: "tone",
+          track: "audio",
+          start: 0.05,
+          duration: 0.4,
+          inPoint: 0.1,
+          outPoint: 0.5,
+          volume: 0.8,
+          fadeIn: 0.02,
+          fadeOut: 0.03,
+          audioMix: {
+            pan: 0.6,
+            gainKeys: [
+              { at: 0.1, gain: 0.1 },
+              { at: 0.4, gain: 1 },
+            ],
+          },
+          locked: false,
+        },
+      ],
+    };
+    try {
+      for (const format of ["mp4", "webm"] as const) {
+        core = await makeCore();
+        core.setLogger(({ message }) => {
+          logs.push(message);
+          if (logs.length > 12) logs.shift();
+        });
+        const plan = buildRenderPlan(project, assets, new Set(["tone"]), {
+          format,
+        });
+        plan.inputs.forEach((asset, index) =>
+          core.FS.writeFile(
+            `input-${index}`,
+            asset.id === "tone" ? tone : validMp4
+          )
+        );
+        runCore(`${format} render`, plan.args);
+        await expect(probeExportMetadata(engine, plan)).resolves.toMatchObject({
+          width: 1280,
+          height: 720,
+        });
+        verifyExportContainer(
+          core.FS.readFile(plan.filename) as Uint8Array,
+          format
+        );
+        runCore(`${format} PCM decode`, [
+          "-v",
+          "error",
+          "-xerror",
+          "-i",
+          plan.filename,
+          "-map",
+          "0:a:0",
+          "-ac",
+          "2",
+          "-ar",
+          "48000",
+          "-f",
+          "f32le",
+          "decoded.f32",
+        ]);
+        const bytes = core.FS.readFile("decoded.f32") as Uint8Array;
+        const pcm = new DataView(
+          bytes.buffer,
+          bytes.byteOffset,
+          bytes.byteLength
+        );
+        const energy = (from: number, to: number, channel: 0 | 1) => {
+          let total = 0;
+          const start = Math.round(from * 48000),
+            end = Math.round(to * 48000);
+          for (let sample = start; sample < end; sample++) {
+            const value = pcm.getFloat32((sample * 2 + channel) * 4, true);
+            total += value * value;
+          }
+          return total / (end - start);
+        };
+        const earlyRight = energy(0.13, 0.19, 1),
+          lateRight = energy(0.32, 0.38, 1),
+          lateLeft = energy(0.32, 0.38, 0);
+        expect(lateRight).toBeGreaterThan(earlyRight * 3);
+        expect(lateRight).toBeGreaterThan(lateLeft * 4);
+        // The sine amplitude is 1/8; volume 0.8 and track gain 0.5 keep
+        // the late right-channel RMS near 0.034, including limiter gain.
+        expect(Math.sqrt(lateRight)).toBeGreaterThan(0.027);
+        expect(Math.sqrt(lateRight)).toBeLessThan(0.044);
+        runCore(`${format} full decode`, [
+          "-v",
+          "error",
+          "-xerror",
+          "-i",
+          plan.filename,
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a:0",
+          "-f",
+          "null",
+          "-",
+        ]);
+      }
+    } finally {
+      core = originalCore;
+    }
+  }, 15000);
 
   it("still rejects incorrect encoded dimensions and duration", async () => {
     await expect(

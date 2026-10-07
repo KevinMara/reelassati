@@ -323,6 +323,9 @@ export function AutonomousEditor({
             duration: p.duration,
             captionStyle: p.captionStyle,
             captionAppearance: p.captionAppearance,
+            aspectRatio: p.aspectRatio,
+            frameRate: p.frameRate,
+            trackSettings: structuredClone(p.trackSettings),
             transcriptProvenance: p.transcriptProvenance,
           };
           const after = {
@@ -334,6 +337,9 @@ export function AutonomousEditor({
             duration: contentDuration(working.clips),
             captionStyle: p.captionStyle,
             captionAppearance: p.captionAppearance,
+            aspectRatio: p.aspectRatio,
+            frameRate: p.frameRate,
+            trackSettings: structuredClone(p.trackSettings),
           };
           const hasChanges =
             JSON.stringify([

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
 import type { EditorChatAction } from "@contracts/editor-chat";
+import { normalizeVisual } from "@contracts/clip-visual";
 import {
   applyChatAction,
   canRunChatAction,
@@ -214,17 +215,15 @@ describe("story section clip division", () => {
       []
     );
     expect(
-      split.clips
-        .slice(0, 2)
-        .map(c => ({
-          start: c.start,
-          duration: c.duration,
-          inPoint: c.inPoint,
-          outPoint: c.outPoint,
-          fadeIn: c.fadeIn,
-          fadeOut: c.fadeOut,
-          label: c.label,
-        }))
+      split.clips.slice(0, 2).map(c => ({
+        start: c.start,
+        duration: c.duration,
+        inPoint: c.inPoint,
+        outPoint: c.outPoint,
+        fadeIn: c.fadeIn,
+        fadeOut: c.fadeOut,
+        label: c.label,
+      }))
     ).toEqual([
       {
         start: 0,
@@ -248,5 +247,216 @@ describe("story section clip division", () => {
     expect(split.clips.slice(2)).toEqual(source.clips.slice(1));
     expect(source.clips).toHaveLength(3);
     expect(split.revisions).toHaveLength(2);
+  });
+
+  const footage = (patch: Partial<TimelineClip> = {}): TimelineClip => ({
+    id: "main",
+    assetId: "video",
+    label: "Original",
+    color: "#6553BE",
+    track: "video",
+    lane: 1,
+    start: 0,
+    duration: 10,
+    inPoint: 2,
+    outPoint: 22,
+    speed: 2,
+    locked: false,
+    ...patch,
+  });
+  const sections = () =>
+    action({
+      kind: "story-beats",
+      splitClips: true,
+      beats: [
+        {
+          id: "hook",
+          kind: "hook",
+          label: "Hook",
+          start: 0,
+          end: 3,
+          evidenceIds: ["first"],
+        },
+        {
+          id: "body",
+          kind: "body",
+          label: "Body",
+          start: 3,
+          end: 10,
+          evidenceIds: ["second"],
+        },
+      ],
+    } as Partial<EditorChatAction>);
+
+  it("rejects one-sided linked story cuts atomically, including a locked audio peer, while markers remain available", () => {
+    for (const locked of [false, true]) {
+      const source = project();
+      source.clips = [
+        footage({ linkId: "av" }),
+        footage({ id: "audio", track: "audio", linkId: "av", locked }),
+      ];
+      const before = structuredClone(source);
+      expect(() => applyChatAction(source, sections(), [])).toThrow(
+        /Include linked audio|Unlock linked/
+      );
+      expect(source).toEqual(before);
+      const markers = applyChatAction(
+        source,
+        { ...sections(), splitClips: false } as EditorChatAction,
+        []
+      );
+      expect(markers.clips).toEqual(source.clips);
+      expect(markers.storyBeats).toHaveLength(2);
+    }
+  });
+
+  it("keeps saved clip selection and range authoritative even with another linked primary source", () => {
+    const source = project(),
+      step = sections();
+    source.clips = [
+      footage(),
+      footage({
+        id: "other",
+        assetId: "other-video",
+        lane: 2,
+        primaryFootage: true,
+        linkId: "other-av",
+      }),
+      footage({
+        id: "other-audio",
+        assetId: "other-video",
+        track: "audio",
+        linkId: "other-av",
+      }),
+    ];
+    source.editorChat = {
+      mode: "auto",
+      maxCredits: 0,
+      messages: [
+        {
+          id: "message",
+          role: "assistant",
+          text: "Divide selected footage",
+          createdAt: source.updatedAt,
+          request: {
+            requestId: "request",
+            projectId: source.id,
+            prompt: "Divide selected footage",
+            mode: "auto",
+            maxCredits: 0,
+            selectedClipIds: ["main"],
+            range: { start: 0, end: 10 },
+          },
+          plan: {
+            assistant: "Reel",
+            requestId: "request",
+            projectId: source.id,
+            message: "Sections",
+            planCredits: 0,
+            totalCredits: 0,
+            maxCredits: 0,
+            budgetExceeded: false,
+            actions: [step],
+            blockedReasons: [],
+            projectUpdatedAt: source.updatedAt,
+          },
+        },
+      ],
+    };
+    const split = applyChatAction(source, step, []);
+    expect(split.clips.filter(c => c.assetId === "video")).toHaveLength(2);
+    expect(split.clips.filter(c => c.assetId === "other-video")).toEqual(
+      source.clips.slice(1)
+    );
+    source.editorChat.messages[0].request!.range = { start: 0, end: 3 };
+    expect(() => applyChatAction(source, step, [])).toThrow(
+      /outside your selected range/
+    );
+  });
+
+  it("preserves persistent groups, visual/audio source clocks and measured words through section splits and undo", () => {
+    const source = project();
+    source.clips = [
+      footage({
+        groupId: "collection",
+        visual: normalizeVisual({
+          keyframes: [
+            { at: 0, x: 0 },
+            { at: 1, x: 20 },
+          ],
+        }),
+        audioMix: {
+          pan: 0.3,
+          gainKeys: [
+            { at: 2, gain: 0.2 },
+            { at: 22, gain: 1 },
+          ],
+        },
+      }),
+      footage({ id: "upper", lane: 2, groupId: "collection" }),
+    ];
+    source.transcript = [
+      {
+        id: "phrase",
+        sourceClipId: "main",
+        start: 2,
+        end: 4,
+        text: "First second",
+        words: [
+          { text: "First", start: 2, end: 2.8 },
+          { text: "second", start: 3.1, end: 4 },
+        ],
+      },
+    ];
+    const split = applyChatAction(source, sections(), []);
+    expect(
+      split.clips
+        .slice(0, 2)
+        .map(c => [c.groupId, c.visualStart, c.visualDuration, c.audioMix])
+    ).toEqual([
+      ["collection", 2, 20, source.clips[0].audioMix],
+      ["collection", 2, 20, source.clips[0].audioMix],
+    ]);
+    expect(split.transcript.map(c => [c.sourceClipId, c.text])).toEqual([
+      ["main", "First"],
+      ["main-a-1", "second"],
+    ]);
+    const words = split.transcript.flatMap(c => c.words ?? []);
+    expect(words.map(word => word.text)).toEqual(
+      source.transcript[0].words!.map(word => word.text)
+    );
+    words.forEach((word, index) => {
+      expect(word.start).toBeCloseTo(
+        source.transcript[0].words![index].start,
+        9
+      );
+      expect(word.end).toBeCloseTo(source.transcript[0].words![index].end, 9);
+    });
+    const restored = applyChatAction(
+      split,
+      action({ kind: "history", direction: "undo" }),
+      []
+    );
+    expect(restored.clips).toEqual(source.clips);
+    expect(restored.transcript).toEqual(source.transcript);
+  });
+
+  it("rejects a section cut through a generated transition before adding markers", () => {
+    const source = project();
+    source.clips = [
+      footage({
+        shotTransition: {
+          outgoingId: "main",
+          incomingId: "next",
+          incomingEntrance: { kind: "none", duration: 0.5 },
+          outgoingExit: { kind: "none", duration: 0.5 },
+        },
+      }),
+    ];
+    expect(() => applyChatAction(source, sections(), [])).toThrow(
+      /Remove the transition/
+    );
+    expect(source.storyBeats).toBeUndefined();
+    expect(source.revisions).toEqual([]);
   });
 });

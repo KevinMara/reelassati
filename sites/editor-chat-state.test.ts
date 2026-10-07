@@ -38,6 +38,35 @@ const message = {
 };
 
 describe("saved editing chat continuity", () => {
+  it("retains supported FPS and legacy settings while dropping malformed FPS actions", () => {
+    const settings = (frameRate?: unknown) => ({
+      ...action,
+      kind: "settings",
+      credits: 0,
+      aspectRatio: "1:1",
+      ...(frameRate !== undefined ? { frameRate } : {}),
+    });
+    const state = normalizeEditorChatState({
+      messages: [
+        {
+          ...message,
+          plan: {
+            ...message.plan,
+            actions: [
+              settings(),
+              ...[24, 25, 30, 60].map(settings),
+              ...[48, 29.97, NaN, Infinity, "30", null].map(settings),
+            ],
+          },
+        },
+      ],
+    })!;
+    const saved = state.messages[0].plan!.actions;
+    expect(saved).toHaveLength(5);
+    expect(
+      saved.map(a => (a.kind === "settings" ? a.frameRate : undefined))
+    ).toEqual([undefined, 24, 25, 30, 60]);
+  });
   it("preserves paid result JSON and recovery identifiers exactly", () => {
     const result = JSON.stringify([
       {

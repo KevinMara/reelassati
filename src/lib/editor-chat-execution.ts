@@ -13,6 +13,8 @@ import type {
   TranscriptSegment,
 } from "@contracts/workspace";
 import type { EditorChatAction } from "@contracts/editor-chat";
+import { exportFrameRates } from "@contracts/export-settings";
+import { assertLinkedEditTargets, splitGrouping } from "@contracts/clip-groups";
 import {
   applyEditOperation,
   contentDuration,
@@ -39,6 +41,8 @@ export function chatSnapshot(
     createdAt: new Date().toISOString(),
     duration: project.duration,
     aspectRatio: project.aspectRatio,
+    frameRate: project.frameRate,
+    trackSettings: structuredClone(project.trackSettings),
     captionStyle: project.captionStyle,
     captionAppearance: project.captionAppearance,
     storyBeats: project.storyBeats,
@@ -61,6 +65,8 @@ export function recordChatEdit(
       p.transcript,
       p.duration,
       p.aspectRatio,
+      p.frameRate,
+      p.trackSettings,
       p.captionStyle,
       p.captionAppearance,
       p.storyBeats,
@@ -211,11 +217,17 @@ export function applyChatAction(
       action.duration
     );
   } else if (action.kind === "settings") {
+    if (
+      action.frameRate !== undefined &&
+      !exportFrameRates.includes(action.frameRate)
+    )
+      throw new Error("Choose a frame rate of 24, 25, 30 or 60 fps.");
     next =
       action.duration !== undefined
         ? resizeTimeline(project, action.duration)
         : { ...project };
     if (action.aspectRatio) next.aspectRatio = action.aspectRatio;
+    if (action.frameRate !== undefined) next.frameRate = action.frameRate;
     if (action.captionStyle) {
       next.captionStyle = action.captionStyle;
       next.captionAppearance = undefined;
@@ -230,13 +242,33 @@ export function applyChatAction(
   } else if (action.kind === "story-beats") {
     next = { ...project, storyBeats: action.beats };
     if (action.splitClips) {
+      const message = project.editorChat?.messages.find(message =>
+        message.plan?.actions.some(step => step.id === action.id)
+      );
+      const selectedClipIds =
+        message?.request?.selectedClipIds ?? message?.selectedClipIds;
+      const range = message?.request?.range ?? message?.range;
+      if (
+        range &&
+        action.beats.some(
+          beat => beat.start < range.start || beat.end > range.end
+        )
+      )
+        throw new Error(
+          "These story sections extend outside your selected range."
+        );
       const splits: Array<{ original: TimelineClip; pieces: TimelineClip[] }> =
         [];
       const boundaries = [
         ...new Set(action.beats.flatMap(beat => [beat.start, beat.end])),
       ].sort((a, b) => a - b);
       next.clips = project.clips.flatMap(clip => {
-        if (clip.locked || !isPrimaryFootage(clip)) return [clip];
+        if (
+          clip.locked ||
+          !isPrimaryFootage(clip) ||
+          (selectedClipIds?.length && !selectedClipIds.includes(clip.id))
+        )
+          return [clip];
         const cuts = [
           clip.start,
           ...boundaries.filter(
@@ -247,7 +279,7 @@ export function applyChatAction(
         ];
         const original = clip;
         if (cuts.length > 2) assertNoShotTransition(project, [clip.id]);
-        clip = preserveGraphicDuration(clip);
+        if (cuts.length > 2) clip = preserveGraphicDuration(clip);
         const pieces = cuts.slice(0, -1).map((start, index) => {
           const end = cuts[index + 1];
           const beat = action.beats.find(
@@ -268,6 +300,37 @@ export function applyChatAction(
         if (pieces.length > 1) splits.push({ original, pieces });
         return pieces;
       });
+      if (splits.length) {
+        const targetClipIds = splits.map(split => split.original.id);
+        // This legacy section action authorizes primary footage only. A linked
+        // structural cut must instead use explicit matching AV edit targets.
+        assertLinkedEditTargets(
+          project,
+          { type: "split", start: 0, end: 0, targetClipIds },
+          targetClipIds
+        );
+        const reserved = new Set(
+          [...project.clips, ...next.clips].flatMap(clip => [
+            clip.id,
+            clip.groupId,
+            clip.linkId,
+          ])
+        );
+        let sequence = 0;
+        const grouped = splitGrouping(project, splits, () => {
+          let id: string;
+          do id = `${action.id}-story-membership-${++sequence}`;
+          while (reserved.has(id));
+          reserved.add(id);
+          return id;
+        });
+        const memberships = new Map(grouped.clips.map(clip => [clip.id, clip]));
+        next.clips = next.clips.map(clip => ({
+          ...clip,
+          groupId: memberships.get(clip.id)?.groupId,
+          linkId: memberships.get(clip.id)?.linkId,
+        }));
+      }
       next.transcript = projectSplitCaptions(project, splits);
     }
   }

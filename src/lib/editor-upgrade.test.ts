@@ -9,6 +9,7 @@ import {
   replaceTimelineClip,
 } from "./editor-manual";
 import { trimTimelineClip } from "./timeline-lanes";
+import { unlinkClips } from "@contracts/clip-groups";
 import { captionIssues, mergeCaptions, splitCaption } from "./caption-editing";
 import { colorGradeFilter, colorGradeMatrix } from "./color-grade";
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
@@ -85,9 +86,9 @@ describe("manual editing preserves media and speech", () => {
       "speech"
     );
     expect(detached.clips[0].muted).toBe(true);
-    expect(deleteClipGroup(detached, ["v"]).transcript).toEqual([
-      { ...p.transcript[0], sourceClipId: "speech" },
-    ]);
+    expect(
+      deleteClipGroup(unlinkClips(detached, ["v", "speech"]), ["v"]).transcript
+    ).toEqual([{ ...p.transcript[0], sourceClipId: "speech" }]);
     expect(
       moveClipGroup(detached, ["speech"], "speech", 3, 1).transcript[0]
     ).toMatchObject({ start: 5, end: 7 });

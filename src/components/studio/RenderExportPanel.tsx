@@ -1,5 +1,5 @@
 import posthog from "@/lib/posthog";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, Loader2, CheckCircle2 } from "lucide-react";
 import {
@@ -12,6 +12,13 @@ import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { CompactSelect } from "@/components/ui/compact-select";
+import {
+  exportDimensions,
+  exportFrameRates,
+  type ExportResolution,
+  type ExportFrameRate,
+  type ExportFormat,
+} from "@contracts/export-settings";
 
 export function RenderExportPanel({
   project,
@@ -23,7 +30,11 @@ export function RenderExportPanel({
   onBrief: () => void;
 }) {
   const { workspace, updateWorkspace } = useWorkspace();
-  const [resolution, setResolution] = useState<720 | 1080>(720);
+  const settingsId = useId();
+  const [resolution, setResolution] = useState<ExportResolution>(720);
+  const [frameRateOverride, setFrameRate] = useState<ExportFrameRate>();
+  const frameRate = frameRateOverride ?? project.frameRate ?? 30;
+  const [format, setFormat] = useState<ExportFormat>("mp4");
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -59,6 +70,8 @@ export function RenderExportPanel({
           workspace.assets,
           {
             resolution,
+            frameRate,
+            format,
             signal: abort.current.signal,
             onProgress: (n, label) => {
               setProgress(n);
@@ -89,6 +102,10 @@ export function RenderExportPanel({
           undefined,
           project.id
         );
+      if (uploaded.current.contentType !== result.file.type)
+        throw new Error(
+          "The saved video has a different format than the export. Please retry saving to Library."
+        );
       const asset = {
         ...uploaded.current,
         projectId: project.id,
@@ -106,6 +123,8 @@ export function RenderExportPanel({
       posthog?.capture("video_export_completed", {
         duration: result.duration,
         resolution,
+        frameRate: result.frameRate,
+        format: result.format,
       });
       setSaved(asset);
       // Download the finalized bytes, including the source's AI marking.
@@ -116,7 +135,9 @@ export function RenderExportPanel({
         );
         setDownload({
           url: URL.createObjectURL(
-            new Blob([new Uint8Array(bytes).buffer], { type: "video/mp4" })
+            new Blob([new Uint8Array(bytes).buffer], {
+              type: asset.contentType,
+            })
           ),
           name: result.file.name,
         });
@@ -155,28 +176,75 @@ export function RenderExportPanel({
       >
         <DialogTitle>Export your video</DialogTitle>
         <DialogDescription>
-          A finished MP4 with your cuts, images, captions, and audio. Saved to
+          A finished video with your cuts, images, captions, and audio. Saved to
           your Library and ready to publish.
         </DialogDescription>
         <p className="font-medium">{project.title}</p>
-        <label className="text-sm">
+        <label htmlFor={`${settingsId}-resolution`} className="text-sm">
           Resolution
           <CompactSelect
+            id={`${settingsId}-resolution`}
             aria-label="Resolution"
             disabled={busy || hasRender}
             value={String(resolution)}
-            onValueChange={value => setResolution(Number(value) as 720 | 1080)}
+            onValueChange={value =>
+              setResolution(Number(value) as ExportResolution)
+            }
             className="mt-2"
             options={[
               { value: "720", label: "720p · faster export" },
               { value: "1080", label: "1080p · more detail" },
+              { value: "2160", label: "4K · maximum detail" },
             ]}
           />
         </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label htmlFor={`${settingsId}-frame-rate`} className="text-sm">
+            Frame rate
+            <CompactSelect
+              id={`${settingsId}-frame-rate`}
+              aria-label="Export frame rate"
+              className="mt-2"
+              disabled={busy || hasRender}
+              value={String(frameRate)}
+              onValueChange={value =>
+                setFrameRate(Number(value) as ExportFrameRate)
+              }
+              options={exportFrameRates.map(value => ({
+                value: String(value),
+                label: `${value} fps${value === (project.frameRate ?? 30) ? " · project" : ""}`,
+              }))}
+            />
+          </label>
+          <label htmlFor={`${settingsId}-format`} className="text-sm">
+            Format
+            <CompactSelect
+              id={`${settingsId}-format`}
+              aria-label="Export format"
+              className="mt-2"
+              disabled={busy || hasRender}
+              value={format}
+              onValueChange={value => setFormat(value as ExportFormat)}
+              options={[
+                { value: "mp4", label: "MP4" },
+                { value: "webm", label: "WebM" },
+              ]}
+            />
+          </label>
+        </div>
         <p className="text-sm text-foreground/70">
-          {project.aspectRatio} canvas · up to 3 minutes. Keep this page open
-          while exporting. Export uses no AI credits.
+          {project.aspectRatio} canvas ·{" "}
+          {exportDimensions(project.aspectRatio, resolution).width} ×{" "}
+          {exportDimensions(project.aspectRatio, resolution).height} ·{" "}
+          {frameRate} fps. Keep this page open while exporting. Export uses no
+          AI credits.
         </p>
+        {resolution === 2160 && (
+          <p className="text-sm text-foreground/70">
+            4K needs more memory and time, especially for long timelines or
+            several video layers.
+          </p>
+        )}
         {busy && (
           <div role="status" aria-live="polite">
             <p className="mb-2 text-sm">
@@ -223,7 +291,7 @@ export function RenderExportPanel({
               ? "Exporting…"
               : hasRender
                 ? "Retry saving to Library"
-                : "Create MP4"}
+                : `Create ${format === "mp4" ? "MP4" : "WebM"}`}
           </button>
         )}
         {busy && progress < 96 && (
@@ -241,7 +309,7 @@ export function RenderExportPanel({
             download={download.name}
             className="text-center text-sm font-medium text-primary"
           >
-            Download MP4
+            Download {format === "webm" ? "WebM" : "MP4"}
           </a>
         )}
         <button

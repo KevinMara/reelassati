@@ -39,10 +39,13 @@ import { normalizeReview } from "../contracts/source-review";
 import { audioGenerationQuote } from "../contracts/audio-generation";
 import { normalizeMediaFolders } from "../contracts/media-folders";
 import { normalizeEditorGenerations } from "../contracts/editor-generations";
+import { normalizeEditorSavedStyles } from "../contracts/editor-style-library";
 import { pcmWaveDuration } from "../contracts/audio-chunks";
 import {
   hashMediaStream,
   inspectMp4Stream,
+  inspectWebmStream,
+  markWebmStream,
   mediaParts,
   mp4Marker,
   storeMediaParts,
@@ -1612,7 +1615,9 @@ async function finalizeEmbeddedProvenance(
   env: SitesEnvironment,
   user: AuthenticatedUser,
   provenance: ContentProvenance,
-  storedBytes: ArrayBuffer | ReadableStream<Uint8Array>
+  storedBytes: ArrayBuffer | ReadableStream<Uint8Array>,
+  contentType = "video/mp4",
+  storedSize?: number
 ): Promise<ContentProvenance> {
   const row = await env.DB.prepare(
     "SELECT * FROM ai_provenance_records WHERE id = ? AND owner_email = ? LIMIT 1"
@@ -1622,14 +1627,20 @@ async function finalizeEmbeddedProvenance(
   if (!row) throw new Error("Stored provenance record is missing");
   const streamed =
     storedBytes instanceof ReadableStream
-      ? await inspectMp4Stream(storedBytes)
+      ? contentType === "video/webm"
+        ? await inspectWebmStream(
+            storedBytes,
+            storedSize || 0,
+            row.public_token
+          )
+        : await inspectMp4Stream(storedBytes)
       : null;
   const inspected = streamed
     ? streamed.marker
     : inspectMediaProvenanceMarker(storedBytes as ArrayBuffer);
   const fingerprint = streamed
     ? streamed.fingerprint
-    : inspected
+    : inspected && "unmarkedBytes" in inspected
       ? await sha256Hex(inspected.unmarkedBytes)
       : "";
   const authenticAsVerified = await tokenIsAuthentic(env, {
@@ -2153,6 +2164,7 @@ function normalizeWorkspace(
     goals: Array.isArray(candidate.goals) ? candidate.goals : [],
     jobs: Array.isArray(candidate.jobs) ? candidate.jobs : [],
     editorGenerations: normalizeEditorGenerations(candidate.editorGenerations),
+    editorStyles: normalizeEditorSavedStyles(candidate.editorStyles),
     activity: Array.isArray(candidate.activity) ? candidate.activity : [],
     updatedAt:
       typeof candidate.updatedAt === "string"
@@ -3559,18 +3571,32 @@ async function generatedAssetStructuralFailure(
   return null;
 }
 
-async function generatedMp4StreamFailure(
+async function generatedVideoStreamFailure(
   row: AssetRow,
   provenance: ProvenanceRow,
   object: R2ObjectBody
 ): Promise<GeneratedAssetVerificationFailure | null> {
-  const inspected = await inspectMp4Stream(object.body);
+  let inspected;
+  try {
+    inspected =
+      row.content_type === "video/webm"
+        ? await inspectWebmStream(
+            object.body,
+            object.size,
+            provenance.public_token
+          )
+        : await inspectMp4Stream(object.body);
+  } catch {
+    return "embedded-marker-mismatch";
+  }
   if (object.size !== row.bytes || inspected.size !== row.bytes)
     return "object-size-mismatch";
   if (
     !inspected.marker ||
     inspected.marker.token !== provenance.public_token ||
-    object.customMetadata?.embeddedMarking !== "mp4-uuid-box"
+    object.customMetadata?.embeddedMarking !== inspected.marker.method ||
+    inspected.marker.method !==
+      (row.content_type === "video/webm" ? "webm-simple-tag" : "mp4-uuid-box")
   )
     return "embedded-marker-mismatch";
   return inspected.fingerprint === provenance.content_sha256
@@ -4641,11 +4667,25 @@ async function finalizeTimelineUpload(
     r2Key: string;
   }
 ): Promise<Asset> {
-  if (input.contentType !== "video/mp4")
-    throw errorResponse("Render your timeline as an MP4", 422);
+  if (!["video/mp4", "video/webm"].includes(input.contentType))
+    throw errorResponse("Render your timeline as an MP4 or WebM", 422);
   const workspace = await getWorkspace(env, user);
   const project = workspace.projects.find(p => p.id === projectId);
   if (!project) throw errorResponse("Source project not found", 404);
+  const raw = await env.BUCKET.get(input.r2Key);
+  if (!raw || raw.size !== input.size)
+    throw errorResponse("The upload is incomplete", 422);
+  const isWebm = input.contentType === "video/webm";
+  if (isWebm) {
+    try {
+      await inspectWebmStream(raw.body, raw.size);
+    } catch (error) {
+      throw errorResponse(
+        error instanceof Error ? error.message : "The WebM upload is invalid",
+        422
+      );
+    }
+  }
   const sources = workspace.assets
     .filter(a => project.clips.some(c => c.assetId === a.id))
     .flatMap(a => (a.provenance ? [a.provenance] : []));
@@ -4657,9 +4697,9 @@ async function finalizeTimelineUpload(
   ) {
     return insertAssetRecord(env, user, input);
   }
-  const raw = await env.BUCKET.get(input.r2Key);
-  if (!raw || raw.size !== input.size)
-    throw errorResponse("The upload is incomplete", 422);
+  const provenanceSource = isWebm ? await env.BUCKET.get(input.r2Key) : raw;
+  if (!provenanceSource || provenanceSource.etag !== raw.etag)
+    throw errorResponse("The source changed during saving", 422);
   const pending = await createProvenanceRecord(env, user, {
     entityType: "asset",
     entityId: input.id,
@@ -4667,7 +4707,7 @@ async function finalizeTimelineUpload(
     operation: "timeline-render",
     provider: "REELassati",
     model: "timeline-compositor",
-    content: raw.body,
+    content: provenanceSource.body,
     embeddedMediaMarker: true,
     metadata: {
       projectId,
@@ -4677,13 +4717,13 @@ async function finalizeTimelineUpload(
   });
   const key = `users/${encodeURIComponent(user.email)}/generated/${input.id}/${sanitizeFilename(input.name)}`;
   const multipart = await env.BUCKET.createMultipartUpload(key, {
-    httpMetadata: { contentType: "video/mp4" },
+    httpMetadata: { contentType: input.contentType },
     customMetadata: {
       owner: user.email,
       originalName: input.name,
       provenanceToken: pending.marking.publicToken || "",
       policyVersion: AI_COMPLIANCE_POLICY_VERSION,
-      embeddedMarking: "mp4-uuid-box",
+      embeddedMarking: isWebm ? "webm-simple-tag" : "mp4-uuid-box",
     },
   });
   try {
@@ -4691,9 +4731,16 @@ async function finalizeTimelineUpload(
     if (!source || source.etag !== raw.etag)
       throw new Error("The source changed during saving");
     const parts: R2UploadedPart[] = [];
+    const markedBody = isWebm
+      ? markWebmStream(
+          source.body,
+          source.size,
+          pending.marking.publicToken || ""
+        )
+      : source.body;
     for await (const part of mediaParts(
-      source.body,
-      mp4Marker(pending.marking.publicToken || ""),
+      markedBody,
+      isWebm ? new Uint8Array() : mp4Marker(pending.marking.publicToken || ""),
       UPLOAD_PART_BYTES
     )) {
       parts.push(await multipart.uploadPart(parts.length + 1, part));
@@ -4706,7 +4753,9 @@ async function finalizeTimelineUpload(
       env,
       user,
       pending,
-      stored.body
+      stored.body,
+      input.contentType,
+      stored.size
     );
     const asset = await insertAssetRecord(env, user, {
       ...input,
@@ -5038,8 +5087,8 @@ async function handleAssets(
             fullObject
           );
           if (!verificationFailure) {
-            if (row.content_type === "video/mp4") {
-              verificationFailure = await generatedMp4StreamFailure(
+            if (["video/mp4", "video/webm"].includes(row.content_type)) {
+              verificationFailure = await generatedVideoStreamFailure(
                 row,
                 provenance,
                 fullObject
@@ -7839,7 +7888,7 @@ async function handleVideoReference(
     );
     const byteFailure =
       !structuralFailure && provenance
-        ? await generatedMp4StreamFailure(row, provenance, object)
+        ? await generatedVideoStreamFailure(row, provenance, object)
         : null;
     if (structuralFailure || byteFailure)
       return errorResponse("Reference unavailable", 404);

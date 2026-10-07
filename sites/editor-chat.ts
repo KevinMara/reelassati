@@ -27,6 +27,12 @@ import type {
 } from "../contracts/editor-chat";
 import type { StoryBeat } from "../contracts/story-beats";
 import { applyAdjacentTransition } from "../contracts/adjacent-transition";
+import { assertLinkedEditTargets } from "../contracts/clip-groups";
+import {
+  exportFrameRates,
+  type ExportFrameRate,
+} from "../contracts/export-settings";
+import { isPrimaryFootage } from "../contracts/timeline-layers";
 import {
   normalizeVisual,
   visualTransitions,
@@ -299,6 +305,7 @@ export function editorChatModelContext(context: EditorChatContext) {
       title: project.title,
       duration: project.duration,
       aspectRatio: project.aspectRatio,
+      frameRate: project.frameRate ?? 30,
       platform: project.platform,
       captionStyle: project.captionStyle,
       captionAppearance: project.captionAppearance,
@@ -362,6 +369,7 @@ Every edit MUST be a complete nested action. Examples (replace IDs and times wit
 {"id":"cut","kind":"edit","label":"Trim ending","reason":"Remove measured dead air","scope":"requested","requestExcerpt":"trim ending","dependsOn":[],"operation":{"type":"trim","start":0,"end":8,"targetClipIds":["actual-clip-id"],"parameters":{"sourceIn":0}}}
 {"id":"remove","kind":"edit","label":"Remove selected callout","reason":"Requested removal","scope":"requested","requestExcerpt":"remove callout","dependsOn":[],"operation":{"type":"delete","start":0,"end":3,"targetClipIds":["actual-callout-id"],"parameters":{}}}
 Do not place type or targetClipIds beside kind. Do not use an operation string. Explicit IDs must exist; never guess IDs. Selected clips are context, not permission to change every clip. A selected time range is a hard boundary; plan only in-range actions and explain when a broader request needs the range cleared. Never emit actions you already know violate it.
+Manual groups and audio/video links are distinct. Existing clips with the same valid linkId have explicitly linked AV timing. A trim, split, move, delete, pacing change, or partial-range style/audio segmentation must include every matching linked clip ID explicitly in operation.targetClipIds, with compatible source clocks. Never add a linked peer outside the requested scope or selected range; explain the constraint and have the user select that scope or unlink first. Whole-clip picture/style and sound controls may target only the requested member. Never silently expand target IDs or break a link.
 Kinds and fields:
 Graphic creation versus revision: use operation.type="graphic" and parameters.graphicMode="create" to add one. To revise an existing graphic use parameters.graphicMode="update", targetClipIds:[the exact unlocked graphic ID], start/end covering that graphic, and parameters.graphic with the fields to change. Existing design fields are preserved. For example replace a callout's words with {type:"graphic",targetClipIds:["actual-id"],start:0,end:3,parameters:{graphicMode:"update",graphic:{text:"Something New",animation:"slide",motion:[{at:0,x:35,y:30,scale:0.9,rotation:0,easing:"ease-out"},{at:0.2,x:50,y:30,scale:1,rotation:0,easing:"hold"},{at:0.85,x:50,y:30,scale:1,rotation:0,easing:"ease-in"},{at:1,x:65,y:30,scale:0.95,rotation:0}]}}}. Use actual target times. Do not invent update-graphic, animate, motion-path or text-replace operation types. To change a graphic's timing, use trim/move separately. A selected video is not a graphic target; new graphics use create.
 - edit: operation follows {type:trim|split|move|delete|caption|silence|pacing|broll|audio|style|graphic,label,reason,start,end,confidence:0..1,intensity:light|balanced|aggressive,targetClipIds,parameters}. Only unlocked clips can be changed. Respect the selected range. Caption text must match supplied transcript or exactly requested words, with evidence-based timing; to caption untranscribed speech use transcribe. Never infer silence from a missing transcript. broll can use parameters.assetId of existing image/video ONLY; paid generation has its own generate action. trim sourceIn is a source-media offset, move destination an absolute timeline time, pacing speed 0.25..4, audio volume 0..2. style supports fit:cover|contain,fadeIn/fadeOut:0..3,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2. For footage transforms use parameters.visual:{x/y:-100..100 (percent offset from canvas center),scale:0.1..4,rotation:-720..720,opacity:0..1,flipX/flipY:boolean,crop:{top/right/bottom/left:0..45 percent of fitted canvas},mask:none|ellipse|rounded,radius:0..50,keyframes:[{at:0..1,x,y,scale,rotation,opacity,easing:linear|ease-in|ease-out|ease-in-out|hold}],entrance/exit:{kind:none|dissolve|wipe-left|wipe-right|wipe-up|wipe-down|slide-left|slide-right|zoom,duration:0.05..5}}. Visual transitions leave audio unchanged. For a transition at an adjacent cut, use adjacent-transition with measured source handles; for existing overlapping video, use visual entrance/exit. A single-clip fade is not a cross-dissolve. Preserve existing keyframes when making unrelated style changes. graphic parameters.graphic supports kind:text|callout|counter|countdown|arrow|highlight|rectangle|ellipse|star|line|spatial-title|spatial-cube|spatial-orbit,text,color:#RRGGBB,background:#RRGGBB,x/y:10..90,size:2..16,animation:none|fade|pop|slide,from,to,prefix,suffix,rotation:-720..720,motion:[{at:0..1,x/y:0..100,scale:0.1..4,rotation:-720..720,opacity:0..1,easing:linear|ease-in|ease-out|ease-in-out|hold}]. Graphic compositions support composition:plain|lower-third|chapter|quote|statistic|progress,secondaryText (up to120 characters),accent:#RRGGBB,padding/cornerRadius:0..6,width:1..90,height:0.2..60 (both shape dimensions percent of canvas width),strokeWidth:0..4 (rectangle/line). Use a nameplate with a real name/role, a proof statistic with an actual measured value, or an attributed quote only when provided. Spatial graphics support spatial:{pitch/yaw:-70..70,depth:0.02..0.65,turns:-3..3,perspective:3..12}; spatial title at most 28 Latin characters. They are editable projected shapes, not tracked footage, arbitrary GLB models or Adobe project execution.
@@ -371,11 +379,11 @@ Graphic creation versus revision: use operation.type="graphic" and parameters.gr
 - generate: media:image|video|speech|music|sfx,prompt,name,seconds for video/music/sfx,voice for speech from supplied voiceIds, optional language. Image is 1K; video 720p with no generated audio, 3–15 integer seconds. Music 5–30 seconds; SFX 0.5–30 seconds. Speech prompt is the exact words to speak, not directions; preserve the language. Output goes to Library by default. Only include insert:{start,duration?} if the command explicitly asks to place/add it in this edit; do not automatically insert assets merely requested for generation. Do not use a real-person voice likeness or claim reference identity.
 - catalog-audio: catalogId from supplied freeAudioCatalog; optional insert:{start,duration?}. Uses an existing bundled CC0 sound/music file, with zero action credits and no audio-generation provider. Prefer this for a whoosh, impact, transition sound, or music bed when a catalog entry fits; never label it newly generated. Use available names/tags to choose, not invented sonic details. Omit insert when only asked to save/find a sound: it goes to Library. Include insert only when asked to add/place sound in the edit. Default duration is bounded by source length and remaining edit/selected range; never stretch or silently loop it. Explicitly requested original/custom generation still uses generate, subject to provider availability. Optional extra sound placements retain extra scope and approval.
 - insert: owned assetId,start,duration?; only actual image/video/audio assets. Reuses the real asset without generation cost.
-- settings: aspectRatio:9:16|16:9|1:1,duration,captionStyle from supplied captionStyles; captionAppearance supports animation:none|active-word|word-reveal|word-only|word-pulse (every word animation requires measured word timestamps; transcribe first if absent),activeColor:#RRGGBB,color/outlineColor/background:#RRGGBB (background:null removes the box),size:2..12 percent of width,bold:boolean,uppercase:boolean,outline:0..2,position:top|bottom,margin:2..40 percent,maxCharacters:12..64. Use these controls for specific styling requests, preserving untouched appearance fields. Do not shorten a project if that would cut locked clips or truncate content outside a requested range.
+- settings: aspectRatio:9:16|16:9|1:1,frameRate:24|25|30|60 (project/export FPS; never approximate an unsupported rate),duration,captionStyle from supplied captionStyles; captionAppearance supports animation:none|active-word|word-reveal|word-only|word-pulse (every word animation requires measured word timestamps; transcribe first if absent),activeColor:#RRGGBB,color/outlineColor/background:#RRGGBB (background:null removes the box),size:2..12 percent of width,bold:boolean,uppercase:boolean,outline:0..2,position:top|bottom,margin:2..40 percent,maxCharacters:12..64. Use these controls for specific styling requests, preserving untouched appearance fields. Do not shorten a project if that would cut locked clips or truncate content outside a requested range.
 - history: direction:undo|redo. Do not combine with other mutation actions in one response.
 - seek: time in seconds. Moves the playhead without editing.
 - replan: prompt containing the original request and reason to use newly obtained evidence. Must depend on analyze/transcribe. Costs another 5 credits; avoid unless decisions truly need the new evidence. At most one, last action. No recursive replan loop.
-- story-beats: beats:[{kind:hook|body|proof|payoff|cta|custom,label,evidenceIds:[...]}],splitClips:boolean. Use only supplied storyEvidence IDs. The server derives boundaries from evidence; never invent percentages or timestamps. Use when requested to divide the video into hook/body/sections, or as a clearly useful optional guide for a full edit. Set splitClips true ONLY when the request explicitly asks to cut/split/divide the footage into those sections; otherwise add guide markers only. Do not force a CTA. If timing evidence is absent, transcribe or analyze first and then replan.
+- story-beats: beats:[{kind:hook|body|proof|payoff|cta|custom,label,evidenceIds:[...]}],splitClips:boolean. Use only supplied storyEvidence IDs. The server derives boundaries from evidence; never invent percentages or timestamps. Use when requested to divide the video into hook/body/sections, or as a clearly useful optional guide for a full edit. Set splitClips true ONLY when the request explicitly asks to cut/split/divide the footage into those sections; otherwise add guide markers only. For linked AV footage, keep story-beats marker-only (splitClips:false) and use separate edit/split actions containing every explicit matching linked ID for requested physical cuts. Emit multiple cuts in descending timeline order so retained original IDs still identify the earlier source pieces. Respect the selected range and requested scope. Do not force a CTA. If timing evidence is absent, transcribe or analyze first and then replan.
 Use at most 24 actions, ordered so prerequisites come first, with ids unique and dependsOn referencing earlier ids. Never output a tool name or operation not listed. Unsupported tasks (camera/object tracking, rotoscoping, Adobe .aep execution, arbitrary social video access) must be explained honestly, not silently simulated. A social URL is only a reference link until actual retrieval/analysis succeeds. Support captions, motion graphics and asset generation directly from natural requests without requiring a menu selection. Prioritize a coherent story: a clear opening promise, real proof, connected beats, legible text, purposeful sound, complete spoken phrases and an ending appropriate to the brief. Do not force a CTA or predict virality.`;
 
 /** Model output is a proposal, never an authority for assets, scope, tariffs or spend. */
@@ -548,6 +556,7 @@ export function normalizeEditorChatPlan(
           operation.end <= operation.start
         )
           throw new Error("This edit needs a non-empty time range.");
+        assertLinkedEditTargets(project, operation);
         if (operation.type === "broll") {
           const asset = owned(operation.parameters?.assetId || "");
           if (!asset || !["video", "image"].includes(asset.kind))
@@ -876,6 +885,12 @@ export function normalizeEditorChatPlan(
           ),
         };
       } else if (row.kind === "settings") {
+        if (
+          row.frameRate !== undefined &&
+          !exportFrameRates.includes(row.frameRate as ExportFrameRate)
+        )
+          throw new Error("Choose a frame rate of 24, 25, 30 or 60 fps.");
+        const frameRate = row.frameRate as ExportFrameRate | undefined;
         const aspectRatio =
           row.aspectRatio === "9:16" ||
           row.aspectRatio === "16:9" ||
@@ -945,6 +960,7 @@ export function normalizeEditorChatPlan(
           !aspectRatio &&
           !captionStyle &&
           !captionAppearance &&
+          frameRate === undefined &&
           duration === undefined
         )
           throw new Error("These project settings are unsupported.");
@@ -952,6 +968,7 @@ export function normalizeEditorChatPlan(
           ...base,
           kind: "settings",
           ...(aspectRatio ? { aspectRatio } : {}),
+          ...(frameRate !== undefined ? { frameRate } : {}),
           ...(captionStyle ? { captionStyle } : {}),
           ...(captionAppearance ? { captionAppearance } : {}),
           ...(duration !== undefined ? { duration } : {}),
@@ -1005,13 +1022,33 @@ export function normalizeEditorChatPlan(
           throw new Error(
             "These story sections extend outside your selected range."
           );
+        const splitClips =
+          request.task !== "story-sections" && row.splitClips === true;
+        if (splitClips) {
+          const targetClipIds = project.clips
+            .filter(
+              c =>
+                !c.locked &&
+                isPrimaryFootage(c) &&
+                (!request.selectedClipIds?.length ||
+                  request.selectedClipIds.includes(c.id))
+            )
+            .map(c => c.id);
+          for (const boundary of new Set(
+            beats.flatMap(beat => [beat.start, beat.end])
+          ))
+            assertLinkedEditTargets(project, {
+              type: "split",
+              start: boundary,
+              end: boundary,
+              targetClipIds,
+            });
+        }
         action = {
           ...base,
           kind: "story-beats",
           beats,
-          ...(request.task !== "story-sections" && row.splitClips === true
-            ? { splitClips: true }
-            : {}),
+          ...(splitClips ? { splitClips: true } : {}),
         };
       } else throw new Error("Reel cannot execute this action type.");
     } catch (error) {

@@ -3,29 +3,43 @@ import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "./platform-api";
 import { buildRenderPlan } from "./render-plan";
 import { probeExportMetadata } from "./export-probe";
+import type {
+  ExportResolution,
+  ExportFrameRate,
+  ExportFormat,
+} from "@contracts/export-settings";
+import { verifyExportContainer } from "./export-verification";
 
 export async function renderVideo(
   project: EditProject,
   assets: Asset[],
   options: {
-    resolution: 720 | 1080;
+    resolution: ExportResolution;
+    frameRate?: ExportFrameRate;
+    format?: ExportFormat;
     signal: AbortSignal;
     onProgress: (percent: number, stage: string) => void;
     loadAsset?: (id: string, signal: AbortSignal) => Promise<Uint8Array>;
   }
-): Promise<{ file: File; width: number; height: number; duration: number }> {
+): Promise<{
+  file: File;
+  width: number;
+  height: number;
+  duration: number;
+  frameRate: ExportFrameRate;
+  format: ExportFormat;
+}> {
   const ffmpeg = new FFmpeg();
   const cancel = () => ffmpeg.terminate();
   options.signal.throwIfAborted();
   options.signal.addEventListener("abort", cancel, { once: true });
   let wasmUrl: string | undefined;
   try {
-    const firstPlan = buildRenderPlan(
-      project,
-      assets,
-      new Set(),
-      options.resolution
-    );
+    const firstPlan = buildRenderPlan(project, assets, new Set(), {
+      resolution: options.resolution,
+      frameRate: options.frameRate,
+      format: options.format,
+    });
     options.onProgress(0, "Preparing export");
     const core = await fetch("/vendor/render/core.bin", {
       signal: AbortSignal.any([options.signal, AbortSignal.timeout(60000)]),
@@ -91,7 +105,11 @@ export async function renderVideo(
       ffmpeg.off("log", probe);
       if (hasAudio) audioIds.add(asset.id);
     }
-    const plan = buildRenderPlan(project, assets, audioIds, options.resolution);
+    const plan = buildRenderPlan(project, assets, audioIds, {
+      resolution: options.resolution,
+      frameRate: options.frameRate,
+      format: options.format,
+    });
     await ffmpeg.writeFile("captions.ass", plan.ass);
     const renderProgress = ({ time }: { time: number }) =>
       options.onProgress(
@@ -111,7 +129,7 @@ export async function renderVideo(
         "The video could not be rendered. Try 720p, a shorter timeline, or replace an unsupported source file."
       );
     ffmpeg.off("progress", renderProgress);
-    options.onProgress(96, "Checking exported duration and picture");
+    options.onProgress(96, "Checking duration, picture, frame rate and format");
     const verified = await probeExportMetadata(ffmpeg, plan);
     options.onProgress(98, "Checking video and audio playback");
     const decodeCode = await ffmpeg.exec([
@@ -119,7 +137,7 @@ export async function renderVideo(
       "error",
       "-xerror",
       "-i",
-      "output.mp4",
+      plan.filename,
       "-map",
       "0:v:0",
       "-map",
@@ -133,9 +151,10 @@ export async function renderVideo(
       throw new Error(
         "The exported file has a playback error. Your project is saved; please retry export."
       );
-    const result = await ffmpeg.readFile("output.mp4");
+    const result = await ffmpeg.readFile(plan.filename);
     if (typeof result === "string" || result.byteLength === 0)
       throw new Error("The export was empty. Your project is still saved.");
+    verifyExportContainer(result, plan.format);
     const name =
       Array.from(project.title, character =>
         character.charCodeAt(0) < 32 ? "-" : character
@@ -144,10 +163,16 @@ export async function renderVideo(
         .replace(/[\\/<>:"|?*]/g, "-")
         .slice(0, 140) || "My video";
     return {
-      file: new File([new Uint8Array(result).buffer], `${name}.mp4`, {
-        type: "video/mp4",
-      }),
+      file: new File(
+        [new Uint8Array(result).buffer],
+        `${name}.${plan.extension}`,
+        {
+          type: plan.mimeType,
+        }
+      ),
       ...verified,
+      frameRate: plan.frameRate,
+      format: plan.format,
     };
   } finally {
     options.signal.removeEventListener("abort", cancel);

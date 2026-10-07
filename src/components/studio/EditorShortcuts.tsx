@@ -6,97 +6,277 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  createDefaultEditorKeybindings,
+  editorChordFromEvent,
+  EDITOR_KEYBOARD_ACTIONS,
+  formatEditorChord,
+  loadEditorKeybindings,
+  saveEditorKeybindings,
+  validateEditorKeybindings,
+  type EditorActionId,
+  type EditorKeybindings,
+} from "@/lib/editor-keybindings";
 
-export const EDITOR_SHORTCUTS = [
-  ["Playback", "Play / pause", "Space", "K"],
-  ["Playback", "Previous / next frame", "←", "→"],
-  ["Playback", "Back / forward one second", "Shift + ←", "Shift + →", "J", "L"],
-  ["Playback", "Beginning / end of edit", "Home", "End"],
-  ["Clips", "Split at playhead", "S"],
-  ["Clips", "Trim start / end to playhead", "Q", "W"],
-  ["Clips", "Delete selected clip", "Delete", "Backspace"],
-  [
-    "Clips",
-    "Ripple delete selected time across all tracks",
-    "Shift + Delete",
-    "Shift + Backspace",
-  ],
-  [
-    "Clips",
-    "Nudge selection one frame / one second",
-    "Alt/Option + ← / →",
-    "Shift + Alt/Option + ← / →",
-  ],
-  [
-    "Clips",
-    "Copy / cut / paste at playhead",
-    "Ctrl/⌘ + C",
-    "Ctrl/⌘ + X",
-    "Ctrl/⌘ + V",
-  ],
-  ["Clips", "Duplicate", "Ctrl/⌘ + D"],
-  ["Clips", "Detach video audio", "Shift + D"],
-  ["Clips", "Mute / unmute", "M"],
-  ["Clips", "Lock / unlock", "Shift + L"],
-  ["Clips", "Deselect", "Esc"],
-  ["Clips", "Select all clips", "Ctrl/⌘ + A"],
-  ["Clips", "Add / remove from selection", "Shift + click"],
-  ["Workspace", "Undo / redo", "Ctrl/⌘ + Z", "Ctrl/⌘ + Shift + Z", "Ctrl + Y"],
-  ["Workspace", "Toggle snapping", "N"],
-  ["Workspace", "Bypass snapping while dragging", "Alt / Option"],
-  ["Workspace", "Zoom timeline in / out / fit", "+", "−", "0"],
-  ["Workspace", "Open Library / Adjust", "Shift + B", "Shift + I"],
-  ["Workspace", "Keyboard shortcuts", "Ctrl/⌘ + /"],
-] as const;
+type EditingBinding = { action: EditorActionId; index: number; draft: string };
+
 export function EditorShortcuts({
   open,
   onOpenChange,
+  bindings,
+  onChange,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  bindings?: EditorKeybindings;
+  onChange?: (bindings: EditorKeybindings) => void;
 }) {
   const [query, setQuery] = useState("");
-  const found = EDITOR_SHORTCUTS.filter(row =>
-    row.join(" ").toLowerCase().includes(query.toLowerCase())
+  const [localBindings, setLocalBindings] = useState(loadEditorKeybindings);
+  const [editing, setEditing] = useState<EditingBinding | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [error, setError] = useState("");
+  const activeBindings = bindings ?? localBindings;
+  const found = EDITOR_KEYBOARD_ACTIONS.filter(action =>
+    [action.label, action.group, ...activeBindings[action.id]]
+      .join(" ")
+      .toLowerCase()
+      .includes(query.toLowerCase())
   );
+
+  const publishBindings = (next: EditorKeybindings) => {
+    const result = validateEditorKeybindings(next);
+    if (!result.valid) {
+      setError(result.errors.map(item => item.message).join(" "));
+      return false;
+    }
+    if (onChange) onChange(result.bindings!);
+    else {
+      setLocalBindings(result.bindings!);
+      if (!saveEditorKeybindings(result.bindings!)) {
+        setError(
+          "Shortcuts changed for this session. Your browser could not save the preference."
+        );
+        return true;
+      }
+    }
+    setError("");
+    return true;
+  };
+  const editBinding = (action: EditorActionId, index: number) => {
+    setEditing({ action, index, draft: activeBindings[action][index] ?? "" });
+    setRecording(false);
+    setError("");
+  };
+  const applyBinding = () => {
+    if (!editing) return;
+    const next = {
+      ...activeBindings,
+      [editing.action]: [...activeBindings[editing.action]],
+    };
+    next[editing.action][editing.index] = editing.draft;
+    if (publishBindings(next)) {
+      setEditing(null);
+      setRecording(false);
+    }
+  };
+  const close = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setEditing(null);
+      setRecording(false);
+      setError("");
+    }
+    onOpenChange(nextOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+    <Dialog open={open} onOpenChange={close}>
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+        onKeyDownCapture={event => {
+          if (!recording || !editing || event.key === "Tab") return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (event.key === "Escape") {
+            setRecording(false);
+            return;
+          }
+          const chord = editorChordFromEvent(event.nativeEvent);
+          if (!chord) return;
+          setEditing({ ...editing, draft: chord });
+          setRecording(false);
+          setError("");
+        }}
+      >
         <DialogTitle>Keyboard shortcuts</DialogTitle>
         <DialogDescription>
-          Available when you are editing the timeline. Text fields keep their
-          normal typing shortcuts.
+          Customize timeline commands. Preferences stay in this browser. Text
+          fields and dialogs keep their normal typing shortcuts. Mod means Ctrl
+          on Windows/Linux and ⌘ on macOS. Recorded shortcuts use physical keys,
+          including on other keyboard layouts.
         </DialogDescription>
-        <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3">
-          <Search className="size-4 text-foreground/50" />
-          <input
-            autoFocus
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Find an action…"
-            aria-label="Search shortcuts"
-            className="w-full bg-transparent py-2.5 text-sm outline-none"
-          />
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex min-w-48 flex-1 items-center gap-2 rounded-lg border border-border bg-background px-3">
+            <Search className="size-4 text-foreground/50" />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Find an action…"
+              aria-label="Search shortcuts"
+              className="w-full bg-transparent py-2.5 text-sm outline-none"
+            />
+          </label>
+          <button
+            type="button"
+            className="rounded-lg border border-border px-3 py-2 text-xs hover:bg-foreground/5"
+            onClick={() => {
+              if (publishBindings(createDefaultEditorKeybindings())) {
+                setEditing(null);
+                setRecording(false);
+              }
+            }}
+          >
+            Reset defaults
+          </button>
+        </div>
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {error}
+          </p>
+        )}
         {["Playback", "Clips", "Workspace"].map(group => {
-          const rows = found.filter(row => row[0] === group);
+          const rows = found.filter(action => action.group === group);
           return rows.length ? (
             <section key={group}>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
                 {group}
               </h3>
               <dl className="divide-y divide-border">
-                {rows.map(([, label, ...keys]) => (
-                  <div
-                    key={label}
-                    className="flex items-center justify-between gap-4 py-2.5"
-                  >
-                    <dt className="text-sm">{label}</dt>
-                    <dd className="flex max-w-[55%] flex-wrap justify-end gap-1.5 text-xs text-foreground/70">
-                      {keys.map(key => (
-                        <kbd key={key}>{key}</kbd>
-                      ))}
-                    </dd>
+                {rows.map(action => (
+                  <div key={action.id} className="py-2.5">
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="text-sm">{action.label}</dt>
+                      <dd className="flex max-w-[60%] flex-wrap items-center justify-end gap-1.5 text-xs text-foreground/70">
+                        {!activeBindings[action.id].length && (
+                          <span>Unassigned</span>
+                        )}
+                        {activeBindings[action.id].map((chord, index) => (
+                          <span
+                            key={chord}
+                            className="inline-flex items-center overflow-hidden rounded border border-border"
+                          >
+                            <button
+                              type="button"
+                              aria-label={`Edit ${action.label} shortcut ${formatEditorChord(chord)}`}
+                              className="px-2 py-1 hover:bg-foreground/5"
+                              onClick={() => editBinding(action.id, index)}
+                            >
+                              <kbd>{formatEditorChord(chord)}</kbd>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${action.label} shortcut ${formatEditorChord(chord)}`}
+                              className="border-l border-border px-1.5 py-1 hover:bg-foreground/5"
+                              onClick={() => {
+                                publishBindings({
+                                  ...activeBindings,
+                                  [action.id]: activeBindings[action.id].filter(
+                                    (_, i) => i !== index
+                                  ),
+                                });
+                                if (editing?.action === action.id) {
+                                  setEditing(null);
+                                  setRecording(false);
+                                }
+                              }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        <button
+                          type="button"
+                          className="rounded border border-border px-2 py-1 hover:bg-foreground/5"
+                          aria-label={`Add shortcut for ${action.label}`}
+                          disabled={activeBindings[action.id].length >= 8}
+                          onClick={() =>
+                            editBinding(
+                              action.id,
+                              activeBindings[action.id].length
+                            )
+                          }
+                        >
+                          Add
+                        </button>
+                      </dd>
+                    </div>
+                    {editing?.action === action.id && (
+                      <div className="mt-3 rounded-lg border border-border bg-background p-3">
+                        <label
+                          htmlFor={`shortcut-${action.id}`}
+                          className="mb-1 block text-xs text-foreground/70"
+                        >
+                          Shortcut for {action.label}
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          <input
+                            id={`shortcut-${action.id}`}
+                            value={editing.draft}
+                            placeholder="e.g. Mod+Shift+S"
+                            className="min-w-32 flex-1 rounded border border-border bg-background px-2 py-1.5 text-sm"
+                            onChange={event =>
+                              setEditing({
+                                ...editing,
+                                draft: event.target.value,
+                              })
+                            }
+                            onKeyDown={event => {
+                              if (event.key === "Enter" && !recording) {
+                                event.preventDefault();
+                                applyBinding();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="rounded border border-border px-2 py-1.5 text-xs"
+                            onClick={() => setRecording(value => !value)}
+                          >
+                            {recording ? "Stop recording" : "Record"}
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground"
+                            disabled={!editing.draft.trim() || recording}
+                            onClick={applyBinding}
+                          >
+                            Apply
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded border border-border px-2 py-1.5 text-xs"
+                            onClick={() => {
+                              setEditing(null);
+                              setRecording(false);
+                              setError("");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <p
+                          aria-live="polite"
+                          className="mt-2 text-xs text-foreground/60"
+                        >
+                          {recording
+                            ? "Press the new key combination. Esc stops recording; Tab moves focus."
+                            : "Click Record or type a chord. Enter Escape to assign Esc. Remove every shortcut to disable an action."}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </dl>

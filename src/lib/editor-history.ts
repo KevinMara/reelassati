@@ -47,6 +47,8 @@ export function restoreEditorRevision(
     captionStyle: revision.captionStyle,
     captionAppearance: revision.captionAppearance,
     aspectRatio: revision.aspectRatio ?? project.aspectRatio,
+    frameRate: revision.frameRate ?? 30,
+    trackSettings: structuredClone(revision.trackSettings),
     storyBeats: revision.storyBeats,
     duration,
     playhead: Math.min(project.playhead, duration),

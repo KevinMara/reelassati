@@ -21,6 +21,6 @@ export function isPrimaryFootage(clip: TimelineClip) {
   return (
     !clip.transitionHandle &&
     clipLaneKind(clip) === "video" &&
-    (clipLaneNumber(clip) === 1 || clip.primaryFootage === true)
+    (clip.primaryFootage ?? clipLaneNumber(clip) === 1)
   );
 }

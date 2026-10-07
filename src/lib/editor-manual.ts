@@ -13,6 +13,15 @@ import {
 } from "./timeline-lanes";
 
 import { captionOwner } from "@contracts/caption-ownership";
+import { isPrimaryFootage } from "@contracts/timeline-layers";
+import {
+  expandLinkedSelection,
+  linkClips,
+  unlinkClips,
+  normalizeClipGroups,
+  splitGrouping,
+  remapPastedGrouping,
+} from "@contracts/clip-groups";
 import {
   assertNoShotTransition,
   transitionFreeClip,
@@ -61,6 +70,7 @@ export function splitClipGroup(
   time: number,
   makeId: () => string
 ) {
+  ids = expandLinkedSelection(project, ids, { groups: false, links: true });
   const selected = project.clips.filter(c => ids.includes(c.id));
   if (selected.some(c => c.locked))
     throw new Error("Unlock the selection before splitting it.");
@@ -102,11 +112,8 @@ export function splitClipGroup(
   );
   return {
     project: {
-      ...project,
+      ...splitGrouping(project, splits, makeId),
       transcript: projectSplitCaptions(project, splits),
-      clips: project.clips.flatMap(
-        c => splits.find(s => s.original.id === c.id)?.pieces ?? [c]
-      ),
     },
     ids: splits.map(s => s.pieces[1].id),
   };
@@ -138,7 +145,7 @@ export function toggleTimelineLane(
 }
 
 /** Captions on the primary speech lane follow source time through manual trims/speed changes. */
-export function replaceTimelineClip(
+function replaceTimelineClipSingle(
   project: EditProject,
   id: string,
   replacement?: TimelineClip
@@ -162,7 +169,13 @@ export function replaceTimelineClip(
         original[key as keyof TimelineClip] !==
         replacement[key as keyof TimelineClip]
     );
-  const follows = timingChanged;
+  const follows =
+    !replacement ||
+    ["start", "duration", "inPoint", "outPoint", "speed", "assetId"].some(
+      key =>
+        original[key as keyof TimelineClip] !==
+        replacement[key as keyof TimelineClip]
+    );
   if (
     timingChanged ||
     (replacement &&
@@ -186,6 +199,8 @@ export function replaceTimelineClip(
     ? project.transcript.flatMap(segment => {
         if (captionOwner(project, segment)?.id !== id) return [segment];
         if (!replacement) return [];
+        // Old speech evidence does not describe a newly substituted source.
+        if (replacement.assetId !== original.assetId) return [];
         const sourceStart =
           original.inPoint +
           (segment.start - original.start) * (original.speed ?? 1);
@@ -230,6 +245,140 @@ export function replaceTimelineClip(
   };
 }
 
+/** Timing controls follow explicit AV links, while picture/name/style controls
+ * remain local. Unknown bounds on a different audio source cannot be extended
+ * speculatively; provide measured assets for extension. All peers are validated
+ * before any clock or caption is changed. */
+export function replaceTimelineClip(
+  project: EditProject,
+  id: string,
+  replacement?: TimelineClip,
+  assets?: Asset[]
+): EditProject {
+  const original = project.clips.find(c => c.id === id);
+  if (!original) throw new Error("This clip is no longer available.");
+  if (!replacement) return deleteClipGroup(project, [id]);
+  if (replacement.id !== id)
+    throw new Error("An edit cannot change the clip’s identity.");
+  replacement = {
+    ...replacement,
+    groupId: original.groupId,
+    linkId: original.linkId,
+    ...(clipLaneKind(original) === "video"
+      ? { primaryFootage: isPrimaryFootage(original) }
+      : {}),
+  };
+  const linkedIds = expandLinkedSelection(project, [id], {
+    groups: false,
+    links: true,
+  });
+  const sourceChanged =
+    replacement.assetId !== original.assetId ||
+    replacement.track !== original.track ||
+    clipLaneKind(replacement) !== clipLaneKind(original);
+  if (sourceChanged && linkedIds.length > 1) {
+    const unlinked = unlinkClips(project, linkedIds);
+    return normalizeClipGroups(
+      replaceTimelineClipSingle(unlinked, id, {
+        ...replacement,
+        linkId: undefined,
+      })
+    );
+  }
+  const clockChanged = [
+    "start",
+    "duration",
+    "inPoint",
+    "outPoint",
+    "speed",
+  ].some(
+    key =>
+      original[key as keyof TimelineClip] !==
+      replacement![key as keyof TimelineClip]
+  );
+  if (!clockChanged || linkedIds.length < 2)
+    return normalizeClipGroups(
+      replaceTimelineClipSingle(project, id, replacement)
+    );
+
+  const peers = project.clips.filter(c => linkedIds.includes(c.id));
+  if (peers.some(c => c.locked))
+    throw new Error(
+      "Unlock linked audio and video before changing their timing."
+    );
+  assertNoShotTransition(project, linkedIds);
+  const sourceDelta =
+      (replacement.inPoint - original.inPoint) / (original.speed ?? 1),
+    rateFactor = (replacement.speed ?? 1) / (original.speed ?? 1);
+  const changes = peers.map(peer => {
+    const sameSource = Boolean(
+        original.assetId && peer.assetId === original.assetId
+      ),
+      speed = (peer.speed ?? 1) * rateFactor,
+      inPoint = sameSource
+        ? replacement!.inPoint
+        : peer.inPoint + sourceDelta * (peer.speed ?? 1),
+      outPoint = sameSource
+        ? replacement!.outPoint
+        : inPoint + replacement!.duration * speed,
+      next =
+        peer.id === id
+          ? replacement!
+          : {
+              ...peer,
+              start: replacement!.start,
+              duration: replacement!.duration,
+              inPoint,
+              outPoint,
+              speed,
+            },
+      measured = assets?.find(a => a.id === peer.assetId)?.duration,
+      limit =
+        measured && Number.isFinite(measured) && measured > 0
+          ? measured
+          : sameSource || peer.id === id
+            ? Infinity
+            : peer.outPoint;
+    if (
+      ![
+        next.start,
+        next.duration,
+        next.inPoint,
+        next.outPoint,
+        next.speed ?? 1,
+      ].every(Number.isFinite) ||
+      next.start < 0 ||
+      next.duration <= 0 ||
+      next.inPoint < 0 ||
+      next.outPoint <= next.inPoint ||
+      (next.speed ?? 1) < 0.25 ||
+      (next.speed ?? 1) > 4 ||
+      Math.abs(
+        (next.outPoint - next.inPoint) / (next.speed ?? 1) - next.duration
+      ) > 0.001 ||
+      next.outPoint > limit + 0.000001
+    )
+      throw new Error(
+        "Linked audio and video need matching valid timing within every source’s measured bounds. No clip was changed."
+      );
+    return next;
+  });
+  // Capture ownership once: moving one peer must not change how a later peer
+  // resolves a legacy cue and accidentally retime that cue a second time.
+  let next: EditProject = {
+    ...project,
+    transcript: project.transcript.map(segment => {
+      const owner = captionOwner(project, segment);
+      return owner && !segment.sourceClipId
+        ? { ...segment, sourceClipId: owner.id }
+        : segment;
+    }),
+  };
+  for (const change of changes)
+    next = replaceTimelineClipSingle(next, change.id, change);
+  return normalizeClipGroups(next);
+}
+
 export function detachClipAudio(
   project: EditProject,
   clipId: string,
@@ -246,6 +395,8 @@ export function detachClipAudio(
     clipLaneKind(clip) !== "video"
   )
     throw new Error("Select an unlocked video with its source audio enabled.");
+  if (!newId || project.clips.some(c => c.id === newId))
+    throw new Error("Detached audio needs a fresh clip identifier.");
   const audio: TimelineClip = {
     ...clip,
     id: newId,
@@ -262,8 +413,11 @@ export function detachClipAudio(
     shotTransition: undefined,
     transitionHandle: false,
     primaryFootage: false,
+    linkId: undefined,
+    groupId: normalizeClipGroups(project).clips.find(c => c.id === clipId)
+      ?.groupId,
   };
-  return {
+  const detached = {
     ...project,
     transcript: project.transcript.map(s =>
       captionOwner(project, s)?.id === clipId
@@ -275,6 +429,19 @@ export function detachClipAudio(
       audio,
     ],
   };
+  // Preserve the previous successful sound extraction on transitioned shots;
+  // their generated relationship forbids introducing a new edit link.
+  if (
+    project.clips.some(
+      c =>
+        c.shotTransition &&
+        [c.shotTransition.outgoingId, c.shotTransition.incomingId].includes(
+          clipId
+        )
+    )
+  )
+    return normalizeClipGroups(detached);
+  return linkClips(detached, [clipId, newId], () => `${newId}-av-link`);
 }
 
 export function moveClipGroup(
@@ -284,6 +451,7 @@ export function moveClipGroup(
   time: number,
   lane: number
 ): EditProject {
+  ids = expandLinkedSelection(project, ids, { groups: false, links: true });
   const group = project.clips.filter(c => ids.includes(c.id)),
     anchor = group.find(c => c.id === anchorId);
   if (!anchor || group.some(c => c.locked))
@@ -303,6 +471,9 @@ export function moveClipGroup(
   );
   const moving = group.map(c => ({
     ...c,
+    ...(clipLaneKind(c) === "video"
+      ? { primaryFootage: isPrimaryFootage(c) }
+      : {}),
     start: c.start + delta,
     lane: Math.max(
       1,
@@ -346,17 +517,18 @@ export function deleteClipGroup(
   project: EditProject,
   ids: string[]
 ): EditProject {
+  ids = expandLinkedSelection(project, ids, { groups: false, links: true });
   const group = project.clips.filter(c => ids.includes(c.id));
   if (group.some(c => c.locked))
     throw new Error("Unlock the selected clips before deleting them.");
   assertNoShotTransition(project, ids);
-  return {
+  return normalizeClipGroups({
     ...project,
     clips: project.clips.filter(c => !ids.includes(c.id)),
     transcript: project.transcript.filter(
       s => !group.some(c => c.id === captionOwner(project, s)?.id)
     ),
-  };
+  });
 }
 
 export function pasteClipGroup(
@@ -371,12 +543,17 @@ export function pasteClipGroup(
     .map(c => transitionFreeClip({ clips: [...project.clips, ...source] }, c));
   if (!source.length) return { project, ids: [] };
   const first = Math.min(...source.map(c => c.start));
-  const added = source.map(c => ({
-    ...structuredClone(c),
-    id: makeId(),
-    start: c.start - first + Math.max(0, time),
-    locked: false,
-  }));
+  const added = remapPastedGrouping(
+    source,
+    source.map(c => ({
+      ...structuredClone(c),
+      id: makeId(),
+      start: c.start - first + Math.max(0, time),
+      locked: false,
+    })),
+    makeId,
+    project.clips
+  );
   // Treat pasted clips as a group when allocating lanes to preserve layer order.
   const staged = { ...project, clips: [...project.clips, ...added] };
   const placed = moveClipGroup(

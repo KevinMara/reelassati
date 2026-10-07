@@ -11,9 +11,253 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,96}$/;
 
 export type EmbeddedMediaMarkingMethod =
   | "mp4-uuid-box"
+  | "webm-simple-tag"
   | "mp3-id3v2-private-frame"
   | "png-text-chunk"
   | "wav-provenance-chunk";
+
+// WebM is an EBML document. Keep Segment offsets unchanged: a finite size is
+// rewritten at its existing width; the new global Tags element goes at EOF.
+// Matroska RFC 9559 §§5.1.8/6.8 and EBML RFC 8794 §6 define these elements.
+export const WEBM_HEADER_LIMIT = 64 * 1024;
+const WEBM_TAG_NAME = "REELASSATI_PROVENANCE";
+const WEBM_TOP_LEVEL_IDS = new Set([
+  0x114d9b74, 0x1549a966, 0x1654ae6b, 0x1f43b675, 0x1c53bb6b, 0x1941a469,
+  0x1043a770, 0x1254c367, 0xec,
+]);
+
+export interface EbmlElementHeader {
+  id: number;
+  dataOffset: number;
+  sizeOffset: number;
+  sizeLength: number;
+  size: number | null;
+}
+
+/** null means an incomplete header. Invalid encodings fail closed. */
+export function readEbmlElementHeader(
+  bytes: Uint8Array,
+  offset: number
+): EbmlElementHeader | null {
+  if (offset >= bytes.length) return null;
+  const vintLength = (first: number, max: number) => {
+    for (let length = 1; length <= max; length++)
+      if (first & (0x80 >> (length - 1))) return length;
+    throw new Error("Invalid WebM EBML header");
+  };
+  const idLength = vintLength(bytes[offset], 4);
+  if (offset + idLength >= bytes.length) return null;
+  let id = 0;
+  for (let i = 0; i < idLength; i++) id = id * 256 + bytes[offset + i];
+  const sizeOffset = offset + idLength;
+  const sizeLength = vintLength(bytes[sizeOffset], 8);
+  if (sizeOffset + sizeLength > bytes.length) return null;
+  let value = BigInt(bytes[sizeOffset] & ((0x80 >> (sizeLength - 1)) - 1));
+  for (let i = 1; i < sizeLength; i++)
+    value = value * 256n + BigInt(bytes[sizeOffset + i]);
+  const unknown = (1n << BigInt(7 * sizeLength)) - 1n;
+  if (value !== unknown && value > BigInt(Number.MAX_SAFE_INTEGER))
+    throw new Error("The WebM element exceeds the supported byte range");
+  return {
+    id,
+    dataOffset: sizeOffset + sizeLength,
+    sizeOffset,
+    sizeLength,
+    size: value === unknown ? null : Number(value),
+  };
+}
+
+export function ebmlSize(value: number, width?: number): Uint8Array {
+  if (!Number.isSafeInteger(value) || value < 0)
+    throw new Error("Invalid WebM element size");
+  let length = width ?? 1;
+  while (
+    width === undefined &&
+    BigInt(value) >= (1n << BigInt(7 * length)) - 1n
+  )
+    length++;
+  if (
+    length < 1 ||
+    length > 8 ||
+    BigInt(value) >= (1n << BigInt(7 * length)) - 1n
+  )
+    throw new Error("The WebM Segment size cannot be extended in place");
+  const output = new Uint8Array(length);
+  let remaining = BigInt(value);
+  for (let i = length - 1; i >= 0; i--) {
+    output[i] = Number(remaining & 255n);
+    remaining >>= 8n;
+  }
+  output[0] |= 0x80 >> (length - 1);
+  return output;
+}
+
+export function readWebmSegmentHeader(
+  bytes: Uint8Array
+): EbmlElementHeader | null {
+  const ebml = readEbmlElementHeader(bytes, 0);
+  if (!ebml) return null;
+  if (ebml.id !== 0x1a45dfa3 || ebml.size === null)
+    throw new Error("The timeline upload is not a WebM document");
+  const end = ebml.dataOffset + ebml.size;
+  if (end > WEBM_HEADER_LIMIT) throw new Error("The WebM header is too large");
+  if (bytes.length < end) return null;
+  let webm = false;
+  for (let offset = ebml.dataOffset; offset < end;) {
+    const element = readEbmlElementHeader(bytes, offset);
+    if (
+      !element ||
+      element.size === null ||
+      element.dataOffset + element.size > end
+    )
+      throw new Error("Invalid WebM document header");
+    if (element.id === 0x4282) {
+      if (
+        webm ||
+        decoder.decode(
+          bytes.subarray(element.dataOffset, element.dataOffset + element.size)
+        ) !== "webm"
+      )
+        throw new Error("The timeline upload must use the WebM document type");
+      webm = true;
+    }
+    offset = element.dataOffset + element.size;
+  }
+  if (!webm) throw new Error("The WebM document type is missing");
+  const segment = readEbmlElementHeader(bytes, end);
+  if (!segment) return null;
+  if (segment.id !== 0x18538067)
+    throw new Error("The WebM Segment header is missing");
+  return segment;
+}
+
+export function validateWebmTopLevelHeader(element: EbmlElementHeader): void {
+  if (!WEBM_TOP_LEVEL_IDS.has(element.id) || element.size === null)
+    throw new Error(
+      "Render WebM with finite clusters and no Segment checksum before saving"
+    );
+}
+
+function ebmlElement(id: number[], data: Uint8Array): Uint8Array {
+  return concatBytes(new Uint8Array(id), ebmlSize(data.length), data);
+}
+
+export function webmMarker(token: string): Uint8Array {
+  if (!TOKEN_PATTERN.test(token))
+    throw new Error("Invalid video provenance token");
+  const simple = ebmlElement(
+    [0x67, 0xc8],
+    concatBytes(
+      ebmlElement([0x45, 0xa3], encoder.encode(WEBM_TAG_NAME)),
+      ebmlElement(
+        [0x44, 0x87],
+        encoder.encode(`${AI_BINARY_MARKER_PREFIX}${token}`)
+      )
+    )
+  );
+  // Empty Targets applies the tag to the whole Segment. Language/default fields
+  // use their schema defaults (und/1), avoiding a nonstandard private element.
+  const tag = ebmlElement(
+    [0x73, 0x73],
+    concatBytes(ebmlElement([0x63, 0xc0], new Uint8Array()), simple)
+  );
+  return ebmlElement([0x12, 0x54, 0xc3, 0x67], tag);
+}
+
+export function inspectWebmMarkerTail(bytes: Uint8Array): {
+  token: string;
+  offset: number;
+  method: "webm-simple-tag";
+} | null {
+  const prefix = encoder.encode(AI_BINARY_MARKER_PREFIX);
+  for (
+    let offset = Math.max(0, bytes.length - 512);
+    offset + 4 <= bytes.length;
+    offset++
+  ) {
+    if (
+      bytes[offset] !== 0x12 ||
+      bytes[offset + 1] !== 0x54 ||
+      bytes[offset + 2] !== 0xc3 ||
+      bytes[offset + 3] !== 0x67
+    )
+      continue;
+    const value = bytes.subarray(offset);
+    const text = decoder.decode(value);
+    const markerStart = text.lastIndexOf(AI_BINARY_MARKER_PREFIX);
+    if (markerStart < 0) continue;
+    const token = text.slice(markerStart + prefix.length);
+    if (TOKEN_PATTERN.test(token) && equalBytes(value, webmMarker(token)))
+      return { token, offset, method: "webm-simple-tag" };
+  }
+  return null;
+}
+
+function inspectWebm(bytes: Uint8Array): InspectedMediaMark | null {
+  try {
+    const segment = readWebmSegmentHeader(bytes);
+    if (
+      !segment ||
+      (segment.size !== null &&
+        segment.dataOffset + segment.size !== bytes.length)
+    )
+      return null;
+    const marker = inspectWebmMarkerTail(bytes);
+    if (!marker) return null;
+    let found = false;
+    for (let offset = segment.dataOffset; offset < bytes.length;) {
+      const element = readEbmlElementHeader(bytes, offset);
+      if (!element) return null;
+      validateWebmTopLevelHeader(element);
+      const end = element.dataOffset + element.size!;
+      if (end > bytes.length) return null;
+      if (offset === marker.offset) found = end === bytes.length;
+      offset = end;
+    }
+    if (!found) return null;
+    const original = bytes.slice(0, marker.offset);
+    if (segment.size !== null)
+      original.set(
+        ebmlSize(original.length - segment.dataOffset, segment.sizeLength),
+        segment.sizeOffset
+      );
+    return {
+      token: marker.token,
+      unmarkedBytes: arrayBuffer(original),
+      method: marker.method,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function embedWebm(bytes: Uint8Array, token: string): EmbeddedMediaMark | null {
+  try {
+    const segment = readWebmSegmentHeader(bytes);
+    if (
+      !segment ||
+      (segment.size !== null &&
+        segment.dataOffset + segment.size !== bytes.length)
+    )
+      return null;
+    for (let offset = segment.dataOffset; offset < bytes.length;) {
+      const element = readEbmlElementHeader(bytes, offset);
+      if (!element) return null;
+      validateWebmTopLevelHeader(element);
+      offset = element.dataOffset + element.size!;
+      if (offset > bytes.length) return null;
+    }
+    const output = concatBytes(bytes, webmMarker(token));
+    if (segment.size !== null)
+      output.set(
+        ebmlSize(output.length - segment.dataOffset, segment.sizeLength),
+        segment.sizeOffset
+      );
+    return { bytes: arrayBuffer(output), method: "webm-simple-tag" };
+  } catch {
+    return null;
+  }
+}
 
 function wave(bytes: Uint8Array): boolean {
   return (
@@ -251,6 +495,8 @@ export function embedMediaProvenanceMarker(
       : null;
   }
   const bytes = new Uint8Array(value);
+  if (contentType.toLowerCase() === "video/webm")
+    return embedWebm(bytes, token);
   if (isMp4(bytes, contentType)) return embedMp4(bytes, token);
   if (isMp3(bytes, contentType)) return embedMp3(bytes, token);
   if (contentType === "audio/wav" && wave(bytes))
@@ -407,6 +653,7 @@ export function inspectMediaProvenanceMarker(
 ): InspectedMediaMark | null {
   const bytes = new Uint8Array(value);
   return (
+    inspectWebm(bytes) ||
     inspectMp4(bytes) ||
     inspectMp3(bytes) ||
     inspectPng(bytes) ||

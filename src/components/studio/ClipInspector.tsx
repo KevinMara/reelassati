@@ -1,5 +1,6 @@
 import {
   useState,
+  useId,
   type Dispatch,
   type SetStateAction,
   type ReactNode,
@@ -11,6 +12,269 @@ import { CompactSelect } from "@/components/ui/compact-select";
 import { GraphicComposer } from "./GraphicComposer";
 import { EditorInfo } from "./EditorInfo";
 import { VisualControls } from "./VisualControls";
+import {
+  audioBaseVolume,
+  audioEnvelopeAt,
+  MAX_AUDIO_GAIN_KEYS,
+  normalizeAudioMix,
+  type ClipAudioMix,
+} from "@contracts/audio-mix";
+
+function AudioMixControls({
+  clip,
+  asset,
+  time,
+  setDraft,
+  onSeek,
+}: {
+  clip: TimelineClip;
+  asset?: Asset;
+  time: number;
+  setDraft: Dispatch<SetStateAction<TimelineClip | null>>;
+  onSeek: (time: number) => void;
+}) {
+  const [chosenSource, setChosenSource] = useState<number | null>(null);
+  const mix = normalizeAudioMix(clip.audioMix);
+  const sourceLimit = Math.min(
+    86400,
+    Math.max(clip.outPoint, asset?.duration ?? 0)
+  );
+  const playheadSource = Math.max(
+    clip.inPoint,
+    Math.min(
+      clip.outPoint,
+      clip.inPoint + (time - clip.start) * (clip.speed ?? 1)
+    )
+  );
+  const source = chosenSource ?? Number(playheadSource.toFixed(3));
+  const update = (change: (current: ClipAudioMix) => ClipAudioMix) =>
+    setDraft(current =>
+      current && !current.locked
+        ? {
+            ...current,
+            audioMix: normalizeAudioMix(
+              change(normalizeAudioMix(current.audioMix))
+            ),
+          }
+        : current
+    );
+  const field =
+    "min-w-0 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm";
+  return (
+    <div className="space-y-4 rounded-xl border border-border p-4">
+      <label className="block text-sm">
+        <span className="mb-2 flex justify-between">
+          <span>Stereo pan</span>
+          <span className="font-mono text-foreground/65">
+            {mix.pan === 0
+              ? "Center"
+              : `${Math.round(Math.abs(mix.pan) * 100)}% ${mix.pan < 0 ? "left" : "right"}`}
+          </span>
+        </span>
+        <input
+          type="range"
+          aria-label="Stereo pan"
+          min={-1}
+          max={1}
+          step={0.01}
+          value={mix.pan}
+          disabled={clip.locked}
+          onChange={event =>
+            update(current => ({ ...current, pan: Number(event.target.value) }))
+          }
+          className="w-full accent-primary"
+        />
+      </label>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">Gain envelope</p>
+        <span className="text-xs text-foreground/60">
+          {mix.gainKeys.length}/{MAX_AUDIO_GAIN_KEYS} keys
+        </span>
+      </div>
+      <p className="text-xs text-foreground/60">
+        Keys use seconds in the original file and multiply Audio gain. They stay
+        attached to that sound when you trim, split, move, or change speed.
+      </p>
+      <div className="grid grid-cols-[1fr_auto] items-end gap-2">
+        <label className="text-xs text-foreground/60">
+          New key at source second
+          <input
+            type="number"
+            min={0}
+            max={sourceLimit}
+            step={0.01}
+            aria-label="New audio key source second"
+            className={`${field} mt-1`}
+            value={source}
+            disabled={clip.locked}
+            onChange={event =>
+              setChosenSource(
+                Math.max(0, Math.min(sourceLimit, Number(event.target.value)))
+              )
+            }
+          />
+        </label>
+        <button
+          type="button"
+          disabled={
+            clip.locked ||
+            (mix.gainKeys.length >= MAX_AUDIO_GAIN_KEYS &&
+              !mix.gainKeys.some(key => key.at === source))
+          }
+          onClick={() =>
+            update(current => ({
+              ...current,
+              gainKeys: [
+                ...current.gainKeys.filter(key => key.at !== source),
+                { at: source, gain: audioEnvelopeAt(current, source) },
+              ],
+            }))
+          }
+          className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-40"
+        >
+          Add key
+        </button>
+      </div>
+      <button
+        type="button"
+        disabled={clip.locked}
+        onClick={() => setChosenSource(Number(playheadSource.toFixed(3)))}
+        className="text-xs text-primary disabled:opacity-40"
+      >
+        Use playhead · source {playheadSource.toFixed(3)}s
+      </button>
+      {mix.gainKeys.length > 0 ? (
+        <div className="space-y-2">
+          <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 text-xs text-foreground/60">
+            <span>Source seconds</span>
+            <span>Gain ×</span>
+            <span className="sr-only">Go to key</span>
+            <span className="sr-only">Remove key</span>
+          </div>
+          {mix.gainKeys.map((key, index) => {
+            const inClip = key.at >= clip.inPoint && key.at < clip.outPoint;
+            return (
+              <div
+                key={index}
+                className="grid grid-cols-[1fr_1fr_auto_auto] gap-2"
+              >
+                <input
+                  type="number"
+                  min={0}
+                  max={sourceLimit}
+                  step={0.01}
+                  className={field}
+                  value={key.at}
+                  disabled={clip.locked}
+                  aria-label={`Audio gain key ${index + 1} source second`}
+                  title={
+                    inClip
+                      ? "Key inside this clip"
+                      : "Retained key outside this clip's current trim"
+                  }
+                  onChange={event =>
+                    update(current => ({
+                      ...current,
+                      gainKeys: current.gainKeys.map((value, i) =>
+                        i === index
+                          ? {
+                              ...value,
+                              at: Math.max(
+                                0,
+                                Math.min(
+                                  sourceLimit,
+                                  Number(event.target.value)
+                                )
+                              ),
+                            }
+                          : value
+                      ),
+                    }))
+                  }
+                />
+                <input
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  className={field}
+                  value={Number(key.gain.toFixed(3))}
+                  disabled={clip.locked}
+                  aria-label={`Audio gain key ${index + 1} gain multiplier`}
+                  onChange={event =>
+                    update(current => ({
+                      ...current,
+                      gainKeys: current.gainKeys.map((value, i) =>
+                        i === index
+                          ? { ...value, gain: Number(event.target.value) }
+                          : value
+                      ),
+                    }))
+                  }
+                />
+                <button
+                  type="button"
+                  disabled={!inClip}
+                  aria-label={`Go to audio gain key ${index + 1}`}
+                  onClick={() =>
+                    onSeek(
+                      clip.start + (key.at - clip.inPoint) / (clip.speed ?? 1)
+                    )
+                  }
+                  className="rounded-lg border border-border px-2 text-xs disabled:opacity-30"
+                >
+                  Go
+                </button>
+                <button
+                  type="button"
+                  disabled={clip.locked}
+                  aria-label={`Remove audio gain key ${index + 1}`}
+                  onClick={() =>
+                    update(current => ({
+                      ...current,
+                      gainKeys: current.gainKeys.filter((_, i) => i !== index),
+                    }))
+                  }
+                  className="rounded-lg border border-border px-2 text-xs disabled:opacity-40"
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-xs text-foreground/60">
+          No keys: constant gain across the clip.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          disabled={clip.locked || !mix.gainKeys.length}
+          onClick={() => update(current => ({ ...current, gainKeys: [] }))}
+          className="text-xs text-primary disabled:opacity-40"
+        >
+          Clear envelope
+        </button>
+        <button
+          type="button"
+          disabled={clip.locked || (!mix.gainKeys.length && mix.pan === 0)}
+          onClick={() =>
+            setDraft(current =>
+              current && !current.locked
+                ? { ...current, audioMix: undefined }
+                : current
+            )
+          }
+          className="text-xs text-primary disabled:opacity-40"
+        >
+          Reset pan & envelope
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function ClipInspector({
   draft,
@@ -40,6 +304,10 @@ export function ClipInspector({
   tracking?: ReactNode;
 }) {
   const [tab, setTab] = useState(draft ? "timing" : "project");
+  const framingId = useId();
+  const hasAudio =
+    draft?.track === "audio" ||
+    ["video", "audio", "export"].includes(asset?.kind ?? "");
   const bounds = draft ? clipTimingLimits(draft, asset, duration) : undefined;
   const field =
     "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm";
@@ -92,7 +360,10 @@ export function ClipInspector({
       <span className="mb-2 flex justify-between">
         <span>{label}</span>
         <span className="font-mono text-foreground/65">
-          {(draft?.[key] ?? fallback).toFixed(2)}
+          {(key === "volume" && draft
+            ? audioBaseVolume(draft)
+            : (draft?.[key] ?? fallback)
+          ).toFixed(2)}
           {key === "speed" ? "×" : key.startsWith("fade") ? "s" : ""}
         </span>
       </span>
@@ -102,7 +373,11 @@ export function ClipInspector({
         min={min}
         max={max}
         step={step}
-        value={draft?.[key] ?? fallback}
+        value={
+          key === "volume" && draft
+            ? audioBaseVolume(draft)
+            : (draft?.[key] ?? fallback)
+        }
         disabled={draft?.locked}
         onChange={e => set(key, Number(e.target.value))}
         className="w-full accent-primary"
@@ -122,7 +397,7 @@ export function ClipInspector({
           ...(asset && asset.kind !== "audio" && draft?.track !== "audio"
             ? [["transform", "Motion & crop"]]
             : []),
-          ["audio", "Sound"],
+          ...(hasAudio ? [["audio", "Sound"]] : []),
           ...(draft?.graphic ? [["graphic", "Graphic"]] : []),
           ["project", "Canvas & duration"],
         ].map(([id, label]) => (
@@ -225,9 +500,10 @@ export function ClipInspector({
           )}
           {tab === "appearance" && (
             <>
-              <label className="block text-sm">
+              <label className="block text-sm" htmlFor={framingId}>
                 Framing
                 <CompactSelect
+                  id={framingId}
                   aria-label="Framing"
                   value={draft.fit ?? "contain"}
                   disabled={draft.locked}
@@ -256,7 +532,7 @@ export function ClipInspector({
               onSeek={onSeek}
             />
           )}
-          {tab === "audio" && (
+          {tab === "audio" && hasAudio && (
             <>
               <div className="flex gap-2">
                 <button
@@ -284,6 +560,14 @@ export function ClipInspector({
                 </EditorInfo>
               </div>
               {slider("volume", "Audio gain", 0, 2, 1)}
+              <AudioMixControls
+                key={draft.id}
+                clip={draft}
+                asset={asset}
+                time={time}
+                setDraft={setDraft}
+                onSeek={onSeek}
+              />
               <button
                 type="button"
                 disabled={draft.locked}

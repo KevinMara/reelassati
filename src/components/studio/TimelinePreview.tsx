@@ -5,6 +5,11 @@ import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import { useEffect, useId, useRef } from "react";
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
+import { audioMixAt, audioMixAutomation } from "@contracts/audio-mix";
+import {
+  effectiveTimelineClips,
+  timelineTrackGain,
+} from "@contracts/timeline-mixer";
 
 let previewAudioContext: AudioContext | undefined;
 
@@ -13,26 +18,37 @@ function MediaLayer({
   asset,
   time,
   playing,
+  trackGain = 1,
 }: {
   clip: TimelineClip;
   asset: Asset;
   time: number;
   playing: boolean;
+  trackGain?: number;
 }) {
   const ref = useRef<HTMLMediaElement | null>(null);
   const gainRef = useRef<
-    { source: MediaElementAudioSourceNode; gain: GainNode } | undefined
+    | {
+        source: MediaElementAudioSourceNode;
+        gain: GainNode;
+        pan: StereoPannerNode;
+      }
+    | undefined
   >(undefined);
   const gradeId = useId().replace(/:/g, "");
   useEffect(() => {
+    const media = ref.current;
     const nodes = gainRef.current;
     if (nodes && previewAudioContext) {
       nodes.source.connect(nodes.gain);
-      nodes.gain.connect(previewAudioContext.destination);
+      nodes.gain.connect(nodes.pan);
+      nodes.pan.connect(previewAudioContext.destination);
     }
     return () => {
+      media?.pause();
       gainRef.current?.source.disconnect();
       gainRef.current?.gain.disconnect();
+      gainRef.current?.pan.disconnect();
     };
   }, []);
   const elapsed = time - clip.start;
@@ -45,35 +61,35 @@ function MediaLayer({
       if (Math.abs(media.currentTime - sourceTime) > (playing ? 0.25 : 0.015))
         media.currentTime = sourceTime;
       media.playbackRate = clip.speed ?? 1;
-      const volume =
-        (clip.volume ?? 1) > 2
-          ? (clip.volume ?? 100) / 100
-          : (clip.volume ?? 1);
-      const fade = Math.max(
-        0,
-        Math.min(
-          1,
-          clip.fadeIn ? (time - clip.start) / clip.fadeIn : 1,
-          clip.fadeOut ? (clip.start + clip.duration - time) / clip.fadeOut : 1
-        )
-      );
+      const mix = audioMixAt(clip, time, trackGain);
       if (playing && !gainRef.current && typeof AudioContext !== "undefined") {
         try {
           previewAudioContext ??= new AudioContext();
-          const source = previewAudioContext.createMediaElementSource(media);
+          const pan = previewAudioContext.createStereoPanner();
           const gain = previewAudioContext.createGain();
+          const source = previewAudioContext.createMediaElementSource(media);
           source.connect(gain);
-          gain.connect(previewAudioContext.destination);
-          gainRef.current = { source, gain };
+          gain.connect(pan);
+          pan.connect(previewAudioContext.destination);
+          gainRef.current = { source, gain, pan };
         } catch {
           /* Keep native playback when Web Audio is unavailable. */
         }
       }
-      if (gainRef.current) {
+      if (gainRef.current && previewAudioContext) {
         media.volume = 1;
-        gainRef.current.gain.gain.value = Math.max(0, volume * fade);
+        const gain = gainRef.current.gain.gain;
+        const now = previewAudioContext.currentTime;
+        gain.cancelScheduledValues(now);
+        gain.setValueAtTime(mix.gain, now);
+        gainRef.current.pan.pan.setValueAtTime(mix.pan, now);
+        if (playing)
+          for (const point of audioMixAutomation(clip, time, trackGain).slice(
+            1
+          ))
+            gain.linearRampToValueAtTime(point.gain, now + point.after);
         if (playing) void previewAudioContext?.resume().catch(() => undefined);
-      } else media.volume = Math.min(1, Math.max(0, volume * fade));
+      } else media.volume = Math.min(1, mix.gain);
       media.muted = !!clip.muted;
       if (playing) void media.play().catch(() => undefined);
       else media.pause();
@@ -81,7 +97,7 @@ function MediaLayer({
     sync();
     media.addEventListener("loadedmetadata", sync);
     return () => media.removeEventListener("loadedmetadata", sync);
-  }, [clip, time, playing]);
+  }, [clip, time, playing, trackGain]);
   const opacity = Math.min(
     1,
     clip.fadeIn ? elapsed / clip.fadeIn : 1,
@@ -202,7 +218,7 @@ export function TimelinePreview({
   zoom?: number;
   pan?: { x: number; y: number };
 }) {
-  const active = project.clips
+  const active = effectiveTimelineClips(project)
     .filter(
       c =>
         c.start <= time &&
@@ -239,6 +255,7 @@ export function TimelinePreview({
             asset={asset}
             time={time}
             playing={playing}
+            trackGain={timelineTrackGain(project, c)}
           />
         ) : null;
       })}

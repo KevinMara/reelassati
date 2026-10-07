@@ -7,6 +7,11 @@ import {
 import { normalizeGraphic } from "@contracts/motion-graphics";
 import { patchVisual } from "@contracts/clip-visual";
 import { assertNoShotTransition } from "@contracts/adjacent-transition";
+import {
+  assertLinkedEditTargets,
+  normalizeClipGroups,
+  splitGrouping,
+} from "@contracts/clip-groups";
 import type {
   EditOperation,
   EditProject,
@@ -15,6 +20,26 @@ import type {
 
 export function contentDuration(clips: TimelineClip[], empty = 1): number {
   return Math.max(empty, ...clips.map(c => c.start + c.duration));
+}
+
+/** Structural revisions create deterministic membership IDs without joining an
+ * existing clip, group or AV link, including newly generated pieces. */
+function membershipIds(
+  project: EditProject,
+  seed: string,
+  pieces: TimelineClip[]
+) {
+  const reserved = new Set(
+    [...project.clips, ...pieces].flatMap(c => [c.id, c.groupId, c.linkId])
+  );
+  let count = 0;
+  return () => {
+    let id: string;
+    do id = `${seed}-membership-${++count}`;
+    while (reserved.has(id));
+    reserved.add(id);
+    return id;
+  };
 }
 
 /** Remove an interval from every unlocked track; preserve source offsets and captions. */
@@ -105,6 +130,20 @@ export function rippleRemove(
         : []),
     ];
   });
+  const removed = new Set(
+    splits.filter(s => !s.pieces.length).map(s => s.original.id)
+  );
+  const base = {
+    ...project,
+    clips: project.clips
+      .filter(c => !removed.has(c.id))
+      .map(preserveGraphicDuration),
+  };
+  const grouped = splitGrouping(
+    base,
+    splits.filter(s => s.pieces.length),
+    membershipIds(project, `ripple-${start}-${end}`, clips)
+  );
   const duration = Math.max(
     0.2,
     project.duration - length,
@@ -112,7 +151,7 @@ export function rippleRemove(
   );
   return {
     ...project,
-    clips,
+    clips: grouped.clips,
     transcript,
     duration,
     playhead: Math.min(
@@ -166,7 +205,7 @@ export function resizeTimeline(project: EditProject, end: number): EditProject {
     throw new Error(
       "Unlock clips beyond the new end before shortening the edit."
     );
-  return {
+  return normalizeClipGroups({
     ...project,
     duration: end,
     playhead: Math.min(project.playhead, end),
@@ -184,7 +223,7 @@ export function resizeTimeline(project: EditProject, end: number): EditProject {
     transcript: project.transcript
       .filter(s => s.start < end)
       .map(s => mapTranscriptTime(s, t => t, { start: 0, end })),
-  };
+  });
 }
 
 /** Execute supported decisions on actual media, never merely mark a suggestion accepted. */
@@ -425,8 +464,70 @@ export function applyEditOperation(
       return c;
     });
   }
-  if (captionSplits.length)
+  assertLinkedEditTargets(
+    project,
+    op,
+    project.clips
+      .filter(original => {
+        const split = captionSplits.find(s => s.original.id === original.id);
+        if (split && split.pieces.length > 1) return true;
+        const replacement = next.clips.find(c => c.id === original.id);
+        return (
+          !replacement ||
+          ["start", "duration", "inPoint", "outPoint", "speed"].some(key =>
+            key === "speed"
+              ? (original.speed ?? 1) !== (replacement.speed ?? 1)
+              : original[key as keyof TimelineClip] !==
+                replacement[key as keyof TimelineClip]
+          )
+        );
+      })
+      .map(c => c.id)
+  );
+  if (captionSplits.length) {
+    const grouped = splitGrouping(
+      project,
+      captionSplits.map(split => ({
+        ...split,
+        pieces: split.pieces.map(piece =>
+          next.clips.find(c => c.id === piece.id)!
+        ),
+      })),
+      membershipIds(project, op.id, next.clips)
+    );
+    next.clips = next.clips.map(clip => {
+      const metadata = grouped.clips.find(c => c.id === clip.id);
+      return metadata
+        ? { ...clip, groupId: metadata.groupId, linkId: metadata.linkId }
+        : clip;
+    });
     next.transcript = projectSplitCaptions(project, captionSplits);
+  }
+  // A valid original link must survive every retained structural piece. This
+  // rejects paired operations whose source bounds or rate would desynchronize
+  // the two sources, rather than quietly discarding the user's relationship.
+  const normalized = normalizeClipGroups(next);
+  const linkedOriginalIds = new Set(
+    normalizeClipGroups(project)
+      .clips.filter(c => c.linkId)
+      .map(c => c.id)
+  );
+  const linkedPieceIds = new Set(
+    captionSplits
+      .filter(s => linkedOriginalIds.has(s.original.id))
+      .flatMap(s => s.pieces.map(c => c.id))
+  );
+  if (
+    next.clips.some(
+      c =>
+        (linkedOriginalIds.has(c.id) || linkedPieceIds.has(c.id)) &&
+        !normalized.clips.find(n => n.id === c.id)?.linkId
+    )
+  )
+    throw new Error(
+      "Linked audio and video need matching valid timing. Unlink them before making different source edits."
+    );
+  next = normalized;
   if (["trim", "move", "pacing", "delete"].includes(op.type)) {
     next.transcript = next.transcript.flatMap(segment => {
       const original = project.clips.find(

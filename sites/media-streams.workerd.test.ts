@@ -11,7 +11,8 @@ it("saves a chunked generated-video stream through actual workerd R2 multipart s
   const compiled = await build({
     stdin: {
       contents: `
-        import {storeMediaParts,mp4Marker,inspectMp4Stream,hashMediaStream} from "./sites/media-streams";
+        import {storeMediaParts,mp4Marker,inspectMp4Stream,hashMediaStream,markWebmStream,inspectWebmStream} from "./sites/media-streams";
+        import {ebmlSize,webmMarker} from "./sites/media-provenance";
         export default {async fetch(request,env){
           const bytes=Uint8Array.from({length:170013},(_,i)=>i%251);
           const make=()=>new ReadableStream({start(c){for(let i=0;i<bytes.length;i+=71)c.enqueue(bytes.slice(i,i+71));c.close();}});
@@ -22,7 +23,18 @@ it("saves a chunked generated-video stream through actual workerd R2 multipart s
           const saved=await storeMediaParts(upload,make(),{partSize:5*1024*1024,maxBytes:10*1024*1024,suffix:marker});
           const object=await env.BUCKET.get("saved.mp4");
           const verified=await inspectMp4Stream(object.body);
-          return Response.json({oldError,size:saved.size,storedSize:object.size,token:verified.marker?.token,fingerprint:verified.fingerprint,originalHash:await hashMediaStream(make())});
+          const payloadSize=6*1024*1024,voidSize=ebmlSize(payloadSize);
+          const webm=new Uint8Array(24+1+voidSize.length+payloadSize);
+          webm.set([0x1a,0x45,0xdf,0xa3,0x87,0x42,0x82,0x84,0x77,0x65,0x62,0x6d,0x18,0x53,0x80,0x67]);
+          webm.set(ebmlSize(webm.length-24,8),16);
+          webm[24]=0xec;webm.set(voidSize,25);
+          const makeWebm=()=>new ReadableStream({pull(c){const n=this.offset||0;if(n===webm.length){c.close();return;}c.enqueue(webm.subarray(n,n+4093));this.offset=Math.min(webm.length,n+4093);}});
+          const webmToken="0123456789abcdef_generated_webm";
+          const webmUpload=await env.BUCKET.createMultipartUpload("saved.webm",{httpMetadata:{contentType:"video/webm"}});
+          const webmSaved=await storeMediaParts(webmUpload,markWebmStream(makeWebm(),webm.length,webmToken),{partSize:5*1024*1024,maxBytes:10*1024*1024,expectedBytes:webm.length+webmMarker(webmToken).length});
+          const webmObject=await env.BUCKET.get("saved.webm");
+          const webmVerified=await inspectWebmStream(webmObject.body,webmObject.size,webmToken);
+          return Response.json({oldError,size:saved.size,storedSize:object.size,token:verified.marker?.token,fingerprint:verified.fingerprint,originalHash:await hashMediaStream(make()),webm:{size:webmSaved.size,storedSize:webmObject.size,token:webmVerified.marker?.token,fingerprint:webmVerified.fingerprint,originalHash:await hashMediaStream(makeWebm())}});
         }};
       `,
       resolveDir: process.cwd(),
@@ -49,6 +61,10 @@ it("saves a chunked generated-video stream through actual workerd R2 multipart s
     expect(result.size).toBeGreaterThan(170013);
     expect(result.token).toBe("0123456789abcdef_generated_video");
     expect(result.fingerprint).toBe(result.originalHash);
+    expect(result.webm.size).toBe(result.webm.storedSize);
+    expect(result.webm.size).toBeGreaterThan(6 * 1024 * 1024);
+    expect(result.webm.token).toBe("0123456789abcdef_generated_webm");
+    expect(result.webm.fingerprint).toBe(result.webm.originalHash);
   } finally {
     await runtime.dispose();
   }

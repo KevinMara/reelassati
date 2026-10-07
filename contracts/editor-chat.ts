@@ -96,6 +96,7 @@ export type EditorChatAction = EditorChatActionBase &
     | {
         kind: "settings";
         aspectRatio?: "9:16" | "16:9" | "1:1";
+        frameRate?: import("./export-settings").ExportFrameRate;
         duration?: number;
         captionStyle?: string;
         captionAppearance?: import("./editor-presets").CaptionAppearance;

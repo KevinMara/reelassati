@@ -18,6 +18,40 @@ import { CaptionFileTools } from "@/components/studio/CaptionFileTools";
 import { ClipInspector } from "@/components/studio/ClipInspector";
 import { ObjectTrackingPanel } from "@/components/studio/ObjectTrackingPanel";
 import { ShotTransitionPanel } from "@/components/studio/ShotTransitionPanel";
+import { TimelineMixer } from "@/components/studio/TimelineMixer";
+import { ClipTimingTools } from "@/components/studio/ClipTimingTools";
+import { TranscriptCutPanel } from "@/components/studio/TranscriptCutPanel";
+import { SavedEditorStyles } from "@/components/studio/SavedEditorStyles";
+import { ProjectFootageSearch } from "@/components/studio/ProjectFootageSearch";
+import {
+  addEditorSavedStyle,
+  removeEditorSavedStyle,
+  type EditorSavedStyle,
+} from "@contracts/editor-style-library";
+import { cutTranscriptWords } from "@/lib/transcript-cuts";
+import {
+  slipTimelineSource,
+  rollTimelineCut,
+  rateStretchTimelineClip,
+} from "@/lib/editor-trimming";
+import {
+  expandLinkedSelection,
+  groupClips,
+  ungroupClips,
+  linkClips,
+  unlinkClips,
+} from "@contracts/clip-groups";
+import {
+  loadEditorKeybindings,
+  saveEditorKeybindings,
+  matchEditorKeybinding,
+  EDITOR_KEYBOARD_ACTIONS,
+  type EditorActionId,
+} from "@/lib/editor-keybindings";
+import {
+  updateTimelineTrack,
+  reorderTimelineTrack,
+} from "@contracts/timeline-mixer";
 import {
   applyAdjacentTransition,
   removeAdjacentTransition,
@@ -184,6 +218,8 @@ function snapshotProject(project: EditProject, label: string): EditRevision {
     captionStyle: project.captionStyle,
     captionAppearance: project.captionAppearance,
     aspectRatio: project.aspectRatio,
+    frameRate: project.frameRate,
+    trackSettings: structuredClone(project.trackSettings),
     storyBeats: project.storyBeats,
     clips: project.clips.map(clip => ({ ...clip })),
     transcript: project.transcript.map(segment => ({ ...segment })),
@@ -278,6 +314,9 @@ export default function EditorPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [mixerOpen, setMixerOpen] = useState(false);
+  const [selectGroups, setSelectGroups] = useState(true);
+  const [keybindings, setKeybindings] = useState(loadEditorKeybindings);
   const [recentlyAddedAssetId, setRecentlyAddedAssetId] = useState<
     string | null
   >(null);
@@ -314,12 +353,16 @@ export default function EditorPage() {
     () => project?.clips.find(clip => clip.id === selectedClipId),
     [project?.clips, selectedClipId]
   );
-  const selectedClips = (project?.clips ?? []).filter(
-    c =>
-      c.id === selectedClipId ||
-      (selectedClipId && extraSelection.includes(c.id))
+  const selectedIds =
+    project && selectedClipId
+      ? expandLinkedSelection(project, [selectedClipId, ...extraSelection], {
+          groups: selectGroups,
+          links: true,
+        })
+      : [];
+  const selectedClips = (project?.clips ?? []).filter(c =>
+    selectedIds.includes(c.id)
   );
-  const selectedIds = selectedClips.map(c => c.id);
   const selectionLocked = selectedClips.some(c => c.locked);
   useEffect(
     () => setClipDraft(selectedClip ? { ...selectedClip } : null),
@@ -522,6 +565,8 @@ export default function EditorPage() {
             captionStyle: item.captionStyle,
             captionAppearance: item.captionAppearance,
             aspectRatio: item.aspectRatio,
+            frameRate: item.frameRate,
+            trackSettings: item.trackSettings,
             storyBeats: item.storyBeats,
           }) ===
           JSON.stringify({
@@ -531,6 +576,8 @@ export default function EditorPage() {
             captionStyle: next.captionStyle,
             captionAppearance: next.captionAppearance,
             aspectRatio: next.aspectRatio,
+            frameRate: next.frameRate,
+            trackSettings: next.trackSettings,
             storyBeats: next.storyBeats,
           });
         if (unchanged) return item;
@@ -777,39 +824,18 @@ export default function EditorPage() {
     await saveProjectChange(
       () =>
         commitProject("Clip moved", current => {
-          if (selectedIds.includes(clip.id) && selectedIds.length > 1)
-            return moveClipGroup(
-              current,
-              selectedIds,
-              clip.id,
-              time,
-              destination.number
-            );
-          const lane = allocateTimelineLane(
-            current.clips,
-            kind,
+          const movingIds = expandLinkedSelection(
+            current,
+            selectedIds.includes(clip.id) ? selectedIds : [clip.id],
+            { groups: selectGroups, links: true }
+          );
+          return moveClipGroup(
+            current,
+            movingIds,
+            clip.id,
             time,
-            clip.duration,
-            destination.number,
-            clip.id
+            destination.number
           );
-          const next = applyEditOperation(current, {
-            id: createId("move"),
-            type: "move",
-            targetClipIds: [clip.id],
-            start: time,
-            end: time + clip.duration,
-            parameters: { destination: time },
-            label: "Move clip",
-            reason: "Manual timeline edit",
-            confidence: 1,
-            intensity: "balanced",
-            status: "accepted",
-          });
-          next.clips = next.clips.map(c =>
-            c.id === clip.id ? { ...c, lane } : c
-          );
-          return next;
         }),
       "The clip could not be moved."
     );
@@ -997,7 +1023,8 @@ export default function EditorPage() {
               },
               previewAsset,
               current.duration
-            )
+            ),
+            workspace.assets
           )
         ),
       "Clip timing could not be saved."
@@ -1230,10 +1257,81 @@ export default function EditorPage() {
     await saveProjectChange(
       () =>
         commitProject("Trimmed to playhead", p =>
-          replaceTimelineClip(p, selectedClip.id, edited)
+          replaceTimelineClip(p, selectedClip.id, edited, workspace.assets)
         ),
       "Could not trim clip."
     );
+  };
+  const editMembership = async (
+    kind: "group" | "ungroup" | "link" | "unlink"
+  ) => {
+    if (!selectedIds.length || selectionLocked) return;
+    await saveProjectChange(
+      () =>
+        commitProject(`${kind} selection`, p =>
+          kind === "group"
+            ? groupClips(p, selectedIds, () => createId("group"))
+            : kind === "ungroup"
+              ? ungroupClips(p, selectedIds)
+              : kind === "link"
+                ? linkClips(p, selectedIds, () => createId("link"))
+                : unlinkClips(p, selectedIds)
+        ),
+      "Could not change this selection’s group or link."
+    );
+  };
+  const applySavedStyle = async (style: EditorSavedStyle) => {
+    if (style.type === "look" && !selectedClip)
+      throw new Error("Select a video or image to apply this look.");
+    await commitProject(`Applied saved style: ${style.name}`, p => {
+      if (style.type === "captions")
+        return {
+          ...p,
+          captionStyle: style.captionStyle,
+          captionAppearance: structuredClone(style.captionAppearance),
+        };
+      if (style.type === "look") {
+        const clip = p.clips.find(c => c.id === selectedClip?.id);
+        if (
+          !clip ||
+          clip.graphic ||
+          !clip.assetId ||
+          clip.track === "audio" ||
+          clip.track === "captions"
+        )
+          throw new Error("Select a video or image to apply this look.");
+        return replaceTimelineClip(
+          p,
+          clip.id,
+          { ...clip, ...structuredClone(style.settings) },
+          workspace.assets
+        );
+      }
+      if (playhead >= p.duration)
+        throw new Error(
+          "Move the playhead inside the edit before inserting a saved graphic."
+        );
+      const id = createId("saved-graphic");
+      const next = applyEditOperation(p, {
+        id,
+        type: "graphic",
+        label: style.graphic.text || style.name,
+        reason: "Applied saved editable graphic",
+        start: playhead,
+        end: Math.min(p.duration, playhead + style.graphicDuration),
+        confidence: 1,
+        intensity: "balanced",
+        targetClipIds: [],
+        status: "proposed",
+        parameters: { graphic: structuredClone(style.graphic) },
+      });
+      return {
+        ...next,
+        clips: next.clips.map(c =>
+          c.id === id ? { ...c, graphicDuration: style.graphicDuration } : c
+        ),
+      };
+    });
   };
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
@@ -1246,127 +1344,111 @@ export default function EditorPage() {
         )
       )
         return;
-      const modifier = event.ctrlKey || event.metaKey;
-      const key = event.key.toLowerCase();
+      const actionId = matchEditorKeybinding(event, keybindings);
+      if (!actionId) return;
       if (
-        modifier &&
-        (key === "c" || key === "x") &&
+        ["copy", "cut"].includes(actionId) &&
         window.getSelection()?.toString()
       )
         return;
-      let action: (() => void | Promise<unknown>) | undefined;
-      if (modifier && key === "z") action = event.shiftKey ? redo : undo;
-      else if (modifier && key === "y") action = redo;
-      else if (modifier && key === "a")
-        action = () => {
-          setSelectedClipId(project.clips[0]?.id ?? null);
-          setExtraSelection(project.clips.slice(1).map(c => c.id));
-        };
-      else if (modifier && key === "c" && selectedClip)
-        action = () => {
-          clipboardRef.current = structuredClone(
-            selectedClips
-              .filter(c => !c.transitionHandle)
-              .map(c => transitionFreeClip(project, c))
+      const needsClip: EditorActionId[] = [
+        "copy",
+        "cut",
+        "duplicate",
+        "delete",
+        "rippleDelete",
+        "nudgeLeft",
+        "nudgeRight",
+        "nudgeSecondLeft",
+        "nudgeSecondRight",
+        "split",
+        "detachAudio",
+        "mute",
+        "lock",
+        "trimStart",
+        "trimEnd",
+        "group",
+        "ungroup",
+        "link",
+        "unlink",
+      ];
+      if (needsClip.includes(actionId) && !selectedClip) return;
+      if (actionId === "paste" && !clipboardRef.current.length) return;
+      const copySelection = () => {
+        clipboardRef.current = structuredClone(
+          selectedClips
+            .filter(c => !c.transitionHandle)
+            .map(c => transitionFreeClip(project, c))
+        );
+        clipboardTranscript.current = structuredClone(project.transcript);
+      };
+      const actions: Record<EditorActionId, () => void | Promise<unknown>> = {
+        undo,
+        redo,
+        selectAll: () => {
+          setSelectedClipId(
+            project.clips.find(c => !c.transitionHandle)?.id ?? null
           );
-          clipboardTranscript.current = structuredClone(project.transcript);
-        };
-      else if (modifier && key === "x" && selectedClip && !selectionLocked)
-        action = async () => {
-          clipboardRef.current = structuredClone(
-            selectedClips
+          setExtraSelection(
+            project.clips
+              .slice(1)
               .filter(c => !c.transitionHandle)
-              .map(c => transitionFreeClip(project, c))
+              .map(c => c.id)
           );
-          clipboardTranscript.current = structuredClone(project.transcript);
+        },
+        copy: copySelection,
+        cut: async () => {
+          if (selectionLocked) return;
+          copySelection();
           await deleteSelectedClip();
-        };
-      else if (modifier && key === "v" && clipboardRef.current.length)
-        action = pasteClip;
-      else if (modifier && key === "d" && selectedClip)
-        action = duplicateSelectedClip;
-      else if (
-        !modifier &&
-        !event.altKey &&
-        (key === "delete" || key === "backspace") &&
-        selectedClip
-      )
-        action = event.shiftKey ? rippleDeleteSelected : deleteSelectedClip;
-      else if (
-        !modifier &&
-        event.altKey &&
-        ["arrowleft", "arrowright"].includes(key) &&
-        selectedClip
-      )
-        action = () =>
-          nudgeSelection(
-            (key === "arrowright" ? 1 : -1) * (event.shiftKey ? 1 : 1 / 30)
-          );
-      else if (!modifier && !event.altKey && key === "s" && selectedClip)
-        action = splitSelectedClip;
-      else if (!modifier && !event.altKey && event.shiftKey && key === "d")
-        action = detachSelectedAudio;
-      else if (!modifier && !event.altKey && event.shiftKey && key === "l")
-        action = () => toggleClipProperty("locked");
-      else if (!modifier && !event.altKey && key === "m")
-        action = () => toggleClipProperty("muted");
-      else if (!modifier && !event.altKey && key === "q")
-        action = () => trimAtPlayhead("start");
-      else if (!modifier && !event.altKey && key === "w")
-        action = () => trimAtPlayhead("end");
-      else if (!modifier && !event.altKey && key === "n")
-        action = () => setSnapping(v => !v);
-      else if (!modifier && !event.altKey && key === "home")
-        action = () => seekTimeline(0);
-      else if (!modifier && !event.altKey && key === "end")
-        action = () => seekTimeline(project.duration);
-      else if (!modifier && !event.altKey && ["j", "l"].includes(key))
-        action = () => seekTimeline(playhead + (key === "j" ? -1 : 1));
-      else if (!modifier && !event.altKey && ["+", "=", "-", "0"].includes(key))
-        action = () =>
-          setTimelineZoom(z =>
-            key === "0"
-              ? 100
-              : Math.max(
-                  25,
-                  Math.min(1600, z * (key === "-" ? 1 / 1.25 : 1.25))
-                )
-          );
-      else if (!modifier && !event.altKey && key === "escape")
-        action = () => {
+        },
+        paste: pasteClip,
+        duplicate: duplicateSelectedClip,
+        delete: deleteSelectedClip,
+        rippleDelete: rippleDeleteSelected,
+        nudgeLeft: () => nudgeSelection(-1 / (project.frameRate ?? 30)),
+        nudgeRight: () => nudgeSelection(1 / (project.frameRate ?? 30)),
+        nudgeSecondLeft: () => nudgeSelection(-1),
+        nudgeSecondRight: () => nudgeSelection(1),
+        split: splitSelectedClip,
+        detachAudio: detachSelectedAudio,
+        lock: () => toggleClipProperty("locked"),
+        mute: () => toggleClipProperty("muted"),
+        trimStart: () => trimAtPlayhead("start"),
+        trimEnd: () => trimAtPlayhead("end"),
+        snapping: () => setSnapping(v => !v),
+        start: () => seekTimeline(0),
+        end: () => seekTimeline(project.duration),
+        seekBackward: () => seekTimeline(playhead - 1),
+        seekForward: () => seekTimeline(playhead + 1),
+        secondBackward: () => seekTimeline(playhead - 1),
+        secondForward: () => seekTimeline(playhead + 1),
+        frameBackward: () =>
+          seekTimeline(playhead - 1 / (project.frameRate ?? 30)),
+        frameForward: () =>
+          seekTimeline(playhead + 1 / (project.frameRate ?? 30)),
+        play: toggleTimelinePlayback,
+        zoomIn: () => setTimelineZoom(z => Math.min(1600, z * 1.25)),
+        zoomOut: () => setTimelineZoom(z => Math.max(25, z / 1.25)),
+        zoomFit: () => setTimelineZoom(100),
+        deselect: () => {
           setSelectedClipId(null);
           setExtraSelection([]);
           setClipDraft(null);
-        };
-      else if (!modifier && !event.altKey && event.shiftKey && key === "b")
-        action = openLibrary;
-      else if (!modifier && !event.altKey && event.shiftKey && key === "i")
-        action = () => setInspectorOpen(true);
-      else if (modifier && !event.altKey && key === "/")
-        action = () => setShortcutsOpen(true);
-      else if (
-        !modifier &&
-        !event.altKey &&
-        (event.code === "Space" || key === "k")
-      )
-        action = toggleTimelinePlayback;
-      else if (
-        !modifier &&
-        !event.altKey &&
-        (key === "arrowleft" || key === "arrowright")
-      )
-        action = () =>
-          seekTimeline(
-            playhead +
-              (key === "arrowright" ? 1 : -1) * (event.shiftKey ? 1 : 1 / 30)
-          );
-      if (!action) return;
+        },
+        library: openLibrary,
+        inspector: () => setInspectorOpen(true),
+        shortcuts: () => setShortcutsOpen(true),
+        group: () => editMembership("group"),
+        ungroup: () => editMembership("ungroup"),
+        link: () => editMembership("link"),
+        unlink: () => editMembership("unlink"),
+      };
+      const action = actions[actionId];
       event.preventDefault();
       if (
         (event.repeat &&
-          !["arrowleft", "arrowright", "j", "l", "+", "=", "-"].includes(
-            key
-          )) ||
+          !EDITOR_KEYBOARD_ACTIONS.find(row => row.id === actionId)?.repeat) ||
         busyAction ||
         keyboardActionPending.current
       )
@@ -1731,6 +1813,37 @@ export default function EditorPage() {
 
   const canvasContent = (
     <div className="grid gap-4">
+      <label className="text-sm" htmlFor="editor-project-frame-rate">
+        Project frame rate
+        <CompactSelect
+          id="editor-project-frame-rate"
+          aria-label="Project frame rate"
+          value={String(project.frameRate ?? 30)}
+          disabled={Boolean(busyAction)}
+          options={[24, 25, 30, 60].map(value => ({
+            value: String(value),
+            label: `${value} fps`,
+          }))}
+          onValueChange={value =>
+            void saveProjectChange(
+              () =>
+                commitProject("Changed project frame rate", p => ({
+                  ...p,
+                  frameRate: Number(value) as 24 | 25 | 30 | 60,
+                })),
+              "Could not change frame rate."
+            )
+          }
+          className="mt-2"
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => setMixerOpen(true)}
+        className="rounded-lg border border-border px-3 py-2 text-sm"
+      >
+        Tracks and audio mixer
+      </button>
       <label className="flex items-center gap-2 text-sm">
         {italian ? "Durata video" : "Video duration"}
         <input
@@ -1849,72 +1962,147 @@ export default function EditorPage() {
     </div>
   );
   const inspectorContent = (
-    <ClipInspector
-      draft={clipDraft}
-      time={playhead}
-      onSeek={seekTimeline}
-      setDraft={setClipDraft}
-      asset={previewAsset}
-      duration={project.duration}
-      canvas={canvasContent}
-      onApply={applyClipDraft}
-      onToggle={toggleClipProperty}
-      onDetach={detachSelectedAudio}
-      onGraphic={async graphic => {
-        await commitProject("Updated motion graphic", p => ({
-          ...p,
-          clips: p.clips.map(c =>
-            c.id === selectedClip?.id && !c.locked
-              ? { ...c, graphic, label: graphic.text.trim() || c.label }
-              : c
-          ),
-        }));
-      }}
-      tracking={
-        selectedClip?.graphic && (
-          <ObjectTrackingPanel
-            key={`${selectedClip.id}:${JSON.stringify(selectedClip)}`}
+    <div>
+      <ClipInspector
+        draft={clipDraft}
+        time={playhead}
+        onSeek={seekTimeline}
+        setDraft={setClipDraft}
+        asset={previewAsset}
+        duration={project.duration}
+        canvas={canvasContent}
+        onApply={applyClipDraft}
+        onToggle={toggleClipProperty}
+        onDetach={detachSelectedAudio}
+        onGraphic={async graphic => {
+          await commitProject("Updated motion graphic", p => ({
+            ...p,
+            clips: p.clips.map(c =>
+              c.id === selectedClip?.id && !c.locked
+                ? { ...c, graphic, label: graphic.text.trim() || c.label }
+                : c
+            ),
+          }));
+        }}
+        tracking={
+          selectedClip?.graphic && (
+            <ObjectTrackingPanel
+              key={`${selectedClip.id}:${JSON.stringify(selectedClip)}`}
+              project={project}
+              clip={selectedClip}
+              assets={workspace.assets}
+              onApply={async (result, expectedSource) => {
+                const expectedGraphic = selectedClip;
+                const expectedAspectRatio = project.aspectRatio;
+                await commitProject(
+                  "Applied observed region tracking",
+                  current => {
+                    const source = current.clips.find(
+                      c => c.id === expectedSource.id
+                    );
+                    const graphic = current.clips.find(
+                      c => c.id === expectedGraphic.id
+                    );
+                    if (
+                      !graphic ||
+                      graphic.locked ||
+                      current.aspectRatio !== expectedAspectRatio ||
+                      JSON.stringify(source) !==
+                        JSON.stringify(expectedSource) ||
+                      JSON.stringify(graphic) !==
+                        JSON.stringify(expectedGraphic)
+                    )
+                      throw new Error(
+                        "The source or graphic changed during tracking. Track the current version again."
+                      );
+                    return {
+                      ...current,
+                      clips: current.clips.map(c =>
+                        c.id === graphic.id ? result : c
+                      ),
+                    };
+                  }
+                );
+              }}
+            />
+          )
+        }
+      />
+      {selectedClip &&
+        !selectedClip.graphic &&
+        previewAsset &&
+        (["video", "audio"].includes(previewAsset.kind) ||
+          (previewAsset.kind === "export" &&
+            previewAsset.contentType.startsWith("video/"))) && (
+          <ClipTimingTools
+            key={`${selectedClip.id}:${selectedClip.duration}`}
             project={project}
             clip={selectedClip}
-            assets={workspace.assets}
-            onApply={async (result, expectedSource) => {
-              const expectedGraphic = selectedClip;
-              const expectedAspectRatio = project.aspectRatio;
-              await commitProject(
-                "Applied observed region tracking",
-                current => {
-                  const source = current.clips.find(
-                    c => c.id === expectedSource.id
-                  );
-                  const graphic = current.clips.find(
-                    c => c.id === expectedGraphic.id
-                  );
-                  if (
-                    !graphic ||
-                    graphic.locked ||
-                    current.aspectRatio !== expectedAspectRatio ||
-                    JSON.stringify(source) !== JSON.stringify(expectedSource) ||
-                    JSON.stringify(graphic) !== JSON.stringify(expectedGraphic)
-                  )
-                    throw new Error(
-                      "The source or graphic changed during tracking. Track the current version again."
-                    );
-                  return {
-                    ...current,
-                    clips: current.clips.map(c =>
-                      c.id === graphic.id ? result : c
-                    ),
-                  };
-                }
+            disabled={Boolean(busyAction) || selectionLocked}
+            onApply={async (mode, value) => {
+              await saveProjectChange(
+                () =>
+                  commitProject(
+                    mode === "slip"
+                      ? "Slipped source window"
+                      : mode === "roll"
+                        ? "Rolled adjacent cut"
+                        : "Rate stretched clip",
+                    p =>
+                      mode === "slip"
+                        ? slipTimelineSource(
+                            p,
+                            selectedClip.id,
+                            value,
+                            workspace.assets
+                          )
+                        : mode === "roll"
+                          ? rollTimelineCut(
+                              p,
+                              selectedClip.id,
+                              value,
+                              workspace.assets
+                            )
+                          : rateStretchTimelineClip(
+                              p,
+                              selectedClip.id,
+                              value,
+                              workspace.assets
+                            )
+                  ),
+                "Could not change the clip timing."
               );
             }}
           />
-        )
-      }
-    />
+        )}
+    </div>
   );
   const captionsContent = (
     <>
+      <TranscriptCutPanel
+        project={project}
+        assets={workspace.assets}
+        busy={Boolean(busyAction)}
+        canRestore={
+          revisionCursor > 0 &&
+          project.revisions[revisionCursor]?.label ===
+            "Removed selected transcript words"
+        }
+        onRestore={undo}
+        onCut={async selections => {
+          const saved = await saveProjectChange(
+            () =>
+              commitProject("Removed selected transcript words", p =>
+                cutTranscriptWords(p, workspace.assets, selections)
+              ),
+            "Could not cut the selected words."
+          );
+          if (saved) {
+            setSelectedClipId(null);
+            setExtraSelection([]);
+          }
+        }}
+      />
       {
         <div>
           <details className="mb-4 rounded-xl border border-border p-3">
@@ -2360,6 +2548,52 @@ export default function EditorPage() {
               );
             }}
           />
+          <details className="border-t border-border p-4">
+            <summary className="cursor-pointer text-sm font-medium">
+              Search project footage
+            </summary>
+            <div className="mt-4">
+              <ProjectFootageSearch
+                project={project}
+                assets={workspace.assets}
+                onSelect={(clipId, time) => {
+                  setSelectedClipId(clipId);
+                  setExtraSelection([]);
+                  seekTimeline(time);
+                }}
+              />
+            </div>
+          </details>
+          <details className="border-t border-border p-4">
+            <summary className="cursor-pointer text-sm font-medium">
+              Saved graphics and styles
+            </summary>
+            <div className="mt-4">
+              <SavedEditorStyles
+                styles={workspace.editorStyles ?? []}
+                selectedClip={selectedClip}
+                project={project}
+                time={playhead}
+                disabled={Boolean(busyAction)}
+                onSave={async draft => {
+                  await updateWorkspace(w => ({
+                    ...w,
+                    editorStyles: addEditorSavedStyle(w.editorStyles, {
+                      ...draft,
+                      id: createId("style"),
+                    }),
+                  }));
+                }}
+                onDelete={async id => {
+                  await updateWorkspace(w => ({
+                    ...w,
+                    editorStyles: removeEditorSavedStyle(w.editorStyles, id),
+                  }));
+                }}
+                onApply={applySavedStyle}
+              />
+            </div>
+          </details>
         </section>
         <main className="contents">
           <section
@@ -2557,11 +2791,64 @@ export default function EditorPage() {
                 Add from library
               </button>
               <span className="mx-1 h-5 w-px bg-border" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="rounded-lg px-3 py-2 text-xs font-medium hover:bg-background"
+                  >
+                    Groups and links
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 space-y-2">
+                  <button
+                    type="button"
+                    aria-pressed={selectGroups}
+                    onClick={() => {
+                      setSelectGroups(value => !value);
+                      setExtraSelection([]);
+                    }}
+                    className="w-full rounded-lg border border-border px-3 py-2 text-left text-sm"
+                  >
+                    Select grouped clips: {selectGroups ? "On" : "Off"}
+                  </button>
+                  {(["group", "ungroup", "link", "unlink"] as const).map(
+                    kind => (
+                      <button
+                        key={kind}
+                        type="button"
+                        disabled={
+                          Boolean(busyAction) ||
+                          selectionLocked ||
+                          !selectedIds.length ||
+                          (["group", "link"].includes(kind) &&
+                            selectedIds.length < 2)
+                        }
+                        onClick={() => void editMembership(kind)}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-sm capitalize hover:bg-background disabled:opacity-40"
+                      >
+                        {kind} selection
+                      </button>
+                    )
+                  )}
+                  <p className="text-xs text-foreground/65">
+                    Linked video and audio move and trim together. Unlink to
+                    edit them independently.
+                  </p>
+                </PopoverContent>
+              </Popover>
+              <button
+                type="button"
+                onClick={() => setMixerOpen(true)}
+                className="rounded-lg px-3 py-2 text-xs font-medium hover:bg-background"
+              >
+                Tracks and mixer
+              </button>
 
               <button
                 type="button"
                 disabled={!selectedClips.length || selectionLocked}
-                title="Split at playhead (S)"
+                title="Split at playhead"
                 onClick={() => void splitSelectedClip()}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-30"
               >
@@ -2571,7 +2858,7 @@ export default function EditorPage() {
               <button
                 type="button"
                 disabled={!selectedClip}
-                title="Duplicate (Ctrl/⌘ D)"
+                title="Duplicate selection"
                 onClick={() => void duplicateSelectedClip()}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-30"
               >
@@ -2581,7 +2868,7 @@ export default function EditorPage() {
               <button
                 type="button"
                 disabled={!selectedClips.length || selectionLocked}
-                title="Delete selection (Delete)"
+                title="Delete selection"
                 onClick={() => void deleteSelectedClip()}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-30"
               >
@@ -2592,7 +2879,7 @@ export default function EditorPage() {
               <button
                 type="button"
                 disabled={!selectedClips.length || selectionLocked}
-                title="Remove the selected time intervals across all unlocked tracks and close the gaps (Shift + Delete)"
+                title="Remove the selected time intervals across all unlocked tracks and close the gaps"
                 onClick={() => void rippleDeleteSelected()}
                 className="rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-30"
               >
@@ -2715,14 +3002,24 @@ export default function EditorPage() {
               disabled={Boolean(busyAction)}
               onSeek={seekTimeline}
               onSelect={(clip, time, additive) => {
+                const related = expandLinkedSelection(project, [clip.id], {
+                  groups: selectGroups,
+                  links: true,
+                });
                 if (additive && selectedIds.includes(clip.id)) {
-                  const remaining = selectedIds.filter(id => id !== clip.id);
+                  const remaining = selectedIds.filter(
+                    id => !related.includes(id)
+                  );
                   setSelectedClipId(remaining[0] ?? null);
                   setExtraSelection(remaining.slice(1));
                 } else {
                   setSelectedClipId(clip.id);
                   setExtraSelection(
-                    additive ? selectedIds.filter(id => id !== clip.id) : []
+                    additive
+                      ? [...new Set([...selectedIds, ...related])].filter(
+                          id => id !== clip.id
+                        )
+                      : related.filter(id => id !== clip.id)
                   );
                   setClipDraft({ ...clip });
                 }
@@ -2747,7 +3044,12 @@ export default function EditorPage() {
                 await saveProjectChange(
                   () =>
                     commitProject("Clip trimmed", current =>
-                      replaceTimelineClip(current, clip.id, clip)
+                      replaceTimelineClip(
+                        current,
+                        clip.id,
+                        clip,
+                        workspace.assets
+                      )
                     ),
                   "The clip could not be trimmed."
                 );
@@ -2777,7 +3079,48 @@ export default function EditorPage() {
         </aside>
       </div>
 
-      <EditorShortcuts open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      <EditorShortcuts
+        open={shortcutsOpen}
+        onOpenChange={setShortcutsOpen}
+        bindings={keybindings}
+        onChange={next => {
+          setKeybindings(next);
+          if (!saveEditorKeybindings(next))
+            setLocalError(
+              "These shortcuts work for this session, but this browser could not save them."
+            );
+        }}
+      />
+      <Dialog open={mixerOpen} onOpenChange={setMixerOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogTitle>Tracks and audio mixer</DialogTitle>
+          <DialogDescription>
+            Rename, reorder and mix the tracks in this project.
+          </DialogDescription>
+          <TimelineMixer
+            project={project}
+            disabled={Boolean(busyAction)}
+            onUpdate={async (lane, patch) => {
+              await saveProjectChange(
+                () =>
+                  commitProject("Updated track settings", p =>
+                    updateTimelineTrack(p, lane, patch)
+                  ),
+                "Could not update this track."
+              );
+            }}
+            onReorder={async (lane, direction) => {
+              await saveProjectChange(
+                () =>
+                  commitProject("Reordered tracks", p =>
+                    reorderTimelineTrack(p, lane, direction)
+                  ),
+                "Could not reorder tracks."
+              );
+            }}
+          />
+        </DialogContent>
+      </Dialog>
       <Dialog open={inspectorOpen} onOpenChange={setInspectorOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogTitle>Adjust</DialogTitle>
@@ -2809,7 +3152,7 @@ export default function EditorPage() {
                   type="range"
                   min={0}
                   max={project.duration}
-                  step={1 / 30}
+                  step={1 / (project.frameRate ?? 30)}
                   value={playhead}
                   onChange={e => seekTimeline(Number(e.target.value))}
                   className="w-full accent-primary"

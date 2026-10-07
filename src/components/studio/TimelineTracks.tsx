@@ -20,6 +20,8 @@ import {
   EyeOff,
 } from "lucide-react";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
+import { timelineTrackSettings } from "@contracts/timeline-mixer";
+import { TimelineMediaStrip } from "./TimelineMediaStrip";
 import {
   LIBRARY_ASSET_DRAG_TYPE,
   TIMELINE_CLIP_DRAG_TYPE,
@@ -425,8 +427,12 @@ export function TimelineTracks({
                   <div className="flex flex-col justify-center gap-1 border-r border-border bg-background/35 px-2 text-[11px] text-foreground/65">
                     <div className="flex items-center gap-1">
                       <Icon className="h-3.5 w-3.5 shrink-0" />
-                      <span>
-                        {names[lane.kind]} {lane.number}
+                      <span
+                        className="min-w-0 truncate"
+                        title={timelineTrackSettings(project, lane)?.name}
+                      >
+                        {timelineTrackSettings(project, lane)?.name ??
+                          `${names[lane.kind]} ${lane.number}`}
                       </span>
                     </div>
                     {clips.length > 0 && onTrackToggle && (
@@ -646,7 +652,16 @@ export function TimelineTracks({
                           }}
                           title={`${clip.label} · Drag to move; drag edges to trim`}
                         >
-                          <span className="pointer-events-none flex items-center gap-1 truncate">
+                          {(clip.track === "video" ||
+                            clip.track === "audio") && (
+                            <TimelineMediaStrip
+                              clip={clip}
+                              asset={assets.find(
+                                asset => asset.id === clip.assetId
+                              )}
+                            />
+                          )}
+                          <span className="pointer-events-none relative z-[1] flex items-center gap-1 truncate">
                             {clip.locked && (
                               <Lock className="h-2.5 w-2.5 shrink-0" />
                             )}
@@ -655,7 +670,7 @@ export function TimelineTracks({
                             )}
                             <span className="truncate">{clip.label}</span>
                           </span>
-                          <span className="pointer-events-none mt-0.5 block truncate font-mono text-[10px] text-white/65">
+                          <span className="pointer-events-none relative z-[1] mt-0.5 block w-fit max-w-full truncate rounded bg-black/35 px-0.5 font-mono text-[10px] text-white/80">
                             {fmt(clip.duration)}
                           </span>
                           {!clip.locked &&

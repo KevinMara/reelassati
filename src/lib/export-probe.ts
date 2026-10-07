@@ -1,4 +1,7 @@
-import { verifyExportMetadata } from "./export-verification";
+import {
+  verifyExportMetadata,
+  type ExpectedExportMetadata,
+} from "./export-verification";
 
 type ExportProbeEngine = {
   ffprobe: (args: string[]) => Promise<number>;
@@ -11,7 +14,7 @@ let probeSequence = 0;
 /** Read encoded metadata using the same core shipped to the browser. */
 export async function probeExportMetadata(
   engine: ExportProbeEngine,
-  expected: { width: number; height: number; duration: number }
+  expected: ExpectedExportMetadata
 ) {
   // Never consume a previous probe's JSON after an interrupted/failed command.
   const path = `export-probe-${++probeSequence}.json`;
@@ -24,7 +27,8 @@ export async function probeExportMetadata(
       "-show_streams",
       "-of",
       "json",
-      "output.mp4",
+      expected.filename ??
+        (expected.format === "webm" ? "output.webm" : "output.mp4"),
       "-o",
       path,
     ]);
@@ -41,7 +45,7 @@ export async function probeExportMetadata(
     return verifyExportMetadata(value, expected);
   } catch {
     throw new Error(
-      "The exported video did not pass its duration and picture checks. Your project is saved; please retry export."
+      "The exported video did not pass its duration, picture, frame rate and format checks. Your project is saved; please retry export."
     );
   } finally {
     // The worker may already have been terminated by Cancel.
