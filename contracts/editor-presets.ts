@@ -7,6 +7,10 @@ export const CAPTION_ANIMATIONS = [
   "word-reveal",
   "word-only",
   "word-pulse",
+  "word-pop",
+  "word-slide",
+  "word-fade",
+  "word-type",
 ] as const;
 export type CaptionAnimation = (typeof CAPTION_ANIMATIONS)[number];
 export interface CaptionPreset {
@@ -52,6 +56,29 @@ const caption = (
 
 /** Original presets; fonts are bundled locally and no asset subscription is required. */
 export const CAPTION_PRESETS: readonly CaptionPreset[] = [
+  caption("word-pop", "Word pop", "Each measured word settles into place.", {
+    animation: "word-pop",
+    size: 7,
+    maxCharacters: 24,
+  }),
+  caption(
+    "word-slide",
+    "Word rise",
+    "Each spoken word rises gently into place.",
+    { animation: "word-slide", size: 6, activeColor: "#7AF5CF" }
+  ),
+  caption(
+    "word-fade",
+    "Word fade",
+    "A soft entrance for each measured spoken word.",
+    { animation: "word-fade", size: 6 }
+  ),
+  caption(
+    "word-type",
+    "Word type",
+    "Letters reveal within each measured word's speech interval.",
+    { animation: "word-type", size: 6, uppercase: true }
+  ),
   caption(
     "reveal",
     "Spoken reveal",
@@ -242,6 +269,8 @@ export function captionLineWidth(text: string, preset: CaptionPreset): number {
 /** Explicit line breaks are shared by CSS preview and ASS export. No timing is invented. */
 export function captionLines(text: string, preset: CaptionPreset): string {
   const clean = text
+    // Caption files may contain control bytes; strip them before either renderer.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
     .replace(/\r\n?/g, "\n");
   const formatted = preset.uppercase ? clean.toUpperCase() : clean;

@@ -63,6 +63,20 @@ export type EditorChatAction = EditorChatActionBase &
   (
     | { kind: "edit"; operation: EditOperation }
     | {
+        kind: "speech-zoom";
+        targetClipIds: string[];
+        amount: number;
+        replacePath: boolean;
+      }
+    | {
+        kind: "beat-cuts";
+        sourceClipId: string;
+        targetClipIds: string[];
+        every: number;
+        minimumGap: number;
+        sensitivity: number;
+      }
+    | {
         kind: "adjacent-transition";
         outgoingId: string;
         incomingId: string;

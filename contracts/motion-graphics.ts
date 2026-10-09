@@ -92,7 +92,9 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
     typeof c === "string" && /^#[a-f\d]{6}$/i.test(c) ? c : fallback;
   const text = (t: unknown, max: number) =>
     typeof t === "string"
-      ? t.replace(/[\u0000-\u001f]/g, " ").slice(0, max)
+      ? // Strip uploaded control bytes before rendering the graphic.
+        // eslint-disable-next-line no-control-regex
+        t.replace(/[\u0000-\u001f]/g, " ").slice(0, max)
       : "";
   const motion = new Map<number, GraphicKeyframe>();
   if (Array.isArray(v.motion))

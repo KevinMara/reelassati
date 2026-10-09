@@ -19,6 +19,7 @@ import { ClipInspector } from "@/components/studio/ClipInspector";
 import { ObjectTrackingPanel } from "@/components/studio/ObjectTrackingPanel";
 import { ShotTransitionPanel } from "@/components/studio/ShotTransitionPanel";
 import { TimelineMixer } from "@/components/studio/TimelineMixer";
+import { RhythmTools } from "@/components/studio/RhythmTools";
 import { ClipTimingTools } from "@/components/studio/ClipTimingTools";
 import { TranscriptCutPanel } from "@/components/studio/TranscriptCutPanel";
 import { SavedEditorStyles } from "@/components/studio/SavedEditorStyles";
@@ -315,6 +316,7 @@ export default function EditorPage() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [mixerOpen, setMixerOpen] = useState(false);
+  const [rhythmOpen, setRhythmOpen] = useState(false);
   const [selectGroups, setSelectGroups] = useState(true);
   const [keybindings, setKeybindings] = useState(loadEditorKeybindings);
   const [recentlyAddedAssetId, setRecentlyAddedAssetId] = useState<
@@ -364,10 +366,13 @@ export default function EditorPage() {
     selectedIds.includes(c.id)
   );
   const selectionLocked = selectedClips.some(c => c.locked);
-  useEffect(
-    () => setClipDraft(selectedClip ? { ...selectedClip } : null),
-    [selectedClip]
+  const [draftSource, setDraftSource] = useState<TimelineClip | undefined>(
+    undefined
   );
+  if (draftSource !== selectedClip) {
+    setDraftSource(selectedClip);
+    setClipDraft(selectedClip ? { ...selectedClip } : null);
+  }
   const previewAsset = useMemo(() => {
     const assetId = selectedClip?.assetId ?? project?.activeAssetId;
     return workspace.assets.find(asset => asset.id === assetId);
@@ -378,7 +383,13 @@ export default function EditorPage() {
       ? (workspace.assets.find(asset => asset.id === assetId) ?? null)
       : null;
   }, [searchParams, workspace.assets]);
-  useEffect(() => setDurationDraft(null), [project?.duration]);
+  const [durationSource, setDurationSource] = useState<number | undefined>(
+    undefined
+  );
+  if (durationSource !== project?.duration) {
+    setDurationSource(project?.duration);
+    setDurationDraft(null);
+  }
   const seekTimeline = useCallback(
     (nextTime: number) => {
       const duration = project?.duration ?? 0;
@@ -2844,6 +2855,14 @@ export default function EditorPage() {
               >
                 Tracks and mixer
               </button>
+              <button
+                type="button"
+                onClick={() => setRhythmOpen(true)}
+                disabled={Boolean(busyAction)}
+                className="rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-40"
+              >
+                Beat cuts and zoom
+              </button>
 
               <button
                 type="button"
@@ -3091,6 +3110,25 @@ export default function EditorPage() {
             );
         }}
       />
+      <Dialog open={rhythmOpen} onOpenChange={setRhythmOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogTitle>Beat cuts and speech zoom</DialogTitle>
+          <DialogDescription>
+            Measure existing audio and make reversible rhythm edits.
+          </DialogDescription>
+          <RhythmTools
+            key={project.id}
+            project={project}
+            assets={workspace.assets}
+            selectedIds={selectedIds}
+            onSeek={seekTimeline}
+            onCommit={async (label, transform) => {
+              await commitProject(label, transform);
+              setRhythmOpen(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
       <Dialog open={mixerOpen} onOpenChange={setMixerOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogTitle>Tracks and audio mixer</DialogTitle>

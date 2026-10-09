@@ -156,6 +156,25 @@ export function VisualControls({
           </button>
         ))}
       </div>
+      <CompactSelect
+        aria-label="Blend mode"
+        value={v.blendMode}
+        onValueChange={blendMode =>
+          update({ blendMode: blendMode as ClipVisual["blendMode"] })
+        }
+        options={[
+          "normal",
+          "multiply",
+          "screen",
+          "overlay",
+          "darken",
+          "lighten",
+          "difference",
+        ].map(value => ({
+          value,
+          label: value[0].toUpperCase() + value.slice(1),
+        }))}
+      />
       <section className="space-y-3 rounded-xl border border-border p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium">
@@ -294,8 +313,94 @@ export function VisualControls({
               { value: "none", label: "No mask" },
               { value: "ellipse", label: "Ellipse" },
               { value: "rounded", label: "Rounded frame" },
+              { value: "polygon", label: "Editable polygon" },
             ]}
           />
+          {v.mask === "polygon" ? (
+            <section className="space-y-2" aria-label="Polygon mask points">
+              <p className="text-xs text-foreground/65">
+                Canvas percentages before transforms. Three to twelve points.
+                Intersections use the even-odd fill rule.
+              </p>
+              {v.polygon.map((point, index) => (
+                <div key={index} className="flex items-center gap-2 text-xs">
+                  <span>Point {index + 1}</span>
+                  {(["x", "y"] as const).map(axis => (
+                    <label key={axis}>
+                      {axis.toUpperCase()}
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={point[axis]}
+                        aria-label={`Mask point ${index + 1} ${axis}`}
+                        className="ml-1 w-16 rounded border border-border bg-background p-1"
+                        onChange={e =>
+                          update({
+                            polygon: v.polygon.map((p, i) =>
+                              i === index
+                                ? { ...p, [axis]: Number(e.target.value) }
+                                : p
+                            ),
+                          })
+                        }
+                      />
+                    </label>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={v.polygon.length <= 3}
+                    aria-label={`Remove mask point ${index + 1}`}
+                    onClick={() =>
+                      update({
+                        polygon: v.polygon.filter((_, i) => i !== index),
+                      })
+                    }
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                disabled={v.polygon.length >= 12}
+                className="rounded-lg border border-border px-2 py-1 text-sm"
+                onClick={() =>
+                  update({
+                    polygon: [
+                      ...v.polygon,
+                      {
+                        x:
+                          (v.polygon[0].x + v.polygon[v.polygon.length - 1].x) /
+                          2,
+                        y:
+                          (v.polygon[0].y + v.polygon[v.polygon.length - 1].y) /
+                          2,
+                      },
+                    ],
+                  })
+                }
+              >
+                Add mask point
+              </button>
+              <button
+                type="button"
+                className="ml-2 rounded-lg border border-border px-2 py-1 text-sm"
+                onClick={() =>
+                  update({
+                    polygon: [
+                      { x: 50, y: 5 },
+                      { x: 95, y: 95 },
+                      { x: 5, y: 95 },
+                    ],
+                  })
+                }
+              >
+                Triangle
+              </button>
+            </section>
+          ) : null}
           {v.mask === "rounded" && (
             <label className="flex items-center justify-between text-sm">
               Corner radius %

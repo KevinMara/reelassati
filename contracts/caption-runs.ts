@@ -16,12 +16,35 @@ export function captionRuns(
   );
   if (normalized.join("") !== spokenText(text))
     return [{ text, active: false }];
-  if (preset.animation === "word-only") {
+  if (
+    ["word-only", "word-pop", "word-slide", "word-fade", "word-type"].includes(
+      preset.animation
+    )
+  ) {
     const word = words.find(w => w.start <= time && time < w.end);
+    let shown = word
+      ? preset.uppercase
+        ? word.text.toUpperCase()
+        : word.text
+      : "";
+    if (word && preset.animation === "word-type") {
+      const characters = [
+        ...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(
+          shown
+        ),
+      ].map(c => c.segment);
+      const progress = Math.max(
+        0,
+        Math.min(1, (time - word.start) / Math.min(0.3, word.end - word.start))
+      );
+      shown = characters
+        .slice(0, Math.max(1, Math.ceil(progress * characters.length)))
+        .join("");
+    }
     return word
       ? [
           {
-            text: preset.uppercase ? word.text.toUpperCase() : word.text,
+            text: shown,
             active: true,
           },
         ]
@@ -63,10 +86,11 @@ export function captionRuns(
 export function captionPulse(
   segment: TranscriptSegment,
   preset: CaptionPreset,
-  time: number
+  time: number,
+  frameRate = 30
 ): number {
   if (preset.animation !== "word-pulse") return 1;
-  const t = Math.floor(time * 30 + 1e-7) / 30;
+  const t = Math.floor(time * frameRate + 1e-7) / frameRate;
   const word = normalizeTranscriptWords(segment.text, segment.words)?.find(
     w => w.start <= t && t < w.end
   );
@@ -76,4 +100,35 @@ export function captionPulse(
     (t - word.start) / Math.min(0.18, word.end - word.start)
   );
   return 1 + 0.045 * (1 - progress) ** 3;
+}
+
+/** Appearance follows actual speech intervals. Missing clocks remain static. */
+export function captionMotion(
+  segment: TranscriptSegment,
+  preset: CaptionPreset,
+  time: number,
+  frameRate = 30
+) {
+  const t = Math.floor(time * frameRate + 1e-7) / frameRate;
+  const word = normalizeTranscriptWords(segment.text, segment.words)?.find(
+    w => w.start <= t && t < w.end
+  );
+  const p = word
+    ? Math.max(
+        0,
+        Math.min(1, (t - word.start) / Math.min(0.16, word.end - word.start))
+      )
+    : 1;
+  const remaining = (1 - p) ** 3;
+  return {
+    scale:
+      preset.animation === "word-pop"
+        ? 1 - 0.18 * remaining
+        : captionPulse(segment, preset, time, frameRate),
+    y: preset.animation === "word-slide" ? preset.size * 0.3 * remaining : 0,
+    opacity:
+      preset.animation === "word-fade" || preset.animation === "word-slide"
+        ? 1 - remaining
+        : 1,
+  };
 }

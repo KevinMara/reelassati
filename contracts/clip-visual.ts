@@ -24,10 +24,19 @@ export type VisualTransition =
   | "slide-right"
   | "zoom";
 export interface ClipVisual extends VisualPose {
+  blendMode:
+    | "normal"
+    | "multiply"
+    | "screen"
+    | "overlay"
+    | "darken"
+    | "lighten"
+    | "difference";
   flipX: boolean;
   flipY: boolean;
   crop: { top: number; right: number; bottom: number; left: number };
-  mask: "none" | "ellipse" | "rounded";
+  mask: "none" | "ellipse" | "rounded" | "polygon";
+  polygon: Array<{ x: number; y: number }>;
   radius: number;
   keyframes: VisualKeyframe[];
   entrance: {
@@ -103,6 +112,16 @@ export function normalizeVisual(value?: unknown): ClipVisual {
     }
   return {
     ...base,
+    blendMode: [
+      "multiply",
+      "screen",
+      "overlay",
+      "darken",
+      "lighten",
+      "difference",
+    ].includes(String(v.blendMode))
+      ? (v.blendMode as ClipVisual["blendMode"])
+      : "normal",
     flipX: v.flipX === true,
     flipY: v.flipY === true,
     crop: {
@@ -111,7 +130,34 @@ export function normalizeVisual(value?: unknown): ClipVisual {
       bottom: bounded(crop.bottom, 0, 0, 45),
       left: bounded(crop.left, 0, 0, 45),
     },
-    mask: v.mask === "ellipse" || v.mask === "rounded" ? v.mask : "none",
+    mask:
+      v.mask === "ellipse" || v.mask === "rounded" || v.mask === "polygon"
+        ? v.mask
+        : "none",
+    polygon:
+      Array.isArray(v.polygon) &&
+      v.polygon.length >= 3 &&
+      v.polygon
+        .slice(0, 12)
+        .every(
+          p =>
+            typeof record(p).x === "number" &&
+            Number.isFinite(record(p).x) &&
+            typeof record(p).y === "number" &&
+            Number.isFinite(record(p).y)
+        )
+        ? v.polygon
+            .slice(0, 12)
+            .map(p => ({
+              x: bounded(record(p).x, 0, 0, 100),
+              y: bounded(record(p).y, 0, 0, 100),
+            }))
+        : [
+            { x: 0, y: 0 },
+            { x: 100, y: 0 },
+            { x: 100, y: 100 },
+            { x: 0, y: 100 },
+          ],
     radius: bounded(v.radius, 8, 0, 50),
     keyframes: [...keys.values()].sort((a, b) => a.at - b.at),
     entrance: transition(v.entrance),

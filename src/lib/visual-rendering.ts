@@ -93,6 +93,19 @@ export function visualRenderFilter(clip: TimelineClip): string {
       ry = `H*${n(v.radius / 100)}`;
     mask = `lte(pow(max(abs(ld(0)-W/2)-(W/2-${rx}),0)/${rx},2)+pow(max(abs(ld(1)-H/2)-(H/2-${ry}),0)/${ry},2),1)`;
   }
+  if (v.mask === "polygon") {
+    const edges = v.polygon.flatMap((a, i) => {
+      const b = v.polygon[(i + 1) % v.polygon.length];
+      if (a.y === b.y) return [];
+      const ax = n(a.x / 100),
+        ay = n(a.y / 100),
+        by = n(b.y / 100);
+      return [
+        `(not(eq(gt(H*${ay},ld(1)),gt(H*${by},ld(1))))*lt(ld(0),W*${ax}+(ld(1)-H*${ay})*W*${n((b.x - a.x) / 100)}/(H*${n((b.y - a.y) / 100)})))`,
+      ];
+    });
+    mask = edges.length ? `mod(${edges.join("+")},2)` : "0";
+  }
   const identity =
     !v.keyframes.length &&
     v.x === 0 &&
@@ -147,4 +160,30 @@ export function visualRenderFilter(clip: TimelineClip): string {
     return filters.join(",");
   }
   return `format=gbrap,geq=r='${coords}r(ld(0)-0.5,ld(1)-0.5)':g='${coords}g(ld(0)-0.5,ld(1)-0.5)':b='${coords}b(ld(0)-0.5,ld(1)-0.5)':a='${coords}alpha(ld(0)-0.5,ld(1)-0.5)*(${opacity})*(${crop})*(${mask})${reveals.length ? `*${reveals.join("*")}` : ""}',format=rgba`;
+}
+
+/** Blend RGB in sRGB, then restore the transformed upper alpha before compositing.
+ * Masks, fades, contain padding and timeline gaps retain the lower layer. */
+export function visualCompositeFilters(
+  clip: TimelineClip,
+  lower: string,
+  upper: string,
+  output: string
+): string[] {
+  const enable = `gte(t,${n(clip.start)})*lt(t,${n(clip.start + clip.duration)})`;
+  const mode = normalizeVisual(clip.visual).blendMode;
+  const overlay = (a: string, b: string) =>
+    `[${a}][${b}]overlay=eof_action=pass:repeatlast=0:enable='${enable}'[${output}]`;
+  if (mode === "normal") return [overlay(lower, upper)];
+  const p = output;
+  return [
+    `[${lower}]split[${p}under][${p}bg]`,
+    `[${upper}]split[${p}color][${p}a]`,
+    `[${p}a]alphaextract[${p}alpha]`,
+    `[${p}bg]format=gbrp[${p}bgrgb]`,
+    `[${p}color]format=gbrp[${p}rgb]`,
+    `[${p}bgrgb][${p}rgb]blend=all_mode=${mode}:eof_action=pass:repeatlast=0[${p}blend]`,
+    `[${p}blend][${p}alpha]alphamerge[${p}merged]`,
+    overlay(`${p}under`, `${p}merged`),
+  ];
 }

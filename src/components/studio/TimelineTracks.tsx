@@ -131,7 +131,7 @@ export function TimelineTracks({
     const fraction = (anchor - 98) / Math.max(1, oldWidth - 104);
     element.scrollLeft += 98 + fraction * (canvasWidth - 104) - anchor;
     previousWidth.current = canvasWidth;
-  }, [canvasWidth, viewport]);
+  }, [canvasWidth, viewport, project.duration, time]);
   const [snapGuide, setSnapGuide] = useState<TimelineSnapPoint | null>(null);
   const draggedClip = useRef<{ id: string; offset: number } | null>(null);
   const lanes = timelineLanes(project.clips);
@@ -496,7 +496,6 @@ export function TimelineTracks({
                   <div
                     data-timeline-lane={key}
                     className={`relative mx-1.5 my-1 overflow-hidden rounded-md bg-background/50 ${drop?.lane === key ? "ring-1 ring-primary" : ""}`}
-                    onClick={e => onSeek(pointerTime(e))}
                     onDragEnter={e => {
                       if (!disabled && supportsDrop(e)) {
                         e.preventDefault();
@@ -549,6 +548,37 @@ export function TimelineTracks({
                     }}
                     onDrop={e => void handleDrop(e, lane)}
                   >
+                    <button
+                      type="button"
+                      aria-label={`Seek in ${names[lane.kind]} ${lane.number}`}
+                      className="absolute inset-0 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                      onClick={e => onSeek(pointerTime(e))}
+                      onKeyDown={e => {
+                        if (
+                          !["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                            e.key
+                          )
+                        )
+                          return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSeek(
+                          e.key === "Home"
+                            ? 0
+                            : e.key === "End"
+                              ? project.duration
+                              : Math.max(
+                                  0,
+                                  Math.min(
+                                    project.duration,
+                                    time +
+                                      (e.key === "ArrowLeft" ? -1 : 1) /
+                                        (project.frameRate ?? 30)
+                                  )
+                                )
+                        );
+                      }}
+                    />
                     {emptyDestination && (
                       <span className="pointer-events-none absolute inset-0 flex items-center px-3 text-[10px] text-foreground/30">
                         {lane.number > 1
@@ -677,7 +707,15 @@ export function TimelineTracks({
                             ["start", "end"].map(side => (
                               <span
                                 key={side}
-                                role="separator"
+                                role="slider"
+                                tabIndex={disabled ? -1 : 0}
+                                aria-valuemin={0}
+                                aria-valuemax={project.duration}
+                                aria-valuenow={
+                                  side === "start"
+                                    ? clip.start
+                                    : clip.start + clip.duration
+                                }
                                 aria-label={`Trim ${side} of ${clip.label}`}
                                 aria-orientation="vertical"
                                 draggable={false}
@@ -686,6 +724,81 @@ export function TimelineTracks({
                                   e.stopPropagation();
                                 }}
                                 onClick={e => e.stopPropagation()}
+                                onKeyDown={e => {
+                                  e.stopPropagation();
+                                  if (
+                                    disabled ||
+                                    !["ArrowLeft", "ArrowRight"].includes(e.key)
+                                  )
+                                    return;
+                                  e.preventDefault();
+                                  const at =
+                                    (side === "start"
+                                      ? original.start
+                                      : original.start + original.duration) +
+                                    (e.key === "ArrowLeft" ? -1 : 1) /
+                                      (project.frameRate ?? 30);
+                                  const asset = assets.find(
+                                    a => a.id === original.assetId
+                                  );
+                                  const siblings = project.clips.filter(
+                                    c =>
+                                      c.id !== original.id &&
+                                      clipLaneKind(c) ===
+                                        clipLaneKind(original) &&
+                                      clipLaneNumber(c) ===
+                                        clipLaneNumber(original)
+                                  );
+                                  const previousEnd = Math.max(
+                                    0,
+                                    ...siblings
+                                      .filter(
+                                        c =>
+                                          c.start + c.duration <=
+                                          original.start + 0.001
+                                      )
+                                      .map(c => c.start + c.duration)
+                                  );
+                                  const nextStart = Math.min(
+                                    project.duration,
+                                    ...siblings
+                                      .filter(
+                                        c =>
+                                          c.start >=
+                                          original.start +
+                                            original.duration -
+                                            0.001
+                                      )
+                                      .map(c => c.start)
+                                  );
+                                  const sourceLimit = clipTimingLimits(
+                                    original,
+                                    asset,
+                                    project.duration
+                                  ).sourceLimit;
+                                  const bound =
+                                    side === "start"
+                                      ? Math.max(
+                                          previousEnd,
+                                          Math.min(
+                                            original.start +
+                                              original.duration -
+                                              0.001,
+                                            at
+                                          )
+                                        )
+                                      : Math.max(
+                                          original.start + 0.001,
+                                          Math.min(nextStart, at)
+                                        );
+                                  const next = trimTimelineClip(
+                                    original,
+                                    side as "start" | "end",
+                                    bound,
+                                    sourceLimit
+                                  );
+                                  void onTrim(next);
+                                }}
                                 onPointerDown={e =>
                                   beginTrim(
                                     e,

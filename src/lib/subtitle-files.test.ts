@@ -12,9 +12,11 @@ it("imports SRT timings and multiline Unicode and roundtrips editable captions",
   });
   expect(
     parseSubtitleFile(exportSrt(imported.segments)).segments.map(
-      ({ id: _, ...s }) => s
+      ({ start, end, text }) => ({ start, end, text })
     )
-  ).toEqual(imported.segments.map(({ id: _, ...s }) => s));
+  ).toEqual(
+    imported.segments.map(({ start, end, text }) => ({ start, end, text }))
+  );
 });
 it("imports WebVTT with identifiers, cue settings and markup; reports invalid and clipped cues", () => {
   const input =

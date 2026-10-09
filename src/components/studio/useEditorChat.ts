@@ -28,6 +28,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { platformApi } from "@/lib/platform-api";
 import {
   applyChatAction,
+  applyMeasuredBeatAction,
   canRunChatAction,
   insertChatAsset,
   mapChatTranscript,
@@ -252,6 +253,7 @@ export function useEditorChat(
       [
         "edit",
         "adjacent-transition",
+        "speech-zoom",
         "insert",
         "settings",
         "history",
@@ -266,6 +268,45 @@ export function useEditorChat(
         action.kind === "seek" ? "Playhead moved" : "Timeline updated"
       );
       if (action.kind === "seek") onSeek(action.time);
+      return;
+    }
+    if (action.kind === "beat-cuts") {
+      const snapshot = getWorkspaceSnapshot();
+      const current = snapshot.projects.find(p => p.id === project.id);
+      if (!current) throw new Error("This project is no longer available.");
+      const source = current.clips.find(c => c.id === action.sourceClipId),
+        asset = snapshot.assets.find(a => a.id === source?.assetId);
+      if (!source || !asset)
+        throw new Error("The beat source is no longer available.");
+      const { timelineWaveform } = await import("@/lib/timeline-media");
+      const { measuredAudioBeats, timelineBeatCuts, rhythmProjectIdentity } =
+        await import("@/lib/rhythm-editing");
+      const identity = rhythmProjectIdentity(current);
+      const waveform = await timelineWaveform(
+        asset,
+        new AbortController().signal
+      );
+      const times = timelineBeatCuts(
+        measuredAudioBeats(waveform, action.sensitivity),
+        source,
+        current.duration,
+        action.every,
+        action.minimumGap
+      );
+      await finishAction(
+        messageId,
+        action,
+        p => {
+          if (p.revisions.some(r => r.id === `chat-revision-${action.id}`))
+            return p;
+          if (rhythmProjectIdentity(p) !== identity)
+            throw new Error(
+              "The timeline changed while measuring beats. No clips were cut."
+            );
+          return applyMeasuredBeatAction(p, action, times);
+        },
+        "Measured beat cuts saved"
+      );
       return;
     }
     if (action.kind === "analyze") {

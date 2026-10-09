@@ -14,6 +14,7 @@ import {
   type TimelineClip,
 } from "../contracts/workspace";
 import { normalizeEditorSavedStyles } from "../contracts/editor-style-library";
+import { normalizeVisual } from "../contracts/clip-visual";
 import {
   embedMediaProvenanceMarker,
   inspectMediaProvenanceMarker,
@@ -704,6 +705,24 @@ describe("provenance integrity boundaries", () => {
           color: "#22d3ee",
           groupId: "group-scene-a",
           linkId: "link-scene-a",
+          visual: {
+            ...normalizeVisual({
+              blendMode: "screen",
+              mask: "polygon",
+              polygon: [
+                { x: 50, y: 5 },
+                { x: 95, y: 95 },
+                { x: 5, y: 95 },
+              ],
+              keyframes: [
+                { at: 0, scale: 1, easing: "hold" },
+                { at: 0.4, scale: 1.12, easing: "ease-in-out" },
+                { at: 1, scale: 1, easing: "hold" },
+              ],
+            }),
+          },
+          visualStart: 2,
+          visualDuration: 5,
         },
         {
           id: "linked-voice",
@@ -753,6 +772,8 @@ describe("provenance integrity boundaries", () => {
           },
         ],
         clips,
+        captionStyle: "word-slide",
+        captionAppearance: { animation: "word-slide", activeColor: "#7AF5CF" },
         transcript: [],
         proposedChanges: [],
         qualitySignals: [],
@@ -872,6 +893,8 @@ describe("provenance integrity boundaries", () => {
           trackSettings: project.trackSettings,
           clips,
           revisions: project.revisions,
+          captionStyle: project.captionStyle,
+          captionAppearance: project.captionAppearance,
         });
         expect(
           actual.assets.find(asset => asset.id === source.id)?.provenance

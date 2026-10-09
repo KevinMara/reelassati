@@ -1,4 +1,7 @@
 import { isPrimaryFootage } from "@contracts/timeline-layers";
+import { speechAutoZoom, cutSelectedOnBeats } from "./rhythm-editing";
+import { clipLaneKind } from "@contracts/timeline-layers";
+import { expandLinkedSelection } from "@contracts/clip-groups";
 import { mapTranscriptTime } from "@contracts/transcript-timing";
 import { projectSplitCaptions } from "./editor-manual";
 import {
@@ -197,6 +200,16 @@ export function applyChatAction(
       },
       action.operation
     );
+  } else if (action.kind === "speech-zoom") {
+    if (project.revisions.some(r => r.id === `chat-revision-${action.id}`))
+      return project;
+    assertChatRhythmTargets(project, action);
+    next = speechAutoZoom(
+      project,
+      action.targetClipIds,
+      action.amount,
+      action.replacePath
+    );
   } else if (action.kind === "adjacent-transition") {
     next = applyAdjacentTransition(
       project,
@@ -335,6 +348,81 @@ export function applyChatAction(
     }
   }
   return recordChatEdit(project, next, action.id, action.label);
+}
+
+function assertChatRhythmTargets(
+  project: EditProject,
+  action: Extract<EditorChatAction, { kind: "speech-zoom" | "beat-cuts" }>
+) {
+  const ids = action.targetClipIds;
+  if (
+    !ids.length ||
+    new Set(ids).size !== ids.length ||
+    ids.some(
+      id =>
+        !project.clips.some(
+          c => c.id === id && !c.locked && !c.transitionHandle
+        )
+    )
+  )
+    throw new Error("The rhythm edit targets missing or locked clips.");
+  const message = project.editorChat?.messages.find(m =>
+    m.plan?.actions.some(a => a.id === action.id)
+  );
+  const selected =
+    message?.request?.selectedClipIds ?? message?.selectedClipIds;
+  if (
+    message?.request?.range ||
+    message?.range ||
+    (selected?.length && ids.some(id => !selected.includes(id)))
+  )
+    throw new Error("This rhythm edit extends outside its saved selection.");
+  const pictures = ids.filter(
+    id => clipLaneKind(project.clips.find(c => c.id === id)!) === "video"
+  );
+  if (action.kind === "beat-cuts") {
+    const peers = expandLinkedSelection(project, pictures, {
+      groups: false,
+      links: true,
+    });
+    if (
+      !pictures.length ||
+      peers.some(id => !ids.includes(id)) ||
+      ids.some(id => !peers.includes(id))
+    )
+      throw new Error(
+        "Beat cuts require every explicitly targeted linked audio/video peer."
+      );
+  } else if (pictures.length !== ids.length)
+    throw new Error("Speech zoom needs picture targets only.");
+  return pictures;
+}
+
+export function applyMeasuredBeatAction(
+  project: EditProject,
+  action: Extract<EditorChatAction, { kind: "beat-cuts" }>,
+  times: number[]
+) {
+  if (project.revisions.some(r => r.id === `chat-revision-${action.id}`))
+    return project;
+  const pictures = assertChatRhythmTargets(project, action);
+  const reserved = new Set(
+    project.clips.flatMap(c => [c.id, c.linkId, c.groupId])
+  );
+  let sequence = 0;
+  const makeId = () => {
+    let id: string;
+    do id = `${action.id}-beat-piece-${++sequence}`;
+    while (reserved.has(id));
+    reserved.add(id);
+    return id;
+  };
+  return recordChatEdit(
+    project,
+    cutSelectedOnBeats(project, pictures, times, makeId),
+    action.id,
+    action.label
+  );
 }
 
 /** Paid actions that lost their response need read-only recovery, never automatic replay. */

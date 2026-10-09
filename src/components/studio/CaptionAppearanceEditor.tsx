@@ -87,6 +87,10 @@ export function CaptionAppearanceEditor({
           { value: "word-reveal", label: "Reveal words as spoken" },
           { value: "word-only", label: "One word at a time" },
           { value: "word-pulse", label: "Pulse with speech" },
+          { value: "word-pop", label: "Pop each spoken word" },
+          { value: "word-slide", label: "Raise each spoken word" },
+          { value: "word-fade", label: "Fade each spoken word" },
+          { value: "word-type", label: "Type each spoken word" },
         ]}
       />
       {p.animation !== "none" && (

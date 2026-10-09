@@ -1,5 +1,5 @@
 import { colorGradeFilter } from "./color-grade";
-import { visualRenderFilter } from "./visual-rendering";
+import { visualRenderFilter, visualCompositeFilters } from "./visual-rendering";
 import { captionAssStyle, captionAssEvents } from "./caption-rendering";
 import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import type { Asset, EditProject } from "@contracts/workspace";
@@ -128,7 +128,7 @@ export function buildRenderPlan(
         `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=${frameRate},${grade}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
       );
       filters.push(
-        `[${visual}][v${index}]overlay=eof_action=pass:repeatlast=0:enable='gte(t,${number(clip.start)})*lt(t,${number(clip.start + clip.duration)})'[layer${index}]`
+        ...visualCompositeFilters(clip, visual, `v${index}`, `layer${index}`)
       );
       visual = `layer${index}`;
     }
@@ -157,7 +157,8 @@ export function buildRenderPlan(
       captions,
       project.captionStyle,
       duration,
-      project.captionAppearance
+      project.captionAppearance,
+      { width, height, frameRate }
     ) +
     "\n" +
     graphics;

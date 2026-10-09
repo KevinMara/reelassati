@@ -155,7 +155,7 @@ export function GraphicMotionEditor({
           </div>
           {next && (
             <div className="space-y-2 rounded-lg bg-foreground/[0.03] p-2.5">
-              <label className="block text-xs">
+              <div className="block text-xs">
                 Motion to next keyframe
                 <CompactSelect
                   aria-label="Keyframe easing"
@@ -177,7 +177,7 @@ export function GraphicMotionEditor({
                     { value: "hold", label: "Hold, then jump" },
                   ]}
                 />
-              </label>
+              </div>
               <div className="flex items-center gap-3 text-[11px] text-foreground/60">
                 <svg
                   viewBox="0 0 76 32"

@@ -1,6 +1,6 @@
 import { CreditPlanner } from "@/components/studio/CreditPlanner";
 import posthog from "@/lib/posthog";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
@@ -177,30 +177,33 @@ export default function BillingPage() {
     [includedAllocation, summary?.includedCredits]
   );
 
-  const openCheckout = async (planId: PlanId) => {
-    if (checkoutInFlight.current) return;
-    checkoutInFlight.current = true;
-    setBusy(`plan:${planId}`);
-    setError(null);
-    try {
-      const { checkoutUrl } = await platformApi.createSubscriptionCheckout(
-        planId,
-        billingCycle
-      );
-      posthog?.capture("checkout_opened", {
-        kind: "subscription",
-        planId,
-        billingCycle,
-      });
-      window.location.assign(checkoutUrl);
-    } catch (cause) {
-      checkoutInFlight.current = false;
-      setError(
-        cause instanceof Error ? cause.message : "Checkout could not open."
-      );
-      setBusy(null);
-    }
-  };
+  const openCheckout = useCallback(
+    async (planId: PlanId) => {
+      if (checkoutInFlight.current) return;
+      checkoutInFlight.current = true;
+      setBusy(`plan:${planId}`);
+      setError(null);
+      try {
+        const { checkoutUrl } = await platformApi.createSubscriptionCheckout(
+          planId,
+          billingCycle
+        );
+        posthog?.capture("checkout_opened", {
+          kind: "subscription",
+          planId,
+          billingCycle,
+        });
+        window.location.assign(checkoutUrl);
+      } catch (cause) {
+        checkoutInFlight.current = false;
+        setError(
+          cause instanceof Error ? cause.message : "Checkout could not open."
+        );
+        setBusy(null);
+      }
+    },
+    [billingCycle]
+  );
 
   useEffect(() => {
     if (
@@ -220,7 +223,7 @@ export default function BillingPage() {
     if (automaticCheckout.current === selection) return;
     automaticCheckout.current = selection;
     void openCheckout(selectedPlan);
-  }, [loading, selectedCycle, selectedPlan, summary]);
+  }, [loading, selectedCycle, selectedPlan, summary, openCheckout]);
 
   const openTopUp = async (topUpId: CreditTopUpId) => {
     if (checkoutInFlight.current) return;

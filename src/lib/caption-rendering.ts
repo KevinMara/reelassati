@@ -5,7 +5,7 @@ import {
 } from "@contracts/editor-presets";
 import type { TranscriptSegment } from "@contracts/workspace";
 import { assTime, escapeAss } from "./graphic-ass";
-import { captionRuns, captionPulse } from "@contracts/caption-runs";
+import { captionRuns, captionMotion } from "@contracts/caption-runs";
 import { normalizeTranscriptWords } from "@contracts/transcript-timing";
 
 const assColor = (hex: string) =>
@@ -26,9 +26,11 @@ export function captionAssEvents(
   segments: readonly TranscriptSegment[],
   presetId: string | undefined,
   duration: number,
-  appearance?: CaptionAppearance
+  appearance?: CaptionAppearance,
+  options: { width?: number; height?: number; frameRate?: number } = {}
 ) {
   const preset = getCaptionPreset(presetId, appearance);
+  const fps = options.frameRate ?? 30;
   return segments
     .filter(
       s =>
@@ -53,17 +55,23 @@ export function captionAssEvents(
             ...(words
               ?.flatMap(w => [w.start, w.end])
               .filter(t => t > start && t < end) ?? []),
-            ...(preset.animation === "word-pulse" && words
+            ...([
+              "word-pulse",
+              "word-pop",
+              "word-slide",
+              "word-fade",
+              "word-type",
+            ].includes(preset.animation) && words
               ? Array.from(
                   {
                     length: Math.max(
                       0,
-                      Math.ceil(end * 30) - Math.ceil(start * 30)
+                      Math.ceil(end * fps) - Math.ceil(start * fps)
                     ),
                   },
                   (_, i) =>
                     Math.floor(
-                      ((Math.ceil(start * 30) + i) / 30) * 100 + 1e-7
+                      ((Math.ceil(start * fps) + i) / fps) * 100 + 1e-7
                     ) / 100
                 )
               : []),
@@ -81,9 +89,17 @@ export function captionAssEvents(
                 : escapeAss(run.text)
           )
           .join("");
-        const scale = (captionPulse(s, preset, (a + b) / 2) * 100).toFixed(3);
+        const motion = captionMotion(s, preset, (a + b) / 2, fps);
+        const scale = (motion.scale * 100).toFixed(3);
+        const alpha = Math.round((1 - motion.opacity) * 255)
+          .toString(16)
+          .padStart(2, "0");
+        const position =
+          options.width && options.height && preset.animation === "word-slide"
+            ? `\\pos(${(options.width / 2).toFixed(2)},${(options.height * (preset.position === "top" ? preset.margin / 100 : 1 - preset.margin / 100) + (motion.y * options.width) / 100).toFixed(2)})`
+            : "";
         return text
-          ? `Dialogue: 100000,${assTime(a)},${assTime(b)},Caption,,0,0,0,,{\\fscx${scale}\\fscy${scale}}${text}`
+          ? `Dialogue: 100000,${assTime(a)},${assTime(b)},Caption,,0,0,0,,{\\fscx${scale}\\fscy${scale}\\alpha&H${alpha}&${position}}${text}`
           : "";
       });
     })

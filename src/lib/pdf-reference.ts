@@ -128,7 +128,8 @@ export async function extractPdfDocumentText(
       for (const item of content.items) {
         cancelled(options.signal);
         if (!("str" in item)) continue;
-        const value = item.str.replace(/\u0000/g, "");
+        // PDF text extraction can include NUL separators.
+        const value = item.str.split(String.fromCharCode(0)).join("");
         if (value.trim()) {
           pageHasText = true;
           hasText = true;

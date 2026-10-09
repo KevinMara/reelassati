@@ -122,6 +122,42 @@ function actionValue(
       !Array.isArray(op.targetClipIds)
     )
       return undefined;
+  } else if (kind === "speech-zoom" || kind === "beat-cuts") {
+    if (
+      !Array.isArray(original.targetClipIds) ||
+      !original.targetClipIds.length ||
+      original.targetClipIds.length > 20 ||
+      original.targetClipIds.some(id => typeof id !== "string" || !id.trim()) ||
+      new Set(original.targetClipIds).size !== original.targetClipIds.length ||
+      value.credits !== 0 ||
+      selectedRange
+    )
+      return undefined;
+    value.targetClipIds = ids(original.targetClipIds);
+    if (kind === "speech-zoom") {
+      if (
+        !finite(original.amount) ||
+        original.amount < 1.02 ||
+        original.amount > 1.4 ||
+        typeof original.replacePath !== "boolean"
+      )
+        return undefined;
+    } else {
+      if (
+        !string(original.sourceClipId) ||
+        !finite(original.every) ||
+        !Number.isInteger(original.every) ||
+        original.every < 1 ||
+        original.every > 8 ||
+        !finite(original.minimumGap) ||
+        original.minimumGap < 0.2 ||
+        original.minimumGap > 10 ||
+        !finite(original.sensitivity) ||
+        original.sensitivity < 0.5 ||
+        original.sensitivity > 2
+      )
+        return undefined;
+    }
   } else if (kind === "adjacent-transition") {
     if (
       !string(value.outgoingId) ||

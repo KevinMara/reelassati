@@ -119,7 +119,9 @@ function MediaLayer({
         ? "ellipse(50% 50% at 50% 50%)"
         : frame.visual.mask === "rounded"
           ? `inset(0 round ${frame.visual.radius}%)`
-          : undefined,
+          : frame.visual.mask === "polygon"
+            ? `polygon(evenodd, ${frame.visual.polygon.map(p => `${p.x}% ${p.y}%`).join(", ")})`
+            : undefined,
   };
   const revealStyle = {
     clipPath: `inset(${frame.reveal.top}% ${frame.reveal.right}% ${frame.reveal.bottom}% ${frame.reveal.left}%)`,
@@ -127,7 +129,11 @@ function MediaLayer({
   const wrap = (media: React.ReactNode) => (
     <div
       className="absolute inset-0"
-      style={{ ...revealStyle, visibility: clip.hidden ? "hidden" : undefined }}
+      style={{
+        ...revealStyle,
+        visibility: clip.hidden ? "hidden" : undefined,
+        mixBlendMode: frame.visual.blendMode,
+      }}
     >
       <div className="absolute inset-0" style={transformStyle}>
         <div className="absolute inset-0" style={maskStyle}>
@@ -235,6 +241,7 @@ export function TimelinePreview({
         pointerEvents: "none",
         aspectRatio: project.aspectRatio.replace(":", "/"),
         containerType: "inline-size",
+        isolation: "isolate",
         maxHeight: "100%",
         maxWidth:
           project.aspectRatio === "9:16"
@@ -270,6 +277,7 @@ export function TimelinePreview({
         segments={project.transcript}
         presetId={project.captionStyle}
         appearance={project.captionAppearance}
+        frameRate={project.frameRate}
         time={time}
       />
     </div>
