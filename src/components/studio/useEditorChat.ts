@@ -25,7 +25,7 @@ import {
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 import { normalizeReview } from "@contracts/source-review";
 import { useWorkspace } from "@/providers/workspace";
-import { platformApi } from "@/lib/platform-api";
+import { platformApi, captureUploadRequestScope, verifyUploadRequestScope } from "@/lib/platform-api";
 import {
   applyChatAction,
   applyMeasuredBeatAction,
@@ -68,6 +68,7 @@ export function useEditorChat(
 ) {
   const { workspace, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
   const stopRequested = useRef(false);
+  const mediaController = useRef<AbortController | null>(null);
   const resultChecks = useRef(new Set<string>());
   const queuedMessages = useRef(new Set<string>());
   const [busy, setBusy] = useState(false);
@@ -147,6 +148,7 @@ export function useEditorChat(
     const queue = queuedMessages.current;
     return () => {
       stopRequested.current = true;
+      mediaController.current?.abort();
       queue.clear();
     };
   }, [project.id]);
@@ -316,18 +318,15 @@ export function useEditorChat(
         : undefined;
       if (assetId && !asset)
         throw new Error("The source video is no longer available.");
-      const result = asset
-        ? await (
-            await import("@/lib/analyze-media")
-          ).analyzeMedia(asset, getProject().platform, action.focus, detail => {
-            void progress(messageId, action.id, detail).catch(() => undefined);
-          })
-        : await platformApi.analyzeVideo({
-            publicUrl: action.publicUrl,
-            platform: getProject().platform,
-            sourceRightsConfirmed: true,
-            focus: action.focus,
-          });
+      if (!asset) throw new Error("Import the final direct video link into private Library first, then ask Reel to analyze that saved video with its measured credit quote. Social pages need an authorized original upload.");
+      mediaController.current?.abort();
+      const controller = new AbortController(); mediaController.current = controller;
+      const scope = await captureUploadRequestScope();
+      const result = await (await import("@/lib/analyze-media")).analyzeMedia(asset, getProject().platform, action.focus, detail => {
+        void progress(messageId, action.id, detail).catch(() => undefined);
+      }, controller.signal, scope);
+      controller.signal.throwIfAborted();
+      await verifyUploadRequestScope(scope);
       await changeAction(messageId, action.id, a => ({
         ...a,
         runtime: { ...a.runtime, result: JSON.stringify(result) },
@@ -1147,9 +1146,13 @@ export function useEditorChat(
   }
 
   async function attachFiles(files: File[]): Promise<EditorChatReference[]> {
+    mediaController.current?.abort();
+    const controller = new AbortController(); mediaController.current = controller;
+    const scope = await captureUploadRequestScope();
     const references: EditorChatReference[] = [];
     if (files.length > 8) throw new Error("Attach up to 8 files at a time.");
     for (const file of files) {
+      controller.signal.throwIfAborted();
       if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
         const { readPdfReference } = await import("@/lib/pdf-reference");
         const reference = await readPdfReference(file);
@@ -1177,9 +1180,11 @@ export function useEditorChat(
         : file.type.startsWith("image/")
           ? "image"
           : "video";
-      let asset = await platformApi.uploadAsset(file, kind);
+      let asset = await platformApi.uploadAsset(file, kind, undefined, undefined, { scope, signal: controller.signal });
       if (kind !== "image")
         asset = { ...asset, duration: await resolveMediaDuration(asset) };
+      controller.signal.throwIfAborted();
+      await verifyUploadRequestScope(scope);
       await save(w => ({
         ...w,
         assets: [asset, ...w.assets.filter(a => a.id !== asset.id)],
@@ -1202,6 +1207,7 @@ export function useEditorChat(
     reviewSavedSuggestion,
     stop: () => {
       stopRequested.current = true;
+      mediaController.current?.abort();
     },
     setPreferences: async (
       patch: Partial<Pick<EditorChatState, "mode" | "maxCredits">>

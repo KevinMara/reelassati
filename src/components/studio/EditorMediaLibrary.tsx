@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { v4 as createUuid } from "uuid";
 import {
   FolderPlus,
@@ -11,7 +11,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
-import { platformApi } from "@/lib/platform-api";
+import { captureUploadRequestScope, verifyUploadRequestScope, platformApi } from "@/lib/platform-api";
+import { DirectVideoImport } from "./DirectVideoImport";
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { validateFileSelection } from "@/lib/file-validation";
 import { LibraryAssetCard } from "./LibraryAssetCard";
@@ -36,6 +37,8 @@ export function EditorMediaLibrary() {
   const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  const uploadController = useRef<AbortController | null>(null);
+  useEffect(() => () => uploadController.current?.abort(), []);
   const folders = workspace.mediaFolders ?? [];
   const currentFolder = folders.find(f => f.id === folderId);
   const reviewedContent = useMemo(() => {
@@ -103,8 +106,13 @@ export function EditorMediaLibrary() {
       return;
     }
     await action(async () => {
+      uploadController.current?.abort();
+      const controller = new AbortController();
+      uploadController.current = controller;
+      const scope = await captureUploadRequestScope();
       const destination = folderId;
       for (const file of checked.files) {
+        controller.signal.throwIfAborted();
         setMessage(`Uploading ${file.name}…`);
         const asset = await platformApi.uploadAsset(
           file,
@@ -112,8 +120,11 @@ export function EditorMediaLibrary() {
             ? "image"
             : file.type.startsWith("audio/")
               ? "audio"
-              : "video"
+              : "video",
+          undefined, undefined, { scope, signal: controller.signal }
         );
+        controller.signal.throwIfAborted();
+        await verifyUploadRequestScope(scope);
         // Save the upload before metadata probing, so a failed probe never loses a file.
         await updateWorkspace(w => ({
           ...w,
@@ -125,6 +136,8 @@ export function EditorMediaLibrary() {
         const duration = await resolveMediaDuration(asset).catch(
           () => undefined
         );
+        controller.signal.throwIfAborted();
+        await verifyUploadRequestScope(scope);
         if (duration)
           await updateWorkspace(w => ({
             ...w,
@@ -136,6 +149,7 @@ export function EditorMediaLibrary() {
       setMessage(
         "Uploaded to Library. Drag a thumbnail onto the timeline to place it."
       );
+      uploadController.current = null;
     });
   }
   async function saveFolder() {
@@ -195,6 +209,7 @@ export function EditorMediaLibrary() {
           e.target.value = "";
         }}
       />
+      <DirectVideoImport disabled={busy || !capabilities.uploads} onImported={async asset => { await updateWorkspace(w => ({ ...w, assets: [...w.assets.filter(a => a.id !== asset.id), { ...asset, folderId: folderId || undefined }] })); }} />
       <div className="mb-3 flex flex-wrap gap-2">
         <button
           type="button"

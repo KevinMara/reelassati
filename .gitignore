@@ -53,3 +53,7 @@ coverage/
 /public/vendor/render/
 
 /public/vendor/pdfjs/
+
+# Rebuilt from the exact Transformers/ORT versions in pnpm-lock.yaml.
+/public/vendor/search/ort/
+/public/vendor/search/transformers.js

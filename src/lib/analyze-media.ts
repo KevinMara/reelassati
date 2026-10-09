@@ -1,6 +1,6 @@
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import type { Asset } from "@contracts/workspace";
-import { PlatformApiError, platformApi } from "./platform-api";
+import { PlatformApiError, platformApi, captureUploadRequestScope, type UploadRequestScope } from "./platform-api";
 import { probeExportMetadata } from "./export-probe";
 import {
   ANALYSIS_DIRECT_BYTES,
@@ -20,8 +20,10 @@ export async function analyzeMedia(
   platform: string,
   focus?: string,
   onProgress?: (stage: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  requestScope?: UploadRequestScope
 ) {
+  const scope = requestScope ?? await captureUploadRequestScope();
   const input = {
     assetId: asset.id,
     platform,
@@ -32,7 +34,7 @@ export async function analyzeMedia(
   if (asset.size <= ANALYSIS_DIRECT_BYTES) {
     onProgress?.(`Analyzing ${asset.name}…`);
     try {
-      return await platformApi.analyzeVideo(input, signal);
+      return await platformApi.analyzeVideo(input, signal, scope);
     } catch (error) {
       // A rejected-size request has not purchased an analysis. Never repeat other paid failures.
       if (!(error instanceof PlatformApiError) || error.status !== 413)
@@ -63,7 +65,7 @@ export async function analyzeMedia(
       wasmURL: wasmUrl,
     });
     signal?.throwIfAborted();
-    const source = await platformApi.downloadAssetBlob(asset.id, signal);
+    const source = await platformApi.downloadAssetBlob(asset.id, signal, { scope });
     await ffmpeg.createDir("/source");
     await ffmpeg.mount(
       FFFSType.WORKERFS,
@@ -168,7 +170,7 @@ export async function analyzeMedia(
     );
     // Upload is intentionally not inserted into the client workspace or timeline.
     // If Cancel occurs during upload, wait for its ID so the server file can still be deleted.
-    const uploaded = await platformApi.uploadAsset(file, "video");
+    const uploaded = await platformApi.uploadAsset(file, "video", undefined, undefined, { scope, signal });
     temporaryAssetId = uploaded.id;
     signal?.throwIfAborted();
     onProgress?.(
@@ -180,13 +182,13 @@ export async function analyzeMedia(
         analysisAssetId: uploaded.id,
         analysisFramesPerSecond: ANALYSIS_PROXY_FPS,
       },
-      signal
+      signal, scope
     );
   } finally {
     signal?.removeEventListener("abort", cancel);
     ffmpeg.terminate();
     if (wasmUrl) URL.revokeObjectURL(wasmUrl);
     if (temporaryAssetId)
-      await platformApi.deleteAsset(temporaryAssetId).catch(() => undefined);
+      await platformApi.deleteAsset(temporaryAssetId, scope).catch(() => undefined);
   }
 }

@@ -181,6 +181,8 @@ export interface EditOperation {
     graphicMode?: "create" | "update";
     graphic?: import("./motion-graphics").MotionGraphic;
     sourceIn?: number;
+    /** Exact caption owner, used when projecting analyzed source clocks onto a timeline occurrence. */
+    sourceClipId?: string;
     destination?: number;
     speed?: number;
     volume?: number;

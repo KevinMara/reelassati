@@ -91,14 +91,49 @@ async function recoverRejectedSession(
   return refreshRequestSession();
 }
 
+/** Capture before any long-running import/model task. Never reassign its upload to a new workspace. */
+export interface UploadRequestScope {
+  ownerId: string;
+  ownerEmail: string;
+  brandId: string;
+}
+export interface UploadRequestOptions {
+  scope?: UploadRequestScope;
+  signal?: AbortSignal;
+}
+function sessionScope(session: Session | null): UploadRequestScope {
+  if (!session?.user.email || !session.access_token)
+    throw new PlatformApiError("Sign in before importing media.", 401);
+  return {
+    ownerId: session.user.id || session.user.email.toLowerCase(),
+    ownerEmail: session.user.email.toLowerCase(),
+    brandId: selectedBrand(session.user.email),
+  };
+}
+export async function captureUploadRequestScope(): Promise<UploadRequestScope> {
+  return sessionScope(await requestSession());
+}
+function assertRequestScope(session: Session | null, scope?: UploadRequestScope) {
+  if (!scope) return;
+  const current = sessionScope(session);
+  if (current.ownerId !== scope.ownerId || current.ownerEmail !== scope.ownerEmail || current.brandId !== scope.brandId)
+    throw new PlatformApiError("Your account or brand changed. Start the import again in the intended workspace.", 409);
+}
+export async function verifyUploadRequestScope(scope: UploadRequestScope) {
+  assertRequestScope(await requestSession(), scope);
+}
+
 async function requestJson<T>(
   path: string,
   init?: RequestInit,
-  direct = false
+  direct = false,
+  scope?: UploadRequestScope
 ): Promise<T> {
   let session = await requestSession();
-  const send = (activeSession: Session | null) =>
-    fetch(direct ? path : platformApiUrl(path), {
+  const send = (activeSession: Session | null) => {
+    init?.signal?.throwIfAborted();
+    assertRequestScope(activeSession, scope);
+    return fetch(direct ? path : platformApiUrl(path), {
       ...init,
       headers: {
         ...(init?.body instanceof FormData
@@ -107,16 +142,19 @@ async function requestJson<T>(
         ...(activeSession?.access_token
           ? { Authorization: `Bearer ${activeSession.access_token}` }
           : {}),
-        "X-Reelassati-Brand": selectedBrand(activeSession?.user.email),
+        "X-Reelassati-Brand": scope?.brandId ?? selectedBrand(activeSession?.user.email),
         ...init?.headers,
       },
     });
+  };
 
   let response = await send(session);
   if (response.status === 401 && session?.access_token) {
     session = await recoverRejectedSession(session.access_token);
     response = await send(session);
   }
+  init?.signal?.throwIfAborted();
+  if (scope) await verifyUploadRequestScope(scope);
 
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   const responseText = await response.text();
@@ -173,9 +211,12 @@ async function requestJson<T>(
 async function uploadForm<T>(
   path: string,
   form: FormData,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  options?: UploadRequestOptions
 ): Promise<T> {
   const session = await requestSession();
+  options?.signal?.throwIfAborted();
+  assertRequestScope(session, options?.scope);
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     request.open("POST", platformApiUrl(path));
@@ -187,9 +228,12 @@ async function uploadForm<T>(
     }
     request.setRequestHeader(
       "X-Reelassati-Brand",
-      selectedBrand(session?.user.email)
+      options?.scope?.brandId ?? selectedBrand(session?.user.email)
     );
     request.responseType = "text";
+    const abort = () => request.abort();
+    const cleanup = () => options?.signal?.removeEventListener("abort", abort);
+    options?.signal?.addEventListener("abort", abort, { once: true });
     onProgress?.(0);
 
     request.upload.onprogress = event => {
@@ -203,6 +247,7 @@ async function uploadForm<T>(
     };
 
     request.onerror = () => {
+      cleanup();
       reject(
         new PlatformApiError(
           "The upload could not reach the server. Check your connection and try again.",
@@ -211,9 +256,11 @@ async function uploadForm<T>(
       );
     };
     request.onabort = () => {
+      cleanup();
       reject(new PlatformApiError("The upload was cancelled.", 0));
     };
     request.onload = () => {
+      cleanup();
       const contentType =
         request.getResponseHeader("content-type")?.toLowerCase() ?? "";
       let body: unknown;
@@ -246,8 +293,12 @@ async function uploadForm<T>(
         );
         return;
       }
-      onProgress?.(100);
-      resolve(body as T);
+      void (async () => {
+        options?.signal?.throwIfAborted();
+        if (options?.scope) await verifyUploadRequestScope(options.scope);
+        onProgress?.(100);
+        resolve(body as T);
+      })().catch(reject);
     };
     request.send(form);
   });
@@ -360,6 +411,13 @@ function supportRequestJson<T>(
 }
 
 export const platformApi = {
+  serviceDiagnostics: (options?: UploadRequestOptions) =>
+    requestJson<import("@contracts/service-diagnostics").ServiceDiagnostics>(
+      "/api/operations/services",
+      { method: "POST", signal: options?.signal },
+      false,
+      options?.scope
+    ),
   operations: () =>
     requestJson<import("@contracts/operations").OperationsStatus>(
       "/api/operations"
@@ -477,11 +535,11 @@ export const platformApi = {
       capabilities: CapabilityState;
     }>("/api/workspace"),
 
-  saveWorkspace: (workspace: WorkspaceDocument) =>
+  saveWorkspace: (workspace: WorkspaceDocument, scope?: UploadRequestScope) =>
     requestJson<{ workspace: WorkspaceDocument }>("/api/workspace", {
       method: "PUT",
       body: JSON.stringify({ workspace }),
-    }),
+    }, false, scope),
 
   editBrief: (projectId: string) =>
     requestJson<{ filename: string; brief: Record<string, unknown> }>(
@@ -553,8 +611,12 @@ export const platformApi = {
     file: File,
     kind?: Asset["kind"],
     onProgress?: (percent: number) => void,
-    projectId?: string
+    projectId?: string,
+    options?: UploadRequestOptions
   ): Promise<Asset> => {
+    const scope = options?.scope ?? await captureUploadRequestScope();
+    const signal = options?.signal;
+    signal?.throwIfAborted();
     if (file.size > DIRECT_UPLOAD_MAX_BYTES || projectId) {
       const initiated = await requestJson<{
         assetId: string;
@@ -567,26 +629,22 @@ export const platformApi = {
           type: file.type || "application/octet-stream",
           kind,
         }),
-      });
+        signal,
+      }, false, scope);
       const partSize = Math.min(
         Math.max(initiated.partSize || UPLOAD_PART_BYTES, 5 * 1024 * 1024),
         UPLOAD_PART_BYTES
       );
       const completedParts: Array<{ partNumber: number; etag: string }> = [];
-      const { data } = await supabase.auth.getSession();
-      const headers = {
-        "Content-Type": "application/octet-stream",
-        "X-Reelassati-Brand": selectedBrand(data.session?.user.email),
-        ...(data.session?.access_token
-          ? { Authorization: `Bearer ${data.session.access_token}` }
-          : {}),
-      };
       try {
         for (
           let offset = 0, partNumber = 1;
           offset < file.size;
           offset += partSize, partNumber += 1
         ) {
+          signal?.throwIfAborted();
+          const session = await requestSession();
+          assertRequestScope(session, scope);
           const end = Math.min(offset + partSize, file.size);
           const response = await fetch(
             platformApiUrl(
@@ -594,10 +652,17 @@ export const platformApi = {
             ),
             {
               method: "PUT",
-              headers,
+              signal,
+              headers: {
+                "Content-Type": "application/octet-stream",
+                "X-Reelassati-Brand": scope.brandId,
+                Authorization: `Bearer ${session!.access_token}`,
+              },
               body: file.slice(offset, end),
             }
           );
+          signal?.throwIfAborted();
+          await verifyUploadRequestScope(scope);
           const payload = (await response.json().catch(() => ({}))) as {
             error?: string;
             etag?: string;
@@ -620,14 +685,15 @@ export const platformApi = {
           {
             method: "POST",
             body: JSON.stringify({ parts: completedParts, projectId }),
-          }
+            signal,
+          }, false, scope
         );
         onProgress?.(100);
         return completed.asset;
       } catch (cause) {
         await requestJson<{ ok: true }>(
           `/api/assets/uploads/${encodeURIComponent(initiated.assetId)}`,
-          { method: "DELETE" }
+          { method: "DELETE" }, false, scope
         ).catch(() => undefined);
         throw cause;
       }
@@ -639,7 +705,8 @@ export const platformApi = {
     const response = await uploadForm<{ asset: Asset }>(
       "/api/assets",
       form,
-      onProgress
+      onProgress,
+      { scope, signal }
     );
     return {
       ...response.asset,
@@ -651,17 +718,20 @@ export const platformApi = {
 
   downloadAssetBlob: async (
     id: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { scope?: UploadRequestScope; maxBytes?: number }
   ): Promise<Blob> => {
-    const { data } = await supabase.auth.getSession();
+    signal?.throwIfAborted();
+    const session = await requestSession();
+    assertRequestScope(session, options?.scope);
     const response = await fetch(
       platformApiUrl(`/api/assets/${encodeURIComponent(id)}`),
       {
         signal,
         headers: {
-          "X-Reelassati-Brand": selectedBrand(data.session?.user.email),
-          ...(data.session?.access_token
-            ? { Authorization: `Bearer ${data.session.access_token}` }
+          "X-Reelassati-Brand": options?.scope?.brandId ?? selectedBrand(session?.user.email),
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
             : {}),
         },
       }
@@ -670,7 +740,33 @@ export const platformApi = {
       throw new Error(
         "A source file could not be downloaded. Reload your Library and try again."
       );
-    return response.blob();
+    const maxBytes = options?.maxBytes;
+    const declared = Number(response.headers.get("content-length"));
+    if (maxBytes !== undefined && (!Number.isFinite(maxBytes) || maxBytes <= 0 || declared > maxBytes)) {
+      await response.body?.cancel();
+      throw new Error("This source exceeds the supported download size. Use a smaller source image.");
+    }
+    let blob: Blob;
+    if (maxBytes !== undefined) {
+      if (!response.body) throw new Error("The source bytes are unavailable.");
+      const reader = response.body.getReader();
+      const chunks: Uint8Array<ArrayBuffer>[] = [];
+      let bytes = 0;
+      try {
+        for (;;) {
+          signal?.throwIfAborted();
+          const part = await reader.read();
+          if (part.done) break;
+          bytes += part.value.byteLength;
+          if (bytes > maxBytes) throw new Error("This source exceeds the supported download size. Use a smaller source image.");
+          chunks.push(new Uint8Array(part.value));
+        }
+      } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+      blob = new Blob(chunks, { type: response.headers.get("content-type") || "application/octet-stream" });
+    } else blob = await response.blob();
+    signal?.throwIfAborted();
+    if (options?.scope) await verifyUploadRequestScope(options.scope);
+    return blob;
   },
   downloadAsset: async (
     id: string,
@@ -696,10 +792,10 @@ export const platformApi = {
     return new Uint8Array(await response.arrayBuffer());
   },
 
-  deleteAsset: (id: string) =>
+  deleteAsset: (id: string, scope?: UploadRequestScope) =>
     requestJson<{ ok: true }>(`/api/assets/${encodeURIComponent(id)}`, {
       method: "DELETE",
-    }),
+    }, false, scope),
 
   renameAsset: (id: string, name: string) =>
     requestJson<{ asset: Asset }>(`/api/assets/${encodeURIComponent(id)}`, {
@@ -769,7 +865,8 @@ export const platformApi = {
       sourceRightsConfirmed: boolean;
       focus?: string;
     },
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    scope?: UploadRequestScope
   ) =>
     requestJson<{
       summary: string;
@@ -790,7 +887,7 @@ export const platformApi = {
       method: "POST",
       signal,
       body: JSON.stringify(input),
-    }),
+    }, false, scope),
 
   transcribe: (
     assetId: string,

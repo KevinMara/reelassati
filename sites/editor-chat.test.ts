@@ -141,7 +141,7 @@ describe("Reel authorization and actual cost planning", () => {
     expect(plan.actions).toEqual([]);
     expect(plan.blockedReasons[0]).toContain("not available");
   });
-  it("accepts only exact reference video links supplied by the user and uses the backend public-link tariff", () => {
+  it("blocks even user-supplied reference URLs until owned video bytes and a measured quote exist", () => {
     const ctx = context();
     ctx.request.references = [
       { url: "https://www.youtube.com/watch?v=reference" },
@@ -164,12 +164,10 @@ describe("Reel authorization and actual cost planning", () => {
       },
       ctx
     );
-    expect(plan.actions).toHaveLength(1);
-    expect(plan.actions[0]).toMatchObject({
-      publicUrl: "https://www.youtube.com/watch?v=reference",
-      credits: 10,
-    });
-    expect(plan.blockedReasons[0]).toContain("you supplied");
+    expect(plan.actions).toEqual([]);
+    expect(plan.blockedReasons).toHaveLength(2);
+    expect(plan.blockedReasons[0]).toContain("measured analysis quote");
+    expect(plan.totalCredits).toBe(5);
   });
   it("recomputes actual tariffs and preserves an over-budget plan without authorizing spend", () => {
     const ctx = context();

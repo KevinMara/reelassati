@@ -1,0 +1,7 @@
+# Local search resources
+
+English text embeddings: Xenova/all-MiniLM-L6-v2, Apache-2.0. Pinned Hugging Face revision `751bff37182d3f1213fa05d7196b954e230abad9`; each model/tokenizer source URL, size and SHA-256 is recorded in `Xenova/all-MiniLM-L6-v2/provenance.json`. The quantized ONNX model is 22,972,370 bytes, SHA-256 `afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1`. Upstream card and full Apache license accompany the files.
+
+Runtime: @huggingface/transformers 3.8.1, Apache-2.0, and onnxruntime-web 1.22.0-dev.20250409-89f8206ba4, MIT (source commit `89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0`). ORT-LICENSE.txt is from https://raw.githubusercontent.com/microsoft/onnxruntime/89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0/LICENSE. `scripts/prepare-search.mjs` copies only the installed browser JSEP factory and WASM binary plus runtime licenses, with file hashes in generated version.json. These copies are ignored by Git and rebuilt from the pinned lockfile. One WASM thread, no inference proxy, no remote model fallback.
+
+No private evidence is stored here. Search runs in a disposable browser worker against text already present in the open project. Model output measures semantic similarity, not verified scene content or a calibrated confidence.

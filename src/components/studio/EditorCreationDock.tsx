@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   Files,
   Film,
@@ -18,7 +18,7 @@ import {
   speechCreditCost,
   videoCreditCost,
 } from "@contracts/billing";
-import { platformApi } from "@/lib/platform-api";
+import { captureUploadRequestScope, platformApi, verifyUploadRequestScope } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { GraphicComposer } from "./GraphicComposer";
@@ -29,6 +29,9 @@ import { useEditorGenerations } from "./useEditorGenerations";
 import { VoiceSelector } from "./VoiceSelector";
 import { EditorSoundLibrary } from "./EditorSoundLibrary";
 import { EditorPresetLibrary } from "./EditorPresetLibrary";
+import { GlbModelComposer } from "./GlbModelComposer";
+import { PersonCutoutPanel } from "./PersonCutoutPanel";
+import { ImageDepthPanel } from "./ImageDepthPanel";
 
 export type DockKind =
   "library" | "image" | "video" | "audio" | "captions" | "graphics" | "effects";
@@ -52,7 +55,7 @@ export function EditorCreationDock({
   playhead: number;
   onInsert: (asset: Asset) => Promise<void>;
 }) {
-  const { workspace, capabilities } = useWorkspace();
+  const { workspace, capabilities, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
   const generation = useEditorGenerations(project.id);
   const [audioMode, setAudioMode] = useState<"voice" | "sounds">("voice");
   const kind =
@@ -63,13 +66,47 @@ export function EditorCreationDock({
   const [count, setCount] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
-  const [graphicMode, setGraphicMode] = useState<"presets" | "custom">(
+  const [imageMode, setImageMode] = useState<"generate" | "cutout" | "depth">("generate");
+  const [graphicMode, setGraphicMode] = useState<"presets" | "custom" | "model">(
     "presets"
   );
   const [graphicPreset, setGraphicPreset] = useState<{
     preset: GraphicPreset;
     revision: number;
   } | null>(null);
+  const uploadController = useRef<AbortController | null>(null);
+  const activeProject = useRef(project.id);
+  useLayoutEffect(() => {
+    activeProject.current = project.id;
+    return () => uploadController.current?.abort();
+  }, [project.id, workspace.profile.email]);
+
+  async function saveModelPose(file: File) {
+    const targetId = project.id;
+    if (activeProject.current !== targetId) throw new Error("The selected project changed. Save the pose again.");
+    uploadController.current?.abort();
+    const controller = new AbortController();
+    uploadController.current = controller;
+    const scope = await captureUploadRequestScope();
+    const assertTarget = () => {
+      controller.signal.throwIfAborted();
+      const latest = getWorkspaceSnapshot();
+      if (activeProject.current !== targetId || latest.profile.email.toLowerCase() !== scope.ownerEmail || !latest.projects.some(p => p.id === targetId))
+        throw new Error("The workspace or project changed. Save the pose again.");
+    };
+    try {
+      assertTarget();
+      const asset = await platformApi.uploadAsset(file, "image", undefined, targetId, { scope, signal: controller.signal });
+      await verifyUploadRequestScope(scope);
+      assertTarget();
+      await updateWorkspace(current => {
+        assertTarget();
+        return { ...current, assets: [...current.assets.filter(a => a.id !== asset.id), asset] };
+      });
+    } finally {
+      if (uploadController.current === controller) uploadController.current = null;
+    }
+  }
   const prompt =
     kind === "video" || kind === "image" || kind === "voice"
       ? prompts[kind]
@@ -228,7 +265,16 @@ export function EditorCreationDock({
             ))}
           </div>
         )}
-        {onAssist && activeTool !== "captions" && (
+        {activeTool === "image" && (
+          <div role="group" aria-label="Image tools" className="mb-4 grid grid-cols-3 gap-1 rounded-lg bg-background p-1">
+            {(["generate", "cutout", "depth"] as const).map(mode => (
+              <button type="button" key={mode} aria-pressed={imageMode === mode} onClick={() => setImageMode(mode)} className={`rounded-md px-2 py-2 text-xs ${imageMode === mode ? "bg-primary/15 text-primary" : "text-foreground/65"}`}>
+                {mode === "generate" ? "Generate" : mode === "cutout" ? "Person cutout" : "Image depth"}
+              </button>
+            ))}
+          </div>
+        )}
+        {onAssist && activeTool !== "captions" && !(activeTool === "image" && imageMode !== "generate") && !(activeTool === "graphics" && graphicMode === "model") && (
           <button
             type="button"
             onClick={() =>
@@ -255,6 +301,7 @@ export function EditorCreationDock({
             <div className="flex rounded-lg bg-background/60 p-1">
               <button
                 type="button"
+                aria-pressed={graphicMode === "presets"}
                 onClick={() => setGraphicMode("presets")}
                 className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "presets" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
               >
@@ -262,10 +309,14 @@ export function EditorCreationDock({
               </button>
               <button
                 type="button"
+                aria-pressed={graphicMode === "custom"}
                 onClick={() => setGraphicMode("custom")}
                 className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "custom" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
               >
                 Customize
+              </button>
+              <button type="button" aria-pressed={graphicMode === "model"} onClick={() => setGraphicMode("model")} className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "model" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}>
+                3D pose
               </button>
             </div>
             {graphicMode === "presets" && (
@@ -280,6 +331,7 @@ export function EditorCreationDock({
                 }}
               />
             )}
+            {graphicMode === "model" && <GlbModelComposer key={project.id} onSave={saveModelPose} />}
             <div hidden={graphicMode !== "custom"}>
               {graphicPreset && (
                 <div className="flex items-center justify-between gap-2 text-xs">
@@ -307,6 +359,10 @@ export function EditorCreationDock({
               />
             </div>
           </div>
+        ) : kind === "image" && imageMode === "cutout" ? (
+          <PersonCutoutPanel key={project.id} projectId={project.id} />
+        ) : kind === "image" && imageMode === "depth" ? (
+          <ImageDepthPanel key={project.id} projectId={project.id} />
         ) : kind === "audio" ? (
           <>
             <AudioGenerator

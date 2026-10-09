@@ -330,3 +330,179 @@ export function searchProjectFootage(
     )
     .slice(0, PROJECT_FOOTAGE_SEARCH_LIMITS.results);
 }
+
+/** Bounded attributable excerpts for the optional local text embedding worker.
+ * No media URLs or workspace identity go to inference. Transcript ownership is
+ * explicit, and every result retains both the source and the timeline clock. */
+export function collectProjectFootageEvidence(
+  project: EditProject,
+  assets: readonly Asset[],
+  excerptCharacters = 512
+): ProjectFootageMatch[] {
+  if (!Number.isFinite(project.duration) || project.duration <= 0) return [];
+  const maximum = Math.max(1, Math.min(512, Math.floor(excerptCharacters)));
+  const assetsById = new Map(assets.map(asset => [asset.id, asset]));
+  const sources = effectiveTimelineClips(project)
+    .slice(0, PROJECT_FOOTAGE_SEARCH_LIMITS.sourceClips)
+    .flatMap(clip => {
+      const source = sourceFor(
+        clip,
+        assetsById.get(clip.assetId ?? ""),
+        project.duration
+      );
+      return source ? [source] : [];
+    });
+  const sourcesById = new Map(sources.map(source => [source.clip.id, source]));
+  const sourcesByAsset = new Map<string, Source[]>();
+  for (const source of sources)
+    sourcesByAsset.set(source.asset.id, [
+      ...(sourcesByAsset.get(source.asset.id) ?? []),
+      source,
+    ]);
+  const rows: ProjectFootageMatch[] = [],
+    ids = new Set<string>();
+  const add = (
+    source: Source,
+    evidence: FootageSearchEvidence,
+    start: number,
+    end: number,
+    raw: string
+  ) => {
+    const snippet = cleanText(raw, maximum);
+    if (
+      !snippet ||
+      end <= start ||
+      rows.length >= PROJECT_FOOTAGE_SEARCH_LIMITS.candidateMatches
+    )
+      return;
+    const id = `${evidence}:${encodeURIComponent(source.clip.id)}:${clock(start)}:${clock(end)}:${hash(snippet)}`;
+    if (ids.has(id)) return;
+    ids.add(id);
+    rows.push({
+      id,
+      clipId: source.clip.id,
+      assetId: source.asset.id,
+      clipLabel: source.clip.label,
+      assetName: source.asset.name,
+      start,
+      end,
+      sourceStart: source.sourceStart + (start - source.start) * source.speed,
+      sourceEnd: source.sourceStart + (end - source.start) * source.speed,
+      snippet,
+      evidence,
+      score: 0,
+      hidden: Boolean(source.clip.hidden),
+      muted: Boolean(source.clip.muted),
+    });
+  };
+  for (const cue of project.transcript.slice(
+    0,
+    PROJECT_FOOTAGE_SEARCH_LIMITS.evidenceRows
+  )) {
+    const source = cue.sourceClipId
+      ? sourcesById.get(cue.sourceClipId)
+      : undefined;
+    if (
+      !source ||
+      !["video", "audio", "export"].includes(source.asset.kind) ||
+      ![cue.start, cue.end].every(Number.isFinite) ||
+      cue.end <= cue.start
+    )
+      continue;
+    const start = Math.max(source.start, cue.start),
+      end = Math.min(source.end, cue.end);
+    if (end <= start) continue;
+    if (!cue.words?.length) {
+      // Without word clocks a partial cue's retained text is unknown. Include
+      // only a complete retained cue; don't attribute trimmed-away speech.
+      if (cue.start >= source.start && cue.end <= source.end)
+        add(source, "transcript", start, end, cue.text);
+      continue;
+    }
+    let text = "",
+      from = 0,
+      to = 0;
+    const flush = () => {
+      if (text) add(source, "transcript", from, to, text);
+      text = "";
+    };
+    for (const word of cue.words.slice(0, 500)) {
+      if (
+        ![word.start, word.end].every(Number.isFinite) ||
+        word.end <= word.start ||
+        word.end <= start ||
+        word.start >= end
+      )
+        continue;
+      const next = cleanText(word.text, maximum);
+      if (!next) continue;
+      if (
+        text &&
+        (text.length + next.length + 1 > maximum || word.start - to > 1.5)
+      )
+        flush();
+      if (!text) from = Math.max(start, word.start);
+      text = text ? `${text} ${next}` : next;
+      to = Math.min(end, word.end);
+    }
+    flush();
+  }
+  const latestReviews = new Map<string, SourceReview>();
+  for (const review of (project.sourceReviews ?? []).slice(
+    0,
+    PROJECT_FOOTAGE_SEARCH_LIMITS.evidenceRows
+  )) {
+    if (
+      !sourcesByAsset.has(review.assetId) ||
+      !Number.isFinite(Date.parse(review.reviewedAt))
+    )
+      continue;
+    const existing = latestReviews.get(review.assetId);
+    if (
+      !existing ||
+      Date.parse(review.reviewedAt) >= Date.parse(existing.reviewedAt)
+    )
+      latestReviews.set(review.assetId, review);
+  }
+  let moments = 0;
+  for (const review of latestReviews.values()) {
+    const members = sourcesByAsset.get(review.assetId)!,
+      asset = members[0].asset;
+    if (
+      !["video", "export"].includes(asset.kind) ||
+      !Number.isFinite(asset.duration) ||
+      asset.duration! <= 0 ||
+      Date.parse(review.reviewedAt) < Date.parse(asset.createdAt)
+    )
+      continue;
+    for (const moment of review.moments) {
+      if (++moments > PROJECT_FOOTAGE_SEARCH_LIMITS.evidenceRows) break;
+      if (
+        ![moment.start, moment.end].every(Number.isFinite) ||
+        moment.start < 0 ||
+        moment.end <= moment.start ||
+        moment.end > asset.duration! + 0.000001
+      )
+        continue;
+      for (const source of members) {
+        const from = Math.max(source.sourceStart, moment.start),
+          to = Math.min(source.sourceEnd, moment.end);
+        if (to > from)
+          add(
+            source,
+            "observed-scene",
+            source.start + (from - source.sourceStart) / source.speed,
+            source.start + (to - source.sourceStart) / source.speed,
+            moment.note
+          );
+      }
+    }
+    if (moments >= PROJECT_FOOTAGE_SEARCH_LIMITS.evidenceRows) break;
+  }
+  for (const source of sources) {
+    add(source, "clip-name", source.start, source.end, source.clip.label);
+    if (source.asset.name !== source.clip.label)
+      add(source, "clip-name", source.start, source.end, source.asset.name);
+  }
+  return rows;
+}

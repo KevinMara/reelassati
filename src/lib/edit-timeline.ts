@@ -360,11 +360,14 @@ export function applyEditOperation(
   } else if (op.type === "caption") {
     if (!p.text?.trim())
       throw new Error("This caption needs text before it can be applied.");
+    if (p.sourceClipId && !project.clips.some(c => c.id === p.sourceClipId && targets.has(c.id) && !c.locked && op.start >= c.start && op.end <= c.start + c.duration))
+      throw new Error("The caption's source owner no longer covers this interval.");
     next.transcript.push({
       id: op.id,
       start: op.start,
       end: op.end,
       text: p.text,
+      ...(p.sourceClipId ? { sourceClipId: p.sourceClipId } : {}),
     });
   } else if (op.type === "broll") {
     if (!p.assetId)

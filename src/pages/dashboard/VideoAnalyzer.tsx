@@ -1,5 +1,5 @@
 import { resolveMediaDuration } from "@/lib/media-metadata";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -22,7 +22,10 @@ import type {
   QualitySignal,
   WorkspaceEvent,
 } from "@contracts/workspace";
-import { platformApi } from "@/lib/platform-api";
+import { platformApi, captureUploadRequestScope, verifyUploadRequestScope } from "@/lib/platform-api";
+import { validateDirectVideoUrl, DIRECT_VIDEO_HELP } from "@contracts/public-video";
+import { importDirectVideo } from "@/lib/direct-video-import";
+import { mapSourceAnalysisToProject } from "@/lib/analysis-project-mapping";
 import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
@@ -38,30 +41,6 @@ const ANALYSIS_PLATFORMS: Array<{ value: Platform; label: string }> = [
   { value: "instagram", label: "Instagram Reels" },
   { value: "youtube", label: "YouTube Shorts" },
 ];
-
-function validatePublicVideoUrl(value: string) {
-  if (!value.trim()) return "Enter a public HTTPS video URL.";
-  try {
-    const parsed = new URL(value.trim());
-    const hostname = parsed.hostname.toLowerCase();
-    if (parsed.protocol !== "https:") return "The video URL must use HTTPS.";
-    if (
-      hostname === "localhost" ||
-      hostname === "0.0.0.0" ||
-      hostname === "::1" ||
-      hostname.endsWith(".local") ||
-      /^10\./.test(hostname) ||
-      /^127\./.test(hostname) ||
-      /^192\.168\./.test(hostname) ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
-    ) {
-      return "Use a public URL, not a local or private network address.";
-    }
-    return null;
-  } catch {
-    return "Enter a valid public HTTPS video URL.";
-  }
-}
 
 function clampScore(score: number) {
   return Math.max(0, Math.min(100, score));
@@ -126,8 +105,18 @@ export default function VideoAnalyzer() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [queued, setQueued] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rights, setRights] = useState(false);
+  const [analyzedAsset, setAnalyzedAsset] = useState<Asset | null>(null);
+  const controller = useRef<AbortController | null>(null);
+  const generation = useRef(0);
+  useEffect(() => () => { generation.current++; controller.current?.abort(); }, []);
 
   const invalidateSourceAuthorization = () => {
+    generation.current++;
+    controller.current?.abort();
+    setAnalyzing(false);
+    setAnalyzedAsset(null);
+    setRights(false);
     setResult(null);
     setQueued(false);
   };
@@ -159,9 +148,9 @@ export default function VideoAnalyzer() {
     [workspace.assets]
   );
   const urlError =
-    sourceMode === "url" ? validatePublicVideoUrl(publicUrl) : null;
+    sourceMode === "url" ? validateDirectVideoUrl(publicUrl) : null;
   const sourceReady =
-    sourceMode === "upload" ? Boolean(file || sourceAsset) : !urlError;
+    sourceMode === "upload" ? Boolean(file || sourceAsset) : Boolean(sourceAsset || !urlError);
   const analysisReady = capabilities.analysis;
   const analysisCreditCost = timedCreditCost(
     sourceAsset?.duration,
@@ -182,138 +171,66 @@ export default function VideoAnalyzer() {
     }));
   };
 
-  const resolveSourceAsset = async () => {
-    if (sourceAsset) return sourceAsset;
-    if (!file) return null;
-    const asset = await platformApi.uploadAsset(
-      file,
-      "video",
-      setUploadProgress
-    );
-    setSourceAsset(asset);
-    await saveUploadedAsset(asset);
-    return asset;
-  };
-
   const handleAnalyze = async () => {
-    if (!sourceReady || !analysisReady || analyzing) return;
-    setAnalyzing(true);
-    setError(null);
-    setResult(null);
-    setQueued(false);
-
+    if (!sourceReady || !analysisReady || analyzing || !rights) return;
+    const id = ++generation.current;
+    controller.current?.abort();
+    const abort = new AbortController(); controller.current = abort;
+    setAnalyzing(true); setError(null); setResult(null); setQueued(false);
     try {
-      let asset = sourceMode === "upload" ? await resolveSourceAsset() : null;
-      if (sourceMode === "upload" && !asset) {
-        throw new Error("Select or upload a video before running analysis.");
+      const scope = await captureUploadRequestScope();
+      let asset = sourceAsset;
+      if (!asset) {
+        if (sourceMode === "url") asset = await importDirectVideo(publicUrl, { signal: abort.signal, scope });
+        else if (file) asset = await platformApi.uploadAsset(file, "video", setUploadProgress, undefined, { scope, signal: abort.signal });
+        if (!asset) throw new Error("Select a video before running analysis.");
       }
-
-      if (asset && !asset.duration) {
-        asset = { ...asset, duration: await resolveMediaDuration(asset) };
-        const readyAsset = asset;
-        setSourceAsset(readyAsset);
-        await updateWorkspace(w => ({
-          ...w,
-          assets: w.assets.map(a => (a.id === readyAsset.id ? readyAsset : a)),
-        }));
+      if (!asset.duration || !Number.isFinite(asset.duration)) asset = { ...asset, duration: await resolveMediaDuration(asset) };
+      abort.signal.throwIfAborted();
+      await verifyUploadRequestScope(scope);
+      if (id !== generation.current) return;
+      const readyAsset = asset;
+      await saveUploadedAsset(readyAsset);
+      if (id !== generation.current || abort.signal.aborted) return;
+      setSourceAsset(readyAsset);
+      // Import/measurement never starts a paid analysis. A second click accepts the actual duration quote.
+      if (!sourceAsset?.duration || sourceAsset.id !== readyAsset.id) {
+        setError(`Source ready · ${readyAsset.duration!.toFixed(1)} seconds. Review the measured credit quote, then press Analyze video.`);
+        return;
       }
-      const analysis = asset
-        ? await (
-            await import("@/lib/analyze-media")
-          ).analyzeMedia(asset, platform)
-        : await platformApi.analyzeVideo({
-            publicUrl: publicUrl.trim(),
-            platform,
-            sourceRightsConfirmed: true,
-          });
-      setResult(analysis);
-      posthog?.capture("video_analysis_completed", {
-        source_type: sourceMode,
-        platform,
-        proposed_changes_count: analysis.changes.length,
-        retention_segments_count: analysis.retention.length,
-      });
-      await updateWorkspace(current => ({
-        ...current,
-        activity: [
-          createEvent(
-            "generation",
-            "Video analysis completed",
-            asset?.name ?? new URL(publicUrl.trim()).hostname
-          ),
-          ...current.activity,
-        ].slice(0, 100),
-      }));
+      const analysis = await (await import("@/lib/analyze-media")).analyzeMedia(readyAsset, platform, undefined, undefined, abort.signal, scope);
+      abort.signal.throwIfAborted();
+      await verifyUploadRequestScope(scope);
+      if (id !== generation.current) return;
+      setAnalyzedAsset(readyAsset); setResult(analysis);
+      posthog?.capture("video_analysis_completed", { source_type: sourceMode, platform, proposed_changes_count: analysis.changes.length, retention_segments_count: analysis.retention.length });
+      await updateWorkspace(current => ({ ...current, activity: [createEvent("generation", "Video analysis completed", readyAsset.name), ...current.activity].slice(0, 100) }));
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "The video could not be analyzed."
-      );
-    } finally {
-      setAnalyzing(false);
-    }
+      if (id === generation.current && !abort.signal.aborted) setError(cause instanceof Error ? cause.message : "The video could not be analyzed.");
+    } finally { if (id === generation.current) { setAnalyzing(false); controller.current = null; } }
   };
 
   const queueChanges = async () => {
-    if (!result || !selectedProjectId) return;
+    if (!result || !selectedProjectId || !analyzedAsset?.duration) return;
     setError(null);
     try {
-      const signals = retentionToQualitySignals(result.retention);
+      let count = 0;
+      let refused: string[] = [];
       await updateWorkspace(current => ({
         ...current,
         projects: current.projects.map(project => {
           if (project.id !== selectedProjectId) return project;
-          const existingChangeIds = new Set(
-            project.proposedChanges.map(change => change.id)
-          );
-          const existingSignalIds = new Set(
-            project.qualitySignals.map(signal => signal.id)
-          );
-          return {
-            ...project,
-            status: "editing",
-            updatedAt: new Date().toISOString(),
-            proposedChanges: [
-              ...project.proposedChanges,
-              ...result.changes
-                .filter(change => !existingChangeIds.has(change.id))
-                .map(change => ({
-                  ...change,
-                  provenance: change.provenance ?? result.provenance,
-                  targetClipIds: project.clips
-                    .filter(
-                      clip =>
-                        clip.start < change.end &&
-                        clip.start + clip.duration > change.start
-                    )
-                    .map(clip => clip.id),
-                  status: "proposed" as const,
-                })),
-            ],
-            qualitySignals: [
-              ...project.qualitySignals,
-              ...signals.filter(signal => !existingSignalIds.has(signal.id)),
-            ],
-          };
+          const mapped = mapSourceAnalysisToProject(project, { id: analyzedAsset.id, duration: analyzedAsset.duration! }, { changes: result.changes.map(change => ({ ...change, provenance: change.provenance ?? result.provenance })), signals: retentionToQualitySignals(result.retention) });
+          const existing = new Set(project.proposedChanges.map(change => change.id));
+          const changes = mapped.changes.filter(change => !existing.has(change.id));
+          count = changes.length; refused = mapped.rejected;
+          if (!changes.length && mapped.rejected.length) throw new Error(`No changes were queued. ${mapped.rejected.join("; ")}`);
+          return { ...project, status: "editing", updatedAt: new Date().toISOString(), proposedChanges: [...project.proposedChanges, ...changes], qualitySignals: [...project.qualitySignals, ...mapped.signals] };
         }),
-        activity: [
-          createEvent(
-            "project",
-            "Analysis queued in editor",
-            `${result.changes.length} proposed changes`
-          ),
-          ...current.activity,
-        ].slice(0, 100),
       }));
       setQueued(true);
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "The edit plan could not be queued."
-      );
-    }
+      if (refused.length) setError(`${count} source-mapped changes queued. Held for an explicit timeline decision: ${refused.join("; ")}`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The edit plan could not be queued."); }
   };
 
   return (
@@ -322,7 +239,7 @@ export default function VideoAnalyzer() {
         <p className="mono-eyebrow mb-2 text-primary">Edit Intelligence</p>
         <h1 className="text-3xl font-semibold">Video Analyzer</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          Analyze your footage or a public video, inspect the evidence by time
+          Analyze your footage or import a direct video file, inspect the evidence by source time
           range, then queue the returned changes in a real edit project.
         </p>
       </div>
@@ -353,6 +270,7 @@ export default function VideoAnalyzer() {
               onClick={() => {
                 if (sourceMode !== "upload") {
                   setSourceMode("upload");
+                  setSourceAsset(null);
                   invalidateSourceAuthorization();
                 }
               }}
@@ -371,6 +289,7 @@ export default function VideoAnalyzer() {
               onClick={() => {
                 if (sourceMode !== "url") {
                   setSourceMode("url");
+                  setSourceAsset(null); setFile(null);
                   invalidateSourceAuthorization();
                 }
               }}
@@ -396,7 +315,7 @@ export default function VideoAnalyzer() {
             <select
               id="analysis-platform"
               value={platform}
-              onChange={event => setPlatform(event.target.value as Platform)}
+              onChange={event => { invalidateSourceAuthorization(); setPlatform(event.target.value as Platform); }}
               className="rounded-lg border border-border bg-background px-3 py-2 text-xs"
             >
               {ANALYSIS_PLATFORMS.map(item => (
@@ -516,6 +435,7 @@ export default function VideoAnalyzer() {
                 value={publicUrl}
                 onChange={event => {
                   setPublicUrl(event.target.value);
+                  setSourceAsset(null);
                   invalidateSourceAuthorization();
                 }}
                 placeholder="https://cdn.example.com/video.mp4"
@@ -529,7 +449,7 @@ export default function VideoAnalyzer() {
             >
               {publicUrl && urlError
                 ? urlError
-                : "Use a URL the analysis service can fetch without browser cookies or local access."}
+                : DIRECT_VIDEO_HELP}
             </p>
           </div>
         )}
@@ -546,10 +466,11 @@ export default function VideoAnalyzer() {
           </p>
         </div>
 
+        <label className="mt-3 flex gap-2 text-xs"><input type="checkbox" checked={rights} onChange={event => setRights(event.target.checked)} disabled={analyzing} />I am authorized to import and submit this video for analysis.</label>
         <button
           type="button"
           onClick={() => void handleAnalyze()}
-          disabled={!sourceReady || analyzing || !analysisReady}
+          disabled={!sourceReady || analyzing || !analysisReady || !rights}
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
         >
           {analyzing ? (
@@ -562,7 +483,7 @@ export default function VideoAnalyzer() {
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              Analyze video · {analysisCreditCost} credits
+              {sourceAsset?.duration ? `Analyze video · ${analysisCreditCost} credits` : "Prepare source and measured quote · no AI credits"}
             </>
           )}
         </button>
@@ -762,7 +683,7 @@ export default function VideoAnalyzer() {
                             className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                           >
                             <option value="">Choose an edit project</option>
-                            {workspace.projects.map(project => (
+                            {workspace.projects.filter(project => project.clips.some(clip => clip.assetId === analyzedAsset?.id)).map(project => (
                               <option key={project.id} value={project.id}>
                                 {project.title}
                               </option>
@@ -789,7 +710,7 @@ export default function VideoAnalyzer() {
                         </div>
                         <p className="mt-2 text-xs text-foreground/70">
                           Changes enter the editor as proposed operations.
-                          Nothing is applied until you review and accept it.
+                          Only occurrences of this exact analyzed source are eligible. Source times follow each clip’s trim and speed; locked or ambiguous changes are held for a timeline decision.
                         </p>
                       </>
                     ) : (

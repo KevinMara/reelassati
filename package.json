@@ -26,6 +26,7 @@
     "@ffmpeg/ffmpeg": "0.12.15",
     "@hono/node-server": "^1.14.3",
     "@hookform/resolvers": "^5.2.2",
+    "@huggingface/transformers": "3.8.1",
     "@noble/hashes": "2.0.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -92,6 +93,7 @@
     "stripe": "22.6.1",
     "superjson": "^2.2.6",
     "tailwind-merge": "^3.4.0",
+    "three": "0.180.0",
     "uuid": "^14.0.0",
     "vaul": "^1.1.2",
     "zod": "^4.3.5"
@@ -104,6 +106,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "0.180.0",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.23",
     "drizzle-kit": "^0.31.8",

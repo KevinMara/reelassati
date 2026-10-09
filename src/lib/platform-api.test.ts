@@ -1,6 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { platformApi, PlatformApiError } from "./platform-api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { platformApi, PlatformApiError, captureUploadRequestScope } from "./platform-api";
 import { supabase } from "@/lib/supabase/client";
+
+beforeEach(() => {
+  vi.stubGlobal("sessionStorage", { getItem: () => null });
+  vi.spyOn(supabase.auth, "getSession").mockResolvedValue({ data: { session: { access_token: "test-owner-token", expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: "owner", email: "creator@example.com" } } }, error: null } as never);
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -216,5 +221,59 @@ describe("platform API transport", () => {
     expect(asset.id).toBe("large-asset");
     expect(fetchMock).toHaveBeenCalledTimes(5);
     expect(progress.at(-1)).toBe(100);
+  });
+
+  it("pins workspace writes and rejects an account changed while requestSession is awaiting", async () => {
+    const scope = await captureUploadRequestScope();
+    vi.spyOn(supabase.auth, "getSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    await expect(platformApi.saveWorkspace({} as never, scope)).rejects.toMatchObject({ status: 409 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a brand switch before sending any media bytes", async () => {
+    const scope = await captureUploadRequestScope();
+    vi.stubGlobal("sessionStorage", { getItem: () => "other-brand" });
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    await expect(platformApi.uploadAsset(new File([new Uint8Array(33 * 1024 * 1024)], "video.mp4"), "video", undefined, undefined, { scope })).rejects.toMatchObject({ status: 409 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("never completes multipart uploads in a new account after parts return", async () => {
+    const scope = await captureUploadRequestScope();
+    let changed = false;
+    vi.spyOn(supabase.auth, "getSession").mockImplementation(async () => ({ data: { session: { access_token: changed ? "other-token" : "test-owner-token", user: { id: changed ? "other" : "owner", email: changed ? "other@example.com" : "creator@example.com" } } }, error: null }) as never);
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
+      if (url.endsWith("/api/assets/uploads")) return Response.json({ assetId: "partial", partSize: 16 * 1024 * 1024 });
+      expect(init.headers).toMatchObject({ "X-Reelassati-Brand": "default", Authorization: "Bearer test-owner-token" });
+      changed = true;
+      return Response.json({ partNumber: 1, etag: "part" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(platformApi.uploadAsset(new File([new Uint8Array(33 * 1024 * 1024)], "video.mp4"), "video", undefined, undefined, { scope })).rejects.toMatchObject({ status: 409 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/complete"))).toBe(false);
+  });
+
+  it("does not retry paid analysis under an account recovered after a rejected token", async () => {
+    const scope = await captureUploadRequestScope();
+    vi.spyOn(supabase.auth, "refreshSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "Expired" }, { status: 401 })));
+    await expect(platformApi.analyzeVideo({ assetId: "owned", platform: "tiktok", sourceRightsConfirmed: true }, undefined, scope)).rejects.toMatchObject({ status: 409 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds actual downloaded bytes even when the server's size header is wrong", async () => {
+    const scope = await captureUploadRequestScope();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Uint8Array(9), { headers: { "content-length": "1", "content-type": "image/png" } })));
+    await expect(platformApi.downloadAssetBlob("image", undefined, { scope, maxBytes: 8 })).rejects.toThrow("supported download size");
+  });
+
+  it("never sends an upload after cancellation", async () => {
+    const scope = await captureUploadRequestScope();
+    const controller = new AbortController(); controller.abort();
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    await expect(platformApi.uploadAsset(new File(["x"], "x.mp4"), "video", undefined, undefined, { scope, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import {
   type PaidMediaRequestControl,
 } from "./paid-media-request";
 import { validateAnalysisProxyDuration } from "./analysis-media";
+import { serviceDiagnostics } from "./service-diagnostics";
 import { normalizeEditorChatState } from "../contracts/editor-chat-state";
 import {
   EDITOR_CHAT_SYSTEM_PROMPT,
@@ -579,6 +580,7 @@ function capabilities(
 ): CapabilityState {
   const missing: string[] = [];
   const useKimiSubscription = isKimiTestOwner(env, user);
+  const soundEffectRate = Number(env.ELEVENLABS_SFX_USD_PER_SECOND);
   const provenanceReady = Boolean(
     env.AI_PROVENANCE_SIGNING_KEY && env.AI_PROVENANCE_SIGNING_KEY.length >= 24
   );
@@ -609,9 +611,10 @@ function capabilities(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
     soundGeneration: Boolean(
-      env.ELEVENLABS_API_KEY &&
+      env.ELEVENLABS_API_KEY?.trim() &&
       env.ELEVENLABS_COMMERCIAL_ENABLED === "true" &&
-      Number(env.ELEVENLABS_SFX_USD_PER_SECOND) > 0 &&
+      Number.isFinite(soundEffectRate) &&
+      soundEffectRate > 0 &&
       env.BUCKET &&
       provenanceReady
     ),
@@ -6078,6 +6081,8 @@ async function handleAi(
       sourceRightsConfirmed?: boolean;
       focus?: string;
     }>(request);
+    if (input.publicUrl !== undefined)
+      return errorResponse("Import a direct video file into your private Library, then analyze its owned asset ID. Raw external video URLs are unsupported.", 422);
     assertProvenanceConfigured(env);
     if (input.sourceRightsConfirmed !== true) {
       return errorResponse(
@@ -6085,7 +6090,7 @@ async function handleAi(
         422
       );
     }
-    let videoUrl = stringValue(input.publicUrl);
+    let videoUrl = "";
     let analysisDuration: number | undefined;
     let analysisUsesProxy = false;
     if (input.analysisAssetId && (!input.assetId || input.publicUrl))
@@ -6093,9 +6098,6 @@ async function handleAi(
         "An analysis copy needs its original uploaded video.",
         422
       );
-    if (videoUrl && !isPublicHttpsUrl(videoUrl)) {
-      return errorResponse("Use a public HTTPS video URL");
-    }
     if (!videoUrl && input.assetId) {
       const row = await getAssetRow(env, user, input.assetId);
       if (!row) return errorResponse("Video asset not found", 404);
@@ -6103,6 +6105,8 @@ async function handleAi(
         return errorResponse("Choose a video asset");
       }
       analysisDuration = await assetDurationSeconds(env, user, row.id);
+      if (!analysisDuration || !Number.isFinite(analysisDuration) || analysisDuration <= 0)
+        return errorResponse("Measure and save the owned video's duration before accepting an analysis quote.", 422);
       const analysisRow = input.analysisAssetId
         ? await getAssetRow(env, user, input.analysisAssetId)
         : row;
@@ -6146,16 +6150,14 @@ async function handleAi(
       videoUrl = `data:${mime};base64,${arrayBufferToBase64(analysisBytes)}`;
     }
     if (!videoUrl)
-      return errorResponse("Upload a video or provide a public URL");
+      return errorResponse("Upload a video to your private Library before analysis.");
 
     await recordComplianceEvent(env, {
       ownerEmail: user.email,
       eventType: "rights.video-analysis-confirmed",
-      entityType: input.assetId ? "asset" : "external-url",
-      entityId: stringValue(input.assetId) || "public-video",
-      details: {
-        source: input.assetId ? "workspace-asset" : "public-https-url",
-      },
+      entityType: "asset",
+      entityId: stringValue(input.assetId),
+      details: { source: "workspace-asset" },
     });
 
     return runPaidAiAction(
@@ -6221,14 +6223,10 @@ async function handleAi(
           },
         });
         const retention = Array.isArray(output.retention)
-          ? output.retention.slice(0, 20).map(item => {
-              const row = item as Record<string, unknown>;
-              return {
-                start: boundedNumber(row.start, 0, 0, 600),
-                end: boundedNumber(row.end, 1, 0, 600),
-                score: boundedNumber(row.score, 50, 0, 100),
-                note: stringValue(row.note, "Review this interval"),
-              };
+          ? output.retention.slice(0, 20).flatMap(item => {
+              const row = recordValue(item);
+              if (!row || typeof row.start !== "number" || typeof row.end !== "number" || !Number.isFinite(row.start) || !Number.isFinite(row.end) || row.start < 0 || row.end <= row.start || !analysisDuration || row.end > analysisDuration) return [];
+              return [{ start: row.start, end: row.end, score: boundedNumber(row.score, 50, 0, 100), note: stringValue(row.note, "Review this interval") }];
             })
           : [];
         const hook =
@@ -12235,6 +12233,13 @@ async function handleApi(
   if (url.pathname === "/api/brands") return handleBrands(request, env, user);
   if (url.pathname === "/api/operations")
     return handleOperations(request, env, user);
+  if (url.pathname === "/api/operations/services") {
+    if (!operatorOwnerEmail(env) || operatorOwnerEmail(env) !== user.email)
+      return errorResponse("Only the studio owner can check services", 403);
+    if (request.method !== "POST")
+      return json({ error: "Use POST to check services" }, 405, { Allow: "POST" });
+    return json(await serviceDiagnostics(env));
+  }
   if (url.pathname === "/api/account/data")
     return handleAccountData(request, env, user);
   if (url.pathname === "/api/voice-preview")

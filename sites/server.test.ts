@@ -1497,7 +1497,7 @@ describe("Sites worker", () => {
           "oai-authenticated-user-email": "creator@example.com",
         },
         body: JSON.stringify({
-          publicUrl: "https://media.example.com/test.mp4",
+          assetId: "owned-video",
         }),
       }),
       {
@@ -1772,7 +1772,7 @@ describe("Sites worker", () => {
     }
   });
 
-  it("keeps explicitly selected non-Kimi analysis models on OpenRouter", async () => {
+  it("rejects raw public video URLs before calling an explicitly selected analysis provider", async () => {
     const originalFetch = globalThis.fetch;
     let providerUrl = "";
     let providerBody: Record<string, unknown> = {};
@@ -1816,22 +1816,10 @@ describe("Sites worker", () => {
         } as never
       );
 
-      expect(response.status).toBe(200);
-      expect(providerUrl).toBe("https://openrouter.ai/api/v1/chat/completions");
-      expect(providerBody.model).toBe("google/gemini-2.5-flash");
-      expect(providerBody.messages).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            role: "user",
-            content: expect.arrayContaining([
-              expect.objectContaining({
-                type: "video_url",
-                video_url: { url: "https://media.example.com/test.mp4" },
-              }),
-            ]),
-          }),
-        ])
-      );
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ error: expect.stringContaining("owned asset ID") });
+      expect(providerUrl).toBe("");
+      expect(providerBody).toEqual({});
     } finally {
       globalThis.fetch = originalFetch;
     }

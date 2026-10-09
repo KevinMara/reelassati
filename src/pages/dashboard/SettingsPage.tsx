@@ -1,4 +1,5 @@
 import { AccountDataControls } from "@/components/studio/AccountDataControls";
+import { ServiceDiagnosticsPanel } from "@/components/studio/ServiceDiagnosticsPanel";
 import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -655,6 +656,9 @@ export default function SettingsPage() {
                     {capabilities.missing.join(", ")}
                   </p>
                 </div>
+              ) : null}
+              {capabilities.operations ? (
+                <ServiceDiagnosticsPanel key={workspace.profile.email} />
               ) : null}
               <div className="mt-5 border-t border-border pt-5">
                 <Link

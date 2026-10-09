@@ -14,7 +14,8 @@ import {
   type CapabilityState,
   type WorkspaceDocument,
 } from "@contracts/workspace";
-import { platformApi, PlatformApiError } from "@/lib/platform-api";
+import { captureUploadRequestScope, platformApi, PlatformApiError } from "@/lib/platform-api";
+import { selectedBrand } from "@/lib/workspace-scope";
 import { reconcileAcknowledgedWorkspace } from "@/lib/workspace-save-reconcile";
 import { useAuth } from "@/hooks/useAuth";
 import { rememberAuthNext, safeDashboardNext } from "@/lib/auth-next";
@@ -158,6 +159,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           "A newer server copy exists. Download a backup, then reload before editing."
         );
       }
+      const ownerEmail = currentRef.current.profile.email.toLowerCase();
+      const brandId = selectedBrand(ownerEmail);
+      // Start authentication now, while keeping optimistic mutations ordered.
+      // Resolve failures as values until this save reaches the queue head.
+      const scopeResult = captureUploadRequestScope().then(
+        scope => ({ scope, error: null }),
+        error => ({ scope: null, error })
+      );
       const next =
         typeof updater === "function" ? updater(currentRef.current) : updater;
       const stamped = {
@@ -174,10 +183,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
       const save = async () => {
         try {
+          const captured = await scopeResult;
+          if (!captured.scope) throw captured.error;
+          if (captured.scope.ownerEmail !== ownerEmail || captured.scope.brandId !== brandId)
+            throw new Error("Your account or brand changed before saving. Reload the intended workspace before editing.");
           const result = await platformApi.saveWorkspace({
             ...stamped,
             revision: serverRevisionRef.current,
-          });
+          }, captured.scope);
           serverRevisionRef.current = result.workspace.revision;
           const reconciled = reconcileAcknowledgedWorkspace(
             currentRef.current,

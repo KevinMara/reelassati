@@ -428,6 +428,8 @@ export function AutonomousEditor({
             <div className="mt-3">
               {" "}
               <ReferenceStylePanel
+                key={project.id}
+                projectId={project.id}
                 onChange={brief => {
                   setReferenceBrief(brief);
                   void updateWorkspace(w => ({
