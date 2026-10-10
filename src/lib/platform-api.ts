@@ -812,11 +812,12 @@ export const platformApi = {
     duration: number;
     language: string;
     brandVoice?: string;
-  }) =>
+  }, options?: UploadRequestOptions) =>
     requestJson<{ script: ScriptDraft }>("/api/ai/script", {
       method: "POST",
       body: JSON.stringify(input),
-    }),
+      signal: options?.signal,
+    }, false, options?.scope),
 
   editorChat: (input: import("@contracts/editor-chat").EditorChatRequest) =>
     requestJson<import("@contracts/editor-chat").EditorChatResponse>(

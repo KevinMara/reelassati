@@ -24,6 +24,10 @@ import {
 
 import { SHORT_FORM_STORY_GUIDANCE } from "../contracts/storytelling-guidance";
 import {
+  normalizeScriptWritingPack,
+  SCRIPT_WRITING_PACK_GUIDANCE,
+} from "../contracts/script-writing-pack";
+import {
   MUSIC_MODEL,
   MusicGenerationError,
   musicQuote,
@@ -2288,6 +2292,7 @@ type ScriptProvenanceProjection = Pick<
   | "tone"
   | "duration"
   | "language"
+  | "writingPack"
 >;
 
 interface ScriptProvenanceMetadata {
@@ -2315,6 +2320,10 @@ function scriptProvenanceProjection(
   script: ScriptDraft,
   cleanFullScript = withoutTextProvenanceMarker(script.fullScript || "")
 ): ScriptProvenanceProjection {
+  const writingPack = normalizeScriptWritingPack(
+    script.writingPack,
+    script.duration
+  );
   return {
     title: stringValue(script.title),
     hook: stringValue(script.hook),
@@ -2325,6 +2334,7 @@ function scriptProvenanceProjection(
     tone: stringValue(script.tone),
     duration: boundedNumber(script.duration, 30, 1, 10_000),
     language: stringValue(script.language, "en"),
+    ...(writingPack ? { writingPack } : {}),
   };
 }
 
@@ -2765,16 +2775,20 @@ async function reconcileWorkspaceProvenance(
       exactMetadata = metadata;
     }
 
+    const normalizedScript = { ...script };
+    delete normalizedScript.writingPack;
+    if (suppliedProjection.writingPack)
+      normalizedScript.writingPack = suppliedProjection.writingPack;
     if (exact && exactMetadata) {
       scripts.push({
-        ...script,
+        ...normalizedScript,
         ...exactMetadata.projection,
         fullScript: appendTextProvenanceMarker(cleanText, exact.public_token),
         provenance: provenanceFromRow(exact),
       });
     } else {
       if (script.provenance || suppliedToken) rejectedClientProjections += 1;
-      const withoutProjection = { ...script };
+      const withoutProjection = { ...normalizedScript };
       delete withoutProjection.provenance;
       scripts.push({ ...withoutProjection, fullScript: cleanText });
     }
@@ -5893,8 +5907,15 @@ async function handleAi(
           env,
           user,
           "script-generation",
-          `${SHORT_FORM_STORY_GUIDANCE} You are REELassati's senior short-form script editor. Return JSON only with keys title, hook, body, cta, fullScript. Write a shootable ${duration}-second script for ${platform}; no inflated viral guarantees, no fake statistics, no generic filler. Make the first line immediately specific. Language: ${stringValue(input.language, "en")}. Tone: ${stringValue(input.tone, "energetic")}. Brand voice: ${stringValue(input.brandVoice, "not supplied")}.`,
-          topic
+          `${SHORT_FORM_STORY_GUIDANCE}\n\n${SCRIPT_WRITING_PACK_GUIDANCE}\nYou are REELassati's senior short-form script editor. Return JSON only. Write a shootable ${duration}-second script for ${platform}; no inflated viral guarantees, no fake statistics, no generic filler. Make the first line immediately specific.`,
+          {
+            topic,
+            duration,
+            platform,
+            language: stringValue(input.language, "en"),
+            tone: stringValue(input.tone, "energetic"),
+            brandVoice: stringValue(input.brandVoice, "not supplied"),
+          }
         );
         const createdAt = new Date().toISOString();
         const hook = stringValue(output.hook);
@@ -5905,6 +5926,11 @@ async function handleAi(
           [hook, body, cta].filter(Boolean).join("\n\n")
         );
         const scriptId = crypto.randomUUID();
+        const writingPack = normalizeScriptWritingPack(
+          output.writingPack,
+          duration,
+          fullScript
+        );
         const canonicalScript: ScriptDraft = {
           id: scriptId,
           title: stringValue(output.title, topic.slice(0, 72)),
@@ -5917,6 +5943,7 @@ async function handleAi(
           duration,
           language: stringValue(input.language, "en"),
           createdAt,
+          ...(writingPack ? { writingPack } : {}),
         };
         const metadata = await scriptProvenanceMetadata(
           canonicalScript,
@@ -6082,7 +6109,10 @@ async function handleAi(
       focus?: string;
     }>(request);
     if (input.publicUrl !== undefined)
-      return errorResponse("Import a direct video file into your private Library, then analyze its owned asset ID. Raw external video URLs are unsupported.", 422);
+      return errorResponse(
+        "Import a direct video file into your private Library, then analyze its owned asset ID. Raw external video URLs are unsupported.",
+        422
+      );
     assertProvenanceConfigured(env);
     if (input.sourceRightsConfirmed !== true) {
       return errorResponse(
@@ -6105,8 +6135,15 @@ async function handleAi(
         return errorResponse("Choose a video asset");
       }
       analysisDuration = await assetDurationSeconds(env, user, row.id);
-      if (!analysisDuration || !Number.isFinite(analysisDuration) || analysisDuration <= 0)
-        return errorResponse("Measure and save the owned video's duration before accepting an analysis quote.", 422);
+      if (
+        !analysisDuration ||
+        !Number.isFinite(analysisDuration) ||
+        analysisDuration <= 0
+      )
+        return errorResponse(
+          "Measure and save the owned video's duration before accepting an analysis quote.",
+          422
+        );
       const analysisRow = input.analysisAssetId
         ? await getAssetRow(env, user, input.analysisAssetId)
         : row;
@@ -6150,7 +6187,9 @@ async function handleAi(
       videoUrl = `data:${mime};base64,${arrayBufferToBase64(analysisBytes)}`;
     }
     if (!videoUrl)
-      return errorResponse("Upload a video to your private Library before analysis.");
+      return errorResponse(
+        "Upload a video to your private Library before analysis."
+      );
 
     await recordComplianceEvent(env, {
       ownerEmail: user.email,
@@ -6225,8 +6264,26 @@ async function handleAi(
         const retention = Array.isArray(output.retention)
           ? output.retention.slice(0, 20).flatMap(item => {
               const row = recordValue(item);
-              if (!row || typeof row.start !== "number" || typeof row.end !== "number" || !Number.isFinite(row.start) || !Number.isFinite(row.end) || row.start < 0 || row.end <= row.start || !analysisDuration || row.end > analysisDuration) return [];
-              return [{ start: row.start, end: row.end, score: boundedNumber(row.score, 50, 0, 100), note: stringValue(row.note, "Review this interval") }];
+              if (
+                !row ||
+                typeof row.start !== "number" ||
+                typeof row.end !== "number" ||
+                !Number.isFinite(row.start) ||
+                !Number.isFinite(row.end) ||
+                row.start < 0 ||
+                row.end <= row.start ||
+                !analysisDuration ||
+                row.end > analysisDuration
+              )
+                return [];
+              return [
+                {
+                  start: row.start,
+                  end: row.end,
+                  score: boundedNumber(row.score, 50, 0, 100),
+                  note: stringValue(row.note, "Review this interval"),
+                },
+              ];
             })
           : [];
         const hook =
@@ -12237,7 +12294,9 @@ async function handleApi(
     if (!operatorOwnerEmail(env) || operatorOwnerEmail(env) !== user.email)
       return errorResponse("Only the studio owner can check services", 403);
     if (request.method !== "POST")
-      return json({ error: "Use POST to check services" }, 405, { Allow: "POST" });
+      return json({ error: "Use POST to check services" }, 405, {
+        Allow: "POST",
+      });
     return json(await serviceDiagnostics(env));
   }
   if (url.pathname === "/api/account/data")

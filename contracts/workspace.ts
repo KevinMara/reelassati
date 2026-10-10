@@ -272,6 +272,7 @@ export interface ScriptDraft {
   tone: string;
   duration: number;
   language: string;
+  writingPack?: import("./script-writing-pack").ScriptWritingPack;
   hookScore?: number;
   createdAt: string;
   provenance?: ContentProvenance;

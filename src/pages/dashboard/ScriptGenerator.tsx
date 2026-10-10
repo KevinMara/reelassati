@@ -1,5 +1,7 @@
 import { ReferenceStylePanel } from "@/components/studio/ReferenceStylePanel";
-import { lazy, useState } from "react";
+import { ScriptWritingPack } from "@/components/studio/ScriptWritingPack";
+import { normalizeScriptWritingPack } from "@contracts/script-writing-pack";
+import { lazy, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -22,8 +24,15 @@ import type {
   ScriptDraft,
   WorkspaceEvent,
 } from "@contracts/workspace";
-import { platformApi } from "@/lib/platform-api";
+import {
+  captureUploadRequestScope,
+  platformApi,
+  verifyUploadRequestScope,
+  type UploadRequestScope,
+} from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import { useAuth } from "@/hooks/useAuth";
+import { selectedBrand } from "@/lib/workspace-scope";
 import { WRITING_LANGUAGES } from "@/lib/languages";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { copyTextWithProvenance } from "@/lib/provenance";
@@ -117,9 +126,51 @@ function createEvent(
 }
 
 function DirectScriptGenerator() {
+  const { user, loading: authLoading } = useAuth();
+  const { workspace, loading } = useWorkspace();
+  if (
+    authLoading ||
+    loading ||
+    !user?.email ||
+    workspace.profile.email.toLowerCase() !== user.email.toLowerCase()
+  )
+    return (
+      <p
+        role="status"
+        className="mx-auto max-w-6xl rounded-xl border border-border bg-surface p-6 text-sm text-foreground/65"
+      >
+        Opening your script workspace…
+      </p>
+    );
+  const contextKey = JSON.stringify([
+    user?.id,
+    user?.email,
+    selectedBrand(user?.email),
+  ]);
+  return <DirectScriptSession key={contextKey} />;
+}
+
+function DirectScriptSession() {
   const [referenceBrief, setReferenceBrief] = useState("");
-  const { workspace, capabilities, loading, saving, updateWorkspace } =
-    useWorkspace();
+  const {
+    workspace,
+    capabilities,
+    loading,
+    saving,
+    updateWorkspace,
+    getWorkspaceSnapshot,
+  } = useWorkspace();
+  const { user } = useAuth();
+  const mounted = useRef(true);
+  const controllerRef = useRef<AbortController | null>(null);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+    };
+  }, []);
   const [searchParams] = useSearchParams();
   const requestedScriptId = searchParams.get("script") ?? "";
   const requestedScript = workspace.scripts.find(
@@ -146,37 +197,102 @@ function DirectScriptGenerator() {
 
   const aiReady = capabilities.ai;
 
-  const saveScript = async (script: ScriptDraft, activityLabel: string) => {
+  function beginTask() {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const expected = {
+      ownerId: user?.id ?? "",
+      ownerEmail: user?.email.toLowerCase() ?? "",
+      brandId: selectedBrand(user?.email),
+    };
+    const visible = () =>
+      mounted.current && controllerRef.current === controller;
+    const current = () => {
+      controller.signal.throwIfAborted();
+      if (
+        !visible() ||
+        !expected.ownerEmail ||
+        getWorkspaceSnapshot().profile.email.toLowerCase() !==
+          expected.ownerEmail ||
+        selectedBrand(expected.ownerEmail) !== expected.brandId
+      )
+        throw new DOMException(
+          "The script task was cancelled because its workspace changed.",
+          "AbortError"
+        );
+    };
+    const authenticate = async () => {
+      current();
+      const scope = await captureUploadRequestScope();
+      current();
+      if (
+        scope.ownerId !== expected.ownerId ||
+        scope.ownerEmail !== expected.ownerEmail ||
+        scope.brandId !== expected.brandId
+      )
+        throw new Error(
+          "Your account or brand changed. Start again in the intended workspace."
+        );
+      return scope;
+    };
+    return { controller, current, visible, authenticate };
+  }
+
+  const saveScript = async (
+    script: ScriptDraft,
+    activityLabel: string,
+    task: { scope: UploadRequestScope; current(): void }
+  ) => {
+    await verifyUploadRequestScope(task.scope);
+    task.current();
     setSaveState("saving");
     try {
-      const savedWorkspace = await updateWorkspace(current => ({
-        ...current,
-        scripts: [
-          script,
-          ...current.scripts.filter(candidate => candidate.id !== script.id),
-        ],
-        activity: [
-          createEvent(
-            "script",
-            activityLabel,
-            `${script.title} · ${script.platform} · ${script.duration}s`
-          ),
-          ...current.activity,
-        ].slice(0, 100),
-      }));
+      const savedWorkspace = await updateWorkspace(current => {
+        task.current();
+        if (current.profile.email.toLowerCase() !== task.scope.ownerEmail)
+          throw new Error(
+            "The destination workspace changed before saving this script."
+          );
+        return {
+          ...current,
+          scripts: [
+            script,
+            ...current.scripts.filter(candidate => candidate.id !== script.id),
+          ],
+          activity: [
+            createEvent(
+              "script",
+              activityLabel,
+              `${script.title} · ${script.platform} · ${script.duration}s`
+            ),
+            ...current.activity,
+          ].slice(0, 100),
+        };
+      });
+      task.current();
       const canonical = savedWorkspace.scripts.find(
         candidate => candidate.id === script.id
       );
       if (canonical) setGeneratedScript(canonical);
       setSaveState("saved");
     } catch (cause) {
+      task.current();
       setSaveState("error");
       throw cause;
     }
   };
 
   const handleGenerate = async () => {
-    if (!topic.trim() || !aiReady || generating) return;
+    if (
+      !topic.trim() ||
+      !aiReady ||
+      generating ||
+      saving ||
+      saveState === "saving"
+    )
+      return;
+    const task = beginTask();
     setGenerating(true);
     setSaveState("idle");
     setError(null);
@@ -200,16 +316,26 @@ function DirectScriptGenerator() {
       .join("\n");
 
     try {
-      const { script } = await platformApi.generateScript({
-        topic: topic.trim(),
-        platform,
-        tone,
-        duration,
-        language,
-        brandVoice: brandInstructions || undefined,
-      });
+      const scope = await task.authenticate();
+      task.current();
+      const { script } = await platformApi.generateScript(
+        {
+          topic: topic.trim(),
+          platform,
+          tone,
+          duration,
+          language,
+          brandVoice: brandInstructions || undefined,
+        },
+        { scope, signal: task.controller.signal }
+      );
+      task.current();
       setGeneratedScript(script);
-      await saveScript(script, "Script generated");
+      await saveScript(script, "Script generated", {
+        scope,
+        current: task.current,
+      });
+      task.current();
       posthog?.capture("script_generated", {
         platform,
         tone,
@@ -218,13 +344,17 @@ function DirectScriptGenerator() {
         used_hook_direction: Boolean(hookDirection.trim()),
       });
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "The script could not be generated."
-      );
+      if (task.visible())
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "The script could not be generated."
+        );
     } finally {
-      setGenerating(false);
+      if (task.visible()) {
+        setGenerating(false);
+        controllerRef.current = null;
+      }
     }
   };
 
@@ -245,14 +375,24 @@ function DirectScriptGenerator() {
   };
 
   const saveEdits = async () => {
-    if (!generatedScript || saving) return;
+    if (!generatedScript || saving || generating) return;
+    const task = beginTask();
     setError(null);
     try {
-      await saveScript(generatedScript, "Script updated");
+      const scope = await task.authenticate();
+      await saveScript(generatedScript, "Script updated", {
+        scope,
+        current: task.current,
+      });
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "The edits could not be saved."
-      );
+      if (task.visible())
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "The edits could not be saved."
+        );
+    } finally {
+      if (task.visible()) controllerRef.current = null;
     }
   };
 
@@ -303,7 +443,7 @@ function DirectScriptGenerator() {
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <ReferenceStylePanel
             purpose="script"
             onChange={setReferenceBrief}
@@ -437,7 +577,14 @@ function DirectScriptGenerator() {
             <button
               type="button"
               onClick={() => void handleGenerate()}
-              disabled={!topic.trim() || generating || loading || !aiReady}
+              disabled={
+                !topic.trim() ||
+                generating ||
+                saving ||
+                saveState === "saving" ||
+                loading ||
+                !aiReady
+              }
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
             >
               {generating ? (
@@ -519,7 +666,7 @@ function DirectScriptGenerator() {
                 key={generatedScript.id}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-xl border border-border bg-surface p-6"
+                className="min-w-0 rounded-xl border border-border bg-surface p-6"
               >
                 <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
@@ -529,6 +676,9 @@ function DirectScriptGenerator() {
                     <div className="min-w-0">
                       <input
                         aria-label="Script title"
+                        disabled={
+                          saving || saveState === "saving" || generating
+                        }
                         value={generatedScript.title}
                         onChange={event =>
                           updateDraft("title", event.target.value)
@@ -590,6 +740,7 @@ function DirectScriptGenerator() {
                     </label>
                     <textarea
                       id="generated-hook"
+                      disabled={saving || saveState === "saving" || generating}
                       value={generatedScript.hook}
                       onChange={event =>
                         updateDraft("hook", event.target.value)
@@ -607,6 +758,7 @@ function DirectScriptGenerator() {
                     </label>
                     <textarea
                       id="generated-body"
+                      disabled={saving || saveState === "saving" || generating}
                       value={generatedScript.body}
                       onChange={event =>
                         updateDraft("body", event.target.value)
@@ -624,6 +776,7 @@ function DirectScriptGenerator() {
                     </label>
                     <textarea
                       id="generated-cta"
+                      disabled={saving || saveState === "saving" || generating}
                       value={generatedScript.cta}
                       onChange={event => updateDraft("cta", event.target.value)}
                       rows={2}
@@ -635,7 +788,7 @@ function DirectScriptGenerator() {
                 <button
                   type="button"
                   onClick={() => void saveEdits()}
-                  disabled={saveState === "saving" || saving}
+                  disabled={saveState === "saving" || saving || generating}
                   className="mt-4 w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
                 >
                   {saveState === "saving" || saving
@@ -660,6 +813,18 @@ function DirectScriptGenerator() {
                     <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </Link>
                 </div>
+                <ScriptWritingPack
+                  pack={normalizeScriptWritingPack(
+                    generatedScript.writingPack,
+                    generatedScript.duration
+                  )}
+                  fullScript={generatedScript.fullScript}
+                  currentHook={generatedScript.hook}
+                  currentCta={generatedScript.cta}
+                  onUseHook={hook => updateDraft("hook", hook)}
+                  onUseCta={cta => updateDraft("cta", cta)}
+                  disabled={saveState === "saving" || saving || generating}
+                />
               </motion.section>
             ) : (
               <motion.section

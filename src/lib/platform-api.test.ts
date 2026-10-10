@@ -303,4 +303,55 @@ describe("platform API transport", () => {
     await expect(platformApi.analyzeVideo({ assetId: "owned", platform: "tiktok", sourceRightsConfirmed: true }, controller.signal, scope)).rejects.toMatchObject({ name: "AbortError" });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it("pins script generation before a delayed requestSession can resolve as another owner", async () => {
+    const scope = await captureUploadRequestScope();
+    let resolveSession!: (value: unknown) => void;
+    vi.spyOn(supabase.auth, "getSession").mockImplementationOnce(() => new Promise(resolve => { resolveSession = resolve; }) as never);
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    const task = platformApi.generateScript({ topic: "Original owner's brief", platform: "tiktok", tone: "professional", duration: 30, language: "en" }, { scope });
+    const result = expect(task).rejects.toMatchObject({ status: 409 });
+    resolveSession({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null });
+    await result;
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["owner", "brand"])("rejects a script response if the %s switches while the provider request is pending", async changed => {
+    const scope = await captureUploadRequestScope();
+    let finish!: (value: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    const task = platformApi.generateScript({ topic: "An owned brief", platform: "instagram", tone: "professional", duration: 30, language: "en" }, { scope });
+    const result = expect(task).rejects.toMatchObject({ status: 409 });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0]).toEqual(["/api/ai/script", expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer test-owner-token", "X-Reelassati-Brand": "default" }) })]);
+    if (changed === "owner")
+      vi.spyOn(supabase.auth, "getSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
+    else vi.stubGlobal("sessionStorage", { getItem: () => "other-brand" });
+    finish(Response.json({ script: { fullScript: "Completed under the original owner" } }));
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry paid script generation as an owner recovered after a rejected token", async () => {
+    const scope = await captureUploadRequestScope();
+    vi.spyOn(supabase.auth, "refreshSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ error: "Expired" }, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(platformApi.generateScript({ topic: "An owned brief", platform: "tiktok", tone: "professional", duration: 30, language: "en" }, { scope })).rejects.toMatchObject({ status: 409 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not return a paid script after component cancellation during response reading", async () => {
+    const scope = await captureUploadRequestScope();
+    const controller = new AbortController();
+    const response = Response.json({ script: { fullScript: "Completed script" } });
+    vi.spyOn(response, "text").mockImplementation(async () => {
+      controller.abort();
+      return JSON.stringify({ script: { fullScript: "Completed script" } });
+    });
+    const fetchMock = vi.fn().mockResolvedValue(response); vi.stubGlobal("fetch", fetchMock);
+    await expect(platformApi.generateScript({ topic: "An owned brief", platform: "tiktok", tone: "professional", duration: 30, language: "en" }, { scope, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
