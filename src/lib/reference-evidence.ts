@@ -75,6 +75,8 @@ export function buildReferenceEvidence(
   )
     throw new Error("The observations belong to a different reference video.");
   const seen = new Set<string>();
+  const captionsSelected = aspects.includes("Caption treatment");
+  const audioSelected = aspects.includes("Music mood and sound placement");
   const observations: ReferenceEvidence["observations"] = [];
   for (const raw of Array.isArray(response.retention)
     ? response.retention.slice(0, 100)
@@ -112,13 +114,17 @@ export function buildReferenceEvidence(
     summary: note(response.summary, "No reference summary was established."),
     observations,
     captions: {
-      presence: presence(review.captions),
-      note: note(review.captionNote, "Caption visibility was not established."),
+      presence: captionsSelected ? presence(review.captions) : "unknown",
+      note: captionsSelected
+        ? note(review.captionNote, "Caption visibility was not established.")
+        : "Caption treatment was not selected for this reference.",
       technicalParameters: "unknown",
     },
     audio: {
-      presence: presence(review.audio),
-      note: note(review.audioNote, "Audio was not assessed."),
+      presence: audioSelected ? presence(review.audio) : "unknown",
+      note: audioSelected
+        ? note(review.audioNote, "Audio was not assessed.")
+        : "Music mood and sound placement were not selected for this reference.",
       technicalParameters: "unknown",
     },
   };

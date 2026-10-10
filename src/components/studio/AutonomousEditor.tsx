@@ -10,14 +10,25 @@ import {
 import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Sparkles, Square } from "lucide-react";
-import type { Asset, EditProject, EditOperation } from "@contracts/workspace";
+import type {
+  Asset,
+  EditProject,
+  EditOperation,
+  WorkspaceDocument,
+} from "@contracts/workspace";
 import {
   AI_CREDIT_COSTS,
   timedCreditCost,
   videoCreditCost,
 } from "@contracts/billing";
 import { useWorkspace } from "@/providers/workspace";
-import { platformApi } from "@/lib/platform-api";
+import {
+  captureUploadRequestScope,
+  platformApi,
+  verifyUploadRequestScope,
+} from "@/lib/platform-api";
+import { selectedBrand } from "@/lib/workspace-scope";
+import { assertAutonomousRunCurrent } from "@/lib/autonomous-run";
 import { applyEditOperation, contentDuration } from "@/lib/edit-timeline";
 
 export function AutonomousEditor({
@@ -27,7 +38,10 @@ export function AutonomousEditor({
   project: EditProject;
   onFinished: () => void;
 }) {
-  const { workspace, updateWorkspace, capabilities } = useWorkspace();
+  const { workspace, getWorkspaceSnapshot, updateWorkspace, capabilities } =
+    useWorkspace();
+  const referenceOwner = workspace.profile.email.toLowerCase();
+  const referenceBrand = selectedBrand(referenceOwner);
   const [style, setStyle] = useState(
     `Clean editorial. ${EDIT_RECIPES["Clean editorial"]}`
   );
@@ -46,11 +60,19 @@ export function AutonomousEditor({
   const [status, setStatus] = useState("");
   const [finished, setFinished] = useState(false);
   const stopped = useRef(false);
-  useEffect(
-    () => () => {
+  const runController = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       stopped.current = true;
-    },
-    []
+      runController.current?.abort();
+    };
+  }, []);
+  useEffect(
+    () => () => runController.current?.abort(),
+    [referenceOwner, referenceBrand, project.id]
   );
   const sources = workspace.assets.filter(
     a =>
@@ -93,21 +115,53 @@ export function AutonomousEditor({
     (!videos || capabilities.videoGeneration);
 
   async function run() {
+    if (runController.current && !runController.current.signal.aborted) return;
     stopped.current = false;
+    const controller = new AbortController();
+    runController.current = controller;
+    const signal = controller.signal;
+    const destination = {
+      ownerEmail: referenceOwner,
+      brandId: referenceBrand,
+      projectId: project.id,
+    };
     setBusy(true);
     setFinished(false);
     setStatus("Examining your footage…");
-    const checkpoint = () => {
-      if (stopped.current)
-        throw new Error(
-          "Stopped. Completed media stays in your Library; the original timeline is intact."
-        );
+    const checkpoint = (
+      current: WorkspaceDocument = getWorkspaceSnapshot()
+    ) => {
+      assertAutonomousRunCurrent(
+        destination,
+        {
+          ownerEmail: current.profile.email.toLowerCase(),
+          brandId: selectedBrand(current.profile.email.toLowerCase()),
+          projectId: project.id,
+          projectExists: current.projects.some(p => p.id === project.id),
+        },
+        signal
+      );
+    };
+    const progress = (stage: string) => {
+      if (!signal.aborted && mounted.current) setStatus(stage);
     };
     let working: EditProject = structuredClone(project);
     const originalClips = JSON.stringify(project.clips);
     const generatedAssets: Asset[] = [];
     const resolvedMedia = new Map<string, string>();
+    let timelineSaveStarted = false;
     try {
+      checkpoint();
+      const scope = await captureUploadRequestScope();
+      checkpoint();
+      if (
+        scope.ownerEmail !== destination.ownerEmail ||
+        scope.brandId !== destination.brandId
+      )
+        throw new Error(
+          "Your account or brand changed before the edit started. Reopen the intended workspace."
+        );
+      const requestOptions = { scope, signal };
       const analysis: Array<{
         assetId: string;
         summary: string;
@@ -120,12 +174,16 @@ export function AutonomousEditor({
         if (asset.kind === "video") {
           setStatus(`Reviewing ${asset.name}…`);
           const { analyzeMedia } = await import("@/lib/analyze-media");
+          checkpoint();
           const result = await analyzeMedia(
             asset,
             project.platform,
             undefined,
-            setStatus
+            progress,
+            signal,
+            scope
           );
+          checkpoint();
           working.sourceReviews = [
             ...(working.sourceReviews ?? []).filter(
               r => r.assetId !== asset.id
@@ -154,12 +212,16 @@ export function AutonomousEditor({
         ) {
           setStatus(`Transcribing ${asset.name}…`);
           const { transcribeMedia } = await import("@/lib/transcribe-media");
+          checkpoint();
           const result = await transcribeMedia(
             asset,
             workspace.profile.contentLanguage,
             project.id,
-            setStatus
+            progress,
+            signal,
+            scope
           );
+          checkpoint();
           if (result.provenance)
             working.transcriptProvenance = result.provenance;
           working.transcript.push(
@@ -174,12 +236,16 @@ export function AutonomousEditor({
         ? contentDuration(working.clips)
         : targetDuration;
       setStatus("Building the cut, pacing, captions, and visual treatment…");
-      const result = await platformApi.generateEditPlan({
-        project: working,
-        command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${plannedDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
-        selectedClipIds: [],
-        range: { start: 0, end: working.duration },
-      });
+      const result = await platformApi.generateEditPlan(
+        {
+          project: working,
+          command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${plannedDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+          selectedClipIds: [],
+          range: { start: 0, end: working.duration },
+        },
+        requestOptions
+      );
+      checkpoint();
       working.proposedChanges = [
         ...working.proposedChanges.filter(c => c.status !== "proposed"),
         ...result.changes,
@@ -198,24 +264,32 @@ export function AutonomousEditor({
         if (op.parameters.mediaKind === "video" && videosUsed < videos) {
           videosUsed++;
           setStatus(`Generating supporting video ${videosUsed}/${videos}…`);
-          const created = await platformApi.createVideo({
-            requestId: createUuid(),
-            assetName: op.label,
-            prompt: op.parameters.prompt,
-            duration: 5,
-            aspectRatio: project.aspectRatio,
-            resolution: "720p",
-            generateAudio: false,
-            projectId: project.id,
-            rightsConfirmed: true,
-            referenceContainsRealPerson: false,
-            realPersonConsentConfirmed: false,
-          });
+          const created = await platformApi.createVideo(
+            {
+              requestId: createUuid(),
+              assetName: op.label,
+              prompt: op.parameters.prompt,
+              duration: 5,
+              aspectRatio: project.aspectRatio,
+              resolution: "720p",
+              generateAudio: false,
+              projectId: project.id,
+              rightsConfirmed: true,
+              referenceContainsRealPerson: false,
+              realPersonConsentConfirmed: false,
+            },
+            requestOptions
+          );
+          checkpoint();
           const deadline = Date.now() + 20 * 60_000;
           while (!asset && Date.now() < deadline) {
             await new Promise(resolve => setTimeout(resolve, 5000));
             checkpoint();
-            const polled = await platformApi.videoJob(created.job.id);
+            const polled = await platformApi.videoJob(
+              created.job.id,
+              requestOptions
+            );
+            checkpoint();
             if (polled.job.status === "failed")
               throw new Error(
                 "A supporting video failed. Completed assets are saved; retry from your Library."
@@ -229,23 +303,33 @@ export function AutonomousEditor({
         } else if (op.parameters.mediaKind !== "video" && imagesUsed < images) {
           imagesUsed++;
           setStatus(`Generating supporting image ${imagesUsed}/${images}…`);
-          asset = await platformApi.generateImage({
-            prompt: op.parameters.prompt,
-            assetName: op.label,
-            aspectRatio: project.aspectRatio,
-            resolution: "1K",
-            rightsConfirmed: true,
-            referenceContainsRealPerson: false,
-            realPersonConsentConfirmed: false,
-          });
+          asset = await platformApi.generateImage(
+            {
+              prompt: op.parameters.prompt,
+              assetName: op.label,
+              aspectRatio: project.aspectRatio,
+              resolution: "1K",
+              rightsConfirmed: true,
+              referenceContainsRealPerson: false,
+              realPersonConsentConfirmed: false,
+            },
+            requestOptions
+          );
+          checkpoint();
         }
         if (asset) {
           generatedAssets.push(asset);
           // Keep the signed AI recommendation immutable; resolve assets only at execution.
-          await updateWorkspace(w => ({
-            ...w,
-            assets: [...w.assets.filter(a => a.id !== asset!.id), asset!],
-          }));
+          await verifyUploadRequestScope(scope);
+          checkpoint();
+          await updateWorkspace(w => {
+            checkpoint(w);
+            return {
+              ...w,
+              assets: [...w.assets.filter(a => a.id !== asset!.id), asset!],
+            };
+          });
+          checkpoint();
           resolvedMedia.set(op.id, asset.id);
         }
       }
@@ -303,75 +387,89 @@ export function AutonomousEditor({
       working.duration = contentDuration(working.clips);
       working.playhead = Math.min(working.playhead ?? 0, working.duration);
       checkpoint();
-      await updateWorkspace(w => ({
-        ...w,
-        projects: w.projects.map(p => {
-          if (p.id !== project.id) return p;
-          if (
-            JSON.stringify(p.clips) !== originalClips ||
-            JSON.stringify(p.transcript) !== JSON.stringify(project.transcript)
-          )
-            throw new Error(
-              "Your timeline changed during the edit. AI media is saved; run again on the current version."
-            );
-          const before = {
-            id: createUuid(),
-            label: "Before autonomous edit",
-            createdAt: new Date().toISOString(),
-            clips: p.clips,
-            transcript: p.transcript,
-            duration: p.duration,
-            captionStyle: p.captionStyle,
-            captionAppearance: p.captionAppearance,
-            aspectRatio: p.aspectRatio,
-            frameRate: p.frameRate,
-            trackSettings: structuredClone(p.trackSettings),
-            transcriptProvenance: p.transcriptProvenance,
-          };
-          const after = {
-            id: createUuid(),
-            label: "Autonomous edit",
-            createdAt: new Date().toISOString(),
-            clips: working.clips,
-            transcript: working.transcript,
-            duration: contentDuration(working.clips),
-            captionStyle: p.captionStyle,
-            captionAppearance: p.captionAppearance,
-            aspectRatio: p.aspectRatio,
-            frameRate: p.frameRate,
-            trackSettings: structuredClone(p.trackSettings),
-          };
-          const hasChanges =
-            JSON.stringify([
-              before.clips,
-              before.transcript,
-              before.duration,
-            ]) !==
-            JSON.stringify([after.clips, after.transcript, after.duration]);
-          return {
-            ...working,
-            updatedAt: new Date().toISOString(),
-            captionStyle: p.captionStyle,
-            captionAppearance: p.captionAppearance,
-            ...(hasChanges
-              ? appendEditorRevisions(p, [before, after], before)
-              : { revisions: p.revisions, revisionIndex: p.revisionIndex }),
-            lastCommand: style,
-          };
-        }),
-      }));
+      await verifyUploadRequestScope(scope);
+      checkpoint();
+      timelineSaveStarted = true;
+      await updateWorkspace(w => {
+        checkpoint(w);
+        return {
+          ...w,
+          projects: w.projects.map(p => {
+            if (p.id !== project.id) return p;
+            if (
+              JSON.stringify(p.clips) !== originalClips ||
+              JSON.stringify(p.transcript) !==
+                JSON.stringify(project.transcript)
+            )
+              throw new Error(
+                "Your timeline changed during the edit. AI media is saved; run again on the current version."
+              );
+            const before = {
+              id: createUuid(),
+              label: "Before autonomous edit",
+              createdAt: new Date().toISOString(),
+              clips: p.clips,
+              transcript: p.transcript,
+              duration: p.duration,
+              captionStyle: p.captionStyle,
+              captionAppearance: p.captionAppearance,
+              aspectRatio: p.aspectRatio,
+              frameRate: p.frameRate,
+              trackSettings: structuredClone(p.trackSettings),
+              transcriptProvenance: p.transcriptProvenance,
+            };
+            const after = {
+              id: createUuid(),
+              label: "Autonomous edit",
+              createdAt: new Date().toISOString(),
+              clips: working.clips,
+              transcript: working.transcript,
+              duration: contentDuration(working.clips),
+              captionStyle: p.captionStyle,
+              captionAppearance: p.captionAppearance,
+              aspectRatio: p.aspectRatio,
+              frameRate: p.frameRate,
+              trackSettings: structuredClone(p.trackSettings),
+            };
+            const hasChanges =
+              JSON.stringify([
+                before.clips,
+                before.transcript,
+                before.duration,
+              ]) !==
+              JSON.stringify([after.clips, after.transcript, after.duration]);
+            return {
+              ...working,
+              updatedAt: new Date().toISOString(),
+              captionStyle: p.captionStyle,
+              captionAppearance: p.captionAppearance,
+              ...(hasChanges
+                ? appendEditorRevisions(p, [before, after], before)
+                : { revisions: p.revisions, revisionIndex: p.revisionIndex }),
+              lastCommand: style,
+            };
+          }),
+        };
+      });
+      checkpoint();
       setFinished(true);
       setStatus(
         `${result.summary}${unresolved.length ? ` ${unresolved.length} suggestions need review in AI assistant.` : ""} Your original edit is available with Undo.`
       );
     } catch (e) {
+      if (!mounted.current || runController.current !== controller) return;
       setStatus(
-        e instanceof Error
-          ? e.message
-          : "The edit could not complete. Your original timeline is preserved."
+        signal.aborted
+          ? `Stopped. Provider work already submitted may still finish in your Library; no further steps will start. ${timelineSaveStarted ? "The timeline save had already started; review your project and use Undo if needed." : "Your original timeline is intact."}`
+          : e instanceof Error
+            ? e.message
+            : "The edit could not complete. Your original timeline is preserved."
       );
     } finally {
-      setBusy(false);
+      if (runController.current === controller) {
+        runController.current = null;
+        if (mounted.current) setBusy(false);
+      }
     }
   }
   return (
@@ -431,21 +529,57 @@ export function AutonomousEditor({
                 key={project.id}
                 projectId={project.id}
                 onChange={brief => {
+                  const current = getWorkspaceSnapshot();
+                  if (
+                    !mounted.current ||
+                    current.profile.email.toLowerCase() !== referenceOwner ||
+                    selectedBrand(referenceOwner) !== referenceBrand ||
+                    !current.projects.some(p => p.id === project.id)
+                  )
+                    return;
                   setReferenceBrief(brief);
-                  void updateWorkspace(w => ({
-                    ...w,
-                    projects: w.projects.map(p =>
-                      p.id === project.id
-                        ? { ...p, referenceStyleBrief: brief }
-                        : p
-                    ),
-                  })).catch(e =>
-                    setStatus(
-                      e instanceof Error
-                        ? e.message
-                        : "Reference direction could not be saved."
+                  void (async () => {
+                    const scope = await captureUploadRequestScope();
+                    if (
+                      scope.ownerEmail !== referenceOwner ||
+                      scope.brandId !== referenceBrand
                     )
-                  );
+                      throw new Error(
+                        "The reference workspace changed. Reopen the intended project."
+                      );
+                    await verifyUploadRequestScope(scope);
+                    await updateWorkspace(w => {
+                      if (
+                        !mounted.current ||
+                        w.profile.email.toLowerCase() !== referenceOwner ||
+                        selectedBrand(referenceOwner) !== referenceBrand ||
+                        !w.projects.some(p => p.id === project.id)
+                      )
+                        throw new Error(
+                          "The reference project changed before saving."
+                        );
+                      return {
+                        ...w,
+                        projects: w.projects.map(p =>
+                          p.id === project.id
+                            ? { ...p, referenceStyleBrief: brief }
+                            : p
+                        ),
+                      };
+                    });
+                  })().catch(e => {
+                    const latest = getWorkspaceSnapshot();
+                    if (
+                      mounted.current &&
+                      latest.profile.email.toLowerCase() === referenceOwner &&
+                      selectedBrand(referenceOwner) === referenceBrand
+                    )
+                      setStatus(
+                        e instanceof Error
+                          ? e.message
+                          : "Reference direction could not be saved."
+                      );
+                  });
                 }}
                 disabled={busy}
               />
@@ -564,11 +698,12 @@ export function AutonomousEditor({
               type="button"
               onClick={() => {
                 stopped.current = true;
+                runController.current?.abort();
               }}
               className="flex items-center gap-2 text-sm"
             >
               <Square className="h-3 w-3" />
-              Stop after current step
+              Stop remaining steps
             </button>
           )}
         </div>

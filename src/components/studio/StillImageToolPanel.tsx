@@ -29,7 +29,8 @@ export function StillImageToolPanel({ projectId, kind }: { projectId: string; ki
   const [preview, setPreview] = useState<Preview | null>(null);
   const [status, setStatus] = useState({ key: "", busy: false, message: "" });
   const operation = useRef<AbortController | null>(null);
-  const contextKey = `${user?.id || ""}:${user?.email || ""}:${selectedBrand(user?.email)}:${projectId}:${sourceId}:${kind}`;
+  const brandId = selectedBrand(user?.email);
+  const contextKey = `${user?.id || ""}:${user?.email || ""}:${brandId}:${projectId}:${sourceId}:${kind}`;
   const images = workspace.assets.filter(asset => asset.kind === "image" && asset.status === "ready");
   const original = images.find(asset => asset.id === sourceId);
   const sourceCurrent = result && original && result.original.id === original.id && result.original.url === original.url && result.original.size === original.size && result.original.createdAt === original.createdAt;
@@ -73,6 +74,9 @@ export function StillImageToolPanel({ projectId, kind }: { projectId: string; ki
       if (original.size > STILL_IMAGE_LIMITS.bytes) throw new Error("Use a PNG, JPEG or WebP image up to 20 MB.");
       const scope = await captureUploadRequestScope();
       controller.signal.throwIfAborted();
+      if (scope.ownerId !== (user.id || user.email.toLowerCase()) || scope.ownerEmail !== user.email.toLowerCase() || scope.brandId !== brandId) {
+        throw new Error("Your account or brand changed. Start again with the current Library image.");
+      }
       assertStillImageContext(getWorkspaceSnapshot(), projectId, original);
       const blob = await platformApi.downloadAssetBlob(original.id, controller.signal, { scope, maxBytes: STILL_IMAGE_LIMITS.bytes });
       const inference = await runStillImageInference(kind, blob, controller.signal, text => {
@@ -136,6 +140,7 @@ export function StillImageToolPanel({ projectId, kind }: { projectId: string; ki
         {images.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
       </select>
       <p className="text-[11px] text-foreground/55">PNG, JPEG or still WebP · up to 20 MB / 4 MP / 4096 px per side.</p>
+      {kind === "depth" ? <p className="text-[11px] text-foreground/55">Relative depth supports aspect ratios from 1:2 to 2:1, including 9:16 and 16:9.</p> : null}
       <button type="button" onClick={() => void analyze()} disabled={!original || busy || !user} className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         {kind === "person" ? "Preview person cutout" : "Preview relative depth"}

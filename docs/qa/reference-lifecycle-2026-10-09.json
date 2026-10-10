@@ -1,0 +1,25 @@
+{
+  "dateUtc": "2026-10-09",
+  "browser": "153.0.8010.0",
+  "fixture": "Actual React panels with isolated authentication/workspace hooks and deferred test-only provider responses",
+  "cases": [
+    "diagnostic starts manually; account switch aborts and ignores a late result",
+    "completed diagnostic clears on email change",
+    "completed diagnostic clears on brand change",
+    "late reference result ignored after explicit cancellation",
+    "late reference result ignored after project change",
+    "late reference result ignored after account change",
+    "late reference result ignored after brand change",
+    "late reference result ignored after unmount",
+    "completed reference retains bound asset and subsecond source clock"
+  ],
+  "externalRequests": 0,
+  "pageErrors": [],
+  "paidProviderCalls": 0,
+  "productionAccountAccess": false,
+  "limits": [
+    "Does not verify live provider generation or funding",
+    "Does not verify a paid owner edit",
+    "Does not recover inaccessible reference media or an unavailable writing guide"
+  ]
+}

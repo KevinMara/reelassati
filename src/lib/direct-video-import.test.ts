@@ -15,7 +15,7 @@ describe("bounded browser video ingestion", () => {
     const video = fakeVideo();
     const fetchMock = vi.fn().mockResolvedValue(new Response(mp4)); vi.stubGlobal("fetch", fetchMock);
     const result = await fetchDirectVideo("https://cdn.test.org/clip.mp4?token=private#fragment");
-    expect(fetchMock).toHaveBeenCalledWith("https://cdn.test.org/clip.mp4?token=private#fragment", expect.objectContaining({ mode: "cors", credentials: "omit", referrerPolicy: "no-referrer", redirect: "error" }));
+    expect(fetchMock).toHaveBeenCalledWith("https://cdn.test.org/clip.mp4?token=private", expect.objectContaining({ mode: "cors", credentials: "omit", referrerPolicy: "no-referrer", redirect: "error" }));
     expect(result).toMatchObject({ duration: 8.125, file: { name: "Imported video.mp4", type: "video/mp4" } });
     expect(result.file.name).not.toContain("private");
     expect(video.removeAttribute).toHaveBeenCalledWith("src");

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
 import { captureUploadRequestScope, verifyUploadRequestScope, platformApi } from "@/lib/platform-api";
+import { selectedBrand } from "@/lib/workspace-scope";
 import { DirectVideoImport } from "./DirectVideoImport";
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { validateFileSelection } from "@/lib/file-validation";
@@ -38,7 +39,10 @@ export function EditorMediaLibrary() {
   const [message, setMessage] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const uploadController = useRef<AbortController | null>(null);
-  useEffect(() => () => uploadController.current?.abort(), []);
+  const uploadGeneration = useRef(0);
+  const owner = workspace.profile.email.toLowerCase();
+  const brand = selectedBrand(owner);
+  useEffect(() => () => { uploadGeneration.current++; uploadController.current?.abort(); }, [owner, brand]);
   const folders = workspace.mediaFolders ?? [];
   const currentFolder = folders.find(f => f.id === folderId);
   const reviewedContent = useMemo(() => {
@@ -105,11 +109,15 @@ export function EditorMediaLibrary() {
       setMessage(checked.error);
       return;
     }
+    const generation = ++uploadGeneration.current;
     await action(async () => {
       uploadController.current?.abort();
       const controller = new AbortController();
       uploadController.current = controller;
       const scope = await captureUploadRequestScope();
+      controller.signal.throwIfAborted();
+      if (scope.ownerEmail !== owner || scope.brandId !== brand || generation !== uploadGeneration.current)
+        throw new Error("The Library workspace changed before uploading.");
       const destination = folderId;
       for (const file of checked.files) {
         controller.signal.throwIfAborted();
@@ -126,25 +134,24 @@ export function EditorMediaLibrary() {
         controller.signal.throwIfAborted();
         await verifyUploadRequestScope(scope);
         // Save the upload before metadata probing, so a failed probe never loses a file.
-        await updateWorkspace(w => ({
-          ...w,
-          assets: [
-            ...w.assets.filter(a => a.id !== asset.id),
-            { ...asset, folderId: destination || undefined },
-          ],
-        }));
+        await updateWorkspace(w => {
+          controller.signal.throwIfAborted();
+          if (generation !== uploadGeneration.current || w.profile.email.toLowerCase() !== scope.ownerEmail || selectedBrand(scope.ownerEmail) !== scope.brandId)
+            throw new Error("The Library workspace changed before saving the upload.");
+          return { ...w, assets: [...w.assets.filter(a => a.id !== asset.id), { ...asset, folderId: destination || undefined }] };
+        });
         const duration = await resolveMediaDuration(asset).catch(
           () => undefined
         );
         controller.signal.throwIfAborted();
         await verifyUploadRequestScope(scope);
         if (duration)
-          await updateWorkspace(w => ({
-            ...w,
-            assets: w.assets.map(a =>
-              a.id === asset.id ? { ...a, duration } : a
-            ),
-          }));
+          await updateWorkspace(w => {
+            controller.signal.throwIfAborted();
+            if (generation !== uploadGeneration.current || w.profile.email.toLowerCase() !== scope.ownerEmail || selectedBrand(scope.ownerEmail) !== scope.brandId)
+              throw new Error("The Library workspace changed before saving the measured duration.");
+            return { ...w, assets: w.assets.map(a => a.id === asset.id ? { ...a, duration } : a) };
+          });
       }
       setMessage(
         "Uploaded to Library. Drag a thumbnail onto the timeline to place it."
@@ -209,7 +216,13 @@ export function EditorMediaLibrary() {
           e.target.value = "";
         }}
       />
-      <DirectVideoImport disabled={busy || !capabilities.uploads} onImported={async asset => { await updateWorkspace(w => ({ ...w, assets: [...w.assets.filter(a => a.id !== asset.id), { ...asset, folderId: folderId || undefined }] })); }} />
+      <DirectVideoImport key={`${owner}:${brand}:${folderId}`} disabled={busy || !capabilities.uploads} onImported={async (asset, scope) => {
+        await updateWorkspace(w => {
+          if (w.profile.email.toLowerCase() !== scope.ownerEmail || selectedBrand(scope.ownerEmail) !== scope.brandId)
+            throw new Error("The Library workspace changed before saving the imported video.");
+          return { ...w, assets: [...w.assets.filter(a => a.id !== asset.id), { ...asset, folderId: folderId || undefined }] };
+        });
+      }} />
       <div className="mb-3 flex flex-wrap gap-2">
         <button
           type="button"

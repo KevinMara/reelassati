@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { Asset } from "@contracts/workspace";
 import { DIRECT_VIDEO_HELP, validateDirectVideoUrl } from "@contracts/public-video";
 import { importDirectVideo } from "@/lib/direct-video-import";
-import { captureUploadRequestScope } from "@/lib/platform-api";
+import { captureUploadRequestScope, verifyUploadRequestScope, type UploadRequestScope } from "@/lib/platform-api";
 
-export function DirectVideoImport({ disabled = false, onImported }: { disabled?: boolean; onImported: (asset: Asset) => Promise<void> | void }) {
+export function DirectVideoImport({ disabled = false, onImported }: { disabled?: boolean; onImported: (asset: Asset, scope: UploadRequestScope) => Promise<void> | void }) {
   const [url, setUrl] = useState("");
   const [rights, setRights] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -26,7 +26,10 @@ export function DirectVideoImport({ disabled = false, onImported }: { disabled?:
       const asset = await importDirectVideo(url, { signal: abort.signal, scope, onProgress: value => { if (generation.current === id) setDetail(value); } });
       abort.signal.throwIfAborted();
       if (generation.current !== id) return;
-      await onImported(asset);
+      await verifyUploadRequestScope(scope);
+      abort.signal.throwIfAborted();
+      if (generation.current !== id) return;
+      await onImported(asset, scope);
       if (generation.current === id) { setUrl(""); setRights(false); setDetail("Video saved to your private Library. It is ready to use."); }
     } catch (error) { if (generation.current === id && !abort.signal.aborted) setDetail(error instanceof Error ? error.message : DIRECT_VIDEO_HELP); }
     finally { if (generation.current === id) { setBusy(false); controller.current = null; } }

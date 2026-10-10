@@ -1,4 +1,11 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   Files,
   Film,
@@ -18,7 +25,12 @@ import {
   speechCreditCost,
   videoCreditCost,
 } from "@contracts/billing";
-import { captureUploadRequestScope, platformApi, verifyUploadRequestScope } from "@/lib/platform-api";
+import {
+  captureUploadRequestScope,
+  platformApi,
+  verifyUploadRequestScope,
+} from "@/lib/platform-api";
+import { selectedBrand } from "@/lib/workspace-scope";
 import { useWorkspace } from "@/providers/workspace";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { GraphicComposer } from "./GraphicComposer";
@@ -29,9 +41,12 @@ import { useEditorGenerations } from "./useEditorGenerations";
 import { VoiceSelector } from "./VoiceSelector";
 import { EditorSoundLibrary } from "./EditorSoundLibrary";
 import { EditorPresetLibrary } from "./EditorPresetLibrary";
-import { GlbModelComposer } from "./GlbModelComposer";
 import { PersonCutoutPanel } from "./PersonCutoutPanel";
 import { ImageDepthPanel } from "./ImageDepthPanel";
+
+const GlbModelComposer = lazy(async () => ({
+  default: (await import("./GlbModelComposer")).GlbModelComposer,
+}));
 
 export type DockKind =
   "library" | "image" | "video" | "audio" | "captions" | "graphics" | "effects";
@@ -55,7 +70,8 @@ export function EditorCreationDock({
   playhead: number;
   onInsert: (asset: Asset) => Promise<void>;
 }) {
-  const { workspace, capabilities, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
+  const { workspace, capabilities, updateWorkspace, getWorkspaceSnapshot } =
+    useWorkspace();
   const generation = useEditorGenerations(project.id);
   const [audioMode, setAudioMode] = useState<"voice" | "sounds">("voice");
   const kind =
@@ -66,10 +82,12 @@ export function EditorCreationDock({
   const [count, setCount] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
-  const [imageMode, setImageMode] = useState<"generate" | "cutout" | "depth">("generate");
-  const [graphicMode, setGraphicMode] = useState<"presets" | "custom" | "model">(
-    "presets"
+  const [imageMode, setImageMode] = useState<"generate" | "cutout" | "depth">(
+    "generate"
   );
+  const [graphicMode, setGraphicMode] = useState<
+    "presets" | "custom" | "model"
+  >("presets");
   const [graphicPreset, setGraphicPreset] = useState<{
     preset: GraphicPreset;
     revision: number;
@@ -79,33 +97,59 @@ export function EditorCreationDock({
   useLayoutEffect(() => {
     activeProject.current = project.id;
     return () => uploadController.current?.abort();
-  }, [project.id, workspace.profile.email]);
+  }, [project.id, workspace.profile.email, activeTool, graphicMode]);
 
-  async function saveModelPose(file: File) {
+  async function prepareModelSave(): Promise<(file: File) => Promise<void>> {
     const targetId = project.id;
-    if (activeProject.current !== targetId) throw new Error("The selected project changed. Save the pose again.");
+    const ownerEmail = workspace.profile.email.toLowerCase();
+    const brandId = selectedBrand(ownerEmail);
+    if (activeProject.current !== targetId)
+      throw new Error("The selected project changed. Save the pose again.");
     uploadController.current?.abort();
     const controller = new AbortController();
     uploadController.current = controller;
     const scope = await captureUploadRequestScope();
+    if (scope.ownerEmail !== ownerEmail || scope.brandId !== brandId)
+      throw new Error(
+        "The account or brand changed. Save the pose again in the intended workspace."
+      );
     const assertTarget = () => {
       controller.signal.throwIfAborted();
       const latest = getWorkspaceSnapshot();
-      if (activeProject.current !== targetId || latest.profile.email.toLowerCase() !== scope.ownerEmail || !latest.projects.some(p => p.id === targetId))
-        throw new Error("The workspace or project changed. Save the pose again.");
+      if (
+        activeProject.current !== targetId ||
+        latest.profile.email.toLowerCase() !== scope.ownerEmail ||
+        !latest.projects.some(p => p.id === targetId)
+      )
+        throw new Error(
+          "The workspace or project changed. Save the pose again."
+        );
     };
-    try {
-      assertTarget();
-      const asset = await platformApi.uploadAsset(file, "image", undefined, targetId, { scope, signal: controller.signal });
-      await verifyUploadRequestScope(scope);
-      assertTarget();
-      await updateWorkspace(current => {
+    assertTarget();
+    return async (file: File) => {
+      try {
         assertTarget();
-        return { ...current, assets: [...current.assets.filter(a => a.id !== asset.id), asset] };
-      });
-    } finally {
-      if (uploadController.current === controller) uploadController.current = null;
-    }
+        const asset = await platformApi.uploadAsset(
+          file,
+          "image",
+          undefined,
+          targetId,
+          { scope, signal: controller.signal }
+        );
+        await verifyUploadRequestScope(scope);
+        assertTarget();
+        await updateWorkspace(current => {
+          assertTarget();
+          return {
+            ...current,
+            assets: [...current.assets.filter(a => a.id !== asset.id), asset],
+          };
+        });
+      } finally {
+        if (uploadController.current === controller)
+          uploadController.current = null;
+      }
+    };
   }
   const prompt =
     kind === "video" || kind === "image" || kind === "voice"
@@ -266,32 +310,49 @@ export function EditorCreationDock({
           </div>
         )}
         {activeTool === "image" && (
-          <div role="group" aria-label="Image tools" className="mb-4 grid grid-cols-3 gap-1 rounded-lg bg-background p-1">
+          <div
+            role="group"
+            aria-label="Image tools"
+            className="mb-4 grid grid-cols-3 gap-1 rounded-lg bg-background p-1"
+          >
             {(["generate", "cutout", "depth"] as const).map(mode => (
-              <button type="button" key={mode} aria-pressed={imageMode === mode} onClick={() => setImageMode(mode)} className={`rounded-md px-2 py-2 text-xs ${imageMode === mode ? "bg-primary/15 text-primary" : "text-foreground/65"}`}>
-                {mode === "generate" ? "Generate" : mode === "cutout" ? "Person cutout" : "Image depth"}
+              <button
+                type="button"
+                key={mode}
+                aria-pressed={imageMode === mode}
+                onClick={() => setImageMode(mode)}
+                className={`rounded-md px-2 py-2 text-xs ${imageMode === mode ? "bg-primary/15 text-primary" : "text-foreground/65"}`}
+              >
+                {mode === "generate"
+                  ? "Generate"
+                  : mode === "cutout"
+                    ? "Person cutout"
+                    : "Image depth"}
               </button>
             ))}
           </div>
         )}
-        {onAssist && activeTool !== "captions" && !(activeTool === "image" && imageMode !== "generate") && !(activeTool === "graphics" && graphicMode === "model") && (
-          <button
-            type="button"
-            onClick={() =>
-              onAssist(
-                kind === "library"
-                  ? "Recommend existing library shots to support this edit, using actual filenames."
-                  : kind === "graphics"
-                    ? "Propose executable graphic operations for this footage: editable text, callouts, counters, countdowns, arrows or highlights. Base numbers on supplied facts; use observed timestamps and keep faces and captions clear."
-                    : `Suggest the best ${kind === "voice" ? "voiceover text and delivery" : kind === "audio" ? "music and sound design" : `${kind} generation prompt`} for this edit. Provide a usable prompt in the summary; do not generate media.`
-              )
-            }
-            className="ai-magic mb-4 inline-flex items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-xs text-primary"
-          >
-            Ask Reel for suggestions
-            <WandSparkles size={14} />
-          </button>
-        )}
+        {onAssist &&
+          activeTool !== "captions" &&
+          !(activeTool === "image" && imageMode !== "generate") &&
+          !(activeTool === "graphics" && graphicMode === "model") && (
+            <button
+              type="button"
+              onClick={() =>
+                onAssist(
+                  kind === "library"
+                    ? "Recommend existing library shots to support this edit, using actual filenames."
+                    : kind === "graphics"
+                      ? "Propose executable graphic operations for this footage: editable text, callouts, counters, countdowns, arrows or highlights. Base numbers on supplied facts; use observed timestamps and keep faces and captions clear."
+                      : `Suggest the best ${kind === "voice" ? "voiceover text and delivery" : kind === "audio" ? "music and sound design" : `${kind} generation prompt`} for this edit. Provide a usable prompt in the summary; do not generate media.`
+                )
+              }
+              className="ai-magic mb-4 inline-flex items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-xs text-primary"
+            >
+              Ask Reel for suggestions
+              <WandSparkles size={14} />
+            </button>
+          )}
         {kind === "captions" ? (
           captions
         ) : kind === "library" ? (
@@ -315,7 +376,12 @@ export function EditorCreationDock({
               >
                 Customize
               </button>
-              <button type="button" aria-pressed={graphicMode === "model"} onClick={() => setGraphicMode("model")} className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "model" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}>
+              <button
+                type="button"
+                aria-pressed={graphicMode === "model"}
+                onClick={() => setGraphicMode("model")}
+                className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "model" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
+              >
                 3D pose
               </button>
             </div>
@@ -331,7 +397,21 @@ export function EditorCreationDock({
                 }}
               />
             )}
-            {graphicMode === "model" && <GlbModelComposer key={project.id} onSave={saveModelPose} />}
+            {graphicMode === "model" && (
+              <Suspense
+                fallback={
+                  <p role="status" className="text-sm text-foreground/65">
+                    Loading 3D pose tools…
+                  </p>
+                }
+              >
+                <GlbModelComposer
+                  key={project.id}
+                  prepareSave={prepareModelSave}
+                  onSave={async file => (await prepareModelSave())(file)}
+                />
+              </Suspense>
+            )}
             <div hidden={graphicMode !== "custom"}>
               {graphicPreset && (
                 <div className="flex items-center justify-between gap-2 text-xs">

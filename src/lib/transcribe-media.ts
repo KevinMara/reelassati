@@ -1,6 +1,10 @@
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import type { Asset } from "@contracts/workspace";
-import { platformApi } from "./platform-api";
+import {
+  captureUploadRequestScope,
+  platformApi,
+  type UploadRequestScope,
+} from "./platform-api";
 
 /** Decode speech separately; the original video is never resized or re-encoded. */
 export async function transcribeMedia(
@@ -8,8 +12,10 @@ export async function transcribeMedia(
   language: string | undefined,
   projectId: string,
   onProgress?: (stage: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  requestScope?: UploadRequestScope
 ) {
+  const scope = requestScope ?? (await captureUploadRequestScope());
   const ffmpeg = new FFmpeg();
   const temporary: string[] = [];
   let wasmUrl = "";
@@ -32,7 +38,10 @@ export async function transcribeMedia(
       coreURL: new URL("/vendor/render/core.js", location.origin).href,
       wasmURL: wasmUrl,
     });
-    const source = await platformApi.downloadAssetBlob(asset.id, signal);
+    signal?.throwIfAborted();
+    const source = await platformApi.downloadAssetBlob(asset.id, signal, {
+      scope,
+    });
     await ffmpeg.createDir("/source");
     await ffmpeg.mount(
       FFFSType.WORKERFS,
@@ -85,7 +94,14 @@ export async function transcribeMedia(
         `Caption source ${index + 1}.wav`,
         { type: "audio/wav" }
       );
-      const uploaded = await platformApi.uploadAsset(file, "audio");
+      signal?.throwIfAborted();
+      const uploaded = await platformApi.uploadAsset(
+        file,
+        "audio",
+        undefined,
+        undefined,
+        { scope, signal }
+      );
       temporary.push(uploaded.id);
       if (data.length < 600 * 16000 * 2) break;
     }
@@ -97,12 +113,15 @@ export async function transcribeMedia(
       asset.id,
       language,
       projectId,
-      temporary
+      temporary,
+      { scope, signal }
     );
   } finally {
     signal?.removeEventListener("abort", cancel);
     ffmpeg.terminate();
     if (wasmUrl) URL.revokeObjectURL(wasmUrl);
-    await Promise.allSettled(temporary.map(id => platformApi.deleteAsset(id)));
+    await Promise.allSettled(
+      temporary.map(id => platformApi.deleteAsset(id, scope))
+    );
   }
 }

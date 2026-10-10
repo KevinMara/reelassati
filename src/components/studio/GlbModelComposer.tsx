@@ -2,8 +2,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import { DEFAULT_GLB_POSE, createGlbPoseRenderer, type GlbPose, type GlbPoseRenderer } from "@/lib/glb-renderer";
 import { GLB_LIMITS } from "@/lib/glb-validation";
 
-export function GlbModelComposer({ onSave, disabled = false }: {
+export function GlbModelComposer({ onSave, prepareSave, disabled = false }: {
   onSave(file: File): Promise<void>;
+  /** Capture the upload owner/workspace at the click boundary, before PNG encoding. */
+  prepareSave?(): Promise<(file: File) => Promise<void>>;
   disabled?: boolean;
 }) {
   const id = useId();
@@ -87,7 +89,13 @@ export function GlbModelComposer({ onSave, disabled = false }: {
             if (!renderer) return;
             const operation = operationRef.current;
             setSaving(true); setError("");
-            void renderer.png().then(blob => onSave(new File([blob], `${model.name.replace(/[^a-z0-9._-]+/gi, "-").slice(0, 100) || "model"}-pose.png`, { type: "image/png" })))
+            void (async () => {
+              const save = prepareSave ? await prepareSave() : onSave;
+              if (operation !== operationRef.current) return;
+              const blob = await renderer.png();
+              if (operation !== operationRef.current) return;
+              await save(new File([blob], `${model.name.replace(/[^a-z0-9._-]+/gi, "-").slice(0, 100) || "model"}-pose.png`, { type: "image/png" }));
+            })()
               .then(() => { if (operation === operationRef.current) setSaved(true); })
               .catch(cause => { if (operation === operationRef.current) setError(cause instanceof Error ? cause.message : "Could not save this pose."); })
               .finally(() => { if (operation === operationRef.current) setSaving(false); });

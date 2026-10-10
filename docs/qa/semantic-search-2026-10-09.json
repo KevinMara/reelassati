@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-09",
+  "environment": "Isolated local HTTP fixture; no signed-in production session",
+  "browser": "Chromium 153.0.8010.0",
+  "worker": "Actual src/workers/semantic-search.worker.ts bundled as browser ESM",
+  "client": "Actual SemanticFootageSearchClient bundled with the same source",
+  "model": {
+    "id": "Xenova/all-MiniLM-L6-v2",
+    "revision": "751bff37182d3f1213fa05d7196b954e230abad9",
+    "dtype": "q8",
+    "device": "wasm",
+    "bytes": 22972370,
+    "sha256": "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1"
+  },
+  "runtime": {
+    "transformers": "3.8.1",
+    "onnxruntime": "1.22.0-dev.20250409-89f8206ba4",
+    "wasmThreads": 1,
+    "javascriptBundle": "transformers.min.js",
+    "javascriptBytes": 888173,
+    "javascriptSha256": "aa5002b70e789798da263f5f99c62bd3e8fcd0c119258a493c40c180648365fa",
+    "wasmBytes": 21596019,
+    "wasmSha256": "c46655e8a94afc45338d4cb2b840475f88e5012d524509916e505079c00bfa39"
+  },
+  "evidence": [
+    "A person sips a hot cup of coffee.",
+    "The white dog plays fetch outside.",
+    "Someone types on a laptop computer at a desk."
+  ],
+  "queries": [
+    {
+      "text": "Somebody enjoys a warm beverage.",
+      "cosineSimilarities": [
+        0.6863217646638382, 0.1339025239048806, 0.22187463727218137
+      ],
+      "firstSearchMilliseconds": 1023.6000000014901
+    },
+    {
+      "text": "A pet runs after a thrown ball.",
+      "cosineSimilarities": [
+        0.006459026002954744, 0.40284346322178227, 0.03814214695112461
+      ]
+    },
+    {
+      "text": "A person is working on a computer.",
+      "evidenceOrder": [2, 0, 1],
+      "cosineSimilarities": [
+        0.796716640665434, 0.27168880208137436, 0.022377305449404715
+      ]
+    }
+  ],
+  "cancellation": {
+    "pendingPromise": "Rejected with AbortError",
+    "restart": "A new worker with reordered evidence produced the third query results",
+    "workersCreated": 3
+  },
+  "bounds": {
+    "excerpts": 256,
+    "excerptCharacters": 512,
+    "dimension": 384,
+    "batchSize": 8,
+    "minimumSimilarity": 0.28,
+    "results": 50,
+    "257Excerpts": "Rejected",
+    "513CharacterExcerpt": "Rejected"
+  },
+  "network": {
+    "externalRequests": 0,
+    "methods": ["GET"],
+    "resources": [
+      "/",
+      "/search-client.js",
+      "/semantic-worker.js",
+      "/vendor/search/transformers.js",
+      "/vendor/search/Xenova/all-MiniLM-L6-v2/tokenizer.json",
+      "/vendor/search/Xenova/all-MiniLM-L6-v2/tokenizer_config.json",
+      "/vendor/search/Xenova/all-MiniLM-L6-v2/config.json",
+      "/vendor/search/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx",
+      "/vendor/search/ort/ort-wasm-simd-threaded.jsep.mjs",
+      "/vendor/search/ort/ort-wasm-simd-threaded.jsep.wasm"
+    ]
+  },
+  "errors": [],
+  "focusedTests": {
+    "filesPassed": 3,
+    "testsPassed": 19,
+    "includesRealCpuModel": true
+  },
+  "checks": {
+    "focusedEslint": "Passed",
+    "changedScriptAndDocumentationFormatting": "Passed"
+  },
+  "limits": "Local model verification only; production account/provider verification is separate. Cosine similarity is not a calibrated confidence or verified scene observation."
+}

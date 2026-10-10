@@ -1,0 +1,173 @@
+{
+  "width": 402,
+  "height": 512,
+  "person": {
+    "milliseconds": 837.2000000029802,
+    "foregroundAlpha": 255,
+    "backgroundAlpha": 0,
+    "visibleFraction": 0.4093011504975124,
+    "thresholdChangedPixels": 11596,
+    "unchangedRgb": true
+  },
+  "depth": {
+    "milliseconds": 4634.10000000149,
+    "repeatMilliseconds": 4692.5999999940395,
+    "flipMilliseconds": 4890.30000000447,
+    "min": 0,
+    "max": 255,
+    "repeatChangedPixels": 0,
+    "flipDirectMeanAbsoluteDifference": 50.65478758550995,
+    "flipMirroredMeanAbsoluteDifference": 6.065128459266169,
+    "faceMean": 108.76478632478633,
+    "backgroundMean": 19.235555555555557
+  },
+  "externalRequests": [],
+  "errors": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/rendering.js"
+    },
+    {
+      "method": "GET",
+      "path": "/nasa-armstrong.png"
+    },
+    {
+      "method": "GET",
+      "path": "/still.worker.js"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/transformers.js"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/person/onnx-community/mediapipe_selfie_segmentation/config.json"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/person/onnx-community/mediapipe_selfie_segmentation/preprocessor_config.json"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/person/onnx-community/mediapipe_selfie_segmentation/config.json"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/person/onnx-community/mediapipe_selfie_segmentation/onnx/model.onnx"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/ort/ort-wasm-simd-threaded.jsep.mjs"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/ort/ort-wasm-simd-threaded.jsep.wasm"
+    },
+    {
+      "method": "GET",
+      "path": "/still.worker.js"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/transformers.js"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/config.json"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/preprocessor_config.json"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/onnx/model_quantized.onnx.part0"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/onnx/model_quantized.onnx.part1"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/ort/ort-wasm-simd-threaded.jsep.mjs"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/ort/ort-wasm-simd-threaded.jsep.wasm"
+    },
+    {
+      "method": "GET",
+      "path": "/still.worker.js"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/transformers.js"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/config.json"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/preprocessor_config.json"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/onnx/model_quantized.onnx.part0"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/onnx/model_quantized.onnx.part1"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/ort/ort-wasm-simd-threaded.jsep.mjs"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/ort/ort-wasm-simd-threaded.jsep.wasm"
+    },
+    {
+      "method": "GET",
+      "path": "/still.worker.js"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/transformers.js"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/config.json"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/preprocessor_config.json"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/onnx/model_quantized.onnx.part0"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/depth/onnx-community/depth-anything-v2-small/onnx/model_quantized.onnx.part1"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/ort/ort-wasm-simd-threaded.jsep.mjs"
+    },
+    {
+      "method": "GET",
+      "path": "/vendor/search/ort/ort-wasm-simd-threaded.jsep.wasm"
+    }
+  ],
+  "fixtureSource": "https://www.nasa.gov/image-article/official-portrait-of-neil-armstrong/",
+  "fixtureImage": "https://www.nasa.gov/wp-content/uploads/2023/03/464436main_S69-31741_full.jpg",
+  "runtime": "Chromium 153; Transformers 3.8.1; WASM execution provider; one thread",
+  "personModelSha256": "3241ac4ad8aa35bdaf33946776db29f7c283a413aa0b0dacb9483594b4531aad",
+  "depthModelSha256": "fcf51f1b230362b28690bb9d1809bf0431f29cad20534e3f589bd7285547f20d"
+}

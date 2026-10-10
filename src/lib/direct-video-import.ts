@@ -43,6 +43,7 @@ export async function fetchDirectVideo(value: string, signal?: AbortSignal, onPr
   const error = validateDirectVideoUrl(value);
   if (error) throw new Error(error);
   const url = new URL(value.trim());
+  url.hash = "";
   const timeout = AbortSignal.timeout(PUBLIC_VIDEO_TIMEOUT_MS);
   const boundedSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   boundedSignal.throwIfAborted();

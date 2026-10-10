@@ -106,7 +106,7 @@ describe("reference source evidence", () => {
           volume: 0.8,
         },
       },
-      aspects
+      [...aspects, "Music mood and sound placement"]
     );
     expect(evidence.captions).toEqual({
       presence: "present",
@@ -119,6 +119,24 @@ describe("reference source evidence", () => {
       technicalParameters: "unknown",
     });
     expect(JSON.stringify(evidence)).not.toContain("Invented font");
+  });
+  it("does not carry deselected caption or audio observations into the brief", () => {
+    const evidence = buildReferenceEvidence(
+      source,
+      {
+        review: {
+          captions: "present",
+          captionNote: "Large yellow captions",
+          audio: "present",
+          audioNote: "Percussion accent",
+        },
+      },
+      ["Cut pacing"]
+    );
+    expect(evidence.captions.presence).toBe("unknown");
+    expect(evidence.audio.presence).toBe("unknown");
+    expect(referenceEvidenceBrief(evidence)).not.toContain("Large yellow");
+    expect(referenceEvidenceBrief(evidence)).not.toContain("Percussion accent");
   });
   it("requires measured duration and source-bound analysis", () => {
     for (const duration of [0, -1, Infinity, NaN])

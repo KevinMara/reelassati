@@ -24,6 +24,7 @@ import {
 } from "@contracts/editor-chat";
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 import { normalizeReview } from "@contracts/source-review";
+import { selectedBrand } from "@/lib/workspace-scope";
 import { useWorkspace } from "@/providers/workspace";
 import { platformApi, captureUploadRequestScope, verifyUploadRequestScope } from "@/lib/platform-api";
 import {
@@ -67,6 +68,8 @@ export function useEditorChat(
   { onSeek }: { onSeek: (time: number) => void }
 ) {
   const { workspace, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
+  const owner = workspace.profile.email.toLowerCase();
+  const brand = selectedBrand(owner);
   const stopRequested = useRef(false);
   const mediaController = useRef<AbortController | null>(null);
   const resultChecks = useRef(new Set<string>());
@@ -92,7 +95,11 @@ export function useEditorChat(
   async function save(transform: (w: WorkspaceDocument) => WorkspaceDocument) {
     // The provider owns the only optimistic snapshot and mutation counter.
     // A returned durable response may be older than a concurrent manual edit.
-    return updateWorkspace(transform);
+    return updateWorkspace(current => {
+      if (current.profile.email.toLowerCase() !== owner || selectedBrand(owner) !== brand || !current.projects.some(p => p.id === project.id))
+        throw new Error("The chat workspace changed. Reopen the intended project before continuing.");
+      return transform(current);
+    });
   }
   async function changeChat(
     transform: (state: EditorChatState) => EditorChatState
@@ -151,7 +158,7 @@ export function useEditorChat(
       mediaController.current?.abort();
       queue.clear();
     };
-  }, [project.id]);
+  }, [project.id, owner, brand]);
 
   useEffect(() => {
     if (busy || activeProjects.has(project.id)) return;
@@ -1191,6 +1198,11 @@ export function useEditorChat(
       }));
       references.push({ assetId: asset.id });
     }
+    controller.signal.throwIfAborted();
+    await verifyUploadRequestScope(scope);
+    const current = getWorkspaceSnapshot();
+    if (current.profile.email.toLowerCase() !== owner || selectedBrand(owner) !== brand || !current.projects.some(p => p.id === project.id))
+      throw new Error("The attachment project changed before the references were ready.");
     return references;
   }
   return {

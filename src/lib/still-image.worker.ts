@@ -1,6 +1,6 @@
-import { env, pipeline, RawImage } from "@huggingface/transformers";
-import { inspectStillImage, assertStillImageDimensions } from "./still-image-bounds";
+import { inspectStillImage, assertStillImageDimensions, assertDepthImageDimensions } from "./still-image-bounds";
 import { DEPTH_MODEL, PERSON_MODEL, imageModelCache } from "./still-image-models";
+import { loadLocalTransformers } from "./local-transformers";
 
 export type StillImageTool = "person" | "depth";
 interface InferenceRequest { kind: StillImageTool; blob: Blob }
@@ -11,27 +11,17 @@ const runtime = globalThis as unknown as {
   postMessage: (message: unknown, transfer?: Transferable[]) => void;
 };
 
-env.allowRemoteModels = false;
-env.allowLocalModels = true;
-env.useBrowserCache = false;
-env.useFSCache = false;
-env.useCustomCache = true;
-env.customCache = imageModelCache(runtime.location.origin);
-if (env.backends.onnx.wasm) {
-  env.backends.onnx.wasm.wasmPaths = "/vendor/search/ort/";
-  env.backends.onnx.wasm.numThreads = 1;
-  env.backends.onnx.wasm.proxy = false;
-}
-
 runtime.onmessage = async event => {
   let bitmap: ImageBitmap | undefined;
   try {
     const { kind, blob } = event.data;
     if (kind !== "person" && kind !== "depth") throw new Error("Unknown still-image tool.");
-    await inspectStillImage(blob);
+    const header = await inspectStillImage(blob);
+    if (kind === "depth") assertDepthImageDimensions(header.width, header.height);
     bitmap = await createImageBitmap(blob);
     const { width, height } = bitmap;
     assertStillImageDimensions(width, height);
+    if (kind === "depth") assertDepthImageDimensions(width, height);
     const canvas = new OffscreenCanvas(width, height);
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("Still-image decoding is unavailable in this browser.");
@@ -39,6 +29,18 @@ runtime.onmessage = async event => {
     bitmap.close();
     bitmap = undefined;
     const rgba = context.getImageData(0, 0, width, height).data;
+    const { env, pipeline, RawImage } = await loadLocalTransformers();
+    env.allowRemoteModels = false;
+    env.allowLocalModels = true;
+    env.useBrowserCache = false;
+    env.useFSCache = false;
+    env.useCustomCache = true;
+    env.customCache = imageModelCache(runtime.location.origin);
+    if (env.backends.onnx.wasm) {
+      env.backends.onnx.wasm.wasmPaths = "/vendor/search/ort/";
+      env.backends.onnx.wasm.numThreads = 1;
+      env.backends.onnx.wasm.proxy = false;
+    }
     const image = new RawImage(new Uint8ClampedArray(rgba), width, height, 4);
     runtime.postMessage({ type: "progress", message: "Loading the local image model…" });
     let values: Uint8Array;

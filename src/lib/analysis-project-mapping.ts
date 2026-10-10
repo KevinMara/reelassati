@@ -6,9 +6,9 @@ const EPSILON = 0.000001;
 function validSpan(start: number, end: number, duration: number) {
   return Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start && end <= duration + EPSILON;
 }
-function sourceSpan(clip: TimelineClip) {
+function sourceSpan(clip: TimelineClip, sourceDuration?: number) {
   const speed = clip.speed ?? 1;
-  if (!Number.isFinite(speed) || speed < 0.25 || speed > 4 || !Number.isFinite(clip.inPoint) || clip.inPoint < 0 || !Number.isFinite(clip.duration) || clip.duration <= 0 || !Number.isFinite(clip.start) || clip.start < 0 || Math.abs(clip.outPoint - clip.inPoint - clip.duration * speed) > 0.001)
+  if (!Number.isFinite(speed) || speed < 0.25 || speed > 4 || !Number.isFinite(clip.inPoint) || clip.inPoint < 0 || !Number.isFinite(clip.duration) || clip.duration <= 0 || !Number.isFinite(clip.start) || clip.start < 0 || !Number.isFinite(clip.outPoint) || (sourceDuration !== undefined && clip.outPoint > sourceDuration + EPSILON) || Math.abs(clip.outPoint - clip.inPoint - clip.duration * speed) > 0.001)
     throw new Error("The analyzed source has an invalid timeline clock. Repair its trim before queueing analysis.");
   return { start: clip.inPoint, end: clip.inPoint + clip.duration * speed, speed };
 }
@@ -24,10 +24,11 @@ export function mapSourceAnalysisToProject(project: EditProject, source: { id: s
   if (!Number.isFinite(source.duration) || source.duration <= 0) throw new Error("Measure the analyzed source duration before queueing changes.");
   const clips = project.clips.filter(c => c.assetId === source.id && clipLaneKind(c) === "video" && !c.transitionHandle);
   if (!clips.length) throw new Error("This project does not contain the analyzed video. Add that exact source to its timeline first.");
+  clips.forEach(clip => sourceSpan(clip, source.duration));
   const changes: EditOperation[] = [], signals: QualitySignal[] = [], rejected: string[] = [];
   for (const change of analysis.changes) {
     if (!validSpan(change.start, change.end, source.duration)) { rejected.push(`${change.label}: invalid source interval`); continue; }
-    if (["silence", "move"].includes(change.type) || (change.type === "graphic" && change.parameters?.graphicMode !== "create")) {
+    if (["silence", "move", "broll"].includes(change.type) || (change.type === "graphic" && change.parameters?.graphicMode !== "create")) {
       rejected.push(`${change.label}: this operation needs an explicit timeline decision`); continue;
     }
     for (const clip of clips) {

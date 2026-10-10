@@ -25,6 +25,13 @@ export function assertStillImageDimensions(width: number, height: number) {
   }
 }
 
+export function assertDepthImageDimensions(width: number, height: number) {
+  assertStillImageDimensions(width, height);
+  if (Math.max(width / height, height / width) > 2) {
+    throw new Error("Relative depth supports still images with an aspect ratio between 1:2 and 2:1.");
+  }
+}
+
 export function inspectStillImageHeader(bytes: Uint8Array): StillImageSize {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const ascii = (offset: number, text: string) =>

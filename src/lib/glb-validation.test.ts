@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { GLB_LIMITS, validateStaticGlb } from "./glb-validation";
 import { DEFAULT_GLB_POSE, normalizeGlbPose } from "./glb-renderer";
 
-function fixture(change?: (document: ReturnType<typeof documentFixture>, binary: Uint8Array) => void): ArrayBuffer {
+function fixture(change?: (document: ReturnType<typeof documentFixture>, binary: Uint8Array) => void, extraBytes = 0): ArrayBuffer {
   const document = documentFixture();
-  const binary = new Uint8Array(44);
+  const binary = new Uint8Array(44 + extraBytes);
+  if (extraBytes) document.buffers[0].byteLength = binary.length;
   new Float32Array(binary.buffer, 0, 9).set([-1, -1, 0, 1, -1, 0, 0, 1, 0]);
   new Uint16Array(binary.buffer, 36, 3).set([0, 1, 2]);
   change?.(document, binary);
@@ -116,6 +117,31 @@ describe("bounded static GLB validation", () => {
     expect(() => validateStaticGlb(fixture(doc => { doc.textures = [{ source: 99 }]; }))).toThrow(/Texture image/);
     expect(() => validateStaticGlb(fixture(doc => { doc.materials = [{ pbrMetallicRoughness: { baseColorTexture: { index: 99 } } }]; }))).toThrow(/texture index/);
     expect(() => validateStaticGlb(fixture(doc => { doc.meshes[0].primitives[0].material = 99; }))).toThrow(/Primitive material/);
+  });
+  it("rejects oversized decoded textures using headers before image decoding", () => {
+    const pngHeader = (bytes: Uint8Array, width: number, height: number) => {
+      const view = new DataView(bytes.buffer, 44);
+      for (const [offset, value] of [[0, 0x89504e47], [4, 0x0d0a1a0a], [8, 13], [12, 0x49484452], [16, width], [20, height]])
+        view.setUint32(offset, value);
+    };
+    expect(() => validateStaticGlb(fixture((doc, bytes) => {
+      doc.bufferViews.push({ buffer: 0, byteOffset: 44, byteLength: 36 });
+      doc.images = [{ bufferView: 2, mimeType: "image/png" }];
+      pngHeader(bytes, 4097, 1);
+    }, 36))).toThrow(/4096-pixel/);
+    expect(() => validateStaticGlb(fixture((doc, bytes) => {
+      doc.bufferViews.push({ buffer: 0, byteOffset: 44, byteLength: 36 });
+      doc.images = Array.from({ length: 3 }, () => ({ bufferView: 2, mimeType: "image/png" }));
+      pngHeader(bytes, 4096, 4096);
+    }, 36))).toThrow(/decoded image budget/);
+  });
+  it("rejects extreme transforms, normalized triangle indices and mixed matrix/TRS", () => {
+    expect(() => validateStaticGlb(fixture(doc => { doc.nodes[0].translation = [1e10, 0, 0]; }))).toThrow(/bounded/);
+    expect(() => validateStaticGlb(fixture(doc => { doc.accessors[1].normalized = true; }))).toThrow(/unsigned scalar/);
+    expect(() => validateStaticGlb(fixture(doc => {
+      doc.nodes[0].matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+      doc.nodes[0].translation = [0, 0, 0];
+    }))).toThrow(/mix matrix/);
   });
 });
 

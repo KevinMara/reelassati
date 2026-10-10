@@ -6,6 +6,7 @@ import type {
 } from "@contracts/service-diagnostics";
 import { captureUploadRequestScope, platformApi } from "@/lib/platform-api";
 import { useAuth } from "@/hooks/useAuth";
+import { selectedBrand } from "@/lib/workspace-scope";
 
 const statusLabels: Record<AiConnectionStatus, string> = {
   "not-configured": "Setup needed",
@@ -20,7 +21,11 @@ export function ServiceDiagnosticsPanel() {
   const { user } = useAuth();
   return (
     <ServiceDiagnosticsCheck
-      key={user?.id ?? "signed-out"}
+      key={JSON.stringify([
+        user?.id,
+        user?.email.toLowerCase(),
+        selectedBrand(user?.email),
+      ])}
       signedIn={Boolean(user)}
     />
   );
@@ -54,9 +59,18 @@ function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
         scope,
         signal: request.signal,
       });
-      if (mounted.current && !request.signal.aborted) setResult(checked);
+      if (
+        mounted.current &&
+        controller.current === request &&
+        !request.signal.aborted
+      )
+        setResult(checked);
     } catch {
-      if (mounted.current && !request.signal.aborted)
+      if (
+        mounted.current &&
+        controller.current === request &&
+        !request.signal.aborted
+      )
         setError(
           "The service check could not complete. Sign in as the studio owner and retry."
         );

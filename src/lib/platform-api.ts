@@ -158,6 +158,8 @@ async function requestJson<T>(
 
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   const responseText = await response.text();
+  init?.signal?.throwIfAborted();
+  if (scope) await verifyUploadRequestScope(scope);
   const isJson = contentType.includes("json");
   let parsed: unknown;
   if (isJson && responseText) {
@@ -529,11 +531,11 @@ export const platformApi = {
     });
   },
 
-  workspace: () =>
+  workspace: (scope?: UploadRequestScope) =>
     requestJson<{
       workspace: WorkspaceDocument;
       capabilities: CapabilityState;
-    }>("/api/workspace"),
+    }>("/api/workspace", undefined, false, scope),
 
   saveWorkspace: (workspace: WorkspaceDocument, scope?: UploadRequestScope) =>
     requestJson<{ workspace: WorkspaceDocument }>("/api/workspace", {
@@ -845,7 +847,7 @@ export const platformApi = {
     selectedClipIds: string[];
     range?: { start: number; end: number };
     localOnly?: boolean;
-  }) =>
+  }, options?: UploadRequestOptions) =>
     requestJson<{
       changes: EditOperation[];
       summary: string;
@@ -853,7 +855,8 @@ export const platformApi = {
     }>("/api/ai/edit-plan", {
       method: "POST",
       body: JSON.stringify(input),
-    }),
+      signal: options?.signal,
+    }, false, options?.scope),
 
   analyzeVideo: (
     input: {
@@ -893,7 +896,8 @@ export const platformApi = {
     assetId: string,
     language?: string,
     projectId?: string,
-    audioAssetIds?: string[]
+    audioAssetIds?: string[],
+    options?: UploadRequestOptions
   ) =>
     requestJson<{
       transcript: string;
@@ -902,7 +906,8 @@ export const platformApi = {
     }>("/api/ai/transcribe", {
       method: "POST",
       body: JSON.stringify({ assetId, language, projectId, audioAssetIds }),
-    }),
+      signal: options?.signal,
+    }, false, options?.scope),
 
   quoteAudio: (kind: "music" | "sfx", seconds: number) =>
     requestJson<{ credits: number }>("/api/ai/audio/quote", {
@@ -949,11 +954,12 @@ export const platformApi = {
     rightsConfirmed: true;
     referenceContainsRealPerson: boolean;
     realPersonConsentConfirmed: boolean;
-  }): Promise<Asset> => {
+  }, options?: UploadRequestOptions): Promise<Asset> => {
     const result = await requestJson<{ asset: Asset }>("/api/ai/image", {
       method: "POST",
       body: JSON.stringify(input),
-    });
+      signal: options?.signal,
+    }, false, options?.scope);
     return result.asset;
   },
 
@@ -972,15 +978,17 @@ export const platformApi = {
     rightsConfirmed: true;
     referenceContainsRealPerson: boolean;
     realPersonConsentConfirmed: boolean;
-  }) =>
+  }, options?: UploadRequestOptions) =>
     requestJson<{ job: GenerationJob }>("/api/video/jobs", {
       method: "POST",
       body: JSON.stringify(input),
-    }),
+      signal: options?.signal,
+    }, false, options?.scope),
 
-  videoJob: (id: string) =>
+  videoJob: (id: string, options?: UploadRequestOptions) =>
     requestJson<{ job: GenerationJob; asset?: Asset }>(
-      `/api/video/jobs/${encodeURIComponent(id)}`
+      `/api/video/jobs/${encodeURIComponent(id)}`,
+      { signal: options?.signal }, false, options?.scope
     ),
 
   /** Retrieve an existing provider output; this endpoint never starts a new generation. */

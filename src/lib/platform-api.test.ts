@@ -276,4 +276,31 @@ describe("platform API transport", () => {
     await expect(platformApi.uploadAsset(new File(["x"], "x.mp4"), "video", undefined, undefined, { scope, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("rejects an account switched while the response body is being read", async () => {
+    const scope = await captureUploadRequestScope();
+    let changed = false;
+    vi.spyOn(supabase.auth, "getSession").mockImplementation(async () => ({ data: { session: { access_token: changed ? "other-token" : "test-owner-token", user: { id: changed ? "other" : "owner", email: changed ? "other@example.com" : "creator@example.com" } } }, error: null }) as never);
+    const response = Response.json({ workspace: { revision: 100 } });
+    vi.spyOn(response, "text").mockImplementation(async () => {
+      changed = true;
+      return JSON.stringify({ workspace: { revision: 100 } });
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+    await expect(platformApi.saveWorkspace({} as never, scope)).rejects.toMatchObject({ status: 409 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not return a completed paid response after cancellation during body reading", async () => {
+    const scope = await captureUploadRequestScope();
+    const controller = new AbortController();
+    const response = Response.json({ summary: "Provider completed" });
+    vi.spyOn(response, "text").mockImplementation(async () => {
+      controller.abort();
+      return JSON.stringify({ summary: "Provider completed" });
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+    await expect(platformApi.analyzeVideo({ assetId: "owned", platform: "tiktok", sourceRightsConfirmed: true }, controller.signal, scope)).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 });

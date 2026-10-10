@@ -25,8 +25,13 @@ const transformersPackage = JSON.parse(
   await readFile(path.join(transformersRoot, "package.json"), "utf8")
 );
 await mkdir(output, { recursive: true });
+const javascript = "transformers.min.js";
+const javascriptSource = path.join(transformersRoot, "dist", javascript);
+// The standalone bundle includes ONNX Runtime's JavaScript. The .web bundle
+// deliberately leaves bare package imports for a bundler and cannot be imported
+// directly by a worker from this static same-origin URL.
 await cp(
-  path.join(transformersRoot, "dist/transformers.web.min.js"),
+  javascriptSource,
   path.join(root, "public/vendor/search/transformers.js")
 );
 // Transformers' browser runtime uses the JSEP factory even with the WASM
@@ -35,7 +40,16 @@ const files = [
   "ort-wasm-simd-threaded.jsep.mjs",
   "ort-wasm-simd-threaded.jsep.wasm",
 ];
-const manifest = [];
+const manifest = [
+  {
+    file: "../transformers.js",
+    source: javascript,
+    bytes: (await stat(javascriptSource)).size,
+    sha256: createHash("sha256")
+      .update(await readFile(javascriptSource))
+      .digest("hex"),
+  },
+];
 for (const file of files) {
   const source = path.join(ortRoot, "dist", file);
   const bytes = (await stat(source)).size;

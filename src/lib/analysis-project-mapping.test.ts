@@ -35,4 +35,14 @@ describe("analysis source ownership and source clocks", () => {
     expect(next.transcript[0]).toMatchObject({ start: 21, end: 23, sourceClipId: "source", text: "Actual source" });
   });
   it("clips local adjustments to retained source without inventing out-of-source evidence", () => { const result = map(project([clip()]), [operation({ start: 5, end: 12 })]); expect(result.changes[0]).toMatchObject({ start: 20, end: 21 }); expect(map(project([clip()]), [operation({ start: 29, end: 31 })]).changes).toEqual([]); });
+
+  it.each([NaN, Infinity, 31])("refuses an invalid or unmeasured source out-point %s", outPoint => {
+    expect(() => map(project([clip({ outPoint })]))).toThrow("invalid timeline clock");
+  });
+
+  it("holds supporting media until an owned asset is explicitly chosen", () => {
+    const result = map(project([clip()]), [operation({ type: "broll", parameters: { assetId: "invented-provider-id" } })]);
+    expect(result.changes).toEqual([]);
+    expect(result.rejected[0]).toContain("explicit timeline decision");
+  });
 });

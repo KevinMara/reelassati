@@ -25,6 +25,8 @@ import type {
 import { platformApi, captureUploadRequestScope, verifyUploadRequestScope } from "@/lib/platform-api";
 import { validateDirectVideoUrl, DIRECT_VIDEO_HELP } from "@contracts/public-video";
 import { importDirectVideo } from "@/lib/direct-video-import";
+import { selectedBrand } from "@/lib/workspace-scope";
+import type { UploadRequestScope } from "@/lib/platform-api";
 import { mapSourceAnalysisToProject } from "@/lib/analysis-project-mapping";
 import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
@@ -109,13 +111,17 @@ export default function VideoAnalyzer() {
   const [analyzedAsset, setAnalyzedAsset] = useState<Asset | null>(null);
   const controller = useRef<AbortController | null>(null);
   const generation = useRef(0);
-  useEffect(() => () => { generation.current++; controller.current?.abort(); }, []);
+  const analyzedScope = useRef<UploadRequestScope | null>(null);
+  const owner = workspace.profile.email.toLowerCase();
+  const brand = selectedBrand(owner);
+  useEffect(() => () => { generation.current++; controller.current?.abort(); analyzedScope.current = null; }, [owner, brand]);
 
   const invalidateSourceAuthorization = () => {
     generation.current++;
     controller.current?.abort();
     setAnalyzing(false);
     setAnalyzedAsset(null);
+    analyzedScope.current = null;
     setRights(false);
     setResult(null);
     setQueued(false);
@@ -157,8 +163,11 @@ export default function VideoAnalyzer() {
     AI_CREDIT_COSTS.videoAnalysisPerMinute
   );
 
-  const saveUploadedAsset = async (asset: Asset) => {
-    await updateWorkspace(current => ({
+  const saveUploadedAsset = async (asset: Asset, scope: UploadRequestScope) => {
+    await updateWorkspace(current => {
+      if (current.profile.email.toLowerCase() !== scope.ownerEmail || selectedBrand(scope.ownerEmail) !== scope.brandId)
+        throw new Error("The workspace changed before the imported video could be saved.");
+      return ({
       ...current,
       assets: [
         asset,
@@ -168,7 +177,8 @@ export default function VideoAnalyzer() {
         createEvent("upload", "Video uploaded for analysis", asset.name),
         ...current.activity,
       ].slice(0, 100),
-    }));
+    });
+    });
   };
 
   const handleAnalyze = async () => {
@@ -179,6 +189,8 @@ export default function VideoAnalyzer() {
     setAnalyzing(true); setError(null); setResult(null); setQueued(false);
     try {
       const scope = await captureUploadRequestScope();
+      abort.signal.throwIfAborted();
+      if (id !== generation.current || scope.ownerEmail !== owner || scope.brandId !== brand) return;
       let asset = sourceAsset;
       if (!asset) {
         if (sourceMode === "url") asset = await importDirectVideo(publicUrl, { signal: abort.signal, scope });
@@ -190,7 +202,7 @@ export default function VideoAnalyzer() {
       await verifyUploadRequestScope(scope);
       if (id !== generation.current) return;
       const readyAsset = asset;
-      await saveUploadedAsset(readyAsset);
+      await saveUploadedAsset(readyAsset, scope);
       if (id !== generation.current || abort.signal.aborted) return;
       setSourceAsset(readyAsset);
       // Import/measurement never starts a paid analysis. A second click accepts the actual duration quote.
@@ -202,21 +214,34 @@ export default function VideoAnalyzer() {
       abort.signal.throwIfAborted();
       await verifyUploadRequestScope(scope);
       if (id !== generation.current) return;
+      analyzedScope.current = scope;
       setAnalyzedAsset(readyAsset); setResult(analysis);
       posthog?.capture("video_analysis_completed", { source_type: sourceMode, platform, proposed_changes_count: analysis.changes.length, retention_segments_count: analysis.retention.length });
-      await updateWorkspace(current => ({ ...current, activity: [createEvent("generation", "Video analysis completed", readyAsset.name), ...current.activity].slice(0, 100) }));
+      await updateWorkspace(current => {
+        if (current.profile.email.toLowerCase() !== scope.ownerEmail || selectedBrand(scope.ownerEmail) !== scope.brandId)
+          throw new Error("The analysis workspace changed before saving its activity.");
+        return { ...current, activity: [createEvent("generation", "Video analysis completed", readyAsset.name), ...current.activity].slice(0, 100) };
+      });
     } catch (cause) {
       if (id === generation.current && !abort.signal.aborted) setError(cause instanceof Error ? cause.message : "The video could not be analyzed.");
     } finally { if (id === generation.current) { setAnalyzing(false); controller.current = null; } }
   };
 
   const queueChanges = async () => {
-    if (!result || !selectedProjectId || !analyzedAsset?.duration) return;
+    if (!result || !selectedProjectId || !analyzedAsset?.duration || !analyzedScope.current) return;
+    const scope = analyzedScope.current;
+    const id = generation.current;
     setError(null);
     try {
+      await verifyUploadRequestScope(scope);
+      if (id !== generation.current) return;
       let count = 0;
       let refused: string[] = [];
-      await updateWorkspace(current => ({
+      await updateWorkspace(current => {
+        if (id !== generation.current || current.profile.email.toLowerCase() !== scope.ownerEmail || selectedBrand(scope.ownerEmail) !== scope.brandId || !current.assets.some(a => a.id === analyzedAsset.id))
+          throw new Error("The analyzed source is no longer in this workspace.");
+        if (!current.projects.some(p => p.id === selectedProjectId)) throw new Error("The selected project is no longer available.");
+        return ({
         ...current,
         projects: current.projects.map(project => {
           if (project.id !== selectedProjectId) return project;
@@ -227,7 +252,9 @@ export default function VideoAnalyzer() {
           if (!changes.length && mapped.rejected.length) throw new Error(`No changes were queued. ${mapped.rejected.join("; ")}`);
           return { ...project, status: "editing", updatedAt: new Date().toISOString(), proposedChanges: [...project.proposedChanges, ...changes], qualitySignals: [...project.qualitySignals, ...mapped.signals] };
         }),
-      }));
+      });
+      });
+      if (id !== generation.current) return;
       setQueued(true);
       if (refused.length) setError(`${count} source-mapped changes queued. Held for an explicit timeline decision: ${refused.join("; ")}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The edit plan could not be queued."); }

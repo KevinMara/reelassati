@@ -1,0 +1,34 @@
+{
+  "scope": "Source-analysis timing and asynchronous workspace ownership review",
+  "verification": {
+    "focusedTestFiles": 5,
+    "focusedTestsPassed": 44,
+    "focusedLint": "passed",
+    "typeChecks": "App, Node and Sites passed"
+  },
+  "coveredCases": [
+    "Analysis source in-point and speed map to the correct repeated timeline occurrence",
+    "Unrelated overlapping clips are never analysis targets",
+    "Explicit linked AV peers are included and locked or incompatible links are rejected",
+    "Caption source owner is retained during application",
+    "Partial whole-clip edits, global ripple, ambiguous move and unselected supporting media are held",
+    "Non-finite and out-of-source timeline clocks are rejected",
+    "Account and brand changes reject workspace writes and multipart completion",
+    "Paid responses are rejected if authentication or cancellation changes during body reading",
+    "Old save successes, failures and pending counters cannot contaminate a reloaded workspace",
+    "Direct imports reject social pages, redirects, non-video bytes and oversized streams",
+    "A decodable picture and measured duration of at most 120 seconds are required"
+  ],
+  "manualReview": [
+    "VideoAnalyzer queue checks owner, brand, analyzed asset and selected project at the actual mutation",
+    "DirectVideoImport changes, cancellation and unmount invalidate pending callbacks",
+    "MediaLibrary saves and duration updates recheck upload scope and cancellation",
+    "Direct import callback carries its captured upload scope into the Library mutation",
+    "Editor chat attachment completion rechecks cancellation and intended project",
+    "Autonomous reference callback checks owner, brand and project before saving"
+  ],
+  "limitations": [
+    "Tests use local mocks and do not authenticate to the owner's production session",
+    "No provider generation or account credit debit was performed by this verification"
+  ]
+}

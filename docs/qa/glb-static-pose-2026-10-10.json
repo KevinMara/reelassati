@@ -1,0 +1,477 @@
+{
+  "browser": "153.0.8010.0",
+  "external": [],
+  "errors": [],
+  "material": {
+    "triangles": 4,
+    "images": 0,
+    "results": [
+      {
+        "key": "default",
+        "bytes": 25331,
+        "sha256": "464027c5fddec2928ca50a3d56a61b6a599fa5d42399481a64fea4b316c9a68b"
+      },
+      {
+        "key": "yaw",
+        "bytes": 26561,
+        "sha256": "5f3a7d73d5b270d174e79c1a0c26d488e60930fdb53c2b1c91696c040a76885c"
+      },
+      {
+        "key": "pitch",
+        "bytes": 28586,
+        "sha256": "921d497b749a6ee4b512e91372ce20da16c8efa4219a025f274463a87d080c0b"
+      },
+      {
+        "key": "roll",
+        "bytes": 40801,
+        "sha256": "770d5e325e99daa353722f365284e2538c7768033c9b042a3afe31dd9bde939c"
+      },
+      {
+        "key": "zoom",
+        "bytes": 25688,
+        "sha256": "660bebd085e774999e8660e76fe3ad5ca2a37e9767c4404ce6f47fef7e656a3d"
+      },
+      {
+        "key": "exposure",
+        "bytes": 25454,
+        "sha256": "dfdac6b10f8ccdc17e5a05e866c6f91390eba3b5bf93adfa672c415d1e5921e6"
+      },
+      {
+        "key": "tint",
+        "bytes": 25321,
+        "sha256": "a5791d76288e5406776f73437af61dd6ad345278b44db291a40e2e6a26e30b54"
+      },
+      {
+        "key": "repeat",
+        "bytes": 25331,
+        "sha256": "464027c5fddec2928ca50a3d56a61b6a599fa5d42399481a64fea4b316c9a68b"
+      }
+    ]
+  },
+  "texture": {
+    "triangles": 2,
+    "images": 1,
+    "results": [
+      {
+        "key": "default",
+        "bytes": 25032,
+        "sha256": "de37ad4be31f3b2e5ed6adf82e4086ec1b1486460ea91824e85feb6a8a3ec8af"
+      },
+      {
+        "key": "yaw",
+        "bytes": 27218,
+        "sha256": "f176880547311f27772ae0fba7976b3e48bdc89db2354668e4ce409e25e6479c"
+      },
+      {
+        "key": "pitch",
+        "bytes": 38352,
+        "sha256": "110866b7ae0b14674eeeac04372859c227e4f3e9d6c4dc855cc73f5dd1461751"
+      },
+      {
+        "key": "roll",
+        "bytes": 62823,
+        "sha256": "b8e2cd1b3baea2ae4d6d60272966c25aa7a5f5b476ee12519d06e1509d825a53"
+      },
+      {
+        "key": "zoom",
+        "bytes": 25139,
+        "sha256": "b9503675db24646081f0cde1f14a3b6aea51d4d021da0df83c826a85ea00931b"
+      },
+      {
+        "key": "exposure",
+        "bytes": 25039,
+        "sha256": "0fbcb60cbe8940d50968e8a92f098aee6e0e52d2ac1bec50104abfb3b7739ac4"
+      },
+      {
+        "key": "tint",
+        "bytes": 25039,
+        "sha256": "9389571475e4aa00e5a164806afddd578a5b6dd93cafc017ebd42795bad9eff8"
+      },
+      {
+        "key": "repeat",
+        "bytes": 25032,
+        "sha256": "de37ad4be31f3b2e5ed6adf82e4086ec1b1486460ea91824e85feb6a8a3ec8af"
+      }
+    ]
+  },
+  "wasm1": {
+    "code": 0,
+    "decode": 0,
+    "bytes": 6787,
+    "width": 720,
+    "height": 720,
+    "frameRate": 30,
+    "args": [
+      "-y",
+      "-filter_complex_threads",
+      "1",
+      "-loop",
+      "1",
+      "-framerate",
+      "30",
+      "-i",
+      "input-0",
+      "-loop",
+      "1",
+      "-framerate",
+      "30",
+      "-i",
+      "input-1",
+      "-filter_complex",
+      "color=c=black:s=720x720:r=30:d=1[base];anullsrc=r=48000:cl=stereo,atrim=duration=1[silence];[0:v]trim=start=0:end=1,setpts=(PTS-STARTPTS)/1,format=rgba,scale=720:720:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=30,null,setpts=PTS+0/TB[v0];[base][v0]overlay=eof_action=pass:repeatlast=0:enable='gte(t,0)*lt(t,1)'[layer0];[1:v]trim=start=0:end=1,setpts=(PTS-STARTPTS)/1,format=rgba,scale=720:720:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=30,null,setpts=PTS+0/TB[v1];[layer0][v1]overlay=eof_action=pass:repeatlast=0:enable='gte(t,0)*lt(t,1)'[layer1];[silence]amix=inputs=1:normalize=0:duration=longest,alimiter=limit=0.95,atrim=duration=1[audio]",
+      "-map",
+      "[layer1]",
+      "-map",
+      "[audio]",
+      "-r",
+      "30",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-crf",
+      "20",
+      "-maxrate",
+      "6000000",
+      "-bufsize",
+      "12000000",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-t",
+      "1",
+      "-movflags",
+      "+faststart",
+      "output.mp4"
+    ]
+  },
+  "wasm0.5": {
+    "code": 0,
+    "decode": 0,
+    "bytes": 6508,
+    "width": 720,
+    "height": 720,
+    "frameRate": 30,
+    "args": [
+      "-y",
+      "-filter_complex_threads",
+      "1",
+      "-loop",
+      "1",
+      "-framerate",
+      "30",
+      "-i",
+      "input-0",
+      "-loop",
+      "1",
+      "-framerate",
+      "30",
+      "-i",
+      "input-1",
+      "-filter_complex",
+      "color=c=black:s=720x720:r=30:d=1[base];anullsrc=r=48000:cl=stereo,atrim=duration=1[silence];[0:v]trim=start=0:end=1,setpts=(PTS-STARTPTS)/1,format=rgba,scale=720:720:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=30,null,setpts=PTS+0/TB[v0];[base][v0]overlay=eof_action=pass:repeatlast=0:enable='gte(t,0)*lt(t,1)'[layer0];[1:v]trim=start=0:end=1,setpts=(PTS-STARTPTS)/1,format=rgba,scale=720:720:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=30,null,format=rgba,settb=AVTB,colorchannelmixer=aa=0.5,setpts=PTS+0/TB[v1];[layer0][v1]overlay=eof_action=pass:repeatlast=0:enable='gte(t,0)*lt(t,1)'[layer1];[silence]amix=inputs=1:normalize=0:duration=longest,alimiter=limit=0.95,atrim=duration=1[audio]",
+      "-map",
+      "[layer1]",
+      "-map",
+      "[audio]",
+      "-r",
+      "30",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-crf",
+      "20",
+      "-maxrate",
+      "6000000",
+      "-bufsize",
+      "12000000",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-t",
+      "1",
+      "-movflags",
+      "+faststart",
+      "output.mp4"
+    ]
+  },
+  "saveEvents": [
+    "prepare",
+    "encode",
+    "save:image/png"
+  ],
+  "closedSaveEvents": [],
+  "sourcePixels": {
+    "size": [
+      1024,
+      1024
+    ],
+    "visiblePixels": 381920,
+    "bounds": [
+      203,
+      203,
+      820,
+      820
+    ],
+    "corner": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "opaqueBluePixels": 187264,
+    "opaqueYellowPixels": 187880
+  },
+  "nativeAndWasmExports": [
+    {
+      "engine": "native",
+      "opacity": 1,
+      "bytes": 60351,
+      "sha256": "a0036c94ca64b75bca66f216225cae1f6201acae02b3f87a51e4de3102ee4834",
+      "fullDecode": true,
+      "metadata": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 720,
+            "height": 720,
+            "avg_frame_rate": "30/1"
+          },
+          {
+            "codec_name": "aac",
+            "avg_frame_rate": "0/0"
+          }
+        ],
+        "format": {
+          "duration": "1.000000"
+        }
+      },
+      "samples": {
+        "(0, 0)": [
+          80,
+          118,
+          160
+        ],
+        "(200, 360)": [
+          9,
+          55,
+          227
+        ],
+        "(350, 360)": [
+          9,
+          55,
+          227
+        ],
+        "(450, 360)": [
+          228,
+          224,
+          106
+        ],
+        "(719, 719)": [
+          80,
+          118,
+          158
+        ]
+      }
+    },
+    {
+      "engine": "wasm",
+      "opacity": 1,
+      "bytes": 6787,
+      "sha256": "22758dc0dab5fcd246d5d8cbe6481095ca647e2b174c81228f23daf5d9ef83c1",
+      "fullDecode": true,
+      "metadata": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 720,
+            "height": 720,
+            "avg_frame_rate": "30/1"
+          },
+          {
+            "codec_name": "aac",
+            "avg_frame_rate": "0/0"
+          }
+        ],
+        "format": {
+          "duration": "1.000000"
+        }
+      },
+      "samples": {
+        "(0, 0)": [
+          80,
+          118,
+          160
+        ],
+        "(200, 360)": [
+          9,
+          55,
+          227
+        ],
+        "(350, 360)": [
+          9,
+          55,
+          227
+        ],
+        "(450, 360)": [
+          228,
+          224,
+          106
+        ],
+        "(719, 719)": [
+          80,
+          118,
+          160
+        ]
+      }
+    },
+    {
+      "engine": "native",
+      "opacity": 0.5,
+      "bytes": 57255,
+      "sha256": "2ef9c9a77f0ada9b26c96572980ead43d9680e3254087b2edf9563be2d485a26",
+      "fullDecode": true,
+      "metadata": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 720,
+            "height": 720,
+            "avg_frame_rate": "30/1"
+          },
+          {
+            "codec_name": "aac",
+            "avg_frame_rate": "0/0"
+          }
+        ],
+        "format": {
+          "duration": "1.000000"
+        }
+      },
+      "samples": {
+        "(0, 0)": [
+          80,
+          118,
+          160
+        ],
+        "(200, 360)": [
+          43,
+          87,
+          193
+        ],
+        "(350, 360)": [
+          43,
+          87,
+          193
+        ],
+        "(450, 360)": [
+          156,
+          174,
+          131
+        ],
+        "(719, 719)": [
+          80,
+          118,
+          158
+        ]
+      }
+    },
+    {
+      "engine": "wasm",
+      "opacity": 0.5,
+      "bytes": 6508,
+      "sha256": "55a4b460f6dffdcd3bbb22116f1fdecccafa6e31f88ab545c25836d6ba45c49f",
+      "fullDecode": true,
+      "metadata": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 720,
+            "height": 720,
+            "avg_frame_rate": "30/1"
+          },
+          {
+            "codec_name": "aac",
+            "avg_frame_rate": "0/0"
+          }
+        ],
+        "format": {
+          "duration": "1.000000"
+        }
+      },
+      "samples": {
+        "(0, 0)": [
+          80,
+          118,
+          160
+        ],
+        "(200, 360)": [
+          43,
+          87,
+          193
+        ],
+        "(350, 360)": [
+          43,
+          87,
+          193
+        ],
+        "(450, 360)": [
+          156,
+          173,
+          133
+        ],
+        "(719, 719)": [
+          80,
+          118,
+          160
+        ]
+      }
+    }
+  ],
+  "verificationDate": "2026-10-10",
+  "scope": "Isolated local module fixtures and shipped FFmpeg core; no authenticated user session or production upload.",
+  "pixelAssertions": {
+    "nativeWasmSampleMaxDifference": 2,
+    "transparentCornerBackgroundMaxDifference": 2,
+    "halfOpacityIdealBlendMaxDifference": 4
+  },
+  "componentAssertions": {
+    "preparationBeforeEncoding": true,
+    "noUploadAfterUnmount": true
+  },
+  "focusedChecks": {
+    "vitestFiles": 2,
+    "vitestTestsPassed": 26,
+    "targetedEslint": "passed"
+  },
+  "files": {
+    "src/lib/glb-validation.ts": "458fbe8fb47263b24cf6f76b81a35efaf26187dedc14a8d3982e1c3c11fadfd6",
+    "src/lib/glb-renderer.ts": "ffb4c3e475f06aab83956ab8d223a3d74da6840c490b27b3250d1063415fc862",
+    "src/components/studio/GlbModelComposer.tsx": "7c046890a0c88ee4b63873eec77572296ffbda025aaf76957e0499bb36e717ff"
+  },
+  "fixtures": {
+    "material-fixture.glb": {
+      "sha256": "35f787a701180ac2af74e68e87fd3b90fb0454c29334663191776c65c4a3d357",
+      "bytes": 1172
+    },
+    "texture-fixture.glb": {
+      "sha256": "6ec1fc5dfedefb8944e7c04e4eaa6ea7819f7fc13606d786ecde80e3220c3631",
+      "bytes": 1364
+    },
+    "background.png": {
+      "sha256": "271a2e0a79bcf41bba2e9592e2c6c7aa596a2b0870f81d8ffac4bd7cb30412fb",
+      "bytes": 5337
+    }
+  }
+}
