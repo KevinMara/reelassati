@@ -7,6 +7,7 @@ export type AiConnectionStatus =
   | "invalid-response";
 
 export type SoundEffectEnvironmentName =
+  | "OPENROUTER_API_KEY"
   | "ELEVENLABS_API_KEY"
   | "ELEVENLABS_COMMERCIAL_ENABLED"
   | "ELEVENLABS_SFX_USD_PER_SECOND";

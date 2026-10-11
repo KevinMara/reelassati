@@ -2,6 +2,10 @@ import { useState } from "react";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
+import {
+  soundEffectCredits,
+  SOUND_EFFECT_PROMPT_LIMIT,
+} from "../../../contracts/audio-generation";
 
 export function AudioGenerator({
   onGenerate,
@@ -71,7 +75,7 @@ export function AudioGenerator({
           aria-label="Describe generated audio"
           disabled={busy}
           value={text}
-          maxLength={4000}
+          maxLength={kind === "sfx" ? SOUND_EFFECT_PROMPT_LIMIT : 4000}
           onChange={e => {
             setText(e.target.value);
             setQuote(null);
@@ -109,8 +113,18 @@ export function AudioGenerator({
           ? "Please wait…"
           : quote === null
             ? "Get credit quote"
-            : `Generate · ${quote} credits`}
+            : kind === "sfx"
+              ? `Generate · hold up to ${quote} credits`
+              : `Generate · ${quote} credits`}
       </button>
+      {kind === "sfx" && quote !== null && (
+        <p className="mt-2 text-sm text-foreground/70">
+          About {soundEffectCredits(seconds)} credits if the generated effect
+          lasts {seconds.toFixed(1)}s. The generator may produce a longer take.
+          Final cost covers the full generated take, including any tail trimmed
+          to your selected length. Unused reserved credits are returned.
+        </p>
+      )}
       {!ready && (
         <p className="mt-2 text-sm text-foreground/70">
           {kind === "music" ? "Music generation" : "Sound-effect generation"} is

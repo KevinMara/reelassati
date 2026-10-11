@@ -19,6 +19,7 @@ import {
   stripeReadiness,
   reserveCredits,
   releaseCreditReservation,
+  settleMeasuredCreditReservation,
   type BillingEnvironment,
 } from "./billing";
 import { LEGAL_TERMS_VERSION } from "../contracts/legal";
@@ -183,6 +184,73 @@ it("enables only the approved account without inventing a subscription or free c
   await releaseCreditReservation(runtime, reserved!);
   expect(credits().included_balance).toBe(700);
   expect(account().status).toBe("inactive");
+});
+
+it.each([
+  [5, 35, 200],
+  [60, 0, 180],
+  [150, 0, 90],
+])(
+  "settles %i measured credits and refunds the original included/topup buckets exactly once",
+  async (actual, included, topup) => {
+    sqlite
+      .prepare(
+        "UPDATE credit_accounts SET included_balance=40, topup_balance=200 WHERE owner_email=?"
+      )
+      .run(owner);
+    const reservation = await reserveCredits(
+      env,
+      { email: owner, name: "Owner" },
+      {
+        cost: 150,
+        operationKey: "measured-audio",
+        category: "audio",
+        description: "SFX",
+        metadata: { model: "seed" },
+      }
+    );
+    expect(reservation).not.toBeNull();
+    expect(credits().included_balance).toBe(0);
+    expect(credits().topup_balance).toBe(90);
+    await settleMeasuredCreditReservation(env, reservation!, actual);
+    await settleMeasuredCreditReservation(env, reservation!, actual);
+    await releaseCreditReservation(env, reservation!);
+    expect(credits().included_balance).toBe(included);
+    expect(credits().topup_balance).toBe(topup);
+    const ledger = sqlite
+      .prepare("SELECT * FROM credit_ledger WHERE id=?")
+      .get(reservation!.id)!;
+    expect(ledger.amount).toBe(-actual);
+    expect(ledger.status).toBe("settled");
+    expect(JSON.parse(String(ledger.metadata_json))).toMatchObject({
+      model: "seed",
+      reservedCredits: 150,
+      measuredCredits: actual,
+    });
+  }
+);
+it("refuses invalid measured charges before changing either credit bucket", async () => {
+  const reservation = await reserveCredits(
+    env,
+    { email: owner, name: "Owner" },
+    {
+      cost: 150,
+      operationKey: "invalid-measured",
+      category: "audio",
+      description: "SFX",
+    }
+  );
+  for (const actual of [0, -1, 151, 1.5, NaN, Infinity]) {
+    await expect(
+      settleMeasuredCreditReservation(env, reservation!, actual)
+    ).rejects.toThrow("accepted reservation");
+    expect(credits().included_balance).toBe(550);
+  }
+  await releaseCreditReservation(env, reservation!);
+  await expect(
+    settleMeasuredCreditReservation(env, reservation!, 5)
+  ).rejects.toThrow("finalized");
+  expect(credits().included_balance).toBe(700);
 });
 
 it("grants exactly 1,000 operator credits once per request without changing the plan", async () => {
@@ -626,17 +694,41 @@ describe("Stripe entitlement integrity with actual SQLite", () => {
         id,
         new Date().toISOString()
       );
-    insert.run("music", owner, -15, "audio", "settled", "music", "Music", new Date().toISOString());
-    insert.run("failed-music", owner, -15, "audio", "released", "failed-music", "Music", new Date().toISOString());
+    insert.run(
+      "music",
+      owner,
+      -15,
+      "audio",
+      "settled",
+      "music",
+      "Music",
+      new Date().toISOString()
+    );
+    insert.run(
+      "failed-music",
+      owner,
+      -15,
+      "audio",
+      "released",
+      "failed-music",
+      "Music",
+      new Date().toISOString()
+    );
     const summary = await billingSummary(env, { email: owner, name: "Owner" });
-    expect(summary.usage?.daily).toEqual(expect.arrayContaining([
-      { date: new Date().toISOString().slice(0, 10), category: "audio", credits: 15 },
-      {
-        date: new Date().toISOString().slice(0, 10),
-        category: "script",
-        credits: 150,
-      },
-    ]));
+    expect(summary.usage?.daily).toEqual(
+      expect.arrayContaining([
+        {
+          date: new Date().toISOString().slice(0, 10),
+          category: "audio",
+          credits: 15,
+        },
+        {
+          date: new Date().toISOString().slice(0, 10),
+          category: "script",
+          credits: 150,
+        },
+      ])
+    );
     expect(summary.usage?.daily).toHaveLength(2);
     expect(summary.recentActivity).toHaveLength(20);
     const empty = await billingSummary(env, {

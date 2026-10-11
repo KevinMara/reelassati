@@ -34,11 +34,7 @@ describe("read-only service diagnostics", () => {
       ai: { status: "not-configured" },
       soundEffects: {
         configured: false,
-        missing: [
-          "ELEVENLABS_API_KEY",
-          "ELEVENLABS_COMMERCIAL_ENABLED",
-          "ELEVENLABS_SFX_USD_PER_SECOND",
-        ],
+        missing: ["OPENROUTER_API_KEY"],
       },
       generationTested: false,
     });
@@ -193,45 +189,29 @@ describe("read-only service diagnostics", () => {
     expect(cancelled).toBe(true);
   });
 
-  it("requires a real sound key, commercial flag, and finite positive account rate", async () => {
-    const invalidRates = [
-      undefined,
-      "",
-      "0",
-      "-1",
-      "Infinity",
-      "NaN",
-      "not-a-rate",
-    ];
-    for (const rate of invalidRates) {
-      const fetcher = vi.fn<typeof fetch>();
+  it("uses the existing OpenRouter key and never treats an ElevenLabs key as a substitute", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    for (const key of [undefined, "", " "]) {
       const result = await serviceDiagnostics(
-        {
-          ...configured,
-          OPENROUTER_API_KEY: " ",
-          ELEVENLABS_SFX_USD_PER_SECOND: rate,
-        },
+        { ...configured, OPENROUTER_API_KEY: key },
         fetcher
       );
       expect(result.soundEffects).toMatchObject({
         configured: false,
-        missing: ["ELEVENLABS_SFX_USD_PER_SECOND"],
+        missing: ["OPENROUTER_API_KEY"],
       });
-      expect(fetcher).not.toHaveBeenCalled();
     }
+    expect(fetcher).not.toHaveBeenCalled();
     const result = await serviceDiagnostics(
-      {
-        ...configured,
-        OPENROUTER_API_KEY: undefined,
-        ELEVENLABS_API_KEY: " ",
-        ELEVENLABS_COMMERCIAL_ENABLED: "TRUE",
-      },
-      vi.fn<typeof fetch>()
+      { OPENROUTER_API_KEY: "existing-key" },
+      vi.fn<typeof fetch>().mockResolvedValue(keyResponse(10))
     );
-    expect(result.soundEffects.missing).toEqual([
-      "ELEVENLABS_API_KEY",
-      "ELEVENLABS_COMMERCIAL_ENABLED",
-    ]);
+    expect(result.soundEffects).toMatchObject({
+      configured: true,
+      missing: [],
+    });
+    expect(result.soundEffects.note).toContain("Seed Audio");
+    expect(result.generationTested).toBe(false);
   });
 });
 
@@ -343,11 +323,11 @@ describe("owner service diagnostics route", () => {
     ).toBe(false);
   });
 
-  it("never marks sound generation ready with an infinite rate or whitespace key", async () => {
+  it("never marks sound generation ready without a usable OpenRouter key", async () => {
     const fixture = routeFixture();
     for (const changed of [
-      { ELEVENLABS_SFX_USD_PER_SECOND: "Infinity" },
-      { ELEVENLABS_API_KEY: " " },
+      { OPENROUTER_API_KEY: "" },
+      { OPENROUTER_API_KEY: " " },
     ]) {
       const response = await worker.fetch(
         new Request("https://studio.example/api/capabilities", {

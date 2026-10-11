@@ -33,6 +33,8 @@ import {
   musicQuote,
   readMusicAudio,
   finishMusicAudio,
+  finishSoundEffectAudio,
+  readSoundEffectAudio,
 } from "./music-generation";
 import { normalizeGraphic } from "../contracts/motion-graphics";
 import { normalizeVisual } from "../contracts/clip-visual";
@@ -42,7 +44,12 @@ import {
   type ProviderTranscript,
 } from "../contracts/transcript-timing";
 import { normalizeReview } from "../contracts/source-review";
-import { audioGenerationQuote } from "../contracts/audio-generation";
+import {
+  SOUND_EFFECT_MODEL,
+  soundEffectQuote,
+  soundEffectCredits,
+  soundEffectPrompt,
+} from "../contracts/audio-generation";
 import { normalizeMediaFolders } from "../contracts/media-folders";
 import { normalizeEditorGenerations } from "../contracts/editor-generations";
 import { normalizeEditorSavedStyles } from "../contracts/editor-style-library";
@@ -136,6 +143,7 @@ import {
   releaseCreditReservation,
   reserveCredits,
   settleCreditReservation,
+  settleMeasuredCreditReservation,
   socialAccountLimit,
   stripeBillingConfigured,
   stripeReadiness,
@@ -591,7 +599,6 @@ function capabilities(
 ): CapabilityState {
   const missing: string[] = [];
   const useKimiSubscription = isKimiTestOwner(env, user);
-  const soundEffectRate = Number(env.ELEVENLABS_SFX_USD_PER_SECOND);
   const provenanceReady = Boolean(
     env.AI_PROVENANCE_SIGNING_KEY && env.AI_PROVENANCE_SIGNING_KEY.length >= 24
   );
@@ -622,12 +629,7 @@ function capabilities(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
     soundGeneration: Boolean(
-      env.ELEVENLABS_API_KEY?.trim() &&
-      env.ELEVENLABS_COMMERCIAL_ENABLED === "true" &&
-      Number.isFinite(soundEffectRate) &&
-      soundEffectRate > 0 &&
-      env.BUCKET &&
-      provenanceReady
+      env.OPENROUTER_API_KEY?.trim() && env.BUCKET && provenanceReady
     ),
     imageGeneration: Boolean(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
@@ -1511,6 +1513,7 @@ async function failProvenanceRecord(
 }
 
 type SpeechOutputRollbackReason =
+  | "audio-credit-settlement-failure"
   | "audio-storage-write-failure"
   | "audio-marking-readback-failure"
   | "asset-persistence-failure"
@@ -5249,6 +5252,7 @@ async function runPaidAiAction(
     referenceId?: string;
     metadata?: Record<string, unknown>;
     prepareResponse?: (response: Response) => Promise<void>;
+    settledDuringAction?: boolean;
   },
   action: (reservation: CreditReservation) => Promise<Response>
 ): Promise<Response> {
@@ -5257,7 +5261,8 @@ async function runPaidAiAction(
     const response = await action(reservation);
     if (response.ok) {
       await input.prepareResponse?.(response);
-      await settleCreditReservation(env, reservation);
+      if (!input.settledDuringAction)
+        await settleCreditReservation(env, reservation);
     } else {
       await releaseCreditReservation(env, reservation);
     }
@@ -5361,13 +5366,7 @@ async function handleAi(
       normalizeOperations: value =>
         mapEditOperations(value, project.duration, project.clips, []),
       quoteAudio: (kind, seconds) =>
-        kind === "music"
-          ? musicQuote(seconds)
-          : audioGenerationQuote(
-              kind,
-              seconds,
-              Number(env.ELEVENLABS_SFX_USD_PER_SECOND)
-            ),
+        kind === "music" ? musicQuote(seconds) : soundEffectQuote(seconds),
       capability: kind =>
         Boolean(
           {
@@ -6563,17 +6562,14 @@ async function handleAi(
     }>(request);
     const kind = input.kind === "music" ? "music" : "sfx";
     const openRouterMusic = generatedAudio && kind === "music";
-    const provider =
-      !generatedAudio || openRouterMusic ? "OpenRouter" : "ElevenLabs";
+    const openRouterSound = generatedAudio && kind === "sfx";
+    const provider = "OpenRouter";
+    let measuredAudioCost: number | undefined;
+    let providerAudioDuration: number | undefined;
     let audioContentType = "audio/mpeg";
     let audioExtension = "mp3";
     let audioDuration: number | undefined;
-    if (
-      provider === "OpenRouter"
-        ? !env.OPENROUTER_API_KEY
-        : !env.ELEVENLABS_API_KEY ||
-          env.ELEVENLABS_COMMERCIAL_ENABLED !== "true"
-    )
+    if (!env.OPENROUTER_API_KEY?.trim())
       return errorResponse("Audio generation is temporarily unavailable", 503);
     let audioCost = 0;
     if (generatedAudio) {
@@ -6582,15 +6578,7 @@ async function handleAi(
       try {
         audioCost = openRouterMusic
           ? musicQuote(Number(input.seconds))
-          : audioGenerationQuote(
-              kind,
-              Number(input.seconds),
-              Number(
-                kind === "music"
-                  ? env.ELEVENLABS_MUSIC_USD_PER_SECOND
-                  : env.ELEVENLABS_SFX_USD_PER_SECOND
-              )
-            );
+          : soundEffectQuote(Number(input.seconds));
       } catch (cause) {
         return errorResponse(
           cause instanceof Error ? cause.message : "Invalid audio quote",
@@ -6598,7 +6586,15 @@ async function handleAi(
         );
       }
       if (url.pathname.endsWith("/quote"))
-        return json({ credits: audioCost, seconds: input.seconds, kind });
+        return json({
+          credits: audioCost,
+          seconds: input.seconds,
+          kind,
+          billing: openRouterSound ? "measured" : "fixed",
+          ...(openRouterSound
+            ? { estimatedCredits: soundEffectCredits(Number(input.seconds)) }
+            : {}),
+        });
       if (input.acceptedCredits !== audioCost)
         return errorResponse(
           "The credit quote changed. Get a fresh quote before generating.",
@@ -6621,6 +6617,19 @@ async function handleAi(
         422
       );
     }
+    let soundPrompt: string | undefined;
+    if (openRouterSound) {
+      try {
+        soundPrompt = soundEffectPrompt(text, Number(input.seconds));
+      } catch (cause) {
+        return errorResponse(
+          cause instanceof Error
+            ? cause.message
+            : "Invalid sound-effect prompt",
+          422
+        );
+      }
+    }
     await assertAllowedCreativeUse(env, user, text);
     const voice = stringValue(input.voice, DEFAULT_VOICE_ID);
     if (!generatedAudio && !findVoice(voice))
@@ -6638,7 +6647,7 @@ async function handleAi(
     const model = generatedAudio
       ? kind === "music"
         ? MUSIC_MODEL
-        : "eleven_text_to_sound_v2"
+        : SOUND_EFFECT_MODEL
       : speechModelForVoice(voice);
     const operation = generatedAudio
       ? ("audio-generation" as const)
@@ -6664,16 +6673,17 @@ async function handleAi(
       {
         cost: generatedAudio ? audioCost : speechCost,
         operationKey: generatedAudio
-          ? `audio:${input.requestId}`
+          ? `audio:${user.email}:${input.requestId}`
           : mediaRequest?.operationKey || `speech:${crypto.randomUUID()}`,
         prepareResponse: mediaRequest?.prepareResponse,
         category: generatedAudio ? "audio" : "speech",
+        settledDuringAction: openRouterSound,
         description: generatedAudio
           ? `AI ${kind} generation`
           : "Voice generation",
         metadata: { characters: speechCharacterCount(text) },
       },
-      async () => {
+      async reservation => {
         const invocation = await beginAiInvocation(
           env,
           user,
@@ -6692,18 +6702,10 @@ async function handleAi(
         try {
           const endpoint = openRouterMusic
             ? `${OPENROUTER_BASE}/chat/completions`
-            : generatedAudio
-              ? `https://api.elevenlabs.io/v1/${kind === "music" ? "music" : "sound-generation"}?output_format=mp3_44100_128`
-              : `${OPENROUTER_BASE}/audio/speech`;
+            : `${OPENROUTER_BASE}/audio/speech`;
           const response = await fetch(endpoint, {
             method: "POST",
-            headers:
-              generatedAudio && !openRouterMusic
-                ? {
-                    "Content-Type": "application/json",
-                    "xi-api-key": env.ELEVENLABS_API_KEY!,
-                  }
-                : openRouterHeaders(env),
+            headers: openRouterHeaders(env),
             signal: AbortSignal.timeout(180000),
             body: JSON.stringify(
               openRouterMusic
@@ -6719,15 +6721,8 @@ async function handleAi(
                       },
                     ],
                   }
-                : generatedAudio
-                  ? kind === "music"
-                    ? {
-                        model_id: model,
-                        prompt: text,
-                        music_length_ms: Math.round(input.seconds! * 1000),
-                        force_instrumental: true,
-                      }
-                    : { model_id: model, text, duration_seconds: input.seconds }
+                : openRouterSound
+                  ? { model, input: soundPrompt, response_format: "mp3" }
                   : { model, input: text, voice, response_format: "mp3" }
             ),
           });
@@ -6748,6 +6743,15 @@ async function handleAi(
             audioContentType = finished.contentType;
             audioExtension = finished.extension;
             audioDuration = finished.duration;
+          } else if (openRouterSound) {
+            const finished = finishSoundEffectAudio(
+              await readSoundEffectAudio(response),
+              Number(input.seconds)
+            );
+            buffer = finished.bytes;
+            audioDuration = finished.duration;
+            providerAudioDuration = finished.providerDuration;
+            measuredAudioCost = soundEffectCredits(providerAudioDuration);
           } else {
             buffer = await response.arrayBuffer();
           }
@@ -6780,7 +6784,10 @@ async function handleAi(
           embeddedMediaMarker: true,
           metadata: {
             invocationId: invocation.id,
-            voice,
+            ...(generatedAudio ? {} : { voice }),
+            ...(openRouterSound
+              ? { providerAudioDuration, creditsCharged: measuredAudioCost }
+              : {}),
             rightsAttested: true,
           },
         });
@@ -6816,7 +6823,7 @@ async function handleAi(
               source: openRouterMusic
                 ? "openrouter-music"
                 : generatedAudio
-                  ? "elevenlabs-audio"
+                  ? "openrouter-sfx"
                   : "openrouter-tts",
               provenanceToken: pendingProvenance.marking.publicToken || "",
               policyVersion: AI_COMPLIANCE_POLICY_VERSION,
@@ -6911,8 +6918,34 @@ async function handleAi(
             { status: 500, headers: { "Content-Type": "application/json" } }
           );
         }
+        if (openRouterSound) {
+          try {
+            await settleMeasuredCreditReservation(
+              env,
+              reservation,
+              measuredAudioCost!
+            );
+          } catch (cause) {
+            await rollbackGeneratedSpeech(
+              env,
+              user,
+              invocation,
+              pendingProvenance,
+              assetId,
+              r2Key,
+              "audio-credit-settlement-failure"
+            );
+            throw cause;
+          }
+        }
         return json(
           {
+            ...(openRouterSound
+              ? {
+                  creditsCharged: measuredAudioCost,
+                  reservedCredits: audioCost,
+                }
+              : {}),
             asset: {
               ...asset,
               ...(audioDuration === undefined

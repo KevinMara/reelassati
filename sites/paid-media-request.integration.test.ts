@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
+import {
+  SOUND_EFFECT_MODEL,
+  soundEffectCredits,
+} from "../contracts/audio-generation";
+import { finishSoundEffectAudio } from "./music-generation";
 import worker from "./server";
 import {
   imageCreditCost,
@@ -9,6 +15,7 @@ import {
 
 const sqlite = new DatabaseSync(":memory:");
 let failFinalCacheWrite = false;
+let failMeasuredSettlement = false;
 class Statement {
   values: Array<string | number | null> = [];
   constructor(readonly sql: string) {}
@@ -26,6 +33,13 @@ class Statement {
     };
   }
   execute() {
+    if (
+      failMeasuredSettlement &&
+      /UPDATE credit_ledger SET\s+amount = \?/i.test(this.sql)
+    ) {
+      failMeasuredSettlement = false;
+      throw new Error("Simulated measured settlement failure");
+    }
     if (
       failFinalCacheWrite &&
       /UPDATE paid_media_requests SET status='completed'/i.test(this.sql)
@@ -94,6 +108,10 @@ let providerCalls = 0;
 const providerRequests: Array<Record<string, unknown>> = [];
 let providerGate: Promise<void> | undefined;
 let providerFailure = false;
+let soundResponse: (() => Response) | undefined;
+const soundBytes = new Uint8Array(
+  readFileSync(new URL("./__fixtures__/music-mp3-vbr.mp3", import.meta.url))
+);
 async function request(
   path: string,
   body?: unknown,
@@ -177,6 +195,13 @@ beforeAll(async () => {
             { word: "there", start: 0.5, end: 0.9, speaker_label: "speaker_0" },
           ],
         });
+      if (url.endsWith("/audio/speech"))
+        if (providerRequests.at(-1)?.model === SOUND_EFFECT_MODEL)
+          return soundResponse
+            ? soundResponse()
+            : new Response(soundBytes.slice(), {
+                headers: { "Content-Type": "audio/mpeg" },
+              });
       if (url.endsWith("/audio/speech"))
         return new Response(
           new Uint8Array([0xff, 0xfb, 0x90, 0x64, 1, 2, 3, 4]),
@@ -478,5 +503,187 @@ describe("durable paid media request IDs on the actual worker", () => {
     ).toBe(422);
     expect(providerCalls).toBe(calls);
     expect(balance()).toBe(before);
+  });
+});
+
+const sfxPayload = (id: string) => ({
+  kind: "sfx",
+  seconds: 0.5,
+  text: "A crisp original camera shutter",
+  rightsConfirmed: true,
+  requestId: id,
+  acceptedCredits: 150,
+});
+describe("OpenRouter custom sound effects on the actual worker", () => {
+  it("requires the accepted maximum balance before any paid provider call", async () => {
+    const before = balance(),
+      calls = providerCalls;
+    const buckets = sqlite
+      .prepare(
+        "SELECT included_balance, topup_balance FROM credit_accounts WHERE owner_email='owner@example.com'"
+      )
+      .get()!;
+    sqlite
+      .prepare(
+        "UPDATE credit_accounts SET included_balance=10, topup_balance=0 WHERE owner_email='owner@example.com'"
+      )
+      .run();
+    try {
+      expect(
+        (
+          await request(
+            "/api/ai/audio",
+            sfxPayload("seed-sfx-insufficient-0123456789")
+          )
+        ).status
+      ).toBe(402);
+      expect(providerCalls).toBe(calls);
+      expect(balance()).toBe(10);
+    } finally {
+      sqlite
+        .prepare(
+          "UPDATE credit_accounts SET included_balance=?, topup_balance=? WHERE owner_email='owner@example.com'"
+        )
+        .run(buckets.included_balance, buckets.topup_balance);
+    }
+    expect(balance()).toBe(before);
+  });
+  it("quotes a maximum hold with an honest requested-duration estimate without calling a provider", async () => {
+    const before = balance(),
+      calls = providerCalls;
+    const response = await request("/api/ai/audio/quote", {
+      kind: "sfx",
+      seconds: 5,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      credits: 150,
+      estimatedCredits: 7,
+      billing: "measured",
+    });
+    expect(providerCalls).toBe(calls);
+    expect(balance()).toBe(before);
+  });
+  it("uses the existing key, omits voice/provider options, measures before trimming and returns the unused hold", async () => {
+    const before = balance(),
+      calls = providerCalls;
+    const expected = soundEffectCredits(
+      finishSoundEffectAudio(soundBytes.slice().buffer, 0.5).providerDuration
+    );
+    const body = sfxPayload("seed-sfx-success-0123456789");
+    const response = await request("/api/ai/audio", body);
+    expect(response.status).toBe(201);
+    const result = await response.json();
+    expect(result).toMatchObject({
+      creditsCharged: expected,
+      reservedCredits: 150,
+      asset: {
+        kind: "audio",
+        contentType: "audio/mpeg",
+        duration: 0.5,
+        provenance: { origin: "ai-generated" },
+      },
+    });
+    expect(providerRequests.at(-1)).toEqual({
+      model: SOUND_EFFECT_MODEL,
+      input: expect.stringContaining(body.text),
+      response_format: "mp3",
+    });
+    expect(balance()).toBe(before - expected);
+    expect((await request("/api/ai/audio", body)).status).toBe(409);
+    expect(providerCalls).toBe(calls + 1);
+    expect(balance()).toBe(before - expected);
+    const asset = sqlite
+      .prepare("SELECT owner_email, r2_key FROM assets WHERE id=?")
+      .get(result.asset.id)!;
+    expect(asset.owner_email).toBe("owner@example.com");
+    expect(objects.has(String(asset.r2_key))).toBe(true);
+    const ledger = sqlite
+      .prepare(
+        "SELECT amount, status, metadata_json FROM credit_ledger WHERE operation_key=?"
+      )
+      .get(`audio:owner@example.com:${body.requestId}`)!;
+    expect(ledger.amount).toBe(-expected);
+    expect(ledger.status).toBe("settled");
+    expect(JSON.parse(String(ledger.metadata_json))).toMatchObject({
+      reservedCredits: 150,
+      measuredCredits: expected,
+    });
+  });
+  it("rejects stale accepted cost and oversized prompts before spending", async () => {
+    const before = balance(),
+      calls = providerCalls;
+    expect(
+      (
+        await request("/api/ai/audio", {
+          ...sfxPayload("seed-sfx-stale-0123456789"),
+          acceptedCredits: 7,
+        })
+      ).status
+    ).toBe(409);
+    expect(
+      (
+        await request("/api/ai/audio", {
+          ...sfxPayload("seed-sfx-long-0123456789"),
+          text: "x".repeat(2701),
+        })
+      ).status
+    ).toBe(422);
+    expect(providerCalls).toBe(calls);
+    expect(balance()).toBe(before);
+  });
+  it.each(["provider", "invalid", "settlement"])(
+    "returns the entire hold and releases no asset after %s failure",
+    async failure => {
+      const before = balance(),
+        count = Number(
+          sqlite.prepare("SELECT COUNT(*) AS n FROM assets").get()!.n
+        );
+      providerFailure = failure === "provider";
+      soundResponse =
+        failure === "invalid"
+          ? () =>
+              new Response("invalid", {
+                headers: { "Content-Type": "audio/mpeg" },
+              })
+          : undefined;
+      failMeasuredSettlement = failure === "settlement";
+      try {
+        const response = await request(
+          "/api/ai/audio",
+          sfxPayload(`seed-sfx-${failure}-0123456789`)
+        );
+        expect(response.status).toBeGreaterThanOrEqual(500);
+        expect(balance()).toBe(before);
+        expect(
+          Number(sqlite.prepare("SELECT COUNT(*) AS n FROM assets").get()!.n)
+        ).toBe(count);
+      } finally {
+        providerFailure = false;
+        soundResponse = undefined;
+        failMeasuredSettlement = false;
+      }
+    }
+  );
+  it("claims a duplicate concurrent request once while holding the full maximum", async () => {
+    const before = balance(),
+      calls = providerCalls;
+    let resolve!: () => void;
+    providerGate = new Promise<void>(r => {
+      resolve = r;
+    });
+    const body = sfxPayload("seed-sfx-concurrent-0123456789");
+    const first = request("/api/ai/audio", body);
+    try {
+      await vi.waitFor(() => expect(providerCalls).toBe(calls + 1));
+      expect(balance()).toBe(before - 150);
+      expect((await request("/api/ai/audio", body)).status).toBe(409);
+      resolve();
+      expect((await first).status).toBe(201);
+      expect(providerCalls).toBe(calls + 1);
+    } finally {
+      resolve();
+      providerGate = undefined;
+    }
   });
 });

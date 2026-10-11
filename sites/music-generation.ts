@@ -286,8 +286,9 @@ function mp3Frame(bytes: Uint8Array, start: number): Mp3Frame {
 /** Lossless tail trim. Retain every leading frame so Layer III bit reservoirs remain intact. */
 function finishMusicMp3(
   buffer: ArrayBuffer,
-  seconds: number
-): FinishedMusicAudio {
+  seconds: number,
+  soundEffect = false
+): FinishedMusicAudio & { providerDuration?: number } {
   const input = new Uint8Array(buffer);
   if (input.length > 16 * 1024 * 1024) throw invalidMp3();
   let start = 0;
@@ -381,7 +382,13 @@ function finishMusicMp3(
   }
   const availableFrames = frames.length - metadataFrames;
   const availableSamples = availableFrames * first.samples - delay - padding;
-  const requestedSamples = Math.round(seconds * first.rate);
+  const providerDuration = availableSamples / first.rate;
+  // Untagged MP3 can contain one frame of encoder padding at the 120s cap.
+  if (providerDuration <= 0 || (soundEffect && providerDuration > 120.1))
+    throw invalidMp3();
+  const requestedSamples = Math.round(
+    (soundEffect ? Math.min(seconds, providerDuration) : seconds) * first.rate
+  );
   if (availableSamples < requestedSamples)
     throw new MusicGenerationError(
       "The generated music is shorter than requested. Please retry."
@@ -485,7 +492,76 @@ function finishMusicMp3(
     duration: gapless
       ? requestedSamples / first.rate
       : (keptAudioFrames * first.samples) / first.rate,
+    ...(soundEffect
+      ? { providerDuration: Math.min(120, providerDuration) }
+      : {}),
   };
+}
+
+/** Validate and measure native MP3 before trimming an editor excerpt. */
+export function finishSoundEffectAudio(buffer: ArrayBuffer, seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0.5 || seconds > 30)
+    throw new MusicGenerationError("Invalid sound-effect excerpt duration.");
+  try {
+    const result = finishMusicMp3(buffer, seconds, true);
+    return { ...result, providerDuration: result.providerDuration! };
+  } catch (cause) {
+    if (cause instanceof MusicGenerationError)
+      throw new MusicGenerationError(
+        cause.message.replaceAll("music", "sound-effect")
+      );
+    throw cause;
+  }
+}
+
+/** Bound raw provider output before allocating storage or parsing MPEG frames. */
+export async function readSoundEffectAudio(
+  response: Response
+): Promise<ArrayBuffer> {
+  const limit = 16 * 1024 * 1024;
+  const contentType = response.headers
+    .get("content-type")
+    ?.split(";")[0]
+    .trim();
+  if (
+    !["audio/mpeg", "audio/mp3"].includes(contentType || "") ||
+    Number(response.headers.get("content-length")) > limit
+  ) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new MusicGenerationError(
+      "The sound-effect provider returned unsupported audio."
+    );
+  }
+  const reader = response.body?.getReader();
+  if (!reader)
+    throw new MusicGenerationError(
+      "The sound-effect provider returned no audio."
+    );
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel().catch(() => undefined);
+        throw new MusicGenerationError(
+          "The sound-effect output exceeded its size limit."
+        );
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes.buffer;
 }
 
 /** Preserve the provider's native codec; Lyria Clip currently returns MP3. */

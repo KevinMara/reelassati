@@ -86,12 +86,7 @@ export async function serviceDiagnostics(
   fetcher: typeof fetch = fetch
 ): Promise<ServiceDiagnostics> {
   const missing: SoundEffectEnvironmentName[] = [];
-  if (!env.ELEVENLABS_API_KEY?.trim()) missing.push("ELEVENLABS_API_KEY");
-  if (env.ELEVENLABS_COMMERCIAL_ENABLED !== "true")
-    missing.push("ELEVENLABS_COMMERCIAL_ENABLED");
-  const soundEffectRate = Number(env.ELEVENLABS_SFX_USD_PER_SECOND);
-  if (!Number.isFinite(soundEffectRate) || soundEffectRate <= 0)
-    missing.push("ELEVENLABS_SFX_USD_PER_SECOND");
+  if (!env.OPENROUTER_API_KEY?.trim()) missing.push("OPENROUTER_API_KEY");
 
   let status: AiConnectionStatus = "not-configured";
   const key = env.OPENROUTER_API_KEY?.trim();
@@ -132,8 +127,8 @@ export async function serviceDiagnostics(
       configured: missing.length === 0,
       missing,
       note: missing.length
-        ? "Voice uses the existing OpenRouter key. Dedicated ElevenLabs SFX is not listed on OpenRouter; Seed Audio is a candidate, but its duration and cost bounds have not been verified for this integration. AI SFX is not enabled. The existing sound library is available. No sound request was made."
-        : "The server sound settings are present. ElevenLabs authorization, account eligibility, and generated output have not been tested.",
+        ? "Configure the existing OpenRouter key to enable AI sound effects. The sound library remains available. No generation request was made."
+        : "Sound effects use Seed Audio through the existing OpenRouter key. Credits cover measured provider output with the agreed delivery allowance; unused reserved credits are returned. Account funding, model access and generated quality have not been tested by this check.",
     },
     generationTested: false,
   };

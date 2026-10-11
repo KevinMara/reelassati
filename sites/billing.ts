@@ -887,6 +887,70 @@ export async function releaseCreditReservation(
   ]);
 }
 
+/** Atomically keep the measured debit and refund the unused hold to its original buckets. */
+export async function settleMeasuredCreditReservation(
+  env: BillingEnvironment,
+  reservation: CreditReservation,
+  actualCost: number
+): Promise<void> {
+  if (
+    !Number.isSafeInteger(actualCost) ||
+    actualCost < 1 ||
+    actualCost > reservation.cost
+  )
+    throw new Error("Measured credit cost exceeds the accepted reservation.");
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE credit_accounts SET
+      included_balance = included_balance + COALESCE((
+        SELECT -included_amount - MIN(-included_amount, ?)
+        FROM credit_ledger WHERE id = ? AND status = 'reserved' AND amount = ? AND applied = 1
+      ), 0),
+      topup_balance = topup_balance + COALESCE((
+        SELECT -topup_amount - (? - MIN(-included_amount, ?))
+        FROM credit_ledger WHERE id = ? AND status = 'reserved' AND amount = ? AND applied = 1
+      ), 0), updated_at = ?
+      WHERE owner_email = (SELECT owner_email FROM credit_ledger WHERE id = ?)`
+    ).bind(
+      actualCost,
+      reservation.id,
+      -reservation.cost,
+      actualCost,
+      actualCost,
+      reservation.id,
+      -reservation.cost,
+      now,
+      reservation.id
+    ),
+    env.DB.prepare(
+      `UPDATE credit_ledger SET
+      amount = ?, included_amount = -MIN(-included_amount, ?),
+      topup_amount = -(? - MIN(-included_amount, ?)),
+      metadata_json = json_set(COALESCE(metadata_json, '{}'), '$.reservedCredits', ?, '$.measuredCredits', ?),
+      status = 'settled', settled_at = ?
+      WHERE id = ? AND status = 'reserved' AND amount = ? AND applied = 1`
+    ).bind(
+      -actualCost,
+      actualCost,
+      actualCost,
+      actualCost,
+      reservation.cost,
+      actualCost,
+      now,
+      reservation.id,
+      -reservation.cost
+    ),
+  ]);
+  const row = await env.DB.prepare(
+    "SELECT amount, status FROM credit_ledger WHERE id = ?"
+  )
+    .bind(reservation.id)
+    .first<{ amount: number; status: string }>();
+  if (!row || row.status !== "settled" || row.amount !== -actualCost)
+    throw new Error("Measured credit settlement could not be finalized.");
+}
+
 export async function grantOperatorCredits(
   env: BillingEnvironment,
   email: string,
