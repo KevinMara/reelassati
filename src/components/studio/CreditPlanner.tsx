@@ -4,6 +4,7 @@ import {
   PLAN_IDS,
   PLAN_NAME_BY_ID,
   planEntitlements,
+  speechCreditRate,
 } from "@contracts/billing";
 
 const ACTIVITIES = [
@@ -37,7 +38,10 @@ export function CreditPlanner() {
   const [counts, setCounts] = useState<Record<string, number>>(
     Object.fromEntries(ACTIVITIES.map(a => [a.key, a.initial]))
   );
-  const total = ACTIVITIES.reduce(
+  const activities = ACTIVITIES.map(a =>
+    a.key === "voice" ? { ...a, cost: speechCreditRate() } : a
+  );
+  const total = activities.reduce(
     (sum, a) => sum + (counts[a.key] || 0) * a.cost,
     0
   );
@@ -61,7 +65,7 @@ export function CreditPlanner() {
         </div>
       </div>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {ACTIVITIES.map(a => (
+        {activities.map(a => (
           <label key={a.key} className="text-sm">
             <span className="block min-h-10 text-foreground/80">{a.label}</span>
             <input

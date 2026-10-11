@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   AI_CREDIT_COSTS,
+  speechCreditRate,
   CREDIT_TOP_UPS,
   PLAN_NAME_BY_ID,
   isBillingCycle,
@@ -481,8 +482,9 @@ export default function BillingPage() {
           </div>
           <p className="mt-2 text-xs text-foreground/60">
             Voice rates: multilingual voices / existing language-specific
-            voices. Transcription is charged per started minute; voice text per
-            started 1,000 characters.
+            voices. Voice is charged for the actual text length, rounded up to
+            whole credits (minimum 1). Transcription is charged per started
+            minute.
           </p>
           <div className="mt-4 space-y-2 text-sm">
             {[
@@ -493,7 +495,7 @@ export default function BillingPage() {
               ["2K image", `${AI_CREDIT_COSTS.image2K}`],
               [
                 "Voice · each 1,000 characters",
-                `${AI_CREDIT_COSTS.speechPerThousandCharacters} / ${AI_CREDIT_COSTS.legacySpeechPerThousandCharacters}`,
+                `${speechCreditRate()} / ${speechCreditRate("English_Graceful_Lady")}`,
               ],
               [
                 "Video analysis · minute",
@@ -527,6 +529,13 @@ export default function BillingPage() {
               </div>
             ))}
           </div>
+          {speechCreditRate() < AI_CREDIT_COSTS.speechPerThousandCharacters && (
+            <p className="mt-3 text-xs text-foreground/60">
+              Voice launch rate through 19 October 2026, 15:00 UTC. After that,
+              multilingual voice costs 20 credits per 1,000 characters,
+              proportional to text length.
+            </p>
+          )}
         </section>
 
         <section className="rounded-2xl border border-border bg-surface p-6">
@@ -538,10 +547,7 @@ export default function BillingPage() {
             {[
               ["scripts", AI_CREDIT_COSTS.script],
               ["1K images", AI_CREDIT_COSTS.image1K],
-              [
-                "1,000-character voice clips",
-                AI_CREDIT_COSTS.speechPerThousandCharacters,
-              ],
+              ["1,000-character voice clips", speechCreditRate()],
               [
                 "15s 720p videos without audio",
                 AI_CREDIT_COSTS.video720pPerSecond * 15,

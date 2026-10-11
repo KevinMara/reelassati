@@ -934,6 +934,7 @@ export const platformApi = {
   },
   synthesizeSpeech: async (input: {
     requestId?: string;
+    acceptedCredits?: number;
     text: string;
     voice: string;
     assetName?: string;
@@ -942,7 +943,7 @@ export const platformApi = {
   }): Promise<Asset> => {
     const result = await requestJson<{ asset: Asset }>("/api/ai/speech", {
       method: "POST",
-      body: JSON.stringify({ ...input, acceptedCredits: speechCreditCost(speechCharacterCount(input.text), input.voice) }),
+      body: JSON.stringify({ ...input, acceptedCredits: input.acceptedCredits ?? speechCreditCost(speechCharacterCount(input.text), input.voice) }),
     });
     return result.asset;
   },

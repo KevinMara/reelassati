@@ -132,7 +132,7 @@ export async function serviceDiagnostics(
       configured: missing.length === 0,
       missing,
       note: missing.length
-        ? "Configure the listed server settings with an eligible commercial ElevenLabs account and its actual positive USD cost per generated second. No sound request was made."
+        ? "Voice uses the existing OpenRouter key. Dedicated ElevenLabs SFX is not listed on OpenRouter; Seed Audio is a candidate, but its duration and cost bounds have not been verified for this integration. AI SFX is not enabled. The existing sound library is available. No sound request was made."
         : "The server sound settings are present. ElevenLabs authorization, account eligibility, and generated output have not been tested.",
     },
     generationTested: false,

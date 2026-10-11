@@ -41,9 +41,10 @@ export const AI_CREDIT_COSTS = {
   script: 5,
   editPlan: 5,
   videoAnalysisPerMinute: 10,
-  // Regular Scribe price ($0.000061111/second) plus the existing 50% delivery allowance.
+  // Regular Scribe price ($0.000061111/second), with delivery headroom.
   transcriptionPerMinute: 2,
-  // Regular Flash price ($40/M characters), with the existing 50% delivery allowance.
+  // Regular v4 Turbo price ($40/M characters), with 50% delivery headroom.
+  // This is a cost allowance, not the subscription/top-up contribution margin.
   speechPerThousandCharacters: 20,
   legacySpeechPerThousandCharacters: 30,
   image1K: 20,
@@ -82,15 +83,37 @@ export function imageCreditCost(resolution: string): number {
 export function speechCharacterCount(text: string): number {
   return Array.from(text).length;
 }
+
+// OpenRouter's documented 50% launch offer ends October 19 at 8am Pacific.
+export const ELEVENLABS_LAUNCH_START_MS = Date.parse("2026-10-07T00:00:00Z");
+export const ELEVENLABS_LAUNCH_END_MS = Date.parse("2026-10-19T15:00:00Z");
+export function speechCreditRate(
+  voice = DEFAULT_VOICE_ID,
+  at = Date.now()
+): number {
+  if (speechModelForVoice(voice) !== ELEVENLABS_SPEECH_MODEL)
+    return AI_CREDIT_COSTS.legacySpeechPerThousandCharacters;
+  return (
+    AI_CREDIT_COSTS.speechPerThousandCharacters *
+    (at >= ELEVENLABS_LAUNCH_START_MS && at < ELEVENLABS_LAUNCH_END_MS
+      ? 0.5
+      : 1)
+  );
+}
+
 export function speechCreditCost(
   characterCount: number,
-  voice = DEFAULT_VOICE_ID
+  voice = DEFAULT_VOICE_ID,
+  at = Date.now()
 ): number {
-  const rate =
-    speechModelForVoice(voice) === ELEVENLABS_SPEECH_MODEL
-      ? AI_CREDIT_COSTS.speechPerThousandCharacters
-      : AI_CREDIT_COSTS.legacySpeechPerThousandCharacters;
-  return Math.max(1, Math.ceil(Math.max(0, characterCount) / 1_000)) * rate;
+  if (!Number.isFinite(characterCount))
+    throw new Error("A valid voice character count is required.");
+  return Math.max(
+    1,
+    Math.ceil(
+      (Math.max(0, characterCount) * speechCreditRate(voice, at)) / 1_000
+    )
+  );
 }
 
 export function timedCreditCost(

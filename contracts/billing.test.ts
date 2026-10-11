@@ -8,6 +8,9 @@ import {
   planEntitlements,
   speechCreditCost,
   speechCharacterCount,
+  speechCreditRate,
+  ELEVENLABS_LAUNCH_START_MS,
+  ELEVENLABS_LAUNCH_END_MS,
   timedCreditCost,
   videoCreditCost,
   deliveryBudgetUsd,
@@ -55,15 +58,48 @@ describe("billing contracts", () => {
   it("quotes image, speech, transcription and analysis credits deterministically", () => {
     expect(imageCreditCost("1K")).toBe(20);
     expect(imageCreditCost("2K")).toBe(40);
-    expect(speechCreditCost(1)).toBe(20);
-    expect(speechCreditCost(1_001)).toBe(40);
+    expect(speechCreditCost(1)).toBe(1);
+    expect(speechCreditCost(1_001, "sarah", ELEVENLABS_LAUNCH_END_MS)).toBe(21);
     expect(speechCreditCost(1_000, "English_Graceful_Lady")).toBe(30);
-    expect(speechCreditCost(1_000, "sarah")).toBe(20);
+    expect(speechCreditCost(1_000, "sarah", ELEVENLABS_LAUNCH_END_MS)).toBe(20);
     expect(speechCharacterCount("ciao 😀")).toBe(6);
     expect(timedCreditCost(61, AI_CREDIT_COSTS.transcriptionPerMinute)).toBe(4);
     expect(timedCreditCost(61, AI_CREDIT_COSTS.videoAnalysisPerMinute)).toBe(
       20
     );
+  });
+
+  it("passes through the verified launch discount and expires it at 8am Pacific", () => {
+    expect(speechCreditRate("sarah", ELEVENLABS_LAUNCH_START_MS - 1)).toBe(20);
+    expect(speechCreditRate("sarah", ELEVENLABS_LAUNCH_START_MS)).toBe(10);
+    expect(speechCreditRate("sarah", ELEVENLABS_LAUNCH_END_MS - 1)).toBe(10);
+    expect(speechCreditRate("sarah", ELEVENLABS_LAUNCH_END_MS)).toBe(20);
+    expect(
+      speechCreditRate("English_Graceful_Lady", ELEVENLABS_LAUNCH_START_MS)
+    ).toBe(30);
+    expect(speechCreditCost(100, "sarah", ELEVENLABS_LAUNCH_START_MS)).toBe(1);
+    expect(speechCreditCost(100, "sarah", ELEVENLABS_LAUNCH_END_MS)).toBe(2);
+    expect(speechCreditCost(1_001, "sarah", ELEVENLABS_LAUNCH_START_MS)).toBe(
+      11
+    );
+    expect(() => speechCreditCost(Infinity)).toThrow(/character count/);
+  });
+
+  it("covers provider costs plus delivery headroom within the accepted credit budget", () => {
+    for (const characters of [1, 50, 100, 999, 1_000, 1_001, 5_000]) {
+      for (const at of [ELEVENLABS_LAUNCH_START_MS, ELEVENLABS_LAUNCH_END_MS]) {
+        const usdPerCharacter =
+          at < ELEVENLABS_LAUNCH_END_MS ? 0.00002 : 0.00004;
+        expect(
+          deliveryBudgetUsd(speechCreditCost(characters, "sarah", at)) + 1e-12
+        ).toBeGreaterThanOrEqual(characters * usdPerCharacter * 1.5);
+      }
+      expect(
+        deliveryBudgetUsd(
+          speechCreditCost(characters, "English_Graceful_Lady")
+        ) + 1e-12
+      ).toBeGreaterThanOrEqual(characters * 0.00006 * 1.5);
+    }
   });
 
   it("prices new and continued video clips from the chosen settings", () => {

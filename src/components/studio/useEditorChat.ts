@@ -560,6 +560,7 @@ export function useEditorChat(
         } else if (action.media === "speech") {
           asset = await platformApi.synthesizeSpeech({
             requestId: id,
+            acceptedCredits: action.credits,
             text: action.prompt,
             voice: action.voice ?? "sarah",
             assetName: record.outputName,

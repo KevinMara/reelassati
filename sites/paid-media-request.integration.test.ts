@@ -1,7 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import worker from "./server";
-import { imageCreditCost, speechCreditCost } from "../contracts/billing";
+import {
+  imageCreditCost,
+  speechCreditCost,
+  ELEVENLABS_LAUNCH_END_MS,
+} from "../contracts/billing";
 
 const sqlite = new DatabaseSync(":memory:");
 let failFinalCacheWrite = false;
@@ -269,29 +273,31 @@ describe("durable paid media request IDs on the actual worker", () => {
     expect(providerCalls).toBe(calls + 1);
     expect(balance()).toBe(before - 4);
   });
-  it("routes ElevenLabs voices to Flash at the shown price and replays without a second charge", async () => {
+  it("routes ElevenLabs voices to v4 Turbo at the shown price and replays without a second charge", async () => {
     const before = balance(),
       calls = providerCalls;
     const body = {
       ...payload("speech", "elevenlabs-speech-0123456789"),
+      text: "x".repeat(1_000),
       voice: "sarah",
-      acceptedCredits: 20,
+      acceptedCredits: speechCreditCost(1_000, "sarah"),
     };
     const first = await request("/api/ai/speech", body);
     expect(first.status).toBe(201);
     expect(providerRequests.at(-1)).toMatchObject({
-      model: "elevenlabs/eleven-flash-v2.5",
+      model: "elevenlabs/eleven-v4-turbo",
       voice: "sarah",
       response_format: "mp3",
     });
-    expect(balance()).toBe(before - 20);
+    expect(balance()).toBe(before - body.acceptedCredits);
     const output = await first.json();
     const again = await request("/api/ai/speech", body);
     expect(await again.json()).toEqual(output);
     expect(providerCalls).toBe(calls + 1);
-    expect(balance()).toBe(before - 20);
+    expect(balance()).toBe(before - body.acceptedCredits);
     const legacy = await request("/api/ai/speech", {
       ...payload("speech"),
+      text: "x".repeat(1_000),
       acceptedCredits: 30,
     });
     expect(legacy.status).toBe(201);
@@ -299,7 +305,7 @@ describe("durable paid media request IDs on the actual worker", () => {
       model: "minimax/speech-2.8-turbo",
       voice: "English_Graceful_Lady",
     });
-    expect(balance()).toBe(before - 50);
+    expect(balance()).toBe(before - body.acceptedCredits - 30);
   });
   it("rejects unpriced voices and stale quotes before provider usage or credit debit", async () => {
     const before = balance(),
@@ -323,6 +329,34 @@ describe("durable paid media request IDs on the actual worker", () => {
     ).toBe(422);
     expect(providerCalls).toBe(calls);
     expect(balance()).toBe(before);
+  });
+
+  it("rejects an expired launch quote before spending and accepts the reviewed regular rate", async () => {
+    const before = balance(),
+      calls = providerCalls;
+    const clock = vi
+      .spyOn(Date, "now")
+      .mockReturnValue(ELEVENLABS_LAUNCH_END_MS);
+    try {
+      const body = {
+        ...payload("speech"),
+        text: "x".repeat(1_000),
+        voice: "sarah",
+        acceptedCredits: 10,
+      };
+      expect((await request("/api/ai/speech", body)).status).toBe(409);
+      expect(providerCalls).toBe(calls);
+      expect(balance()).toBe(before);
+      const response = await request("/api/ai/speech", {
+        ...body,
+        acceptedCredits: 20,
+      });
+      expect(response.status).toBe(201);
+      expect(providerCalls).toBe(calls + 1);
+      expect(balance()).toBe(before - 20);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it.each(["image", "speech"] as const)(

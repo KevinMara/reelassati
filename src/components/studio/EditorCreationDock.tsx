@@ -165,7 +165,7 @@ export function EditorCreationDock({
           continuation: false,
         })
       : kind === "voice"
-        ? speechCreditCost(speechCharacterCount(prompt), voice)
+        ? speechCreditCost(speechCharacterCount(prompt.trim()), voice)
         : imageCreditCost("1K");
   const available =
     kind === "image"
@@ -201,6 +201,7 @@ export function EditorCreationDock({
               })
             : selectedKind === "voice"
               ? platformApi.synthesizeSpeech({
+                  acceptedCredits: unitCost,
                   text,
                   voice,
                   assetName: record.outputName,

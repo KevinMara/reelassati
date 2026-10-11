@@ -10,7 +10,7 @@ export const ELEVENLABS_VOICE_CATALOG_SOURCE =
   "https://openrouter.ai/api/v1/models?output_modalities=speech";
 export const VOICE_CATALOG_CHECKED_AT = "2026-10-11";
 export const DEFAULT_VOICE_ID = "sarah";
-export const ELEVENLABS_SPEECH_MODEL = "elevenlabs/eleven-flash-v2.5";
+export const ELEVENLABS_SPEECH_MODEL = "elevenlabs/eleven-v4-turbo";
 export const LEGACY_SPEECH_MODEL = "minimax/speech-2.8-turbo";
 export const TRANSCRIPTION_MODEL = "elevenlabs/scribe-v2";
 /** OpenRouter's documented premade IDs; no cloned or account-specific voices. */

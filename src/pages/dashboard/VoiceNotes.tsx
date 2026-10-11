@@ -322,6 +322,10 @@ export default function VoiceNotes() {
     }
   };
 
+  const speechCredits = speechCreditCost(
+    speechCharacterCount(speechText.trim()),
+    voiceId
+  );
   const handleSynthesize = async () => {
     if (
       !speechText.trim() ||
@@ -337,6 +341,7 @@ export default function VoiceNotes() {
     setSpeechAsset(null);
     try {
       const asset = await platformApi.synthesizeSpeech({
+        acceptedCredits: speechCredits,
         text: speechText.trim(),
         voice: voiceId.trim(),
         assetName: speechAssetName.trim(),
@@ -718,12 +723,7 @@ export default function VoiceNotes() {
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Generate speech ·{" "}
-                  {speechCreditCost(
-                    speechCharacterCount(speechText),
-                    voiceId
-                  )}{" "}
-                  credits
+                  Generate speech · {speechCredits} credits
                 </>
               )}
             </button>

@@ -182,8 +182,8 @@ export function VoiceSelector({
       )}
       {selected?.tags.includes("multilingual") && (
         <p className="text-[11px] text-muted-foreground">
-          Speaks 32 languages, including Italian. Uses the lower voice credit
-          rate.
+          Speaks 90+ languages, including Italian, with expressive delivery.
+          Uses the lower voice credit rate.
         </p>
       )}
       {showPreview && selected && (
