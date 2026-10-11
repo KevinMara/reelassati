@@ -113,7 +113,7 @@ export function buildRenderPlan(
           ? Math.min(max, Math.max(min, value!))
           : fallback;
       const grade = colorGradeFilter(clip);
-      const transform = visualRenderFilter(clip);
+      const transform = visualRenderFilter(clip, { width, height });
       const fades = [
         clip.fadeIn
           ? `fade=t=in:st=0:d=${number(Math.min(clip.duration, bounded(clip.fadeIn, 0, 0, 5)))}:alpha=1`

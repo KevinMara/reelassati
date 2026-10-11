@@ -146,10 +146,16 @@ const guides: Record<string, PageGuide> = {
         "La modalità con conferma chiede il permesso per aggiunte facoltative oltre la richiesta. La modalità automatica le consente. Il lavoro richiesto e i passaggi necessari non richiedono conferme ripetute; le azioni a pagamento rispettano i limiti di crediti mostrati."
       ),
       section(
+        "Build a motion kit",
+        "Crea un kit animato",
+        "Open Graphics → Motion kits for a brand reveal, speaker introduction, chapter, quote, statistic or closing card. Edit the text, accent and duration; the brand reveal can use a logo from Library. Add at the playhead, then refine the grouped layers on the timeline. Undo removes the whole insertion. These native templates use no AI credits.",
+        "Apri Grafica → Motion kits per un’introduzione del brand, un nome con ruolo, un capitolo, una citazione, una statistica o una chiusura. Modifica testo, colore e durata; il brand può usare un logo dalla Libreria. Inserisci alla testina e regola le clip raggruppate nella timeline. Annulla rimuove l’intero inserimento. Questi template non consumano crediti AI."
+      ),
+      section(
         "Refine, review, and export",
         "Rifinisci, rivedi ed esporta",
-        "Play the whole edit, check caption timing and audio, and adjust project format and duration before export. Undo and Redo recover editing changes. Export creates a video file; it does not publish to your social accounts.",
-        "Riproduci tutto il montaggio, controlla tempi dei sottotitoli e audio, poi regola formato e durata del progetto prima dell’esportazione. Annulla e Ripeti recuperano le modifiche. Esporta crea un file video; non pubblica sui social."
+        "Review the whole edit before export. Your current device renders the video: keep the page open, and try 720p or a shorter edit if memory is limited. Download-only avoids a Library upload; Library saving makes the result available for later publication. AI media needs Library saving to finalize its source marking. Rendering uses no AI credits. AI generation, hosting and storage still have costs and allowances.",
+        "Rivedi tutto il montaggio prima di esportare. Il dispositivo in uso crea il video: lascia aperta la pagina e prova 720p o un montaggio più corto se la memoria è limitata. Solo download evita il caricamento in Libreria; salvare in Libreria permette di pubblicare in seguito. I media AI richiedono il salvataggio per finalizzare la marcatura d’origine. Il rendering non consuma crediti AI. Generazione AI, hosting e spazio hanno costi e disponibilità proprie."
       ),
     ],
     shortcuts: [

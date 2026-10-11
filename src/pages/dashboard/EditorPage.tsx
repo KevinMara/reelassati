@@ -1,4 +1,5 @@
 import { isPrimaryFootage } from "@contracts/timeline-layers";
+import { insertMotionKit } from "@/lib/motion-kits";
 import { normalizeReview } from "@contracts/source-review";
 import { mapChatTranscript } from "@/lib/editor-chat-execution";
 import { normalizeTranscriptWords } from "@contracts/transcript-timing";
@@ -2541,6 +2542,14 @@ export default function EditorPage() {
             project={project}
             playhead={playhead}
             onInsert={addLibraryAssetAtPlayhead}
+            onMotionKit={async draft => {
+              const identity = createId("motion-kit");
+              await commitProject("Added motion kit", p =>
+                insertMotionKit(p, workspace.assets, draft, playhead, identity)
+              );
+              setSelectedClipId(`${identity}-${draft.logoAssetId ? 1 : 0}`);
+              setExtraSelection([]);
+            }}
             onGraphic={async (graphic, seconds) => {
               await commitProject("Added motion graphic", p =>
                 applyEditOperation(p, {

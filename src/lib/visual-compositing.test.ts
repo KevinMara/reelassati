@@ -77,7 +77,64 @@ function check(bytes: Uint8Array, mode: (typeof modes)[number]) {
     expect(Math.abs(after[c] - background[c])).toBeLessThan(3);
   }
 }
+const logoPose: TimelineClip = {
+  id: "logo",
+  label: "Logo",
+  track: "overlay",
+  start: 0,
+  duration: 1,
+  inPoint: 0,
+  outPoint: 1,
+  visualStart: 0,
+  visualDuration: 1,
+  locked: false,
+  color: "#ffffff",
+  visual: normalizeVisual({
+    scale: 0.25,
+    y: -25,
+    entrance: { kind: "dissolve", duration: 0.2 },
+    exit: { kind: "dissolve", duration: 0.2 },
+  }),
+};
+const logoGraph = (clip = logoPose) =>
+  `color=white:s=64x64:r=10:d=${clip.duration},format=rgba,${visualRenderFilter(clip, { width: 64, height: 64 })},format=rgba[rgba]`;
+function checkLogo(bytes: Uint8Array, trimmed = false) {
+  const alpha = (frame: number, x: number, y: number) =>
+    bytes[(frame * 64 * 64 + y * 64 + x) * 4 + 3];
+  expect(bytes.length).toBe((trimmed ? 5 : 10) * 64 * 64 * 4);
+  expect(alpha(0, 32, 16)).toBe(trimmed ? 255 : 0);
+  expect(alpha(trimmed ? 2 : 5, 32, 16)).toBe(255);
+  expect(alpha(trimmed ? 2 : 5, 32, 40)).toBe(0);
+  expect(alpha(trimmed ? 2 : 5, 1, 1)).toBe(0);
+}
 describe("actual polygon masks and alpha-aware layer blending", () => {
+  it("scales contained logos with transparent padding and preserves a trimmed fade clock in native FFmpeg", () => {
+    for (const trimmed of [false, true]) {
+      const clip = trimmed
+        ? { ...logoPose, inPoint: 0.25, duration: 0.5 }
+        : logoPose;
+      const bytes = execFileSync("ffmpeg", [
+        "-v",
+        "error",
+        "-filter_complex_threads",
+        "1",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc",
+        "-filter_complex",
+        logoGraph(clip),
+        "-map",
+        "[rgba]",
+        "-t",
+        String(clip.duration),
+        "-f",
+        "rawvideo",
+        "pipe:1",
+      ]);
+      checkLogo(bytes, trimmed);
+    }
+  });
   for (const mode of modes)
     it(`composites ${mode} pixels, transparent corners and gaps in native FFmpeg`, () => {
       const bytes = execFileSync(
@@ -152,6 +209,36 @@ describe("shipped browser WASM compositor", () => {
     core.setLogger(() => {});
   });
   afterAll(() => vi.unstubAllGlobals());
+  it("runs the contained-logo fast path and trimmed animation in the shipped browser core", () => {
+    for (const trimmed of [false, true]) {
+      const clip = trimmed
+        ? { ...logoPose, inPoint: 0.25, duration: 0.5 }
+        : logoPose;
+      core.exec(
+        "-v",
+        "error",
+        "-filter_complex_threads",
+        "1",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc",
+        "-filter_complex",
+        logoGraph(clip),
+        "-map",
+        "[rgba]",
+        "-t",
+        String(clip.duration),
+        "-f",
+        "rawvideo",
+        "logo.rgba"
+      );
+      expect(core.ret).toBe(0);
+      checkLogo(core.FS.readFile("logo.rgba"), trimmed);
+      core.FS.unlink("logo.rgba");
+      core.reset();
+    }
+  }, 30000);
   for (const mode of modes)
     it(`runs real ${mode} plus polygon/opacity in the installed browser core`, () => {
       core.exec(

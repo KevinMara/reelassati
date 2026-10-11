@@ -21,7 +21,10 @@ function ease(p: string, easing: VisualEasing) {
 }
 
 /** Fixed-size inverse affine sampling avoids dynamic scale/rotate frame clipping. */
-export function visualRenderFilter(clip: TimelineClip): string {
+export function visualRenderFilter(
+  clip: TimelineClip,
+  canvas?: { width: number; height: number }
+): string {
   if (!clip.visual) return "";
   const v = normalizeVisual(clip.visual),
     clock = visualClock(clip),
@@ -130,13 +133,45 @@ export function visualRenderFilter(clip: TimelineClip): string {
     !v.flipY &&
     !Object.values(v.crop).some(Boolean) &&
     v.mask === "none";
+  // Static contained logos need only scale + transparent padding, rather than
+  // an inverse transform evaluated for every pixel of every exported frame.
+  const scaledWidth = canvas
+    ? Math.max(1, Math.round(canvas.width * v.scale))
+    : 0;
+  const scaledHeight = canvas
+    ? Math.max(1, Math.round(canvas.height * v.scale))
+    : 0;
+  const leftPad = canvas
+    ? Math.round(canvas.width * (0.5 + v.x / 100) - scaledWidth / 2)
+    : 0;
+  const topPad = canvas
+    ? Math.round(canvas.height * (0.5 + v.y / 100) - scaledHeight / 2)
+    : 0;
+  const containedPose =
+    canvas &&
+    !v.keyframes.length &&
+    v.scale < 1 &&
+    v.rotation === 0 &&
+    !v.flipX &&
+    !v.flipY &&
+    !Object.values(v.crop).some(Boolean) &&
+    v.mask === "none" &&
+    leftPad >= 0 &&
+    topPad >= 0 &&
+    leftPad + scaledWidth <= canvas.width &&
+    topPad + scaledHeight <= canvas.height;
   if (
-    plainGeometry &&
+    (plainGeometry || containedPose) &&
     [v.entrance.kind, v.exit.kind].every(
       kind => kind === "none" || kind === "dissolve"
     )
   ) {
     const filters = ["format=rgba", "settb=AVTB"];
+    if (containedPose)
+      filters.push(
+        `scale=${scaledWidth}:${scaledHeight}:flags=bilinear`,
+        `pad=${canvas!.width}:${canvas!.height}:${leftPad}:${topPad}:color=black@0`
+      );
     if (v.opacity !== 1) filters.push(`colorchannelmixer=aa=${n(v.opacity)}`);
     for (const [type, effect] of [
       ["in", v.entrance],

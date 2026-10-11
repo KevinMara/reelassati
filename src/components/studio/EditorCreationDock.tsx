@@ -44,6 +44,8 @@ import { EditorSoundLibrary } from "./EditorSoundLibrary";
 import { EditorPresetLibrary } from "./EditorPresetLibrary";
 import { PersonCutoutPanel } from "./PersonCutoutPanel";
 import { ImageDepthPanel } from "./ImageDepthPanel";
+import { MotionKitLibrary } from "./MotionKitLibrary";
+import type { MotionKitDraft } from "@contracts/motion-kits";
 
 const GlbModelComposer = lazy(async () => ({
   default: (await import("./GlbModelComposer")).GlbModelComposer,
@@ -60,6 +62,7 @@ export function EditorCreationDock({
   captions,
   effects,
   onGraphic,
+  onMotionKit,
 }: {
   onAssist?: (context: string) => void;
   activeTool: DockKind;
@@ -67,6 +70,7 @@ export function EditorCreationDock({
   captions: ReactNode;
   effects: ReactNode;
   onGraphic: (graphic: MotionGraphic, seconds: number) => Promise<void>;
+  onMotionKit: (draft: MotionKitDraft) => Promise<void>;
   project: EditProject;
   playhead: number;
   onInsert: (asset: Asset) => Promise<void>;
@@ -87,8 +91,8 @@ export function EditorCreationDock({
     "generate"
   );
   const [graphicMode, setGraphicMode] = useState<
-    "presets" | "custom" | "model"
-  >("presets");
+    "kits" | "presets" | "custom" | "model"
+  >("kits");
   const [graphicPreset, setGraphicPreset] = useState<{
     preset: GraphicPreset;
     revision: number;
@@ -364,6 +368,14 @@ export function EditorCreationDock({
             <div className="flex rounded-lg bg-background/60 p-1">
               <button
                 type="button"
+                aria-pressed={graphicMode === "kits"}
+                onClick={() => setGraphicMode("kits")}
+                className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "kits" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
+              >
+                Motion kits
+              </button>
+              <button
+                type="button"
                 aria-pressed={graphicMode === "presets"}
                 onClick={() => setGraphicMode("presets")}
                 className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "presets" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
@@ -387,6 +399,14 @@ export function EditorCreationDock({
                 3D pose
               </button>
             </div>
+            {graphicMode === "kits" && (
+              <MotionKitLibrary
+                key={project.id}
+                project={project}
+                assets={workspace.assets}
+                onInsert={onMotionKit}
+              />
+            )}
             {graphicMode === "presets" && (
               <EditorPresetLibrary
                 mode="graphics"

@@ -9,7 +9,17 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { Asset, EditProject } from "@contracts/workspace";
-import { platformApi } from "@/lib/platform-api";
+import {
+  captureUploadRequestScope,
+  platformApi,
+  verifyUploadRequestScope,
+  type UploadRequestScope,
+} from "@/lib/platform-api";
+import { selectedBrand } from "@/lib/workspace-scope";
+import {
+  deliverBrowserExport,
+  type ExportDestination,
+} from "@/lib/export-delivery";
 import { useWorkspace } from "@/providers/workspace";
 import { CompactSelect } from "@/components/ui/compact-select";
 import {
@@ -29,7 +39,19 @@ export function RenderExportPanel({
   onClose: () => void;
   onBrief: () => void;
 }) {
-  const { workspace, updateWorkspace } = useWorkspace();
+  const { workspace, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
+  const requiresMarking = Boolean(
+    project.transcriptProvenance ||
+    workspace.assets.some(
+      a => a.provenance && project.clips.some(c => c.assetId === a.id)
+    )
+  );
+  const [destination, setDestination] = useState<ExportDestination>("download");
+  const actualDestination = requiresMarking ? "library" : destination;
+  const [localDone, setLocalDone] = useState(false);
+  const [exportScope, setExportScope] = useState<UploadRequestScope | null>(
+    null
+  );
   const settingsId = useId();
   const [resolution, setResolution] = useState<ExportResolution>(720);
   const [frameRateOverride, setFrameRate] = useState<ExportFrameRate>();
@@ -50,7 +72,16 @@ export function RenderExportPanel({
     ReturnType<typeof import("@/lib/render-video").renderVideo>
   > | null>(null);
   const uploaded = useRef<Asset | null>(null);
-  useEffect(() => () => abort.current?.abort(), []);
+  const brandId = selectedBrand(workspace.profile.email.toLowerCase());
+  const workspaceChanged = Boolean(
+    exportScope &&
+    (exportScope.ownerEmail !== workspace.profile.email.toLowerCase() ||
+      exportScope.brandId !== brandId)
+  );
+  useEffect(
+    () => () => abort.current?.abort(),
+    [project.id, workspace.profile.email, brandId]
+  );
   useEffect(
     () => () => {
       if (download) URL.revokeObjectURL(download.url);
@@ -59,10 +90,27 @@ export function RenderExportPanel({
   );
 
   async function create() {
+    if (busy || workspaceChanged) return;
     setBusy(true);
     setError(null);
     abort.current = new AbortController();
     try {
+      const scope = exportScope ?? (await captureUploadRequestScope());
+      setExportScope(scope);
+      const assertTarget = () => {
+        abort.current!.signal.throwIfAborted();
+        const latest = getWorkspaceSnapshot();
+        if (
+          latest.profile.email.toLowerCase() !== scope.ownerEmail ||
+          selectedBrand(scope.ownerEmail) !== scope.brandId ||
+          !latest.projects.some(p => p.id === project.id)
+        )
+          throw new Error(
+            "The account, brand or project changed. Reopen export in the intended workspace."
+          );
+      };
+      assertTarget();
+      await verifyUploadRequestScope(scope);
       if (!pending.current) {
         const { renderVideo } = await import("@/lib/render-video");
         const result = await renderVideo(
@@ -81,71 +129,73 @@ export function RenderExportPanel({
         );
         pending.current = result;
         setHasRender(true);
-        const hasAiSource =
-          project.transcriptProvenance ||
-          workspace.assets.some(
-            a => a.provenance && project.clips.some(c => c.assetId === a.id)
-          );
-        if (!hasAiSource)
+        assertTarget();
+        if (!requiresMarking)
           setDownload({
             url: URL.createObjectURL(result.file),
             name: result.file.name,
           });
       }
       const result = pending.current;
-      setStage("Saving to your Library");
-      setProgress(96);
-      if (!uploaded.current)
-        uploaded.current = await platformApi.uploadAsset(
-          result.file,
-          "video",
-          undefined,
-          project.id
-        );
-      if (uploaded.current.contentType !== result.file.type)
-        throw new Error(
-          "The saved video has a different format than the export. Please retry saving to Library."
-        );
-      const asset = {
-        ...uploaded.current,
-        projectId: project.id,
-        duration: result.duration,
-        width: result.width,
-        height: result.height,
-      };
-      await updateWorkspace(current => ({
-        ...current,
-        assets: [asset, ...current.assets.filter(a => a.id !== asset.id)],
-        projects: current.projects.map(p =>
-          p.id === project.id ? { ...p, status: "review" as const } : p
-        ),
-      }));
+      assertTarget();
+      await verifyUploadRequestScope(scope);
+      const delivery = await deliverBrowserExport(result, {
+        destination: actualDestination,
+        requiresMarking,
+        upload: async () => {
+          setStage("Saving to your Library");
+          setProgress(99);
+          assertTarget();
+          uploaded.current ??= await platformApi.uploadAsset(
+            result.file,
+            "video",
+            undefined,
+            project.id,
+            { scope, signal: abort.current!.signal }
+          );
+          await verifyUploadRequestScope(scope);
+          assertTarget();
+          return uploaded.current;
+        },
+        save: async asset => {
+          await updateWorkspace(current => {
+            assertTarget();
+            return {
+              ...current,
+              assets: [asset, ...current.assets.filter(a => a.id !== asset.id)],
+              projects: current.projects.map(p =>
+                p.id === project.id ? { ...p, status: "review" as const } : p
+              ),
+            };
+          });
+        },
+        download: async asset => {
+          const bytes = await platformApi.downloadAsset(
+            asset.id,
+            abort.current!.signal
+          );
+          await verifyUploadRequestScope(scope);
+          assertTarget();
+          return bytes;
+        },
+      });
+      assertTarget();
+      if (delivery.file)
+        setDownload({
+          url: URL.createObjectURL(delivery.file),
+          name: delivery.file.name,
+        });
+      setSaved(delivery.asset);
+      setLocalDone(!delivery.asset);
       posthog?.capture("video_export_completed", {
         duration: result.duration,
         resolution,
         frameRate: result.frameRate,
         format: result.format,
+        destination: actualDestination,
       });
-      setSaved(asset);
-      // Download the finalized bytes, including the source's AI marking.
-      try {
-        const bytes = await platformApi.downloadAsset(
-          asset.id,
-          abort.current.signal
-        );
-        setDownload({
-          url: URL.createObjectURL(
-            new Blob([new Uint8Array(bytes).buffer], {
-              type: asset.contentType,
-            })
-          ),
-          name: result.file.name,
-        });
-      } catch {
-        /* The saved video remains downloadable from the Library. */
-      }
       setProgress(100);
-      setStage("Saved to Library");
+      setStage(delivery.asset ? "Saved to Library" : "Ready to download");
     } catch (cause) {
       setError(
         abort.current.signal.aborted
@@ -176,10 +226,31 @@ export function RenderExportPanel({
       >
         <DialogTitle>Export your video</DialogTitle>
         <DialogDescription>
-          A finished video with your cuts, images, captions, and audio. Saved to
-          your Library and ready to publish.
+          Your device renders your cuts, images, motion graphics, captions and
+          audio. Download the result or save it to your Library.
         </DialogDescription>
         <p className="font-medium">{project.title}</p>
+        <label className="text-sm" htmlFor={`${settingsId}-destination`}>
+          Save to
+          <CompactSelect
+            id={`${settingsId}-destination`}
+            aria-label="Export destination"
+            disabled={busy || hasRender || requiresMarking}
+            value={actualDestination}
+            onValueChange={value => setDestination(value as ExportDestination)}
+            options={[
+              { value: "download", label: "Download only · no Library upload" },
+              { value: "library", label: "Library · save and publish later" },
+            ]}
+          />
+        </label>
+        {requiresMarking && (
+          <p className="text-xs text-foreground/70">
+            This project includes AI media. Library saving finalizes its AI
+            source marking before download.
+          </p>
+        )}
+
         <label htmlFor={`${settingsId}-resolution`} className="text-sm">
           Resolution
           <CompactSelect
@@ -236,8 +307,9 @@ export function RenderExportPanel({
           {project.aspectRatio} canvas ·{" "}
           {exportDimensions(project.aspectRatio, resolution).width} ×{" "}
           {exportDimensions(project.aspectRatio, resolution).height} ·{" "}
-          {frameRate} fps. Keep this page open while exporting. Export uses no
-          AI credits.
+          {frameRate} fps. Rendering uses this device’s processor and memory.
+          Keep this page open while exporting. Templates and rendering use no AI
+          credits; Library storage and AI generation have their own allowances.
         </p>
         {resolution === 2160 && (
           <p className="text-sm text-foreground/70">
@@ -262,7 +334,19 @@ export function RenderExportPanel({
             {error}
           </p>
         )}
-        {saved ? (
+        {workspaceChanged ? (
+          <p role="alert" className="text-sm text-destructive">
+            The workspace changed. Close this dialog and reopen export in the
+            intended workspace.
+          </p>
+        ) : localDone ? (
+          <p
+            role="status"
+            className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm"
+          >
+            Your video is ready to download. No copy was uploaded to Library.
+          </p>
+        ) : saved ? (
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
             <p className="flex items-center gap-2 font-medium">
               <CheckCircle2 className="h-5 w-5" />
@@ -294,7 +378,7 @@ export function RenderExportPanel({
                 : `Create ${format === "mp4" ? "MP4" : "WebM"}`}
           </button>
         )}
-        {busy && progress < 96 && (
+        {busy && !hasRender && (
           <button
             type="button"
             className="text-sm text-foreground/70"
@@ -303,7 +387,7 @@ export function RenderExportPanel({
             Cancel export
           </button>
         )}
-        {download && (
+        {download && !workspaceChanged && (
           <a
             href={download.url}
             download={download.name}
