@@ -10,7 +10,7 @@ import {
 export async function transcribeMedia(
   asset: Asset,
   language: string | undefined,
-  projectId: string,
+  projectId: string | undefined,
   onProgress?: (stage: string) => void,
   signal?: AbortSignal,
   requestScope?: UploadRequestScope

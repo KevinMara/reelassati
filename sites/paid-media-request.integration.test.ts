@@ -87,6 +87,7 @@ const env = {
   ASSETS: { fetch: () => new Response("static") },
 };
 let providerCalls = 0;
+const providerRequests: Array<Record<string, unknown>> = [];
 let providerGate: Promise<void> | undefined;
 let providerFailure = false;
 async function request(
@@ -131,7 +132,10 @@ const payload = (kind: "image" | "speech", requestId?: string) => ({
 const cost = (kind: "image" | "speech") =>
   kind === "image"
     ? imageCreditCost("1K")
-    : speechCreditCost("A short original narration.".length);
+    : speechCreditCost(
+        "A short original narration.".length,
+        "English_Graceful_Lady"
+      );
 
 beforeAll(async () => {
   vi.stubGlobal(
@@ -145,6 +149,7 @@ beforeAll(async () => {
             ?.replace("Bearer ", ""),
         });
       providerCalls++;
+      providerRequests.push(JSON.parse(String(init?.body || "{}")));
       if (providerGate) await providerGate;
       if (providerFailure)
         return Response.json(
@@ -158,6 +163,14 @@ beforeAll(async () => {
               b64_json:
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC",
             },
+          ],
+        });
+      if (url.endsWith("/audio/transcriptions"))
+        return Response.json({
+          text: "Hello there",
+          words: [
+            { word: "Hello", start: 0.1, end: 0.4, speaker_label: "speaker_0" },
+            { word: "there", start: 0.5, end: 0.9, speaker_label: "speaker_0" },
           ],
         });
       if (url.endsWith("/audio/speech"))
@@ -181,6 +194,137 @@ afterAll(() => {
 });
 
 describe("durable paid media request IDs on the actual worker", () => {
+  it("bills Scribe from measured PCM duration and preserves actual word timestamps", async () => {
+    const bytes = new Uint8Array(44 + 32000 * 61),
+      v = new DataView(bytes.buffer);
+    const label = (offset: number, text: string) =>
+      bytes.set(new TextEncoder().encode(text), offset);
+    label(0, "RIFF");
+    v.setUint32(4, bytes.length - 8, true);
+    label(8, "WAVE");
+    label(12, "fmt ");
+    v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true);
+    v.setUint32(24, 16000, true);
+    v.setUint32(28, 32000, true);
+    v.setUint16(32, 2, true);
+    v.setUint16(34, 16, true);
+    label(36, "data");
+    v.setUint32(40, bytes.length - 44, true);
+    objects.set("fixture-scribe.wav", bytes);
+    sqlite
+      .prepare(
+        "INSERT INTO assets (id,owner_email,name,kind,content_type,bytes,r2_key,created_at) VALUES (?,?,?,?,?,?,?,?)"
+      )
+      .run(
+        "scribe-source",
+        "owner@example.com",
+        "speech.wav",
+        "audio",
+        "audio/wav",
+        bytes.length,
+        "fixture-scribe.wav",
+        new Date().toISOString()
+      );
+    const before = balance(),
+      calls = providerCalls;
+    const response = await request("/api/ai/transcribe", {
+      assetId: "scribe-source",
+      language: "en",
+    });
+    expect(response.status).toBe(200);
+    expect(providerRequests.at(-1)).toMatchObject({
+      model: "elevenlabs/scribe-v2",
+      timestamp_granularities: ["word"],
+      provider: {
+        options: { elevenlabs: { diarize: true, tag_audio_events: false } },
+      },
+    });
+    expect(balance()).toBe(before - 4);
+    const result = (await response.json()) as {
+      segments: Array<{ speaker: string; words: unknown }>;
+    };
+    expect(result.segments[0].words).toEqual([
+      { text: "Hello", start: 0.1, end: 0.4 },
+      { text: "there", start: 0.5, end: 0.9 },
+    ]);
+    expect(result.segments[0].speaker).toBe("speaker_0");
+    expect(
+      (
+        await request("/api/ai/transcribe", {
+          assetId: "scribe-source",
+          audioAssetIds: ["scribe-source", "scribe-source"],
+        })
+      ).status
+    ).toBe(422);
+    sqlite
+      .prepare(
+        "UPDATE assets SET content_type='audio/mpeg' WHERE id='scribe-source'"
+      )
+      .run();
+    expect(
+      (await request("/api/ai/transcribe", { assetId: "scribe-source" })).status
+    ).toBe(422);
+    expect(providerCalls).toBe(calls + 1);
+    expect(balance()).toBe(before - 4);
+  });
+  it("routes ElevenLabs voices to Flash at the shown price and replays without a second charge", async () => {
+    const before = balance(),
+      calls = providerCalls;
+    const body = {
+      ...payload("speech", "elevenlabs-speech-0123456789"),
+      voice: "sarah",
+      acceptedCredits: 20,
+    };
+    const first = await request("/api/ai/speech", body);
+    expect(first.status).toBe(201);
+    expect(providerRequests.at(-1)).toMatchObject({
+      model: "elevenlabs/eleven-flash-v2.5",
+      voice: "sarah",
+      response_format: "mp3",
+    });
+    expect(balance()).toBe(before - 20);
+    const output = await first.json();
+    const again = await request("/api/ai/speech", body);
+    expect(await again.json()).toEqual(output);
+    expect(providerCalls).toBe(calls + 1);
+    expect(balance()).toBe(before - 20);
+    const legacy = await request("/api/ai/speech", {
+      ...payload("speech"),
+      acceptedCredits: 30,
+    });
+    expect(legacy.status).toBe(201);
+    expect(providerRequests.at(-1)).toMatchObject({
+      model: "minimax/speech-2.8-turbo",
+      voice: "English_Graceful_Lady",
+    });
+    expect(balance()).toBe(before - 50);
+  });
+  it("rejects unpriced voices and stale quotes before provider usage or credit debit", async () => {
+    const before = balance(),
+      calls = providerCalls;
+    expect(
+      (
+        await request("/api/ai/speech", {
+          ...payload("speech"),
+          voice: "sarah",
+          acceptedCredits: 30,
+        })
+      ).status
+    ).toBe(409);
+    expect(
+      (
+        await request("/api/ai/speech", {
+          ...payload("speech"),
+          voice: "unknown-private-voice",
+        })
+      ).status
+    ).toBe(422);
+    expect(providerCalls).toBe(calls);
+    expect(balance()).toBe(before);
+  });
+
   it.each(["image", "speech"] as const)(
     "replays %s exactly with one provider call, one debit and payload collision rejection",
     async kind => {

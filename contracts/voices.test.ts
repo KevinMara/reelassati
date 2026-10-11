@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterVoices,
+  speechModelForVoice,
   findVoice,
   VOICE_CATALOG,
   VOICE_LANGUAGES,
@@ -9,7 +10,11 @@ import {
 
 describe("documented voice catalog", () => {
   it("keeps provider identifiers, language-specific samples and legacy cached previews valid", () => {
-    expect(VOICE_CATALOG.length).toBe(332);
+    expect(VOICE_CATALOG.length).toBe(353);
+    expect(speechModelForVoice("sarah")).toBe("elevenlabs/eleven-flash-v2.5");
+    expect(speechModelForVoice("Italian_Narrator")).toBe(
+      "minimax/speech-2.8-turbo"
+    );
     expect(new Set(VOICE_CATALOG.map(voice => voice.id)).size).toBe(
       VOICE_CATALOG.length
     );

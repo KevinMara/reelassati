@@ -63,7 +63,13 @@ import {
 } from "../contracts/trend-quality";
 import { SOCIAL_METRICS } from "../contracts/social-analytics";
 import { isAuthorizedMaintenanceIdentity } from "../contracts/maintenance";
-import { VOICE_PREVIEWS } from "../contracts/voices";
+import {
+  VOICE_PREVIEWS,
+  DEFAULT_VOICE_ID,
+  findVoice,
+  speechModelForVoice,
+  TRANSCRIPTION_MODEL,
+} from "../contracts/voices";
 import {
   parseSocialPost,
   type SocialAnalyticsResponse,
@@ -115,6 +121,7 @@ import {
   CREDIT_TOP_UPS,
   imageCreditCost,
   speechCreditCost,
+  speechCharacterCount,
   timedCreditCost,
   videoCreditCost,
 } from "../contracts/billing";
@@ -6349,6 +6356,14 @@ async function handleAi(
     }
     const audioParts: Array<{ row: AssetRow; duration: number }> = [];
     if (Array.isArray(input.audioAssetIds) && input.audioAssetIds.length) {
+      if (
+        input.audioAssetIds.length > 100 ||
+        new Set(input.audioAssetIds).size !== input.audioAssetIds.length
+      )
+        return errorResponse(
+          "Choose up to 100 distinct prepared speech segments",
+          422
+        );
       for (const id of input.audioAssetIds) {
         const audio = await getAssetRow(env, user, stringValue(id));
         if (
@@ -6377,9 +6392,18 @@ async function handleAi(
           "Prepare speech segments before transcribing a large recording",
           422
         );
+      if (row.content_type !== "audio/wav")
+        return errorResponse(
+          "Prepare speech segments to measure the recording before transcription",
+          422
+        );
+      const header = await env.BUCKET.get(row.r2_key, {
+        range: { offset: 0, length: Math.min(4096, row.bytes) },
+      });
+      if (!header) return errorResponse("Speech audio is missing", 404);
       audioParts.push({
         row,
-        duration: (await assetDurationSeconds(env, user, assetId)) || 0,
+        duration: pcmWaveDuration(await header.arrayBuffer(), row.bytes),
       });
     }
     const transcriptionDuration = audioParts.reduce(
@@ -6401,8 +6425,7 @@ async function handleAi(
         metadata: { durationSeconds: transcriptionDuration || null },
       },
       async () => {
-        const model =
-          env.OPENROUTER_STT_MODEL || "openai/whisper-large-v3-turbo";
+        const model = TRANSCRIPTION_MODEL;
         const invocation = await beginAiInvocation(
           env,
           user,
@@ -6425,6 +6448,7 @@ async function handleAi(
               `${OPENROUTER_BASE}/audio/transcriptions`,
               {
                 method: "POST",
+                signal: AbortSignal.timeout(180000),
                 headers: openRouterHeaders(env),
                 body: JSON.stringify({
                   model,
@@ -6434,7 +6458,12 @@ async function handleAi(
                   },
                   ...(input.language ? { language: input.language } : {}),
                   response_format: "verbose_json",
-                  timestamp_granularities: ["segment", "word"],
+                  timestamp_granularities: ["word"],
+                  provider: {
+                    options: {
+                      elevenlabs: { diarize: true, tag_audio_events: false },
+                    },
+                  },
                 }),
               }
             );
@@ -6593,15 +6622,24 @@ async function handleAi(
       );
     }
     await assertAllowedCreativeUse(env, user, text);
-    const voice = stringValue(
-      input.voice,
-      env.OPENROUTER_TTS_VOICE || "English_Graceful_Lady"
-    );
+    const voice = stringValue(input.voice, DEFAULT_VOICE_ID);
+    if (!generatedAudio && !findVoice(voice))
+      return errorResponse("Choose an available voice", 422);
+    const speechCost = speechCreditCost(speechCharacterCount(text), voice);
+    if (
+      !generatedAudio &&
+      input.acceptedCredits !== undefined &&
+      input.acceptedCredits !== speechCost
+    )
+      return errorResponse(
+        "The credit quote changed. Review the current cost before generating.",
+        409
+      );
     const model = generatedAudio
       ? kind === "music"
         ? MUSIC_MODEL
         : "eleven_text_to_sound_v2"
-      : env.OPENROUTER_TTS_MODEL || "minimax/speech-2.8-turbo";
+      : speechModelForVoice(voice);
     const operation = generatedAudio
       ? ("audio-generation" as const)
       : ("speech-synthesis" as const);
@@ -6624,7 +6662,7 @@ async function handleAi(
       env,
       user,
       {
-        cost: generatedAudio ? audioCost : speechCreditCost(text.length),
+        cost: generatedAudio ? audioCost : speechCost,
         operationKey: generatedAudio
           ? `audio:${input.requestId}`
           : mediaRequest?.operationKey || `speech:${crypto.randomUUID()}`,
@@ -6633,7 +6671,7 @@ async function handleAi(
         description: generatedAudio
           ? `AI ${kind} generation`
           : "Voice generation",
-        metadata: { characters: text.length },
+        metadata: { characters: speechCharacterCount(text) },
       },
       async () => {
         const invocation = await beginAiInvocation(
@@ -8803,7 +8841,7 @@ async function handleVoicePreview(
     email: "system-voice-previews@reelassati.app",
     name: "REELassati",
   };
-  const model = env.OPENROUTER_TTS_MODEL || "minimax/speech-2.8-turbo";
+  const model = speechModelForVoice(voice);
   const id = `voice-preview-${(await sha256Hex(`${model}:${voice}:${previewText}`)).slice(0, 32)}`;
   const r2Key = `users/${encodeURIComponent(system.email)}/generated/${id}.mp3`;
   const cached = await env.DB.prepare(

@@ -165,6 +165,7 @@ export function VoiceSelector({
           </Command>
           <p className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
             {matches.length} {matches.length === 1 ? "voice" : "voices"} ·
+            ElevenLabs voices support multilingual text at a lower credit cost.
             Choose one, then listen to its sample.
           </p>
         </PopoverContent>
@@ -177,6 +178,12 @@ export function VoiceSelector({
               {item}
             </span>
           ))}
+        </p>
+      )}
+      {selected?.tags.includes("multilingual") && (
+        <p className="text-[11px] text-muted-foreground">
+          Speaks 32 languages, including Italian. Uses the lower voice credit
+          rate.
         </p>
       )}
       {showPreview && selected && (

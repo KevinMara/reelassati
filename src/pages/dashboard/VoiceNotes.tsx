@@ -1,5 +1,6 @@
+import { resolveMediaDuration } from "@/lib/media-metadata";
 import { VoiceSelector } from "@/components/studio/VoiceSelector";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -38,6 +39,7 @@ import posthog from "@/lib/posthog";
 import {
   AI_CREDIT_COSTS,
   speechCreditCost,
+  speechCharacterCount,
   timedCreditCost,
 } from "@contracts/billing";
 
@@ -79,6 +81,8 @@ export default function VoiceNotes() {
       : "tiktok";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [fileDuration, setFileDuration] = useState<number | undefined>();
+
   const [title, setTitle] = useState("");
   const [sourceAsset, setSourceAsset] = useState<Asset | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -98,7 +102,7 @@ export default function VoiceNotes() {
   const [speechText, setSpeechText] = useState(
     requestedScript?.fullScript ?? ""
   );
-  const [voiceId, setVoiceId] = useState("English_Graceful_Lady");
+  const [voiceId, setVoiceId] = useState("sarah");
   const [speechAssetName, setSpeechAssetName] = useState(
     requestedScript
       ? `${requestedScript.title} · voiceover`
@@ -109,6 +113,25 @@ export default function VoiceNotes() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    void resolveMediaDuration({ kind: "audio", url } as Asset)
+      .then(duration => {
+        if (active) setFileDuration(duration);
+      })
+      .catch(() => {
+        if (active)
+          setError(
+            "The recording duration could not be read. Choose a playable audio file."
+          );
+      });
+    return () => {
+      active = false;
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
 
   const invalidateVoiceAttestation = () => {
     setVoiceRightsConfirmed(false);
@@ -116,6 +139,7 @@ export default function VoiceNotes() {
 
   const selectAudioFile = (nextFile: File | null) => {
     setFile(nextFile);
+    setFileDuration(undefined);
     setSourceAsset(null);
     setUploadProgress(0);
     setTranscription("");
@@ -171,9 +195,10 @@ export default function VoiceNotes() {
       "audio",
       setUploadProgress
     );
-    const asset = title.trim()
+    const renamed = title.trim()
       ? (await platformApi.renameAsset(uploaded.id, title.trim())).asset
       : uploaded;
+    const asset = { ...renamed, duration: await resolveMediaDuration(renamed) };
     setSourceAsset(asset);
     await saveAsset(asset, "Voice note uploaded");
     return asset;
@@ -207,10 +232,14 @@ export default function VoiceNotes() {
       : "uploaded_file";
     try {
       const asset = await uploadSelectedFile();
-      const result = await platformApi.transcribe(
-        asset.id,
-        language === "auto" ? undefined : language
+      const { transcribeMedia } = await import("@/lib/transcribe-media");
+      const result = await transcribeMedia(
+        asset,
+        language === "auto" ? undefined : language,
+        undefined
       );
+      if (!result.provenance)
+        throw new Error("No speech was found in this recording.");
       setTranscription(result.transcript);
       setTranscriptionProvenance(result.provenance);
       setSpeechText(withoutTextProvenanceMarker(result.transcript));
@@ -562,7 +591,8 @@ export default function VoiceNotes() {
                 disabled={
                   (!sourceAsset && !file) ||
                   Boolean(busyAction) ||
-                  !capabilities.transcription
+                  !capabilities.transcription ||
+                  !(sourceAsset?.duration || fileDuration)
                 }
                 className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
               >
@@ -578,7 +608,7 @@ export default function VoiceNotes() {
                     <AudioLines className="h-4 w-4" />
                     Transcribe ·{" "}
                     {timedCreditCost(
-                      sourceAsset?.duration,
+                      sourceAsset?.duration ?? fileDuration,
                       AI_CREDIT_COSTS.transcriptionPerMinute
                     )}{" "}
                     credits
@@ -688,7 +718,11 @@ export default function VoiceNotes() {
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Generate speech · {speechCreditCost(speechText.length)}{" "}
+                  Generate speech ·{" "}
+                  {speechCreditCost(
+                    speechCharacterCount(speechText),
+                    voiceId
+                  )}{" "}
                   credits
                 </>
               )}

@@ -7,6 +7,7 @@ import {
   imageCreditCost,
   planEntitlements,
   speechCreditCost,
+  speechCharacterCount,
   timedCreditCost,
   videoCreditCost,
   deliveryBudgetUsd,
@@ -54,9 +55,12 @@ describe("billing contracts", () => {
   it("quotes image, speech, transcription and analysis credits deterministically", () => {
     expect(imageCreditCost("1K")).toBe(20);
     expect(imageCreditCost("2K")).toBe(40);
-    expect(speechCreditCost(1)).toBe(30);
-    expect(speechCreditCost(1_001)).toBe(60);
-    expect(timedCreditCost(61, AI_CREDIT_COSTS.transcriptionPerMinute)).toBe(2);
+    expect(speechCreditCost(1)).toBe(20);
+    expect(speechCreditCost(1_001)).toBe(40);
+    expect(speechCreditCost(1_000, "English_Graceful_Lady")).toBe(30);
+    expect(speechCreditCost(1_000, "sarah")).toBe(20);
+    expect(speechCharacterCount("ciao 😀")).toBe(6);
+    expect(timedCreditCost(61, AI_CREDIT_COSTS.transcriptionPerMinute)).toBe(4);
     expect(timedCreditCost(61, AI_CREDIT_COSTS.videoAnalysisPerMinute)).toBe(
       20
     );

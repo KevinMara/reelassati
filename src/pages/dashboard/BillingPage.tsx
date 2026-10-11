@@ -479,6 +479,11 @@ export default function BillingPage() {
             <Gauge className="h-4 w-4 text-primary" />
             <h2 className="font-medium">Credit guide</h2>
           </div>
+          <p className="mt-2 text-xs text-foreground/60">
+            Voice rates: multilingual voices / existing language-specific
+            voices. Transcription is charged per started minute; voice text per
+            started 1,000 characters.
+          </p>
           <div className="mt-4 space-y-2 text-sm">
             {[
               ["Script", `${AI_CREDIT_COSTS.script}`],
@@ -487,8 +492,8 @@ export default function BillingPage() {
               ["1K image", `${AI_CREDIT_COSTS.image1K}`],
               ["2K image", `${AI_CREDIT_COSTS.image2K}`],
               [
-                "Voice · 1,000 characters",
-                `${AI_CREDIT_COSTS.speechPerThousandCharacters}`,
+                "Voice · each 1,000 characters",
+                `${AI_CREDIT_COSTS.speechPerThousandCharacters} / ${AI_CREDIT_COSTS.legacySpeechPerThousandCharacters}`,
               ],
               [
                 "Video analysis · minute",

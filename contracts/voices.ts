@@ -5,7 +5,43 @@
  */
 export const VOICE_CATALOG_SOURCE =
   "https://platform.minimax.io/docs/faq/system-voice-id";
-export const VOICE_CATALOG_CHECKED_AT = "2026-09-15";
+// MiniMax catalog checked 2026-09-15; ElevenLabs IDs checked 2026-10-11.
+export const ELEVENLABS_VOICE_CATALOG_SOURCE =
+  "https://openrouter.ai/api/v1/models?output_modalities=speech";
+export const VOICE_CATALOG_CHECKED_AT = "2026-10-11";
+export const DEFAULT_VOICE_ID = "sarah";
+export const ELEVENLABS_SPEECH_MODEL = "elevenlabs/eleven-flash-v2.5";
+export const LEGACY_SPEECH_MODEL = "minimax/speech-2.8-turbo";
+export const TRANSCRIPTION_MODEL = "elevenlabs/scribe-v2";
+/** OpenRouter's documented premade IDs; no cloned or account-specific voices. */
+export const ELEVENLABS_VOICE_IDS = [
+  "george",
+  "sarah",
+  "adam",
+  "alice",
+  "bella",
+  "bill",
+  "brian",
+  "callum",
+  "charlie",
+  "chris",
+  "daniel",
+  "eric",
+  "harry",
+  "jessica",
+  "laura",
+  "liam",
+  "lily",
+  "matilda",
+  "river",
+  "roger",
+  "will",
+] as const;
+export function speechModelForVoice(voice: string): string {
+  return (ELEVENLABS_VOICE_IDS as readonly string[]).includes(voice)
+    ? ELEVENLABS_SPEECH_MODEL
+    : LEGACY_SPEECH_MODEL;
+}
 export type VoiceDefinition = {
   id: string;
   name: string;
@@ -451,9 +487,20 @@ const documentedVoices: readonly [
   ["Hindi", "hindi_female_2_v1", "Tranquil Woman"],
   ["Hindi", "hindi_female_1_v2", "News Anchor"],
 ];
-export const VOICE_CATALOG: readonly VoiceDefinition[] = documentedVoices.map(
-  ([language, id, name]) => ({ id, name, language, tags: voiceTags(name) })
-);
+export const VOICE_CATALOG: readonly VoiceDefinition[] = [
+  ...ELEVENLABS_VOICE_IDS.map(id => ({
+    id,
+    name: id[0].toUpperCase() + id.slice(1),
+    language: "English",
+    tags: ["multilingual", "narration"],
+  })),
+  ...documentedVoices.map(([language, id, name]) => ({
+    id,
+    name,
+    language,
+    tags: voiceTags(name),
+  })),
+];
 export const VOICE_LANGUAGES = [
   ...new Set(VOICE_CATALOG.map(voice => voice.language)),
 ].sort();

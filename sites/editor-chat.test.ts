@@ -211,7 +211,7 @@ describe("Reel authorization and actual cost planning", () => {
       },
       context()
     );
-    expect(plan.actions[0].credits).toBe(2);
+    expect(plan.actions[0].credits).toBe(4);
     expect(plan.actions[0].scope).toBe("requested");
     expect(editorChatNeedsApproval(plan.actions[0], "ask")).toBe(false);
     expect(plan.actions[1].scope).toBe("extra");

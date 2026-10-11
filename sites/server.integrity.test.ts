@@ -522,7 +522,7 @@ async function generateSpeech(
       headers: authHeaders,
       body: JSON.stringify({
         text: "A verified voice take",
-        voice: "test-voice",
+        voice: "sarah",
         rightsConfirmed: true,
       }),
     }),
@@ -1458,34 +1458,47 @@ describe("provenance integrity boundaries", () => {
       workspace: ReturnType<typeof createEmptyWorkspace>;
     };
 
-    const r2Key = "users/creator/assets/source.mp3";
+    const sourceWave = new Uint8Array(44 + 32000 * 2);
+    const wav = new DataView(sourceWave.buffer);
+    const label = (offset: number, value: string) =>
+      sourceWave.set(new TextEncoder().encode(value), offset);
+    label(0, "RIFF");
+    wav.setUint32(4, sourceWave.length - 8, true);
+    label(8, "WAVE");
+    label(12, "fmt ");
+    wav.setUint32(16, 16, true);
+    wav.setUint16(20, 1, true);
+    wav.setUint16(22, 1, true);
+    wav.setUint32(24, 16000, true);
+    wav.setUint32(28, 32000, true);
+    wav.setUint16(32, 2, true);
+    wav.setUint16(34, 16, true);
+    label(36, "data");
+    wav.setUint32(40, sourceWave.length - 44, true);
+    const r2Key = "users/creator/assets/source.wav";
     DB.state.assets.push({
       id: "source-audio",
       owner_email: "creator@example.com",
-      name: "source.mp3",
+      name: "source.wav",
       kind: "audio",
-      content_type: "audio/mpeg",
-      bytes: rawMp3.byteLength,
+      content_type: "audio/wav",
+      bytes: sourceWave.byteLength,
       r2_key: r2Key,
       created_at: now,
     });
-    await BUCKET.put(r2Key, rawMp3, {
-      httpMetadata: { contentType: "audio/mpeg" },
+    await BUCKET.put(r2Key, sourceWave, {
+      httpMetadata: { contentType: "audio/wav" },
     });
     let transcriptionInput: Record<string, unknown> = {};
     globalThis.fetch = async (_url, init) => {
       transcriptionInput = JSON.parse(String(init?.body));
       return Response.json({
         text: "First line Second line",
-        segments: [
-          { start: 0, end: 1, text: "First line" },
-          { start: 1, end: 2, text: "Second line" },
-        ],
         words: [
-          { word: "First", start: 0, end: 0.4 },
-          { word: "line", start: 0.5, end: 0.9 },
-          { word: "Second", start: 1, end: 1.4 },
-          { word: "line", start: 1.5, end: 1.9 },
+          { word: "First", start: 0, end: 0.4, speaker_label: "speaker_0" },
+          { word: "line", start: 0.5, end: 0.9, speaker_label: "speaker_0" },
+          { word: "Second", start: 1, end: 1.4, speaker_label: "speaker_1" },
+          { word: "line", start: 1.5, end: 1.9, speaker_label: "speaker_1" },
         ],
       });
     };
@@ -1507,9 +1520,14 @@ describe("provenance integrity boundaries", () => {
       segments: EditProject["transcript"];
       provenance: ContentProvenance;
     };
-    expect(transcriptionInput.timestamp_granularities).toEqual([
-      "segment",
-      "word",
+    expect(transcriptionInput.model).toBe("elevenlabs/scribe-v2");
+    expect(transcriptionInput.timestamp_granularities).toEqual(["word"]);
+    expect(transcriptionInput.provider).toEqual({
+      options: { elevenlabs: { diarize: true, tag_audio_events: false } },
+    });
+    expect(transcriptResult.segments.map(s => s.speaker)).toEqual([
+      "speaker_0",
+      "speaker_1",
     ]);
     expect(transcriptResult.segments[0].words).toEqual([
       { text: "First", start: 0, end: 0.4 },

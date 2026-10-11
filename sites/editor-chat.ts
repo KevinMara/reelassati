@@ -9,6 +9,7 @@ import {
   AI_CREDIT_COSTS,
   imageCreditCost,
   speechCreditCost,
+  speechCharacterCount,
   timedCreditCost,
   videoCreditCost,
 } from "../contracts/billing";
@@ -249,9 +250,12 @@ export function editorChatModelContext(context: EditorChatContext) {
   );
   const voiceIds = [
     ...new Map(
-      [...requestedVoices, ...preferredVoices, ...representatives].map(
-        voice => [voice.id, voice]
-      )
+      [
+        ...requestedVoices,
+        ...VOICE_CATALOG.filter(voice => voice.tags.includes("multilingual")),
+        ...preferredVoices,
+        ...representatives,
+      ].map(voice => [voice.id, voice])
     ).values(),
   ]
     .slice(0, 50)
@@ -909,8 +913,7 @@ export function normalizeEditorChatPlan(
                 : undefined;
         const voice =
           media === "speech"
-            ? VOICE_CATALOG.find(voice => voice.id === row.voice)?.id ||
-              "English_Graceful_Lady"
+            ? VOICE_CATALOG.find(voice => voice.id === row.voice)?.id || "sarah"
             : undefined;
         const credits =
           media === "image"
@@ -923,7 +926,7 @@ export function normalizeEditorChatPlan(
                   continuation: false,
                 })
               : media === "speech"
-                ? speechCreditCost(prompt.length)
+                ? speechCreditCost(speechCharacterCount(prompt), voice)
                 : context.quoteAudio(media, seconds!);
         if (!Number.isSafeInteger(credits) || credits < 1)
           throw new Error("A reliable generation quote is not available.");

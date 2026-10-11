@@ -1,3 +1,4 @@
+import { speechCreditCost, speechCharacterCount } from "@contracts/billing";
 import type {
   Asset,
   CapabilityState,
@@ -941,7 +942,7 @@ export const platformApi = {
   }): Promise<Asset> => {
     const result = await requestJson<{ asset: Asset }>("/api/ai/speech", {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...input, acceptedCredits: speechCreditCost(speechCharacterCount(input.text), input.voice) }),
     });
     return result.asset;
   },

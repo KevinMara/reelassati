@@ -1,3 +1,8 @@
+import {
+  DEFAULT_VOICE_ID,
+  speechModelForVoice,
+  ELEVENLABS_SPEECH_MODEL,
+} from "./voices";
 import { PUBLIC_PLAN_PRICING, type PublicPlanName } from "./pricing";
 
 export type PlanId = "creator" | "pro" | "studio";
@@ -36,8 +41,11 @@ export const AI_CREDIT_COSTS = {
   script: 5,
   editPlan: 5,
   videoAnalysisPerMinute: 10,
-  transcriptionPerMinute: 1,
-  speechPerThousandCharacters: 30,
+  // Regular Scribe price ($0.000061111/second) plus the existing 50% delivery allowance.
+  transcriptionPerMinute: 2,
+  // Regular Flash price ($40/M characters), with the existing 50% delivery allowance.
+  speechPerThousandCharacters: 20,
+  legacySpeechPerThousandCharacters: 30,
   image1K: 20,
   image2K: 40,
   video720pPerSecond: 40,
@@ -70,11 +78,19 @@ export function imageCreditCost(resolution: string): number {
     : AI_CREDIT_COSTS.image1K;
 }
 
-export function speechCreditCost(characterCount: number): number {
-  return (
-    Math.max(1, Math.ceil(Math.max(0, characterCount) / 1_000)) *
-    AI_CREDIT_COSTS.speechPerThousandCharacters
-  );
+/** OpenRouter bills Unicode code points, including inline delivery tags. */
+export function speechCharacterCount(text: string): number {
+  return Array.from(text).length;
+}
+export function speechCreditCost(
+  characterCount: number,
+  voice = DEFAULT_VOICE_ID
+): number {
+  const rate =
+    speechModelForVoice(voice) === ELEVENLABS_SPEECH_MODEL
+      ? AI_CREDIT_COSTS.speechPerThousandCharacters
+      : AI_CREDIT_COSTS.legacySpeechPerThousandCharacters;
+  return Math.max(1, Math.ceil(Math.max(0, characterCount) / 1_000)) * rate;
 }
 
 export function timedCreditCost(

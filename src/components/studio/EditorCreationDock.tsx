@@ -23,6 +23,7 @@ import type { Asset, EditProject } from "@contracts/workspace";
 import {
   imageCreditCost,
   speechCreditCost,
+  speechCharacterCount,
   videoCreditCost,
 } from "@contracts/billing";
 import {
@@ -78,7 +79,7 @@ export function EditorCreationDock({
     activeTool === "audio" && audioMode === "voice" ? "voice" : activeTool;
   const [prompts, setPrompts] = useState({ video: "", image: "", voice: "" });
   const [seconds, setSeconds] = useState(5);
-  const [voice, setVoice] = useState("English_Graceful_Lady");
+  const [voice, setVoice] = useState("sarah");
   const [count, setCount] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -164,7 +165,7 @@ export function EditorCreationDock({
           continuation: false,
         })
       : kind === "voice"
-        ? speechCreditCost(prompt.length)
+        ? speechCreditCost(speechCharacterCount(prompt), voice)
         : imageCreditCost("1K");
   const available =
     kind === "image"

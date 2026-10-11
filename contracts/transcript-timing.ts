@@ -108,6 +108,7 @@ export interface ProviderTranscript {
     end?: number;
     text?: string;
     words?: unknown;
+    speaker?: string;
   }>;
   words?: unknown;
 }
@@ -117,11 +118,30 @@ export function providerTranscriptSegments(
   duration: number,
   offset = 0
 ): TranscriptSegment[] {
-  const wordCandidates = Array.isArray(result.words) ? result.words : [];
+  // Scribe may use text/speaker_id; OpenRouter verbose_json uses word/speaker_label.
+  const wordCandidates = (Array.isArray(result.words) ? result.words : []).map(
+    w => {
+      if (!w || typeof w !== "object") return w;
+      return {
+        ...w,
+        word: typeof w.word === "string" ? w.word : w.text,
+        speaker:
+          typeof w.speaker_label === "string"
+            ? w.speaker_label
+            : typeof w.speaker_id === "string"
+              ? w.speaker_id
+              : typeof w.speaker === "number"
+                ? `speaker_${w.speaker}`
+                : undefined,
+      };
+    }
+  );
   let segments = Array.isArray(result.segments) ? result.segments : [];
   if (!segments.length && wordCandidates.length) {
     const valid = wordCandidates.filter(
-      (w): w is { word: string; start: number; end: number } =>
+      (
+        w
+      ): w is { word: string; start: number; end: number; speaker?: string } =>
         w &&
         typeof w.word === "string" &&
         Number.isFinite(w.start) &&
@@ -137,13 +157,15 @@ export function providerTranscriptSegments(
           end: group[group.length - 1].end,
           text: group.map(w => w.word.trim()).join(" "),
           words: group,
+          ...(group[0].speaker ? { speaker: group[0].speaker } : {}),
         });
       group = [];
     };
     for (const word of valid) {
       if (
         group.length &&
-        (word.start - group[0].start > 3 ||
+        (word.speaker !== group[0].speaker ||
+          word.start - group[0].start > 3 ||
           group.map(w => w.word).join(" ").length + word.word.length > 48)
       )
         flush();
@@ -180,6 +202,7 @@ export function providerTranscriptSegments(
       {
         id: `segment-${offset}-${index}`,
         text: s.text.trim(),
+        ...(s.speaker ? { speaker: s.speaker } : {}),
         start: offset + start,
         end: offset + end,
         ...(words

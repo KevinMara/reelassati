@@ -561,7 +561,7 @@ export function useEditorChat(
           asset = await platformApi.synthesizeSpeech({
             requestId: id,
             text: action.prompt,
-            voice: action.voice ?? "English_Graceful_Lady",
+            voice: action.voice ?? "sarah",
             assetName: record.outputName,
             projectId: project.id,
             rightsConfirmed: true,
