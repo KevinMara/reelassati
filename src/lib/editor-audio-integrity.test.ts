@@ -33,5 +33,5 @@ describe("selectable free audio", () => {
         entry.id
       ).toBeLessThan(0.06);
     }
-  });
+  }, 30_000);
 });

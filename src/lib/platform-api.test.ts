@@ -13,6 +13,46 @@ afterEach(() => {
 });
 
 describe("platform API transport", () => {
+  it("pins speech retries to the reviewed request and workspace after a lost response", async () => {
+    const scope = await captureUploadRequestScope();
+    const input = {
+      requestId: "speech-recovery-20261014",
+      acceptedCredits: 1,
+      text: "An original short voice test.",
+      voice: "sarah",
+      rightsConfirmed: true as const,
+    };
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(Response.json({ asset: { id: "saved-voice", kind: "audio" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(platformApi.synthesizeSpeech(input, { scope })).rejects.toThrow("Failed to fetch");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(platformApi.synthesizeSpeech(input, { scope })).resolves.toMatchObject({ id: "saved-voice" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.map(call => JSON.parse(call[1].body))).toEqual([input, input]);
+    for (const call of fetchMock.mock.calls)
+      expect(call[1].headers).toMatchObject({ Authorization: "Bearer test-owner-token", "X-Reelassati-Brand": "default" });
+  });
+
+  it.each(["owner", "brand"])("discards a speech result when the %s changes during generation", async changed => {
+    const scope = await captureUploadRequestScope();
+    let finish!: (value: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    const task = platformApi.synthesizeSpeech({
+      requestId: "speech-scoped-20261014", text: "Owned original copy", voice: "sarah", rightsConfirmed: true,
+    }, { scope });
+    const rejected = expect(task).rejects.toMatchObject({ status: 409 });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    if (changed === "owner")
+      vi.spyOn(supabase.auth, "getSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
+    else vi.stubGlobal("sessionStorage", { getItem: () => "other-brand" });
+    finish(Response.json({ asset: { id: "original-owner-voice" } }));
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("refreshes a rejected browser session once and retries with the new token", async () => {
     vi.stubGlobal("sessionStorage", { getItem: () => null });
     const user = { email: "creator@example.com" };

@@ -23,7 +23,11 @@ import type {
   ScriptDraft,
   WorkspaceEvent,
 } from "@contracts/workspace";
-import { platformApi } from "@/lib/platform-api";
+import {
+  captureUploadRequestScope,
+  platformApi,
+  PlatformApiError,
+} from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { CONTENT_LANGUAGES } from "@/lib/languages";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
@@ -113,6 +117,19 @@ export default function VoiceNotes() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const speechAttempt = useRef<{
+    fingerprint: string;
+    id: string;
+    input: Parameters<typeof platformApi.synthesizeSpeech>[0];
+  } | null>(null);
+  const speechPending = useRef(false);
+  const speechMounted = useRef(false);
+  useEffect(() => {
+    speechMounted.current = true;
+    return () => {
+      speechMounted.current = false;
+    };
+  }, []);
   useEffect(() => {
     let active = true;
     if (!file) return;
@@ -332,32 +349,64 @@ export default function VoiceNotes() {
       !voiceId.trim() ||
       !voiceRightsConfirmed ||
       busyAction ||
+      speechPending.current ||
       !capabilities.speech
     ) {
       return;
     }
+    speechPending.current = true;
+    const input = {
+      acceptedCredits: speechCredits,
+      text: speechText.trim(),
+      voice: voiceId.trim(),
+      assetName: speechAssetName.trim(),
+      projectId: workspace.projects[0]?.id,
+      rightsConfirmed: true as const,
+    };
     setBusyAction("speech");
     setError(null);
     setSpeechAsset(null);
     try {
-      const asset = await platformApi.synthesizeSpeech({
-        acceptedCredits: speechCredits,
-        text: speechText.trim(),
-        voice: voiceId.trim(),
-        assetName: speechAssetName.trim(),
-        projectId: workspace.projects[0]?.id,
-        rightsConfirmed: voiceRightsConfirmed,
+      const scope = await captureUploadRequestScope();
+      if (!speechMounted.current) return;
+      // Preserve the reviewed tariff and immutable payload when recovering an
+      // existing attempt across the launch discount's expiry.
+      const fingerprint = JSON.stringify({
+        scope,
+        ...input,
+        acceptedCredits: undefined,
       });
+      if (speechAttempt.current?.fingerprint !== fingerprint)
+        speechAttempt.current = { fingerprint, id: crypto.randomUUID(), input };
+      const asset = await platformApi.synthesizeSpeech(
+        { ...speechAttempt.current.input, requestId: speechAttempt.current.id },
+        { scope }
+      );
+      if (!speechMounted.current) return;
       setSpeechAsset(asset);
       await saveAsset(asset, "Speech generated");
+      speechAttempt.current = null;
     } catch (cause) {
+      if (!speechMounted.current) return;
+      // An explicit rejected request can be corrected. A lost response or
+      // running request retains its identity so retrying cannot buy a second take.
+      if (
+        cause instanceof PlatformApiError &&
+        ((cause.status < 500 && cause.status !== 409) ||
+          (cause.status === 409 &&
+            cause.message.includes("credit quote changed")))
+      )
+        speechAttempt.current = null;
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "Speech could not be generated."
+        cause instanceof TypeError
+          ? "The response was interrupted. Check Library, or retry the same text and voice to recover this request without generating twice."
+          : cause instanceof Error
+            ? cause.message
+            : "Speech could not be generated."
       );
     } finally {
-      setBusyAction(null);
+      speechPending.current = false;
+      if (speechMounted.current) setBusyAction(null);
     }
   };
 

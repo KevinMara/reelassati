@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 function source(relativePath: string): string {
@@ -60,7 +61,9 @@ describe("platform-wide functional invariants", () => {
       "./pages/dashboard/ContentLibrary.tsx",
       "./pages/dashboard/EditorPage.tsx",
     ].map(source);
-    const allPages = filesUnder(new URL("./pages", import.meta.url).pathname)
+    const allPages = filesUnder(
+      fileURLToPath(new URL("./pages", import.meta.url))
+    )
       .filter(path => path.endsWith(".tsx"))
       .map(path => readFileSync(path, "utf8"));
 
@@ -98,7 +101,7 @@ describe("platform-wide functional invariants", () => {
 
   it("prevents native buttons from accidentally submitting a surrounding form", () => {
     const componentFiles = filesUnder(
-      new URL(".", import.meta.url).pathname
+      fileURLToPath(new URL(".", import.meta.url))
     ).filter(path => path.endsWith(".tsx"));
     const offenders: string[] = [];
     for (const path of componentFiles) {
@@ -217,7 +220,7 @@ describe("platform-wide functional invariants", () => {
         expect.objectContaining({ destination: "/api/$1" }),
       ])
     );
-    expect(readdirSync(new URL("../api", import.meta.url).pathname)).toEqual([
+    expect(readdirSync(new URL("../api", import.meta.url))).toEqual([
       "support.ts",
       "trends-weekly.ts",
     ]);
@@ -225,7 +228,7 @@ describe("platform-wide functional invariants", () => {
       "export default { fetch: handleSupport }"
     );
     expect(
-      readdirSync(new URL("../legacy-api", import.meta.url).pathname).length
+      readdirSync(new URL("../legacy-api", import.meta.url)).length
     ).toBeGreaterThan(0);
     expect(vercel).toMatchObject({
       functions: {
@@ -398,7 +401,7 @@ describe("platform-wide functional invariants", () => {
 
   it("keeps clipboard fallback and reliable object-URL downloads", () => {
     const clipboard = source("./lib/clipboard.ts");
-    const allSource = filesUnder(new URL(".", import.meta.url).pathname)
+    const allSource = filesUnder(fileURLToPath(new URL(".", import.meta.url)))
       .filter(path => /\.(ts|tsx)$/.test(path) && !path.endsWith(".test.ts"))
       .map(path => readFileSync(path, "utf8"))
       .join("\n");

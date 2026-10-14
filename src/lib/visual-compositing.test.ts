@@ -126,6 +126,10 @@ describe("actual polygon masks and alpha-aware layer blending", () => {
         logoGraph(clip),
         "-map",
         "[rgba]",
+        // Match the render plan's explicit output rate; FFmpeg versions infer
+        // different rates from the audio-only input and the AVTB filter clock.
+        "-r",
+        "10",
         "-t",
         String(clip.duration),
         "-f",
@@ -227,6 +231,8 @@ describe("shipped browser WASM compositor", () => {
         logoGraph(clip),
         "-map",
         "[rgba]",
+        "-r",
+        "10",
         "-t",
         String(clip.duration),
         "-f",

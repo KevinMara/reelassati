@@ -205,6 +205,7 @@ export function EditorCreationDock({
               })
             : selectedKind === "voice"
               ? platformApi.synthesizeSpeech({
+                  requestId: record.id,
                   acceptedCredits: unitCost,
                   text,
                   voice,

@@ -940,11 +940,12 @@ export const platformApi = {
     assetName?: string;
     projectId?: string;
     rightsConfirmed: true;
-  }): Promise<Asset> => {
+  }, options?: UploadRequestOptions): Promise<Asset> => {
     const result = await requestJson<{ asset: Asset }>("/api/ai/speech", {
       method: "POST",
       body: JSON.stringify({ ...input, acceptedCredits: input.acceptedCredits ?? speechCreditCost(speechCharacterCount(input.text), input.voice) }),
-    });
+      signal: options?.signal,
+    }, false, options?.scope);
     return result.asset;
   },
 
