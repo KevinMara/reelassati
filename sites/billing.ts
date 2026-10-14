@@ -1085,6 +1085,22 @@ export async function socialAccountLimit(
     : 0;
 }
 
+/** Entitlements do not require credit migrations, usage aggregation or Stripe
+ * readiness. Brand navigation reads this on every load. */
+export async function brandWorkspaceLimit(
+  env: BillingEnvironment,
+  user: BillingUser
+): Promise<number> {
+  const subscription = await billingAccount(env, user.email);
+  return (activeSubscription(subscription) ||
+    operatorCreditAccess(env, user)) &&
+    subscription &&
+    isPlanId(subscription.plan_id || "") &&
+    isBillingCycle(subscription.billing_cycle || "")
+    ? planEntitlements(subscription.plan_id as PlanId).workspaces
+    : 1;
+}
+
 function safeAppOrigin(request: Request, env: BillingEnvironment): string {
   const configured = cleanString(env.PUBLIC_APP_URL).replace(/\/$/, "");
   if (/^https:\/\/(?:www\.)?reelassati\.app$/i.test(configured)) {

@@ -136,6 +136,7 @@ import {
   applyAllDueAnnualCreditRenewals,
   availableCredits,
   billingSummary,
+  brandWorkspaceLimit,
   grantReferralCredits,
   grantOperatorCredits,
   handleBillingApi,
@@ -1939,8 +1940,7 @@ async function handleBrands(
   env: SitesEnvironment,
   user: AuthenticatedUser
 ): Promise<Response> {
-  const billing = await billingSummary(env, user);
-  const limit = billing.canUseCredits ? billing.plan?.workspaces || 1 : 1;
+  const limit = await brandWorkspaceLimit(env, user);
   if (request.method === "GET") {
     const result = await env.DB.prepare(
       "SELECT id, name, created_at AS createdAt FROM brand_workspaces WHERE owner_email = ? ORDER BY created_at"

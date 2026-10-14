@@ -102,6 +102,18 @@ describe("real SQLite workspace separation", () => {
         new Date().toISOString(),
         new Date().toISOString()
       );
+    const prepared = vi.spyOn(DB, "prepare");
+    const navigation = await request("/api/brands");
+    expect(navigation.status).toBe(200);
+    expect((await navigation.json()).limit).toBe(3);
+    // Navigating between brands must not initialize credits, scan their usage
+    // ledger, or probe the payment provider.
+    expect(
+      prepared.mock.calls.some(([sql]) =>
+        /credit_accounts|credit_ledger|stripe_events/i.test(sql)
+      )
+    ).toBe(false);
+    prepared.mockRestore();
     const first = await request("/api/brands", "default", "POST", {
       name: "Brand A",
     });
@@ -161,5 +173,43 @@ describe("real SQLite workspace separation", () => {
       workspace: ReturnType<typeof createEmptyWorkspace>;
     };
     expect(defaultAfter.workspace.assets).toEqual([]);
+  });
+
+  it("keeps expired and unpaid accounts at one workspace without changing credit balances", async () => {
+    const now = new Date().toISOString();
+    for (const [owner, status, end] of [
+      [
+        "expired@example.com",
+        "active",
+        new Date(Date.now() - 86400000).toISOString(),
+      ],
+      [
+        "unpaid@example.com",
+        "inactive",
+        new Date(Date.now() + 86400000).toISOString(),
+      ],
+    ]) {
+      sqlite
+        .prepare(
+          "INSERT INTO billing_accounts(owner_email,plan_id,billing_cycle,status,current_period_end,created_at,updated_at) VALUES (?,'studio','monthly',?,?,?,?)"
+        )
+        .run(owner, status, end, now, now);
+      const result = await request(
+        "/api/brands",
+        "default",
+        "GET",
+        undefined,
+        owner
+      );
+      expect(result.status).toBe(200);
+      expect((await result.json()).limit).toBe(1);
+      expect(
+        sqlite
+          .prepare(
+            "SELECT COUNT(*) AS count FROM credit_accounts WHERE owner_email=?"
+          )
+          .get(owner)?.count
+      ).toBe(0);
+    }
   });
 });
