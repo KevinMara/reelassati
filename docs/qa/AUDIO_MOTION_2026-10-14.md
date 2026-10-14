@@ -21,6 +21,9 @@ It does not introduce another model, change prices or require an Adobe worker.
 - The first standalone voice request returned `Failed to fetch`; the subsequent
   billing screen still showed 832 credits and no successful voice usage. That
   observation does not establish where the request failed or prove voice quality.
+- After deploying the recovery fix, a new multilingual Sarah request succeeded
+  and was saved to Library. The downloaded MP3 is 8.08 seconds, 44.1 kHz mono;
+  full decoding passed with zero clipped samples (peak −1.15 dBFS).
 - Browser audio download automation navigated to the signed media URL and timed
   out. No local listening audition or waveform-quality claim is made.
 
@@ -34,6 +37,11 @@ overlapping submissions. The API checks the original owner/brand before sending
 and after reading the response, and an unmounted page cannot save a late result.
 Explicit validation or changed-quote rejections allow a corrected new request.
 The editor's voice-generation queue also sends its existing generation record ID.
+
+The live transcription follow-up exposed missing duration metadata on generated
+speech assets. Their existing player now measures loaded audio metadata before
+enabling the quote. Selecting a different saved asset clears the previous
+measurement and remounts the player, preventing a stale duration quote.
 
 Recovery identity is held by the mounted voice page; this is not a claim of
 cross-navigation or cross-device recovery. Server idempotency and asset storage

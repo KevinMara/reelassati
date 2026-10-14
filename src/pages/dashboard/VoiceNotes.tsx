@@ -571,9 +571,15 @@ export default function VoiceNotes() {
                   Stored as {sourceAsset.name}
                 </div>
                 <audio
+                  key={sourceAsset.id}
                   src={sourceAsset.url}
                   controls
                   preload="metadata"
+                  onLoadedMetadata={event => {
+                    const duration = event.currentTarget.duration;
+                    if (Number.isFinite(duration) && duration > 0)
+                      setFileDuration(duration);
+                  }}
                   aria-label={`Voice-note preview: ${sourceAsset.name}`}
                   aria-describedby="voice-source-description"
                   className="mt-3 w-full"
@@ -605,6 +611,7 @@ export default function VoiceNotes() {
                   ) ?? null;
                 setSourceAsset(asset);
                 setFile(null);
+                setFileDuration(undefined);
                 setTranscription("");
                 setTranscriptionProvenance(null);
                 setGeneratedScript(null);
