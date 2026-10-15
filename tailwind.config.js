@@ -29,9 +29,9 @@ module.exports = {
         ],
       },
       colors: {
-        border: "hsl(var(--border))",
-        "border-strong": "hsl(var(--border-strong))",
-        input: "hsl(var(--input))",
+        border: "hsl(var(--edge-color) / calc(0.08 * <alpha-value>))",
+        "border-strong": "hsl(var(--edge-color) / calc(0.16 * <alpha-value>))",
+        input: "hsl(var(--edge-color) / calc(0.12 * <alpha-value>))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",

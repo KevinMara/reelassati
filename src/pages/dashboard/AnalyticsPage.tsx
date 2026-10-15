@@ -2,13 +2,11 @@ import { SocialPerformance } from "@/components/studio/SocialPerformance";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertCircle,
   CalendarClock,
   CheckCircle2,
   FileText,
   Film,
   ImageIcon,
-  Radio,
   Send,
   Sparkles,
   type LucideIcon,
@@ -98,7 +96,7 @@ const ANALYTICS_RANGES = [
 ] as const;
 
 export default function AnalyticsPage() {
-  const { workspace, capabilities, loading } = useWorkspace();
+  const { workspace, loading } = useWorkspace();
   const [selectedMetrics, setSelectedMetrics] = useState<AnalyticsMetricKey[]>([
     "published",
     "scheduled",
@@ -243,8 +241,8 @@ export default function AnalyticsPage() {
         <p className="mono-eyebrow mb-2 text-primary">Measured workspace</p>
         <h1 className="text-3xl font-semibold">Analytics</h1>
         <p className="mt-2 max-w-2xl text-sm text-foreground/70">
-          Production and publication facts currently stored in REELassati.
-          Reach, retention, and engagement are never estimated.
+          Track your content, publishing activity, and connected audience
+          metrics.
         </p>
       </div>
 
@@ -418,28 +416,6 @@ export default function AnalyticsPage() {
               ))}
             </LineChart>
           </ChartContainer>
-        </div>
-      </section>
-
-      <section className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-          <div className="flex-1">
-            <h2 className="font-medium">Audience metrics are not synced yet</h2>
-            <p className="mt-1 text-sm leading-relaxed text-foreground/70">
-              {capabilities.publishing
-                ? "Connected distribution is ready, but sync your social performance above to import the metrics available for your accounts."
-                : "Publishing is not connected, and no platform analytics source is available."}{" "}
-              This screen will not manufacture performance numbers.
-            </p>
-            <Link
-              to="/dashboard/social"
-              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-hover"
-            >
-              <Radio className="h-4 w-4" />
-              Review publishing connections
-            </Link>
-          </div>
         </div>
       </section>
 

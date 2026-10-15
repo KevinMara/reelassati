@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import {
   useDeferredValue,
   useEffect,
@@ -515,7 +516,7 @@ export default function ContentLibrary() {
           <Star className="h-4 w-4" />
           Favorites
         </button>
-        <select
+        <StudioSelect
           aria-label="Filter Library by project"
           value={projectFilter}
           onChange={event => setProjectFilter(event.target.value)}
@@ -527,7 +528,7 @@ export default function ContentLibrary() {
               {project.title}
             </option>
           ))}
-        </select>
+        </StudioSelect>
       </div>
       {filteredItems.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-14 text-center">

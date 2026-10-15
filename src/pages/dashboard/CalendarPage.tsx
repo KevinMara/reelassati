@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { PublicationReadiness } from "@/components/studio/PublicationReadiness";
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -416,7 +417,7 @@ export default function CalendarPage() {
       </div>
 
       <div className="mb-5 flex flex-wrap gap-2">
-        <select
+        <StudioSelect
           value={itemFilter}
           onChange={event =>
             setItemFilter(
@@ -429,10 +430,10 @@ export default function CalendarPage() {
           <option value="all">All calendar items</option>
           <option value="events">My events</option>
           <option value="publications">Publications</option>
-        </select>
+        </StudioSelect>
         {showPosts ? (
           <>
-            <select
+            <StudioSelect
               value={statusFilter}
               onChange={event =>
                 setStatusFilter(
@@ -448,8 +449,8 @@ export default function CalendarPage() {
               <option value="publishing">Publishing</option>
               <option value="published">Published</option>
               <option value="failed">Failed</option>
-            </select>
-            <select
+            </StudioSelect>
+            <StudioSelect
               value={platformFilter}
               onChange={event =>
                 setPlatformFilter(event.target.value as "all" | Platform)
@@ -463,7 +464,7 @@ export default function CalendarPage() {
                   {PLATFORM_META[platform].label}
                 </option>
               ))}
-            </select>
+            </StudioSelect>
           </>
         ) : null}
         <span className="self-center text-xs text-foreground/65">
@@ -744,7 +745,7 @@ export default function CalendarPage() {
                   className="block space-y-1.5 text-sm font-medium"
                 >
                   Type
-                  <select
+                  <StudioSelect
                     id="calendar-event-kind"
                     value={eventForm.kind}
                     onChange={event =>
@@ -760,7 +761,7 @@ export default function CalendarPage() {
                         {meta.label}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                 </label>
               </div>
 

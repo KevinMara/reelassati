@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { ReferenceStylePanel } from "@/components/studio/ReferenceStylePanel";
 import { ScriptWritingPack } from "@/components/studio/ScriptWritingPack";
 import { normalizeScriptWritingPack } from "@contracts/script-writing-pack";
@@ -474,7 +475,7 @@ function DirectScriptSession() {
                 >
                   Platform
                 </label>
-                <select
+                <StudioSelect
                   id="script-platform"
                   value={platform}
                   onChange={event =>
@@ -487,7 +488,7 @@ function DirectScriptSession() {
                       {item.label}
                     </option>
                   ))}
-                </select>
+                </StudioSelect>
               </div>
               <div>
                 <label
@@ -496,7 +497,7 @@ function DirectScriptSession() {
                 >
                   Tone
                 </label>
-                <select
+                <StudioSelect
                   id="script-tone"
                   value={tone}
                   onChange={event =>
@@ -509,7 +510,7 @@ function DirectScriptSession() {
                       {item}
                     </option>
                   ))}
-                </select>
+                </StudioSelect>
               </div>
             </div>
 
@@ -543,7 +544,7 @@ function DirectScriptSession() {
                 >
                   Language
                 </label>
-                <select
+                <StudioSelect
                   id="script-language"
                   value={language}
                   onChange={event => setLanguage(event.target.value)}
@@ -554,7 +555,7 @@ function DirectScriptSession() {
                       {item.label}
                     </option>
                   ))}
-                </select>
+                </StudioSelect>
               </div>
             </div>
 

@@ -1,3 +1,5 @@
+import { AudioPlayer } from "@/components/ui/audio-player";
+import { StudioSelect } from "@/components/ui/studio-select";
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { VoiceSelector } from "@/components/studio/VoiceSelector";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -570,8 +572,9 @@ export default function VoiceNotes() {
                   <Check className="h-4 w-4" />
                   Stored as {sourceAsset.name}
                 </div>
-                <audio
+                <AudioPlayer
                   key={sourceAsset.id}
+                  downloadName={sourceAsset.name}
                   src={sourceAsset.url}
                   controls
                   preload="metadata"
@@ -601,7 +604,7 @@ export default function VoiceNotes() {
             >
               Saved audio
             </label>
-            <select
+            <StudioSelect
               id="saved-audio"
               value={sourceAsset?.id ?? ""}
               onChange={event => {
@@ -627,14 +630,14 @@ export default function VoiceNotes() {
                   {asset.name}
                 </option>
               ))}
-            </select>
+            </StudioSelect>
 
             <p className="mt-4 flex items-center gap-1.5 text-xs text-foreground/65">
               <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
               REELassati AI transcription
             </p>
             <div className="mt-2 flex gap-2">
-              <select
+              <StudioSelect
                 aria-label="Transcription language"
                 value={language}
                 onChange={event => setLanguage(event.target.value)}
@@ -645,7 +648,7 @@ export default function VoiceNotes() {
                     {item.label}
                   </option>
                 ))}
-              </select>
+              </StudioSelect>
               <button
                 type="button"
                 onClick={() => void handleTranscribe()}
@@ -797,8 +800,9 @@ export default function VoiceNotes() {
                 <div className="mt-2">
                   <AiProvenanceBadge provenance={speechAsset.provenance} />
                 </div>
-                <audio
+                <AudioPlayer
                   src={speechAsset.url}
+                  downloadName={speechAsset.name}
                   controls
                   preload="metadata"
                   aria-label={`Generated speech preview: ${speechAsset.name}`}
@@ -860,7 +864,7 @@ export default function VoiceNotes() {
                 </p>
 
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                  <select
+                  <StudioSelect
                     value={scriptPlatform}
                     onChange={event =>
                       setScriptPlatform(event.target.value as Platform)
@@ -873,7 +877,7 @@ export default function VoiceNotes() {
                         {item.label}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                   <button
                     type="button"
                     onClick={() => void handleGenerateScript()}

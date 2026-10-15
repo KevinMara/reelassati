@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -305,7 +306,7 @@ export default function InterviewMe({
                   >
                     Destination
                   </label>
-                  <select
+                  <StudioSelect
                     id="interview-platform"
                     value={platform}
                     onChange={event =>
@@ -318,7 +319,7 @@ export default function InterviewMe({
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                 </div>
               </div>
               <button

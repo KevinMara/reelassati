@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { useMemo, useState } from "react";
 import { BookmarkPlus, SlidersHorizontal, Trash2 } from "lucide-react";
 import type { EditProject, TimelineClip } from "@contracts/workspace";
@@ -91,9 +92,10 @@ export function SavedEditorStyles({
         </span>
       </div>
       <div className="space-y-2 rounded-xl border border-border bg-background/30 p-3">
-        <label className="block space-y-1 text-xs">
+        <label htmlFor={`saved-style-kind-${project.id}`} className="block space-y-1 text-xs">
           <span className="text-muted-foreground">Capture</span>
-          <select
+          <StudioSelect
+            id={`saved-style-kind-${project.id}`}
             value={type}
             disabled={blocked}
             onChange={event =>
@@ -108,7 +110,7 @@ export function SavedEditorStyles({
             <option value="look">
               Selected clip pose and grade at playhead
             </option>
-          </select>
+          </StudioSelect>
         </label>
         <label className="block space-y-1 text-xs">
           <span className="text-muted-foreground">Style name</span>

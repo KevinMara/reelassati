@@ -2,6 +2,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import worker from "./server";
 import type { WorkspaceDocument } from "../contracts/workspace";
+import {
+  extractTextProvenanceToken,
+  withoutTextProvenanceMarker,
+} from "../contracts/compliance";
 
 const sqlite = new DatabaseSync(":memory:");
 let failFinalCacheWrite = false;
@@ -279,6 +283,62 @@ afterAll(() => {
   vi.unstubAllGlobals();
 });
 
+describe("publication copy field selection", () => {
+  it("preserves manual caption and destinations when only hashtags are generated", async () => {
+    const original = nextOutput;
+    nextOutput = {
+      caption: "Unrequested replacement",
+      hashtags: ["#editing", "editing", "shortform"],
+    };
+    const before = balance();
+    const response = await request("/api/ai/publication-copy", {
+      brief: "A walkthrough of timeline editing",
+      caption: "Keep my exact caption.",
+      hashtags: ["manual"],
+      platforms: ["instagram"],
+      language: "en",
+      fields: ["hashtags"],
+    });
+    expect(response.status).toBe(200);
+    const data = (await response.json()) as {
+      caption: string;
+      hashtags: string[];
+    };
+    expect(withoutTextProvenanceMarker(data.caption)).toBe(
+      "Keep my exact caption."
+    );
+    expect(extractTextProvenanceToken(data.caption)).toBeTruthy();
+    expect(data.hashtags).toEqual(["editing", "shortform"]);
+    expect(balance()).toBe(before - 5);
+    const sent = JSON.stringify(providerCalls.at(-1));
+    expect(sent).toContain("instagram");
+    expect(sent).toContain("hashtags");
+    nextOutput = original;
+  });
+
+  it("does not charge an invalid request and refunds an empty selected field", async () => {
+    const original = nextOutput;
+    const before = balance();
+    const calls = providerCalls.length;
+    const invalid = await request("/api/ai/publication-copy", {
+      brief: "Draft",
+      platforms: ["instagram"],
+      fields: [],
+    });
+    expect(invalid.status).toBe(400);
+    expect(providerCalls.length).toBe(calls);
+    nextOutput = { caption: "", hashtags: [] };
+    const empty = await request("/api/ai/publication-copy", {
+      brief: "Draft",
+      platforms: ["instagram"],
+      fields: ["caption"],
+    });
+    expect(empty.status).toBeGreaterThanOrEqual(400);
+    expect(balance()).toBe(before);
+    nextOutput = original;
+  });
+});
+
 describe("authenticated paid editing chat route", () => {
   it("releases all planning credits on upstream billing failure and replays the sanitized failure without another provider call", async () => {
     const originalAccount = sqlite
@@ -531,6 +591,28 @@ describe("authenticated paid editing chat route", () => {
         },
       },
       retention: [],
+      insights: [
+        {
+          start: 0,
+          end: 2,
+          role: "hook",
+          attention: 80,
+          clarity: 76,
+          confidence: 0.8,
+          visualEvidence: "Product demonstration",
+          audioEvidence: "Spoken promise",
+          strength: "Result is visible",
+          improvement: "Make the promise specific",
+        },
+        {
+          start: 29,
+          end: 35,
+          role: "cta",
+          attention: 90,
+          visualEvidence: "Outside the source",
+        },
+        { start: 3, end: 4, role: "core", attention: 99 },
+      ],
       changes: [],
     };
     const before = balance();
@@ -538,7 +620,6 @@ describe("authenticated paid editing chat route", () => {
     const input = {
       assetId: "source",
       analysisAssetId: "foreign-proxy",
-      sourceRightsConfirmed: true,
     };
     expect((await request("/api/ai/analyze", input)).status).toBe(404);
     expect(
@@ -556,8 +637,20 @@ describe("authenticated paid editing chat route", () => {
       analysisAssetId: "proxy",
     });
     expect(good.status).toBe(200);
-    expect(await good.json()).toMatchObject({
+    const analyzed = (await good.json()) as { insights: unknown[] };
+    expect(analyzed).toMatchObject({
       review: { ending: null, captions: "unknown" },
+      coverage: {
+        input: "full-duration-proxy",
+        durationSeconds: 30,
+        proxyFramesPerSecond: 8,
+      },
+    });
+    expect(analyzed.insights).toHaveLength(1);
+    expect(analyzed.insights[0]).toMatchObject({
+      role: "hook",
+      attention: 80,
+      stimulation: null,
     });
     const payload = providerCalls.at(-1)! as {
       messages: Array<{ content: unknown }>;

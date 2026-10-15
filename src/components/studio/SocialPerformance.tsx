@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -108,7 +109,7 @@ export function SocialPerformance() {
           </p>
         </div>
         <div className="flex gap-2">
-          <select
+          <StudioSelect
             aria-label="Social performance period"
             value={days}
             onChange={e => setDays(Number(e.target.value))}
@@ -117,7 +118,7 @@ export function SocialPerformance() {
             <option value={7}>7 days</option>
             <option value={30}>30 days</option>
             <option value={90}>90 days</option>
-          </select>
+          </StudioSelect>
           <button
             type="button"
             onClick={() => void sync()}

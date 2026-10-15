@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { Globe2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -22,7 +23,7 @@ export function LanguagePicker({ compact = false }: { compact?: boolean }) {
     >
       <Globe2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span className="sr-only">Language</span>
-      <select
+      <StudioSelect
         value={current}
         onChange={event =>
           void selectLanguage(event.target.value as SupportedLanguage)
@@ -39,7 +40,7 @@ export function LanguagePicker({ compact = false }: { compact?: boolean }) {
             {label}
           </option>
         ))}
-      </select>
+      </StudioSelect>
       <span className="pointer-events-none absolute end-0 text-[8px]">▾</span>
     </label>
   );

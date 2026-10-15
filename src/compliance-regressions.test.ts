@@ -83,12 +83,11 @@ describe("protected product and compliance invariants", () => {
     for (const text of files) expect(text).toContain("useFileDropZone(");
   });
 
-  it("keeps disclosure language release-specific and approval-invalidating", () => {
+  it("keeps audience language independent with the requested English default", () => {
     const publisher = source("./pages/dashboard/PublisherPage.tsx");
-    expect(publisher).toContain('useState<ReleaseDisclosureLanguage>("unset")');
-    expect(publisher).toMatch(
-      /setDisclosureLanguage\(option\.value\);\s+invalidateReleaseReview\(\);/
-    );
+    expect(publisher).toContain('useState<DisclosureLanguage>("en")');
+    expect(publisher).toContain('id="publisher-language"');
+    expect(publisher).not.toContain("TriStateQuestion");
     expect(publisher).not.toContain(
       'workspace.profile.language === "it" ? "it" : "en"'
     );

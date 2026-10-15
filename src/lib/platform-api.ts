@@ -114,11 +114,21 @@ function sessionScope(session: Session | null): UploadRequestScope {
 export async function captureUploadRequestScope(): Promise<UploadRequestScope> {
   return sessionScope(await requestSession());
 }
-function assertRequestScope(session: Session | null, scope?: UploadRequestScope) {
+function assertRequestScope(
+  session: Session | null,
+  scope?: UploadRequestScope
+) {
   if (!scope) return;
   const current = sessionScope(session);
-  if (current.ownerId !== scope.ownerId || current.ownerEmail !== scope.ownerEmail || current.brandId !== scope.brandId)
-    throw new PlatformApiError("Your account or brand changed. Start the import again in the intended workspace.", 409);
+  if (
+    current.ownerId !== scope.ownerId ||
+    current.ownerEmail !== scope.ownerEmail ||
+    current.brandId !== scope.brandId
+  )
+    throw new PlatformApiError(
+      "Your account or brand changed. Start the import again in the intended workspace.",
+      409
+    );
 }
 export async function verifyUploadRequestScope(scope: UploadRequestScope) {
   assertRequestScope(await requestSession(), scope);
@@ -143,7 +153,8 @@ async function requestJson<T>(
         ...(activeSession?.access_token
           ? { Authorization: `Bearer ${activeSession.access_token}` }
           : {}),
-        "X-Reelassati-Brand": scope?.brandId ?? selectedBrand(activeSession?.user.email),
+        "X-Reelassati-Brand":
+          scope?.brandId ?? selectedBrand(activeSession?.user.email),
         ...init?.headers,
       },
     });
@@ -539,10 +550,15 @@ export const platformApi = {
     }>("/api/workspace", undefined, false, scope),
 
   saveWorkspace: (workspace: WorkspaceDocument, scope?: UploadRequestScope) =>
-    requestJson<{ workspace: WorkspaceDocument }>("/api/workspace", {
-      method: "PUT",
-      body: JSON.stringify({ workspace }),
-    }, false, scope),
+    requestJson<{ workspace: WorkspaceDocument }>(
+      "/api/workspace",
+      {
+        method: "PUT",
+        body: JSON.stringify({ workspace }),
+      },
+      false,
+      scope
+    ),
 
   editBrief: (projectId: string) =>
     requestJson<{ filename: string; brief: Record<string, unknown> }>(
@@ -617,23 +633,28 @@ export const platformApi = {
     projectId?: string,
     options?: UploadRequestOptions
   ): Promise<Asset> => {
-    const scope = options?.scope ?? await captureUploadRequestScope();
+    const scope = options?.scope ?? (await captureUploadRequestScope());
     const signal = options?.signal;
     signal?.throwIfAborted();
     if (file.size > DIRECT_UPLOAD_MAX_BYTES || projectId) {
       const initiated = await requestJson<{
         assetId: string;
         partSize: number;
-      }>("/api/assets/uploads", {
-        method: "POST",
-        body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          type: file.type || "application/octet-stream",
-          kind,
-        }),
-        signal,
-      }, false, scope);
+      }>(
+        "/api/assets/uploads",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            name: file.name,
+            size: file.size,
+            type: file.type || "application/octet-stream",
+            kind,
+          }),
+          signal,
+        },
+        false,
+        scope
+      );
       const partSize = Math.min(
         Math.max(initiated.partSize || UPLOAD_PART_BYTES, 5 * 1024 * 1024),
         UPLOAD_PART_BYTES
@@ -689,14 +710,18 @@ export const platformApi = {
             method: "POST",
             body: JSON.stringify({ parts: completedParts, projectId }),
             signal,
-          }, false, scope
+          },
+          false,
+          scope
         );
         onProgress?.(100);
         return completed.asset;
       } catch (cause) {
         await requestJson<{ ok: true }>(
           `/api/assets/uploads/${encodeURIComponent(initiated.assetId)}`,
-          { method: "DELETE" }, false, scope
+          { method: "DELETE" },
+          false,
+          scope
         ).catch(() => undefined);
         throw cause;
       }
@@ -732,7 +757,8 @@ export const platformApi = {
       {
         signal,
         headers: {
-          "X-Reelassati-Brand": options?.scope?.brandId ?? selectedBrand(session?.user.email),
+          "X-Reelassati-Brand":
+            options?.scope?.brandId ?? selectedBrand(session?.user.email),
           ...(session?.access_token
             ? { Authorization: `Bearer ${session.access_token}` }
             : {}),
@@ -745,9 +771,14 @@ export const platformApi = {
       );
     const maxBytes = options?.maxBytes;
     const declared = Number(response.headers.get("content-length"));
-    if (maxBytes !== undefined && (!Number.isFinite(maxBytes) || maxBytes <= 0 || declared > maxBytes)) {
+    if (
+      maxBytes !== undefined &&
+      (!Number.isFinite(maxBytes) || maxBytes <= 0 || declared > maxBytes)
+    ) {
       await response.body?.cancel();
-      throw new Error("This source exceeds the supported download size. Use a smaller source image.");
+      throw new Error(
+        "This source exceeds the supported download size. Use a smaller source image."
+      );
     }
     let blob: Blob;
     if (maxBytes !== undefined) {
@@ -761,11 +792,20 @@ export const platformApi = {
           const part = await reader.read();
           if (part.done) break;
           bytes += part.value.byteLength;
-          if (bytes > maxBytes) throw new Error("This source exceeds the supported download size. Use a smaller source image.");
+          if (bytes > maxBytes)
+            throw new Error(
+              "This source exceeds the supported download size. Use a smaller source image."
+            );
           chunks.push(new Uint8Array(part.value));
         }
-      } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
-      blob = new Blob(chunks, { type: response.headers.get("content-type") || "application/octet-stream" });
+      } finally {
+        await reader.cancel().catch(() => undefined);
+        reader.releaseLock();
+      }
+      blob = new Blob(chunks, {
+        type:
+          response.headers.get("content-type") || "application/octet-stream",
+      });
     } else blob = await response.blob();
     signal?.throwIfAborted();
     if (options?.scope) await verifyUploadRequestScope(options.scope);
@@ -796,9 +836,14 @@ export const platformApi = {
   },
 
   deleteAsset: (id: string, scope?: UploadRequestScope) =>
-    requestJson<{ ok: true }>(`/api/assets/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    }, false, scope),
+    requestJson<{ ok: true }>(
+      `/api/assets/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      },
+      false,
+      scope
+    ),
 
   renameAsset: (id: string, name: string) =>
     requestJson<{ asset: Asset }>(`/api/assets/${encodeURIComponent(id)}`, {
@@ -806,19 +851,52 @@ export const platformApi = {
       body: JSON.stringify({ name }),
     }),
 
-  generateScript: (input: {
-    topic: string;
-    platform: string;
-    tone: string;
-    duration: number;
-    language: string;
-    brandVoice?: string;
-  }, options?: UploadRequestOptions) =>
-    requestJson<{ script: ScriptDraft }>("/api/ai/script", {
-      method: "POST",
-      body: JSON.stringify(input),
-      signal: options?.signal,
-    }, false, options?.scope),
+  generateScript: (
+    input: {
+      topic: string;
+      platform: string;
+      tone: string;
+      duration: number;
+      language: string;
+      brandVoice?: string;
+    },
+    options?: UploadRequestOptions
+  ) =>
+    requestJson<{ script: ScriptDraft }>(
+      "/api/ai/script",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        signal: options?.signal,
+      },
+      false,
+      options?.scope
+    ),
+
+  generatePublicationCopy: (
+    input: {
+      brief: string;
+      caption: string;
+      hashtags: string[];
+      platforms: string[];
+      language: "en" | "it";
+      fields: Array<"caption" | "hashtags">;
+    },
+    options?: UploadRequestOptions
+  ) =>
+    requestJson<{
+      caption: string;
+      hashtags: string[];
+    }>(
+      "/api/ai/publication-copy",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        signal: options?.signal,
+      },
+      false,
+      options?.scope
+    ),
 
   editorChat: (input: import("@contracts/editor-chat").EditorChatRequest) =>
     requestJson<import("@contracts/editor-chat").EditorChatResponse>(
@@ -843,22 +921,30 @@ export const platformApi = {
       }
     ),
 
-  generateEditPlan: (input: {
-    project: EditProject;
-    command: string;
-    selectedClipIds: string[];
-    range?: { start: number; end: number };
-    localOnly?: boolean;
-  }, options?: UploadRequestOptions) =>
+  generateEditPlan: (
+    input: {
+      project: EditProject;
+      command: string;
+      selectedClipIds: string[];
+      range?: { start: number; end: number };
+      localOnly?: boolean;
+    },
+    options?: UploadRequestOptions
+  ) =>
     requestJson<{
       changes: EditOperation[];
       summary: string;
       provenance: ContentProvenance;
-    }>("/api/ai/edit-plan", {
-      method: "POST",
-      body: JSON.stringify(input),
-      signal: options?.signal,
-    }, false, options?.scope),
+    }>(
+      "/api/ai/edit-plan",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        signal: options?.signal,
+      },
+      false,
+      options?.scope
+    ),
 
   analyzeVideo: (
     input: {
@@ -867,7 +953,7 @@ export const platformApi = {
       analysisFramesPerSecond?: number;
       publicUrl?: string;
       platform: string;
-      sourceRightsConfirmed: boolean;
+      sourceRightsConfirmed?: boolean;
       focus?: string;
     },
     signal?: AbortSignal,
@@ -875,8 +961,15 @@ export const platformApi = {
   ) =>
     requestJson<{
       summary: string;
-      hook: { score: number; note: string };
-      pacing: { score: number; note: string };
+      hook: { score: number | null; note: string };
+      pacing: { score: number | null; note: string };
+      insights?: import("@contracts/video-analysis").VideoInsight[];
+      coverage?: {
+        input: "full-duration-original" | "full-duration-proxy";
+        durationSeconds: number;
+        proxyFramesPerSecond: number | null;
+        providerFrameSampling: "provider-controlled";
+      };
       review?: ReturnType<
         typeof import("@contracts/source-review").normalizeReview
       >;
@@ -888,11 +981,16 @@ export const platformApi = {
       }>;
       changes: EditOperation[];
       provenance: ContentProvenance;
-    }>("/api/ai/analyze", {
-      method: "POST",
-      signal,
-      body: JSON.stringify(input),
-    }, false, scope),
+    }>(
+      "/api/ai/analyze",
+      {
+        method: "POST",
+        signal,
+        body: JSON.stringify(input),
+      },
+      false,
+      scope
+    ),
 
   transcribe: (
     assetId: string,
@@ -905,11 +1003,16 @@ export const platformApi = {
       transcript: string;
       segments: EditProject["transcript"];
       provenance: ContentProvenance;
-    }>("/api/ai/transcribe", {
-      method: "POST",
-      body: JSON.stringify({ assetId, language, projectId, audioAssetIds }),
-      signal: options?.signal,
-    }, false, options?.scope),
+    }>(
+      "/api/ai/transcribe",
+      {
+        method: "POST",
+        body: JSON.stringify({ assetId, language, projectId, audioAssetIds }),
+        signal: options?.signal,
+      },
+      false,
+      options?.scope
+    ),
 
   quoteAudio: (kind: "music" | "sfx", seconds: number) =>
     requestJson<{ credits: number }>("/api/ai/audio/quote", {
@@ -932,67 +1035,98 @@ export const platformApi = {
     });
     return result.asset;
   },
-  synthesizeSpeech: async (input: {
-    requestId?: string;
-    acceptedCredits?: number;
-    text: string;
-    voice: string;
-    assetName?: string;
-    projectId?: string;
-    rightsConfirmed: true;
-  }, options?: UploadRequestOptions): Promise<Asset> => {
-    const result = await requestJson<{ asset: Asset }>("/api/ai/speech", {
-      method: "POST",
-      body: JSON.stringify({ ...input, acceptedCredits: input.acceptedCredits ?? speechCreditCost(speechCharacterCount(input.text), input.voice) }),
-      signal: options?.signal,
-    }, false, options?.scope);
+  synthesizeSpeech: async (
+    input: {
+      requestId?: string;
+      acceptedCredits?: number;
+      text: string;
+      voice: string;
+      assetName?: string;
+      projectId?: string;
+      rightsConfirmed: true;
+    },
+    options?: UploadRequestOptions
+  ): Promise<Asset> => {
+    const result = await requestJson<{ asset: Asset }>(
+      "/api/ai/speech",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ...input,
+          acceptedCredits:
+            input.acceptedCredits ??
+            speechCreditCost(speechCharacterCount(input.text), input.voice),
+        }),
+        signal: options?.signal,
+      },
+      false,
+      options?.scope
+    );
     return result.asset;
   },
 
-  generateImage: async (input: {
-    requestId?: string;
-    prompt: string;
-    assetName: string;
-    aspectRatio: "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
-    resolution: "1K" | "2K";
-    rightsConfirmed: true;
-    referenceContainsRealPerson: boolean;
-    realPersonConsentConfirmed: boolean;
-  }, options?: UploadRequestOptions): Promise<Asset> => {
-    const result = await requestJson<{ asset: Asset }>("/api/ai/image", {
-      method: "POST",
-      body: JSON.stringify(input),
-      signal: options?.signal,
-    }, false, options?.scope);
+  generateImage: async (
+    input: {
+      requestId?: string;
+      prompt: string;
+      assetName: string;
+      aspectRatio: "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
+      resolution: "1K" | "2K";
+      rightsConfirmed: true;
+      referenceContainsRealPerson: boolean;
+      realPersonConsentConfirmed: boolean;
+    },
+    options?: UploadRequestOptions
+  ): Promise<Asset> => {
+    const result = await requestJson<{ asset: Asset }>(
+      "/api/ai/image",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        signal: options?.signal,
+      },
+      false,
+      options?.scope
+    );
     return result.asset;
   },
 
-  createVideo: (input: {
-    requestId: string;
-    assetName: string;
-    prompt: string;
-    duration: number;
-    aspectRatio: "9:16" | "16:9" | "1:1";
-    resolution: "720p" | "1080p";
-    generateAudio: boolean;
-    firstFrameUrl?: string;
-    lastFrameUrl?: string;
-    continuitySourceJobId?: string;
-    projectId?: string;
-    rightsConfirmed: true;
-    referenceContainsRealPerson: boolean;
-    realPersonConsentConfirmed: boolean;
-  }, options?: UploadRequestOptions) =>
-    requestJson<{ job: GenerationJob }>("/api/video/jobs", {
-      method: "POST",
-      body: JSON.stringify(input),
-      signal: options?.signal,
-    }, false, options?.scope),
+  createVideo: (
+    input: {
+      requestId: string;
+      assetName: string;
+      prompt: string;
+      duration: number;
+      aspectRatio: "9:16" | "16:9" | "1:1";
+      resolution: "720p" | "1080p";
+      generateAudio: boolean;
+      firstFrameUrl?: string;
+      lastFrameUrl?: string;
+      continuitySourceJobId?: string;
+      projectId?: string;
+      rightsConfirmed: true;
+      referenceContainsRealPerson: boolean;
+      realPersonConsentConfirmed: boolean;
+    },
+    options?: UploadRequestOptions
+  ) =>
+    requestJson<{ job: GenerationJob }>(
+      "/api/video/jobs",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        signal: options?.signal,
+      },
+      false,
+      options?.scope
+    ),
 
   videoJob: (id: string, options?: UploadRequestOptions) =>
     requestJson<{ job: GenerationJob; asset?: Asset }>(
       `/api/video/jobs/${encodeURIComponent(id)}`,
-      { signal: options?.signal }, false, options?.scope
+      { signal: options?.signal },
+      false,
+      options?.scope
     ),
 
   /** Retrieve an existing provider output; this endpoint never starts a new generation. */

@@ -60,7 +60,6 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace";
 import { platformApi } from "@/lib/platform-api";
-import type { ComplianceStatus } from "@contracts/compliance";
 import { StudioMediaTray } from "@/components/studio/StudioMediaTray";
 import { PageGuideButton } from "@/components/help/PageGuide";
 
@@ -576,112 +575,34 @@ function DashboardHome() {
 
 function StudioStatus() {
   const { capabilities, workspace, error } = useWorkspace();
-  const [compliance, setCompliance] = useState<ComplianceStatus | null>(null);
-  const [legalName, setLegalName] = useState("");
-  const [entityType, setEntityType] = useState<
-    "individual" | "company" | "other"
-  >("individual");
-  const [firstEuAvailabilityDate, setFirstEuAvailabilityDate] = useState("");
-  const [creativeScopeConfirmed, setCreativeScopeConfirmed] = useState(false);
-  const [complianceNotice, setComplianceNotice] = useState("");
-  const [complianceBusy, setComplianceBusy] = useState(false);
-  useEffect(() => {
-    let active = true;
-    platformApi
-      .complianceStatus()
-      .then(({ status }) => {
-        if (!active) return;
-        setCompliance(status);
-        setLegalName(status.operatorName || "");
-        if (status.operatorEntityType) setEntityType(status.operatorEntityType);
-        setFirstEuAvailabilityDate(status.firstEuAvailabilityDate || "");
-        setCreativeScopeConfirmed(status.creativeScopeConfirmed);
-      })
-      .catch((cause: unknown) => {
-        if (active) {
-          setComplianceNotice(
-            cause instanceof Error
-              ? cause.message
-              : "Compliance status could not load."
-          );
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const saveOperator = async () => {
-    if (
-      !legalName.trim() ||
-      !firstEuAvailabilityDate ||
-      !creativeScopeConfirmed
-    )
-      return;
-    setComplianceBusy(true);
-    setComplianceNotice("");
-    try {
-      const { status } = await platformApi.saveOperatorCompliance({
-        legalName: legalName.trim(),
-        entityType,
-        releaseStatus: "public",
-        firstEuAvailabilityDate,
-        creativeScopeConfirmed: true,
-      });
-      setCompliance(status);
-      setComplianceNotice("Operator facts and intended use saved.");
-    } catch (cause) {
-      setComplianceNotice(
-        cause instanceof Error
-          ? cause.message
-          : "Operator facts could not be saved."
-      );
-    } finally {
-      setComplianceBusy(false);
-    }
-  };
-
-  const acknowledgeLiteracy = async () => {
-    setComplianceBusy(true);
-    setComplianceNotice("");
-    try {
-      const { status } = await platformApi.acknowledgeAiLiteracy();
-      setCompliance(status);
-      setComplianceNotice("Role-specific AI operations review recorded.");
-    } catch (cause) {
-      setComplianceNotice(
-        cause instanceof Error
-          ? cause.message
-          : "The review could not be recorded."
-      );
-    } finally {
-      setComplianceBusy(false);
-    }
-  };
   const rows = [
     {
       label: "Workspace database",
       detail: "Projects, edits, goals, and revisions",
       ready: capabilities.persistence,
       icon: Database,
+      to: "/dashboard/settings",
     },
     {
       label: "Media storage",
       detail: "Private uploaded and generated assets",
       ready: capabilities.uploads,
       icon: HardDrive,
+      to: "/dashboard/library",
     },
     {
       label: "REELassati AI",
       detail: "Scripts, edit plans, analysis, voice, and video",
       ready: capabilities.ai && capabilities.analysis,
       icon: BrainCircuit,
+      to: "/dashboard/script",
     },
     {
       label: "Connected publishing",
       detail: "Account connection, scheduling, and posts",
       ready: capabilities.publishing,
       icon: Radio,
+      to: "/dashboard/social",
     },
   ];
 
@@ -696,9 +617,11 @@ function StudioStatus() {
       {error ? <p className="mt-5 text-sm text-destructive">{error}</p> : null}
       <div className="grid sm:grid-cols-2 gap-4 mt-8">
         {rows.map(row => (
-          <div
+          <Link
             key={row.label}
-            className="bg-surface border border-border rounded-xl p-5"
+            to={row.to}
+            aria-label={`${row.label}: ${row.ready ? "open" : "resolve setup"}`}
+            className="group block bg-surface border border-border rounded-xl p-5 transition duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transform-none"
           >
             <div className="flex items-center justify-between">
               <row.icon className="h-5 w-5 text-primary" />
@@ -715,7 +638,11 @@ function StudioStatus() {
             </div>
             <h2 className="font-semibold mt-5">{row.label}</h2>
             <p className="text-sm text-foreground/70 mt-1">{row.detail}</p>
-          </div>
+            <span className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary">
+              {row.ready ? "Open workspace" : "Resolve setup"}
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+            </span>
+          </Link>
         ))}
       </div>
       <div className="mt-6 bg-surface border border-border rounded-xl p-5">
@@ -731,177 +658,6 @@ function StudioStatus() {
           </p>
         ) : null}
       </div>
-      <section className="mt-6 rounded-xl border border-border bg-surface p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="mono-eyebrow text-primary">
-              Compliance control plane
-            </p>
-            <h2 className="mt-2 text-lg font-semibold">
-              EU public-release readiness
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm text-foreground/70">
-              Versioned controls, machine provenance and publishing gates are
-              structural. This status does not claim certification or replace
-              legal review.
-            </p>
-          </div>
-          <span
-            className={cn(
-              "rounded-full px-3 py-1.5 font-mono text-xs uppercase tracking-wide",
-              compliance?.publicLaunchReady
-                ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-amber-500/10 text-amber-600"
-            )}
-          >
-            {compliance?.publicLaunchReady
-              ? "Ready on recorded facts"
-              : "Facts needed"}
-          </span>
-        </div>
-        {complianceNotice ? (
-          <p className="mt-4 rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground/60">
-            {complianceNotice}
-          </p>
-        ) : null}
-        {compliance?.blockers.length ? (
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {compliance.blockers.map(blocker => (
-              <li
-                key={blocker}
-                className="rounded-lg border border-amber-500/15 bg-amber-500/5 px-3 py-2 text-xs"
-              >
-                {blocker}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-border bg-background p-4">
-            <h3 className="text-sm font-semibold">Operator and intended use</h3>
-            <p className="mt-1 text-xs text-foreground/70">
-              Record the exact operator facts; REELassati never invents an
-              entity name or market date.
-            </p>
-            <input
-              value={legalName}
-              onChange={event => setLegalName(event.target.value)}
-              placeholder="Full legal operator name"
-              className="mt-3 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm"
-            />
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <select
-                value={entityType}
-                onChange={event =>
-                  setEntityType(event.target.value as typeof entityType)
-                }
-                className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
-              >
-                <option value="individual">Individual</option>
-                <option value="company">Company</option>
-                <option value="other">Other entity</option>
-              </select>
-              <div className="flex items-center rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs font-medium text-emerald-600">
-                Public platform
-              </div>
-            </div>
-            <label className="mt-3 block text-xs text-foreground/70">
-              First EU availability or put-into-service date
-              <input
-                type="date"
-                value={firstEuAvailabilityDate}
-                onChange={event =>
-                  setFirstEuAvailabilityDate(event.target.value)
-                }
-                className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm"
-              />
-            </label>
-            <label className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-foreground/60">
-              <input
-                type="checkbox"
-                checked={creativeScopeConfirmed}
-                onChange={event =>
-                  setCreativeScopeConfirmed(event.target.checked)
-                }
-                className="mt-0.5 accent-primary"
-              />
-              <span>
-                Permanently limit REELassati to creative/marketing work—never
-                biometric/emotion inference or high-impact decisions about
-                people.
-              </span>
-            </label>
-            <button
-              type="button"
-              onClick={() => void saveOperator()}
-              disabled={
-                complianceBusy ||
-                !legalName.trim() ||
-                !firstEuAvailabilityDate ||
-                !creativeScopeConfirmed
-              }
-              className="mt-4 rounded-lg bg-primary px-4 py-2.5 text-xs font-medium text-white disabled:opacity-40"
-            >
-              Save operator record
-            </button>
-          </div>
-
-          <div className="rounded-xl border border-border bg-background p-4">
-            <h3 className="text-sm font-semibold">
-              Role-specific AI operations review
-            </h3>
-            <p className="mt-1 text-xs leading-relaxed text-foreground/70">
-              Review intended use, model limitations, synthetic-media
-              disclosure, rights/consent, human editorial control and incident
-              escalation. This records the owner’s review only; staff and
-              contractors need role-appropriate measures of their own.
-            </p>
-            <ul className="mt-3 space-y-2 text-xs text-foreground/65">
-              <li>• Each AI task uses a recorded managed production route.</li>
-              <li>
-                • Generated output needs verified provenance before release.
-              </li>
-              <li>
-                • Realistic synthetic media and public-interest text use
-                conditional disclosures.
-              </li>
-              <li>
-                • AI output can be wrong; final claims remain under human
-                control.
-              </li>
-            </ul>
-            <button
-              type="button"
-              onClick={() => void acknowledgeLiteracy()}
-              disabled={
-                complianceBusy || Boolean(compliance?.aiLiteracyAcknowledgedAt)
-              }
-              className="mt-4 rounded-lg border border-primary/30 px-4 py-2.5 text-xs font-medium text-primary disabled:opacity-45"
-            >
-              {compliance?.aiLiteracyAcknowledgedAt
-                ? `Reviewed ${new Date(compliance.aiLiteracyAcknowledgedAt).toLocaleDateString()}`
-                : "Record completed review"}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-5">
-          {capabilities.modelRoutes.map(route => (
-            <div
-              key={route.purpose}
-              className="rounded-lg border border-border bg-background p-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-medium">{route.purpose}</p>
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-foreground/70">
-                Managed by REELassati
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
@@ -1217,7 +973,7 @@ export default function Dashboard() {
           </button>
         </header>
 
-        <main className="flex-1 p-6 lg:p-10 w-full">
+        <main className="flex-1 p-4 sm:p-6 xl:p-8 w-full">
           <Suspense fallback={<StudioPageFallback />}>
             {workspaceLoading ? (
               <StudioPageFallback />

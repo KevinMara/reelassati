@@ -499,12 +499,14 @@ describe("platform-wide functional invariants", () => {
     expect(library).toContain("/dashboard/script?script=");
   });
 
-  it("uses a non-blocking analysis privacy notice instead of repeated consent", () => {
+  it("keeps registration terms while analysis starts from a chosen source without repeated declarations", () => {
     const analyzer = source("./pages/dashboard/VideoAnalyzer.tsx");
     const signup = source("./pages/Signup.tsx");
     expect(analyzer).not.toContain("analysisAuthorized");
     expect(analyzer).not.toContain("I'm authorized to provide this video");
-    expect(analyzer).toMatch(/platform\s+terms and privacy information/);
+    expect(analyzer).not.toContain("I am authorized to import and submit this video");
+    expect(analyzer).not.toMatch(/platform\s+terms and privacy information/);
+    expect(analyzer).toContain("!sourceReady || analyzing || !analysisReady");
     expect(signup).toContain("termsAccepted");
     expect(signup).toContain('to="/terms"');
     expect(signup).toContain('to="/privacy"');

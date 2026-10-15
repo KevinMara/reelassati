@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import {
   useEffect,
   useMemo,
@@ -621,7 +622,7 @@ export default function TrendsPage() {
                   <span className="mb-1.5 block text-foreground/70">
                     Platform
                   </span>
-                  <select
+                  <StudioSelect
                     value={researchPlatform}
                     onChange={event =>
                       setResearchPlatform(
@@ -635,13 +636,13 @@ export default function TrendsPage() {
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                 </label>
                 <label className="text-xs">
                   <span className="mb-1.5 block text-foreground/70">
                     Content type
                   </span>
-                  <select
+                  <StudioSelect
                     value={contentType}
                     onChange={event =>
                       setContentType(event.target.value as TrendContentType)
@@ -653,13 +654,13 @@ export default function TrendsPage() {
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                 </label>
                 <label className="text-xs">
                   <span className="mb-1.5 block text-foreground/70">
                     Performance objective
                   </span>
-                  <select
+                  <StudioSelect
                     value={objective}
                     onChange={event =>
                       setObjective(event.target.value as TrendObjective)
@@ -671,7 +672,7 @@ export default function TrendsPage() {
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                 </label>
                 <label className="text-xs">
                   <span className="mb-1.5 block text-foreground/70">
@@ -830,7 +831,7 @@ export default function TrendsPage() {
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
-            <select
+            <StudioSelect
               value={platformFilter}
               onChange={event =>
                 setPlatformFilter(event.target.value as "all" | TrendPlatform)
@@ -843,8 +844,8 @@ export default function TrendsPage() {
                   {option.label}
                 </option>
               ))}
-            </select>
-            <select
+            </StudioSelect>
+            <StudioSelect
               value={lifecycleFilter}
               onChange={event =>
                 setLifecycleFilter(event.target.value as "all" | TrendLifecycle)
@@ -858,7 +859,7 @@ export default function TrendsPage() {
                   {label}
                 </option>
               ))}
-            </select>
+            </StudioSelect>
           </div>
         </div>
 
@@ -1116,7 +1117,7 @@ export default function TrendsPage() {
             </label>
             <label className="text-sm">
               <span className="mb-1.5 block font-medium">Platform</span>
-              <select
+              <StudioSelect
                 value={platform}
                 onChange={event => setPlatform(event.target.value as Platform)}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
@@ -1126,11 +1127,11 @@ export default function TrendsPage() {
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </StudioSelect>
             </label>
             <label className="text-sm">
               <span className="mb-1.5 block font-medium">Target duration</span>
-              <select
+              <StudioSelect
                 value={duration}
                 onChange={event => setDuration(Number(event.target.value))}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
@@ -1140,7 +1141,7 @@ export default function TrendsPage() {
                     {seconds} seconds
                   </option>
                 ))}
-              </select>
+              </StudioSelect>
             </label>
           </div>
           <div className="mt-5 flex justify-end">
@@ -1164,7 +1165,7 @@ export default function TrendsPage() {
               </p>
               <h2 className="mt-1 font-medium">Format hypotheses</h2>
             </div>
-            <select
+            <StudioSelect
               value={filter}
               onChange={event =>
                 setFilter(event.target.value as "all" | Platform)
@@ -1178,7 +1179,7 @@ export default function TrendsPage() {
                   {option.label}
                 </option>
               ))}
-            </select>
+            </StudioSelect>
           </div>
           {hypotheses.length ? (
             <div className="space-y-4">

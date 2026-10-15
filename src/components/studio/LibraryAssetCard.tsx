@@ -1,3 +1,4 @@
+import { AudioPlayer } from "@/components/ui/audio-player";
 import { useState } from "react";
 import { GripVertical, Music2, Pencil, Check, X } from "lucide-react";
 import type { Asset } from "@contracts/workspace";
@@ -154,8 +155,9 @@ export function LibraryAssetCard({
               className="max-h-[65vh] w-full rounded-lg object-contain"
             />
           ) : asset.kind === "audio" ? (
-            <audio
+            <AudioPlayer
               src={asset.url}
+              downloadName={asset.name}
               controls
               preload="metadata"
               className="w-full"

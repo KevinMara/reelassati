@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { useMemo, useState } from "react";
 import {
   CalendarDays,
@@ -366,7 +367,7 @@ export default function GoalTracker() {
               >
                 Metric
               </label>
-              <select
+              <StudioSelect
                 id="goal-metric"
                 value={metric}
                 onChange={event =>
@@ -379,7 +380,7 @@ export default function GoalTracker() {
                     {meta.label}
                   </option>
                 ))}
-              </select>
+              </StudioSelect>
             </div>
             <div>
               <label
@@ -421,7 +422,7 @@ export default function GoalTracker() {
               >
                 Platform
               </label>
-              <select
+              <StudioSelect
                 id="goal-platform"
                 value={platform}
                 onChange={event =>
@@ -434,7 +435,7 @@ export default function GoalTracker() {
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </StudioSelect>
             </div>
           </div>
           <div className="mt-4 flex gap-2">

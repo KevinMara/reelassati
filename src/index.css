@@ -2,6 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Keep built-in date/time pickers legible alongside the shared dark controls. */
+.dark { color-scheme: dark; }
+
+.audio-player { container-type: inline-size; }
+@container (max-width: 300px) {
+  .audio-player-controls { flex-wrap: wrap; gap: 8px; }
+  .audio-player-seek { order: 10; flex-basis: 100%; margin: 5px 0; }
+  .audio-player-clock { width: 88px; font-size: 10px; }
+}
+@container (max-width: 220px) {
+  .audio-player-clock { flex: 1; min-width: 0; width: auto; }
+}
+
+.media-seek {
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.media-seek::-webkit-slider-thumb {
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border: 2px solid hsl(var(--background));
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.4);
+  transition: transform 150ms;
+}
+.media-seek::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border: 2px solid hsl(var(--background));
+  border-radius: 50%;
+  background: hsl(var(--primary));
+}
+.media-seek:hover::-webkit-slider-thumb {
+  transform: scale(1.25);
+}
+[data-slot="select-trigger"] [data-slot="select-value"] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+[data-slot="select-content"] [role="option"] {
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="select-content"],
+  [data-slot="popover-content"],
+  [data-slot="dialog-content"],
+  [data-slot="dialog-overlay"] {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 @keyframes ai-color-flow {
   0%,
   100% {
@@ -225,6 +284,7 @@
     --success: 145 45% 33%;
     --warning: 27 64% 45%;
 
+    --edge-color: 30 10% 10%;
     --border: 30 10% 10% / 0.08;
     --border-strong: 30 10% 10% / 0.16;
     --input: 30 10% 10% / 0.12;
@@ -290,6 +350,7 @@
     --destructive: 358 56% 55%;
     --destructive-foreground: 42 27% 95%;
 
+    --edge-color: 42 27% 95%;
     --border: 42 27% 95% / 0.08;
     --border-strong: 42 27% 95% / 0.16;
     --input: 42 27% 95% / 0.12;

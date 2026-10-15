@@ -271,10 +271,15 @@ export default function EditorPage() {
     getWorkspaceSnapshot,
   } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    null
+  const requestedProject = workspace.projects.find(
+    item => item.id === searchParams.get("project")
   );
-  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    requestedProject?.id ?? null
+  );
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(
+    requestedProject?.clips[0]?.id ?? null
+  );
   const [extraSelection, setExtraSelection] = useState<string[]>([]);
   const [durationDraft, setDurationDraft] = useState<string | null>(null);
   const [leftTool, setLeftTool] = useState<DockKind>("library");
@@ -297,17 +302,19 @@ export default function EditorPage() {
   }>();
   const [clipDraft, setClipDraft] = useState<TimelineClip | null>(null);
   const [transcriptDraft, setTranscriptDraft] = useState<TranscriptSegment[]>(
-    []
+    requestedProject?.transcript.map(segment => ({ ...segment })) ?? []
   );
   const captionCursors = useRef<Record<string, number>>({});
   const transcriptBase = useRef<{ projectId: string; value: string } | null>(
     null
   );
   const [transcriptConflict, setTranscriptConflict] = useState(false);
-  const [titleDraft, setTitleDraft] = useState("");
+  const [titleDraft, setTitleDraft] = useState(requestedProject?.title ?? "");
   const [transcriptionProvenance, setTranscriptionProvenance] =
-    useState<ContentProvenance | null>(null);
-  const [rawPlayhead, setPlayhead] = useState(0);
+    useState<ContentProvenance | null>(
+      requestedProject?.transcriptProvenance ?? null
+    );
+  const [rawPlayhead, setPlayhead] = useState(requestedProject?.playhead ?? 0);
   const [playing, setPlaying] = useState(false);
   const [timelineZoom, setTimelineZoom] = useState(100);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);

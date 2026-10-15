@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { CreditPlanner } from "@/components/studio/CreditPlanner";
 import posthog from "@/lib/posthog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -862,7 +863,7 @@ function UsageChart({
             </span>
           </p>
         </div>
-        <select
+        <StudioSelect
           aria-label="Credit usage time range"
           value={range}
           onChange={e => setRange(Number(e.target.value))}
@@ -870,7 +871,7 @@ function UsageChart({
         >
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
-        </select>
+        </StudioSelect>
       </div>
       <div
         className="mt-5 h-56"

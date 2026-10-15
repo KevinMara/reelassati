@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { useState } from "react";
 import { useWorkspace } from "@/providers/workspace";
 
@@ -42,7 +43,7 @@ export function ScenePresets({
     <div className="mb-5 rounded-xl border border-border bg-background/60 p-4">
       <label className="text-sm font-medium">
         Saved scenes
-        <select
+        <StudioSelect
           aria-label="Reuse a saved scene"
           defaultValue=""
           onChange={e => {
@@ -59,7 +60,7 @@ export function ScenePresets({
               {p.name}
             </option>
           ))}
-        </select>
+        </StudioSelect>
       </label>
       <div className="mt-3 flex gap-2">
         <input

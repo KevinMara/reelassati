@@ -33,6 +33,8 @@ export interface CapabilityState {
   imageGeneration: boolean;
   videoGeneration: boolean;
   publishing: boolean;
+  /** Versioned rollout: older backends do not accept the automatic composer. */
+  publicationComposer?: boolean;
   missing: string[];
   modelRoutes: Array<{
     purpose:

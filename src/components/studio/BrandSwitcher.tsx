@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2 } from "lucide-react";
@@ -63,7 +64,7 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
           ) : null}
           Brand workspace
         </span>
-        <select
+        <StudioSelect
           aria-label="Active brand workspace"
           disabled={!data || saving || !!workspaceError || busy}
           value={data?.activeId || "default"}
@@ -79,7 +80,7 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
               {brand.name}
             </option>
           ))}
-        </select>
+        </StudioSelect>
       </label>
       {manage && data && (
         <>

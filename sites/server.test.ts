@@ -1268,6 +1268,33 @@ describe("Sites worker", () => {
     }
   });
 
+  it("automatic origin labels cannot be hidden by a client or forge human consent", () => {
+    const review = publicationReviewFromInput(
+      {
+        policyVersion: disclosureReview.policyVersion,
+        mode: "automatic-provenance",
+        reviewedAt: new Date().toISOString(),
+        disclosureLanguage: "en",
+        containsAiGeneratedText: false,
+        rightsConfirmed: true,
+        substantiveHumanReview: true,
+        visibleDisclosure: { required: false, text: "Forged" },
+      },
+      { hasMedia: true, authenticatedAiMedia: true, authenticatedAiText: true }
+    );
+    expect(review.visibleDisclosure).toMatchObject({
+      required: true,
+      text: "Content created or edited with AI assistance.",
+    });
+    expect(review.classificationAnswers.depictsRealPersonOrVoice).toBe(
+      "unknown"
+    );
+    expect(review.classificationAnswers.publicInterestText).toBe("unknown");
+    expect(review.rightsConfirmed).toBe(false);
+    expect(review.substantiveHumanReview).toBe(false);
+    expect(review.mode).toBe("automatic-provenance");
+  });
+
   it("uses the per-release audience language instead of a conflicting UI projection", () => {
     const review = publicationReviewFromInput(
       {
@@ -1488,7 +1515,7 @@ describe("Sites worker", () => {
     expect(response.headers.get("X-REELassati-Retention")).toBe("none");
   });
 
-  it("requires server-recorded authorization before video analysis", async () => {
+  it("requires an owned video asset after removing the redundant analysis declaration", async () => {
     const response = await worker.fetch(
       new Request("https://studio.example/api/ai/analyze", {
         method: "POST",
@@ -1508,9 +1535,9 @@ describe("Sites worker", () => {
       } as never
     );
 
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
-      error: expect.stringContaining("submit this video"),
+      error: "Video asset not found",
     });
   });
 
@@ -1817,7 +1844,9 @@ describe("Sites worker", () => {
       );
 
       expect(response.status).toBe(422);
-      expect(await response.json()).toMatchObject({ error: expect.stringContaining("owned asset ID") });
+      expect(await response.json()).toMatchObject({
+        error: expect.stringContaining("owned asset ID"),
+      });
       expect(providerUrl).toBe("");
       expect(providerBody).toEqual({});
     } finally {

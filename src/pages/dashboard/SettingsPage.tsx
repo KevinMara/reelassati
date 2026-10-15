@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { AccountDataControls } from "@/components/studio/AccountDataControls";
 import { ServiceDiagnosticsPanel } from "@/components/studio/ServiceDiagnosticsPanel";
 import { useMemo, useState, type FormEvent } from "react";
@@ -310,11 +311,12 @@ export default function SettingsPage() {
                     className="w-full cursor-not-allowed rounded-lg border border-border bg-foreground/[0.03] px-4 py-2.5 text-foreground/70"
                   />
                 </label>
-                <label className="text-sm">
+                <label htmlFor="settings-interface-language" className="text-sm">
                   <span className="mb-1.5 block font-medium">
                     Interface language
                   </span>
-                  <select
+                  <StudioSelect
+                    id="settings-interface-language"
                     value={profileDraft.language}
                     onChange={event =>
                       setProfileField(
@@ -326,13 +328,13 @@ export default function SettingsPage() {
                   >
                     <option value="en">English</option>
                     <option value="it">Italiano</option>
-                  </select>
+                  </StudioSelect>
                 </label>
                 <label className="text-sm">
                   <span className="mb-1.5 block font-medium">
                     Default creation language
                   </span>
-                  <select
+                  <StudioSelect
                     value={profileDraft.contentLanguage}
                     onChange={event =>
                       setProfileField("contentLanguage", event.target.value)
@@ -344,13 +346,13 @@ export default function SettingsPage() {
                         {language.label}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                 </label>
                 <label className="text-sm">
                   <span className="mb-1.5 block font-medium">
                     Publishing timezone
                   </span>
-                  <select
+                  <StudioSelect
                     value={profileDraft.timezone}
                     onChange={event =>
                       setProfileField("timezone", event.target.value)
@@ -362,7 +364,7 @@ export default function SettingsPage() {
                         {timezone}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                 </label>
               </div>
               <div className="flex items-center justify-between border-t border-border pt-5">
@@ -446,11 +448,12 @@ export default function SettingsPage() {
                       className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                     />
                   </label>
-                  <label className="text-sm">
+                  <label htmlFor="settings-caption-preset" className="text-sm">
                     <span className="mb-1.5 block font-medium">
                       Caption preset
                     </span>
-                    <select
+                    <StudioSelect
+                      id="settings-caption-preset"
                       value={brandDraft.captionPreset}
                       onChange={event =>
                         setBrandField(
@@ -463,7 +466,7 @@ export default function SettingsPage() {
                       <option value="kinetic">Kinetic</option>
                       <option value="editorial">Editorial</option>
                       <option value="minimal">Minimal</option>
-                    </select>
+                    </StudioSelect>
                   </label>
                   <label className="text-sm">
                     <span className="mb-1.5 block font-medium">

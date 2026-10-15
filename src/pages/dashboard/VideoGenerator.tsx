@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { ScenePresets } from "@/components/studio/ScenePresets";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -578,7 +579,7 @@ export default function VideoGenerator() {
               >
                 Duration
               </label>
-              <select
+              <StudioSelect
                 id="video-duration"
                 value={duration}
                 onChange={event => {
@@ -594,7 +595,7 @@ export default function VideoGenerator() {
                     {seconds} seconds
                   </option>
                 ))}
-              </select>
+              </StudioSelect>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -692,7 +693,7 @@ export default function VideoGenerator() {
                   >
                     Previous clip
                   </label>
-                  <select
+                  <StudioSelect
                     id="continuity-source"
                     value={continuitySourceJobId}
                     onChange={event => {
@@ -712,7 +713,7 @@ export default function VideoGenerator() {
                         </option>
                       );
                     })}
-                  </select>
+                  </StudioSelect>
                   <p className="mt-2 text-xs leading-relaxed text-foreground/65">
                     Continuity Lock reuses the selected clip, its scene
                     direction, reference frames, and generation lineage. Write

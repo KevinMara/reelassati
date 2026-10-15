@@ -74,17 +74,24 @@ export type RightsBasis =
   "owned-or-licensed" | "documented-consent" | "not-applicable";
 
 export type DisclosureReason =
-  "realistic-synthetic-media" | "public-interest-text" | "not-required";
+  | "realistic-synthetic-media"
+  | "public-interest-text"
+  | "ai-origin"
+  | "not-required";
 
 export type DisclosureLanguage = "en" | "it";
 
 /**
  * EU-AI-07 — Immutable review snapshot bound to a publishing intent.
- * These are factual declarations by the authenticated deployer. The server
+ * Legacy reviews are factual declarations by the authenticated deployer.
+ * Automatic mode records source-based labeling and keeps unknown facts unknown.
+ * The server
  * validates their internal consistency and the server-owned asset provenance;
  * it never treats a client boolean as proof of ownership or consent.
  */
 export interface PublicationComplianceReview {
+  /** Automatic mode records provenance decisions, never user attestations. */
+  mode?: "automatic-provenance";
   policyVersion: typeof AI_COMPLIANCE_POLICY_VERSION;
   reviewedAt: string;
   /**
@@ -93,11 +100,11 @@ export interface PublicationComplianceReview {
    */
   disclosureLanguage: DisclosureLanguage;
   classificationAnswers: {
-    aiGeneratedText: "yes" | "no";
-    realisticSyntheticMedia: "yes" | "no" | "not-applicable";
-    depictsRealPersonOrVoice: "yes" | "no" | "not-applicable";
-    creativeOrFictionalWork: "yes" | "no" | "not-applicable";
-    publicInterestText: "yes" | "no";
+    aiGeneratedText: "yes" | "no" | "unknown";
+    realisticSyntheticMedia: "yes" | "no" | "unknown" | "not-applicable";
+    depictsRealPersonOrVoice: "yes" | "no" | "unknown" | "not-applicable";
+    creativeOrFictionalWork: "yes" | "no" | "unknown" | "not-applicable";
+    publicInterestText: "yes" | "no" | "unknown";
   };
   intendedUseConfirmed: boolean;
   rightsConfirmed: boolean;

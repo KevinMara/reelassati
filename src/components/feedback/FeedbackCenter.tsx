@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
@@ -394,7 +395,7 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Field label={isItalian ? "Impatto" : "Impact"}>
-                <select
+                <StudioSelect
                   value={impact}
                   onChange={event => setImpact(event.target.value as Impact)}
                   className={FIELD_INPUT}
@@ -405,7 +406,7 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
                   </option>
                   <option value="minor">Minor — workaround available</option>
                   <option value="idea">Idea — improvement request</option>
-                </select>
+                </StudioSelect>
               </Field>
               <Field
                 label={
@@ -582,7 +583,7 @@ function OwnerInbox({
               />
             </label>
             <div className="grid grid-cols-2 gap-2">
-              <select
+              <StudioSelect
                 value={statusFilter}
                 onChange={event =>
                   setStatusFilter(event.target.value as FeedbackStatus | "all")
@@ -595,8 +596,8 @@ function OwnerInbox({
                     {STATUS_LABELS[status]}
                   </option>
                 ))}
-              </select>
-              <select
+              </StudioSelect>
+              <StudioSelect
                 value={typeFilter}
                 onChange={event =>
                   setTypeFilter(event.target.value as FeedbackType | "all")
@@ -606,7 +607,7 @@ function OwnerInbox({
                 <option value="all">Bugs + ideas</option>
                 <option value="bug">Bugs</option>
                 <option value="feedback">Ideas</option>
-              </select>
+              </StudioSelect>
             </div>
           </div>
 
@@ -682,7 +683,7 @@ function OwnerInbox({
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <Field label="Status">
-                  <select
+                  <StudioSelect
                     value={selected.status}
                     onChange={event =>
                       void updateItem(selected, {
@@ -696,10 +697,10 @@ function OwnerInbox({
                         {STATUS_LABELS[status]}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                 </Field>
                 <Field label="Priority">
-                  <select
+                  <StudioSelect
                     value={selected.priority}
                     onChange={event =>
                       void updateItem(selected, {
@@ -715,7 +716,7 @@ function OwnerInbox({
                         {priority.slice(1)}
                       </option>
                     ))}
-                  </select>
+                  </StudioSelect>
                 </Field>
               </div>
 

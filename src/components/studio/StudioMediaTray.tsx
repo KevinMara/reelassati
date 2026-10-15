@@ -41,11 +41,6 @@ export function StudioMediaTray() {
         >
           <Library className="h-3.5 w-3.5 text-primary" />
           Media
-          {recentMedia.length ? (
-            <span className="flex min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 py-0.5 font-mono text-xs font-semibold text-primary">
-              {recentMedia.length}
-            </span>
-          ) : null}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-[340px] p-3">

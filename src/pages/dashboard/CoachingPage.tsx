@@ -8,7 +8,6 @@ import {
   FolderKanban,
   Lightbulb,
   RefreshCw,
-  ShieldCheck,
   Target,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -124,7 +123,6 @@ function buildReport(workspace: WorkspaceDocument) {
 
 export default function CoachingPage() {
   const { workspace, refresh, saving } = useWorkspace();
-  const [refreshedAt, setRefreshedAt] = useState(() => new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const report = useMemo(() => buildReport(workspace), [workspace]);
@@ -139,7 +137,6 @@ export default function CoachingPage() {
         setRefreshError("The latest workspace data could not be loaded.");
         return;
       }
-      setRefreshedAt(new Date());
     } catch (cause) {
       setRefreshError(
         cause instanceof Error
@@ -155,7 +152,7 @@ export default function CoachingPage() {
     <div className="mx-auto max-w-5xl">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">Evidence coach</p>
+          <p className="mono-eyebrow mb-2 text-primary">Weekly momentum</p>
           <h1 className="text-3xl font-semibold">Weekly Review</h1>
           <p className="mt-2 max-w-2xl text-foreground/60">
             A practical review built only from your saved projects, publishing
@@ -187,25 +184,6 @@ export default function CoachingPage() {
           {refreshError}
         </p>
       ) : null}
-
-      <div className="mb-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
-        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-        <div>
-          <p className="text-sm font-medium">
-            Workspace evidence, not synthetic analytics
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-foreground/70">
-            REELassati does not yet have verified reach, watch-time or retention
-            data in this workspace, so this report will not fabricate views,
-            engagement, growth or “best times.” Updated{" "}
-            {refreshedAt.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-            .
-          </p>
-        </div>
-      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 14 }}
@@ -242,7 +220,7 @@ export default function CoachingPage() {
         <section className="rounded-xl border border-border bg-surface p-6">
           <h2 className="mb-4 flex items-center gap-2 font-medium">
             <BarChart3 className="h-4 w-4 text-primary" />
-            What the workspace proves
+            Your week at a glance
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {report.evidence.map(item => (

@@ -1,3 +1,4 @@
+import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import type { Asset } from "@contracts/workspace";
@@ -135,10 +136,10 @@ export function StillImageToolPanel({ projectId, kind }: { projectId: string; ki
         {" "}Runs locally in your browser without a provider credit charge.
       </p>
       <label className="block text-xs font-medium" htmlFor={`still-source-${kind}-${projectId}`}>Source image</label>
-      <select id={`still-source-${kind}-${projectId}`} value={sourceId} onChange={event => { operation.current?.abort(); setSourceId(event.target.value); setResult(null); }} className="w-full rounded-lg border border-border bg-background p-2 text-sm">
+      <StudioSelect id={`still-source-${kind}-${projectId}`} value={sourceId} onChange={event => { operation.current?.abort(); setSourceId(event.target.value); setResult(null); }} className="w-full rounded-lg border border-border bg-background p-2 text-sm">
         <option value="">Choose a Library image</option>
         {images.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
-      </select>
+      </StudioSelect>
       <p className="text-[11px] text-foreground/55">PNG, JPEG or still WebP · up to 20 MB / 4 MP / 4096 px per side.</p>
       {kind === "depth" ? <p className="text-[11px] text-foreground/55">Relative depth supports aspect ratios from 1:2 to 2:1, including 9:16 and 16:9.</p> : null}
       <button type="button" onClick={() => void analyze()} disabled={!original || busy || !user} className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40">
