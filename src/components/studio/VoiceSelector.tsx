@@ -51,8 +51,20 @@ export function VoiceSelector({
   const [tag, setTag] = useState("all");
   const selected = findVoice(value);
   const matches = useMemo(
-    () => filterVoices(query, language, tag),
-    [query, language, tag]
+    () =>
+      filterVoices("", language, tag).filter(voice =>
+        [
+          voice.name,
+          voice.language,
+          ...voice.tags,
+          ui(voice.language),
+          ...voice.tags.map(item => ui(item)),
+        ]
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(query.toLocaleLowerCase())
+      ),
+    [query, language, tag, ui]
   );
 
   return (
@@ -64,14 +76,16 @@ export function VoiceSelector({
             id={id}
             disabled={disabled}
             className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-left text-sm outline-none transition-colors hover:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-            aria-label={`Voice: ${selected?.name || "Choose a voice"}`}
+            aria-label={ui("Voice: {{name}}", {
+              name: selected?.name || ui("Choose a voice"),
+            })}
           >
             <Mic2
               className="size-3.5 shrink-0 text-primary"
               aria-hidden="true"
             />
             <span className="min-w-0 flex-1 truncate">
-              {selected?.name || "Choose a voice"}
+              {selected?.name || ui("Choose a voice")}
             </span>
             <ChevronDown
               className="size-3.5 shrink-0 text-muted-foreground"
@@ -102,7 +116,7 @@ export function VoiceSelector({
                   <SelectItem value="all">{ui("All languages")}</SelectItem>
                   {VOICE_LANGUAGES.map(item => (
                     <SelectItem key={item} value={item}>
-                      {item}
+                      {ui(item)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -119,7 +133,7 @@ export function VoiceSelector({
                   <SelectItem value="all">{ui("All styles")}</SelectItem>
                   {VOICE_TAGS.map(item => (
                     <SelectItem key={item} value={item}>
-                      {item}
+                      {ui(item)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -155,7 +169,8 @@ export function VoiceSelector({
                       {voice.name}
                     </span>
                     <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
-                      {voice.language} · {voice.tags.join(" · ")}
+                      {ui(voice.language)} ·{" "}
+                      {voice.tags.map(item => ui(item)).join(" · ")}
                     </span>
                   </span>
                   {voice.id === value && (
@@ -175,10 +190,10 @@ export function VoiceSelector({
       </Popover>
       {selected && (
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
-          <span>{selected.language}</span>
+          <span>{ui(selected.language)}</span>
           {selected.tags.map(item => (
             <span key={item} className="rounded-md bg-muted px-1.5 py-0.5">
-              {item}
+              {ui(item)}
             </span>
           ))}
         </p>

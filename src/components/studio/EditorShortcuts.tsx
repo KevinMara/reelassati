@@ -40,7 +40,13 @@ export function EditorShortcuts({
   const [error, setError] = useState("");
   const activeBindings = bindings ?? localBindings;
   const found = EDITOR_KEYBOARD_ACTIONS.filter(action =>
-    [action.label, action.group, ...activeBindings[action.id]]
+    [
+      ui(action.label),
+      ui(action.group),
+      action.label,
+      action.group,
+      ...activeBindings[action.id],
+    ]
       .join(" ")
       .toLowerCase()
       .includes(query.toLowerCase())
@@ -155,13 +161,13 @@ export function EditorShortcuts({
           return rows.length ? (
             <section key={group}>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
-                {group}
+                {ui(group)}
               </h3>
               <dl className="divide-y divide-border">
                 {rows.map(action => (
                   <div key={action.id} className="py-2.5">
                     <div className="flex items-center justify-between gap-4">
-                      <dt className="text-sm">{action.label}</dt>
+                      <dt className="text-sm">{ui(action.label)}</dt>
                       <dd className="flex max-w-[60%] flex-wrap items-center justify-end gap-1.5 text-xs text-foreground/70">
                         {!activeBindings[action.id].length && (
                           <span>{ui("Unassigned")}</span>
@@ -173,7 +179,13 @@ export function EditorShortcuts({
                           >
                             <button
                               type="button"
-                              aria-label={`Edit ${action.label} shortcut ${formatEditorChord(chord)}`}
+                              aria-label={ui(
+                                "Edit {{action}} shortcut {{shortcut}}",
+                                {
+                                  action: ui(action.label),
+                                  shortcut: formatEditorChord(chord),
+                                }
+                              )}
                               className="px-2 py-1 hover:bg-foreground/5"
                               onClick={() => editBinding(action.id, index)}
                             >
@@ -181,7 +193,13 @@ export function EditorShortcuts({
                             </button>
                             <button
                               type="button"
-                              aria-label={`Remove ${action.label} shortcut ${formatEditorChord(chord)}`}
+                              aria-label={ui(
+                                "Remove {{action}} shortcut {{shortcut}}",
+                                {
+                                  action: ui(action.label),
+                                  shortcut: formatEditorChord(chord),
+                                }
+                              )}
                               className="border-l border-border px-1.5 py-1 hover:bg-foreground/5"
                               onClick={() => {
                                 publishBindings({
@@ -203,7 +221,9 @@ export function EditorShortcuts({
                         <button
                           type="button"
                           className="rounded border border-border px-2 py-1 hover:bg-foreground/5"
-                          aria-label={`Add shortcut for ${action.label}`}
+                          aria-label={ui("Add shortcut for {{action}}", {
+                            action: ui(action.label),
+                          })}
                           disabled={activeBindings[action.id].length >= 8}
                           onClick={() =>
                             editBinding(
@@ -222,7 +242,7 @@ export function EditorShortcuts({
                           htmlFor={`shortcut-${action.id}`}
                           className="mb-1 block text-xs text-foreground/70"
                         >
-                          {ui("Shortcut for")} {action.label}
+                          {ui("Shortcut for")} {ui(action.label)}
                         </label>
                         <div className="flex flex-wrap gap-2">
                           <input

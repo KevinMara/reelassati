@@ -19,10 +19,25 @@ export function loadUiLocale(
       ...existing.existingItalianUi,
       ...manual.italianUi,
     }));
-  } else if (["es", "fr", "de", "pt"].includes(code)) {
-    pending = import("./locales/ui-critical-west").then(
-      module => module.westernUi[code]
-    );
+  } else if (code === "fr") {
+    pending = Promise.all([
+      import("./locales/ui-critical-west"),
+      import("./locales/ui-fr"),
+    ]).then(([critical, full]) => ({
+      ...full.frenchUi,
+      ...critical.westernUi.fr,
+    }));
+  } else if (["es", "de", "pt"].includes(code)) {
+    const supplement =
+      code === "es"
+        ? import("./locales/ui-es").then(module => module.spanishUi)
+        : code === "de"
+          ? import("./locales/ui-de").then(module => module.germanUi)
+          : import("./locales/ui-pt").then(module => module.portugueseUi);
+    pending = Promise.all([
+      import("./locales/ui-critical-west"),
+      supplement,
+    ]).then(([critical, full]) => ({ ...full, ...critical.westernUi[code] }));
   } else if (["ru", "uk", "pl", "ro", "tr"].includes(code)) {
     pending = import("./locales/ui-critical-east").then(
       module => module.easternUi[code]

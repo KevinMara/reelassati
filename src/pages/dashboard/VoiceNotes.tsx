@@ -542,7 +542,7 @@ export default function VoiceNotes() {
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium">
-                  {file?.name ?? "Choose an audio file"}
+                  {file?.name ?? ui("Choose an audio file")}
                 </span>
                 <span className="mt-1 block text-xs text-foreground/65">
                   {file
@@ -592,7 +592,9 @@ export default function VoiceNotes() {
                     if (Number.isFinite(duration) && duration > 0)
                       setFileDuration(duration);
                   }}
-                  aria-label={`Voice-note preview: ${sourceAsset.name}`}
+                  aria-label={ui("Voice-note preview: {{name}}", {
+                    name: sourceAsset.name,
+                  })}
                   aria-describedby="voice-source-description"
                   className="mt-3 w-full"
                 />
@@ -676,7 +678,9 @@ export default function VoiceNotes() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {uploadProgress > 0 && uploadProgress < 100
-                      ? `Uploading ${uploadProgress}%`
+                      ? ui("Uploading {{progress}}%", {
+                          progress: uploadProgress,
+                        })
                       : ui("Transcribing")}
                   </>
                 ) : (
@@ -820,7 +824,9 @@ export default function VoiceNotes() {
                   downloadName={speechAsset.name}
                   controls
                   preload="metadata"
-                  aria-label={`Generated speech preview: ${speechAsset.name}`}
+                  aria-label={ui("Generated speech preview: {{name}}", {
+                    name: speechAsset.name,
+                  })}
                   aria-describedby="generated-speech-transcript"
                   className="mt-3 w-full"
                 />

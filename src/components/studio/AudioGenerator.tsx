@@ -120,8 +120,10 @@ export function AudioGenerator({
           : quote === null
             ? ui("Get credit quote")
             : kind === "sfx"
-              ? `Generate · hold up to ${quote} credits`
-              : `Generate · ${quote} credits`}
+              ? ui("Generate · hold up to {{credits}} credits", {
+                  credits: quote,
+                })
+              : ui("Generate · {{credits}} credits", { credits: quote })}
       </button>
       {kind === "sfx" && quote !== null && (
         <p className="mt-2 text-sm text-foreground/70">

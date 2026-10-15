@@ -78,7 +78,7 @@ export function MotionKitLibrary({
             key={kit.id}
             disabled={busy}
             aria-pressed={draft.kit === kit.id}
-            title={kit.detail}
+            title={ui(kit.detail)}
             onClick={() =>
               patch({
                 kit: kit.id,
@@ -90,7 +90,7 @@ export function MotionKitLibrary({
             }
             className="rounded-lg border border-border p-3 text-left text-xs aria-pressed:border-primary aria-pressed:bg-primary/10 disabled:opacity-50"
           >
-            {kit.name}
+            {ui(kit.name)}
           </button>
         ))}
       </div>

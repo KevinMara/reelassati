@@ -117,6 +117,7 @@ function StudioPageFallback() {
 
 function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
   const ui = useUiText();
+  const { i18n } = useTranslation();
   const [credits, setCredits] = useState<number | null>(null);
 
   useEffect(() => {
@@ -145,7 +146,9 @@ function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
       aria-label={
         credits === null
           ? ui("Open plan and credits")
-          : `${credits} credits available`
+          : ui("Available credits: {{credits}}", {
+              credits: credits.toLocaleString(i18n.resolvedLanguage),
+            })
       }
       className="group hidden items-center gap-2 rounded-pill border border-border bg-surface px-3 py-1.5 text-xs transition-all hover:border-primary/35 hover:shadow-sm sm:flex"
     >
@@ -153,7 +156,9 @@ function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
         <Coins className="h-3 w-3" />
       </span>
       <span className="font-mono font-medium">
-        {credits === null ? ui("Credits") : credits.toLocaleString()}
+        {credits === null
+          ? ui("Credits")
+          : credits.toLocaleString(i18n.resolvedLanguage)}
       </span>
     </Link>
   );
@@ -209,7 +214,11 @@ function DashboardHome() {
     {
       label: "Editing projects",
       value: workspace.projects.length,
-      sub: `${workspace.projects.filter(project => project.status === "editing").length} currently in edit`,
+      sub: ui("Edits in progress: {{count}}", {
+        count: workspace.projects.filter(
+          project => project.status === "editing"
+        ).length,
+      }),
       icon: Scissors,
       to: "/dashboard/edit",
     },
@@ -368,7 +377,9 @@ function DashboardHome() {
               </span>
               <div>
                 <p className="text-xs font-medium">{ui("Weekly momentum")}</p>
-                <p className="text-xs text-foreground/70">{momentumMessage}</p>
+                <p className="text-xs text-foreground/70">
+                  {ui(momentumMessage)}
+                </p>
               </div>
             </div>
           </div>
@@ -420,7 +431,7 @@ function DashboardHome() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {stats.map(s => (
           <Link
-            key={ui(s.label)}
+            key={s.to}
             to={s.to}
             data-reward-surface
             className="studio-stat-card group bg-surface border border-border rounded-xl p-5 shadow-card"
@@ -432,7 +443,7 @@ function DashboardHome() {
               <s.icon className="h-4 w-4 text-foreground/70 transition-colors group-hover:text-primary" />
             </div>
             <div className="text-2xl font-semibold tabular">{s.value}</div>
-            <p className="text-xs text-foreground/70 mt-1">{s.sub}</p>
+            <p className="text-xs text-foreground/70 mt-1">{ui(s.sub)}</p>
           </Link>
         ))}
       </div>
@@ -461,8 +472,8 @@ function DashboardHome() {
               </div>
               <ChevronRight className="studio-action-arrow h-4 w-4 text-foreground/70 group-hover:text-primary" />
             </div>
-            <h3 className="font-semibold">{qs.title}</h3>
-            <p className="text-sm text-foreground/60 mt-1">{qs.desc}</p>
+            <h3 className="font-semibold">{ui(qs.title)}</h3>
+            <p className="text-sm text-foreground/60 mt-1">{ui(qs.desc)}</p>
           </Link>
         ))}
       </div>
@@ -559,8 +570,10 @@ function DashboardHome() {
                   </span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-foreground/70">{item.detail}</p>
+                  <p className="text-sm font-medium">{ui(item.title)}</p>
+                  <p className="text-xs text-foreground/70">
+                    {ui(item.detail)}
+                  </p>
                 </div>
               </Link>
             ))}
@@ -627,9 +640,12 @@ function StudioStatus() {
       <div className="grid sm:grid-cols-2 gap-4 mt-8">
         {rows.map(row => (
           <Link
-            key={ui(row.label)}
+            key={row.to}
             to={row.to}
-            aria-label={`${row.label}: ${row.ready ? ui("open") : ui("resolve setup")}`}
+            aria-label={ui("{{service}}: {{action}}", {
+              service: ui(row.label),
+              action: row.ready ? ui("Open workspace") : ui("Resolve setup"),
+            })}
             className="group block bg-surface border border-border rounded-xl p-5 transition duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transform-none"
           >
             <div className="flex items-center justify-between">
@@ -646,7 +662,7 @@ function StudioStatus() {
               </span>
             </div>
             <h2 className="font-semibold mt-5">{ui(row.label)}</h2>
-            <p className="text-sm text-foreground/70 mt-1">{row.detail}</p>
+            <p className="text-sm text-foreground/70 mt-1">{ui(row.detail)}</p>
             <span className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary">
               {row.ready ? ui("Open workspace") : ui("Resolve setup")}
               <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />

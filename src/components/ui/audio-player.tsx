@@ -131,7 +131,9 @@ function SourceAudioPlayer({
       <div className="audio-player-controls flex min-w-0 items-center gap-3">
         <button
           type="button"
-          aria-label={`${playing ? ui("Pause") : ui("Play")} ${label}`}
+          aria-label={ui(playing ? "Pause {{label}}" : "Play {{label}}", {
+            label,
+          })}
           disabled={!src || Boolean(error)}
           className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:bg-primary-hover disabled:opacity-40"
           onClick={() => {
@@ -165,7 +167,7 @@ function SourceAudioPlayer({
           step={0.01}
           value={time}
           disabled={!duration}
-          aria-label={`Seek ${label}`}
+          aria-label={ui("Seek {{label}}", { label })}
           style={{
             background: `linear-gradient(to right,hsl(var(--primary)) ${progress}%,hsl(var(--foreground)/.12) ${progress}%)`,
           }}

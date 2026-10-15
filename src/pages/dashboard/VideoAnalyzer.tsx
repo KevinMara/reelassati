@@ -251,7 +251,10 @@ export default function VideoAnalyzer() {
       // Import/measurement never starts a paid analysis. A second click accepts the actual duration quote.
       if (!sourceAsset?.duration || sourceAsset.id !== readyAsset.id) {
         setNotice(
-          `Source ready · ${readyAsset.duration!.toFixed(1)} seconds. Review the measured credit quote, then press Analyze video.`
+          ui(
+            "Source ready · {{seconds}} seconds. Review the measured credit quote, then press Analyze video.",
+            { seconds: readyAsset.duration!.toFixed(1) }
+          )
         );
         return;
       }
@@ -617,11 +620,13 @@ export default function VideoAnalyzer() {
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">
-                    {file?.name ?? "Choose a video file"}
+                    {file?.name ?? ui("Choose a video file")}
                   </span>
                   <span className="mt-1 block text-xs text-foreground/70">
                     {file
-                      ? `${(file.size / 1024 / 1024).toFixed(1)} MB · uploads when analysis starts`
+                      ? ui("{{megabytes}} MB · uploads when analysis starts", {
+                          megabytes: (file.size / 1024 / 1024).toFixed(1),
+                        })
                       : capabilities.uploads
                         ? isDragging
                           ? ui("Drop it here")
@@ -723,13 +728,15 @@ export default function VideoAnalyzer() {
               <Loader2 className="h-4 w-4 animate-spin" />
               {uploadProgress > 0 && uploadProgress < 100
                 ? ui("Uploading source")
-                : analysisStage || "Analyzing edit"}
+                : analysisStage || ui("Analyzing edit")}
             </>
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
               {sourceAsset?.duration
-                ? `Analyze video · ${analysisCreditCost} credits`
+                ? ui("Analyze video · {{credits}} credits", {
+                    credits: analysisCreditCost,
+                  })
                 : ui("Prepare video · no credits")}
             </>
           )}
@@ -809,7 +816,7 @@ export default function VideoAnalyzer() {
                           {recommendation.end.toFixed(1)}s
                         </span>
                         <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                          {recommendation.priority}
+                          {ui(recommendation.priority)}
                         </span>
                       </div>
                       <h3 className="mt-3 text-sm font-semibold">
@@ -838,7 +845,7 @@ export default function VideoAnalyzer() {
                           <p className="text-sm font-medium">{change.label}</p>
                           <p className="mt-1 font-mono text-xs text-foreground/70">
                             {change.start.toFixed(1)}s–{change.end.toFixed(1)}s
-                            · {change.type}
+                            · {ui(change.type)}
                           </p>
                         </div>
                         <span className="rounded-full bg-foreground/[0.06] px-2 py-1 text-xs text-foreground/70">
@@ -850,7 +857,7 @@ export default function VideoAnalyzer() {
                         {change.reason}
                       </p>
                       <p className="mt-2 text-xs uppercase tracking-wider text-foreground/70">
-                        {change.intensity}{" "}
+                        {ui(change.intensity)}{" "}
                         {ui("intensity · review before accepting")}
                       </p>
                     </article>

@@ -54,7 +54,7 @@ export function GraphicMotionEditor({
             }}
             className="rounded-lg border border-border px-2 py-2 text-left text-xs hover:border-primary/60"
           >
-            {p.name}
+            {ui(p.name)}
           </button>
         ))}
       </div>

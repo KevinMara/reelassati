@@ -20,6 +20,7 @@ describe("interface localization", () => {
     expect(loadUiLocale("it")).toBe(italian);
     expect((await italian)["Clarity"]).toBe("Chiarezza");
     expect((await loadUiLocale("ja"))["Clarity"]).toBe(uiLocales.ja.Clarity);
+    expect((await loadUiLocale("fr"))["Settings"]).toBe(uiLocales.fr.Settings);
   });
 
   it("connects legacy navigation keys to the selected interface catalog", () => {
@@ -60,6 +61,35 @@ describe("interface localization", () => {
     }
   });
 
+  it("preserves interpolated content and links throughout supplemental catalogs", () => {
+    const links = (text: string) =>
+      [...text.matchAll(/https?:\/\/[a-z0-9][^\s<>"')}]*/gi)]
+        .map(match => match[0].replace(/[.,;!?]+$/, ""))
+        .sort();
+    const markup = (text: string) =>
+      [...text.matchAll(/<\/?[a-z][^>]*>/gi)].map(match => match[0]).sort();
+    for (const [code, dictionary] of Object.entries(uiLocales)) {
+      for (const [key, value] of Object.entries(dictionary)) {
+        expect(value.trim(), `${code}: ${key}`).not.toBe("");
+        expect(placeholders(value), `${code}: ${key}`).toEqual(
+          placeholders(key)
+        );
+        expect(links(value), `${code}: ${key}`).toEqual(links(key));
+        expect(markup(value), `${code}: ${key}`).toEqual(markup(key));
+      }
+    }
+  });
+
+  it("keeps the image resolution distinct from the purchased image count", () => {
+    const key = "1K images if used only for images.";
+    for (const [code, dictionary] of Object.entries(uiLocales)) {
+      const translated = dictionary[key];
+      if (translated !== undefined) {
+        expect(translated, code).toMatch(/1\s*K/i);
+      }
+    }
+  });
+
   it("switches interface copy and keeps interpolated user content intact", async () => {
     const instance = createInstance();
     await instance.init({
@@ -74,6 +104,17 @@ describe("interface localization", () => {
       interpolation: { escapeValue: false },
     });
     expect(instance.t("Processing load")).toBe("Carico cognitivo");
+    expect(
+      instance.t("Available credits: {{credits}}", { credits: "801" })
+    ).toBe("Crediti disponibili: 801");
+    expect(
+      instance.t("Voice: {{name}}", { name: "Sarah — Bright & clear" })
+    ).toBe("Voce: Sarah — Bright & clear");
+    expect(
+      instance.t("Delete {{name}}", { name: "My original footage.mp4" })
+    ).toBe("Elimina My original footage.mp4");
+    expect(instance.t("Word rise")).toBe("Parole in salita");
+    expect(instance.t("Back one second")).toBe("Indietro di un secondo");
     expect(
       instance.t("Projects updated in the last 7 days: {{count}}", { count: 4 })
     ).toBe("Progetti aggiornati negli ultimi 7 giorni: 4");

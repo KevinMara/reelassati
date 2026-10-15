@@ -12,17 +12,23 @@
 
 ## Localization scope
 
-Static UI copy now goes through reactive translation resources; interface and generated-content language remain separate. The header and Settings offer the same 28 locales. Catalogs load on demand; English does not download the additional language catalogs. Critical analyzer/shared-control phrases have 222 translations per non-English locale. The Italian audit has no currently used literal UI-key gaps.
+Static UI copy now goes through reactive translation resources; interface and generated-content language remain separate. The header and Settings offer the same 28 locales. Catalogs load on demand; English does not download the additional language catalogs. Critical analyzer/shared-control phrases have 222 translations per non-English locale.
 
-This is not complete platform translation in the other 26 locales: approximately 1,953 broader used phrases per locale still need translation at this checkpoint. Imported descriptors, API error text and user/generated content require origin-aware review. `node scripts/localization-audit.mjs --output <path>` reports exact gaps rather than filling them with English and counting them as translated. The local offline translation experiment is separate from released, reviewed catalogs.
+The follow-up audit finds **2,459 used UI keys**, with no key gaps in English, Italian, Spanish, French, German or Portuguese. Imported preset names, shortcuts, voice tags and shared control messages are included. The remaining 22 locales each still have 2,276 broader key gaps at this checkpoint; their catalogs are in progress. A separate list of 124 dynamic bindings remains for origin-aware review, including API errors and user/generated content. User filenames, captions, prompts and model output are not silently translated. `node scripts/localization-audit.mjs --output <path>` reports exact gaps rather than counting English fallbacks as translations.
+
+Calendar headings, weekdays and dates follow the interface locale. Billing periods, plan details, credit-guide labels, Library controls, origin badges and publication statuses use translated copy. A mistaken Italian allowance label that described 1K-resolution images as thousands of images was corrected; a regression now preserves the resolution unit. Plan-card headings and descriptions have aligned spacing. Weekly review recommendations link directly to the appropriate action page with visible hover and keyboard focus feedback.
+
+A bounded offline M2M100 trial used ten public UI phrases in three languages and no paid API. It failed meaning and placeholder checks, so none of its output entered the catalogs and no bulk job was started. Supplemental catalogs are manually authored and checked for interpolation, links and markup integrity.
 
 ## Validation
 
 - Full suite: **884 tests passed across 113 files** at the first final integration checkpoint; subsequent focused checks cover small localization/CSS refinements.
+- Follow-up localization and functional checks: **39 tests passed across five files**, including all imported catalog entries, preserved user content, resolution units, generated-file recovery and editor regressions.
 - App/Node and Worker TypeScript, ESLint, app build and Worker build passed.
 - Isolated 390 × 844 frame layout review covered 20 routes. Content widths fit the 380-pixel area after correcting Prompt Director. This is responsive layout verification with synthetic data, not a live delivery/generation test.
 - Analyzer CUA checks covered actual source seeking, channel visibility, thresholds, tabs, legacy incomplete reports, missing clarity and English/German/Greek narrow layouts. Four rendering regressions cover incomplete-score and role behavior.
 - No paid generation or external load-testing calls were made.
+- The official client release `19e963b72c041481de27a96a99ef71153afefb1e` was confirmed successful on both Vercel projects. Live checks confirmed the simplified publishing composer, English-default audience selector, hidden Media count, outline brain icon, removed coaching/status panels and working status-to-account setup navigation. Additional translation refinements described above form the subsequent release.
 
 ## Release boundaries
 

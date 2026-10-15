@@ -37,13 +37,16 @@ export function EditorPresetLibrary({
   const [query, setQuery] = useState("");
   const [hoveredCaption, setHoveredCaption] = useState<string>();
   const match = (p: { name: string; description: string }) =>
-    `${p.name} ${p.description}`.toLowerCase().includes(query.toLowerCase());
-  const heading =
+    `${ui(p.name)} ${ui(p.description)} ${p.name} ${p.description}`
+      .toLowerCase()
+      .includes(query.toLowerCase());
+  const heading = ui(
     mode === "captions"
       ? "Caption styles"
       : mode === "graphics"
         ? "Motion graphics"
-        : "Looks & fades";
+        : "Looks & fades"
+  );
   return (
     <section className="space-y-3" aria-label={heading}>
       <div className="flex items-center justify-between gap-2">
@@ -60,7 +63,7 @@ export function EditorPresetLibrary({
         />
         <input
           className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs"
-          aria-label={`Search ${heading.toLowerCase()}`}
+          aria-label={ui("Search {{category}}", { category: heading })}
           placeholder={ui("Search presets…")}
           value={query}
           onChange={event => setQuery(event.target.value)}
@@ -75,7 +78,7 @@ export function EditorPresetLibrary({
               disabled={disabled}
               aria-pressed={(selectedCaptionId ?? "classic") === p.id}
               onClick={() => onCaptionPreset?.(p.id)}
-              title={p.description}
+              title={ui(p.description)}
               className="group relative min-w-0 rounded-xl border border-border p-2 text-left transition hover:border-primary/60 aria-pressed:border-primary aria-pressed:bg-primary/5 disabled:opacity-50"
             >
               <div
@@ -91,7 +94,9 @@ export function EditorPresetLibrary({
                 />
               </div>
               <div className="mt-2 flex items-center justify-between gap-1">
-                <span className="truncate text-xs font-medium">{p.name}</span>
+                <span className="truncate text-xs font-medium">
+                  {ui(p.name)}
+                </span>
                 {(selectedCaptionId ?? "classic") === p.id && (
                   <Check
                     aria-label={ui("Selected")}
@@ -118,7 +123,7 @@ export function EditorPresetLibrary({
               key={p.id}
               disabled={disabled}
               onClick={() => onClipLook?.(p)}
-              title={p.description}
+              title={ui(p.description)}
               className="rounded-xl border border-border p-3 text-left transition hover:border-primary/60 disabled:opacity-50"
             >
               <div
@@ -129,7 +134,7 @@ export function EditorPresetLibrary({
               >
                 <SlidersHorizontal size={20} className="text-white/80" />
               </div>
-              <span className="text-xs font-medium">{p.name}</span>
+              <span className="text-xs font-medium">{ui(p.name)}</span>
             </button>
           ))}
       </div>
@@ -144,13 +149,13 @@ export function EditorPresetLibrary({
                 key={p.id}
                 type="button"
                 disabled={disabled}
-                title={p.description}
+                title={ui(p.description)}
                 onClick={() =>
                   onFadePreset?.({ fadeIn: p.fadeIn, fadeOut: p.fadeOut })
                 }
                 className="rounded-lg border border-border px-2.5 py-1.5 text-xs transition hover:border-primary/60 disabled:opacity-50"
               >
-                {p.name}
+                {ui(p.name)}
               </button>
             ))}
           </div>
@@ -189,6 +194,7 @@ function GraphicCard({
   onSelect: () => void;
   disabled: boolean;
 }) {
+  const ui = useUiText();
   const [hovered, setHovered] = useState(false);
   const [previewTime, setPreviewTime] = useState(0.8);
   useEffect(() => {
@@ -219,7 +225,7 @@ function GraphicCard({
       type="button"
       disabled={disabled}
       onClick={onSelect}
-      title={preset.description}
+      title={ui(preset.description)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -235,7 +241,7 @@ function GraphicCard({
           time={hovered ? previewTime : Math.min(0.8, preset.duration / 2)}
         />
       </div>
-      <div className="mt-2 truncate text-xs font-medium">{preset.name}</div>
+      <div className="mt-2 truncate text-xs font-medium">{ui(preset.name)}</div>
     </button>
   );
 }

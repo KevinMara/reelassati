@@ -474,7 +474,7 @@ function ReferenceStyleSession({
         >
           {cost === null
             ? ui("Measure a reference before analysis")
-            : `Analyze reference · ${cost} credits`}
+            : ui("Analyze reference · {{credits}} credits", { credits: cost })}
           <WandSparkles aria-hidden="true" className="h-3.5 w-3.5" />
         </button>
       </fieldset>

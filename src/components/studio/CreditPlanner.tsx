@@ -65,14 +65,18 @@ export function CreditPlanner() {
             <span className="text-sm">{ui("credits")}</span>
           </p>
           <p className="mt-1 text-sm">
-            {fit ? `Fits in ${PLAN_NAME_BY_ID[fit]}` : ui("Studio + top-ups")}
+            {fit
+              ? ui("Fits in {{plan}}", { plan: PLAN_NAME_BY_ID[fit] })
+              : ui("Studio + top-ups")}
           </p>
         </div>
       </div>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {activities.map(a => (
           <label key={a.key} className="text-sm">
-            <span className="block min-h-10 text-foreground/80">{a.label}</span>
+            <span className="block min-h-10 text-foreground/80">
+              {ui(a.label)}
+            </span>
             <input
               type="number"
               min={0}
@@ -108,8 +112,12 @@ export function CreditPlanner() {
                 <span>{PLAN_NAME_BY_ID[id]}</span>
                 <span>
                   {total <= allowance
-                    ? `${(allowance - total).toLocaleString()} left`
-                    : `${(total - allowance).toLocaleString()} extra`}
+                    ? ui("{{credits}} left", {
+                        credits: (allowance - total).toLocaleString(),
+                      })
+                    : ui("{{credits}} extra", {
+                        credits: (total - allowance).toLocaleString(),
+                      })}
                 </span>
               </div>
               <progress

@@ -85,7 +85,7 @@ export function EditorGenerationTray({
         >
           {expanded
             ? ui("Show recent files")
-            : `Show all ${records.length} files`}
+            : ui("Show all {{count}} files", { count: records.length })}
         </button>
       )}
     </section>
@@ -149,7 +149,7 @@ function GenerationCard({
                   ref={node => {
                     node?.focus();
                   }}
-                  aria-label={`Name for ${record.name}`}
+                  aria-label={ui("Name for {{name}}", { name: record.name })}
                   value={name}
                   maxLength={240}
                   onChange={e => setName(e.target.value)}
@@ -175,7 +175,7 @@ function GenerationCard({
                 </p>
                 <button
                   type="button"
-                  aria-label={`Rename ${record.name}`}
+                  aria-label={ui("Rename {{name}}", { name: record.name })}
                   onClick={() => {
                     setName(record.name);
                     setRename(true);
@@ -192,7 +192,7 @@ function GenerationCard({
           >
             {pending && <Loader2 size={12} className="animate-spin" />}
             {record.status === "failed"
-              ? record.error || "Generation failed."
+              ? record.error || ui("Generation failed.")
               : record.status === "completed"
                 ? ui("This file is no longer in Library.")
                 : ui(
@@ -228,7 +228,9 @@ function GenerationCard({
               className="mt-2 flex items-center gap-1.5 rounded-lg border border-primary/25 px-2.5 py-1.5 text-xs text-primary disabled:opacity-40"
             >
               {checking && <Loader2 size={12} className="animate-spin" />}
-              {ui("Check")} {generationKindLabel[record.kind].toLowerCase()}
+              {ui("Check {{type}}", {
+                type: ui(generationKindLabel[record.kind]).toLocaleLowerCase(),
+              })}
             </button>
           )}
         </>

@@ -1,4 +1,5 @@
 import { useUiText } from "@/lib/i18n/ui";
+import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -92,6 +93,15 @@ export default function PublisherPage() {
 
 function PublisherComposer() {
   const ui = useUiText();
+  const { i18n } = useTranslation("ui");
+  const locale = i18n.resolvedLanguage || i18n.language || "en";
+  const publicationStatuses = {
+    draft: "Draft",
+    scheduled: "Scheduled",
+    publishing: "Publishing",
+    published: "Published",
+    failed: "Failed",
+  };
   const {
     workspace,
     capabilities,
@@ -603,7 +613,7 @@ function PublisherComposer() {
         </motion.div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="rounded-xl border border-border bg-surface p-6">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-medium">
@@ -851,7 +861,7 @@ function PublisherComposer() {
                           invalidateReleaseReview();
                         }}
                       />
-                      {field}
+                      {ui(field === "caption" ? "Caption" : "Hashtags")}
                     </label>
                   ))}
                 </div>
@@ -907,7 +917,7 @@ function PublisherComposer() {
                 </div>
               ) : null}
               <p className="max-h-64 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">
-                {outgoingVisiblePreview || "Your caption will appear here."}
+                {outgoingVisiblePreview || ui("Your caption will appear here.")}
               </p>
             </section>
 
@@ -1051,7 +1061,9 @@ function PublisherComposer() {
                               : "bg-foreground/5 text-foreground/70"
                       }`}
                     >
-                      {post.status}
+                      {ui(publicationStatuses[post.status], {
+                        context: "publication",
+                      })}
                     </span>
                     {post.status === "draft" && (
                       <button
@@ -1075,7 +1087,7 @@ function PublisherComposer() {
                     </div>
                   ) : (
                     <p className="line-clamp-3 text-sm font-medium">
-                      {post.caption || "Untitled draft"}
+                      {post.caption || ui("Untitled draft")}
                     </p>
                   )}
                   {post.complianceReview ? (
@@ -1119,13 +1131,13 @@ function PublisherComposer() {
                   </div>
                   <p className="mt-1 text-xs text-foreground/70">
                     {post.scheduledAt
-                      ? new Date(post.scheduledAt).toLocaleString()
-                      : new Date(post.createdAt).toLocaleDateString()}
+                      ? new Date(post.scheduledAt).toLocaleString(locale)
+                      : new Date(post.createdAt).toLocaleDateString(locale)}
                   </p>
                   {post.statusCheckedAt && (
                     <p className="mt-1 text-xs text-foreground/70">
                       {ui("Delivery checked")}{" "}
-                      {new Date(post.statusCheckedAt).toLocaleString()}
+                      {new Date(post.statusCheckedAt).toLocaleString(locale)}
                     </p>
                   )}
                   {post.failureReason && (

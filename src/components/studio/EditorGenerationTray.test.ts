@@ -1,11 +1,29 @@
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { createElement, type ReactElement } from "react";
+import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { createInstance } from "i18next";
+import { I18nextProvider } from "react-i18next";
 import { createEmptyWorkspace, type GenerationJob } from "@contracts/workspace";
 import { nextEditorGeneration } from "@/lib/editor-generations";
 import { EditorGenerationTray } from "./EditorGenerationTray";
 
 const now = "2026-09-15T10:00:00.000Z";
+const interfaceI18n = createInstance();
+beforeAll(async () => {
+  await interfaceI18n.init({
+    lng: "en",
+    defaultNS: "ui",
+    keySeparator: false,
+    nsSeparator: false,
+    resources: { en: { ui: {} } },
+    interpolation: { escapeValue: false },
+  });
+});
+function renderToStaticMarkup(element: ReactElement) {
+  return renderMarkup(
+    createElement(I18nextProvider, { i18n: interfaceI18n }, element)
+  );
+}
 
 describe("existing video output recovery", () => {
   it("offers recovery only for eligible failed video jobs and does not start recovery by rendering", () => {

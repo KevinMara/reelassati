@@ -386,7 +386,9 @@ export function RenderExportPanel({
               ? ui("Exporting…")
               : hasRender
                 ? ui("Retry saving to Library")
-                : `Create ${format === "mp4" ? "MP4" : "WebM"}`}
+                : ui("Create {{format}}", {
+                    format: format === "mp4" ? "MP4" : "WebM",
+                  })}
           </button>
         )}
         {busy && !hasRender && (

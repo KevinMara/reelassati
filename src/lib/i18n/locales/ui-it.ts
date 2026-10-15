@@ -1,5 +1,7 @@
+import { extraItalianUi } from "./ui-it-extra";
+
 /** Interface translations only; never applied to user or generated content. */
-export const italianUi: Record<string, string> = {
+const reviewedItalianUi: Record<string, string> = {
   Attention: "Attenzione",
   Stimulation: "Stimolazione",
   "Processing load": "Carico cognitivo",
@@ -111,7 +113,7 @@ export const italianUi: Record<string, string> = {
   "credits every month": "crediti ogni mese",
   "For example: up to": "Ad esempio: fino a",
   "1K images if used only for images.":
-    "mila immagini, se utilizzati solo per le immagini.",
+    "immagini 1K, se utilizzati solo per le immagini.",
   "Prices exclude tax; applicable taxes are added at checkout. Annual plans receive credits monthly. Plan credits reset; purchased credits roll over.":
     "Le imposte applicabili vengono aggiunte al pagamento. I piani annuali ricevono crediti ogni mese. I crediti del piano si rinnovano; quelli acquistati si accumulano.",
   "Manage plan and invoices": "Gestisci piano e fatture",
@@ -2516,4 +2518,9 @@ export const italianUi: Record<string, string> = {
     "Costruisci l'apertura intorno a una trasformazione visibile.",
   "Show evidence before explaining the process.":
     "Mostra la prova prima di spiegare il processo.",
+};
+
+export const italianUi: Record<string, string> = {
+  ...reviewedItalianUi,
+  ...extraItalianUi,
 };

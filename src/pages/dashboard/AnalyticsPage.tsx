@@ -214,25 +214,29 @@ export default function AnalyticsPage() {
     {
       label: "Active edits",
       value: activeProjects.length,
-      detail: `${workspace.projects.length} total projects`,
+      detail: ui("Total projects: {{count}}", {
+        count: workspace.projects.length,
+      }),
       icon: Film,
     },
     {
       label: "Ready assets",
       value: readyAssets.length,
-      detail: `${workspace.assets.length} stored assets`,
+      detail: ui("Stored assets: {{count}}", {
+        count: workspace.assets.length,
+      }),
       icon: CheckCircle2,
     },
     {
       label: "Scheduled",
       value: scheduledPosts.length,
-      detail: "Saved to the publishing queue",
+      detail: ui("Saved to the publishing queue"),
       icon: CalendarClock,
     },
     {
       label: "Published records",
       value: publishedPosts.length,
-      detail: "Recorded by this workspace",
+      detail: ui("Recorded by this workspace"),
       icon: Send,
     },
   ];

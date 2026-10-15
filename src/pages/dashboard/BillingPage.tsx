@@ -1,4 +1,5 @@
 import { useUiText } from "@/lib/i18n/ui";
+import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { CreditPlanner } from "@/components/studio/CreditPlanner";
 import posthog from "@/lib/posthog";
@@ -40,11 +41,11 @@ import { platformApi } from "@/lib/platform-api";
 
 const PLAN_IDS: PlanId[] = ["creator", "pro", "studio"];
 
-function formatDate(value: string | null): string {
+function formatDate(value: string | null, locale: string): string {
   if (!value) return "—";
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "—";
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -72,6 +73,8 @@ function actionLabel(category: string): string {
 
 export default function BillingPage() {
   const ui = useUiText();
+  const { i18n } = useTranslation("ui");
+  const locale = i18n.resolvedLanguage || i18n.language || "en";
   const [searchParams] = useSearchParams();
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -513,33 +516,33 @@ export default function BillingPage() {
           </p>
           <div className="mt-4 space-y-2 text-sm">
             {[
-              ["Script", `${AI_CREDIT_COSTS.script}`],
-              ["Trend research · one / both platforms", "8 / 15"],
-              ["AI edit plan", `${AI_CREDIT_COSTS.editPlan}`],
-              ["1K image", `${AI_CREDIT_COSTS.image1K}`],
-              ["2K image", `${AI_CREDIT_COSTS.image2K}`],
+              [ui("Script"), `${AI_CREDIT_COSTS.script}`],
+              [ui("Trend research · one / both platforms"), "8 / 15"],
+              [ui("AI edit plan"), `${AI_CREDIT_COSTS.editPlan}`],
+              [ui("1K image"), `${AI_CREDIT_COSTS.image1K}`],
+              [ui("2K image"), `${AI_CREDIT_COSTS.image2K}`],
               [
-                "Voice · each 1,000 characters",
+                ui("Voice · each 1,000 characters"),
                 `${speechCreditRate()} / ${speechCreditRate("English_Graceful_Lady")}`,
               ],
               [
-                "Video analysis · minute",
+                ui("Video analysis · minute"),
                 `${AI_CREDIT_COSTS.videoAnalysisPerMinute}`,
               ],
               [
-                "Transcription · minute",
+                ui("Transcription · minute"),
                 `${AI_CREDIT_COSTS.transcriptionPerMinute}`,
               ],
               [
-                "15s video · 720p, no audio",
+                ui("15s video · 720p, no audio"),
                 `${AI_CREDIT_COSTS.video720pPerSecond * 15}`,
               ],
               [
-                "15s video · 720p with audio",
+                ui("15s video · 720p with audio"),
                 `${AI_CREDIT_COSTS.video720pWithAudioPerSecond * 15}`,
               ],
               [
-                "Continue 15s · 720p / 1080p",
+                ui("Continue 15s · 720p / 1080p"),
                 `${AI_CREDIT_COSTS.continuation720p15Seconds} / ${AI_CREDIT_COSTS.continuation1080p15Seconds}`,
               ],
             ].map(([label, value]) => (
@@ -570,11 +573,11 @@ export default function BillingPage() {
           </p>
           <div className="my-5 grid grid-cols-2 gap-3">
             {[
-              ["scripts", AI_CREDIT_COSTS.script],
-              ["1K images", AI_CREDIT_COSTS.image1K],
-              ["1,000-character voice clips", speechCreditRate()],
+              [ui("scripts"), AI_CREDIT_COSTS.script],
+              [ui("1K images"), AI_CREDIT_COSTS.image1K],
+              [ui("1,000-character voice clips"), speechCreditRate()],
               [
-                "15s 720p videos without audio",
+                ui("15s 720p videos without audio"),
                 AI_CREDIT_COSTS.video720pPerSecond * 15,
               ],
             ].map(([label, cost]) => (
@@ -615,10 +618,10 @@ export default function BillingPage() {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
-                      {actionLabel(item.category)}
+                      {ui(actionLabel(item.category))}
                     </p>
                     <p className="truncate text-xs text-foreground/65">
-                      {item.description} · {formatDate(item.createdAt)}
+                      {item.description} · {formatDate(item.createdAt, locale)}
                     </p>
                   </div>
                   <span
@@ -661,6 +664,8 @@ function PlanChooser({
   onManage: () => Promise<void>;
 }) {
   const ui = useUiText();
+  const { i18n } = useTranslation("ui");
+  const locale = i18n.resolvedLanguage || i18n.language || "en";
   const manageExisting = Boolean(
     summary?.plan &&
     !["canceled", "incomplete_expired", "inactive"].includes(
@@ -691,7 +696,7 @@ function PlanChooser({
               onClick={() => setBillingCycle(cycle)}
               className={`rounded-pill px-4 py-2 capitalize transition-colors ${billingCycle === cycle ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground/75 hover:bg-primary/10"}`}
             >
-              {cycle}
+              {ui(cycle === "annual" ? "Annual" : "Monthly")}
               {cycle === "annual" ? ui(" · 2 months free") : ""}
             </button>
           ))}
@@ -710,7 +715,7 @@ function PlanChooser({
               key={planId}
               className={`relative flex flex-col rounded-2xl border p-6 transition-all motion-safe:hover:-translate-y-1 ${featured ? "border-primary/60 bg-gradient-to-br from-primary/15 via-surface to-surface shadow-[0_8px_40px_-16px_hsl(var(--primary)/0.45)]" : "border-border bg-surface hover:border-primary/40"} ${selectedPlan === planId ? "ring-2 ring-primary/30" : ""}`}
             >
-              <div className="mb-5 flex items-center justify-between gap-2">
+              <div className="mb-5 flex min-h-10 items-start justify-between gap-2">
                 <span className="font-mono text-xs uppercase tracking-widest text-primary">
                   {planId === "creator"
                     ? ui("Your first momentum")
@@ -725,7 +730,7 @@ function PlanChooser({
                 )}
               </div>
               <h3 className="text-2xl font-semibold">{name}</h3>
-              <p className="mt-2 min-h-12 text-sm text-foreground/75">
+              <p className="mt-2 min-h-16 text-sm text-foreground/75">
                 {planId === "creator"
                   ? ui("For one creator finding a consistent rhythm.")
                   : featured
@@ -734,7 +739,7 @@ function PlanChooser({
               </p>
               <p className="mt-5">
                 <span className="text-4xl font-semibold tracking-tight">
-                  {price.toLocaleString(undefined, {
+                  {price.toLocaleString(locale, {
                     maximumFractionDigits: 2,
                   })}
                 </span>
@@ -745,24 +750,29 @@ function PlanChooser({
               </p>
               <p className="mt-2 text-sm text-foreground/70">
                 {annual
-                  ? `${plan.annualTotal.toLocaleString()} USD billed yearly · save ${plan.monthlyPrice * 2} USD`
+                  ? ui("{{total}} USD billed yearly · save {{saving}} USD", {
+                      total: plan.annualTotal.toLocaleString(locale),
+                      saving: (plan.monthlyPrice * 2).toLocaleString(locale),
+                    })
                   : ui("Billed monthly · cancel renewal anytime")}
               </p>
               <div className="my-6 rounded-xl border border-primary/20 bg-primary/10 p-4">
                 <p className="text-3xl font-semibold text-primary">
-                  {plan.monthlyCredits.toLocaleString()}
+                  {plan.monthlyCredits.toLocaleString(locale)}
                 </p>
                 <p className="mt-1 text-sm">{ui("credits every month")}</p>
               </div>
               <ul className="space-y-3 text-sm text-foreground/85">
                 {[
-                  `${plan.workspaces} brand workspace${plan.workspaces === 1 ? "" : "s"}`,
-                  `${plan.socialAccounts} connected social accounts`,
-                  "AI scripts, images, video and voice",
-                  "Video analysis and custom trend research",
-                  "Weekly organic short-form trends",
-                  "Library, MP4 export and content calendar",
-                  "Optional credit top-ups that roll over",
+                  ui("Brand workspaces: {{count}}", { count: plan.workspaces }),
+                  ui("Connected social accounts: {{count}}", {
+                    count: plan.socialAccounts,
+                  }),
+                  ui("AI scripts, images, video and voice"),
+                  ui("Video analysis and custom trend research"),
+                  ui("Weekly organic short-form trends"),
+                  ui("Library, MP4 export and content calendar"),
+                  ui("Optional credit top-ups that roll over"),
                 ].map(detail => (
                   <li key={detail} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -774,7 +784,7 @@ function PlanChooser({
                 {ui("For example: up to")}{" "}
                 {Math.floor(
                   plan.monthlyCredits / AI_CREDIT_COSTS.image1K
-                ).toLocaleString()}{" "}
+                ).toLocaleString(locale)}{" "}
                 {ui("1K images if used only for images.")}
               </p>
               <button
@@ -798,8 +808,8 @@ function PlanChooser({
                     : current
                       ? ui("Manage your plan")
                       : manageExisting
-                        ? `Explore ${name} in billing`
-                        : `Choose ${name}`}
+                        ? ui("Explore {{name}} in billing", { name })
+                        : ui("Choose {{name}}", { name })}
               </button>
             </article>
           );
@@ -819,7 +829,7 @@ function PlanChooser({
                 {summary.plan.cancelAtPeriodEnd
                   ? ui("Ends")
                   : ui("Period ends")}{" "}
-                {formatDate(summary.plan.currentPeriodEnd)}
+                {formatDate(summary.plan.currentPeriodEnd, locale)}
               </>
             ) : (
               "Your billing account"
@@ -969,7 +979,7 @@ function UsageChart({
                 className="h-2.5 w-2.5 rounded-sm"
                 style={{ background: category.color }}
               />
-              {category.label}
+              {ui(category.label)}
             </span>
             <span className="font-mono">
               {loading || !summary?.usage

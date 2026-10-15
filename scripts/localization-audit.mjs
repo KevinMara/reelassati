@@ -14,8 +14,18 @@ try {
   const outfile = path.join(temporary, "catalog.mjs");
   await build({
     stdin: {
-      contents:
-        'export {uiLocales} from "./src/lib/i18n/locales/ui"; export {INTERFACE_LANGUAGE_CODES} from "./contracts/interface-language"; export {westernUi} from "./src/lib/i18n/locales/ui-critical-west";',
+      contents: [
+        'export {uiLocales} from "./src/lib/i18n/locales/ui";',
+        'export {INTERFACE_LANGUAGE_CODES} from "./contracts/interface-language";',
+        'export {westernUi} from "./src/lib/i18n/locales/ui-critical-west";',
+        'export {CAPTION_PRESETS, GRAPHIC_PRESETS, CLIP_LOOK_PRESETS, FADE_PRESETS} from "./contracts/editor-presets";',
+        'export {MOTION_CHOREOGRAPHIES} from "./contracts/motion-graphics";',
+        'export {MOTION_KITS} from "./contracts/motion-kits";',
+        'export {EDITOR_KEYBOARD_ACTIONS} from "./src/lib/editor-keybindings";',
+        'export {EDITOR_TASK_PRESETS} from "./contracts/editor-chat-presets";',
+        'export {VOICE_CATALOG} from "./contracts/voices";',
+        'export {generationKindLabel} from "./contracts/editor-generations";',
+      ].join("\n"),
       resolveDir: root,
       loader: "ts",
     },
@@ -92,6 +102,88 @@ function shouldTranslate(text) {
     !/^[^\s@]+@[^\s@]+$/.test(text) &&
     !/^[a-z]{2}-[A-Z]{2}$/.test(text)
   );
+}
+// Only explicitly reviewed interface descriptors belong here. Preset IDs,
+// workflow instructions and editable/generated content remain outside this audit.
+const importedInterfaceCatalogs = [
+  ...[
+    "CAPTION_PRESETS",
+    "GRAPHIC_PRESETS",
+    "CLIP_LOOK_PRESETS",
+    "FADE_PRESETS",
+  ].map(collection => ({
+    source: "contracts/editor-presets.ts",
+    collection,
+    fields: ["name", "description"],
+  })),
+  {
+    source: "contracts/motion-graphics.ts",
+    collection: "MOTION_CHOREOGRAPHIES",
+    fields: ["name"],
+  },
+  {
+    source: "contracts/motion-kits.ts",
+    collection: "MOTION_KITS",
+    fields: ["name", "detail"],
+  },
+  {
+    source: "src/lib/editor-keybindings.ts",
+    collection: "EDITOR_KEYBOARD_ACTIONS",
+    fields: ["label", "group"],
+  },
+  {
+    source: "contracts/editor-chat-presets.ts",
+    collection: "EDITOR_TASK_PRESETS",
+    fields: ["label", "hint"],
+  },
+  {
+    source: "contracts/voices.ts",
+    collection: "VOICE_CATALOG",
+    fields: ["language"],
+    arrayFields: ["tags"],
+  },
+  {
+    source: "contracts/editor-generations.ts",
+    collection: "generationKindLabel",
+    shape: "record-values",
+    fields: [],
+  },
+];
+for (const catalog of importedInterfaceCatalogs) {
+  const collection = catalogs[catalog.collection];
+  const entries =
+    catalog.shape === "record-values"
+      ? collection &&
+        typeof collection === "object" &&
+        !Array.isArray(collection)
+        ? Object.values(collection)
+        : undefined
+      : collection;
+  if (!Array.isArray(entries))
+    throw new Error(
+      `Missing reviewed interface catalog: ${catalog.collection}`
+    );
+  const catalogKeys = new Set();
+  for (const entry of entries) {
+    const values =
+      catalog.shape === "record-values"
+        ? [entry]
+        : catalog.fields.map(field => entry[field]);
+    for (const field of catalog.arrayFields ?? []) {
+      if (!Array.isArray(entry[field]))
+        throw new Error(
+          `Missing reviewed interface array: ${catalog.collection}.${field}`
+        );
+      values.push(...entry[field]);
+    }
+    for (const text of values) {
+      if (typeof text === "string" && shouldTranslate(text)) {
+        keys.add(text);
+        catalogKeys.add(text);
+      }
+    }
+  }
+  catalog.keyCount = catalogKeys.size;
 }
 function isDisplayConditional(node, source) {
   const parent = node.parent;
@@ -298,9 +390,10 @@ const locales = Object.fromEntries(
 const report = {
   generatedAt: new Date().toISOString(),
   scope:
-    "Static React interface copy; user/generated content is excluded. Dynamic descriptors are conservatively included by displayed field. Raw templates, external library catalogs, and API errors need separate review.",
+    "Static React interface copy and explicitly reviewed imported interface catalogs; user/generated content is excluded. Local dynamic descriptors are conservatively included by displayed field. Raw templates, other imported catalogs, and API errors need separate review. Key coverage does not certify complete interface localization.",
   criticalKeys: critical,
   usedKeys,
+  importedInterfaceCatalogs,
   rawInterfaceCopy,
   dynamicBindingsForReview,
   locales,

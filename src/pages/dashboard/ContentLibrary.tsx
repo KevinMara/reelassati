@@ -1,4 +1,5 @@
 import { useUiText } from "@/lib/i18n/ui";
+import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
 import {
   useDeferredValue,
@@ -121,6 +122,8 @@ function AssetPreview({ asset }: { asset: Asset }) {
 
 export default function ContentLibrary() {
   const ui = useUiText();
+  const { i18n } = useTranslation();
+  const interfaceLocale = i18n.resolvedLanguage || i18n.language || "en";
   const { workspace, capabilities, updateWorkspace, loading, saving } =
     useWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -141,6 +144,7 @@ export default function ContentLibrary() {
   const [notice, setNotice] = useState<{
     tone: "success" | "error";
     message: string;
+    values?: Record<string, string>;
   } | null>(null);
 
   useEffect(() => {
@@ -242,7 +246,8 @@ export default function ContentLibrary() {
       });
       setNotice({
         tone: "success",
-        message: `${asset.name} is ready in your library.`,
+        message: "{{name}} is ready in your library.",
+        values: { name: asset.name },
       });
     } catch (cause) {
       setNotice({
@@ -276,7 +281,12 @@ export default function ContentLibrary() {
   });
 
   const deleteItem = async (item: LibraryItem) => {
-    if (!window.confirm(`Permanently delete “${item.title}”?`)) return;
+    if (
+      !window.confirm(
+        ui("Permanently delete “{{name}}”?", { name: item.title })
+      )
+    )
+      return;
     setDeletingId(item.id);
     setNotice(null);
     try {
@@ -307,7 +317,11 @@ export default function ContentLibrary() {
           ),
         }));
       }
-      setNotice({ tone: "success", message: `${item.title} was deleted.` });
+      setNotice({
+        tone: "success",
+        message: "{{name}} was deleted.",
+        values: { name: item.title },
+      });
     } catch (cause) {
       setNotice({
         tone: "error",
@@ -324,7 +338,9 @@ export default function ContentLibrary() {
   const renameAsset = async (
     item: Extract<LibraryItem, { source: "asset" }>
   ) => {
-    const nextName = window.prompt("Name this asset", item.asset.name)?.trim();
+    const nextName = window
+      .prompt(ui("Name this asset"), item.asset.name)
+      ?.trim();
     if (!nextName || nextName === item.asset.name) return;
     setRenamingId(item.id);
     setNotice(null);
@@ -342,7 +358,11 @@ export default function ContentLibrary() {
           ),
         })),
       }));
-      setNotice({ tone: "success", message: `Renamed to ${asset.name}.` });
+      setNotice({
+        tone: "success",
+        message: "Renamed to {{name}}.",
+        values: { name: asset.name },
+      });
     } catch (cause) {
       setNotice({
         tone: "error",
@@ -365,7 +385,11 @@ export default function ContentLibrary() {
         item.script.fullScript,
         item.script.provenance
       );
-      setNotice({ tone: "success", message: `${item.title} was copied.` });
+      setNotice({
+        tone: "success",
+        message: "{{name}} was copied.",
+        values: { name: item.title },
+      });
     } catch {
       setNotice({
         tone: "error",
@@ -424,7 +448,9 @@ export default function ContentLibrary() {
             ) : (
               <Upload className="h-4 w-4" />
             )}
-            {uploading ? `Uploading ${uploadProgress}%` : ui("Upload media")}
+            {uploading
+              ? ui("Uploading {{progress}}%", { progress: uploadProgress })
+              : ui("Upload media")}
           </button>
           <p className="mt-1 text-center text-xs text-foreground/65">
             {isDragging ? ui("Drop files here") : ui("or drop a file here")}
@@ -447,7 +473,7 @@ export default function ContentLibrary() {
           }`}
         >
           {notice.tone === "error" ? <AlertCircle className="h-4 w-4" /> : null}
-          {notice.message}
+          {ui(notice.message, notice.values)}
         </div>
       ) : null}
 
@@ -635,7 +661,7 @@ export default function ContentLibrary() {
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${meta.color}`}
                       >
-                        {meta.label}
+                        {ui(meta.label)}
                       </span>
                       <h2
                         className="mt-2 truncate text-sm font-medium"
@@ -644,7 +670,9 @@ export default function ContentLibrary() {
                         {item.title}
                       </h2>
                       <p className="mt-1 text-xs text-foreground/65">
-                        {new Date(item.createdAt).toLocaleDateString()}
+                        {new Date(item.createdAt).toLocaleDateString(
+                          interfaceLocale
+                        )}
                         {item.source === "asset"
                           ? ` · ${formatBytes(item.asset.size)}`
                           : ""}
@@ -666,7 +694,9 @@ export default function ContentLibrary() {
                           type="button"
                           onClick={() => void renameAsset(item)}
                           disabled={isRenaming || saving}
-                          aria-label={`Rename ${item.title}`}
+                          aria-label={ui("Rename {{name}}", {
+                            name: item.title,
+                          })}
                           className="rounded-md p-1.5 text-foreground/70 transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-40"
                         >
                           {isRenaming ? (
@@ -680,7 +710,7 @@ export default function ContentLibrary() {
                         type="button"
                         onClick={() => void deleteItem(item)}
                         disabled={isDeleting || saving}
-                        aria-label={`Delete ${item.title}`}
+                        aria-label={ui("Delete {{name}}", { name: item.title })}
                         className="rounded-md p-1.5 text-foreground/70 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
                       >
                         {isDeleting ? (

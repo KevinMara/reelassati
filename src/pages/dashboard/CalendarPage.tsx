@@ -1,4 +1,5 @@
 import { useUiText } from "@/lib/i18n/ui";
+import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { PublicationReadiness } from "@/components/studio/PublicationReadiness";
 import { useMemo, useState, type FormEvent } from "react";
@@ -33,22 +34,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/providers/workspace";
-
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 const PLATFORM_META: Record<Platform, { label: string; dot: string }> = {
   tiktok: { label: "TikTok", dot: "bg-slate-950" },
@@ -118,8 +103,8 @@ function dateKey(value: string, timeZone: string) {
   return `${valueFor("year")}-${valueFor("month")}-${valueFor("day")}`;
 }
 
-function timeLabel(value: string, timeZone: string) {
-  return new Intl.DateTimeFormat(undefined, {
+function timeLabel(value: string, timeZone: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     timeZone,
     hour: "2-digit",
     minute: "2-digit",
@@ -130,9 +115,9 @@ function postDate(post: ScheduledPost) {
   return post.scheduledAt || post.publishedAt;
 }
 
-function postTitle(post: ScheduledPost) {
+function postTitle(post: ScheduledPost, untitled: string) {
   const trimmed = post.caption.trim();
-  if (!trimmed) return "Untitled publication";
+  if (!trimmed) return untitled;
   return trimmed.length > 58 ? `${trimmed.slice(0, 58)}…` : trimmed;
 }
 
@@ -165,6 +150,17 @@ function createId(prefix: string) {
 
 export default function CalendarPage() {
   const ui = useUiText();
+  const { i18n } = useTranslation("ui");
+  const locale = i18n.resolvedLanguage || i18n.language || "en";
+  const days = useMemo(() => {
+    const format = new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      timeZone: "UTC",
+    });
+    return Array.from({ length: 7 }, (_, index) =>
+      format.format(new Date(Date.UTC(2023, 0, index + 1)))
+    );
+  }, [locale]);
   const { workspace, loading, saving, updateWorkspace } = useWorkspace();
   const [openedAt] = useState(() => Date.now());
   const [currentDate, setCurrentDate] = useState(() => {
@@ -481,7 +477,10 @@ export default function CalendarPage() {
         <section className="rounded-xl border border-border bg-surface p-4 sm:p-6 lg:col-span-2">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              {MONTHS[month]} {year}
+              {new Intl.DateTimeFormat(locale, {
+                month: "long",
+                year: "numeric",
+              }).format(currentDate)}
             </h2>
             <div className="flex gap-1">
               <button
@@ -517,9 +516,9 @@ export default function CalendarPage() {
           </div>
 
           <div className="grid grid-cols-7 gap-1">
-            {DAYS.map(day => (
+            {days.map((day, index) => (
               <div
-                key={day}
+                key={index}
                 className="py-2 text-center text-xs uppercase tracking-wider text-foreground/65 sm:text-xs"
               >
                 {day}
@@ -540,7 +539,12 @@ export default function CalendarPage() {
                   type="button"
                   onClick={() => setSelectedDate(key)}
                   onDoubleClick={() => openCreateEvent(key)}
-                  aria-label={`${MONTHS[month]} ${day}, ${year}: ${items.length} items`}
+                  aria-label={ui("{{date}} · Items: {{count}}", {
+                    date: new Intl.DateTimeFormat(locale, {
+                      dateStyle: "long",
+                    }).format(new Date(year, month, day)),
+                    count: items.length,
+                  })}
                   className={`group min-h-16 rounded-lg border p-1.5 text-left transition-all sm:min-h-24 sm:p-2 ${
                     isSelected
                       ? "border-primary bg-primary/10 shadow-sm"
@@ -591,7 +595,7 @@ export default function CalendarPage() {
                               }`}
                             />
                             <span className="hidden truncate text-xs text-foreground/60 sm:block">
-                              {postTitle(item.post)}
+                              {postTitle(item.post, ui("Untitled publication"))}
                             </span>
                           </div>
                         );
@@ -619,7 +623,7 @@ export default function CalendarPage() {
                 <h2 className="font-medium">
                   {selectedDate
                     ? new Date(`${selectedDate}T12:00:00`).toLocaleDateString(
-                        undefined,
+                        locale,
                         { weekday: "long", month: "long", day: "numeric" }
                       )
                     : ui("Coming up")}
@@ -952,6 +956,15 @@ function PostCard({
   showDate: boolean;
 }) {
   const ui = useUiText();
+  const { i18n } = useTranslation("ui");
+  const locale = i18n.resolvedLanguage || i18n.language || "en";
+  const statuses = {
+    draft: "Draft",
+    scheduled: "Scheduled",
+    publishing: "Publishing",
+    published: "Published",
+    failed: "Failed",
+  };
   const value = postDate(post);
   return (
     <article className="rounded-lg border border-border bg-background p-3 transition-transform hover:-translate-y-0.5">
@@ -968,7 +981,9 @@ function PostCard({
           </span>
         ))}
       </div>
-      <p className="mt-2 text-sm font-medium">{postTitle(post)}</p>
+      <p className="mt-2 text-sm font-medium">
+        {postTitle(post, ui("Untitled publication"))}
+      </p>
       {(post.status === "draft" || post.status === "failed") && (
         <>
           <PublicationReadiness post={post} />
@@ -990,13 +1005,15 @@ function PostCard({
                 : "text-primary"
           }
         >
-          {post.status}
+          {ui(statuses[post.status], { context: "publication" })}
         </span>
         {value ? (
           <span className="flex items-center gap-1 text-foreground/65">
             <Clock className="h-3 w-3" />
-            {showDate ? `${dateKey(value, timeZone)} · ` : ""}
-            {timeLabel(value, timeZone)}
+            {showDate
+              ? `${new Intl.DateTimeFormat(locale, { timeZone, month: "short", day: "numeric" }).format(new Date(value))} · `
+              : ""}
+            {timeLabel(value, timeZone, locale)}
           </span>
         ) : null}
       </div>

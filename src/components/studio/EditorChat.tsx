@@ -606,7 +606,7 @@ export function EditorChat({
             <div className="mt-5 grid grid-cols-2 gap-2">
               {STARTERS.map(item => (
                 <button
-                  key={ui(item.label)}
+                  key={item.preset}
                   type="button"
                   onClick={() => starter(item.preset)}
                   className="flex min-h-16 flex-col items-start gap-2 rounded-xl border border-border bg-background/40 p-3 text-left text-xs text-foreground/75 transition-colors hover:border-primary/50 hover:bg-primary/5"
@@ -650,7 +650,10 @@ export function EditorChat({
                     )}
                     {message.request?.taskPreset && (
                       <p className="mt-2 text-xs text-primary">
-                        {editorTaskPreset(message.request.taskPreset)?.label}
+                        {ui(
+                          editorTaskPreset(message.request.taskPreset)?.label ??
+                            ""
+                        )}
                         {message.request.executionMode === "plan"
                           ? ui(" · Plan first")
                           : ""}
@@ -860,7 +863,9 @@ export function EditorChat({
                             ? ui("Finished")
                             : ui("No changes made")}
                           {typeof message.usedCredits === "number"
-                            ? ` · up to ${message.usedCredits} credits`
+                            ? ui(" · up to {{credits}} credits", {
+                                credits: message.usedCredits,
+                              })
                             : ""}
                         </div>
                       )}
@@ -917,7 +922,7 @@ export function EditorChat({
               {taskPreset && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs">
                   <WandSparkles className="size-3" />
-                  {editorTaskPreset(taskPreset)?.label}
+                  {ui(editorTaskPreset(taskPreset)?.label ?? "")}
                   <button
                     type="button"
                     aria-label={ui("Remove task preset")}
@@ -976,7 +981,7 @@ export function EditorChat({
             aria-label={ui("Message Reel")}
             placeholder={
               taskPreset
-                ? editorTaskPreset(taskPreset)?.hint
+                ? ui(editorTaskPreset(taskPreset)?.hint ?? "")
                 : executionMode === "plan"
                   ? ui(
                       "Describe the result. Reel will make a plan for you to review…"
@@ -1059,7 +1064,7 @@ export function EditorChat({
                     ) : (
                       <WandSparkles />
                     )}
-                    {preset.label}
+                    {ui(preset.label)}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuItem
@@ -1134,7 +1139,16 @@ export function EditorChat({
               type="button"
               onClick={() => setSettingsOpen(true)}
               className="flex min-w-0 items-center gap-1 rounded-lg px-1.5 py-1 text-[10px] text-foreground/50 hover:text-foreground"
-              title={`Optional improvements: ${chat.state.mode === "ask" ? ui("ask first") : ui("automatically approved")}. Limit: ${chat.state.maxCredits} credits.`}
+              title={ui(
+                "Optional improvements: {{approval}}. Limit: {{credits}} credits.",
+                {
+                  approval:
+                    chat.state.mode === "ask"
+                      ? ui("ask first")
+                      : ui("automatically approved"),
+                  credits: chat.state.maxCredits,
+                }
+              )}
             >
               <span className="truncate">
                 {chat.state.mode === "ask"
@@ -1287,7 +1301,7 @@ function ActionCard({
             <span>{actionStateLabel(action)}</span>
             <span>
               {action.credits
-                ? `${action.credits} credits`
+                ? ui("{{credits}} credits", { credits: action.credits })
                 : ui("No AI credits")}
             </span>
           </div>
@@ -1322,7 +1336,11 @@ function ActionCard({
             >
               {action.runtime?.approved
                 ? ui("Included · queued")
-                : `Include it${action.credits ? ` · ${action.credits} cr` : ""}`}
+                : action.credits
+                  ? ui("Include it · {{credits}} cr", {
+                      credits: action.credits,
+                    })
+                  : ui("Include it")}
             </button>
             <button
               type="button"
@@ -1353,7 +1371,18 @@ function ActionCard({
         >
           {action.kind === "catalog-audio"
             ? ui("Retry free sound")
-            : `Check ${action.kind === "generate" ? (action.media === "speech" ? ui("voiceover") : action.media === "sfx" ? ui("sound effect") : action.media) : action.kind === "transcribe" ? ui("saved captions") : ui("saved plan")}`}
+            : ui("Check {{type}}", {
+                type:
+                  action.kind === "generate"
+                    ? action.media === "speech"
+                      ? ui("voiceover")
+                      : action.media === "sfx"
+                        ? ui("sound effect")
+                        : ui(action.media)
+                    : action.kind === "transcribe"
+                      ? ui("saved captions")
+                      : ui("saved plan"),
+              })}
         </button>
       )}
       {action.status === "interrupted" && (
