@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import worker from "./server";
 import type { WorkspaceDocument } from "../contracts/workspace";
+import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "../contracts/video-analysis";
+import { customTrendResearchCreditCost } from "../contracts/pricing";
 import {
   extractTextProvenanceToken,
   withoutTextProvenanceMarker,
@@ -108,6 +110,8 @@ let nextOutput: Record<string, unknown> = {
 };
 let providerGate: Promise<void> | undefined;
 let providerFailure: { status: number; payload: unknown } | undefined;
+let searchAnnotations: unknown[] | undefined;
+let trendVerificationStatus = 403;
 async function request(
   path: string,
   body?: unknown,
@@ -155,6 +159,79 @@ function mp4(seconds: number) {
   view.setUint32(44, seconds * 1000);
   return data;
 }
+function videoAnalysisOutput() {
+  const insight = {
+    label: "Source observation",
+    roleReason: "This interval advances the demonstrated result",
+    attention: 80,
+    stimulation: 45,
+    processingLoad: 35,
+    clarity: 76,
+    confidence: 0.8,
+    visualEvidence: "The product result is shown beside the speaker",
+    audioEvidence: "A specific promise is spoken while the result is visible",
+    strength: "The promise has matching visual proof",
+    improvement: "Keep the result visible while the next step is explained",
+    rationale:
+      "Aligned audiovisual cues make the promised result easier to follow",
+  };
+  return {
+    schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+    summary:
+      "The source pairs a product promise with a visible demonstration and closes with a request to save.",
+    review: {
+      captions: "absent",
+      captionNote: "No on-screen captions were visible in the reviewed sample",
+      audio: "present",
+      audioNote: "Spoken steps and background music are audible",
+      ending: {
+        time: 28,
+        confidence: 0.9,
+        completed: true,
+        trailingContent: "empty",
+        note: "Finished",
+      },
+    },
+    hook: { score: 80, note: "The promise is shown and spoken at the opening" },
+    pacing: {
+      score: 76,
+      note: "The demonstration advances without a repeated step",
+    },
+    insights: [
+      { ...insight, start: 0, end: 2, role: "hook" },
+      { ...insight, start: 2, end: 27, role: "core" },
+      {
+        ...insight,
+        start: 27,
+        end: 30,
+        role: "cta",
+        roleReason: "The speaker asks the viewer to save the demonstration",
+        audioEvidence: "Save this demonstration for your next project",
+      },
+    ],
+    structure: ["hook", "core", "proof", "payoff", "cta"].map(role => ({
+      role,
+      status: ["hook", "core", "cta"].includes(role) ? "present" : "absent",
+      note:
+        role === "proof" || role === "payoff"
+          ? "No distinct standalone section was observed"
+          : "Observed in the corresponding source-time interval",
+    })),
+    recommendations: [
+      {
+        start: 2,
+        end: 5,
+        label: "Keep the result visible",
+        observation: "The result moves partly out of frame",
+        action: "Reframe or reshoot with the result beside the speaker",
+        reason: "Keep the spoken claim and its proof together",
+        priority: "medium",
+        confidence: 0.8,
+      },
+    ],
+    changes: [],
+  };
+}
 function asset(
   id: string,
   owner: string,
@@ -189,6 +266,13 @@ beforeAll(async () => {
             .get("Authorization")
             ?.replace("Bearer ", ""),
         });
+      if (
+        url.startsWith("https://www.tiktok.com/oembed") ||
+        url.startsWith("https://www.instagram.com/reel/")
+      )
+        return new Response("Platform access limited", {
+          status: trendVerificationStatus,
+        });
       providerCalls.push(JSON.parse(String(init?.body || "{}")));
       if (providerGate) await providerGate;
       if (providerFailure)
@@ -196,7 +280,14 @@ beforeAll(async () => {
           status: providerFailure.status,
         });
       return Response.json({
-        choices: [{ message: { content: JSON.stringify(nextOutput) } }],
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(nextOutput),
+              ...(searchAnnotations ? { annotations: searchAnnotations } : {}),
+            },
+          },
+        ],
       });
     })
   );
@@ -577,44 +668,7 @@ describe("authenticated paid editing chat route", () => {
     expect(providerCalls.length).toBe(calls + 1);
   });
   it("supplies actual full-duration private video bytes and rejects foreign or shortened analysis proxies", async () => {
-    nextOutput = {
-      summary: "Observed source",
-      review: {
-        captions: "absent",
-        audio: "present",
-        ending: {
-          time: 28,
-          confidence: 0.9,
-          completed: true,
-          trailingContent: "empty",
-          note: "Finished",
-        },
-      },
-      retention: [],
-      insights: [
-        {
-          start: 0,
-          end: 2,
-          role: "hook",
-          attention: 80,
-          clarity: 76,
-          confidence: 0.8,
-          visualEvidence: "Product demonstration",
-          audioEvidence: "Spoken promise",
-          strength: "Result is visible",
-          improvement: "Make the promise specific",
-        },
-        {
-          start: 29,
-          end: 35,
-          role: "cta",
-          attention: 90,
-          visualEvidence: "Outside the source",
-        },
-        { start: 3, end: 4, role: "core", attention: 99 },
-      ],
-      changes: [],
-    };
+    nextOutput = videoAnalysisOutput();
     const before = balance();
     const calls = providerCalls.length;
     const input = {
@@ -635,10 +689,15 @@ describe("authenticated paid editing chat route", () => {
     const good = await request("/api/ai/analyze", {
       ...input,
       analysisAssetId: "proxy",
+      schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+      language: "it",
     });
     expect(good.status).toBe(200);
     const analyzed = (await good.json()) as { insights: unknown[] };
     expect(analyzed).toMatchObject({
+      schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+      language: "it",
+      overall: { status: "complete", score: 76, coveragePercent: 100 },
       review: { ending: null, captions: "unknown" },
       coverage: {
         input: "full-duration-proxy",
@@ -646,11 +705,13 @@ describe("authenticated paid editing chat route", () => {
         proxyFramesPerSecond: 8,
       },
     });
-    expect(analyzed.insights).toHaveLength(1);
+    expect(analyzed.insights).toHaveLength(3);
     expect(analyzed.insights[0]).toMatchObject({
       role: "hook",
       attention: 80,
-      stimulation: null,
+      stimulation: 45,
+      processingLoad: 35,
+      clarity: 76,
     });
     const payload = providerCalls.at(-1)! as {
       messages: Array<{ content: unknown }>;
@@ -663,6 +724,285 @@ describe("authenticated paid editing chat route", () => {
         }),
       ])
     );
+    expect(payload.messages[0].content).toContain("language code it");
+    expect(payload).toMatchObject({
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "reelassati_video_analysis_v2", strict: true },
+      },
+      provider: { require_parameters: true },
+    });
+    expect(balance()).toBe(before - 10);
+  });
+  it("refunds incomplete, legacy, unsupported or empty analyzer reports instead of settling misleading scores", async () => {
+    const complete = videoAnalysisOutput();
+    const failures = [
+      {
+        output: {
+          summary: "Old report",
+          hook: { score: 90 },
+          pacing: { score: 85 },
+          retention: [
+            { start: 0, end: 30, score: 90, note: "Source observation" },
+          ],
+          changes: [],
+        },
+        reason: "unsupported-schema",
+      },
+      {
+        output: {
+          ...complete,
+          insights: complete.insights.map(row => ({ ...row, clarity: null })),
+        },
+        reason: "missing-channels",
+      },
+      {
+        output: { ...complete, insights: complete.insights.slice(1) },
+        reason: "incomplete-coverage",
+      },
+      {
+        output: { ...complete, structure: [] },
+        reason: "missing-story-assessment",
+      },
+      {
+        output: { ...complete, recommendations: [], changes: [] },
+        reason: "unexplained-empty-plan",
+      },
+      {
+        output: {
+          ...complete,
+          changes: [
+            {
+              type: "audio",
+              label: "Balance",
+              reason: "Observed sound masks speech",
+              evidence: "Music overlaps spoken steps",
+              start: 1,
+              end: 31,
+              confidence: 0.8,
+              intensity: "light",
+              parameters: { volume: 0.5 },
+            },
+          ],
+        },
+        reason: "invalid-edit-plan",
+      },
+      {
+        output: {
+          ...complete,
+          insights: complete.insights.map(row => ({ ...row, role: "unknown" })),
+        },
+        reason: "invalid-intervals",
+      },
+    ];
+    for (const failure of failures) {
+      const before = balance(),
+        calls = providerCalls.length;
+      nextOutput = failure.output;
+      const response = await request("/api/ai/analyze", {
+        assetId: "source",
+        schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+      });
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        analysisIncomplete: true,
+        creditsRefunded: true,
+        reason: failure.reason,
+      });
+      expect(balance()).toBe(before);
+      expect(providerCalls.length).toBe(calls + 1);
+      const invocation = sqlite
+        .prepare(
+          "SELECT status,error_code FROM ai_invocations ORDER BY rowid DESC LIMIT 1"
+        )
+        .get();
+      expect(invocation).toMatchObject({
+        status: "failed",
+        error_code: `analysis_${failure.reason}`,
+      });
+    }
+  });
+  it("accepts an explained preserve-source review and bounded executable operations without inventing edits", async () => {
+    const complete = videoAnalysisOutput();
+    nextOutput = {
+      ...complete,
+      recommendations: [],
+      noChangesReason:
+        "Each claim already has visible proof and the closing action is clear; preserve the existing cut.",
+    };
+    const preserve = await request("/api/ai/analyze", { assetId: "source" });
+    expect(preserve.status).toBe(200);
+    expect(await preserve.json()).toMatchObject({
+      changes: [],
+      recommendations: [],
+      noChangesReason: expect.stringContaining("preserve"),
+    });
+    nextOutput = {
+      ...complete,
+      changes: [
+        {
+          type: "audio",
+          label: "Lower the music bed",
+          reason: "The sound competes with the spoken step",
+          evidence: "Music masks the step at 2 seconds",
+          start: 2,
+          end: 5,
+          confidence: 0.8,
+          intensity: "light",
+          parameters: { volume: 0.5 },
+        },
+      ],
+    };
+    const planned = await request("/api/ai/analyze", { assetId: "source" });
+    expect(planned.status).toBe(200);
+    expect(await planned.json()).toMatchObject({
+      changes: [
+        { type: "audio", start: 2, end: 5, parameters: { volume: 0.5 } },
+      ],
+    });
+    const before = balance(),
+      calls = providerCalls.length;
+    expect(
+      (
+        await request("/api/ai/analyze", {
+          assetId: "source",
+          schemaVersion: "unsupported",
+        })
+      ).status
+    ).toBe(409);
+    expect(balance()).toBe(before);
+    expect(providerCalls.length).toBe(calls);
+  });
+});
+
+describe("grounded custom trend research", () => {
+  function researchFixture() {
+    const publishedAt = new Date(Date.now() - 86_400_000).toISOString();
+    const brandEvidence =
+      "Example Brand demonstrates its new product cleaning a stained surface";
+    const sourceUrl = "https://www.tiktok.com/@examplebrand/video/1234567890";
+    const content = `${brandEvidence}. Published ${publishedAt}. Normal brand-owned feed post. 1.2M views, 75K likes, 3000 comments and 12000 shares.`;
+    const trend = {
+      platform: "tiktok",
+      title: "A visible product result",
+      creator: "examplebrand",
+      brandName: "Example Brand",
+      sourceUrl,
+      publishedAt,
+      thumbnailUrl: null,
+      niche: "Home",
+      region: "Global",
+      language: "en",
+      hook: "The stained surface appears beside the product result",
+      pattern: "Result, demonstration and reveal",
+      lifecycle: "breakout",
+      confidence: 0.9,
+      metrics: { views: 999999999, likes: null, comments: null, shares: null },
+      brandEvidence,
+      evidence: [content],
+      organicBrandPromotion: true,
+      paidAd: false,
+      organicEvidence: "Normal brand-owned feed post",
+      viralityEvidence: "1.2M reported views on the source",
+      hypothesis:
+        "The visible transformation may make the promise easier to follow",
+      adaptation:
+        "Show your own measured customer outcome before explaining the steps",
+      passSignal: "Compare opening hold with the account's own prior baseline",
+    };
+    return {
+      trend,
+      annotation: {
+        type: "url_citation",
+        url_citation: {
+          url: sourceUrl,
+          title: "Example Brand product transformation",
+          content,
+        },
+      },
+    };
+  }
+  it("allows the promised blank-topic broad scan, retains grounded results through a platform403 and uses the current quoted price", async () => {
+    const previous = nextOutput;
+    const fixture = researchFixture();
+    nextOutput = { trends: [fixture.trend] };
+    searchAnnotations = [fixture.annotation];
+    trendVerificationStatus = 403;
+    const before = balance(),
+      calls = providerCalls.length;
+    try {
+      const response = await request("/api/trends", {
+        scope: { query: "", platform: "tiktok", language: "en" },
+      });
+      expect(response.status).toBe(200);
+      const result = (await response.json()) as {
+        trends: Array<{ metrics: { views: number }; evidence: string[] }>;
+        creditCost: number;
+      };
+      expect(result.trends).toHaveLength(1);
+      expect(result.trends[0].metrics.views).toBe(1_200_000);
+      expect(result.trends[0].evidence.join(" ")).toContain(
+        "direct platform access check was blocked"
+      );
+      expect(result.creditCost).toBe(customTrendResearchCreditCost("tiktok"));
+      expect(balance()).toBe(before - result.creditCost);
+      const paidCalls = providerCalls.slice(calls);
+      expect(paidCalls).toHaveLength(2);
+      expect(paidCalls[0]).toMatchObject({
+        max_tool_calls: 2,
+        tools: [{ type: "openrouter:web_search", parameters: { max_uses: 2 } }],
+      });
+      expect(JSON.stringify(paidCalls[0])).toContain(
+        "Broad current-breakout discovery"
+      );
+    } finally {
+      nextOutput = previous;
+      searchAnnotations = undefined;
+    }
+  });
+  it("still refunds search-grounded results with no qualifying metrics or a known missing source", async () => {
+    const previous = nextOutput;
+    const fixture = researchFixture();
+    try {
+      for (const unavailableSource of [false, true]) {
+        nextOutput = { trends: [fixture.trend] };
+        searchAnnotations = [
+          {
+            ...fixture.annotation,
+            url_citation: {
+              ...fixture.annotation.url_citation,
+              content: unavailableSource
+                ? fixture.annotation.url_citation.content
+                : fixture.annotation.url_citation.content.replace(
+                    "1.2M views, 75K likes, 3000 comments and 12000 shares",
+                    "1000 views, 50 likes, 3 comments and 2 shares"
+                  ),
+            },
+          },
+        ];
+        trendVerificationStatus = unavailableSource ? 404 : 403;
+        const before = balance();
+        const response = await request("/api/trends", {
+          scope: {
+            query: "source-backed product results",
+            platform: "tiktok",
+            language: "en",
+          },
+        });
+        expect(response.status).toBe(502);
+        expect(await response.json()).toMatchObject({
+          creditsRefunded: true,
+          reason: unavailableSource
+            ? "source-unavailable"
+            : "no-eligible-sources",
+        });
+        expect(balance()).toBe(before);
+      }
+    } finally {
+      nextOutput = previous;
+      searchAnnotations = undefined;
+      trendVerificationStatus = 403;
+    }
   });
 });
 

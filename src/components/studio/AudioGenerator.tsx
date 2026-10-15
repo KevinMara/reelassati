@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { platformApi } from "@/lib/platform-api";
@@ -17,6 +18,7 @@ export function AudioGenerator({
     acceptedCredits: number;
   }) => Promise<void>;
 }) {
+  const ui = useUiText();
   const { capabilities } = useWorkspace();
   const [kind, setKind] = useState<"music" | "sfx">("music");
   const [seconds, setSeconds] = useState(15);
@@ -37,7 +39,9 @@ export function AudioGenerator({
       } else {
         await onGenerate({ kind, seconds, text, acceptedCredits: quote });
         setMessage(
-          "Generation started. Your audio will appear in Generated files and Library."
+          ui(
+            "Generation started. Your audio will appear in Generated files and Library."
+          )
         );
         setQuote(null);
       }
@@ -51,11 +55,11 @@ export function AudioGenerator({
   return (
     <div className="mb-4 rounded-xl border border-border bg-background/50 p-3">
       <h3 className="mb-3 text-sm font-medium">
-        Generate music & sound effects with AI
+        {ui("Generate music & sound effects with AI")}
       </h3>
       <div className="grid min-w-0 gap-3">
         <CompactSelect
-          aria-label="Audio generation type"
+          aria-label={ui("Audio generation type")}
           disabled={busy}
           value={kind}
           onValueChange={value => {
@@ -72,7 +76,7 @@ export function AudioGenerator({
           className="w-full"
         />
         <textarea
-          aria-label="Describe generated audio"
+          aria-label={ui("Describe generated audio")}
           disabled={busy}
           value={text}
           maxLength={kind === "sfx" ? SOUND_EFFECT_PROMPT_LIMIT : 4000}
@@ -80,15 +84,17 @@ export function AudioGenerator({
             setText(e.target.value);
             setQuote(null);
           }}
-          placeholder="Describe mood, instruments, rhythm, or the sound you need…"
+          placeholder={ui(
+            "Describe mood, instruments, rhythm, or the sound you need…"
+          )}
           rows={2}
           className="rounded-lg border border-border bg-surface p-2 text-sm"
         />
         <label className="text-sm">
-          Seconds
+          {ui("Seconds")}
           <input
             type="range"
-            aria-label="AI audio duration"
+            aria-label={ui("AI audio duration")}
             disabled={busy}
             min={kind === "music" ? 3 : 0.5}
             max={30}
@@ -110,26 +116,30 @@ export function AudioGenerator({
         className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-40"
       >
         {busy
-          ? "Please wait…"
+          ? ui("Please wait…")
           : quote === null
-            ? "Get credit quote"
+            ? ui("Get credit quote")
             : kind === "sfx"
               ? `Generate · hold up to ${quote} credits`
               : `Generate · ${quote} credits`}
       </button>
       {kind === "sfx" && quote !== null && (
         <p className="mt-2 text-sm text-foreground/70">
-          About {soundEffectCredits(seconds)} credits if the generated effect
-          lasts {seconds.toFixed(1)}s. The generator may produce a longer take.
-          Final cost covers the full generated take, including any tail trimmed
-          to your selected length. Unused reserved credits are returned.
+          {ui("About")} {soundEffectCredits(seconds)}{" "}
+          {ui("credits if the generated effect lasts")} {seconds.toFixed(1)}
+          {ui(
+            "s. The generator may produce a longer take. Final cost covers the full generated take, including any tail trimmed to your selected length. Unused reserved credits are returned."
+          )}
         </p>
       )}
       {!ready && (
         <p className="mt-2 text-sm text-foreground/70">
-          {kind === "music" ? "Music generation" : "Sound-effect generation"} is
-          not available yet. You can use the free sounds below or upload audio
-          to Library.
+          {kind === "music"
+            ? ui("Music generation")
+            : ui("Sound-effect generation")}{" "}
+          {ui(
+            "is not available yet. You can use the free sounds below or upload audio to Library."
+          )}
         </p>
       )}
       {message && (

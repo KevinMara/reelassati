@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   Children,
   Fragment,
@@ -66,6 +67,7 @@ export function StudioSelect({
   autoFocus,
   ...props
 }: Props) {
+  const ui = useUiText();
   const native = useRef<HTMLSelectElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [invalid, setInvalid] = useState(false);
@@ -127,7 +129,7 @@ export function StudioSelect({
             "!py-0"
           )}
         >
-          <SelectValue placeholder="Select an option" />
+          <SelectValue placeholder={ui("Select an option")} />
         </SelectTrigger>
         <SelectContent position="popper" align="start" sideOffset={6}>
           {options.map((option, index) => (

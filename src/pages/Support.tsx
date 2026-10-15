@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import {
   ArrowUp,
@@ -47,9 +48,10 @@ const initialMessage: SupportMessage = {
 };
 
 export default function Support() {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const { user } = useAuth();
-  const isItalian = i18n.resolvedLanguage?.startsWith("it");
+
   const [messages, setMessages] = useState<SupportMessage[]>([initialMessage]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -143,15 +145,15 @@ export default function Support() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-55" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
               </span>
-              {isItalian ? "Supporto ufficiale" : "Official support"}
+              {ui("Official support")}
             </div>
             <h1 className="text-balance text-4xl font-semibold tracking-tight md:text-6xl">
-              {isItalian ? "Come possiamo aiutarti?" : "How can we help?"}
+              {ui("How can we help?")}
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-pretty leading-relaxed text-foreground/60">
-              {isItalian
-                ? "Parla con l’assistente di supporto per una soluzione immediata. Se serve una persona, trasforma la conversazione in un ticket completo in un solo passaggio."
-                : "Talk to the support assistant for an immediate solution. When a person is needed, turn the conversation into a complete support ticket in one step."}
+              {ui(
+                "Talk to the support assistant for an immediate solution. When a person is needed, turn the conversation into a complete support ticket in one step."
+              )}
             </p>
           </header>
 
@@ -166,17 +168,15 @@ export default function Support() {
                   </span>
                   <div>
                     <h2 className="text-sm font-semibold">
-                      REELassati Support
+                      {ui("REELassati Support")}
                     </h2>
                     <p className="text-[11px] text-foreground/45">
-                      {isItalian
-                        ? "Assistente AI · Escalation umana"
-                        : "AI assistant · Human escalation"}
+                      {ui("AI assistant · Human escalation")}
                     </p>
                   </div>
                 </div>
                 <span className="hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-emerald-600 sm:flex">
-                  <ShieldCheck className="h-3 w-3" /> Safe support
+                  <ShieldCheck className="h-3 w-3" /> {ui("Safe support")}
                 </span>
               </div>
 
@@ -225,7 +225,7 @@ export default function Support() {
 
               {error ? (
                 <div className="mx-3 mb-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-xs text-destructive sm:mx-5">
-                  {error} You can always email{" "}
+                  {error} {ui("You can always email")}{" "}
                   <a
                     className="font-semibold underline"
                     href={`mailto:${SUPPORT_EMAIL}`}
@@ -265,20 +265,18 @@ export default function Support() {
                       }
                     }}
                     rows={1}
-                    placeholder={
-                      isItalian
-                        ? "Descrivi il problema o ciò che vuoi fare…"
-                        : "Describe the problem or what you want to do…"
-                    }
+                    placeholder={ui(
+                      "Describe the problem or what you want to do…"
+                    )}
                     className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-2.5 py-3 text-sm outline-none placeholder:text-foreground/30"
-                    aria-label="Message REELassati Support"
+                    aria-label={ui("Message REELassati Support")}
                   />
                   <button
                     type="button"
                     onClick={() => void sendMessage()}
                     disabled={!input.trim() || busy}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[0_10px_26px_-12px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:translate-y-0 disabled:opacity-40"
-                    aria-label="Send message"
+                    aria-label={ui("Send message")}
                   >
                     {busy ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -288,13 +286,11 @@ export default function Support() {
                   </button>
                 </div>
                 <p className="mt-2 px-1 text-[10px] text-foreground/35">
-                  {isItalian
-                    ? "Non inviare password, codici, chiavi API o dati di pagamento."
-                    : "Never send passwords, verification codes, API keys, or payment data."}{" "}
+                  {ui(
+                    "Never send passwords, verification codes, API keys, or payment data."
+                  )}{" "}
                   <Link to="/privacy" className="text-primary hover:underline">
-                    {isItalian
-                      ? "Come trattiamo i messaggi"
-                      : "How messages are handled"}
+                    {ui("How messages are handled")}
                   </Link>
                   .
                 </p>
@@ -321,12 +317,12 @@ export default function Support() {
                     <Sparkles className="h-4 w-4" />
                   </span>
                   <h2 className="mt-4 text-lg font-semibold">
-                    {isItalian ? "Supporto che agisce" : "Support that acts"}
+                    {ui("Support that acts")}
                   </h2>
                   <p className="mt-2 text-sm leading-relaxed text-foreground/55">
-                    {isItalian
-                      ? "L’assistente analizza il problema, propone passaggi concreti e prepara il ticket con contesto e priorità quando serve."
-                      : "The assistant diagnoses the issue, gives concrete steps, and prepares a contextual, prioritized ticket when needed."}
+                    {ui(
+                      "The assistant diagnoses the issue, gives concrete steps, and prepares a contextual, prioritized ticket when needed."
+                    )}
                   </p>
                   <ul className="mt-4 space-y-3 text-xs text-foreground/60">
                     <Feature
@@ -349,16 +345,16 @@ export default function Support() {
                 <div className="flex items-center gap-2 text-primary">
                   <Mail className="h-4 w-4" />
                   <p className="font-mono text-[10px] uppercase tracking-wider">
-                    {isItalian ? "Supporto umano" : "Human support"}
+                    {ui("Human support")}
                   </p>
                 </div>
                 <h2 className="mt-3 text-base font-semibold">
                   {SUPPORT_EMAIL}
                 </h2>
                 <p className="mt-2 text-xs leading-relaxed text-foreground/50">
-                  {isItalian
-                    ? "Per richieste complesse, account, pagamenti, privacy o problemi persistenti."
-                    : "For complex requests, accounts, billing, privacy, or persistent technical problems."}
+                  {ui(
+                    "For complex requests, accounts, billing, privacy, or persistent technical problems."
+                  )}
                 </p>
                 <a
                   href={SUPPORT_GMAIL_URL}
@@ -366,7 +362,7 @@ export default function Support() {
                   rel="noreferrer"
                   className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-hover"
                 >
-                  {isItalian ? "Apri l’email" : "Open email composer"}
+                  {ui("Open email composer")}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
@@ -375,22 +371,22 @@ export default function Support() {
                 <div className="flex items-center gap-2 text-primary">
                   <MessageSquareWarning className="h-4 w-4" />
                   <p className="font-mono text-[10px] uppercase tracking-wider">
-                    {isItalian ? "Feedback prodotto" : "Product feedback"}
+                    {ui("Product feedback")}
                   </p>
                 </div>
                 <h2 className="mt-3 text-base font-semibold">
-                  {isItalian ? "Bug o idea?" : "Found a bug or have an idea?"}
+                  {ui("Found a bug or have an idea?")}
                 </h2>
                 <p className="mt-2 text-xs leading-relaxed text-foreground/50">
-                  {isItalian
-                    ? "Invia un report strutturato direttamente alla coda del prodotto."
-                    : "Send a structured report directly to the product queue."}
+                  {ui(
+                    "Send a structured report directly to the product queue."
+                  )}
                 </p>
                 <Link
                   to="/feedback"
                   className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-hover"
                 >
-                  {isItalian ? "Invia feedback" : "Send feedback"}
+                  {ui("Send feedback")}
                   <ExternalLink className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -469,6 +465,7 @@ function TicketForm({
   setName: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
 }) {
+  const ui = useUiText();
   return (
     <form
       onSubmit={onSubmit}
@@ -479,13 +476,14 @@ function TicketForm({
           <TicketCheck className="h-4 w-4" />
         </span>
         <span className="rounded-full bg-primary/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-primary">
-          {draft.priority} priority
+          {draft.priority} {ui("priority")}
         </span>
       </div>
-      <h2 className="mt-4 text-lg font-semibold">Ticket ready</h2>
+      <h2 className="mt-4 text-lg font-semibold">{ui("Ticket ready")}</h2>
       <p className="mt-2 text-xs leading-relaxed text-foreground/50">
-        The assistant prepared this escalation from your conversation. Review
-        and send it to human support.
+        {ui(
+          "The assistant prepared this escalation from your conversation. Review and send it to human support."
+        )}
       </p>
       <div className="mt-4 rounded-xl border border-border bg-background p-3">
         <p className="text-xs font-semibold">{draft.subject}</p>
@@ -498,7 +496,7 @@ function TicketForm({
           <input
             value={name}
             onChange={event => setName(event.target.value)}
-            placeholder="Your name"
+            placeholder={ui("Your name")}
             maxLength={120}
             className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs outline-none focus:border-primary/40"
           />
@@ -522,26 +520,28 @@ function TicketForm({
         ) : (
           <TicketCheck className="h-4 w-4" />
         )}
-        Create support ticket
+        {ui("Create support ticket")}
       </button>
     </form>
   );
 }
 
 function TicketSuccess({ ticket }: { ticket: SupportTicketResult }) {
+  const ui = useUiText();
   return (
     <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.045] p-5">
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
         <CheckCircle2 className="h-5 w-5" />
       </span>
-      <h2 className="mt-4 text-lg font-semibold">Ticket created</h2>
+      <h2 className="mt-4 text-lg font-semibold">{ui("Ticket created")}</h2>
       <p className="mt-2 text-xs leading-relaxed text-foreground/55">
-        Reference <strong className="text-foreground">{ticket.id}</strong>. Keep
-        this ID for any follow-up.
+        {ui("Reference")}{" "}
+        <strong className="text-foreground">{ticket.id}</strong>
+        {ui(". Keep this ID for any follow-up.")}
       </p>
       <p className="mt-3 rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-[11px] text-foreground/55">
         {ticket.emailStatus === "sent"
-          ? "Human support has been notified by email."
+          ? ui("Human support has been notified by email.")
           : `The ticket is securely recorded. For immediate delivery, also email ${ticket.supportEmail} and include the reference above.`}
       </p>
     </div>

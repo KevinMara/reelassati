@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { CreditPlanner } from "@/components/studio/CreditPlanner";
 import posthog from "@/lib/posthog";
@@ -70,6 +71,7 @@ function actionLabel(category: string): string {
 }
 
 export default function BillingPage() {
+  const ui = useUiText();
   const [searchParams] = useSearchParams();
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -265,11 +267,16 @@ export default function BillingPage() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">Plan & credits</p>
-          <h1 className="text-3xl font-semibold">Your creative fuel.</h1>
+          <p className="mono-eyebrow mb-2 text-primary">
+            {ui("Plan & credits")}
+          </p>
+          <h1 className="text-3xl font-semibold">
+            {ui("Your creative fuel.")}
+          </h1>
           <p className="mt-2 max-w-2xl text-foreground/60">
-            One transparent REELassati balance for every AI tool. Plan credits
-            refresh monthly; purchased top-ups roll over.
+            {ui(
+              "One transparent REELassati balance for every AI tool. Plan credits refresh monthly; purchased top-ups roll over."
+            )}
           </p>
         </div>
         <button
@@ -279,7 +286,7 @@ export default function BillingPage() {
           className="inline-flex items-center justify-center gap-2 rounded-pill border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/40 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {ui("Refresh")}
         </button>
       </div>
 
@@ -291,10 +298,14 @@ export default function BillingPage() {
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <p>
             {paymentState === "complete"
-              ? "Payment confirmed. Your credits are ready—let’s create something."
+              ? ui(
+                  "Payment confirmed. Your credits are ready—let’s create something."
+                )
               : paymentState === "expired"
-                ? "This checkout expired. You can start a new purchase."
-                : "Confirming your payment and credits. This page checks automatically; delayed payment methods may take longer."}
+                ? ui("This checkout expired. You can start a new purchase.")
+                : ui(
+                    "Confirming your payment and credits. This page checks automatically; delayed payment methods may take longer."
+                  )}
           </p>
         </div>
       ) : null}
@@ -321,8 +332,9 @@ export default function BillingPage() {
           role="status"
           className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm"
         >
-          AI access is enabled for this account. Generations use your available
-          credits; no paid subscription is active.
+          {ui(
+            "AI access is enabled for this account. Generations use your available credits; no paid subscription is active."
+          )}
         </p>
       )}
 
@@ -330,10 +342,11 @@ export default function BillingPage() {
         <div className="flex items-center gap-3">
           <Sparkles className="h-5 w-5 text-primary" />
           <div>
-            <h2 className="font-medium">Credit top-ups</h2>
+            <h2 className="font-medium">{ui("Credit top-ups")}</h2>
             <p className="text-sm text-foreground/70">
-              Extra credits at a lower unit price than any plan. Yours to keep
-              across renewals, with an active subscription.
+              {ui(
+                "Extra credits at a lower unit price than any plan. Yours to keep across renewals, with an active subscription."
+              )}
             </p>
           </div>
         </div>
@@ -355,11 +368,13 @@ export default function BillingPage() {
                     <p className="text-2xl font-semibold">
                       {pack.credits.toLocaleString()}
                     </p>
-                    <p className="text-xs text-foreground/70">credits</p>
+                    <p className="text-xs text-foreground/70">
+                      {ui("credits")}
+                    </p>
                   </div>
                   {index === 2 ? (
                     <span className="rounded-pill bg-primary/10 px-2 py-1 font-mono text-xs uppercase tracking-wide text-primary">
-                      Best credit value
+                      {ui("Best credit value")}
                     </span>
                   ) : null}
                 </div>
@@ -374,15 +389,21 @@ export default function BillingPage() {
                   )}
                 </div>
                 <p className="mt-3 text-sm text-foreground/70">
-                  {((pack.price / pack.credits) * 1000).toFixed(2)} USD per
-                  1,000 credits
+                  {((pack.price / pack.credits) * 1000).toFixed(2)}{" "}
+                  {ui("USD per 1,000 credits")}
                 </p>
                 <p className="mt-2 text-sm text-foreground/80">
                   {id === "boost"
-                    ? "Covers one 15-second 720p video with audio, plus 100 credits."
+                    ? ui(
+                        "Covers one 15-second 720p video with audio, plus 100 credits."
+                      )
                     : id === "momentum"
-                      ? "Room for two 15-second 720p videos with audio, plus 200 credits."
-                      : "Room for five 15-second 720p videos with audio, plus 500 credits."}
+                      ? ui(
+                          "Room for two 15-second 720p videos with audio, plus 200 credits."
+                        )
+                      : ui(
+                          "Room for five 15-second 720p videos with audio, plus 500 credits."
+                        )}
                 </p>
                 <button
                   type="button"
@@ -396,22 +417,23 @@ export default function BillingPage() {
                   className="mt-4 w-full rounded-pill bg-primary/15 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {busy === `topup:${id}`
-                    ? "Opening…"
+                    ? ui("Opening…")
                     : summary && !summary.configured
-                      ? "Purchases opening soon"
+                      ? ui("Purchases opening soon")
                       : summary &&
                           (!summary.canUseCredits ||
                             summary.creditAccess === "operator")
-                        ? "Active plan required"
-                        : "Add credits"}
+                        ? ui("Active plan required")
+                        : ui("Add credits")}
                 </button>
               </article>
             );
           })}
         </div>
         <p className="mt-3 text-xs text-foreground/65">
-          Displayed prices exclude tax. Applicable VAT or sales tax is
-          calculated and added at checkout from your billing details.
+          {ui(
+            "Displayed prices exclude tax. Applicable VAT or sales tax is calculated and added at checkout from your billing details."
+          )}
         </p>
       </section>
 
@@ -420,7 +442,7 @@ export default function BillingPage() {
           <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
           <div className="relative flex items-start justify-between gap-4">
             <div>
-              <p className="mono-eyebrow text-primary">Available now</p>
+              <p className="mono-eyebrow text-primary">{ui("Available now")}</p>
               <div className="mt-3 flex items-center gap-3">
                 <Coins className="h-7 w-7 text-primary" />
                 <span className="text-5xl font-semibold tracking-tight">
@@ -430,7 +452,7 @@ export default function BillingPage() {
                 </span>
               </div>
               <p className="mt-2 text-sm text-foreground/70">
-                REELassati credits
+                {ui("REELassati credits")}
               </p>
             </div>
             {summary?.plan ? (
@@ -441,14 +463,15 @@ export default function BillingPage() {
           </div>
           {!!summary?.adjustmentDebt && (
             <p className="relative mt-4 text-sm text-foreground/75">
-              {summary.adjustmentDebt.toLocaleString()} credits deducted for a
-              payment refund or dispute. Your available balance includes this
-              adjustment.
+              {summary.adjustmentDebt.toLocaleString()}{" "}
+              {ui(
+                "credits deducted for a payment refund or dispute. Your available balance includes this adjustment."
+              )}
             </p>
           )}
           <div className="relative mt-7 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-border/70 bg-background/55 p-4 backdrop-blur">
-              <p className="text-xs text-foreground/70">Plan credits</p>
+              <p className="text-xs text-foreground/70">{ui("Plan credits")}</p>
               <p className="mt-1 text-xl font-semibold">
                 {(summary?.includedCredits || 0).toLocaleString()}
               </p>
@@ -460,12 +483,14 @@ export default function BillingPage() {
               </div>
             </div>
             <div className="rounded-xl border border-border/70 bg-background/55 p-4 backdrop-blur">
-              <p className="text-xs text-foreground/70">Rollover top-ups</p>
+              <p className="text-xs text-foreground/70">
+                {ui("Rollover top-ups")}
+              </p>
               <p className="mt-1 text-xl font-semibold">
                 {(summary?.topUpCredits || 0).toLocaleString()}
               </p>
               <p className="mt-3 text-xs text-foreground/70">
-                Extra credits stay in your balance.
+                {ui("Extra credits stay in your balance.")}
               </p>
             </div>
           </div>
@@ -479,13 +504,12 @@ export default function BillingPage() {
         <section className="rounded-2xl border border-border bg-surface p-6">
           <div className="flex items-center gap-2">
             <Gauge className="h-4 w-4 text-primary" />
-            <h2 className="font-medium">Credit guide</h2>
+            <h2 className="font-medium">{ui("Credit guide")}</h2>
           </div>
           <p className="mt-2 text-xs text-foreground/60">
-            Voice rates: multilingual voices / existing language-specific
-            voices. Voice is charged for the actual text length, rounded up to
-            whole credits (minimum 1). Transcription is charged per started
-            minute.
+            {ui(
+              "Voice rates: multilingual voices / existing language-specific voices. Voice is charged for the actual text length, rounded up to whole credits (minimum 1). Transcription is charged per started minute."
+            )}
           </p>
           <div className="mt-4 space-y-2 text-sm">
             {[
@@ -532,17 +556,17 @@ export default function BillingPage() {
           </div>
           {speechCreditRate() < AI_CREDIT_COSTS.speechPerThousandCharacters && (
             <p className="mt-3 text-xs text-foreground/60">
-              Voice launch rate through 19 October 2026, 15:00 UTC. After that,
-              multilingual voice costs 20 credits per 1,000 characters,
-              proportional to text length.
+              {ui(
+                "Voice launch rate through 19 October 2026, 15:00 UTC. After that, multilingual voice costs 20 credits per 1,000 characters, proportional to text length."
+              )}
             </p>
           )}
         </section>
 
         <section className="rounded-2xl border border-border bg-surface p-6">
-          <h2 className="font-medium">What can your credits create?</h2>
+          <h2 className="font-medium">{ui("What can your credits create?")}</h2>
           <p className="mt-2 text-sm text-foreground/70">
-            With your current balance, choose up to one of these:
+            {ui("With your current balance, choose up to one of these:")}
           </p>
           <div className="my-5 grid grid-cols-2 gap-3">
             {[
@@ -570,12 +594,13 @@ export default function BillingPage() {
             ))}
           </div>
           <p className="mb-6 text-xs text-foreground/65">
-            Examples are alternatives, not a combined allowance.
+            {ui("Examples are alternatives, not a combined allowance.")}
           </p>
-          <h2 className="font-medium">Recent credit activity</h2>
+          <h2 className="font-medium">{ui("Recent credit activity")}</h2>
           <p className="mt-1 text-xs text-foreground/70">
-            Failed AI jobs are released automatically and do not consume
-            credits.
+            {ui(
+              "Failed AI jobs are released automatically and do not consume credits."
+            )}
           </p>
           <div className="mt-4 divide-y divide-border">
             {loading ? (
@@ -606,7 +631,7 @@ export default function BillingPage() {
               ))
             ) : (
               <div className="py-10 text-center text-sm text-foreground/65">
-                Credit activity will appear here.
+                {ui("Credit activity will appear here.")}
               </div>
             )}
           </div>
@@ -635,6 +660,7 @@ function PlanChooser({
   summary: BillingSummary | null;
   onManage: () => Promise<void>;
 }) {
+  const ui = useUiText();
   const manageExisting = Boolean(
     summary?.plan &&
     !["canceled", "incomplete_expired", "inactive"].includes(
@@ -646,16 +672,16 @@ function PlanChooser({
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 id="plans-title" className="text-2xl font-semibold">
-            Find your creative pace.
+            {ui("Find your creative pace.")}
           </h2>
           <p className="mt-2 text-foreground/70">
-            One plan. Every creation tool. Room to keep going.
+            {ui("One plan. Every creation tool. Room to keep going.")}
           </p>
         </div>
         <div
           className="inline-flex rounded-pill border border-border bg-surface p-1 text-sm"
           role="group"
-          aria-label="Billing cycle"
+          aria-label={ui("Billing cycle")}
         >
           {(["monthly", "annual"] as const).map(cycle => (
             <button
@@ -666,7 +692,7 @@ function PlanChooser({
               className={`rounded-pill px-4 py-2 capitalize transition-colors ${billingCycle === cycle ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground/75 hover:bg-primary/10"}`}
             >
               {cycle}
-              {cycle === "annual" ? " · 2 months free" : ""}
+              {cycle === "annual" ? ui(" · 2 months free") : ""}
             </button>
           ))}
         </div>
@@ -687,24 +713,24 @@ function PlanChooser({
               <div className="mb-5 flex items-center justify-between gap-2">
                 <span className="font-mono text-xs uppercase tracking-widest text-primary">
                   {planId === "creator"
-                    ? "Your first momentum"
+                    ? ui("Your first momentum")
                     : featured
-                      ? "More room to create"
-                      : "Your biggest ideas"}
+                      ? ui("More room to create")
+                      : ui("Your biggest ideas")}
                 </span>
                 {(current || featured) && (
                   <span className="rounded-pill bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
-                    {current ? "Current plan" : "Recommended"}
+                    {current ? ui("Current plan") : ui("Recommended")}
                   </span>
                 )}
               </div>
               <h3 className="text-2xl font-semibold">{name}</h3>
               <p className="mt-2 min-h-12 text-sm text-foreground/75">
                 {planId === "creator"
-                  ? "For one creator finding a consistent rhythm."
+                  ? ui("For one creator finding a consistent rhythm.")
                   : featured
-                    ? "For frequent creators running several channels."
-                    : "For a larger content output across your channels."}
+                    ? ui("For frequent creators running several channels.")
+                    : ui("For a larger content output across your channels.")}
               </p>
               <p className="mt-5">
                 <span className="text-4xl font-semibold tracking-tight">
@@ -712,18 +738,21 @@ function PlanChooser({
                     maximumFractionDigits: 2,
                   })}
                 </span>
-                <span className="text-sm text-foreground/70"> USD / month</span>
+                <span className="text-sm text-foreground/70">
+                  {" "}
+                  {ui("USD / month")}
+                </span>
               </p>
               <p className="mt-2 text-sm text-foreground/70">
                 {annual
                   ? `${plan.annualTotal.toLocaleString()} USD billed yearly · save ${plan.monthlyPrice * 2} USD`
-                  : "Billed monthly · cancel renewal anytime"}
+                  : ui("Billed monthly · cancel renewal anytime")}
               </p>
               <div className="my-6 rounded-xl border border-primary/20 bg-primary/10 p-4">
                 <p className="text-3xl font-semibold text-primary">
                   {plan.monthlyCredits.toLocaleString()}
                 </p>
-                <p className="mt-1 text-sm">credits every month</p>
+                <p className="mt-1 text-sm">{ui("credits every month")}</p>
               </div>
               <ul className="space-y-3 text-sm text-foreground/85">
                 {[
@@ -742,11 +771,11 @@ function PlanChooser({
                 ))}
               </ul>
               <p className="my-5 border-t border-border pt-4 text-sm text-foreground/70">
-                For example: up to{" "}
+                {ui("For example: up to")}{" "}
                 {Math.floor(
                   plan.monthlyCredits / AI_CREDIT_COSTS.image1K
                 ).toLocaleString()}{" "}
-                1K images if used only for images.
+                {ui("1K images if used only for images.")}
               </p>
               <button
                 type="button"
@@ -763,11 +792,11 @@ function PlanChooser({
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
                 {busy === `plan:${planId}` || busy === "portal"
-                  ? "Opening secure checkout…"
+                  ? ui("Opening secure checkout…")
                   : disabled && !manageExisting && summary
-                    ? "Purchases opening soon"
+                    ? ui("Purchases opening soon")
                     : current
-                      ? "Manage your plan"
+                      ? ui("Manage your plan")
                       : manageExisting
                         ? `Explore ${name} in billing`
                         : `Choose ${name}`}
@@ -777,9 +806,9 @@ function PlanChooser({
         })}
       </div>
       <p className="mt-4 text-sm text-foreground/70">
-        Prices exclude tax; applicable taxes are added at checkout. Annual plans
-        receive credits monthly. Plan credits reset; purchased credits roll
-        over.
+        {ui(
+          "Prices exclude tax; applicable taxes are added at checkout. Annual plans receive credits monthly. Plan credits reset; purchased credits roll over."
+        )}
       </p>
       {(summary?.plan || summary?.canManageBilling) && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 text-sm">
@@ -787,7 +816,9 @@ function PlanChooser({
             {summary.plan ? (
               <>
                 {summary.plan.name} · {summary.plan.status.replace(/_/g, " ")} ·{" "}
-                {summary.plan.cancelAtPeriodEnd ? "Ends" : "Period ends"}{" "}
+                {summary.plan.cancelAtPeriodEnd
+                  ? ui("Ends")
+                  : ui("Period ends")}{" "}
                 {formatDate(summary.plan.currentPeriodEnd)}
               </>
             ) : (
@@ -800,7 +831,7 @@ function PlanChooser({
             disabled={!summary?.canManageBilling || busy !== null}
             className="font-medium text-primary disabled:opacity-60"
           >
-            Manage plan and invoices
+            {ui("Manage plan and invoices")}
           </button>
         </div>
       )}
@@ -826,6 +857,7 @@ function UsageChart({
   summary: BillingSummary | null;
   loading: boolean;
 }) {
+  const ui = useUiText();
   const [range, setRange] = useState(30);
   const data = useMemo(() => {
     const end = new Date(summary?.usage?.through || new Date().toISOString());
@@ -854,23 +886,23 @@ function UsageChart({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="usage-title" className="text-xl font-semibold">
-            Your creative activity
+            {ui("Your creative activity")}
           </h2>
           <p className="mt-2 text-3xl font-semibold">
             {loading || !summary?.usage ? "—" : total.toLocaleString()}{" "}
             <span className="text-sm font-normal text-foreground/70">
-              credits used
+              {ui("credits used")}
             </span>
           </p>
         </div>
         <StudioSelect
-          aria-label="Credit usage time range"
+          aria-label={ui("Credit usage time range")}
           value={range}
           onChange={e => setRange(Number(e.target.value))}
           className="rounded-lg border border-border bg-background p-2 text-sm"
         >
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
+          <option value={7}>{ui("Last 7 days")}</option>
+          <option value={30}>{ui("Last 30 days")}</option>
         </StudioSelect>
       </div>
       <div
@@ -915,7 +947,7 @@ function UsageChart({
             {USAGE_CATEGORIES.map(category => (
               <Bar
                 key={category.key}
-                name={category.label}
+                name={ui(category.label)}
                 dataKey={category.key}
                 stackId="usage"
                 fill={category.color}
@@ -949,12 +981,16 @@ function UsageChart({
       </div>
       <p className="mt-4 text-xs text-foreground/65">
         {loading
-          ? "Loading credit usage…"
+          ? ui("Loading credit usage…")
           : !summary?.usage
-            ? "Usage could not be loaded. Try Refresh."
+            ? ui("Usage could not be loaded. Try Refresh.")
             : total === 0
-              ? "No credits used in this period. Your first creation will appear here."
-              : "Completed AI actions · UTC dates · failed and pending jobs excluded."}
+              ? ui(
+                  "No credits used in this period. Your first creation will appear here."
+                )
+              : ui(
+                  "Completed AI actions · UTC dates · failed and pending jobs excluded."
+                )}
       </p>
     </section>
   );

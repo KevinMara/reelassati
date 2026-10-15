@@ -20,6 +20,7 @@ import {
   reserveCredits,
   releaseCreditReservation,
   settleMeasuredCreditReservation,
+  settleCreditReservation,
   type BillingEnvironment,
 } from "./billing";
 import { LEGAL_TERMS_VERSION } from "../contracts/legal";
@@ -108,8 +109,12 @@ function credits() {
 }
 beforeAll(async () => {
   await initializeBillingSchema(env);
+  sqlite.exec(
+    "CREATE TABLE IF NOT EXISTS trend_research_runs (id TEXT PRIMARY KEY, owner_email TEXT, credit_cost INTEGER, created_at TEXT)"
+  );
 });
 beforeEach(() => {
+  sqlite.exec("DELETE FROM trend_research_runs");
   sqlite.exec(
     "DELETE FROM billing_accounts; DELETE FROM credit_accounts; DELETE FROM credit_ledger; DELETE FROM stripe_events; DELETE FROM billing_payment_adjustments; DELETE FROM billing_checkouts;"
   );
@@ -131,6 +136,177 @@ beforeEach(() => {
 });
 afterAll(() => sqlite.close());
 afterEach(() => vi.unstubAllGlobals());
+
+it("does not migrate a successful modern trend charge twice, including a zero-history account", async () => {
+  const user = { email: owner, name: "Owner" };
+  const reservation = await reserveCredits(env, user, {
+    cost: 8,
+    operationKey: "trend:first",
+    category: "trend-research",
+    description: "Custom research",
+  });
+  expect(reservation).not.toBeNull();
+  const createdAt = sqlite
+    .prepare(
+      "SELECT created_at FROM credit_ledger WHERE operation_key = 'trend:first'"
+    )
+    .get()!.created_at;
+  sqlite
+    .prepare("INSERT INTO trend_research_runs VALUES ('modern', ?, 8, ?)")
+    .run(owner, createdAt);
+  await settleCreditReservation(env, reservation!);
+  expect((await billingSummary(env, user)).availableCredits).toBe(692);
+  expect((await billingSummary(env, user)).availableCredits).toBe(692);
+  expect(
+    sqlite
+      .prepare("SELECT amount FROM credit_ledger WHERE operation_key=?")
+      .get(`legacy-trend-spend:${owner}`)
+  ).toBeUndefined();
+});
+
+it("migrates only pre-ledger trend history and corrects an existing duplicate debit once in its original buckets", async () => {
+  const now = new Date().toISOString();
+  sqlite
+    .prepare(
+      "INSERT INTO trend_research_runs VALUES ('legacy', ?, 10, '2020-01-01T00:00:00.000Z'), ('modern', ?, 8, ?)"
+    )
+    .run(owner, owner, now);
+  sqlite
+    .prepare(
+      `INSERT INTO credit_ledger (id, owner_email, amount, included_amount, topup_amount, category, status, operation_key, description, metadata_json, applied, created_at, settled_at)
+    VALUES ('modern-charge', ?, -8, -8, 0, 'trend-research', 'settled', 'trend:modern', 'Research', '{}', 1, ?, ?),
+    ('incorrect-migration', ?, -18, -10, -8, 'migration', 'settled', ?, 'Previous research', '{}', 1, ?, ?)`
+    )
+    .run(owner, now, now, owner, `legacy-trend-spend:${owner}`, now, now);
+  sqlite
+    .prepare(
+      "UPDATE credit_accounts SET included_balance=682, topup_balance=12 WHERE owner_email=?"
+    )
+    .run(owner);
+  const user = { email: owner, name: "Owner" };
+  expect((await billingSummary(env, user)).availableCredits).toBe(702);
+  expect(credits().included_balance).toBe(682);
+  expect(credits().topup_balance).toBe(20);
+  expect((await billingSummary(env, user)).availableCredits).toBe(702);
+  expect(
+    sqlite
+      .prepare("SELECT COUNT(*) AS n FROM credit_ledger WHERE operation_key=?")
+      .get(`legacy-trend-repair-v2:${owner}`)!.n
+  ).toBe(1);
+});
+
+it("uses the owner's first modern reservation as cutover even when that request was released", async () => {
+  const cutover = "2026-10-15T12:00:00.000Z";
+  sqlite
+    .prepare(
+      `INSERT INTO credit_ledger
+    (id,owner_email,amount,included_amount,topup_amount,category,status,operation_key,description,metadata_json,applied,created_at,settled_at)
+    VALUES ('released-first',?,-8,-8,0,'trend-research','released','trend:released-first','Failed research','{}',1,?,?),
+      ('other-owner','other@example.com',-8,-8,0,'trend-research','settled','trend:other-owner','Other account','{}',1,'2019-01-01T00:00:00.000Z','2019-01-01T00:00:00.000Z')`
+    )
+    .run(owner, cutover, cutover);
+  sqlite
+    .prepare(
+      `INSERT INTO credit_ledger
+    (id,owner_email,amount,included_amount,topup_amount,category,status,operation_key,description,metadata_json,applied,created_at,settled_at)
+    VALUES ('modern-same',?,-8,-8,0,'trend-research','settled','trend:modern-same','Research','{}',1,?,?),
+      ('modern-later',?,-8,-8,0,'trend-research','settled','trend:modern-later','Research','{}',1,'2026-10-15T12:00:01.000Z','2026-10-15T12:00:01.000Z')`
+    )
+    .run(owner, cutover, cutover, owner);
+  sqlite
+    .prepare(
+      "UPDATE credit_accounts SET included_balance=684 WHERE owner_email=?"
+    )
+    .run(owner);
+  sqlite
+    .prepare(
+      `INSERT INTO trend_research_runs VALUES
+    ('legacy',?,10,'2020-01-01T00:00:00.000Z'),
+    ('same-millisecond',?,8,?),
+    ('later-modern',?,8,'2026-10-15T12:00:01.000Z'),
+    ('other-history','other@example.com',300,'2018-01-01T00:00:00.000Z')`
+    )
+    .run(owner, owner, cutover, owner);
+  const user = { email: owner, name: "Owner" };
+  expect((await billingSummary(env, user)).availableCredits).toBe(674);
+  expect((await billingSummary(env, user)).availableCredits).toBe(674);
+  expect(
+    sqlite
+      .prepare("SELECT amount FROM credit_ledger WHERE operation_key=?")
+      .get(`legacy-trend-spend:${owner}`)!.amount
+  ).toBe(-10);
+  expect(
+    sqlite
+      .prepare("SELECT COUNT(*) AS n FROM credit_ledger WHERE operation_key=?")
+      .get(`legacy-trend-repair-v2:${owner}`)!.n
+  ).toBe(0);
+});
+
+it("restores duplicate excess spanning both original buckets without refunding valid legacy spend", async () => {
+  const cutover = "2026-10-15T12:00:00.000Z";
+  sqlite
+    .prepare(
+      `INSERT INTO trend_research_runs VALUES ('legacy',?,20,'2020-01-01T00:00:00.000Z'),('modern',?,10,?)`
+    )
+    .run(owner, owner, cutover);
+  sqlite
+    .prepare(
+      `INSERT INTO credit_ledger
+    (id,owner_email,amount,included_amount,topup_amount,category,status,operation_key,description,metadata_json,applied,created_at,settled_at)
+    VALUES ('modern',?,-10,-10,0,'trend-research','settled','trend:mixed-buckets','Research','{}',1,?,?),
+      ('incorrect',?,-30,-25,-5,'migration','settled',?,'Previous research','{}',1,?,?)`
+    )
+    .run(
+      owner,
+      cutover,
+      cutover,
+      owner,
+      `legacy-trend-spend:${owner}`,
+      cutover,
+      cutover
+    );
+  sqlite
+    .prepare(
+      "UPDATE credit_accounts SET included_balance=65,topup_balance=15 WHERE owner_email=?"
+    )
+    .run(owner);
+  const user = { email: owner, name: "Owner" };
+  expect((await billingSummary(env, user)).availableCredits).toBe(90);
+  expect(credits()).toMatchObject({ included_balance: 70, topup_balance: 20 });
+  expect((await billingSummary(env, user)).availableCredits).toBe(90);
+  expect(
+    sqlite
+      .prepare(
+        "SELECT amount,included_amount,topup_amount FROM credit_ledger WHERE operation_key=?"
+      )
+      .get(`legacy-trend-repair-v2:${owner}`)
+  ).toMatchObject({ amount: 10, included_amount: 5, topup_amount: 5 });
+});
+
+it("preserves a negative bucket when migrating legacy spend rather than reallocating its debt", async () => {
+  sqlite
+    .prepare(
+      "INSERT INTO trend_research_runs VALUES ('legacy',?,5,'2020-01-01T00:00:00.000Z')"
+    )
+    .run(owner);
+  sqlite
+    .prepare(
+      "UPDATE credit_accounts SET included_balance=-10,topup_balance=20 WHERE owner_email=?"
+    )
+    .run(owner);
+  expect(
+    (await billingSummary(env, { email: owner, name: "Owner" }))
+      .availableCredits
+  ).toBe(5);
+  expect(credits()).toMatchObject({ included_balance: -10, topup_balance: 15 });
+  expect(
+    sqlite
+      .prepare(
+        "SELECT amount,included_amount,topup_amount FROM credit_ledger WHERE operation_key=?"
+      )
+      .get(`legacy-trend-spend:${owner}`)
+  ).toMatchObject({ amount: -5, included_amount: 0, topup_amount: -5 });
+});
 
 it("enables only the approved account without inventing a subscription or free credits", async () => {
   sqlite

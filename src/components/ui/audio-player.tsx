@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useRef, useState, type AudioHTMLAttributes } from "react";
 import { Download, Loader2, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ function SourceAudioPlayer({
   downloadName,
   ...props
 }: AudioPlayerProps) {
+  const ui = useUiText();
   const audio = useRef<HTMLAudioElement>(null);
   const downloadController = useRef<AbortController | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -57,7 +59,9 @@ function SourceAudioPlayer({
       const response = await fetch(src, { signal: controller.signal });
       if (!response.ok)
         throw new Error(
-          "Audio download is unavailable. Reload its Library link and try again."
+          ui(
+            "Audio download is unavailable. Reload its Library link and try again."
+          )
         );
       const blob = await response.blob();
       controller.signal.throwIfAborted();
@@ -121,13 +125,13 @@ function SourceAudioPlayer({
         onError={() => {
           setBusy(false);
           setPlaying(false);
-          setError("Audio could not load. Reload the source to try again.");
+          setError(ui("Audio could not load. Reload the source to try again."));
         }}
       />
       <div className="audio-player-controls flex min-w-0 items-center gap-3">
         <button
           type="button"
-          aria-label={`${playing ? "Pause" : "Play"} ${label}`}
+          aria-label={`${playing ? ui("Pause") : ui("Play")} ${label}`}
           disabled={!src || Boolean(error)}
           className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:bg-primary-hover disabled:opacity-40"
           onClick={() => {
@@ -137,7 +141,9 @@ function SourceAudioPlayer({
             else
               void player
                 .play()
-                .catch(() => setError("Playback could not start. Try again."));
+                .catch(() =>
+                  setError(ui("Playback could not start. Try again."))
+                );
           }}
         >
           {busy ? (
@@ -172,7 +178,7 @@ function SourceAudioPlayer({
         />
         <button
           type="button"
-          aria-label={muted ? "Unmute audio" : "Mute audio"}
+          aria-label={muted ? ui("Unmute audio") : ui("Mute audio")}
           aria-pressed={muted}
           className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
           onClick={() => {
@@ -191,8 +197,8 @@ function SourceAudioPlayer({
             type="button"
             onClick={() => void download()}
             disabled={downloading}
-            aria-label="Download audio"
-            title="Download audio"
+            aria-label={ui("Download audio")}
+            title={ui("Download audio")}
             className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             {downloading ? (

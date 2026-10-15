@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { BrandSwitcher } from "@/components/studio/BrandSwitcher";
 import { useMemo, useState, type FormEvent } from "react";
 import {
@@ -39,6 +40,7 @@ const CAPTION_PRESETS: Array<{
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
 export default function ClientsPage() {
+  const ui = useUiText();
   const { workspace, updateWorkspace, loading, saving } = useWorkspace();
   const [edits, setEdits] = useState<Partial<BrandKit>>({});
   const [notice, setNotice] = useState<{
@@ -128,17 +130,18 @@ export default function ClientsPage() {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="mono-eyebrow mb-2 text-primary">
-            Reusable creative memory
+            {ui("Reusable creative memory")}
           </p>
-          <h1 className="text-3xl font-semibold">Brand DNA</h1>
+          <h1 className="text-3xl font-semibold">{ui("Brand DNA")}</h1>
           <p className="mt-2 max-w-2xl text-sm text-foreground/70">
-            One truthful source of creative constraints for this workspace.
-            Switch brands above to keep each client’s content separate.
+            {ui(
+              "One truthful source of creative constraints for this workspace. Switch brands above to keep each client’s content separate."
+            )}
           </p>
         </div>
         <div className="rounded-xl border border-border bg-surface px-4 py-3 text-right">
           <p className="mono-eyebrow text-xs text-foreground/70">
-            Definition depth
+            {ui("Definition depth")}
           </p>
           <p className="mt-1 text-xl font-semibold tabular-nums">
             {readiness}%
@@ -170,36 +173,43 @@ export default function ClientsPage() {
           <section>
             <div className="mb-4 flex items-center gap-2">
               <Target className="h-4 w-4 text-primary" />
-              <h2 className="font-medium">Positioning</h2>
+              <h2 className="font-medium">{ui("Positioning")}</h2>
             </div>
             <div className="grid gap-4">
               <label className="text-sm">
-                <span className="mb-1.5 block font-medium">Brand name</span>
+                <span className="mb-1.5 block font-medium">
+                  {ui("Brand name")}
+                </span>
                 <input
                   value={draft.name}
                   onChange={event => updateDraft("name", event.target.value)}
                   className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="Your public-facing brand"
+                  placeholder={ui("Your public-facing brand")}
                   required
                 />
               </label>
               <label className="text-sm">
-                <span className="mb-1.5 block font-medium">Voice rules</span>
+                <span className="mb-1.5 block font-medium">
+                  {ui("Voice rules")}
+                </span>
                 <textarea
                   value={draft.voice}
                   onChange={event => updateDraft("voice", event.target.value)}
                   rows={4}
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="How the brand speaks, phrases it avoids, energy level, point of view, and proof style"
+                  placeholder={ui(
+                    "How the brand speaks, phrases it avoids, energy level, point of view, and proof style"
+                  )}
                 />
                 <span className="mt-1.5 block text-xs text-foreground/70">
-                  Be concrete enough that an editor can reject an off-brand
-                  line.
+                  {ui(
+                    "Be concrete enough that an editor can reject an off-brand line."
+                  )}
                 </span>
               </label>
               <label className="text-sm">
                 <span className="mb-1.5 block font-medium">
-                  Audience tension
+                  {ui("Audience tension")}
                 </span>
                 <textarea
                   value={draft.audience}
@@ -208,7 +218,9 @@ export default function ClientsPage() {
                   }
                   rows={4}
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="Who this is for, what they already believe, and what problem creates urgency"
+                  placeholder={ui(
+                    "Who this is for, what they already believe, and what problem creates urgency"
+                  )}
                 />
               </label>
             </div>
@@ -217,11 +229,13 @@ export default function ClientsPage() {
           <section className="border-t border-border pt-7">
             <div className="mb-4 flex items-center gap-2">
               <Palette className="h-4 w-4 text-primary" />
-              <h2 className="font-medium">Visual system</h2>
+              <h2 className="font-medium">{ui("Visual system")}</h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-sm">
-                <span className="mb-1.5 block font-medium">Primary color</span>
+                <span className="mb-1.5 block font-medium">
+                  {ui("Primary color")}
+                </span>
                 <div className="flex gap-2">
                   <input
                     type="color"
@@ -237,7 +251,7 @@ export default function ClientsPage() {
                       )
                     }
                     className="h-10 w-12 rounded-lg border border-border bg-background p-1"
-                    aria-label="Choose primary color"
+                    aria-label={ui("Choose primary color")}
                   />
                   <input
                     value={draft.primaryColor}
@@ -245,12 +259,14 @@ export default function ClientsPage() {
                       updateDraft("primaryColor", event.target.value)
                     }
                     className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs uppercase"
-                    aria-label="Primary color hexadecimal value"
+                    aria-label={ui("Primary color hexadecimal value")}
                   />
                 </div>
               </label>
               <label className="text-sm">
-                <span className="mb-1.5 block font-medium">Accent color</span>
+                <span className="mb-1.5 block font-medium">
+                  {ui("Accent color")}
+                </span>
                 <div className="flex gap-2">
                   <input
                     type="color"
@@ -266,7 +282,7 @@ export default function ClientsPage() {
                       )
                     }
                     className="h-10 w-12 rounded-lg border border-border bg-background p-1"
-                    aria-label="Choose accent color"
+                    aria-label={ui("Choose accent color")}
                   />
                   <input
                     value={draft.accentColor}
@@ -274,13 +290,13 @@ export default function ClientsPage() {
                       updateDraft("accentColor", event.target.value)
                     }
                     className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs uppercase"
-                    aria-label="Accent color hexadecimal value"
+                    aria-label={ui("Accent color hexadecimal value")}
                   />
                 </div>
               </label>
               <label className="text-sm sm:col-span-2">
                 <span className="mb-1.5 flex items-center gap-1.5 font-medium">
-                  <Type className="h-3.5 w-3.5" /> Brand typeface
+                  <Type className="h-3.5 w-3.5" /> {ui("Brand typeface")}
                 </span>
                 <input
                   value={draft.font}
@@ -295,7 +311,7 @@ export default function ClientsPage() {
           <section className="border-t border-border pt-7">
             <div className="mb-4 flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4 text-primary" />
-              <h2 className="font-medium">Editing defaults</h2>
+              <h2 className="font-medium">{ui("Editing defaults")}</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               {CAPTION_PRESETS.map(preset => (
@@ -312,7 +328,7 @@ export default function ClientsPage() {
                 >
                   <Captions className="h-4 w-4 text-primary" />
                   <span className="mt-3 block text-sm font-medium">
-                    {preset.label}
+                    {ui(preset.label)}
                   </span>
                   <span className="mt-1 block text-xs leading-relaxed text-foreground/70">
                     {preset.detail}
@@ -323,11 +339,11 @@ export default function ClientsPage() {
             <div className="mt-5 grid gap-5 sm:grid-cols-2">
               <label
                 htmlFor="client-safe-zone"
-                aria-label="Safe-zone inset"
+                aria-label={ui("Safe-zone inset")}
                 className="text-sm"
               >
                 <span className="mb-2 flex items-center justify-between">
-                  <span className="font-medium">Safe-zone inset</span>
+                  <span className="font-medium">{ui("Safe-zone inset")}</span>
                   <span className="font-mono text-xs text-primary">
                     {draft.safeZone}%
                   </span>
@@ -346,12 +362,12 @@ export default function ClientsPage() {
               </label>
               <label
                 htmlFor="client-audio-ducking"
-                aria-label="Voice ducking"
+                aria-label={ui("Voice ducking")}
                 className="text-sm"
               >
                 <span className="mb-2 flex items-center justify-between">
                   <span className="flex items-center gap-1.5 font-medium">
-                    <Volume2 className="h-3.5 w-3.5" /> Voice ducking
+                    <Volume2 className="h-3.5 w-3.5" /> {ui("Voice ducking")}
                   </span>
                   <span className="font-mono text-xs text-primary">
                     {draft.audioDucking}%
@@ -374,7 +390,9 @@ export default function ClientsPage() {
 
           <div className="flex items-center justify-between border-t border-border pt-5">
             <span className="text-xs text-foreground/70">
-              {dirty ? "Unsaved Brand DNA changes" : "Brand DNA is saved"}
+              {dirty
+                ? ui("Unsaved Brand DNA changes")
+                : ui("Brand DNA is saved")}
             </span>
             <button
               type="submit"
@@ -386,7 +404,7 @@ export default function ClientsPage() {
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Save Brand DNA
+              {ui("Save Brand DNA")}
             </button>
           </div>
         </form>
@@ -405,7 +423,7 @@ export default function ClientsPage() {
               />
               <div className="flex h-full flex-col justify-end">
                 <p className="font-mono text-xs uppercase tracking-[0.18em] text-white/55">
-                  Live constraint preview
+                  {ui("Live constraint preview")}
                 </p>
                 <p
                   className={`mt-3 max-w-[15rem] text-white ${
@@ -417,7 +435,7 @@ export default function ClientsPage() {
                   }`}
                   style={{ fontFamily: draft.font || "Geist" }}
                 >
-                  Make every frame earn the next one.
+                  {ui("Make every frame earn the next one.")}
                 </p>
                 <div
                   className="mt-4 h-1 rounded-full"
@@ -437,7 +455,7 @@ export default function ClientsPage() {
               <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg bg-background p-3">
                   <dt className="text-xs uppercase tracking-wide text-foreground/70">
-                    Projects
+                    {ui("Projects")}
                   </dt>
                   <dd className="mt-1 font-semibold">
                     {workspace.projects.length}
@@ -445,7 +463,7 @@ export default function ClientsPage() {
                 </div>
                 <div className="rounded-lg bg-background p-3">
                   <dt className="text-xs uppercase tracking-wide text-foreground/70">
-                    Assets
+                    {ui("Assets")}
                   </dt>
                   <dd className="mt-1 font-semibold">
                     {workspace.assets.length}
@@ -453,7 +471,7 @@ export default function ClientsPage() {
                 </div>
                 <div className="rounded-lg bg-background p-3">
                   <dt className="text-xs uppercase tracking-wide text-foreground/70">
-                    Scripts
+                    {ui("Scripts")}
                   </dt>
                   <dd className="mt-1 font-semibold">
                     {workspace.scripts.length}

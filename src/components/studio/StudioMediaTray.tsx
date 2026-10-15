@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { AssetThumbnail } from "./AssetThumbnail";
 import { useMemo, useState } from "react";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/popover";
 
 export function StudioMediaTray() {
+  const ui = useUiText();
   const { workspace } = useWorkspace();
   const [open, setOpen] = useState(false);
   const recentMedia = useMemo(
@@ -37,22 +39,22 @@ export function StudioMediaTray() {
         <button
           type="button"
           className="group hidden h-9 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs text-foreground/70 transition-all hover:-translate-y-px hover:border-primary/30 hover:text-foreground sm:flex"
-          aria-label="Open connected media tray"
+          aria-label={ui("Open connected media tray")}
         >
           <Library className="h-3.5 w-3.5 text-primary" />
-          Media
+          {ui("Media")}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-[340px] p-3">
         <div className="mb-3 flex items-start justify-between gap-3 px-1">
           <div>
-            <p className="text-xs font-semibold">Connected media</p>
+            <p className="text-xs font-semibold">{ui("Connected media")}</p>
             <p className="mt-0.5 text-xs text-foreground/70">
-              Recent uploads and generations, ready for Edit.
+              {ui("Recent uploads and generations, ready for Edit.")}
             </p>
           </div>
           <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-            Synced
+            {ui("Synced")}
           </span>
         </div>
 
@@ -84,7 +86,7 @@ export function StudioMediaTray() {
                       {asset.name}
                     </span>
                     <span className="mt-0.5 block text-xs capitalize text-foreground/70">
-                      {asset.kind} · use in Edit
+                      {asset.kind} {ui("· use in Edit")}
                     </span>
                   </span>
                   <Scissors className="h-3.5 w-3.5 text-foreground/25 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
@@ -94,9 +96,9 @@ export function StudioMediaTray() {
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center">
-            <p className="text-xs font-medium">No media yet</p>
+            <p className="text-xs font-medium">{ui("No media yet")}</p>
             <p className="mt-1 text-xs text-foreground/70">
-              Upload or generate something and it will appear here.
+              {ui("Upload or generate something and it will appear here.")}
             </p>
           </div>
         )}
@@ -107,14 +109,14 @@ export function StudioMediaTray() {
             onClick={() => setOpen(false)}
             className="rounded-lg border border-border px-3 py-2 text-center text-xs font-medium hover:border-primary/30"
           >
-            Full library
+            {ui("Full library")}
           </Link>
           <Link
             to="/dashboard/edit"
             onClick={() => setOpen(false)}
             className="rounded-lg bg-primary px-3 py-2 text-center text-xs font-medium text-primary-foreground hover:bg-primary-hover"
           >
-            Open Edit
+            {ui("Open Edit")}
           </Link>
         </div>
       </PopoverContent>

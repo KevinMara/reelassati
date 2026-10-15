@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Film, Layers3, Moon, Sparkles, Sun } from "lucide-react";
@@ -6,6 +7,7 @@ import { LanguagePicker } from "@/components/LanguagePicker";
 import { useTheme } from "@/hooks/useTheme";
 
 export function AuthShell({ children }: { children: ReactNode }) {
+  const ui = useUiText();
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -15,7 +17,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
       <div className="pointer-events-none absolute -right-24 bottom-0 h-80 w-80 rounded-full bg-fuchsia-500/10 blur-[120px]" />
 
       <nav className="relative z-20 mx-auto flex h-20 max-w-6xl items-center justify-between px-5">
-        <Link to="/" aria-label="REELassati home">
+        <Link to="/" aria-label={ui("REELassati home")}>
           <Logo size="md" />
         </Link>
         <div className="flex items-center gap-3 rounded-pill border border-border/70 bg-background/65 px-3 py-2 shadow-sm backdrop-blur-xl">
@@ -24,7 +26,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={toggleTheme}
-            aria-label="Toggle theme"
+            aria-label={ui("Toggle theme")}
             className="text-muted-foreground transition-colors hover:text-foreground"
           >
             {theme === "light" ? (
@@ -41,7 +43,9 @@ export function AuthShell({ children }: { children: ReactNode }) {
           <div className="absolute inset-8 rounded-[2rem] border border-primary/20 bg-gradient-to-br from-primary/14 via-surface/70 to-fuchsia-500/10 shadow-[0_45px_100px_-50px_hsl(var(--primary)/0.65)] backdrop-blur-xl [transform:rotateY(8deg)_rotateX(2deg)]" />
           <div className="absolute left-16 top-20 w-72 rounded-2xl border border-border/70 bg-surface/90 p-5 shadow-2xl backdrop-blur-xl motion-safe:animate-[float_7s_ease-in-out_infinite]">
             <div className="flex items-center justify-between">
-              <span className="mono-eyebrow text-primary">CREATIVE SYSTEM</span>
+              <span className="mono-eyebrow text-primary">
+                {ui("CREATIVE SYSTEM")}
+              </span>
               <Layers3 className="h-4 w-4 text-primary" />
             </div>
             <div className="mt-5 space-y-2">
@@ -56,9 +60,11 @@ export function AuthShell({ children }: { children: ReactNode }) {
                 <Film className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-medium">One focused workspace</p>
+                <p className="text-sm font-medium">
+                  {ui("One focused workspace")}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Edit · review · publish
+                  {ui("Edit · review · publish")}
                 </p>
               </div>
             </div>

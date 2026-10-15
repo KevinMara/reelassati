@@ -1,12 +1,17 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import { Film } from "lucide-react";
 import type { Asset } from "@contracts/workspace";
 
 export function AssetThumbnail({ asset }: { asset: Asset }) {
+  const ui = useUiText();
   const [failed, setFailed] = useState(false);
   if (failed)
     return (
-      <Film aria-label="Preview unavailable" className="h-5 w-5 text-primary" />
+      <Film
+        aria-label={ui("Preview unavailable")}
+        className="h-5 w-5 text-primary"
+      />
     );
   if (asset.kind === "image")
     return (

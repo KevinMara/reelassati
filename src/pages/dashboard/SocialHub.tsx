@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -54,6 +55,7 @@ function errorMessage(cause: unknown) {
 }
 
 export default function SocialHub() {
+  const ui = useUiText();
   const { workspace, capabilities, updateWorkspace, saving, loading } =
     useWorkspace();
   const [configured, setConfigured] = useState(capabilities.publishing);
@@ -139,11 +141,14 @@ export default function SocialHub() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">Distribution layer</p>
-          <h1 className="text-3xl font-semibold">Social Hub</h1>
+          <p className="mono-eyebrow mb-2 text-primary">
+            {ui("Distribution layer")}
+          </p>
+          <h1 className="text-3xl font-semibold">{ui("Social Hub")}</h1>
           <p className="mt-2 max-w-2xl text-foreground/60">
-            Link real publishing accounts, then use the same verified
-            destinations everywhere in your workspace.
+            {ui(
+              "Link real publishing accounts, then use the same verified destinations everywhere in your workspace."
+            )}
           </p>
         </div>
         <button
@@ -153,7 +158,7 @@ export default function SocialHub() {
           className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/40 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Syncing" : "Sync accounts"}
+          {syncing ? ui("Syncing") : ui("Sync accounts")}
         </button>
       </div>
 
@@ -173,13 +178,17 @@ export default function SocialHub() {
           <div>
             <p className="text-sm font-medium">
               {configured
-                ? "Publishing connection is ready"
-                : "Publishing setup is incomplete"}
+                ? ui("Publishing connection is ready")
+                : ui("Publishing setup is incomplete")}
             </p>
             <p className="mt-1 text-xs text-foreground/70">
               {configured
-                ? "Account data below comes from the connected publishing service. Follower and growth analytics are not invented or estimated here."
-                : "Publishing connections are temporarily unavailable until the managed service is ready."}
+                ? ui(
+                    "Account data below comes from the connected publishing service. Follower and growth analytics are not invented or estimated here."
+                  )
+                : ui(
+                    "Publishing connections are temporarily unavailable until the managed service is ready."
+                  )}
             </p>
           </div>
         </div>
@@ -200,11 +209,13 @@ export default function SocialHub() {
               ).length
             }
           </p>
-          <p className="text-sm text-foreground/70">Connected accounts</p>
+          <p className="text-sm text-foreground/70">
+            {ui("Connected accounts")}
+          </p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-5">
           <p className="text-3xl font-semibold">{connectedPlatforms.size}</p>
-          <p className="text-sm text-foreground/70">Active platforms</p>
+          <p className="text-sm text-foreground/70">{ui("Active platforms")}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-5">
           <p className="text-sm font-medium">
@@ -213,16 +224,18 @@ export default function SocialHub() {
                   hour: "2-digit",
                   minute: "2-digit",
                 })
-              : "Not synced yet"}
+              : ui("Not synced yet")}
           </p>
-          <p className="mt-1 text-sm text-foreground/70">Last account sync</p>
+          <p className="mt-1 text-sm text-foreground/70">
+            {ui("Last account sync")}
+          </p>
         </div>
       </div>
 
       {workspace.accounts.length > 0 && (
         <section className="mb-10">
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/70">
-            Connected destinations
+            {ui("Connected destinations")}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {workspace.accounts.map(account => {
@@ -272,7 +285,7 @@ export default function SocialHub() {
                       ) : (
                         <Unlink className="h-3.5 w-3.5" />
                       )}
-                      Disconnect
+                      {ui("Disconnect")}
                     </button>
                   </div>
                 </motion.article>
@@ -284,7 +297,7 @@ export default function SocialHub() {
 
       <section>
         <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/70">
-          Add a destination
+          {ui("Add a destination")}
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {CONNECTABLE_PLATFORMS.map(platform => {
@@ -305,7 +318,9 @@ export default function SocialHub() {
                   <div>
                     <p className="text-sm font-medium">{meta.name}</p>
                     <p className="text-xs text-foreground/70">
-                      {alreadyConnected ? "Connected" : "OAuth connection"}
+                      {alreadyConnected
+                        ? ui("Connected")
+                        : ui("OAuth connection")}
                     </p>
                   </div>
                 </div>
@@ -322,7 +337,7 @@ export default function SocialHub() {
                   ) : (
                     <Link2 className="h-3.5 w-3.5" />
                   )}
-                  {alreadyConnected ? "Already linked" : "Connect"}
+                  {alreadyConnected ? ui("Already linked") : ui("Connect")}
                 </button>
               </motion.article>
             );

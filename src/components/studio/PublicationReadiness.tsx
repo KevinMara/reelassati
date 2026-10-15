@@ -1,6 +1,8 @@
+import { useUiText } from "@/lib/i18n/ui";
 import type { ScheduledPost } from "@contracts/workspace";
 import { useWorkspace } from "@/providers/workspace";
 export function PublicationReadiness({ post }: { post: ScheduledPost }) {
+  const ui = useUiText();
   const { workspace } = useWorkspace();
   const checks = [
     { label: "Caption", ready: !!post.caption.trim() },
@@ -26,11 +28,11 @@ export function PublicationReadiness({ post }: { post: ScheduledPost }) {
       <div className="mb-2 flex flex-wrap gap-1.5">
         {checks.map(c => (
           <span
-            key={c.label}
+            key={ui(c.label)}
             className={`rounded-md px-2 py-1 text-xs ${c.ready ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" : "bg-foreground/5 text-foreground/70"}`}
           >
             {c.ready ? "✓ " : ""}
-            {c.label}
+            {ui(c.label)}
           </span>
         ))}
       </div>
@@ -41,7 +43,8 @@ export function PublicationReadiness({ post }: { post: ScheduledPost }) {
         max={checks.length}
       />
       <p className="mt-1 text-xs text-foreground/65">
-        {count}/{checks.length} prepared · final checks happen when you publish.
+        {count}/{checks.length}{" "}
+        {ui("prepared · final checks happen when you publish.")}
       </p>
     </div>
   );

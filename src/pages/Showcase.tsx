@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   useCallback,
   useEffect,
@@ -408,6 +409,7 @@ const ITEMS: ShowcaseItem[] = [
 ];
 
 export default function Showcase() {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const reduceMotion = useReducedMotion();
   const language: Language = i18n.resolvedLanguage?.startsWith("it")
@@ -483,28 +485,24 @@ export default function Showcase() {
               className="mb-4 inline-flex items-center gap-1 text-sm text-foreground/70 transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden />{" "}
-              {language === "it" ? "Torna alla home" : "Back to home"}
+              {ui("Back to home")}
             </Link>
             <p className="mono-eyebrow mb-2 text-primary">
-              {language === "it"
-                ? "Walkthrough prodotto"
-                : "Product walkthroughs"}
+              {ui("Product walkthroughs")}
             </p>
             <h1 className="text-4xl font-semibold md:text-5xl">
-              {language === "it"
-                ? "Guarda come ragiona il flusso."
-                : "See how the workflow thinks."}
+              {ui("See how the workflow thinks.")}
             </h1>
             <p className="mt-4 max-w-2xl text-foreground/60">
-              {language === "it"
-                ? "Questi sono esempi interattivi di decisioni e interfaccia, non contenuti pubblicati né risultati attribuiti a creator."
-                : "These are interactive workflow and interface specimens—not published creator work, testimonials, or attributed performance results."}
+              {ui(
+                "These are interactive workflow and interface specimens—not published creator work, testimonials, or attributed performance results."
+              )}
             </p>
           </div>
 
           <div
             className="mb-8 flex flex-wrap gap-2"
-            aria-label={language === "it" ? "Filtra esempi" : "Filter examples"}
+            aria-label={ui("Filter examples")}
           >
             {categories.map(category => (
               <button
@@ -538,7 +536,7 @@ export default function Showcase() {
                     setSelectedItem(item);
                   }}
                   className="group overflow-hidden rounded-xl border border-border bg-surface text-left shadow-card transition-all hover:-translate-y-1 hover:shadow-card-hover focus:outline-none focus:ring-2 focus:ring-primary/30 motion-reduce:hover:translate-y-0"
-                  aria-label={`${language === "it" ? "Apri esempio" : "Open example"}: ${item.title[language]}`}
+                  aria-label={`${ui("Open example")}: ${item.title[language]}`}
                 >
                   <WorkflowThumbnail item={item} language={language} />
                   <div className="p-5">
@@ -568,9 +566,7 @@ export default function Showcase() {
                       ))}
                     </div>
                     <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-medium text-foreground/70 transition-colors group-hover:text-primary">
-                      {language === "it"
-                        ? "Ispeziona il flusso"
-                        : "Inspect the workflow"}{" "}
+                      {ui("Inspect the workflow")}{" "}
                       <ArrowRight className="h-3 w-3" aria-hidden />
                     </span>
                   </div>
@@ -585,7 +581,7 @@ export default function Showcase() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/55 p-4 backdrop-blur-sm">
           <button
             type="button"
-            aria-label={language === "it" ? "Chiudi finestra" : "Close dialog"}
+            aria-label={ui("Close dialog")}
             onClick={closeDialog}
             tabIndex={-1}
             className="absolute inset-0 cursor-default"
@@ -601,14 +597,14 @@ export default function Showcase() {
           >
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/90 px-6 py-4 backdrop-blur-xl">
               <span className="mono-eyebrow text-primary">
-                {language === "it" ? "Specimen di flusso" : "Workflow specimen"}
+                {ui("Workflow specimen")}
               </span>
               <button
                 ref={closeButtonRef}
                 type="button"
                 onClick={closeDialog}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
-                aria-label={language === "it" ? "Chiudi" : "Close"}
+                aria-label={ui("Close")}
               >
                 <X className="h-4 w-4" aria-hidden />
               </button>
@@ -632,24 +628,18 @@ export default function Showcase() {
 
               <div className="mt-7 grid gap-3 sm:grid-cols-2">
                 <Info
-                  label={
-                    language === "it"
-                      ? "Materiale di partenza"
-                      : "Starting material"
-                  }
+                  label={ui("Starting material")}
                   value={selectedItem.source[language]}
                 />
                 <Info
-                  label={language === "it" ? "Obiettivo" : "Edit objective"}
+                  label={ui("Edit objective")}
                   value={selectedItem.goal[language]}
                 />
               </div>
 
               <div className="mt-7">
                 <p className="mono-eyebrow mb-3 text-foreground/70">
-                  {language === "it"
-                    ? "Decisioni revisionabili"
-                    : "Reviewable decisions"}
+                  {ui("Reviewable decisions")}
                 </p>
                 <div className="space-y-2">
                   {selectedItem.steps.map(step => (
@@ -678,9 +668,7 @@ export default function Showcase() {
                   to={selectedItem.route}
                   className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
                 >
-                  {language === "it"
-                    ? "Apri lo strumento reale"
-                    : "Open the real tool"}{" "}
+                  {ui("Open the real tool")}{" "}
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
                 <button
@@ -688,7 +676,7 @@ export default function Showcase() {
                   onClick={closeDialog}
                   className="rounded-lg border border-border px-5 py-3 text-sm font-medium transition-colors hover:bg-surface"
                 >
-                  {language === "it" ? "Torna agli esempi" : "Back to examples"}
+                  {ui("Back to examples")}
                 </button>
               </div>
             </div>
@@ -710,6 +698,7 @@ function WorkflowThumbnail({
   language: Language;
   large?: boolean;
 }) {
+  const ui = useUiText();
   return (
     <div
       className={`relative overflow-hidden bg-gradient-to-br ${item.accent} ${large ? "h-60 rounded-xl border border-border" : "h-56 border-b border-border"}`}
@@ -727,9 +716,9 @@ function WorkflowThumbnail({
           <div className="space-y-2 text-center">
             <p className="text-xs text-foreground/70">00:03 — 00:06</p>
             <p className="text-lg font-semibold">
-              {language === "it" ? "Dai risalto alle" : "Make every"}{" "}
+              {ui("Make every")}{" "}
               <span className="rounded bg-primary px-1 text-primary-foreground">
-                {language === "it" ? "parole giuste." : "word count."}
+                {ui("word count.")}
               </span>
             </p>
           </div>
@@ -758,12 +747,7 @@ function WorkflowThumbnail({
           </div>
         ) : item.id === "quality-preflight" ? (
           <div className="grid grid-cols-2 gap-2 text-sm">
-            {[
-              "1080 × 1920",
-              "MP4",
-              language === "it" ? "Audio" : "Audio",
-              language === "it" ? "Sottotitoli" : "Captions",
-            ].map(label => (
+            {["1080 × 1920", "MP4", ui("Audio"), ui("Captions")].map(label => (
               <span key={label} className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-primary" />
                 {label}
@@ -785,20 +769,18 @@ function WorkflowThumbnail({
         ) : (
           <div className="space-y-2 text-xs">
             <div className="flex items-center gap-2">
-              <span className="w-12">
-                {language === "it" ? "Prima" : "Before"}
-              </span>
+              <span className="w-12">{ui("Before")}</span>
               <span className="w-1/4 rounded bg-foreground/10 p-2 line-through">
-                {language === "it" ? "Pausa" : "Pause"}
-              </span>
-              <span className="flex-1 rounded bg-primary/20 p-2">Hook</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-12">
-                {language === "it" ? "Dopo" : "After"}
+                {ui("Pause")}
               </span>
               <span className="flex-1 rounded bg-primary/20 p-2">
-                Hook → {language === "it" ? "Dimostrazione" : "Proof"}
+                {ui("Hook")}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-12">{ui("After")}</span>
+              <span className="flex-1 rounded bg-primary/20 p-2">
+                {ui("Hook →")} {ui("Proof")}
               </span>
             </div>
           </div>

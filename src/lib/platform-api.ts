@@ -948,6 +948,8 @@ export const platformApi = {
 
   analyzeVideo: (
     input: {
+      schemaVersion?: typeof import("@contracts/video-analysis").VIDEO_ANALYSIS_SCHEMA_VERSION;
+      language?: string;
       assetId?: string;
       analysisAssetId?: string;
       analysisFramesPerSecond?: number;
@@ -960,10 +962,16 @@ export const platformApi = {
     scope?: UploadRequestScope
   ) =>
     requestJson<{
+      schemaVersion?: typeof import("@contracts/video-analysis").VIDEO_ANALYSIS_SCHEMA_VERSION;
+      scoreScope?: "audiovisual-editorial-only";
       summary: string;
       hook: { score: number | null; note: string };
       pacing: { score: number | null; note: string };
       insights?: import("@contracts/video-analysis").VideoInsight[];
+      overall?: import("@contracts/video-analysis").VideoEditorialScore;
+      structure?: import("@contracts/video-analysis").VideoStoryAssessment[];
+      recommendations?: import("@contracts/video-analysis").VideoEditorialRecommendation[];
+      noChangesReason?: string;
       coverage?: {
         input: "full-duration-original" | "full-duration-proxy";
         durationSeconds: number;

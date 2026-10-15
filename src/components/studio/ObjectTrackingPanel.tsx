@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { trackVideoRegion } from "@/lib/region-tracking";
@@ -17,6 +18,7 @@ export function ObjectTrackingPanel({
   assets: Asset[];
   onApply: (result: TimelineClip, source: TimelineClip) => Promise<void>;
 }) {
+  const ui = useUiText();
   const sources = project.clips.filter(
     c =>
       !c.transitionHandle &&
@@ -77,14 +79,15 @@ export function ObjectTrackingPanel({
   if (!source || !asset)
     return (
       <p className="text-xs text-foreground/65">
-        Add overlapping video footage to track this graphic.
+        {ui("Add overlapping video footage to track this graphic.")}
       </p>
     );
   if (clip.graphic?.kind.startsWith("spatial-"))
     return (
       <p className="text-xs text-foreground/65">
-        Region tracking attaches 2D graphics. Choose a text, callout, or vector
-        shape.
+        {ui(
+          "Region tracking attaches 2D graphics. Choose a text, callout, or vector shape."
+        )}
       </p>
     );
   const sourceStart =
@@ -92,15 +95,15 @@ export function ObjectTrackingPanel({
   return (
     <fieldset className="space-y-3 rounded-xl border border-border p-3">
       <legend className="px-1 text-sm font-medium">
-        Attach to moving region
+        {ui("Attach to moving region")}
       </legend>
       <p className="text-xs text-foreground/65">
-        Draw around a distinctive edge, logo, or textured object. Tracking
-        follows its 2D position and keeps your graphic’s initial offset. Review
-        the path before applying it.
+        {ui(
+          "Draw around a distinctive edge, logo, or textured object. Tracking follows its 2D position and keeps your graphic’s initial offset. Review the path before applying it."
+        )}
       </p>
       <CompactSelect
-        aria-label="Tracking source clip"
+        aria-label={ui("Tracking source clip")}
         value={source.id}
         disabled={busy}
         onValueChange={value => {
@@ -116,7 +119,7 @@ export function ObjectTrackingPanel({
         className="relative touch-none overflow-hidden rounded-lg bg-black"
         style={{ aspectRatio: ratio, cursor: busy ? "wait" : "crosshair" }}
         role="group"
-        aria-label="Draw tracking region on source footage"
+        aria-label={ui("Draw tracking region on source footage")}
         onPointerDown={e => {
           if (busy) return;
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -143,13 +146,15 @@ export function ObjectTrackingPanel({
           playsInline
           preload="auto"
           className="pointer-events-none h-full w-full object-contain"
-          aria-label="Tracking seed frame"
+          aria-label={ui("Tracking seed frame")}
           onLoadedMetadata={e => {
             const v = e.currentTarget;
             setRatio(v.videoWidth / v.videoHeight);
             v.currentTime = sourceStart;
           }}
-          onError={() => setError("The source preview could not be loaded.")}
+          onError={() =>
+            setError(ui("The source preview could not be loaded."))
+          }
         />
         {region && (
           <div
@@ -167,7 +172,7 @@ export function ObjectTrackingPanel({
         <div className="grid grid-cols-2 gap-2">
           {(["x", "y", "width", "height"] as const).map(key => (
             <label key={key} className="text-xs">
-              Region {key} %
+              {ui("Region")} {key} %
               <input
                 type="number"
                 min={0}
@@ -192,11 +197,11 @@ export function ObjectTrackingPanel({
           className="text-xs text-primary"
           onClick={() => setRegion({ x: 0.4, y: 0.4, width: 0.2, height: 0.2 })}
         >
-          Set region with numeric controls
+          {ui("Set region with numeric controls")}
         </button>
       )}
       <label className="block text-xs">
-        Source seconds to track · up to {maximum.toFixed(1)}s
+        {ui("Source seconds to track · up to")} {maximum.toFixed(1)}s
         <input
           type="number"
           min={0.25}
@@ -214,14 +219,14 @@ export function ObjectTrackingPanel({
       {busy ? (
         <div className="flex items-center justify-between text-xs">
           <span role="status">
-            Analysing decoded frames… {Math.round(progress * 100)}%
+            {ui("Analysing decoded frames…")} {Math.round(progress * 100)}%
           </span>
           <button
             type="button"
             className="text-destructive"
             onClick={() => abort.current?.abort()}
           >
-            Cancel
+            {ui("Cancel")}
           </button>
         </div>
       ) : (
@@ -266,13 +271,13 @@ export function ObjectTrackingPanel({
               .finally(() => setProgress(undefined));
           }}
         >
-          Track region · free
+          {ui("Track region · free")}
         </button>
       )}
       <p className="text-[11px] text-foreground/55">
-        Stops on lost or ambiguous matches. Rotation, scale changes, scene cuts
-        and occlusion may require a shorter interval. Applying replaces the
-        motion path and limits the graphic to the observed interval.
+        {ui(
+          "Stops on lost or ambiguous matches. Rotation, scale changes, scene cuts and occlusion may require a shorter interval. Applying replaces the motion path and limits the graphic to the observed interval."
+        )}
       </p>
       {error && (
         <p role="alert" className="text-xs text-destructive">
@@ -291,10 +296,11 @@ export function ObjectTrackingPanel({
             playing={false}
           />
           <label className="block text-xs">
-            Review tracked path · {(previewTime - result.start).toFixed(2)}s
+            {ui("Review tracked path ·")}{" "}
+            {(previewTime - result.start).toFixed(2)}s
             <input
               className="block w-full accent-primary"
-              aria-label="Tracked graphic review time"
+              aria-label={ui("Tracked graphic review time")}
               type="range"
               min={result.start}
               max={result.start + result.duration - 0.001}
@@ -304,8 +310,9 @@ export function ObjectTrackingPanel({
             />
           </label>
           <p className="text-xs text-foreground/60">
-            {result.graphic?.motion?.length} editable keyframes ·{" "}
-            {result.duration.toFixed(2)}s observed
+            {result.graphic?.motion?.length} {ui("editable keyframes ·")}{" "}
+            {result.duration.toFixed(2)}
+            {ui("s observed")}
           </p>
           <button
             type="button"
@@ -322,7 +329,7 @@ export function ObjectTrackingPanel({
                 .finally(() => setSaving(false));
             }}
           >
-            Apply tracked path
+            {ui("Apply tracked path")}
           </button>
         </div>
       )}

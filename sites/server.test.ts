@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import worker, {
   appendReleaseDisclosure,
+  customTrendDiscoveryCohort,
   groundTrendOutput,
   jobFromRow,
   normalizeTrendItems,
@@ -11,6 +12,7 @@ import worker, {
   submitZernioPost,
   trendSearchCitations,
   trendTextCitations,
+  verifyTrendCitation,
 } from "./server";
 import {
   AI_COMPLIANCE_POLICY_VERSION,
@@ -449,6 +451,104 @@ describe("Sites worker", () => {
         content: "Observed search excerpt",
       },
     ]);
+  });
+
+  it("retains source-grounded search excerpts when platform verification is blocked, rate-limited or times out", async () => {
+    const citation = {
+      platform: "tiktok" as const,
+      sourceUrl: "https://www.tiktok.com/@brand/video/1234567890",
+      title: "Product demonstration",
+      content:
+        "Example Brand demonstrates its product on 2026-10-14 with 1.2M views.",
+    };
+    try {
+      for (const status of [401, 403, 429, 503]) {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => new Response("Access blocked", { status }))
+        );
+        expect(await verifyTrendCitation(citation)).toEqual({
+          ...citation,
+          verification: "access-limited",
+        });
+      }
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new DOMException("Timed out", "TimeoutError");
+        })
+      );
+      expect(await verifyTrendCitation(citation)).toEqual({
+        ...citation,
+        verification: "access-limited",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("excludes known deleted sources and detects successful HTTP redirects to a login wall", async () => {
+    const citation = {
+      platform: "instagram" as const,
+      sourceUrl: "https://www.instagram.com/reel/BrandResult123/",
+      title: "Product demonstration",
+      content: "Retrieved source evidence",
+    };
+    try {
+      for (const status of [404, 410]) {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => new Response("Gone", { status }))
+        );
+        expect(await verifyTrendCitation(citation)).toBeNull();
+      }
+      const login = new Response(
+        "<html><title>Instagram</title><p>Log in to continue</p></html>"
+      );
+      Object.defineProperty(login, "url", {
+        value:
+          "https://www.instagram.com/accounts/login/?next=/reel/BrandResult123/embed/",
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => login)
+      );
+      expect(await verifyTrendCitation(citation)).toMatchObject({
+        verification: "access-limited",
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response("<html>Sorry, this page isn't available.</html>")
+        )
+      );
+      expect(await verifyTrendCitation(citation)).toBeNull();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response("<html>This video is available. Actual embed</html>")
+        )
+      );
+      expect(await verifyTrendCitation(citation)).toMatchObject({
+        verification: "reachable",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("uses substantive broad discovery for a blank custom topic without adding search passes", () => {
+    expect(customTrendDiscoveryCohort({ query: "" })).toContain(
+      "product demonstrations"
+    );
+    expect(customTrendDiscoveryCohort({ query: "" })).toContain(
+      "founder storytelling"
+    );
+    expect(customTrendDiscoveryCohort({ query: "skincare" })).toContain(
+      "Custom topic: skincare"
+    );
   });
 
   it("extracts direct video links from grounded research notes", () => {

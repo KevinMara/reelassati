@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -9,12 +10,12 @@ import { LanguagePicker } from "@/components/LanguagePicker";
 import { useAuth } from "@/hooks/useAuth";
 
 export function Navbar() {
-  const { t, i18n } = useTranslation();
+  const ui = useUiText();
+  const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { user, loading: authLoading } = useAuth();
-  const isItalian = i18n.resolvedLanguage?.startsWith("it");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -34,10 +35,10 @@ export function Navbar() {
 
   const labels = {
     capabilities: t("nav.features"),
-    examples: isItalian ? "Esempi" : "Walkthroughs",
-    presets: isItalian ? "Preset" : "Presets",
+    examples: ui("Walkthroughs"),
+    presets: ui("Presets"),
     access: t("nav.pricing"),
-    contact: isItalian ? "Contatti" : "Contact",
+    contact: ui("Contact"),
     studio: t("nav.start_free"),
     login: t("nav.login"),
     signup: t("nav.signup"),
@@ -54,16 +55,14 @@ export function Navbar() {
     >
       <div className="container-page flex h-16 items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link to="/" className="shrink-0" aria-label="REELassati home">
+          <Link to="/" className="shrink-0" aria-label={ui("REELassati home")}>
             <Logo size="md" />
           </Link>
         </div>
 
         <nav
           className="hidden items-center gap-1 md:flex"
-          aria-label={
-            isItalian ? "Navigazione principale" : "Primary navigation"
-          }
+          aria-label={ui("Primary navigation")}
         >
           <NavItem to="/#features">{labels.capabilities}</NavItem>
           <NavItem to="/showcase">{labels.examples}</NavItem>
@@ -79,13 +78,7 @@ export function Navbar() {
             onClick={toggleTheme}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
             aria-label={
-              theme === "light"
-                ? isItalian
-                  ? "Attiva tema scuro"
-                  : "Use dark theme"
-                : isItalian
-                  ? "Attiva tema chiaro"
-                  : "Use light theme"
+              theme === "light" ? ui("Use dark theme") : ui("Use light theme")
             }
           >
             {theme === "light" ? (
@@ -124,15 +117,7 @@ export function Navbar() {
           type="button"
           className="inline-flex h-10 w-10 items-center justify-center rounded-pill text-foreground hover:bg-foreground/[0.04] md:hidden"
           onClick={() => setOpen(current => !current)}
-          aria-label={
-            open
-              ? isItalian
-                ? "Chiudi menu"
-                : "Close menu"
-              : isItalian
-                ? "Apri menu"
-                : "Open menu"
-          }
+          aria-label={open ? ui("Close menu") : ui("Open menu")}
           aria-expanded={open}
           aria-controls="mobile-navigation"
         >
@@ -153,7 +138,7 @@ export function Navbar() {
       >
         <nav
           className="container-page flex flex-col gap-1 py-6"
-          aria-label={isItalian ? "Navigazione mobile" : "Mobile navigation"}
+          aria-label={ui("Mobile navigation")}
         >
           <MobileLink to="/#features" onNavigate={() => setOpen(false)}>
             {labels.capabilities}
@@ -178,13 +163,7 @@ export function Navbar() {
               onClick={toggleTheme}
               className="p-1.5 text-muted-foreground"
               aria-label={
-                theme === "light"
-                  ? isItalian
-                    ? "Attiva tema scuro"
-                    : "Use dark theme"
-                  : isItalian
-                    ? "Attiva tema chiaro"
-                    : "Use light theme"
+                theme === "light" ? ui("Use dark theme") : ui("Use light theme")
               }
             >
               {theme === "light" ? (

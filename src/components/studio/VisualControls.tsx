@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   Diamond,
   FlipHorizontal2,
@@ -30,6 +31,7 @@ export function VisualControls({
   onChange: (clip: TimelineClip) => void;
   onSeek: (time: number) => void;
 }) {
+  const ui = useUiText();
   const v = normalizeVisual(clip.visual),
     p = visualProgress(clip, time),
     clock = visualClock(clip);
@@ -65,11 +67,11 @@ export function VisualControls({
     <fieldset disabled={disabled} className="space-y-5 disabled:opacity-50">
       <div className="flex items-center justify-between">
         <span className="flex items-center text-sm font-medium">
-          Transform
-          <EditorInfo label="Transform animation">
-            Position is a percentage of the canvas. Once keyframes exist,
-            changing a value adds or updates a keyframe at the playhead.
-            Trimming and splitting preserve the animation's source timing.
+          {ui("Transform")}
+          <EditorInfo label={ui("Transform animation")}>
+            {ui(
+              "Position is a percentage of the canvas. Once keyframes exist, changing a value adds or updates a keyframe at the playhead. Trimming and splitting preserve the animation's source timing."
+            )}
           </EditorInfo>
         </span>
         <button
@@ -87,7 +89,7 @@ export function VisualControls({
           className="inline-flex items-center gap-1.5 text-sm text-foreground/65"
         >
           <RotateCcw size={14} />
-          Reset
+          {ui("Reset")}
         </button>
       </div>
       {(
@@ -133,8 +135,9 @@ export function VisualControls({
       ))}
       {keyframeLimit && (
         <p className="text-sm text-foreground/65">
-          This clip has 24 keyframes. Select an existing keyframe to adjust its
-          pose, or remove one before adding another.
+          {ui(
+            "This clip has 24 keyframes. Select an existing keyframe to adjust its pose, or remove one before adding another."
+          )}
         </p>
       )}
       <div className="flex gap-2">
@@ -157,7 +160,7 @@ export function VisualControls({
         ))}
       </div>
       <CompactSelect
-        aria-label="Blend mode"
+        aria-label={ui("Blend mode")}
         value={v.blendMode}
         onValueChange={blendMode =>
           update({ blendMode: blendMode as ClipVisual["blendMode"] })
@@ -178,7 +181,7 @@ export function VisualControls({
       <section className="space-y-3 rounded-xl border border-border p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium">
-            Keyframes · {v.keyframes.length}/24
+            {ui("Keyframes ·")} {v.keyframes.length}/24
           </span>
           <button
             type="button"
@@ -197,7 +200,7 @@ export function VisualControls({
             }
           >
             <Diamond size={14} fill={active >= 0 ? "currentColor" : "none"} />
-            {active >= 0 ? "Remove keyframe" : "Add at playhead"}
+            {active >= 0 ? ui("Remove keyframe") : ui("Add at playhead")}
           </button>
         </div>
         {!!v.keyframes.length && (
@@ -226,7 +229,7 @@ export function VisualControls({
             </div>
             {active >= 0 && (
               <CompactSelect
-                aria-label="Keyframe easing"
+                aria-label={ui("Keyframe easing")}
                 value={v.keyframes[active].easing}
                 onValueChange={easing =>
                   update({
@@ -275,12 +278,13 @@ export function VisualControls({
       </section>
       <details className="rounded-xl border border-border p-3">
         <summary className="cursor-pointer text-sm font-medium">
-          Frame crop & mask
+          {ui("Frame crop & mask")}
         </summary>
         <div className="mt-3 space-y-3">
           <p className="text-sm text-foreground/65">
-            Crop hides canvas edges before the transform; media underneath stays
-            visible.
+            {ui(
+              "Crop hides canvas edges before the transform; media underneath stays visible."
+            )}
           </p>
           <div className="grid grid-cols-2 gap-3">
             {(["top", "right", "bottom", "left"] as const).map(edge => (
@@ -306,7 +310,7 @@ export function VisualControls({
             ))}
           </div>
           <CompactSelect
-            aria-label="Mask shape"
+            aria-label={ui("Mask shape")}
             value={v.mask}
             onValueChange={mask => update({ mask: mask as ClipVisual["mask"] })}
             options={[
@@ -317,14 +321,20 @@ export function VisualControls({
             ]}
           />
           {v.mask === "polygon" ? (
-            <section className="space-y-2" aria-label="Polygon mask points">
+            <section
+              className="space-y-2"
+              aria-label={ui("Polygon mask points")}
+            >
               <p className="text-xs text-foreground/65">
-                Canvas percentages before transforms. Three to twelve points.
-                Intersections use the even-odd fill rule.
+                {ui(
+                  "Canvas percentages before transforms. Three to twelve points. Intersections use the even-odd fill rule."
+                )}
               </p>
               {v.polygon.map((point, index) => (
                 <div key={index} className="flex items-center gap-2 text-xs">
-                  <span>Point {index + 1}</span>
+                  <span>
+                    {ui("Point")} {index + 1}
+                  </span>
                   {(["x", "y"] as const).map(axis => (
                     <label key={axis}>
                       {axis.toUpperCase()}
@@ -382,7 +392,7 @@ export function VisualControls({
                   })
                 }
               >
-                Add mask point
+                {ui("Add mask point")}
               </button>
               <button
                 type="button"
@@ -397,13 +407,13 @@ export function VisualControls({
                   })
                 }
               >
-                Triangle
+                {ui("Triangle")}
               </button>
             </section>
           ) : null}
           {v.mask === "rounded" && (
             <label className="flex items-center justify-between text-sm">
-              Corner radius %
+              {ui("Corner radius %")}
               <input
                 className={field}
                 type="number"
@@ -418,12 +428,11 @@ export function VisualControls({
       </details>
       <section className="space-y-3 rounded-xl border border-border p-3">
         <p className="flex items-center text-sm font-medium">
-          Visual transitions
-          <EditorInfo label="Visual transitions">
-            These affect the picture only. To transition between two shots,
-            overlap them on separate video lanes and apply an entrance to the
-            upper clip. Keep the outgoing shot fully visible for a clean
-            dissolve.
+          {ui("Visual transitions")}
+          <EditorInfo label={ui("Visual transitions")}>
+            {ui(
+              "These affect the picture only. To transition between two shots, overlap them on separate video lanes and apply an entrance to the upper clip. Keep the outgoing shot fully visible for a clean dissolve."
+            )}
           </EditorInfo>
         </p>
         {(["entrance", "exit"] as const).map(key => (
@@ -478,7 +487,7 @@ export function VisualControls({
           }
         >
           <Trash2 size={14} />
-          Clear transitions
+          {ui("Clear transitions")}
         </button>
       </section>
     </fieldset>

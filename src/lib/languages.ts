@@ -69,3 +69,51 @@ export function languageLabel(code: string) {
     code.toUpperCase()
   );
 }
+
+const AUTO_DETECT_LABELS: Record<string, string> = {
+  en: "Auto-detect",
+  it: "Rileva automaticamente",
+  es: "Detectar automáticamente",
+  fr: "Détection automatique",
+  de: "Automatisch erkennen",
+  pt: "Detetar automaticamente",
+  nl: "Automatisch detecteren",
+  pl: "Wykryj automatycznie",
+  ro: "Detectare automată",
+  tr: "Otomatik algıla",
+  uk: "Визначити автоматично",
+  ru: "Определить автоматически",
+  ar: "اكتشاف تلقائي",
+  hi: "अपने आप पहचानें",
+  ja: "自動検出",
+  ko: "자동 감지",
+  zh: "自动检测",
+  vi: "Tự động nhận diện",
+  da: "Registrer automatisk",
+  sv: "Identifiera automatiskt",
+  no: "Oppdag automatisk",
+  fi: "Tunnista automaattisesti",
+  cs: "Automaticky rozpoznat",
+  hu: "Automatikus felismerés",
+  el: "Αυτόματη ανίχνευση",
+  he: "זיהוי אוטומטי",
+  id: "Deteksi otomatis",
+  th: "ตรวจหาอัตโนมัติ",
+};
+
+/** Language names belong to the interface locale; the selected content code does not change. */
+export function localizedLanguageLabel(code: string, interfaceLocale: string) {
+  const locale = interfaceLocale.toLowerCase().split("-")[0];
+  if (code === "auto")
+    return AUTO_DETECT_LABELS[locale] || AUTO_DETECT_LABELS.en;
+  if (!CONTENT_LANGUAGES.some(language => language.code === code))
+    return code.toUpperCase();
+  try {
+    return (
+      new Intl.DisplayNames([locale], { type: "language" }).of(code) ||
+      languageLabel(code)
+    );
+  } catch {
+    return languageLabel(code);
+  }
+}

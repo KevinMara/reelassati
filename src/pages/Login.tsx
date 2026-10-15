@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, LockKeyhole } from "lucide-react";
@@ -13,6 +14,7 @@ import {
 } from "@/lib/auth-next";
 
 export default function Login() {
+  const ui = useUiText();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -39,7 +41,7 @@ export default function Login() {
       <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary-wash text-primary shadow-[inset_0_1px_rgba(255,255,255,0.25),0_12px_35px_-18px_hsl(var(--primary))]">
         <LockKeyhole className="h-5 w-5" />
       </div>
-      <p className="mono-eyebrow mb-2 text-primary">SECURE ACCOUNT</p>
+      <p className="mono-eyebrow mb-2 text-primary">{ui("SECURE ACCOUNT")}</p>
       <h1 className="text-3xl font-semibold tracking-tight">
         {t("auth.login.title")}
       </h1>
@@ -103,7 +105,7 @@ export default function Login() {
           disabled={loading}
           className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-medium text-primary-foreground shadow-[0_14px_30px_-16px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-[0_18px_36px_-16px_hsl(var(--primary))] disabled:opacity-50"
         >
-          {loading ? "Signing in…" : t("auth.login_btn")}
+          {loading ? ui("Signing in…") : t("auth.login_btn")}
           {!loading ? (
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           ) : null}

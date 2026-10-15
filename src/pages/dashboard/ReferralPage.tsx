@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
 import {
   Check,
@@ -14,6 +15,7 @@ import { platformApi, type ReferralStats } from "@/lib/platform-api";
 import { writeClipboardText } from "@/lib/clipboard";
 
 export default function ReferralPage() {
+  const ui = useUiText();
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [creditBalance, setCreditBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -83,7 +85,9 @@ export default function ReferralPage() {
       return true;
     } catch {
       setError(
-        "Copying was blocked by the browser. Select the value and copy it manually."
+        ui(
+          "Copying was blocked by the browser. Select the value and copy it manually."
+        )
       );
       return false;
     }
@@ -108,7 +112,7 @@ export default function ReferralPage() {
     } catch (cause) {
       if (cause instanceof Error && cause.name === "AbortError") return;
       setError(
-        "The share panel could not open. Copy the referral link instead."
+        ui("The share panel could not open. Copy the referral link instead.")
       );
     }
   };
@@ -147,21 +151,27 @@ export default function ReferralPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">Creator rewards</p>
+        <p className="mono-eyebrow mb-2 text-primary">
+          {ui("Creator rewards")}
+        </p>
         <h1 className="text-3xl font-semibold">
-          Refer creators. Earn studio credits.
+          {ui("Refer creators. Earn studio credits.")}
         </h1>
         <p className="mt-2 max-w-2xl text-foreground/60">
           {billingReady
-            ? "Earn 500 credits—$5.00 of REELassati product value—when a referred creator successfully buys a paid plan. Link visits and sign-ups do not count."
-            : "Share a creator link and keep referrals attached. Rewards activate after paid-plan billing and signed purchase verification are connected."}
+            ? ui(
+                "Earn 500 credits—$5.00 of REELassati product value—when a referred creator successfully buys a paid plan. Link visits and sign-ups do not count."
+              )
+            : ui(
+                "Share a creator link and keep referrals attached. Rewards activate after paid-plan billing and signed purchase verification are connected."
+              )}
         </p>
       </div>
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           icon={Users}
-          label="Successful referrals"
+          label={ui("Successful referrals")}
           value={loading ? "—" : String(stats?.completedReferrals ?? 0)}
           detail={
             billingReady
@@ -171,7 +181,7 @@ export default function ReferralPage() {
         />
         <Metric
           icon={Link2}
-          label="Pending referrals"
+          label={ui("Pending referrals")}
           value={loading ? "—" : String(stats?.pendingReferrals ?? 0)}
           detail={
             billingReady
@@ -181,7 +191,7 @@ export default function ReferralPage() {
         />
         <Metric
           icon={Coins}
-          label="Available credits"
+          label={ui("Available credits")}
           value={creditBalance.toLocaleString()}
           detail={
             billingReady
@@ -192,7 +202,7 @@ export default function ReferralPage() {
         />
         <Metric
           icon={Gift}
-          label="Referral value earned"
+          label={ui("Referral value earned")}
           value={stats?.dollarValue ?? "$0.00"}
           detail="Product value only; not withdrawable cash."
           tone="primary"
@@ -205,9 +215,9 @@ export default function ReferralPage() {
             <Link2 className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="font-medium">Your creator link</h2>
+            <h2 className="font-medium">{ui("Your creator link")}</h2>
             <p className="text-xs text-foreground/70">
-              Share the full link or the short creator code.
+              {ui("Share the full link or the short creator code.")}
             </p>
           </div>
         </div>
@@ -223,7 +233,7 @@ export default function ReferralPage() {
                 readOnly
                 value={stats.shareUrl}
                 onFocus={event => event.currentTarget.select()}
-                aria-label="Referral link"
+                aria-label={ui("Referral link")}
                 className="min-w-0 flex-1 rounded-lg border border-border bg-background px-4 py-3 text-sm"
               />
               <button
@@ -236,14 +246,14 @@ export default function ReferralPage() {
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}
-                {copied === "link" ? "Copied" : "Copy"}
+                {copied === "link" ? ui("Copied") : ui("Copy")}
               </button>
               <button
                 type="button"
                 onClick={() => void share()}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-white hover:bg-primary-hover"
               >
-                <Send className="h-4 w-4" /> Share
+                <Send className="h-4 w-4" /> {ui("Share")}
               </button>
             </div>
             <button
@@ -264,11 +274,13 @@ export default function ReferralPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1.3fr_.7fr]">
         <section className="rounded-xl border border-border bg-surface p-6">
-          <h2 className="font-medium">Reward history</h2>
+          <h2 className="font-medium">{ui("Reward history")}</h2>
           <p className="mt-1 text-xs text-foreground/70">
             {billingReady
-              ? "Paid-plan purchases verified by the billing system."
-              : "Claims are saved; qualification remains locked until billing is connected."}
+              ? ui("Paid-plan purchases verified by the billing system.")
+              : ui(
+                  "Claims are saved; qualification remains locked until billing is connected."
+                )}
           </p>
           <div className="mt-5 divide-y divide-border">
             {stats?.referrals.length ? (
@@ -299,7 +311,7 @@ export default function ReferralPage() {
                     >
                       {referral.status === "verified"
                         ? `+${referral.creditsAwarded}`
-                        : "Pending"}
+                        : ui("Pending")}
                     </p>
                     <p className="text-xs text-foreground/70">
                       {referral.dollarValue}
@@ -309,18 +321,22 @@ export default function ReferralPage() {
               ))
             ) : (
               <div className="py-10 text-center text-sm text-foreground/70">
-                Your first successful referral will appear here.
+                {ui("Your first successful referral will appear here.")}
               </div>
             )}
           </div>
         </section>
 
         <section className="h-fit rounded-xl border border-border bg-surface p-6">
-          <h2 className="font-medium">Have a creator code?</h2>
+          <h2 className="font-medium">{ui("Have a creator code?")}</h2>
           <p className="mt-1 text-xs leading-relaxed text-foreground/70">
             {billingReady
-              ? "Attach it once. The reward unlocks only after your first successful paid-plan purchase."
-              : "Attach it once. It remains pending until signed billing verification is available."}
+              ? ui(
+                  "Attach it once. The reward unlocks only after your first successful paid-plan purchase."
+                )
+              : ui(
+                  "Attach it once. It remains pending until signed billing verification is available."
+                )}
           </p>
           <input
             value={claimCode}
@@ -339,7 +355,7 @@ export default function ReferralPage() {
             ) : (
               <Gift className="h-4 w-4" />
             )}
-            Apply code
+            {ui("Apply code")}
           </button>
           {notice ? (
             <p className="mt-3 text-xs text-emerald-500">{notice}</p>
@@ -350,10 +366,9 @@ export default function ReferralPage() {
           <div className="mt-5 flex gap-2 border-t border-border pt-4">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
             <p className="text-xs leading-relaxed text-foreground/70">
-              Credits pay for REELassati usage. The dollar amount communicates
-              equivalent product value; it is not cash or a withdrawal balance.
-              Opening a link, creating an account, or using the app never
-              triggers a reward.
+              {ui(
+                "Credits pay for REELassati usage. The dollar amount communicates equivalent product value; it is not cash or a withdrawal balance. Opening a link, creating an account, or using the app never triggers a reward."
+              )}
             </p>
           </div>
         </section>

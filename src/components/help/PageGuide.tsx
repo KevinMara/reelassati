@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useId, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -54,6 +55,7 @@ function PageGuideDialog({
   className,
   compact = false,
 }: PageGuideButtonProps & { guide: PageGuide }) {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const language: GuideLanguage = (
     i18n.resolvedLanguage || i18n.language
@@ -64,7 +66,7 @@ function PageGuideDialog({
   const [query, setQuery] = useState("");
   const searchId = useId();
   const isItalian = language === "it";
-  const guideLabel = isItalian ? "Guida" : "Guide";
+  const guideLabel = ui("Guide");
   const title = guide.title[language];
   const normalizedQuery = query.trim().toLocaleLowerCase(language);
   const visibleSections = guide.sections.filter(item =>
@@ -142,7 +144,7 @@ function PageGuideDialog({
         <DialogHeader className="border-b border-border px-5 pb-4 pt-5 text-left sm:px-6">
           <p className="mb-1 flex items-center gap-2 text-xs font-medium text-primary">
             <BookOpen className="h-4 w-4" aria-hidden />
-            {isItalian ? "Guida alla pagina" : "Page guide"}
+            {ui("Page guide")}
           </p>
           <DialogTitle className="pr-8 text-xl leading-tight">
             {title}
@@ -153,7 +155,7 @@ function PageGuideDialog({
           {guide.sections.length > 4 || guide.shortcuts ? (
             <div className="relative mt-2">
               <label htmlFor={searchId} className="sr-only">
-                {isItalian ? "Cerca nella guida" : "Find in this guide"}
+                {ui("Find in this guide")}
               </label>
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/50"
@@ -164,11 +166,7 @@ function PageGuideDialog({
                 type="search"
                 value={query}
                 onChange={event => setQuery(event.target.value)}
-                placeholder={
-                  isItalian
-                    ? "Cerca strumenti o scorciatoie…"
-                    : "Find a tool or shortcut…"
-                }
+                placeholder={ui("Find a tool or shortcut…")}
                 className="h-9 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
               />
             </div>
@@ -211,12 +209,12 @@ function PageGuideDialog({
                 className="mb-1 flex items-center gap-2 text-sm font-semibold"
               >
                 <Keyboard className="h-4 w-4 text-primary" aria-hidden />
-                {isItalian ? "Scorciatoie da tastiera" : "Keyboard shortcuts"}
+                {ui("Keyboard shortcuts")}
               </h3>
               <p className="mb-4 text-xs leading-relaxed text-foreground/60">
-                {isItalian
-                  ? "Le scorciatoie del montaggio sono attive quando non scrivi in un campo o in una finestra di dialogo."
-                  : "Editing shortcuts work when you are not typing in a field or using a dialog."}
+                {ui(
+                  "Editing shortcuts work when you are not typing in a field or using a dialog."
+                )}
               </p>
               <dl className="space-y-3">
                 {visibleShortcuts.map(shortcut => (
@@ -242,9 +240,9 @@ function PageGuideDialog({
               role="status"
               className="py-6 text-center text-sm text-foreground/65"
             >
-              {isItalian
-                ? "Nessuna voce trovata. Prova un’altra parola o cancella la ricerca."
-                : "No matching guide entries. Try another word or clear the search."}
+              {ui(
+                "No matching guide entries. Try another word or clear the search."
+              )}
             </p>
           ) : null}
         </div>
@@ -255,19 +253,19 @@ function PageGuideDialog({
             onClick={() => setOpen(false)}
             className="inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-primary"
           >
-            {isItalian ? "Chiedi all’assistenza" : "Ask support"}
+            {ui("Ask support")}
             <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
           </Link>
           <div className="flex items-center gap-3">
             <span className="hidden text-xs text-foreground/50 sm:inline">
-              {isItalian ? "Riapri con" : "Reopen with"}{" "}
+              {ui("Reopen with")}{" "}
               <kbd className="rounded border border-border px-1 font-mono">
                 ?
               </kbd>
             </span>
             <DialogClose asChild>
               <Button type="button" size="sm">
-                {isItalian ? "Ho capito" : "Got it"}
+                {ui("Got it")}
               </Button>
             </DialogClose>
           </div>

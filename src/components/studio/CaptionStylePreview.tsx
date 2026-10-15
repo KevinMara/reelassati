@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
 import type { CaptionAppearance } from "@contracts/editor-presets";
 import { CaptionLayer } from "./CaptionLayer";
@@ -27,6 +28,7 @@ export function CaptionStylePreview({
   animate?: boolean;
   compact?: boolean;
 }) {
+  const ui = useUiText();
   const [time, setTime] = useState(1.15);
   useEffect(() => {
     if (
@@ -47,7 +49,7 @@ export function CaptionStylePreview({
     <div
       className={`relative overflow-hidden rounded-lg bg-[#252A32] ${compact ? "aspect-[1.8]" : "aspect-video"}`}
       style={{ containerType: "inline-size" }}
-      aria-label="Caption style sample"
+      aria-label={ui("Caption style sample")}
     >
       <CaptionLayer
         presetId={presetId}

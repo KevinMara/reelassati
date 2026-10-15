@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { ScenePresets } from "@/components/studio/ScenePresets";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -132,6 +133,7 @@ function createEvent(
 }
 
 export default function VideoGenerator() {
+  const ui = useUiText();
   const { workspace, capabilities, loading, updateWorkspace } = useWorkspace();
   const [searchParams] = useSearchParams();
   const requestedTemplate = getTemplateById(
@@ -450,7 +452,9 @@ export default function VideoGenerator() {
       window.setTimeout(() => setPromptCopied(false), 1800);
     } catch {
       setError(
-        "Clipboard access is blocked. Select the prompt preview and copy it manually."
+        ui(
+          "Clipboard access is blocked. Select the prompt preview and copy it manually."
+        )
       );
     }
   };
@@ -458,11 +462,14 @@ export default function VideoGenerator() {
   return (
     <div className="mx-auto max-w-7xl">
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">AI Video Studio</p>
-        <h1 className="text-3xl font-semibold">Prompt Director</h1>
+        <p className="mono-eyebrow mb-2 text-primary">
+          {ui("AI Video Studio")}
+        </p>
+        <h1 className="text-3xl font-semibold">{ui("Prompt Director")}</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          Direct a new clip or continue a previous scene while keeping its
-          subject, setting, and visual language consistent.
+          {ui(
+            "Direct a new clip or continue a previous scene while keeping its subject, setting, and visual language consistent."
+          )}
         </p>
       </div>
 
@@ -474,24 +481,25 @@ export default function VideoGenerator() {
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
             <p className="text-sm font-medium">
-              Video generation is not configured
+              {ui("Video generation is not configured")}
             </p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/70">
-              Video generation is temporarily unavailable. Prompt design remains
-              available in the meantime.
+              {ui(
+                "Video generation is temporarily unavailable. Prompt design remains available in the meantime."
+              )}
             </p>
           </div>
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(300px,0.82fr)_minmax(0,1.35fr)_minmax(290px,0.83fr)]">
+      <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.35fr)_minmax(0,0.83fr)]">
         <div className="space-y-5">
           <section className="rounded-xl border border-border bg-surface p-5">
             <div className="mb-3 flex items-center gap-2">
               <Film className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-medium">Visual style</h2>
+              <h2 className="text-sm font-medium">{ui("Visual style")}</h2>
               <span className="ml-auto text-xs uppercase tracking-wider text-foreground/70">
-                {VIDEO_PROMPT_TEMPLATES.length} templates
+                {VIDEO_PROMPT_TEMPLATES.length} {ui("templates")}
               </span>
             </div>
             <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">
@@ -524,27 +532,27 @@ export default function VideoGenerator() {
           <section className="rounded-xl border border-border bg-surface p-5">
             <div className="mb-3 flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-medium">Output controls</h2>
+              <h2 className="text-sm font-medium">{ui("Output controls")}</h2>
             </div>
 
             <label
               className="mb-2 block text-xs font-medium text-foreground/70"
               htmlFor="video-asset-name"
             >
-              Video name
+              {ui("Video name")}
             </label>
             <input
               id="video-asset-name"
               value={assetName}
               maxLength={110}
               onChange={event => setAssetName(event.target.value)}
-              placeholder="Summer launch — clip 01"
+              placeholder={ui("Summer launch — clip 01")}
               className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             />
 
             <fieldset>
               <legend className="mb-2 text-xs font-medium text-foreground/70">
-                Aspect ratio
+                {ui("Aspect ratio")}
               </legend>
               <div className="grid grid-cols-3 gap-2">
                 {RATIOS.map(item => (
@@ -577,7 +585,7 @@ export default function VideoGenerator() {
                 className="mb-2 block text-xs font-medium text-foreground/70"
                 htmlFor="video-duration"
               >
-                Duration
+                {ui("Duration")}
               </label>
               <StudioSelect
                 id="video-duration"
@@ -592,7 +600,7 @@ export default function VideoGenerator() {
               >
                 {DURATIONS.map(seconds => (
                   <option key={seconds} value={seconds}>
-                    {seconds} seconds
+                    {seconds} {ui("seconds")}
                   </option>
                 ))}
               </StudioSelect>
@@ -639,12 +647,12 @@ export default function VideoGenerator() {
               <span>
                 <span className="flex items-center gap-1.5 text-sm font-medium">
                   <Volume2 className="h-3.5 w-3.5" />
-                  Native audio
+                  {ui("Native audio")}
                 </span>
                 <span className="mt-0.5 block text-xs text-foreground/65">
                   {generateAudio
-                    ? "Requested with the video"
-                    : "Silent output requested"}
+                    ? ui("Requested with the video")
+                    : ui("Silent output requested")}
                 </span>
               </span>
             </button>
@@ -655,7 +663,7 @@ export default function VideoGenerator() {
           <section className="rounded-xl border border-border bg-surface p-5">
             <div className="mb-3 flex items-center gap-2">
               <Layers3 className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-medium">Clip continuity</h2>
+              <h2 className="text-sm font-medium">{ui("Clip continuity")}</h2>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {(["new", "continue"] as const).map(mode => (
@@ -679,7 +687,7 @@ export default function VideoGenerator() {
                       : "border-border bg-background hover:border-primary/35"
                   }`}
                 >
-                  {mode === "new" ? "New scene" : "Continue a clip"}
+                  {mode === "new" ? ui("New scene") : ui("Continue a clip")}
                 </button>
               ))}
             </div>
@@ -691,7 +699,7 @@ export default function VideoGenerator() {
                     className="mb-2 block text-xs font-medium"
                     htmlFor="continuity-source"
                   >
-                    Previous clip
+                    {ui("Previous clip")}
                   </label>
                   <StudioSelect
                     id="continuity-source"
@@ -715,21 +723,21 @@ export default function VideoGenerator() {
                     })}
                   </StudioSelect>
                   <p className="mt-2 text-xs leading-relaxed text-foreground/65">
-                    Continuity Lock reuses the selected clip, its scene
-                    direction, reference frames, and generation lineage. Write
-                    what happens next below. Consistency is strongly guided, not
-                    guaranteed pixel-for-pixel.
+                    {ui(
+                      "Continuity Lock reuses the selected clip, its scene direction, reference frames, and generation lineage. Write what happens next below. Consistency is strongly guided, not guaranteed pixel-for-pixel."
+                    )}
                   </p>
                 </div>
               ) : (
                 <p className="mt-4 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground/70">
-                  Generate one clip first. Completed clips will appear here as
-                  continuity sources.
+                  {ui(
+                    "Generate one clip first. Completed clips will appear here as continuity sources."
+                  )}
                 </p>
               )
             ) : (
               <p className="mt-3 text-xs leading-relaxed text-foreground/65">
-                Starts a fresh subject, setting, and visual sequence.
+                {ui("Starts a fresh subject, setting, and visual sequence.")}
               </p>
             )}
           </section>
@@ -737,10 +745,11 @@ export default function VideoGenerator() {
           <section className="rounded-xl border border-border bg-surface p-6">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-medium">Scene direction</p>
+                <p className="text-sm font-medium">{ui("Scene direction")}</p>
                 <p className="mt-1 text-xs text-foreground/65">
-                  Be concrete. The selected style adds camera and production
-                  language.
+                  {ui(
+                    "Be concrete. The selected style adds camera and production language."
+                  )}
                 </p>
               </div>
               <WandSparkles className="h-5 w-5 text-primary" />
@@ -761,7 +770,7 @@ export default function VideoGenerator() {
                   className="mb-2 block text-xs font-medium"
                   htmlFor="director-subject"
                 >
-                  Subject
+                  {ui("Subject")}
                 </label>
                 <input
                   id="director-subject"
@@ -769,7 +778,7 @@ export default function VideoGenerator() {
                   onChange={event =>
                     updateDirection("subject", event.target.value)
                   }
-                  placeholder="A ceramic artist in her late twenties"
+                  placeholder={ui("A ceramic artist in her late twenties")}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
@@ -778,7 +787,7 @@ export default function VideoGenerator() {
                   className="mb-2 block text-xs font-medium"
                   htmlFor="director-action"
                 >
-                  Action
+                  {ui("Action")}
                 </label>
                 <input
                   id="director-action"
@@ -786,7 +795,7 @@ export default function VideoGenerator() {
                   onChange={event =>
                     updateDirection("action", event.target.value)
                   }
-                  placeholder="Glazes a finished cup, then reveals it"
+                  placeholder={ui("Glazes a finished cup, then reveals it")}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
@@ -795,7 +804,7 @@ export default function VideoGenerator() {
                   className="mb-2 block text-xs font-medium"
                   htmlFor="director-location"
                 >
-                  Location
+                  {ui("Location")}
                 </label>
                 <input
                   id="director-location"
@@ -803,14 +812,14 @@ export default function VideoGenerator() {
                   onChange={event =>
                     updateDirection("location", event.target.value)
                   }
-                  placeholder="A sunlit working studio"
+                  placeholder={ui("A sunlit working studio")}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
               </div>
             </div>
             <details className="mt-4 rounded-xl border border-border p-4">
               <summary className="cursor-pointer text-sm font-medium">
-                Camera, lighting, dialogue and sound
+                {ui("Camera, lighting, dialogue and sound")}
               </summary>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div>
@@ -818,7 +827,7 @@ export default function VideoGenerator() {
                     className="mb-2 block text-xs font-medium"
                     htmlFor="director-camera"
                   >
-                    Camera movement
+                    {ui("Camera movement")}
                   </label>
                   <input
                     id="director-camera"
@@ -826,7 +835,7 @@ export default function VideoGenerator() {
                     onChange={event =>
                       updateDirection("camera", event.target.value)
                     }
-                    placeholder="Slow push-in, then a macro detail"
+                    placeholder={ui("Slow push-in, then a macro detail")}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   />
                 </div>
@@ -835,7 +844,7 @@ export default function VideoGenerator() {
                     className="mb-2 block text-xs font-medium"
                     htmlFor="director-mood"
                   >
-                    Mood and light
+                    {ui("Mood and light")}
                   </label>
                   <input
                     id="director-mood"
@@ -843,7 +852,7 @@ export default function VideoGenerator() {
                     onChange={event =>
                       updateDirection("mood", event.target.value)
                     }
-                    placeholder="Warm morning light, tactile and calm"
+                    placeholder={ui("Warm morning light, tactile and calm")}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   />
                 </div>
@@ -852,7 +861,7 @@ export default function VideoGenerator() {
                     className="mb-2 block text-xs font-medium"
                     htmlFor="director-dialogue"
                   >
-                    Dialogue
+                    {ui("Dialogue")}
                   </label>
                   <input
                     id="director-dialogue"
@@ -860,7 +869,9 @@ export default function VideoGenerator() {
                     onChange={event =>
                       updateDirection("dialogue", event.target.value)
                     }
-                    placeholder="The detail that makes every cup different."
+                    placeholder={ui(
+                      "The detail that makes every cup different."
+                    )}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   />
                 </div>
@@ -869,7 +880,7 @@ export default function VideoGenerator() {
                     className="mb-2 block text-xs font-medium"
                     htmlFor="director-sound"
                   >
-                    Sound
+                    {ui("Sound")}
                   </label>
                   <input
                     id="director-sound"
@@ -877,7 +888,7 @@ export default function VideoGenerator() {
                     onChange={event =>
                       updateDirection("sound", event.target.value)
                     }
-                    placeholder="Brush on clay, room tone, no music"
+                    placeholder={ui("Brush on clay, room tone, no music")}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   />
                 </div>
@@ -886,7 +897,7 @@ export default function VideoGenerator() {
                     className="mb-2 block text-xs font-medium"
                     htmlFor="director-avoid"
                   >
-                    Avoid
+                    {ui("Avoid")}
                   </label>
                   <input
                     id="director-avoid"
@@ -894,7 +905,7 @@ export default function VideoGenerator() {
                     onChange={event =>
                       updateDirection("avoid", event.target.value)
                     }
-                    placeholder="Extra fingers, warped cup, logos"
+                    placeholder={ui("Extra fingers, warped cup, logos")}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   />
                 </div>
@@ -905,9 +916,12 @@ export default function VideoGenerator() {
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                 <p>
-                  Your direction mentions {mentionedDurations.join(", ")}{" "}
-                  seconds, but output is set to {duration} seconds. The output
-                  setting wins; align the wording to avoid contradictory motion.
+                  {ui("Your direction mentions")}{" "}
+                  {mentionedDurations.join(", ")}{" "}
+                  {ui("seconds, but output is set to")} {duration}{" "}
+                  {ui(
+                    "seconds. The output setting wins; align the wording to avoid contradictory motion."
+                  )}
                 </p>
               </div>
             ) : null}
@@ -920,8 +934,8 @@ export default function VideoGenerator() {
             >
               <ImageIcon className="h-3.5 w-3.5" />
               {showReferences
-                ? "Hide reference frames"
-                : "Add reference frames"}
+                ? ui("Hide reference frames")
+                : ui("Add reference frames")}
             </button>
 
             {showReferences ? (
@@ -931,7 +945,7 @@ export default function VideoGenerator() {
                     className="mb-2 block text-xs font-medium"
                     htmlFor="first-frame-url"
                   >
-                    First frame URL
+                    {ui("First frame URL")}
                   </label>
                   <input
                     id="first-frame-url"
@@ -957,7 +971,7 @@ export default function VideoGenerator() {
                     className="mb-2 block text-xs font-medium"
                     htmlFor="last-frame-url"
                   >
-                    Last frame URL
+                    {ui("Last frame URL")}
                   </label>
                   <input
                     id="last-frame-url"
@@ -979,8 +993,9 @@ export default function VideoGenerator() {
                   ) : null}
                 </div>
                 <p className="sm:col-span-2 text-xs text-foreground/65">
-                  Only public HTTPS image URLs are accepted. Browser blob URLs
-                  and local network addresses cannot be used for generation.
+                  {ui(
+                    "Only public HTTPS image URLs are accepted. Browser blob URLs and local network addresses cannot be used for generation."
+                  )}
                 </p>
               </div>
             ) : null}
@@ -989,9 +1004,9 @@ export default function VideoGenerator() {
           <section className="rounded-xl border border-border bg-surface p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium">Compiled prompt</p>
+                <p className="text-sm font-medium">{ui("Compiled prompt")}</p>
                 <p className="mt-0.5 text-xs text-foreground/65">
-                  {template?.name ?? "Custom"} · ready to generate
+                  {template?.name ?? "Custom"} {ui("· ready to generate")}
                 </p>
               </div>
               <button
@@ -999,7 +1014,7 @@ export default function VideoGenerator() {
                 onClick={() => void copyPrompt()}
                 disabled={!enhancedPrompt}
                 className="rounded-lg p-2 hover:bg-background disabled:opacity-35"
-                aria-label="Copy compiled prompt"
+                aria-label={ui("Copy compiled prompt")}
               >
                 {promptCopied ? (
                   <Check className="h-4 w-4 text-emerald-500" />
@@ -1016,7 +1031,7 @@ export default function VideoGenerator() {
             </div>
             {template?.finishingNote ? (
               <p className="mt-3 rounded-lg border border-primary/15 bg-primary/5 p-3 text-xs leading-relaxed text-foreground/70">
-                Finishing workflow: {template.finishingNote}
+                {ui("Finishing workflow:")} {template.finishingNote}
               </p>
             ) : null}
           </section>
@@ -1027,30 +1042,30 @@ export default function VideoGenerator() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-foreground/65">
-                  Ready to generate
+                  {ui("Ready to generate")}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-primary">
                   {clipMode === "continue"
-                    ? "Continuity Lock enabled"
-                    : "New clip"}
+                    ? ui("Continuity Lock enabled")
+                    : ui("New clip")}
                 </p>
               </div>
               <Sparkles className="h-5 w-5 text-primary/60" />
             </div>
             <p className="mt-2 text-xs leading-relaxed text-foreground/65">
-              Generation uses REELassati credits inside your workspace.
+              {ui("Generation uses REELassati credits inside your workspace.")}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-lg border border-primary/10 bg-background/70 p-2.5">
-                <span className="block text-foreground/65">Output</span>
+                <span className="block text-foreground/65">{ui("Output")}</span>
                 <span className="mt-1 block font-medium">
                   {duration}s · {resolution}
                 </span>
               </div>
               <div className="rounded-lg border border-primary/10 bg-background/70 p-2.5">
-                <span className="block text-foreground/65">Format</span>
+                <span className="block text-foreground/65">{ui("Format")}</span>
                 <span className="mt-1 block font-medium">
-                  {ratio} · {generateAudio ? "audio" : "silent"}
+                  {ratio} · {generateAudio ? ui("audio") : ui("silent")}
                 </span>
               </div>
             </div>
@@ -1063,8 +1078,9 @@ export default function VideoGenerator() {
                   className="mt-0.5 accent-primary"
                 />
                 <span>
-                  I may use the prompt, brands, references, faces and voices in
-                  this generation.
+                  {ui(
+                    "I may use the prompt, brands, references, faces and voices in this generation."
+                  )}
                 </span>
               </label>
               <label className="flex items-start gap-2 text-foreground/65">
@@ -1078,8 +1094,9 @@ export default function VideoGenerator() {
                   className="mt-0.5 accent-primary"
                 />
                 <span>
-                  The prompt or a reference depicts an identifiable real person
-                  or imitates their voice.
+                  {ui(
+                    "The prompt or a reference depicts an identifiable real person or imitates their voice."
+                  )}
                 </span>
               </label>
               {referenceContainsRealPerson ? (
@@ -1093,7 +1110,9 @@ export default function VideoGenerator() {
                     className="mt-0.5 accent-primary"
                   />
                   <span>
-                    I hold documented consent or another verified legal basis.
+                    {ui(
+                      "I hold documented consent or another verified legal basis."
+                    )}
                   </span>
                 </label>
               ) : null}
@@ -1118,18 +1137,18 @@ export default function VideoGenerator() {
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Starting generation
+                  {ui("Starting generation")}
                 </>
               ) : activeJobId ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Generation in progress
+                  {ui("Generation in progress")}
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Generate video · {generationCreditCost.toLocaleString()}{" "}
-                  credits
+                  {ui("Generate video ·")}{" "}
+                  {generationCreditCost.toLocaleString()} {ui("credits")}
                 </>
               )}
             </button>
@@ -1144,11 +1163,13 @@ export default function VideoGenerator() {
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Generating video</p>
+                  <p className="text-sm font-medium">
+                    {ui("Generating video")}
+                  </p>
                   <p className="mt-1 text-xs text-foreground/65">
                     {job.continuity?.mode === "continue"
-                      ? "Continuing the selected clip"
-                      : "Creating a new clip"}
+                      ? ui("Continuing the selected clip")
+                      : ui("Creating a new clip")}
                   </p>
                 </div>
                 <span
@@ -1174,7 +1195,7 @@ export default function VideoGenerator() {
                 />
               </div>
               <div className="mt-2 flex justify-between text-xs text-foreground/65">
-                <span>Progress</span>
+                <span>{ui("Progress")}</span>
                 <span>{Math.round(job.progress)}%</span>
               </div>
               {job.error ? (
@@ -1185,10 +1206,10 @@ export default function VideoGenerator() {
             <section className="rounded-xl border border-border bg-surface p-5">
               <Film className="h-6 w-6 text-primary/45" />
               <p className="mt-3 text-sm font-medium">
-                Your video will appear here
+                {ui("Your video will appear here")}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-foreground/65">
-                Set the scene, confirm the rights, and start generation.
+                {ui("Set the scene, confirm the rights, and start generation.")}
               </p>
             </section>
           )}
@@ -1200,9 +1221,9 @@ export default function VideoGenerator() {
               className="rounded-xl border border-border bg-surface p-5"
             >
               <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="text-sm font-medium">Generated asset</p>
+                <p className="text-sm font-medium">{ui("Generated asset")}</p>
                 <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium uppercase text-emerald-500">
-                  Saved
+                  {ui("Saved")}
                 </span>
               </div>
               <AiProvenanceBadge provenance={resultAsset.provenance} />
@@ -1228,12 +1249,13 @@ export default function VideoGenerator() {
                 id="generated-video-caption-status"
                 className="mt-2 text-xs leading-relaxed text-foreground/65"
               >
-                Caption track not added yet. Open the asset in Edit to create
-                and review captions before delivery.
+                {ui(
+                  "Caption track not added yet. Open the asset in Edit to create and review captions before delivery."
+                )}
               </p>
               <EditAssetLink
                 assetId={resultAsset.id}
-                label="Add video to Edit"
+                label={ui("Add video to Edit")}
                 className="mt-4"
               />
               <a
@@ -1242,7 +1264,7 @@ export default function VideoGenerator() {
                 className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2.5 text-sm font-medium transition-colors hover:border-primary/45"
               >
                 <Download className="h-4 w-4" />
-                Download video
+                {ui("Download video")}
               </a>
               {job?.status === "completed" ? (
                 <button
@@ -1257,7 +1279,7 @@ export default function VideoGenerator() {
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
                 >
                   <Layers3 className="h-4 w-4" />
-                  Continue this clip
+                  {ui("Continue this clip")}
                 </button>
               ) : null}
             </motion.section>

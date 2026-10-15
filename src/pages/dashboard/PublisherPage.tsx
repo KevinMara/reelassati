@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -90,6 +91,7 @@ export default function PublisherPage() {
 }
 
 function PublisherComposer() {
+  const ui = useUiText();
   const {
     workspace,
     capabilities,
@@ -571,11 +573,14 @@ function PublisherComposer() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">Distribution control</p>
-        <h1 className="text-3xl font-semibold">Publisher</h1>
+        <p className="mono-eyebrow mb-2 text-primary">
+          {ui("Distribution control")}
+        </p>
+        <h1 className="text-3xl font-semibold">{ui("Publisher")}</h1>
         <p className="mt-2 max-w-2xl text-foreground/60">
-          Prepare your next post. Choose its destinations, shape the copy, and
-          set the timing.
+          {ui(
+            "Prepare your next post. Choose its destinations, shape the copy, and set the timing."
+          )}
         </p>
       </div>
 
@@ -603,7 +608,7 @@ function PublisherComposer() {
           <div className="mb-6 flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-medium">
               <Send className="h-4 w-4 text-primary" />
-              {editingId ? "Edit draft" : "New publication"}
+              {editingId ? ui("Edit draft") : ui("New publication")}
             </h2>
             {editingId && (
               <button
@@ -611,7 +616,7 @@ function PublisherComposer() {
                 onClick={resetComposer}
                 className="text-xs text-foreground/70 hover:text-foreground"
               >
-                Clear draft
+                {ui("Clear draft")}
               </button>
             )}
           </div>
@@ -622,7 +627,7 @@ function PublisherComposer() {
                 htmlFor="publisher-platform"
                 className="mb-2 block text-sm font-medium"
               >
-                Platform
+                {ui("Platform")}
               </label>
               <StudioSelect
                 className="w-full"
@@ -643,7 +648,8 @@ function PublisherComposer() {
             </div>
             <div>
               <label className="mb-2 block text-sm font-medium">
-                Destinations ({selectedAccounts.length})
+                {ui("Destinations (")}
+                {selectedAccounts.length})
               </label>
               {connectedAccounts.some(
                 account => account.platform === targetPlatform
@@ -676,7 +682,7 @@ function PublisherComposer() {
                     to="/dashboard/social"
                     className="inline-flex items-center gap-2 font-medium text-primary hover:underline"
                   >
-                    Connect a publishing account →
+                    {ui("Connect a publishing account →")}
                   </Link>
                 </div>
               )}
@@ -687,7 +693,7 @@ function PublisherComposer() {
                 htmlFor="publisher-caption"
                 className="mb-2 block text-sm font-medium"
               >
-                Caption
+                {ui("Caption")}
               </label>
               <textarea
                 id="publisher-caption"
@@ -696,13 +702,13 @@ function PublisherComposer() {
                   setCaption(event.target.value);
                   invalidateReleaseReview();
                 }}
-                placeholder="Write the final caption in your brand voice…"
+                placeholder={ui("Write the final caption in your brand voice…")}
                 rows={6}
                 className="w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/30"
               />
               <p className="mt-1 text-right text-xs text-foreground/70">
                 {withoutTextProvenanceMarker(caption).length.toLocaleString()}{" "}
-                characters
+                {ui("characters")}
               </p>
             </div>
 
@@ -711,7 +717,7 @@ function PublisherComposer() {
                 htmlFor="publisher-hashtags"
                 className="mb-2 block text-sm font-medium"
               >
-                Hashtags
+                {ui("Hashtags")}
               </label>
               <input
                 id="publisher-hashtags"
@@ -730,7 +736,7 @@ function PublisherComposer() {
                 htmlFor="publisher-media"
                 className="mb-2 block text-sm font-medium"
               >
-                Media
+                {ui("Media")}
               </label>
               <StudioSelect
                 id="publisher-media"
@@ -742,7 +748,7 @@ function PublisherComposer() {
                 }}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm"
               >
-                <option value="">Text-only publication</option>
+                <option value="">{ui("Text-only publication")}</option>
                 {publishableAssets.map(asset => (
                   <option key={asset.id} value={asset.id}>
                     {asset.name} · {asset.kind}
@@ -758,7 +764,7 @@ function PublisherComposer() {
                   htmlFor="publisher-language"
                   className="mb-2 block text-sm font-medium"
                 >
-                  Audience language
+                  {ui("Audience language")}
                 </label>
                 <StudioSelect
                   className="w-full"
@@ -769,8 +775,8 @@ function PublisherComposer() {
                     invalidateReleaseReview();
                   }}
                 >
-                  <option value="en">English</option>
-                  <option value="it">Italian</option>
+                  <option value="en">{ui("English")}</option>
+                  <option value="it">{ui("Italian")}</option>
                 </StudioSelect>
               </div>
               <div>
@@ -778,7 +784,7 @@ function PublisherComposer() {
                   htmlFor="publisher-ai-label"
                   className="mb-2 block text-sm font-medium"
                 >
-                  AI content label
+                  {ui("AI content label")}
                 </label>
                 <StudioSelect
                   className="w-full"
@@ -789,17 +795,22 @@ function PublisherComposer() {
                     invalidateReleaseReview();
                   }}
                 >
-                  <option value="auto">Automatic · from content origin</option>
-                  <option value="include">Include AI assistance label</option>
+                  <option value="auto">
+                    {ui("Automatic · from content origin")}
+                  </option>
+                  <option value="include">
+                    {ui("Include AI assistance label")}
+                  </option>
                 </StudioSelect>
               </div>
             </div>
 
             <details className="group rounded-xl border border-border bg-background p-4">
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium">
-                <Sparkles className="h-4 w-4 text-primary" /> Write with AI{" "}
+                <Sparkles className="h-4 w-4 text-primary" />{" "}
+                {ui("Write with AI")}{" "}
                 <span className="ml-auto text-xs text-foreground/60">
-                  Optional
+                  {ui("Optional")}
                 </span>
               </summary>
               <div className="mt-4 space-y-3">
@@ -807,7 +818,7 @@ function PublisherComposer() {
                   htmlFor="publisher-brief"
                   className="block text-xs font-medium"
                 >
-                  What is this post about?
+                  {ui("What is this post about?")}
                 </label>
                 <textarea
                   id="publisher-brief"
@@ -817,7 +828,9 @@ function PublisherComposer() {
                     invalidateReleaseReview();
                   }}
                   rows={3}
-                  placeholder="Topic, audience, key points, and the action you want viewers to take…"
+                  placeholder={ui(
+                    "Topic, audience, key points, and the action you want viewers to take…"
+                  )}
                   className="w-full rounded-lg border border-border bg-surface p-3 text-sm"
                 />
                 <div className="flex flex-wrap gap-4">
@@ -859,19 +872,20 @@ function PublisherComposer() {
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  Generate selected copy · {AI_CREDIT_COSTS.script} credits
+                  {ui("Generate selected copy ·")} {AI_CREDIT_COSTS.script}{" "}
+                  {ui("credits")}
                 </button>
               </div>
             </details>
 
             <section
-              aria-label="Post preview"
+              aria-label={ui("Post preview")}
               className="rounded-xl border border-border bg-background p-4"
             >
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-medium">Post preview</h3>
+                <h3 className="text-sm font-medium">{ui("Post preview")}</h3>
                 <span className="text-xs text-foreground/60">
-                  {disclosureLanguage === "it" ? "Italian" : "English"}
+                  {disclosureLanguage === "it" ? ui("Italian") : ui("English")}
                 </span>
               </div>
               {selectedAsset ? (
@@ -903,7 +917,7 @@ function PublisherComposer() {
                   htmlFor="publisher-date"
                   className="mb-2 block text-sm font-medium"
                 >
-                  Date
+                  {ui("Date")}
                 </label>
                 <input
                   id="publisher-date"
@@ -921,7 +935,7 @@ function PublisherComposer() {
                   htmlFor="publisher-time"
                   className="mb-2 block text-sm font-medium"
                 >
-                  Time
+                  {ui("Time")}
                 </label>
                 <input
                   id="publisher-time"
@@ -936,7 +950,7 @@ function PublisherComposer() {
               </div>
             </div>
             <p className="-mt-3 text-xs text-foreground/70">
-              Entered in your browser timezone; workspace preference:{" "}
+              {ui("Entered in your browser timezone; workspace preference:")}{" "}
               {workspace.profile.timezone}.
             </p>
 
@@ -952,7 +966,7 @@ function PublisherComposer() {
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                Save draft
+                {ui("Save draft")}
               </button>
               <button
                 type="button"
@@ -973,7 +987,7 @@ function PublisherComposer() {
                 ) : (
                   <Calendar className="h-4 w-4" />
                 )}
-                Schedule
+                {ui("Schedule")}
               </button>
               <button
                 type="button"
@@ -992,7 +1006,7 @@ function PublisherComposer() {
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                Publish now
+                {ui("Publish now")}
               </button>
             </div>
           </div>
@@ -1002,7 +1016,7 @@ function PublisherComposer() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-medium">
               <Clock className="h-4 w-4 text-primary" />
-              Workspace queue
+              {ui("Workspace queue")}
             </h2>
             {providerQueueKey && capabilities.publishing && (
               <button
@@ -1014,7 +1028,7 @@ function PublisherComposer() {
                 <RefreshCw
                   className={`h-3 w-3 ${reconciling ? "animate-spin" : ""}`}
                 />
-                Refresh
+                {ui("Refresh")}
               </button>
             )}
           </div>
@@ -1044,7 +1058,7 @@ function PublisherComposer() {
                         type="button"
                         onClick={() => void deleteDraft(post.id)}
                         className="rounded p-1 text-foreground/70 hover:bg-red-500/10 hover:text-red-500"
-                        aria-label="Delete draft"
+                        aria-label={ui("Delete draft")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -1053,7 +1067,7 @@ function PublisherComposer() {
                   {post.outgoingContent ? (
                     <div>
                       <p className="mb-1 font-mono text-xs uppercase tracking-wide text-foreground/70">
-                        Final delivery content
+                        {ui("Final delivery content")}
                       </p>
                       <p className="line-clamp-4 whitespace-pre-line text-sm font-medium">
                         {withoutTextProvenanceMarker(post.outgoingContent)}
@@ -1067,24 +1081,24 @@ function PublisherComposer() {
                   {post.complianceReview ? (
                     <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-medium uppercase tracking-wide">
                       <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-600">
-                        Origin label prepared
+                        {ui("Origin label prepared")}
                       </span>
                       <span className="rounded-full bg-foreground/5 px-2 py-1 text-foreground/70">
                         {post.complianceReview.disclosureLanguage === "it"
-                          ? "Italian disclosure"
+                          ? ui("Italian disclosure")
                           : post.complianceReview.disclosureLanguage === "en"
-                            ? "English disclosure"
-                            : "Disclosure language not recorded"}
+                            ? ui("English disclosure")
+                            : ui("Disclosure language not recorded")}
                       </span>
                       {post.complianceReview.visibleDisclosure.required ? (
                         <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">
-                          Visible cue included
+                          {ui("Visible cue included")}
                         </span>
                       ) : null}
                       {post.outgoingContent &&
                       extractTextProvenanceToken(post.outgoingContent) ? (
                         <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">
-                          Machine provenance included
+                          {ui("Machine provenance included")}
                         </span>
                       ) : null}
                     </div>
@@ -1100,7 +1114,7 @@ function PublisherComposer() {
                         ? post.platforms
                             .map(platform => PLATFORM_META[platform].label)
                             .join(", ")
-                        : "No destination"}
+                        : ui("No destination")}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-foreground/70">
@@ -1110,7 +1124,7 @@ function PublisherComposer() {
                   </p>
                   {post.statusCheckedAt && (
                     <p className="mt-1 text-xs text-foreground/70">
-                      Delivery checked{" "}
+                      {ui("Delivery checked")}{" "}
                       {new Date(post.statusCheckedAt).toLocaleString()}
                     </p>
                   )}
@@ -1127,7 +1141,7 @@ function PublisherComposer() {
                       rel="noreferrer"
                       className="mt-2 block text-xs font-medium text-primary hover:underline"
                     >
-                      Open live post
+                      {ui("Open live post")}
                       {post.publishedUrls!.length > 1 ? ` ${index + 1}` : ""}
                     </a>
                   ))}
@@ -1137,7 +1151,7 @@ function PublisherComposer() {
                       onClick={() => loadDraft(post)}
                       className="mt-3 text-xs font-medium text-primary hover:underline"
                     >
-                      Open in composer
+                      {ui("Open in composer")}
                     </button>
                   )}
                 </article>
@@ -1146,7 +1160,9 @@ function PublisherComposer() {
           ) : (
             <div className="py-12 text-center text-foreground/70">
               <Clock className="mx-auto mb-2 h-8 w-8" />
-              <p className="text-sm">No drafts or scheduled posts yet.</p>
+              <p className="text-sm">
+                {ui("No drafts or scheduled posts yet.")}
+              </p>
             </div>
           )}
         </aside>

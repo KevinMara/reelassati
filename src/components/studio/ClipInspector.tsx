@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   useState,
   useId,
@@ -33,6 +34,7 @@ function AudioMixControls({
   setDraft: Dispatch<SetStateAction<TimelineClip | null>>;
   onSeek: (time: number) => void;
 }) {
+  const ui = useUiText();
   const [chosenSource, setChosenSource] = useState<number | null>(null);
   const mix = normalizeAudioMix(clip.audioMix);
   const sourceLimit = Math.min(
@@ -64,16 +66,16 @@ function AudioMixControls({
     <div className="space-y-4 rounded-xl border border-border p-4">
       <label className="block text-sm">
         <span className="mb-2 flex justify-between">
-          <span>Stereo pan</span>
+          <span>{ui("Stereo pan")}</span>
           <span className="font-mono text-foreground/65">
             {mix.pan === 0
-              ? "Center"
-              : `${Math.round(Math.abs(mix.pan) * 100)}% ${mix.pan < 0 ? "left" : "right"}`}
+              ? ui("Center")
+              : `${Math.round(Math.abs(mix.pan) * 100)}% ${mix.pan < 0 ? ui("left") : ui("right")}`}
           </span>
         </span>
         <input
           type="range"
-          aria-label="Stereo pan"
+          aria-label={ui("Stereo pan")}
           min={-1}
           max={1}
           step={0.01}
@@ -86,24 +88,25 @@ function AudioMixControls({
         />
       </label>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">Gain envelope</p>
+        <p className="text-sm font-medium">{ui("Gain envelope")}</p>
         <span className="text-xs text-foreground/60">
-          {mix.gainKeys.length}/{MAX_AUDIO_GAIN_KEYS} keys
+          {mix.gainKeys.length}/{MAX_AUDIO_GAIN_KEYS} {ui("keys")}
         </span>
       </div>
       <p className="text-xs text-foreground/60">
-        Keys use seconds in the original file and multiply Audio gain. They stay
-        attached to that sound when you trim, split, move, or change speed.
+        {ui(
+          "Keys use seconds in the original file and multiply Audio gain. They stay attached to that sound when you trim, split, move, or change speed."
+        )}
       </p>
       <div className="grid grid-cols-[1fr_auto] items-end gap-2">
         <label className="text-xs text-foreground/60">
-          New key at source second
+          {ui("New key at source second")}
           <input
             type="number"
             min={0}
             max={sourceLimit}
             step={0.01}
-            aria-label="New audio key source second"
+            aria-label={ui("New audio key source second")}
             className={`${field} mt-1`}
             value={source}
             disabled={clip.locked}
@@ -132,7 +135,7 @@ function AudioMixControls({
           }
           className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-40"
         >
-          Add key
+          {ui("Add key")}
         </button>
       </div>
       <button
@@ -141,15 +144,15 @@ function AudioMixControls({
         onClick={() => setChosenSource(Number(playheadSource.toFixed(3)))}
         className="text-xs text-primary disabled:opacity-40"
       >
-        Use playhead · source {playheadSource.toFixed(3)}s
+        {ui("Use playhead · source")} {playheadSource.toFixed(3)}s
       </button>
       {mix.gainKeys.length > 0 ? (
         <div className="space-y-2">
           <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 text-xs text-foreground/60">
-            <span>Source seconds</span>
-            <span>Gain ×</span>
-            <span className="sr-only">Go to key</span>
-            <span className="sr-only">Remove key</span>
+            <span>{ui("Source seconds")}</span>
+            <span>{ui("Gain ×")}</span>
+            <span className="sr-only">{ui("Go to key")}</span>
+            <span className="sr-only">{ui("Remove key")}</span>
           </div>
           {mix.gainKeys.map((key, index) => {
             const inClip = key.at >= clip.inPoint && key.at < clip.outPoint;
@@ -169,8 +172,8 @@ function AudioMixControls({
                   aria-label={`Audio gain key ${index + 1} source second`}
                   title={
                     inClip
-                      ? "Key inside this clip"
-                      : "Retained key outside this clip's current trim"
+                      ? ui("Key inside this clip")
+                      : ui("Retained key outside this clip's current trim")
                   }
                   onChange={event =>
                     update(current => ({
@@ -223,7 +226,7 @@ function AudioMixControls({
                   }
                   className="rounded-lg border border-border px-2 text-xs disabled:opacity-30"
                 >
-                  Go
+                  {ui("Go")}
                 </button>
                 <button
                   type="button"
@@ -245,7 +248,7 @@ function AudioMixControls({
         </div>
       ) : (
         <p className="text-xs text-foreground/60">
-          No keys: constant gain across the clip.
+          {ui("No keys: constant gain across the clip.")}
         </p>
       )}
       <div className="flex flex-wrap gap-3">
@@ -255,7 +258,7 @@ function AudioMixControls({
           onClick={() => update(current => ({ ...current, gainKeys: [] }))}
           className="text-xs text-primary disabled:opacity-40"
         >
-          Clear envelope
+          {ui("Clear envelope")}
         </button>
         <button
           type="button"
@@ -269,7 +272,7 @@ function AudioMixControls({
           }
           className="text-xs text-primary disabled:opacity-40"
         >
-          Reset pan & envelope
+          {ui("Reset pan & envelope")}
         </button>
       </div>
     </div>
@@ -303,6 +306,7 @@ export function ClipInspector({
   onSeek: (time: number) => void;
   tracking?: ReactNode;
 }) {
+  const ui = useUiText();
   const [tab, setTab] = useState(draft ? "timing" : "project");
   const framingId = useId();
   const hasAudio =
@@ -389,7 +393,7 @@ export function ClipInspector({
       <div
         className="flex flex-wrap gap-1 rounded-xl bg-background p-1"
         role="group"
-        aria-label="Adjustment sections"
+        aria-label={ui("Adjustment sections")}
       >
         {[
           ["timing", "Timing"],
@@ -419,7 +423,7 @@ export function ClipInspector({
         <>
           <div className="flex items-center gap-3">
             <label className="min-w-0 flex-1 text-xs text-foreground/60">
-              Selected clip
+              {ui("Selected clip")}
               <input
                 className={`${field} mt-1`}
                 value={draft.label}
@@ -432,12 +436,12 @@ export function ClipInspector({
               onClick={() => void onToggle("locked")}
               className="mt-5 rounded-lg border border-border px-3 py-2 text-sm"
             >
-              {draft.locked ? "Unlock" : "Lock"}
+              {draft.locked ? ui("Unlock") : ui("Lock")}
             </button>
           </div>
           {draft.locked && (
             <p className="text-sm text-amber-600 dark:text-amber-300">
-              Unlock this clip to change its settings.
+              {ui("Unlock this clip to change its settings.")}
             </p>
           )}
           {tab === "timing" && (
@@ -471,11 +475,10 @@ export function ClipInspector({
                     <span className="mb-1 flex items-center">
                       {label}
                       {key === "inPoint" && (
-                        <EditorInfo label="Source in and out">
-                          These are positions in the original file. Trimming
-                          changes which part is used; timeline start controls
-                          where it appears in your edit. Existing captions on
-                          the primary lane follow these changes.
+                        <EditorInfo label={ui("Source in and out")}>
+                          {ui(
+                            "These are positions in the original file. Trimming changes which part is used; timeline start controls where it appears in your edit. Existing captions on the primary lane follow these changes."
+                          )}
                         </EditorInfo>
                       )}
                     </span>
@@ -501,10 +504,10 @@ export function ClipInspector({
           {tab === "appearance" && (
             <>
               <label className="block text-sm" htmlFor={framingId}>
-                Framing
+                {ui("Framing")}
                 <CompactSelect
                   id={framingId}
-                  aria-label="Framing"
+                  aria-label={ui("Framing")}
                   value={draft.fit ?? "contain"}
                   disabled={draft.locked}
                   onValueChange={value => set("fit", value)}
@@ -519,8 +522,9 @@ export function ClipInspector({
               {slider("contrast", "Contrast", 0.5, 2, 1)}
               {slider("saturation", "Saturation", 0, 2, 1)}
               <p className="text-xs text-foreground/60">
-                Browse Looks & transitions in the left tool panel for reusable
-                treatments.
+                {ui(
+                  "Browse Looks & transitions in the left tool panel for reusable treatments."
+                )}
               </p>
             </>
           )}
@@ -541,7 +545,7 @@ export function ClipInspector({
                   onClick={() => void onToggle("muted")}
                   className="rounded-lg border border-border px-3 py-2 text-sm"
                 >
-                  {draft.muted ? "Unmute" : "Mute"}
+                  {draft.muted ? ui("Unmute") : ui("Mute")}
                 </button>
                 {asset?.kind === "video" && draft.track !== "audio" && (
                   <button
@@ -550,13 +554,13 @@ export function ClipInspector({
                     onClick={() => void onDetach()}
                     className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-40"
                   >
-                    Detach audio
+                    {ui("Detach audio")}
                   </button>
                 )}
-                <EditorInfo label="Detach audio">
-                  Creates an independently editable audio clip with the same
-                  timing and mutes the source video's sound. One Undo restores
-                  both.
+                <EditorInfo label={ui("Detach audio")}>
+                  {ui(
+                    "Creates an independently editable audio clip with the same timing and mutes the source video's sound. One Undo restores both."
+                  )}
                 </EditorInfo>
               </div>
               {slider("volume", "Audio gain", 0, 2, 1)}
@@ -585,18 +589,18 @@ export function ClipInspector({
                 }
                 className="rounded-lg border border-border px-3 py-2 text-sm"
               >
-                Set as music under dialogue
+                {ui("Set as music under dialogue")}
               </button>
             </>
           )}
           {["appearance", "audio"].includes(tab) && (
             <div className="space-y-4 rounded-xl border border-border p-4">
               <p className="flex items-center text-sm font-medium">
-                Entrance & exit
-                <EditorInfo label="Clip fades">
-                  Fades ease this clip in and out. Video fades also fade its
-                  source audio. Overlap clips on separate video lanes for a
-                  dissolve. A split preserves the original outer fades.
+                {ui("Entrance & exit")}
+                <EditorInfo label={ui("Clip fades")}>
+                  {ui(
+                    "Fades ease this clip in and out. Video fades also fade its source audio. Overlap clips on separate video lanes for a dissolve. A split preserves the original outer fades."
+                  )}
                 </EditorInfo>
               </p>
               {slider(
@@ -631,7 +635,7 @@ export function ClipInspector({
           ) : (
             <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
               <p className="text-xs text-foreground/60">
-                Changes are saved as an undoable revision.
+                {ui("Changes are saved as an undoable revision.")}
               </p>
               <button
                 type="button"
@@ -639,14 +643,14 @@ export function ClipInspector({
                 onClick={() => void onApply()}
                 className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
               >
-                Apply changes
+                {ui("Apply changes")}
               </button>
             </div>
           )}
         </>
       ) : (
         <p className="text-sm text-foreground/60">
-          Select a clip on the timeline to adjust it.
+          {ui("Select a clip on the timeline to adjust it.")}
         </p>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { mapChatTranscript } from "@/lib/editor-chat-execution";
 import { v4 as createUuid } from "uuid";
 import { appendEditorRevisions } from "@/lib/editor-history";
@@ -38,6 +39,7 @@ export function AutonomousEditor({
   project: EditProject;
   onFinished: () => void;
 }) {
+  const ui = useUiText();
   const { workspace, getWorkspaceSnapshot, updateWorkspace, capabilities } =
     useWorkspace();
   const referenceOwner = workspace.profile.email.toLowerCase();
@@ -159,7 +161,9 @@ export function AutonomousEditor({
         scope.brandId !== destination.brandId
       )
         throw new Error(
-          "Your account or brand changed before the edit started. Reopen the intended workspace."
+          ui(
+            "Your account or brand changed before the edit started. Reopen the intended workspace."
+          )
         );
       const requestOptions = { scope, signal };
       const analysis: Array<{
@@ -292,13 +296,17 @@ export function AutonomousEditor({
             checkpoint();
             if (polled.job.status === "failed")
               throw new Error(
-                "A supporting video failed. Completed assets are saved; retry from your Library."
+                ui(
+                  "A supporting video failed. Completed assets are saved; retry from your Library."
+                )
               );
             asset = polled.asset;
           }
           if (!asset)
             throw new Error(
-              "The video is still generating. It will remain available in your Library; your timeline is unchanged."
+              ui(
+                "The video is still generating. It will remain available in your Library; your timeline is unchanged."
+              )
             );
         } else if (op.parameters.mediaKind !== "video" && imagesUsed < images) {
           imagesUsed++;
@@ -402,7 +410,9 @@ export function AutonomousEditor({
                 JSON.stringify(project.transcript)
             )
               throw new Error(
-                "Your timeline changed during the edit. AI media is saved; run again on the current version."
+                ui(
+                  "Your timeline changed during the edit. AI media is saved; run again on the current version."
+                )
               );
             const before = {
               id: createUuid(),
@@ -477,10 +487,13 @@ export function AutonomousEditor({
       <div className="mb-4 flex items-center gap-3">
         <Sparkles className="h-6 w-6 text-primary" />
         <div>
-          <h2 className="text-xl font-semibold">Let AI build your edit</h2>
+          <h2 className="text-xl font-semibold">
+            {ui("Let AI build your edit")}
+          </h2>
           <p className="text-sm text-foreground/70">
-            Footage review → captions → cut and pacing → supporting shots →
-            editable timeline.
+            {ui(
+              "Footage review → captions → cut and pacing → supporting shots → editable timeline."
+            )}
           </p>
         </div>
       </div>
@@ -488,19 +501,21 @@ export function AutonomousEditor({
         <div>
           {referenceBrief && (
             <details className="mb-2 text-xs">
-              <summary>Saved reference direction</summary>
+              <summary>{ui("Saved reference direction")}</summary>
               <p className="mt-2 whitespace-pre-wrap">{referenceBrief}</p>
             </details>
           )}
           <label className="block text-sm font-medium">
-            Describe the style and outcome
+            {ui("Describe the style and outcome")}
             <textarea
               disabled={busy}
-              aria-label="Autonomous editing style"
+              aria-label={ui("Autonomous editing style")}
               rows={4}
               value={style}
               onChange={e => setStyle(e.target.value)}
-              placeholder="Premium skincare demo. Clean editorial captions, a fast before/after opening, subtle fades, warm colour, and a quiet product close-up at the end."
+              placeholder={ui(
+                "Premium skincare demo. Clean editorial captions, a fast before/after opening, subtle fades, warm colour, and a quiet product close-up at the end."
+              )}
               className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm"
             />
           </label>
@@ -521,7 +536,7 @@ export function AutonomousEditor({
           </div>
           <details className="mt-4 rounded-xl border border-border bg-surface p-3">
             <summary className="cursor-pointer text-sm font-medium">
-              Match a reference style or video · optional
+              {ui("Match a reference style or video · optional")}
             </summary>
             <div className="mt-3">
               {" "}
@@ -545,7 +560,9 @@ export function AutonomousEditor({
                       scope.brandId !== referenceBrand
                     )
                       throw new Error(
-                        "The reference workspace changed. Reopen the intended project."
+                        ui(
+                          "The reference workspace changed. Reopen the intended project."
+                        )
                       );
                     await verifyUploadRequestScope(scope);
                     await updateWorkspace(w => {
@@ -556,7 +573,7 @@ export function AutonomousEditor({
                         !w.projects.some(p => p.id === project.id)
                       )
                         throw new Error(
-                          "The reference project changed before saving."
+                          ui("The reference project changed before saving.")
                         );
                       return {
                         ...w,
@@ -592,13 +609,13 @@ export function AutonomousEditor({
               checked={automaticDuration}
               onChange={e => setAutomaticDuration(e.target.checked)}
             />
-            Detect ending from content automatically
+            {ui("Detect ending from content automatically")}
           </label>
           <label className="mt-4 block text-sm">
-            Target duration · {targetDuration.toFixed(1)}s
+            {ui("Target duration ·")} {targetDuration.toFixed(1)}s
             <input
               disabled={busy || automaticDuration}
-              aria-label="AI target duration"
+              aria-label={ui("AI target duration")}
               type="range"
               min={1}
               max={Math.max(180, project.duration)}
@@ -617,23 +634,24 @@ export function AutonomousEditor({
               checked={captions}
               onChange={e => setCaptions(e.target.checked)}
             />
-            Transcribe and caption footage
+            {ui("Transcribe and caption footage")}
           </label>
           <details className="rounded-xl border border-border p-3">
             <summary className="cursor-pointer text-sm">
-              Create extra images or videos · optional
+              {ui("Create extra images or videos · optional")}
             </summary>
             <p className="my-3 text-xs leading-relaxed text-foreground/60">
-              Your own footage is used by default. Allow paid new assets only
-              when you want supporting shots.
+              {ui(
+                "Your own footage is used by default. Allow paid new assets only when you want supporting shots."
+              )}
             </p>
             <div className="space-y-3">
               {" "}
               <label className="flex items-center justify-between gap-2 text-sm">
-                New images, up to
+                {ui("New images, up to")}
                 <input
                   disabled={busy}
-                  aria-label="Maximum generated images"
+                  aria-label={ui("Maximum generated images")}
                   type="number"
                   min={0}
                   value={images}
@@ -646,10 +664,10 @@ export function AutonomousEditor({
                 />
               </label>
               <label className="flex items-center justify-between gap-2 text-sm">
-                New 5s videos, up to
+                {ui("New 5s videos, up to")}
                 <input
                   disabled={busy}
-                  aria-label="Maximum generated videos"
+                  aria-label={ui("Maximum generated videos")}
                   type="number"
                   min={0}
                   value={videos}
@@ -665,13 +683,15 @@ export function AutonomousEditor({
           </details>
           <div className="border-t border-border pt-3">
             <p className="text-2xl font-semibold">
-              Up to {estimate.toLocaleString()} credits
+              {ui("Up to")} {estimate.toLocaleString()} {ui("credits")}
             </p>
             <p className="mt-1 text-xs text-foreground/70">
-              Review {analysisCost} · speech timing {transcriptCost} · plan{" "}
-              {AI_CREDIT_COSTS.editPlan} · optional media {mediaCost}. Only
-              requested generations run. Manual editing and local export use no
-              AI credits.
+              {ui("Review")} {analysisCost} {ui("· speech timing")}{" "}
+              {transcriptCost} {ui("· plan")} {AI_CREDIT_COSTS.editPlan}{" "}
+              {ui("· optional media")} {mediaCost}
+              {ui(
+                ". Only requested generations run. Manual editing and local export use no AI credits."
+              )}
             </p>
           </div>
 
@@ -691,7 +711,7 @@ export function AutonomousEditor({
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            Build my edit · ≤ {estimate} credits
+            {ui("Build my edit · ≤")} {estimate} {ui("credits")}
           </button>
           {busy && (
             <button
@@ -703,7 +723,7 @@ export function AutonomousEditor({
               className="flex items-center gap-2 text-sm"
             >
               <Square className="h-3 w-3" />
-              Stop remaining steps
+              {ui("Stop remaining steps")}
             </button>
           )}
         </div>
@@ -722,7 +742,7 @@ export function AutonomousEditor({
           onClick={onFinished}
           className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground"
         >
-          Review and export my edit
+          {ui("Review and export my edit")}
         </button>
       )}
     </section>

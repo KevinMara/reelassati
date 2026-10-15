@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import {
   useDeferredValue,
@@ -119,6 +120,7 @@ function AssetPreview({ asset }: { asset: Asset }) {
 }
 
 export default function ContentLibrary() {
+  const ui = useUiText();
   const { workspace, capabilities, updateWorkspace, loading, saving } =
     useWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -392,11 +394,14 @@ export default function ContentLibrary() {
         }`}
       >
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">Private media system</p>
-          <h1 className="text-3xl font-semibold">Content Library</h1>
+          <p className="mono-eyebrow mb-2 text-primary">
+            {ui("Private media system")}
+          </p>
+          <h1 className="text-3xl font-semibold">{ui("Content Library")}</h1>
           <p className="mt-2 max-w-2xl text-sm text-foreground/70">
-            Your uploaded footage, generated media, exports, and saved scripts,
-            ready to reuse across your projects.
+            {ui(
+              "Your uploaded footage, generated media, exports, and saved scripts, ready to reuse across your projects."
+            )}
           </p>
         </div>
         <div>
@@ -406,7 +411,7 @@ export default function ContentLibrary() {
             accept="video/*,audio/*,image/*"
             onChange={uploadFile}
             className="sr-only"
-            aria-label="Choose media to upload"
+            aria-label={ui("Choose media to upload")}
           />
           <button
             type="button"
@@ -419,14 +424,14 @@ export default function ContentLibrary() {
             ) : (
               <Upload className="h-4 w-4" />
             )}
-            {uploading ? `Uploading ${uploadProgress}%` : "Upload media"}
+            {uploading ? `Uploading ${uploadProgress}%` : ui("Upload media")}
           </button>
           <p className="mt-1 text-center text-xs text-foreground/65">
-            {isDragging ? "Drop files here" : "or drop a file here"}
+            {isDragging ? ui("Drop files here") : ui("or drop a file here")}
           </p>
           {!capabilities.uploads ? (
             <p className="mt-2 max-w-52 text-right text-xs text-amber-600">
-              Media storage needs configuration.
+              {ui("Media storage needs configuration.")}
             </p>
           ) : null}
         </div>
@@ -448,18 +453,18 @@ export default function ContentLibrary() {
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <label className="relative min-w-64 flex-1 sm:max-w-md">
-          <span className="sr-only">Search library</span>
+          <span className="sr-only">{ui("Search library")}</span>
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/65" />
           <input
             ref={searchInputRef}
             type="search"
             value={search}
             onChange={event => setSearch(event.target.value)}
-            placeholder="Search by name or type"
+            placeholder={ui("Search by name or type")}
             className="w-full rounded-lg border border-border bg-surface py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/30"
           />
         </label>
-        <div className="flex flex-wrap gap-1" aria-label="Filter library">
+        <div className="flex flex-wrap gap-1" aria-label={ui("Filter library")}>
           {FILTERS.map(option => (
             <button
               key={option.value}
@@ -472,7 +477,7 @@ export default function ContentLibrary() {
                   : "border border-border bg-surface hover:border-primary/40"
               }`}
             >
-              {option.label}
+              {ui(option.label)}
             </button>
           ))}
         </div>
@@ -480,7 +485,7 @@ export default function ContentLibrary() {
           <button
             type="button"
             onClick={() => setViewMode("grid")}
-            aria-label="Grid view"
+            aria-label={ui("Grid view")}
             aria-pressed={viewMode === "grid"}
             className={`rounded-lg p-2 ${
               viewMode === "grid"
@@ -493,7 +498,7 @@ export default function ContentLibrary() {
           <button
             type="button"
             onClick={() => setViewMode("list")}
-            aria-label="List view"
+            aria-label={ui("List view")}
             aria-pressed={viewMode === "list"}
             className={`rounded-lg p-2 ${
               viewMode === "list"
@@ -514,15 +519,15 @@ export default function ContentLibrary() {
           className={`flex items-center gap-2 rounded-pill border px-4 py-2 text-sm ${favoritesOnly ? "border-primary bg-primary/15" : "border-border"}`}
         >
           <Star className="h-4 w-4" />
-          Favorites
+          {ui("Favorites")}
         </button>
         <StudioSelect
-          aria-label="Filter Library by project"
+          aria-label={ui("Filter Library by project")}
           value={projectFilter}
           onChange={event => setProjectFilter(event.target.value)}
           className="rounded-lg border border-border bg-surface p-2 text-sm"
         >
-          <option value="">All projects</option>
+          <option value="">{ui("All projects")}</option>
           {workspace.projects.map(project => (
             <option value={project.id} key={project.id}>
               {project.title}
@@ -535,20 +540,22 @@ export default function ContentLibrary() {
           <FileText className="mx-auto h-7 w-7 text-primary" />
           <h2 className="mt-4 font-medium">
             {items.length
-              ? "No matching content"
-              : "Your reusable library starts here"}
+              ? ui("No matching content")
+              : ui("Your reusable library starts here")}
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-sm text-foreground/70">
             {items.length
-              ? "Change the search or filter to reveal more items."
-              : "Upload real media here, or create a script and it will appear automatically."}
+              ? ui("Change the search or filter to reveal more items.")
+              : ui(
+                  "Upload real media here, or create a script and it will appear automatically."
+                )}
           </p>
           {!items.length ? (
             <Link
               to="/dashboard/script"
               className="mt-5 inline-flex rounded-lg border border-border px-4 py-2 text-sm font-medium hover:border-primary/40"
             >
-              Create a script
+              {ui("Create a script")}
             </Link>
           ) : null}
         </div>
@@ -576,7 +583,9 @@ export default function ContentLibrary() {
                   <button
                     type="button"
                     aria-label={
-                      item.asset.favorite ? "Remove favorite" : "Add favorite"
+                      item.asset.favorite
+                        ? ui("Remove favorite")
+                        : ui("Add favorite")
                     }
                     aria-pressed={item.asset.favorite === true}
                     disabled={saving}
@@ -616,7 +625,11 @@ export default function ContentLibrary() {
                     <Icon className="h-7 w-7 text-primary" />
                   )}
                 </div>
-                <div className={viewMode === "grid" ? "min-w-0 p-4" : "min-w-0 flex-1"}>
+                <div
+                  className={
+                    viewMode === "grid" ? "min-w-0 p-4" : "min-w-0 flex-1"
+                  }
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <span
@@ -686,7 +699,7 @@ export default function ContentLibrary() {
                         item.asset.kind === "audio" ? (
                           <EditAssetLink
                             assetId={item.asset.id}
-                            label="Use in Edit"
+                            label={ui("Use in Edit")}
                             compact
                           />
                         ) : null}
@@ -696,7 +709,7 @@ export default function ContentLibrary() {
                           rel="noreferrer"
                           className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground/70 transition-colors hover:border-primary/35 hover:text-foreground"
                         >
-                          Open <ExternalLink className="h-3 w-3" />
+                          {ui("Open")} <ExternalLink className="h-3 w-3" />
                         </a>
                       </div>
                     ) : (
@@ -705,11 +718,11 @@ export default function ContentLibrary() {
                           to={`/dashboard/script?script=${encodeURIComponent(item.script.id)}`}
                           className="inline-flex rounded-lg bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary-hover"
                         >
-                          Open in Script
+                          {ui("Open in Script")}
                         </Link>
                         <details>
                           <summary className="cursor-pointer font-medium text-primary">
-                            Read script
+                            {ui("Read script")}
                           </summary>
                           <p className="mt-3 whitespace-pre-wrap rounded-lg bg-background p-3 leading-relaxed text-foreground/65">
                             {item.script.fullScript}
@@ -719,7 +732,7 @@ export default function ContentLibrary() {
                             onClick={() => void copyLibraryScript(item)}
                             className="mt-2 text-xs font-medium text-primary hover:underline"
                           >
-                            Copy with origin record
+                            {ui("Copy with origin record")}
                           </button>
                         </details>
                       </div>

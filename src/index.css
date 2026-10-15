@@ -3,16 +3,34 @@
 @tailwind utilities;
 
 /* Keep built-in date/time pickers legible alongside the shared dark controls. */
-.dark { color-scheme: dark; }
+.dark {
+  color-scheme: dark;
+}
 
-.audio-player { container-type: inline-size; }
+.audio-player {
+  container-type: inline-size;
+}
 @container (max-width: 300px) {
-  .audio-player-controls { flex-wrap: wrap; gap: 8px; }
-  .audio-player-seek { order: 10; flex-basis: 100%; margin: 5px 0; }
-  .audio-player-clock { width: 88px; font-size: 10px; }
+  .audio-player-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .audio-player-seek {
+    order: 10;
+    flex-basis: 100%;
+    margin: 5px 0;
+  }
+  .audio-player-clock {
+    width: 88px;
+    font-size: 10px;
+  }
 }
 @container (max-width: 220px) {
-  .audio-player-clock { flex: 1; min-width: 0; width: auto; }
+  .audio-player-clock {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
 }
 
 .media-seek {
@@ -41,12 +59,139 @@
 .media-seek:hover::-webkit-slider-thumb {
   transform: scale(1.25);
 }
+
+/* One interaction and proportion system for every Studio route. Compact icon
+   tools and the editing canvas keep their deliberate dimensions. */
+.studio-shell {
+  --studio-control-radius: 12px;
+}
+.studio-shell main {
+  min-width: 0;
+}
+.studio-shell > aside {
+  left: auto;
+  right: auto;
+  inset-inline-start: 0;
+  border-right-width: 0;
+  border-inline-end-width: 1px;
+}
+@media (max-width: 1023px) {
+  [dir="rtl"] .studio-shell > aside.-translate-x-full {
+    --tw-translate-x: 100%;
+  }
+}
+.studio-shell .studio-route-enter h1 {
+  font-size: clamp(1.5rem, 1.2rem + 0.6vw, 1.875rem);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.studio-shell .studio-route-enter h2 {
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+.studio-shell .studio-route-enter :is(section, form).p-6 {
+  padding: clamp(1.125rem, 0.9rem + 0.6vw, 1.5rem);
+}
+.studio-shell
+  .studio-route-enter
+  :is(input, textarea, [data-slot="select-trigger"]) {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-radius: var(--studio-control-radius);
+}
+.studio-shell .studio-route-enter [data-slot="select-trigger"] {
+  min-height: 2.5rem;
+  line-height: 1.25;
+  padding-block: 0.5rem;
+}
+.studio-shell .studio-route-enter [data-slot="select-trigger"][data-size="sm"] {
+  min-height: 2rem;
+  height: 2rem;
+  padding-block: 0.375rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.studio-shell
+  .studio-route-enter
+  :is(input, [data-slot="select-trigger"]).py-3 {
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+.studio-shell :is(button, a, [role="button"]):focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 3px;
+}
+.studio-shell button:disabled,
+.studio-shell [aria-disabled="true"] {
+  cursor: not-allowed;
+}
+.studio-shell button:is(.py-3, .py-4),
+.studio-shell a:is(.py-3, .py-4) {
+  padding-block: 0.7rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  font-weight: 550;
+}
+.studio-shell button.bg-primary:not(.ai-magic) {
+  color: hsl(var(--primary-foreground));
+  background-image: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.075),
+    transparent 70%
+  );
+  box-shadow:
+    inset 0 1px rgb(255 255 255 / 0.12),
+    0 2px 5px rgb(0 0 0 / 0.08);
+}
+.studio-shell a.bg-primary:not(.ai-magic) {
+  color: hsl(var(--primary-foreground));
+}
+.studio-shell :is(button, a, [role="button"]) {
+  transition:
+    color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out),
+    translate 160ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .studio-shell button.bg-primary:not(:disabled):not(.ai-magic):hover {
+    box-shadow:
+      inset 0 1px rgb(255 255 255 / 0.17),
+      0 5px 18px hsl(var(--primary) / 0.2);
+    translate: 0 -1px;
+  }
+  .studio-shell
+    :is(button, a).border:not(:disabled):not([aria-disabled="true"]):hover {
+    border-color: hsl(var(--primary) / 0.42);
+  }
+  .studio-shell button:not(:disabled):active,
+  .studio-shell a:active {
+    translate: 0 0;
+  }
+}
+@media (max-width: 640px) {
+  .studio-shell .studio-route-enter :is(.gap-6, .space-y-6) {
+    gap: 1rem;
+  }
+  .studio-shell
+    .studio-route-enter
+    .space-y-6
+    > :not([hidden])
+    ~ :not([hidden]) {
+    margin-top: 1rem;
+  }
+  .studio-shell .studio-route-enter :is(input, textarea) {
+    font-size: 1rem;
+  }
+}
 [data-slot="select-trigger"] [data-slot="select-value"] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: left;
+  text-align: start;
 }
 [data-slot="select-content"] [role="option"] {
   overflow-wrap: anywhere;

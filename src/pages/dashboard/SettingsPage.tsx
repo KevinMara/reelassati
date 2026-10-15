@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { AccountDataControls } from "@/components/studio/AccountDataControls";
 import { ServiceDiagnosticsPanel } from "@/components/studio/ServiceDiagnosticsPanel";
@@ -25,7 +26,8 @@ import {
 import type { BrandKit, WorkspaceProfile } from "@contracts/workspace";
 import { useTheme } from "@/hooks/useTheme";
 import { useWorkspace } from "@/providers/workspace";
-import { WRITING_LANGUAGES } from "@/lib/languages";
+import { WRITING_LANGUAGES, localizedLanguageLabel } from "@/lib/languages";
+import { selectLanguage, supportedLanguages } from "@/lib/i18n";
 
 type Tab = "profile" | "brand" | "appearance" | "integrations";
 
@@ -53,6 +55,7 @@ const COMMON_TIMEZONES = [
 ];
 
 export default function SettingsPage() {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const { workspace, capabilities, updateWorkspace, loading, saving } =
     useWorkspace();
@@ -118,7 +121,7 @@ export default function SettingsPage() {
         email: workspace.profile.email,
       };
       await updateWorkspace(current => ({ ...current, profile: next }));
-      await i18n.changeLanguage(next.language);
+      await selectLanguage(next.language);
       setProfileEdits({});
       setNotice({ tone: "success", message: "Studio profile saved." });
     } catch (cause) {
@@ -218,10 +221,12 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">Workspace control</p>
-        <h1 className="text-3xl font-semibold">Settings</h1>
+        <p className="mono-eyebrow mb-2 text-primary">
+          {ui("Workspace control")}
+        </p>
+        <h1 className="text-3xl font-semibold">{ui("Settings")}</h1>
         <p className="mt-2 text-sm text-foreground/70">
-          Saved studio preferences and live capability checks.
+          {ui("Saved studio preferences and live capability checks.")}
         </p>
       </div>
 
@@ -244,7 +249,7 @@ export default function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <nav
           className="flex gap-1 overflow-x-auto lg:flex-col"
-          aria-label="Settings"
+          aria-label={ui("Settings")}
         >
           {TABS.map(tab => (
             <button
@@ -262,7 +267,7 @@ export default function SettingsPage() {
               }`}
             >
               <tab.icon className="h-4 w-4" />
-              {tab.label}
+              {ui(tab.label)}
             </button>
           ))}
         </nav>
@@ -274,15 +279,18 @@ export default function SettingsPage() {
               className="space-y-5 rounded-xl border border-border bg-surface p-6"
             >
               <div>
-                <h2 className="text-lg font-medium">Studio profile</h2>
+                <h2 className="text-lg font-medium">{ui("Studio profile")}</h2>
                 <p className="mt-1 text-sm text-foreground/70">
-                  The owner email comes from the authenticated private site
-                  session.
+                  {ui(
+                    "The owner email comes from the authenticated private site session."
+                  )}
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">Your name</span>
+                  <span className="mb-1.5 block font-medium">
+                    {ui("Your name")}
+                  </span>
                   <input
                     value={profileDraft.name}
                     onChange={event =>
@@ -293,7 +301,9 @@ export default function SettingsPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">Studio name</span>
+                  <span className="mb-1.5 block font-medium">
+                    {ui("Studio name")}
+                  </span>
                   <input
                     value={profileDraft.workspaceName}
                     onChange={event =>
@@ -304,16 +314,21 @@ export default function SettingsPage() {
                   />
                 </label>
                 <label className="text-sm sm:col-span-2">
-                  <span className="mb-1.5 block font-medium">Owner email</span>
+                  <span className="mb-1.5 block font-medium">
+                    {ui("Owner email")}
+                  </span>
                   <input
                     value={workspace.profile.email}
                     readOnly
                     className="w-full cursor-not-allowed rounded-lg border border-border bg-foreground/[0.03] px-4 py-2.5 text-foreground/70"
                   />
                 </label>
-                <label htmlFor="settings-interface-language" className="text-sm">
+                <label
+                  htmlFor="settings-interface-language"
+                  className="text-sm"
+                >
                   <span className="mb-1.5 block font-medium">
-                    Interface language
+                    {ui("Interface language")}
                   </span>
                   <StudioSelect
                     id="settings-interface-language"
@@ -326,13 +341,16 @@ export default function SettingsPage() {
                     }
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                   >
-                    <option value="en">English</option>
-                    <option value="it">Italiano</option>
+                    {supportedLanguages.map(([code, label]) => (
+                      <option key={code} value={code}>
+                        {label}
+                      </option>
+                    ))}
                   </StudioSelect>
                 </label>
                 <label className="text-sm">
                   <span className="mb-1.5 block font-medium">
-                    Default creation language
+                    {ui("Default creation language")}
                   </span>
                   <StudioSelect
                     value={profileDraft.contentLanguage}
@@ -343,14 +361,17 @@ export default function SettingsPage() {
                   >
                     {WRITING_LANGUAGES.map(language => (
                       <option key={language.code} value={language.code}>
-                        {language.label}
+                        {localizedLanguageLabel(
+                          language.code,
+                          i18n.resolvedLanguage || "en"
+                        )}
                       </option>
                     ))}
                   </StudioSelect>
                 </label>
                 <label className="text-sm">
                   <span className="mb-1.5 block font-medium">
-                    Publishing timezone
+                    {ui("Publishing timezone")}
                   </span>
                   <StudioSelect
                     value={profileDraft.timezone}
@@ -370,8 +391,8 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between border-t border-border pt-5">
                 <span className="text-xs text-foreground/65">
                   {profileDirty
-                    ? "Unsaved profile changes"
-                    : "Profile is saved"}
+                    ? ui("Unsaved profile changes")
+                    : ui("Profile is saved")}
                 </span>
                 <button
                   type="submit"
@@ -383,7 +404,7 @@ export default function SettingsPage() {
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  Save profile
+                  {ui("Save profile")}
                 </button>
               </div>
             </form>
@@ -395,15 +416,18 @@ export default function SettingsPage() {
               className="space-y-5 rounded-xl border border-border bg-surface p-6"
             >
               <div>
-                <h2 className="text-lg font-medium">Brand defaults</h2>
+                <h2 className="text-lg font-medium">{ui("Brand defaults")}</h2>
                 <p className="mt-1 text-sm text-foreground/70">
-                  These constraints are reusable across scripts, AI plans, and
-                  edits.
+                  {ui(
+                    "These constraints are reusable across scripts, AI plans, and edits."
+                  )}
                 </p>
               </div>
               <div className="grid gap-4">
                 <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">Brand name</span>
+                  <span className="mb-1.5 block font-medium">
+                    {ui("Brand name")}
+                  </span>
                   <input
                     value={brandDraft.name}
                     onChange={event =>
@@ -414,7 +438,9 @@ export default function SettingsPage() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">Voice rules</span>
+                  <span className="mb-1.5 block font-medium">
+                    {ui("Voice rules")}
+                  </span>
                   <textarea
                     value={brandDraft.voice}
                     onChange={event =>
@@ -422,11 +448,15 @@ export default function SettingsPage() {
                     }
                     rows={4}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
-                    placeholder="Specific language, energy, point of view, and phrases to avoid"
+                    placeholder={ui(
+                      "Specific language, energy, point of view, and phrases to avoid"
+                    )}
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">Audience</span>
+                  <span className="mb-1.5 block font-medium">
+                    {ui("Audience")}
+                  </span>
                   <textarea
                     value={brandDraft.audience}
                     onChange={event =>
@@ -434,12 +464,16 @@ export default function SettingsPage() {
                     }
                     rows={4}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
-                    placeholder="Who they are, what they believe, and what creates urgency"
+                    placeholder={ui(
+                      "Who they are, what they believe, and what creates urgency"
+                    )}
                   />
                 </label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm">
-                    <span className="mb-1.5 block font-medium">Typeface</span>
+                    <span className="mb-1.5 block font-medium">
+                      {ui("Typeface")}
+                    </span>
                     <input
                       value={brandDraft.font}
                       onChange={event =>
@@ -450,7 +484,7 @@ export default function SettingsPage() {
                   </label>
                   <label htmlFor="settings-caption-preset" className="text-sm">
                     <span className="mb-1.5 block font-medium">
-                      Caption preset
+                      {ui("Caption preset")}
                     </span>
                     <StudioSelect
                       id="settings-caption-preset"
@@ -463,14 +497,14 @@ export default function SettingsPage() {
                       }
                       className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
                     >
-                      <option value="kinetic">Kinetic</option>
-                      <option value="editorial">Editorial</option>
-                      <option value="minimal">Minimal</option>
+                      <option value="kinetic">{ui("Kinetic")}</option>
+                      <option value="editorial">{ui("Editorial")}</option>
+                      <option value="minimal">{ui("Minimal")}</option>
                     </StudioSelect>
                   </label>
                   <label className="text-sm">
                     <span className="mb-1.5 block font-medium">
-                      Primary color
+                      {ui("Primary color")}
                     </span>
                     <input
                       type="color"
@@ -483,7 +517,7 @@ export default function SettingsPage() {
                   </label>
                   <label className="text-sm">
                     <span className="mb-1.5 block font-medium">
-                      Accent color
+                      {ui("Accent color")}
                     </span>
                     <input
                       type="color"
@@ -496,7 +530,7 @@ export default function SettingsPage() {
                   </label>
                   <label className="text-sm">
                     <span className="mb-1.5 flex justify-between font-medium">
-                      Safe zone <span>{brandDraft.safeZone}%</span>
+                      {ui("Safe zone")} <span>{brandDraft.safeZone}%</span>
                     </span>
                     <input
                       type="range"
@@ -511,7 +545,8 @@ export default function SettingsPage() {
                   </label>
                   <label className="text-sm">
                     <span className="mb-1.5 flex justify-between font-medium">
-                      Audio ducking <span>{brandDraft.audioDucking}%</span>
+                      {ui("Audio ducking")}{" "}
+                      <span>{brandDraft.audioDucking}%</span>
                     </span>
                     <input
                       type="range"
@@ -534,14 +569,14 @@ export default function SettingsPage() {
                   to="/dashboard/clients"
                   className="text-xs font-medium text-primary"
                 >
-                  Open the full Brand DNA editor
+                  {ui("Open the full Brand DNA editor")}
                 </Link>
                 <button
                   type="submit"
                   disabled={!brandDirty || saving}
                   className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white disabled:opacity-45"
                 >
-                  <Save className="h-4 w-4" /> Save defaults
+                  <Save className="h-4 w-4" /> {ui("Save defaults")}
                 </button>
               </div>
             </form>
@@ -550,9 +585,9 @@ export default function SettingsPage() {
           {activeTab === "appearance" ? (
             <section className="space-y-6 rounded-xl border border-border bg-surface p-6">
               <div>
-                <h2 className="text-lg font-medium">Appearance</h2>
+                <h2 className="text-lg font-medium">{ui("Appearance")}</h2>
                 <p className="mt-1 text-sm text-foreground/70">
-                  Theme preference is kept in this browser.
+                  {ui("Theme preference is kept in this browser.")}
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -569,9 +604,11 @@ export default function SettingsPage() {
                   }`}
                 >
                   <Sun className="h-5 w-5 text-primary" />
-                  <span className="mt-3 block text-sm font-medium">Light</span>
+                  <span className="mt-3 block text-sm font-medium">
+                    {ui("Light")}
+                  </span>
                   <span className="mt-1 block text-xs text-foreground/65">
-                    Warm paper surfaces and high-contrast controls.
+                    {ui("Warm paper surfaces and high-contrast controls.")}
                   </span>
                 </button>
                 <button
@@ -587,20 +624,25 @@ export default function SettingsPage() {
                   }`}
                 >
                   <Moon className="h-5 w-5 text-primary" />
-                  <span className="mt-3 block text-sm font-medium">Dark</span>
+                  <span className="mt-3 block text-sm font-medium">
+                    {ui("Dark")}
+                  </span>
                   <span className="mt-1 block text-xs text-foreground/65">
-                    Low-glare editing surfaces for longer sessions.
+                    {ui("Low-glare editing surfaces for longer sessions.")}
                   </span>
                 </button>
               </div>
               <div className="rounded-lg border border-border bg-background p-4">
                 <div className="flex items-center gap-2">
                   <Globe2 className="h-4 w-4 text-primary" />
-                  <p className="text-sm font-medium">Language and timezone</p>
+                  <p className="text-sm font-medium">
+                    {ui("Language and timezone")}
+                  </p>
                 </div>
                 <p className="mt-1 text-xs text-foreground/65">
-                  Edit these under Studio profile so interface and publishing
-                  settings stay in one saved record.
+                  {ui(
+                    "Edit these under Studio profile so interface and publishing settings stay in one saved record."
+                  )}
                 </p>
               </div>
             </section>
@@ -611,24 +653,25 @@ export default function SettingsPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-medium">
-                    Configured capabilities
+                    {ui("Configured capabilities")}
                   </h2>
                   <p className="mt-1 text-sm text-foreground/70">
-                    These checks confirm deployed bindings and keys are present.
-                    The first real request verifies each external service.
+                    {ui(
+                      "These checks confirm deployed bindings and keys are present. The first real request verifies each external service."
+                    )}
                   </p>
                 </div>
                 <Link
                   to="/dashboard/status"
                   className="text-sm font-medium text-primary"
                 >
-                  Open studio status
+                  {ui("Open studio status")}
                 </Link>
               </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 {capabilityRows.map(row => (
                   <article
-                    key={row.label}
+                    key={ui(row.label)}
                     className="rounded-xl border border-border bg-background p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -640,10 +683,12 @@ export default function SettingsPage() {
                             : "bg-amber-500/10 text-amber-600"
                         }`}
                       >
-                        {row.ready ? "Configured" : "Setup needed"}
+                        {row.ready ? ui("Configured") : ui("Setup needed")}
                       </span>
                     </div>
-                    <h3 className="mt-4 text-sm font-medium">{row.label}</h3>
+                    <h3 className="mt-4 text-sm font-medium">
+                      {ui(row.label)}
+                    </h3>
                     <p className="mt-1 text-xs leading-relaxed text-foreground/65">
                       {row.detail}
                     </p>
@@ -653,7 +698,7 @@ export default function SettingsPage() {
               {capabilities.missing.length ? (
                 <div className="mt-5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
                   <p className="text-xs font-medium text-amber-700">
-                    Missing environment configuration
+                    {ui("Missing environment configuration")}
                   </p>
                   <p className="mt-1 break-words font-mono text-xs text-foreground/70">
                     {capabilities.missing.join(", ")}
@@ -668,7 +713,8 @@ export default function SettingsPage() {
                   to="/dashboard/social"
                   className="inline-flex items-center gap-2 text-sm font-medium text-primary"
                 >
-                  <Radio className="h-4 w-4" /> Manage publishing accounts
+                  <Radio className="h-4 w-4" />{" "}
+                  {ui("Manage publishing accounts")}
                 </Link>
               </div>
             </section>

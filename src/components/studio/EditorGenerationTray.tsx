@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import {
   Check,
@@ -33,6 +34,7 @@ export function EditorGenerationTray({
   onRename: (record: EditorGeneration, name: string) => Promise<void>;
   onRecoverVideo: (record: EditorGeneration) => Promise<void>;
 }) {
+  const ui = useUiText();
   const [expanded, setExpanded] = useState(false);
   if (!records.length) return null;
   const ordered = [...records].sort(
@@ -43,16 +45,17 @@ export function EditorGenerationTray({
   );
   return (
     <section
-      aria-label="Generated files"
+      aria-label={ui("Generated files")}
       className="mt-5 border-t border-border pt-4"
     >
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-medium">Generated files</h3>
+        <h3 className="text-sm font-medium">{ui("Generated files")}</h3>
         <span className="text-xs text-foreground/45">{records.length}</span>
       </div>
       <p className="mb-3 text-xs leading-relaxed text-foreground/55">
-        Ready files are saved to Library. Drag them onto the timeline whenever
-        you need them.
+        {ui(
+          "Ready files are saved to Library. Drag them onto the timeline whenever you need them."
+        )}
       </p>
       <div className="space-y-2">
         {(expanded ? ordered : ordered.slice(0, 8)).map(record => (
@@ -80,7 +83,9 @@ export function EditorGenerationTray({
           onClick={() => setExpanded(value => !value)}
           className="mt-3 text-xs text-primary"
         >
-          {expanded ? "Show recent files" : `Show all ${records.length} files`}
+          {expanded
+            ? ui("Show recent files")
+            : `Show all ${records.length} files`}
         </button>
       )}
     </section>
@@ -104,6 +109,7 @@ function GenerationCard({
   canRecover: boolean;
   onRecoverVideo: (r: EditorGeneration) => Promise<void>;
 }) {
+  const ui = useUiText();
   const [rename, setRename] = useState(false);
   const [name, setName] = useState(record.name);
   const [error, setError] = useState("");
@@ -155,7 +161,7 @@ function GenerationCard({
                 />
                 <button
                   type="submit"
-                  aria-label="Save generation name"
+                  aria-label={ui("Save generation name")}
                   disabled={!name.trim()}
                   className="p-1 text-primary"
                 >
@@ -188,8 +194,10 @@ function GenerationCard({
             {record.status === "failed"
               ? record.error || "Generation failed."
               : record.status === "completed"
-                ? "This file is no longer in Library."
-                : "Waiting for provider output. You can keep creating or check saved results."}
+                ? ui("This file is no longer in Library.")
+                : ui(
+                    "Waiting for provider output. You can keep creating or check saved results."
+                  )}
           </p>
           {canRecover ? (
             <div className="mt-2 space-y-1.5">
@@ -204,11 +212,12 @@ function GenerationCard({
                 ) : (
                   <RotateCcw size={12} />
                 )}
-                {checking ? "Recovering video…" : "Recover video"}
+                {checking ? ui("Recovering video…") : ui("Recover video")}
               </button>
               <p className="text-[11px] leading-relaxed text-foreground/50">
-                Retrieves the existing output · no new generation or credit
-                charge.
+                {ui(
+                  "Retrieves the existing output · no new generation or credit charge."
+                )}
               </p>
             </div>
           ) : (
@@ -218,8 +227,8 @@ function GenerationCard({
               onClick={() => void onCheck(record)}
               className="mt-2 flex items-center gap-1.5 rounded-lg border border-primary/25 px-2.5 py-1.5 text-xs text-primary disabled:opacity-40"
             >
-              {checking && <Loader2 size={12} className="animate-spin" />}Check{" "}
-              {generationKindLabel[record.kind].toLowerCase()}
+              {checking && <Loader2 size={12} className="animate-spin" />}
+              {ui("Check")} {generationKindLabel[record.kind].toLowerCase()}
             </button>
           )}
         </>

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Asset, TimelineClip } from "@contracts/workspace";
 import {
@@ -23,6 +24,7 @@ export function TimelineMediaStrip({
   clip: TimelineClip;
   asset?: Asset;
 }) {
+  const ui = useUiText();
   const element = useRef<HTMLSpanElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState<View | null>(null);
@@ -249,7 +251,7 @@ export function TimelineMediaStrip({
       )}
       {current?.kind === "unavailable" && (
         <span className="absolute bottom-0 right-1 max-w-full truncate text-[8px] font-normal text-white/60">
-          {audio ? "Waveform unavailable" : "Filmstrip unavailable"}
+          {audio ? ui("Waveform unavailable") : ui("Filmstrip unavailable")}
         </span>
       )}
     </span>

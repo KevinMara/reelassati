@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   ArrowRight,
   Bot,
@@ -266,6 +267,7 @@ const CONTROLS = {
 } as const;
 
 export default function AITransparency() {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const language: Language = i18n.resolvedLanguage?.startsWith("it")
     ? "it"
@@ -319,7 +321,7 @@ export default function AITransparency() {
             </p>
             <div className="mt-4 border-t border-border pt-4">
               <p className="font-mono text-[9px] uppercase tracking-wider text-foreground/40">
-                {language === "it" ? "Input inviato" : "Input transferred"}
+                {ui("Input transferred")}
               </p>
               <p className="mt-1.5 text-xs leading-5 text-foreground/55">
                 {system.input}
@@ -439,9 +441,9 @@ export default function AITransparency() {
 
       <div className="mt-10 flex items-center gap-2 rounded-xl border border-border bg-surface-recessed px-4 py-3 text-xs leading-5 text-foreground/50">
         <Database className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-        {language === "it"
-          ? "I dettagli del modello e della provenienza devono seguire l’output salvato; l’interfaccia non considera il solo nome del file come prova."
-          : "Model and provenance details should travel with the saved output; the interface does not treat a filename alone as evidence."}
+        {ui(
+          "Model and provenance details should travel with the saved output; the interface does not treat a filename alone as evidence."
+        )}
       </div>
     </PublicComplianceShell>
   );

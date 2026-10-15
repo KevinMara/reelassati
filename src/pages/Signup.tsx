@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
@@ -13,8 +14,9 @@ import {
 } from "@/lib/auth-next";
 
 export default function Signup() {
-  const { t, i18n } = useTranslation();
-  const isItalian = i18n.resolvedLanguage?.startsWith("it");
+  const ui = useUiText();
+  const { t } = useTranslation();
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, signup, loading, error, clearError } = useAuth();
@@ -51,7 +53,9 @@ export default function Signup() {
       <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary-wash text-primary shadow-[inset_0_1px_rgba(255,255,255,0.25),0_12px_35px_-18px_hsl(var(--primary))]">
         <Sparkles className="h-5 w-5" />
       </div>
-      <p className="mono-eyebrow mb-2 text-primary">YOUR CREATOR WORKSPACE</p>
+      <p className="mono-eyebrow mb-2 text-primary">
+        {ui("YOUR CREATOR WORKSPACE")}
+      </p>
       <h1 className="text-3xl font-semibold tracking-tight">
         {t("auth.signup.title")}
       </h1>
@@ -62,9 +66,9 @@ export default function Signup() {
       {confirmationSent ? (
         <div className="mt-7 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-5">
           <Check className="mb-3 h-5 w-5 text-emerald-500" />
-          <p className="font-medium">Check your email</p>
+          <p className="font-medium">{ui("Check your email")}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            We sent a secure confirmation link to {email}.
+            {ui("We sent a secure confirmation link to")} {email}.
           </p>
           <Link
             to={`/auth/login?next=${encodeURIComponent(safeDashboardNext(requestedNext))}`}
@@ -84,19 +88,17 @@ export default function Signup() {
               className="mt-0.5 accent-primary"
             />
             <span>
-              {isItalian ? "Accetto i " : "I agree to the "}
+              {ui("I agree to the ")}
               <Link to="/terms" className="text-primary underline">
-                {isItalian ? "Termini di servizio" : "Terms of Service"}
+                {ui("Terms of Service")}
               </Link>{" "}
-              {isItalian ? "e le regole di " : "and "}
+              {ui("and ")}
               <Link to="/responsible-use" className="text-primary underline">
-                {isItalian ? "Uso responsabile" : "Responsible Use rules"}
+                {ui("Responsible Use rules")}
               </Link>
-              {isItalian
-                ? ", e dichiaro di aver letto l’"
-                : ", and acknowledge the "}
+              {ui(", and acknowledge the ")}
               <Link to="/privacy" className="text-primary underline">
-                {isItalian ? "Informativa privacy" : "Privacy Notice"}
+                {ui("Privacy Notice")}
               </Link>
               .
             </span>
@@ -148,7 +150,7 @@ export default function Signup() {
                   setPassword(event.target.value);
                 }}
                 className="mt-2 h-11 w-full rounded-xl border border-border bg-background/70 px-3 outline-none transition focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
-                placeholder="At least 8 characters"
+                placeholder={ui("At least 8 characters")}
               />
             </label>
             {error ? (
@@ -164,21 +166,19 @@ export default function Signup() {
               disabled={loading || !termsAccepted}
               className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-medium text-primary-foreground shadow-[0_14px_30px_-16px_hsl(var(--primary))] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:opacity-50"
             >
-              {loading ? "Creating account…" : t("auth.signup_btn")}
+              {loading ? ui("Creating account…") : t("auth.signup_btn")}
               {!loading ? (
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               ) : null}
             </button>
           </form>
           <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground">
-            {isItalian
-              ? "Scopri come funziona l’AI gestita in "
-              : "Learn how managed AI works in "}
+            {ui("Learn how managed AI works in ")}
             <Link
               to="/ai-transparency"
               className="text-primary hover:underline"
             >
-              {isItalian ? "Trasparenza AI" : "AI transparency"}
+              {ui("AI transparency")}
             </Link>
             .
           </p>

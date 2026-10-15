@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useRef, useState } from "react";
 import type { Asset, EditProject } from "@contracts/workspace";
 import { expandLinkedSelection } from "@contracts/clip-groups";
@@ -28,6 +29,7 @@ export function RhythmTools({
   ) => Promise<void>;
   onSeek: (time: number) => void;
 }) {
+  const ui = useUiText();
   const pictures = project.clips.filter(
     c => clipLaneKind(c) === "video" && !c.graphic && !c.transitionHandle
   );
@@ -136,7 +138,9 @@ export function RhythmTools({
             (kind === "cuts" && (!measurement || stale))
           )
             throw new Error(
-              "The timeline changed. Measure or review it again before applying."
+              ui(
+                "The timeline changed. Measure or review it again before applying."
+              )
             );
           return kind === "cuts"
             ? cutSelectedOnBeats(current, targets, times, () =>
@@ -160,12 +164,13 @@ export function RhythmTools({
   return (
     <div className="space-y-5">
       <p className="text-sm text-foreground/65">
-        Uses existing media and measured speech. No AI credits. Apply creates
-        one saved revision; Undo restores the previous edit.
+        {ui(
+          "Uses existing media and measured speech. No AI credits. Apply creates one saved revision; Undo restores the previous edit."
+        )}
       </p>
       <fieldset disabled={busy} className="space-y-2">
         <legend className="mb-2 text-sm font-semibold">
-          Picture clips to edit
+          {ui("Picture clips to edit")}
         </legend>
         {pictures.length ? (
           pictures.map(c => (
@@ -183,34 +188,35 @@ export function RhythmTools({
                 }
               />
               {c.label} · {c.start.toFixed(2)}–
-              {(c.start + c.duration).toFixed(2)}s{c.locked ? " · Locked" : ""}
+              {(c.start + c.duration).toFixed(2)}s
+              {c.locked ? ui(" · Locked") : ""}
             </label>
           ))
         ) : (
-          <p className="text-sm">Add picture footage first.</p>
+          <p className="text-sm">{ui("Add picture footage first.")}</p>
         )}
         {linked.length ? (
           <p className="text-xs text-foreground/65">
-            Beat cuts also split linked audio:{" "}
+            {ui("Beat cuts also split linked audio:")}{" "}
             {linked
               .map(id => project.clips.find(c => c.id === id)?.label)
               .join(", ")}
-            . Independent music and other layers stay in place.
+            {ui(". Independent music and other layers stay in place.")}
           </p>
         ) : null}
       </fieldset>
       <section
         className="space-y-3 rounded-xl border border-border p-3"
-        aria-label="Beat cuts"
+        aria-label={ui("Beat cuts")}
       >
-        <h3 className="text-sm font-semibold">Beat cuts</h3>
+        <h3 className="text-sm font-semibold">{ui("Beat cuts")}</h3>
         <p className="text-xs text-foreground/65">
-          Measures percussive onsets from the actual waveform, up to five
-          minutes / 16 MB. Review points before cutting. This does not infer
-          downbeats or rearrange shots.
+          {ui(
+            "Measures percussive onsets from the actual waveform, up to five minutes / 16 MB. Review points before cutting. This does not infer downbeats or rearrange shots."
+          )}
         </p>
         <CompactSelect
-          aria-label="Beat audio source"
+          aria-label={ui("Beat audio source")}
           value={sourceId}
           disabled={busy || !sources.length}
           options={sources.map(c => ({ value: c.id, label: c.label }))}
@@ -220,9 +226,9 @@ export function RhythmTools({
           }}
         />
         <label className="block text-xs">
-          Sensitivity · {sensitivity.toFixed(1)}
+          {ui("Sensitivity ·")} {sensitivity.toFixed(1)}
           <input
-            aria-label="Beat sensitivity"
+            aria-label={ui("Beat sensitivity")}
             type="range"
             min={0.5}
             max={2}
@@ -242,13 +248,13 @@ export function RhythmTools({
           onClick={() => void measure()}
           className={button}
         >
-          {busy ? "Working…" : "Measure source audio"}
+          {busy ? ui("Working…") : ui("Measure source audio")}
         </button>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs">
-            Use every Nth onset
+            {ui("Use every Nth onset")}
             <input
-              aria-label="Beat interval"
+              aria-label={ui("Beat interval")}
               type="number"
               min={1}
               max={8}
@@ -263,9 +269,9 @@ export function RhythmTools({
             />
           </label>
           <label className="text-xs">
-            Minimum gap (seconds)
+            {ui("Minimum gap (seconds)")}
             <input
-              aria-label="Minimum beat gap"
+              aria-label={ui("Minimum beat gap")}
               type="number"
               min={0.2}
               max={10}
@@ -284,7 +290,7 @@ export function RhythmTools({
           <>
             <p className="text-sm" role="status">
               {stale
-                ? "Timeline changed. Measure again."
+                ? ui("Timeline changed. Measure again.")
                 : `${times.length} measured cut points in this source's timeline interval.`}
             </p>
             <div className="flex max-h-32 flex-wrap gap-1 overflow-auto">
@@ -302,8 +308,9 @@ export function RhythmTools({
             </div>
             {!stale && !times.length ? (
               <p className="text-xs text-foreground/65">
-                No strong onsets were measured in the retained interval. No cut
-                points were invented.
+                {ui(
+                  "No strong onsets were measured in the retained interval. No cut points were invented."
+                )}
               </p>
             ) : null}
           </>
@@ -316,28 +323,28 @@ export function RhythmTools({
           onClick={() => void apply("cuts")}
           className={button}
         >
-          Apply beat cuts
+          {ui("Apply beat cuts")}
         </button>
         {times.length > 48 ? (
           <p className="text-xs">
-            Use wider spacing to stay within 48 cut points.
+            {ui("Use wider spacing to stay within 48 cut points.")}
           </p>
         ) : null}
       </section>
       <section
         className="space-y-3 rounded-xl border border-border p-3"
-        aria-label="Speech autozoom"
+        aria-label={ui("Speech autozoom")}
       >
-        <h3 className="text-sm font-semibold">Speech autozoom</h3>
+        <h3 className="text-sm font-semibold">{ui("Speech autozoom")}</h3>
         <p className="text-xs text-foreground/65">
-          Alternates restrained punch-ins at measured phrase changes. Each
-          picture clip needs a transcript with word timing. Position stays as
-          authored; this does not track a face or camera.
+          {ui(
+            "Alternates restrained punch-ins at measured phrase changes. Each picture clip needs a transcript with word timing. Position stays as authored; this does not track a face or camera."
+          )}
         </p>
         <label className="block text-xs">
-          Zoom · {zoom.toFixed(2)}×
+          {ui("Zoom ·")} {zoom.toFixed(2)}×
           <input
-            aria-label="Speech zoom amount"
+            aria-label={ui("Speech zoom amount")}
             type="range"
             min={1.02}
             max={1.4}
@@ -355,7 +362,7 @@ export function RhythmTools({
             disabled={busy}
             onChange={e => setReplacePath(e.target.checked)}
           />
-          Replace existing motion
+          {ui("Replace existing motion")}
         </label>
         <button
           type="button"
@@ -363,7 +370,7 @@ export function RhythmTools({
           onClick={() => void apply("zoom")}
           className={button}
         >
-          Apply speech zoom
+          {ui("Apply speech zoom")}
         </button>
       </section>
       {error ? (

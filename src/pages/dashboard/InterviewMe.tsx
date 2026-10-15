@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -53,6 +54,7 @@ export default function InterviewMe({
 }: {
   embedded?: boolean;
 }) {
+  const ui = useUiText();
   const { workspace, capabilities, updateWorkspace } = useWorkspace();
   const [topic, setTopic] = useState("");
   const [niche, setNiche] = useState("");
@@ -139,7 +141,9 @@ export default function InterviewMe({
   const generateScript = async () => {
     if (!capabilities.ai) {
       setError(
-        "AI generation is temporarily unavailable. Your interview answers remain on this screen so you can try again later."
+        ui(
+          "AI generation is temporarily unavailable. Your interview answers remain on this screen so you can try again later."
+        )
       );
       return;
     }
@@ -211,7 +215,9 @@ export default function InterviewMe({
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setError(
-        "Clipboard access was blocked. Select the script and copy it manually."
+        ui(
+          "Clipboard access was blocked. Select the script and copy it manually."
+        )
       );
     }
   };
@@ -230,14 +236,19 @@ export default function InterviewMe({
   return (
     <div className={`mx-auto max-w-4xl ${embedded ? "pb-4" : ""}`}>
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">Story extractor</p>
-        <h1 className="text-3xl font-semibold">Interview Me</h1>
+        <p className="mono-eyebrow mb-2 text-primary">
+          {ui("Story extractor")}
+        </p>
+        <h1 className="text-3xl font-semibold">{ui("Interview Me")}</h1>
         <p className="mt-2 max-w-2xl text-foreground/60">
-          Answer a focused editorial interview, then turn your own evidence into
-          one production-ready short-form script.
+          {ui(
+            "Answer a focused editorial interview, then turn your own evidence into one production-ready short-form script."
+          )}
         </p>
         <p className="mt-3 inline-flex rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs text-primary">
-          AI writes the final draft only after your guided answers are complete.
+          {ui(
+            "AI writes the final draft only after your guided answers are complete."
+          )}
         </p>
       </div>
 
@@ -245,9 +256,9 @@ export default function InterviewMe({
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
           <p className="text-sm text-foreground/65">
-            The guided interview is available. Final script generation requires
-            the server-side AI integration; REELassati will not pretend a local
-            template is an AI result.
+            {ui(
+              "The guided interview is available. Final script generation requires the server-side AI integration; REELassati will not pretend a local template is an AI result."
+            )}
           </p>
         </div>
       )}
@@ -273,13 +284,15 @@ export default function InterviewMe({
                   htmlFor="interview-topic"
                   className="mb-2 block text-sm font-medium"
                 >
-                  What should this short be about?
+                  {ui("What should this short be about?")}
                 </label>
                 <input
                   id="interview-topic"
                   value={topic}
                   onChange={event => setTopic(event.target.value)}
-                  placeholder="The lesson I learned after launching too early…"
+                  placeholder={ui(
+                    "The lesson I learned after launching too early…"
+                  )}
                   className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
@@ -289,13 +302,13 @@ export default function InterviewMe({
                     htmlFor="interview-niche"
                     className="mb-2 block text-sm font-medium"
                   >
-                    Niche
+                    {ui("Niche")}
                   </label>
                   <input
                     id="interview-niche"
                     value={niche}
                     onChange={event => setNiche(event.target.value)}
-                    placeholder="Design, fitness, business…"
+                    placeholder={ui("Design, fitness, business…")}
                     className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm"
                   />
                 </div>
@@ -304,7 +317,7 @@ export default function InterviewMe({
                     htmlFor="interview-platform"
                     className="mb-2 block text-sm font-medium"
                   >
-                    Destination
+                    {ui("Destination")}
                   </label>
                   <StudioSelect
                     id="interview-platform"
@@ -316,7 +329,7 @@ export default function InterviewMe({
                   >
                     {PLATFORM_OPTIONS.map(option => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {ui(option.label)}
                       </option>
                     ))}
                   </StudioSelect>
@@ -329,7 +342,7 @@ export default function InterviewMe({
                 className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-40"
               >
                 <MessageCircle className="h-4 w-4" />
-                Start the interview
+                {ui("Start the interview")}
               </button>
             </div>
           </motion.section>
@@ -344,7 +357,8 @@ export default function InterviewMe({
           >
             <div className="mb-4 flex items-center justify-between text-xs text-foreground/70">
               <span>
-                Question {questionIndex + 1} of {questions.length}
+                {ui("Question")} {questionIndex + 1} {ui("of")}{" "}
+                {questions.length}
               </span>
               <span>
                 {Math.round(((questionIndex + 1) / questions.length) * 100)}%
@@ -375,7 +389,7 @@ export default function InterviewMe({
                 {currentQuestion.guidance}
               </div>
               <label htmlFor="interview-answer" className="sr-only">
-                Your answer to: {currentQuestion.prompt}
+                {ui("Your answer to:")} {currentQuestion.prompt}
               </label>
               <textarea
                 id="interview-answer"
@@ -386,7 +400,9 @@ export default function InterviewMe({
                     [currentQuestion.id]: event.target.value,
                   }))
                 }
-                placeholder="Answer in your own words. Specific beats polished."
+                placeholder={ui(
+                  "Answer in your own words. Specific beats polished."
+                )}
                 rows={7}
                 className="mt-5 w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
               />
@@ -402,7 +418,7 @@ export default function InterviewMe({
                   className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-background"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  Back
+                  {ui("Back")}
                 </button>
                 <button
                   type="button"
@@ -413,11 +429,11 @@ export default function InterviewMe({
                   {questionIndex === questions.length - 1 ? (
                     <>
                       <Sparkles className="h-4 w-4" />
-                      Generate script
+                      {ui("Generate script")}
                     </>
                   ) : (
                     <>
-                      Next question
+                      {ui("Next question")}
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
@@ -435,9 +451,11 @@ export default function InterviewMe({
             className="rounded-xl border border-border bg-surface py-20 text-center"
           >
             <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-primary" />
-            <p className="text-lg font-medium">Writing from your answers…</p>
+            <p className="text-lg font-medium">
+              {ui("Writing from your answers…")}
+            </p>
             <p className="mt-2 text-sm text-foreground/70">
-              One request, then one persisted script—sequentially.
+              {ui("One request, then one persisted script—sequentially.")}
             </p>
           </motion.div>
         )}
@@ -450,7 +468,7 @@ export default function InterviewMe({
           >
             <div className="mb-4 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm text-emerald-600">
               <CheckCircle2 className="h-4 w-4" />
-              Script saved to your workspace
+              {ui("Script saved to your workspace")}
             </div>
             <article className="rounded-xl border border-border bg-surface p-6">
               <div className="mb-5 flex items-start justify-between gap-4">
@@ -473,26 +491,26 @@ export default function InterviewMe({
                   ) : (
                     <Copy className="h-3.5 w-3.5" />
                   )}
-                  {copied ? "Copied" : "Copy"}
+                  {copied ? ui("Copied") : ui("Copy")}
                 </button>
               </div>
 
               <div className="space-y-5">
                 <div>
-                  <p className="mono-eyebrow mb-2 text-primary">Hook</p>
+                  <p className="mono-eyebrow mb-2 text-primary">{ui("Hook")}</p>
                   <p className="text-base font-medium leading-relaxed">
                     {script.hook}
                   </p>
                 </div>
                 <div>
-                  <p className="mono-eyebrow mb-2 text-primary">Body</p>
+                  <p className="mono-eyebrow mb-2 text-primary">{ui("Body")}</p>
                   <p className="whitespace-pre-wrap text-sm leading-7 text-foreground/75">
                     {script.body}
                   </p>
                 </div>
                 <div>
                   <p className="mono-eyebrow mb-2 text-primary">
-                    Call to action
+                    {ui("Call to action")}
                   </p>
                   <p className="text-sm font-medium">{script.cta}</p>
                 </div>
@@ -503,7 +521,7 @@ export default function InterviewMe({
               onClick={reset}
               className="mt-5 w-full rounded-lg border border-border py-3 text-sm font-medium hover:bg-surface"
             >
-              Start a new interview
+              {ui("Start a new interview")}
             </button>
           </motion.section>
         )}

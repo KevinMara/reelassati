@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -36,6 +37,7 @@ function previewRatio(ratio: (typeof RATIOS)[number]) {
 }
 
 export default function ImageGenerator() {
+  const ui = useUiText();
   const { workspace, capabilities, loading, updateWorkspace } = useWorkspace();
   const [assetName, setAssetName] = useState("Untitled image");
   const [prompt, setPrompt] = useState("");
@@ -112,12 +114,14 @@ export default function ImageGenerator() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">AI Image Studio</p>
-        <h1 className="text-3xl font-semibold">Create a visual</h1>
+        <p className="mono-eyebrow mb-2 text-primary">
+          {ui("AI Image Studio")}
+        </p>
+        <h1 className="text-3xl font-semibold">{ui("Create a visual")}</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          Generate campaign images, thumbnails, backgrounds, and supporting
-          visuals. Every result is saved automatically to your connected media
-          library under the name you choose.
+          {ui(
+            "Generate campaign images, thumbnails, backgrounds, and supporting visuals. Every result is saved automatically to your connected media library under the name you choose."
+          )}
         </p>
       </div>
 
@@ -126,11 +130,12 @@ export default function ImageGenerator() {
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
             <p className="text-sm font-medium">
-              Image generation is temporarily unavailable
+              {ui("Image generation is temporarily unavailable")}
             </p>
             <p className="mt-1 text-xs text-foreground/70">
-              Your saved images and uploads remain available in the Library and
-              Edit.
+              {ui(
+                "Your saved images and uploads remain available in the Library and Edit."
+              )}
             </p>
           </div>
         </div>
@@ -139,14 +144,14 @@ export default function ImageGenerator() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)]">
         <section className="rounded-xl border border-border bg-surface p-6">
           <label className="block text-xs font-medium" htmlFor="image-name">
-            Image name
+            {ui("Image name")}
           </label>
           <input
             id="image-name"
             value={assetName}
             maxLength={110}
             onChange={event => setAssetName(event.target.value)}
-            placeholder="Summer launch — hero image"
+            placeholder={ui("Summer launch — hero image")}
             className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
           />
 
@@ -154,7 +159,7 @@ export default function ImageGenerator() {
             className="mt-5 block text-xs font-medium"
             htmlFor="image-prompt"
           >
-            Describe the image
+            {ui("Describe the image")}
           </label>
           <textarea
             id="image-prompt"
@@ -165,7 +170,7 @@ export default function ImageGenerator() {
               setPrompt(event.target.value);
               invalidateAttestation();
             }}
-            placeholder="A high-contrast editorial product shot with..."
+            placeholder={ui("A high-contrast editorial product shot with...")}
             className="mt-2 w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-relaxed"
           />
           <p className="mt-1 text-right text-xs text-foreground/70">
@@ -173,7 +178,9 @@ export default function ImageGenerator() {
           </p>
 
           <fieldset className="mt-5">
-            <legend className="mb-2 text-xs font-medium">Aspect ratio</legend>
+            <legend className="mb-2 text-xs font-medium">
+              {ui("Aspect ratio")}
+            </legend>
             <div className="grid grid-cols-5 gap-2">
               {RATIOS.map(ratio => (
                 <button
@@ -220,7 +227,7 @@ export default function ImageGenerator() {
                 className="mt-0.5 accent-primary"
               />
               <span>
-                I may use this prompt, its brands, and its likenesses.
+                {ui("I may use this prompt, its brands, and its likenesses.")}
               </span>
             </label>
             <label className="flex items-start gap-2 text-foreground/65">
@@ -233,7 +240,9 @@ export default function ImageGenerator() {
                 }}
                 className="mt-0.5 accent-primary"
               />
-              <span>The image will depict an identifiable real person.</span>
+              <span>
+                {ui("The image will depict an identifiable real person.")}
+              </span>
             </label>
             {containsRealPerson ? (
               <label className="flex items-start gap-2 text-foreground/65">
@@ -246,7 +255,9 @@ export default function ImageGenerator() {
                   className="mt-0.5 accent-primary"
                 />
                 <span>
-                  I hold documented consent or another verified legal basis.
+                  {ui(
+                    "I hold documented consent or another verified legal basis."
+                  )}
                 </span>
               </label>
             ) : null}
@@ -267,17 +278,18 @@ export default function ImageGenerator() {
           >
             {generating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Generating image
+                <Loader2 className="h-4 w-4 animate-spin" />{" "}
+                {ui("Generating image")}
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4" /> Generate image ·{" "}
-                {imageCreditCost(resolution)} credits
+                <Sparkles className="h-4 w-4" /> {ui("Generate image ·")}{" "}
+                {imageCreditCost(resolution)} {ui("credits")}
               </>
             )}
           </button>
           <p className="mt-2 text-center text-xs text-foreground/65">
-            Credits are returned automatically if generation fails.
+            {ui("Credits are returned automatically if generation fails.")}
           </p>
         </section>
 
@@ -289,7 +301,7 @@ export default function ImageGenerator() {
                   <div>
                     <p className="text-sm font-medium">{resultAsset.name}</p>
                     <p className="mt-0.5 text-xs text-foreground/65">
-                      Saved to your image library
+                      {ui("Saved to your image library")}
                     </p>
                   </div>
                   <AiProvenanceBadge provenance={resultAsset.provenance} />
@@ -305,7 +317,7 @@ export default function ImageGenerator() {
                 </div>
                 <EditAssetLink
                   assetId={resultAsset.id}
-                  label="Add image to Edit"
+                  label={ui("Add image to Edit")}
                   className="mt-4"
                 />
                 <a
@@ -313,7 +325,7 @@ export default function ImageGenerator() {
                   download={resultAsset.name}
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2.5 text-sm font-medium hover:border-primary/45"
                 >
-                  <Download className="h-4 w-4" /> Download image
+                  <Download className="h-4 w-4" /> {ui("Download image")}
                 </a>
               </motion.div>
             ) : (
@@ -322,11 +334,12 @@ export default function ImageGenerator() {
                   <ImageIcon className="h-6 w-6 text-primary" />
                 </span>
                 <p className="mt-4 text-sm font-medium">
-                  Your generated image will appear here
+                  {ui("Your generated image will appear here")}
                 </p>
                 <p className="mt-1 max-w-sm text-xs leading-relaxed text-foreground/65">
-                  Name it, describe it, choose its format, and generate. The
-                  saved result is immediately available inside Edit.
+                  {ui(
+                    "Name it, describe it, choose its format, and generate. The saved result is immediately available inside Edit."
+                  )}
                 </p>
               </div>
             )}
@@ -335,9 +348,9 @@ export default function ImageGenerator() {
           {recentImages.length ? (
             <section className="rounded-xl border border-border bg-surface p-5">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-medium">Recent images</h2>
+                <h2 className="text-sm font-medium">{ui("Recent images")}</h2>
                 <span className="text-xs uppercase tracking-wider text-foreground/70">
-                  Connected library
+                  {ui("Connected library")}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2">

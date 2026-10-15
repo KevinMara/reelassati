@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Mic2 } from "lucide-react";
 import {
@@ -43,6 +44,7 @@ export function VoiceSelector({
   id,
   showPreview = true,
 }: VoiceSelectorProps) {
+  const ui = useUiText();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState("all");
@@ -82,22 +84,22 @@ export function VoiceSelector({
           className="w-[min(380px,calc(100vw-24px))] overflow-hidden rounded-xl border-border bg-popover p-0 shadow-xl"
         >
           <div className="border-b border-border px-3 py-2.5">
-            <p className="text-sm font-medium">Find your voice</p>
+            <p className="text-sm font-medium">{ui("Find your voice")}</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {VOICE_CATALOG.length} voices · {VOICE_LANGUAGES.length} native
-              languages
+              {VOICE_CATALOG.length} {ui("voices ·")} {VOICE_LANGUAGES.length}{" "}
+              {ui("native languages")}
             </p>
             <div className="mt-2 flex gap-2">
               <Select value={language} onValueChange={setLanguage}>
                 <SelectTrigger
                   size="sm"
-                  aria-label="Filter voices by native language"
+                  aria-label={ui("Filter voices by native language")}
                   className="min-w-0 flex-1 rounded-md text-xs"
                 >
-                  <SelectValue placeholder="All languages" />
+                  <SelectValue placeholder={ui("All languages")} />
                 </SelectTrigger>
                 <SelectContent position="popper" className="max-h-64">
-                  <SelectItem value="all">All languages</SelectItem>
+                  <SelectItem value="all">{ui("All languages")}</SelectItem>
                   {VOICE_LANGUAGES.map(item => (
                     <SelectItem key={item} value={item}>
                       {item}
@@ -108,13 +110,13 @@ export function VoiceSelector({
               <Select value={tag} onValueChange={setTag}>
                 <SelectTrigger
                   size="sm"
-                  aria-label="Filter voices by description"
+                  aria-label={ui("Filter voices by description")}
                   className="min-w-0 flex-1 rounded-md text-xs"
                 >
-                  <SelectValue placeholder="All styles" />
+                  <SelectValue placeholder={ui("All styles")} />
                 </SelectTrigger>
                 <SelectContent position="popper" className="max-h-64">
-                  <SelectItem value="all">All styles</SelectItem>
+                  <SelectItem value="all">{ui("All styles")}</SelectItem>
                   {VOICE_TAGS.map(item => (
                     <SelectItem key={item} value={item}>
                       {item}
@@ -128,15 +130,15 @@ export function VoiceSelector({
             <CommandInput
               value={query}
               onValueChange={setQuery}
-              placeholder="Search narration, warm, Italian…"
-              aria-label="Search voices"
+              placeholder={ui("Search narration, warm, Italian…")}
+              aria-label={ui("Search voices")}
             />
             <CommandList
               className="max-h-64 p-1.5"
-              aria-label="Available voices"
+              aria-label={ui("Available voices")}
             >
               <CommandEmpty>
-                No voices match. Try another language or style.
+                {ui("No voices match. Try another language or style.")}
               </CommandEmpty>
               {matches.map(voice => (
                 <CommandItem
@@ -164,9 +166,10 @@ export function VoiceSelector({
             </CommandList>
           </Command>
           <p className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
-            {matches.length} {matches.length === 1 ? "voice" : "voices"} ·
-            ElevenLabs voices support multilingual text at a lower credit cost.
-            Choose one, then listen to its sample.
+            {matches.length} {matches.length === 1 ? ui("voice") : ui("voices")}{" "}
+            {ui(
+              "· ElevenLabs voices support multilingual text at a lower credit cost. Choose one, then listen to its sample."
+            )}
           </p>
         </PopoverContent>
       </Popover>
@@ -182,8 +185,9 @@ export function VoiceSelector({
       )}
       {selected?.tags.includes("multilingual") && (
         <p className="text-[11px] text-muted-foreground">
-          Speaks 90+ languages, including Italian, with expressive delivery.
-          Uses the lower voice credit rate.
+          {ui(
+            "Speaks 90+ languages, including Italian, with expressive delivery. Uses the lower voice credit rate."
+          )}
         </p>
       )}
       {showPreview && selected && (

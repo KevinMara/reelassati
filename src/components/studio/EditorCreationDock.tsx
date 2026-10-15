@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   lazy,
   Suspense,
@@ -75,6 +76,7 @@ export function EditorCreationDock({
   playhead: number;
   onInsert: (asset: Asset) => Promise<void>;
 }) {
+  const ui = useUiText();
   const { workspace, capabilities, updateWorkspace, getWorkspaceSnapshot } =
     useWorkspace();
   const generation = useEditorGenerations(project.id);
@@ -109,14 +111,16 @@ export function EditorCreationDock({
     const ownerEmail = workspace.profile.email.toLowerCase();
     const brandId = selectedBrand(ownerEmail);
     if (activeProject.current !== targetId)
-      throw new Error("The selected project changed. Save the pose again.");
+      throw new Error(ui("The selected project changed. Save the pose again."));
     uploadController.current?.abort();
     const controller = new AbortController();
     uploadController.current = controller;
     const scope = await captureUploadRequestScope();
     if (scope.ownerEmail !== ownerEmail || scope.brandId !== brandId)
       throw new Error(
-        "The account or brand changed. Save the pose again in the intended workspace."
+        ui(
+          "The account or brand changed. Save the pose again in the intended workspace."
+        )
       );
     const assertTarget = () => {
       controller.signal.throwIfAborted();
@@ -127,7 +131,7 @@ export function EditorCreationDock({
         !latest.projects.some(p => p.id === targetId)
       )
         throw new Error(
-          "The workspace or project changed. Save the pose again."
+          ui("The workspace or project changed. Save the pose again.")
         );
     };
     assertTarget();
@@ -237,11 +241,14 @@ export function EditorCreationDock({
   }
 
   return (
-    <section aria-label="Create and manage media" className="h-full min-w-0">
+    <section
+      aria-label={ui("Create and manage media")}
+      className="h-full min-w-0"
+    >
       <div
         role="tablist"
         tabIndex={-1}
-        aria-label="Media tools"
+        aria-label={ui("Media tools")}
         onKeyDown={e => {
           const tabs = Array.from(
             e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')
@@ -301,7 +308,7 @@ export function EditorCreationDock({
           <div
             className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-background p-1"
             role="group"
-            aria-label="Audio tools"
+            aria-label={ui("Audio tools")}
           >
             {(["voice", "sounds"] as const).map(tab => (
               <button
@@ -311,7 +318,7 @@ export function EditorCreationDock({
                 onClick={() => setAudioMode(tab)}
                 className={`rounded-md px-2 py-2 text-sm ${audioMode === tab ? "bg-primary/15 text-primary" : "text-foreground/65"}`}
               >
-                {tab === "voice" ? "Voiceover" : "Music & SFX"}
+                {tab === "voice" ? ui("Voiceover") : ui("Music & SFX")}
               </button>
             ))}
           </div>
@@ -319,7 +326,7 @@ export function EditorCreationDock({
         {activeTool === "image" && (
           <div
             role="group"
-            aria-label="Image tools"
+            aria-label={ui("Image tools")}
             className="mb-4 grid grid-cols-3 gap-1 rounded-lg bg-background p-1"
           >
             {(["generate", "cutout", "depth"] as const).map(mode => (
@@ -331,10 +338,10 @@ export function EditorCreationDock({
                 className={`rounded-md px-2 py-2 text-xs ${imageMode === mode ? "bg-primary/15 text-primary" : "text-foreground/65"}`}
               >
                 {mode === "generate"
-                  ? "Generate"
+                  ? ui("Generate")
                   : mode === "cutout"
-                    ? "Person cutout"
-                    : "Image depth"}
+                    ? ui("Person cutout")
+                    : ui("Image depth")}
               </button>
             ))}
           </div>
@@ -356,7 +363,7 @@ export function EditorCreationDock({
               }
               className="ai-magic mb-4 inline-flex items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-xs text-primary"
             >
-              Ask Reel for suggestions
+              {ui("Ask Reel for suggestions")}
               <WandSparkles size={14} />
             </button>
           )}
@@ -373,7 +380,7 @@ export function EditorCreationDock({
                 onClick={() => setGraphicMode("kits")}
                 className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "kits" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
               >
-                Motion kits
+                {ui("Motion kits")}
               </button>
               <button
                 type="button"
@@ -381,7 +388,7 @@ export function EditorCreationDock({
                 onClick={() => setGraphicMode("presets")}
                 className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "presets" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
               >
-                Preset library
+                {ui("Preset library")}
               </button>
               <button
                 type="button"
@@ -389,7 +396,7 @@ export function EditorCreationDock({
                 onClick={() => setGraphicMode("custom")}
                 className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "custom" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
               >
-                Customize
+                {ui("Customize")}
               </button>
               <button
                 type="button"
@@ -397,7 +404,7 @@ export function EditorCreationDock({
                 onClick={() => setGraphicMode("model")}
                 className={`flex-1 rounded-md px-2 py-1.5 text-xs ${graphicMode === "model" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
               >
-                3D pose
+                {ui("3D pose")}
               </button>
             </div>
             {graphicMode === "kits" && (
@@ -424,7 +431,7 @@ export function EditorCreationDock({
               <Suspense
                 fallback={
                   <p role="status" className="text-sm text-foreground/65">
-                    Loading 3D pose tools…
+                    {ui("Loading 3D pose tools…")}
                   </p>
                 }
               >
@@ -446,7 +453,7 @@ export function EditorCreationDock({
                     onClick={() => setGraphicPreset(null)}
                     className="shrink-0 text-primary"
                   >
-                    Start blank
+                    {ui("Start blank")}
                   </button>
                 </div>
               )}
@@ -489,12 +496,16 @@ export function EditorCreationDock({
               className="block text-xs font-medium text-foreground/65"
               htmlFor={`generation-prompt-${project.id}`}
             >
-              {kind === "voice" ? "Voiceover script" : `Describe your ${kind}`}
+              {kind === "voice"
+                ? ui("Voiceover script")
+                : `Describe your ${kind}`}
             </label>
             <textarea
               id={`generation-prompt-${project.id}`}
               aria-label={
-                kind === "voice" ? "Voiceover text" : "Generation prompt"
+                kind === "voice"
+                  ? ui("Voiceover text")
+                  : ui("Generation prompt")
               }
               value={prompt}
               onChange={e =>
@@ -503,16 +514,16 @@ export function EditorCreationDock({
               rows={4}
               placeholder={
                 kind === "voice"
-                  ? "Write the exact words you want spoken…"
-                  : "Describe the subject, setting, lighting, and style…"
+                  ? ui("Write the exact words you want spoken…")
+                  : ui("Describe the subject, setting, lighting, and style…")
               }
               className="w-full resize-y rounded-xl border border-border bg-background p-3 text-sm"
             />
             {kind === "video" && (
               <label className="block text-xs">
-                Duration · {seconds.toFixed(1)}s
+                {ui("Duration ·")} {seconds.toFixed(1)}s
                 <input
-                  aria-label="Generated video duration"
+                  aria-label={ui("Generated video duration")}
                   type="range"
                   min={3}
                   max={15}
@@ -527,10 +538,10 @@ export function EditorCreationDock({
             )}
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-foreground/65">
-                Files to create
+                {ui("Files to create")}
               </span>
               <CompactSelect
-                aria-label="Number of generated files"
+                aria-label={ui("Number of generated files")}
                 value={String(count)}
                 onValueChange={value => setCount(Number(value))}
                 options={[1, 2, 3, 4].map(value => ({
@@ -547,13 +558,14 @@ export function EditorCreationDock({
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              Generate {count > 1 ? `${count} files · ` : "· "}
-              {unitCost * count} credits
+              {ui("Generate")} {count > 1 ? `${count} files · ` : "· "}
+              {unitCost * count} {ui("credits")}
             </button>
             {!available && (
               <p className="text-xs text-foreground/55">
-                This generation service is not available yet. Your existing
-                files remain available in Library.
+                {ui(
+                  "This generation service is not available yet. Your existing files remain available in Library."
+                )}
               </p>
             )}
           </div>

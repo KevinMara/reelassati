@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { OwnerOperations } from "@/components/studio/OwnerOperations";
 import { CreationStart } from "@/components/studio/CreationStart";
 import { BrandSwitcher } from "@/components/studio/BrandSwitcher";
@@ -5,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { Logo } from "@/components/Logo";
+import { LanguagePicker } from "@/components/LanguagePicker";
 import {
   Link,
   Navigate,
@@ -15,15 +17,12 @@ import {
 } from "react-router-dom";
 import {
   LayoutDashboard,
-  Search,
   Bell,
   Sun,
   Moon,
-  Globe,
   Users,
   FileText,
   BarChart3,
-  Search as SearchIcon,
   PenLine,
   Scissors,
   Send,
@@ -104,11 +103,12 @@ const FeedbackPage = lazy(() => import("./dashboard/FeedbackPage"));
 const BillingPage = lazy(() => import("./dashboard/BillingPage"));
 
 function StudioPageFallback() {
+  const ui = useUiText();
   return (
     <div
       className="flex min-h-[55vh] items-center justify-center"
       role="status"
-      aria-label="Loading Studio tool"
+      aria-label={ui("Loading Studio tool")}
     >
       <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
     </div>
@@ -116,6 +116,7 @@ function StudioPageFallback() {
 }
 
 function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
+  const ui = useUiText();
   const [credits, setCredits] = useState<number | null>(null);
 
   useEffect(() => {
@@ -143,7 +144,7 @@ function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
       to="/dashboard/billing"
       aria-label={
         credits === null
-          ? "Open plan and credits"
+          ? ui("Open plan and credits")
           : `${credits} credits available`
       }
       className="group hidden items-center gap-2 rounded-pill border border-border bg-surface px-3 py-1.5 text-xs transition-all hover:border-primary/35 hover:shadow-sm sm:flex"
@@ -152,7 +153,7 @@ function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
         <Coins className="h-3 w-3" />
       </span>
       <span className="font-mono font-medium">
-        {credits === null ? "Credits" : credits.toLocaleString()}
+        {credits === null ? ui("Credits") : credits.toLocaleString()}
       </span>
     </Link>
   );
@@ -160,6 +161,7 @@ function CreditBalanceChip({ refreshKey }: { refreshKey: string }) {
 
 // ── Dashboard Home ──
 function DashboardHome() {
+  const ui = useUiText();
   const { t } = useTranslation();
   const { user } = useAuth();
   const { workspace, capabilities, loading, saving, error } = useWorkspace();
@@ -248,7 +250,7 @@ function DashboardHome() {
     {
       title: t("dash.analizza_video"),
       desc: t("dash.analizza_video_desc"),
-      icon: SearchIcon,
+      icon: BrainCircuit,
       to: "/dashboard/analyze",
     },
     {
@@ -323,14 +325,14 @@ function DashboardHome() {
     <div>
       <CreationStart />
       <div className="dashboard-hero mb-6 rounded-2xl border border-border px-5 py-5 md:px-6">
-        <p className="mono-eyebrow text-primary mb-2">Dashboard</p>
+        <p className="mono-eyebrow text-primary mb-2">{ui("Dashboard")}</p>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold">
               {t(greetKey)}, {user?.name || "Creator"}.
             </h1>
             <p className="text-sm text-foreground/70 mt-2">
-              What will you make impossible to scroll past today?
+              {ui("What will you make impossible to scroll past today?")}
             </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs text-foreground/70 shadow-sm backdrop-blur-sm">
@@ -346,17 +348,17 @@ function DashboardHome() {
               )}
             />
             {saving
-              ? "Saving workspace…"
+              ? ui("Saving workspace…")
               : error
-                ? "Changes need attention"
-                : "Everything saved"}
+                ? ui("Changes need attention")
+                : ui("Everything saved")}
           </span>
         </div>
       </div>
 
       <section
         className="momentum-strip mb-6 rounded-xl border border-border bg-surface px-4 py-4 shadow-card sm:px-5"
-        aria-label="Weekly momentum"
+        aria-label={ui("Weekly momentum")}
       >
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
           <div className="min-w-[180px] flex-1">
@@ -365,7 +367,7 @@ function DashboardHome() {
                 <Sparkles className="h-3.5 w-3.5" />
               </span>
               <div>
-                <p className="text-xs font-medium">Weekly momentum</p>
+                <p className="text-xs font-medium">{ui("Weekly momentum")}</p>
                 <p className="text-xs text-foreground/70">{momentumMessage}</p>
               </div>
             </div>
@@ -377,13 +379,15 @@ function DashboardHome() {
                 {weekActivity.length}
               </p>
               <p className="text-xs uppercase tracking-wide text-foreground/70">
-                actions this week
+                {ui("actions this week")}
               </p>
             </div>
           </div>
           <div
             className="flex min-w-[120px] items-center gap-2.5"
-            title="Estimate based only on AI-assisted actions recorded in this workspace"
+            title={ui(
+              "Estimate based only on AI-assisted actions recorded in this workspace"
+            )}
           >
             <Timer className="h-4 w-4 text-primary" />
             <div>
@@ -391,11 +395,12 @@ function DashboardHome() {
                 {formattedTimeSaved}
               </p>
               <p className="text-xs uppercase tracking-wide text-foreground/70">
-                time reclaimed
+                {ui("time reclaimed")}
               </p>
               <span className="sr-only">
-                Estimated only from AI-assisted actions recorded in this
-                workspace.
+                {ui(
+                  "Estimated only from AI-assisted actions recorded in this workspace."
+                )}
               </span>
             </div>
           </div>
@@ -404,7 +409,7 @@ function DashboardHome() {
             <div>
               <p className="text-sm font-semibold tabular">{activeDays}</p>
               <p className="text-xs uppercase tracking-wide text-foreground/70">
-                active days
+                {ui("active days")}
               </p>
             </div>
           </div>
@@ -415,14 +420,14 @@ function DashboardHome() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {stats.map(s => (
           <Link
-            key={s.label}
+            key={ui(s.label)}
             to={s.to}
             data-reward-surface
             className="studio-stat-card group bg-surface border border-border rounded-xl p-5 shadow-card"
           >
             <div className="flex items-center justify-between mb-3">
               <span className="mono-eyebrow text-foreground/70 text-xs">
-                {s.label}
+                {ui(s.label)}
               </span>
               <s.icon className="h-4 w-4 text-foreground/70 transition-colors group-hover:text-primary" />
             </div>
@@ -439,7 +444,7 @@ function DashboardHome() {
           to="/dashboard/edit"
           className="text-sm text-primary hover:text-primary-hover flex items-center gap-1"
         >
-          Open Studio <ChevronRight className="h-3.5 w-3.5" />
+          {ui("Open Studio")} <ChevronRight className="h-3.5 w-3.5" />
         </Link>
       </div>
       <div className="grid sm:grid-cols-2 gap-4 mb-10">
@@ -468,7 +473,7 @@ function DashboardHome() {
           id="recent-activity"
           className="scroll-mt-20 lg:col-span-2 bg-surface border border-border rounded-xl p-6"
         >
-          <h2 className="font-medium mb-4">Recent Activity</h2>
+          <h2 className="font-medium mb-4">{ui("Recent Activity")}</h2>
           <div className="space-y-3">
             {recentActivity.length ? (
               recentActivity.map(item => (
@@ -493,11 +498,12 @@ function DashboardHome() {
             ) : (
               <div className="rounded-lg border border-dashed border-border p-8 text-center">
                 <p className="text-sm font-medium">
-                  Your activity starts with a real action.
+                  {ui("Your activity starts with a real action.")}
                 </p>
                 <p className="text-xs text-foreground/70 mt-1">
-                  Upload footage or create a project to start your activity
-                  history.
+                  {ui(
+                    "Upload footage or create a project to start your activity history."
+                  )}
                 </p>
               </div>
             )}
@@ -518,7 +524,7 @@ function DashboardHome() {
           <div
             className="mb-5 h-1.5 overflow-hidden rounded-full bg-primary/10"
             role="progressbar"
-            aria-label="Studio setup progress"
+            aria-label={ui("Studio setup progress")}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={onboardingProgress}
@@ -564,7 +570,7 @@ function DashboardHome() {
               to="/dashboard/trends"
               className="flex items-center gap-2 text-sm text-primary hover:text-primary-hover"
             >
-              <Flame className="h-4 w-4" /> Explore trending content
+              <Flame className="h-4 w-4" /> {ui("Explore trending content")}
             </Link>
           </div>
         </div>
@@ -574,6 +580,7 @@ function DashboardHome() {
 }
 
 function StudioStatus() {
+  const ui = useUiText();
   const { capabilities, workspace, error } = useWorkspace();
   const rows = [
     {
@@ -609,18 +616,20 @@ function StudioStatus() {
   return (
     <div className="max-w-4xl mx-auto">
       {capabilities.operations && <OwnerOperations />}
-      <p className="mono-eyebrow text-primary mb-2">Production readiness</p>
-      <h1 className="text-3xl font-semibold">Studio status</h1>
+      <p className="mono-eyebrow text-primary mb-2">
+        {ui("Production readiness")}
+      </p>
+      <h1 className="text-3xl font-semibold">{ui("Studio status")}</h1>
       <p className="text-foreground/60 mt-2">
-        Availability for storage, generation, and connected publishing.
+        {ui("Availability for storage, generation, and connected publishing.")}
       </p>
       {error ? <p className="mt-5 text-sm text-destructive">{error}</p> : null}
       <div className="grid sm:grid-cols-2 gap-4 mt-8">
         {rows.map(row => (
           <Link
-            key={row.label}
+            key={ui(row.label)}
             to={row.to}
-            aria-label={`${row.label}: ${row.ready ? "open" : "resolve setup"}`}
+            aria-label={`${row.label}: ${row.ready ? ui("open") : ui("resolve setup")}`}
             className="group block bg-surface border border-border rounded-xl p-5 transition duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transform-none"
           >
             <div className="flex items-center justify-between">
@@ -633,28 +642,28 @@ function StudioStatus() {
                     : "bg-amber-500/10 text-amber-500"
                 )}
               >
-                {row.ready ? "Configured" : "Setup needed"}
+                {row.ready ? ui("Configured") : ui("Setup needed")}
               </span>
             </div>
-            <h2 className="font-semibold mt-5">{row.label}</h2>
+            <h2 className="font-semibold mt-5">{ui(row.label)}</h2>
             <p className="text-sm text-foreground/70 mt-1">{row.detail}</p>
             <span className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary">
-              {row.ready ? "Open workspace" : "Resolve setup"}
+              {row.ready ? ui("Open workspace") : ui("Resolve setup")}
               <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
             </span>
           </Link>
         ))}
       </div>
       <div className="mt-6 bg-surface border border-border rounded-xl p-5">
-        <h2 className="font-medium">Workspace footprint</h2>
+        <h2 className="font-medium">{ui("Workspace footprint")}</h2>
         <p className="text-sm text-foreground/60 mt-2">
-          {workspace.projects.length} projects · {workspace.assets.length}{" "}
-          assets · {workspace.scripts.length} scripts · {workspace.posts.length}{" "}
-          publications
+          {workspace.projects.length} {ui("projects ·")}{" "}
+          {workspace.assets.length} {ui("assets ·")} {workspace.scripts.length}{" "}
+          {ui("scripts ·")} {workspace.posts.length} {ui("publications")}
         </p>
         {capabilities.missing.length ? (
           <p className="text-xs text-foreground/70 mt-3">
-            Some managed services still need setup.
+            {ui("Some managed services still need setup.")}
           </p>
         ) : null}
       </div>
@@ -664,7 +673,8 @@ function StudioStatus() {
 
 // ── Main Dashboard Component ──
 export default function Dashboard() {
-  const { t, i18n } = useTranslation();
+  const ui = useUiText();
+  const { t } = useTranslation();
   const { user, logout, loading: authLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { loading: workspaceLoading } = useWorkspace();
@@ -689,8 +699,6 @@ export default function Dashboard() {
     );
   }
 
-  const toggleLang = () =>
-    i18n.changeLanguage(i18n.language === "it" ? "en" : "it");
   const path = location.pathname;
 
   const navItems: Array<
@@ -704,7 +712,7 @@ export default function Dashboard() {
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
     { group: "create" },
     { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
-    { icon: Search, label: t("nav.analyze"), to: "/dashboard/analyze" },
+    { icon: BrainCircuit, label: t("nav.analyze"), to: "/dashboard/analyze" },
     { icon: Send, label: t("nav.publish"), to: "/dashboard/publish" },
     { icon: BarChart3, label: t("nav.analytics"), to: "/dashboard/analytics" },
     { separator: true, label: "Workspace" },
@@ -712,9 +720,7 @@ export default function Dashboard() {
     { icon: Calendar, label: t("nav.calendar"), to: "/dashboard/calendar" },
     {
       icon: Mail,
-      label: i18n.language.startsWith("it")
-        ? "Coach settimanale"
-        : "Weekly Coach",
+      label: ui("Weekly Coach"),
       to: "/dashboard/coaching",
     },
     { separator: true, label: "Account" },
@@ -722,35 +728,27 @@ export default function Dashboard() {
     { icon: AtSign, label: t("nav.social"), to: "/dashboard/social" },
     {
       icon: Gift,
-      label: i18n.language.startsWith("it")
-        ? "Invita e guadagna"
-        : "Refer & Earn",
+      label: ui("Refer & Earn"),
       to: "/dashboard/referral",
     },
     {
       icon: WalletCards,
-      label: i18n.language.startsWith("it")
-        ? "Piano e crediti"
-        : "Plan & credits",
+      label: ui("Plan & credits"),
       to: "/dashboard/billing",
     },
     {
       separator: true,
-      label: i18n.language.startsWith("it") ? "Supporto" : "Support",
+      label: ui("Support"),
     },
     {
       icon: MessageSquareWarning,
-      label: i18n.language.startsWith("it")
-        ? "Feedback e problemi"
-        : "Feedback & bugs",
+      label: ui("Feedback & bugs"),
       to: "/dashboard/feedback",
     },
     { icon: Settings, label: t("nav.settings"), to: "/dashboard/settings" },
     {
       icon: Shield,
-      label: i18n.language.startsWith("it")
-        ? "Stato dello studio"
-        : "Studio status",
+      label: ui("Studio status"),
       to: "/dashboard/status",
     },
   ];
@@ -761,7 +759,7 @@ export default function Dashboard() {
       {mobileOpen && (
         <button
           type="button"
-          aria-label="Close navigation"
+          aria-label={ui("Close navigation")}
           className="fixed inset-0 bg-black/40 z-40 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
@@ -782,7 +780,9 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => setCollapsed(!collapsed)}
-            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+            aria-label={
+              collapsed ? ui("Expand navigation") : ui("Collapse navigation")
+            }
             aria-expanded={!collapsed}
             className="hidden lg:flex p-1.5 rounded-md text-foreground/70 hover:text-foreground"
           >
@@ -795,7 +795,7 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            aria-label="Close navigation"
+            aria-label={ui("Close navigation")}
             className="lg:hidden p-1.5"
           >
             <X className="h-4 w-4" />
@@ -844,15 +844,13 @@ export default function Dashboard() {
                       ? "bg-primary/10 font-medium text-primary"
                       : "text-foreground/70 hover:bg-foreground/[0.04] hover:text-foreground"
                   )}
-                  title={collapsed ? "Create" : undefined}
+                  title={collapsed ? ui("Create") : undefined}
                 >
                   <Sparkles className="h-[18px] w-[18px] shrink-0" />
                   {!collapsed ? (
                     <>
                       <span className="flex-1 text-left">
-                        {i18n.language.startsWith("it")
-                          ? "Genera media"
-                          : "Generate media"}
+                        {ui("Generate media")}
                       </span>
                       <ChevronDown
                         className={cn(
@@ -870,21 +868,19 @@ export default function Dashboard() {
                   >
                     <SidebarItem
                       icon={Film}
-                      label="Video"
+                      label={ui("Video")}
                       to="/dashboard/video"
                       active={path.startsWith("/dashboard/video")}
                     />
                     <SidebarItem
                       icon={Images}
-                      label={
-                        i18n.language.startsWith("it") ? "Immagini" : "Images"
-                      }
+                      label={ui("Images")}
                       to="/dashboard/image"
                       active={path.startsWith("/dashboard/image")}
                     />
                     <SidebarItem
                       icon={Mic}
-                      label="Audio"
+                      label={ui("Audio")}
                       to="/dashboard/voice"
                       active={path.startsWith("/dashboard/voice")}
                     />
@@ -895,7 +891,7 @@ export default function Dashboard() {
               <SidebarItem
                 key={item.to}
                 icon={item.icon}
-                label={item.label}
+                label={ui(item.label)}
                 to={item.to}
                 active={
                   path === item.to ||
@@ -925,13 +921,13 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            aria-label="Open navigation"
+            aria-label={ui("Open navigation")}
             className="lg:hidden p-2 -ml-2"
           >
             <Menu className="h-5 w-5" />
           </button>
           <span className="mono-eyebrow text-foreground/70 hidden sm:block">
-            Dashboard
+            {ui("Dashboard")}
           </span>
           <div className="flex-1" />
           <PageGuideButton compact />
@@ -939,7 +935,7 @@ export default function Dashboard() {
           <StudioMediaTray key={path} />
           <Link
             to="/dashboard#recent-activity"
-            aria-label="Recent activity"
+            aria-label={ui("Recent activity")}
             className="p-2 text-foreground/70"
           >
             <Bell className="h-[18px] w-[18px]" />
@@ -948,7 +944,7 @@ export default function Dashboard() {
             type="button"
             onClick={toggleTheme}
             aria-label={
-              theme === "light" ? "Use dark theme" : "Use light theme"
+              theme === "light" ? ui("Use dark theme") : ui("Use light theme")
             }
             className="p-2 text-foreground/70"
           >
@@ -958,19 +954,7 @@ export default function Dashboard() {
               <Sun className="h-4 w-4" />
             )}
           </button>
-          <button
-            type="button"
-            onClick={toggleLang}
-            aria-label={
-              i18n.language === "it"
-                ? "Switch to English"
-                : "Passa all’italiano"
-            }
-            className="flex items-center gap-1 text-xs text-foreground/70"
-          >
-            <Globe className="h-3.5 w-3.5" />{" "}
-            {i18n.language === "it" ? "IT" : "EN"}
-          </button>
+          <LanguagePicker compact />
         </header>
 
         <main className="flex-1 p-4 sm:p-6 xl:p-8 w-full">

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useId, useMemo, useState } from "react";
 import { Search, ArrowUpRight, Loader2 } from "lucide-react";
 import type { Asset, EditProject } from "@contracts/workspace";
@@ -35,6 +36,7 @@ export function ProjectFootageSearch({
   assets: readonly Asset[];
   onSelect: (clipId: string, time: number) => void;
 }) {
+  const ui = useUiText();
   const inputId = useId();
   const { user } = useAuth();
   const [query, setQuery] = useState("");
@@ -105,14 +107,13 @@ export function ProjectFootageSearch({
     }
   };
   return (
-    <section className="space-y-3" aria-label="Search project footage">
+    <section className="space-y-3" aria-label={ui("Search project footage")}>
       <div>
-        <h3 className="text-sm font-semibold">Find in this project</h3>
+        <h3 className="text-sm font-semibold">{ui("Find in this project")}</h3>
         <p className="mt-1 text-xs leading-relaxed text-foreground/65">
-          Search transcript words, recorded scene observations, and clip names.
-          Visual descriptions are searchable after source analysis exists.
-          Search uses no AI credits. Meaning search compares English
-          descriptions on your device against this existing text evidence.
+          {ui(
+            "Search transcript words, recorded scene observations, and clip names. Visual descriptions are searchable after source analysis exists. Search uses no AI credits. Meaning search compares English descriptions on your device against this existing text evidence."
+          )}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -122,7 +123,7 @@ export function ProjectFootageSearch({
           onClick={() => setMode("literal")}
           className={`rounded-lg border px-3 py-1.5 text-xs ${mode === "literal" ? "border-primary/50 bg-primary/10" : "border-border"}`}
         >
-          Exact words
+          {ui("Exact words")}
         </button>
         <button
           type="button"
@@ -130,11 +131,11 @@ export function ProjectFootageSearch({
           onClick={() => setMode("meaning")}
           className={`rounded-lg border px-3 py-1.5 text-xs ${mode === "meaning" ? "border-primary/50 bg-primary/10" : "border-border"}`}
         >
-          Meaning · English
+          {ui("Meaning · English")}
         </button>
       </div>
       <label htmlFor={inputId} className="sr-only">
-        Search project words or descriptions
+        {ui("Search project words or descriptions")}
       </label>
       <div className="relative">
         <Search
@@ -148,16 +149,16 @@ export function ProjectFootageSearch({
           value={query}
           maxLength={PROJECT_FOOTAGE_SEARCH_LIMITS.queryCharacters}
           onChange={event => setQuery(event.target.value)}
-          placeholder="Try a spoken phrase or “coffee cup”"
+          placeholder={ui("Try a spoken phrase or “coffee cup”")}
           className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/15"
         />
       </div>
       {mode === "meaning" && (
         <>
           <p className="text-xs leading-relaxed text-foreground/60">
-            The first search loads about 46 MB of local model resources. Text
-            stays on this device. Results show related evidence, not verified
-            visual observations.
+            {ui(
+              "The first search loads about 46 MB of local model resources. Text stays on this device. Results show related evidence, not verified visual observations."
+            )}
           </p>
           <button
             type="button"
@@ -173,12 +174,13 @@ export function ProjectFootageSearch({
             {currentMeaning?.busy && (
               <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
             )}
-            Find related moments
+            {ui("Find related moments")}
           </button>
           {corpus.omittedExcerpts && (
             <p className="text-xs text-foreground/60">
-              This search uses the first 256 distinct evidence excerpts. Exact
-              words searches additional evidence.
+              {ui(
+                "This search uses the first 256 distinct evidence excerpts. Exact words searches additional evidence."
+              )}
             </p>
           )}
           {currentMeaning && (
@@ -192,7 +194,7 @@ export function ProjectFootageSearch({
           )}
           {!corpus.excerpts.length && (
             <p className="text-xs text-foreground/60">
-              No attributable text evidence is available yet.
+              {ui("No attributable text evidence is available yet.")}
             </p>
           )}
         </>
@@ -204,14 +206,17 @@ export function ProjectFootageSearch({
           className="text-xs text-foreground/60"
         >
           {matches.length
-            ? `${matches.length} matching ${matches.length === 1 ? "moment" : "moments"}${matches.length === PROJECT_FOOTAGE_SEARCH_LIMITS.results ? " (showing the first 50)" : ""}`
-            : "No matching source evidence. Try words from a caption or a shorter description."}
+            ? `${matches.length} matching ${matches.length === 1 ? ui("moment") : ui("moments")}${matches.length === PROJECT_FOOTAGE_SEARCH_LIMITS.results ? ui(" (showing the first 50)") : ""}`
+            : ui(
+                "No matching source evidence. Try words from a caption or a shorter description."
+              )}
         </p>
       )}
       {!active && (
         <p className="text-xs text-foreground/55">
-          Results link to the exact source clip and timeline time. Clip-name
-          matches describe file labels.
+          {ui(
+            "Results link to the exact source clip and timeline time. Clip-name matches describe file labels."
+          )}
         </p>
       )}
       <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
@@ -231,13 +236,17 @@ export function ProjectFootageSearch({
                 {timeLabel(match.start)}–{timeLabel(match.end)}
               </span>
               {mode === "meaning" && (
-                <span className="text-foreground/55">Meaning match</span>
+                <span className="text-foreground/55">
+                  {ui("Meaning match")}
+                </span>
               )}
               {match.hidden && (
-                <span className="text-foreground/55">Picture hidden</span>
+                <span className="text-foreground/55">
+                  {ui("Picture hidden")}
+                </span>
               )}
               {match.muted && (
-                <span className="text-foreground/55">Sound muted</span>
+                <span className="text-foreground/55">{ui("Sound muted")}</span>
               )}
               <ArrowUpRight
                 aria-hidden="true"

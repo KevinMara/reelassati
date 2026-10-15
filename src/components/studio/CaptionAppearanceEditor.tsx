@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import {
   getCaptionPreset,
@@ -19,6 +20,7 @@ export function CaptionAppearanceEditor({
   sample: string;
   onApply: (appearance: CaptionAppearance) => Promise<void>;
 }) {
+  const ui = useUiText();
   const [draft, setDraft] = useState<CaptionAppearance>(appearance ?? {});
   const [busy, setBusy] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
@@ -28,14 +30,14 @@ export function CaptionAppearanceEditor({
   return (
     <section
       className="space-y-3 rounded-xl border border-border p-3"
-      aria-label="Customize captions"
+      aria-label={ui("Customize captions")}
     >
       <h3 className="flex items-center text-sm font-semibold">
-        Customize captions
-        <EditorInfo label="Caption safe area">
-          Size is a percentage of video width. Safe margin keeps captions away
-          from social-player controls. Preview and export use these same
-          settings. Burned-in source captions cannot be restyled here.
+        {ui("Customize captions")}
+        <EditorInfo label={ui("Caption safe area")}>
+          {ui(
+            "Size is a percentage of video width. Safe margin keeps captions away from social-player controls. Preview and export use these same settings. Burned-in source captions cannot be restyled here."
+          )}
         </EditorInfo>
       </h3>
       <CaptionStylePreview
@@ -49,11 +51,11 @@ export function CaptionAppearanceEditor({
         onClick={() => setPreviewPlaying(v => !v)}
         className="rounded-lg border border-border px-3 py-2 text-xs"
       >
-        {previewPlaying ? "Pause style sample" : "Play style sample"}
+        {previewPlaying ? ui("Pause style sample") : ui("Play style sample")}
       </button>
       {sample && (
         <p className="truncate text-xs text-foreground/60">
-          Current text: {sample}
+          {ui("Current text:")} {sample}
         </p>
       )}
       <div className="grid grid-cols-2 gap-3">
@@ -76,7 +78,7 @@ export function CaptionAppearanceEditor({
         ))}
       </div>
       <CompactSelect
-        aria-label="Caption animation"
+        aria-label={ui("Caption animation")}
         value={p.animation}
         onValueChange={animation =>
           patch({ animation: animation as CaptionAnimation })
@@ -95,12 +97,13 @@ export function CaptionAppearanceEditor({
       />
       {p.animation !== "none" && (
         <p className="text-sm text-foreground/65">
-          Uses measured word timings from transcription. Imported subtitles or
-          edited lines without word timings display the whole phrase.
+          {ui(
+            "Uses measured word timings from transcription. Imported subtitles or edited lines without word timings display the whole phrase."
+          )}
         </p>
       )}
       <CompactSelect
-        aria-label="Caption position"
+        aria-label={ui("Caption position")}
         value={p.position}
         onValueChange={position =>
           patch({ position: position as "top" | "bottom" })
@@ -162,15 +165,15 @@ export function CaptionAppearanceEditor({
               patch({ background: e.target.checked ? "#141414" : null })
             }
           />
-          Label background
+          {ui("Label background")}
         </label>
       </div>
       {p.background && (
         <label className="flex items-center justify-between text-xs">
-          Background color
+          {ui("Background color")}
           <input
             type="color"
-            aria-label="Caption background"
+            aria-label={ui("Caption background")}
             value={p.background}
             onChange={e => patch({ background: e.target.value })}
             className="h-8 w-14 rounded border border-border"
@@ -183,7 +186,7 @@ export function CaptionAppearanceEditor({
           onClick={() => setDraft({})}
           className="rounded-lg border border-border px-3 py-2 text-xs"
         >
-          Reset preset
+          {ui("Reset preset")}
         </button>
         <button
           type="button"
@@ -194,7 +197,7 @@ export function CaptionAppearanceEditor({
           }}
           className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
         >
-          Apply style
+          {ui("Apply style")}
         </button>
       </div>
     </section>

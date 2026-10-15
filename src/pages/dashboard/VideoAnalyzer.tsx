@@ -1,4 +1,10 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { AnalysisReview } from "@/components/studio/AnalysisReview";
+import {
+  VIDEO_ANALYSIS_SCHEMA_VERSION,
+  scoreVideoInsights,
+} from "@contracts/video-analysis";
+import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -53,28 +59,9 @@ const ANALYSIS_PLATFORMS: Array<{ value: Platform; label: string }> = [
   { value: "youtube", label: "YouTube Shorts" },
 ];
 
-function clampScore(score: number | null) {
-  if (score === null) return 0;
-  return Math.max(0, Math.min(100, score));
-}
-
 function confidencePercent(confidence: number) {
   const normalized = confidence <= 1 ? confidence * 100 : confidence;
-  return Math.round(clampScore(normalized));
-}
-
-function signalColor(score: number | null) {
-  if (score === null) return "text-muted-foreground";
-  if (score >= 75) return "text-emerald-500";
-  if (score >= 50) return "text-amber-500";
-  return "text-red-500";
-}
-
-function signalBar(score: number | null) {
-  if (score === null) return "bg-muted";
-  if (score >= 75) return "bg-emerald-500";
-  if (score >= 50) return "bg-amber-500";
-  return "bg-red-500";
+  return Math.round(Math.max(0, Math.min(100, normalized)));
 }
 
 function retentionToQualitySignals(
@@ -106,6 +93,8 @@ function createEvent(
 }
 
 export default function VideoAnalyzer() {
+  const ui = useUiText();
+  const { i18n } = useTranslation("ui");
   const { workspace, capabilities, loading, updateWorkspace } = useWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sourceMode, setSourceMode] = useState<SourceMode>("upload");
@@ -180,7 +169,9 @@ export default function VideoAnalyzer() {
     sourceMode === "upload"
       ? Boolean(file || sourceAsset)
       : Boolean(sourceAsset || !urlError);
-  const analysisReady = capabilities.analysis;
+  const analysisReady =
+    capabilities.analysis &&
+    capabilities.analysisSchemaVersion === VIDEO_ANALYSIS_SCHEMA_VERSION;
   const analysisCreditCost = timedCreditCost(
     sourceAsset?.duration,
     AI_CREDIT_COSTS.videoAnalysisPerMinute
@@ -193,7 +184,7 @@ export default function VideoAnalyzer() {
         selectedBrand(scope.ownerEmail) !== scope.brandId
       )
         throw new Error(
-          "The workspace changed before the imported video could be saved."
+          ui("The workspace changed before the imported video could be saved.")
         );
       return {
         ...current,
@@ -245,7 +236,8 @@ export default function VideoAnalyzer() {
             undefined,
             { scope, signal: abort.signal }
           );
-        if (!asset) throw new Error("Select a video before running analysis.");
+        if (!asset)
+          throw new Error(ui("Select a video before running analysis."));
       }
       if (!asset.duration || !Number.isFinite(asset.duration))
         asset = { ...asset, duration: await resolveMediaDuration(asset) };
@@ -273,11 +265,22 @@ export default function VideoAnalyzer() {
           if (id === generation.current) setAnalysisStage(stage);
         },
         abort.signal,
-        scope
+        scope,
+        i18n.resolvedLanguage || i18n.language
       );
       abort.signal.throwIfAborted();
       await verifyUploadRequestScope(scope);
       if (id !== generation.current) return;
+      if (
+        analysis.schemaVersion !== VIDEO_ANALYSIS_SCHEMA_VERSION ||
+        scoreVideoInsights(analysis.insights ?? [], readyAsset.duration!)
+          .status !== "complete"
+      )
+        throw new Error(
+          ui(
+            "The video review is incomplete. Please refresh before analyzing again."
+          )
+        );
       analyzedScope.current = scope;
       setAnalyzedAsset(readyAsset);
       setResult(analysis);
@@ -293,7 +296,7 @@ export default function VideoAnalyzer() {
           selectedBrand(scope.ownerEmail) !== scope.brandId
         )
           throw new Error(
-            "The analysis workspace changed before saving its activity."
+            ui("The analysis workspace changed before saving its activity.")
           );
         return {
           ...current,
@@ -346,10 +349,10 @@ export default function VideoAnalyzer() {
           !current.assets.some(a => a.id === analyzedAsset.id)
         )
           throw new Error(
-            "The analyzed source is no longer in this workspace."
+            ui("The analyzed source is no longer in this workspace.")
           );
         if (!current.projects.some(p => p.id === selectedProjectId))
-          throw new Error("The selected project is no longer available.");
+          throw new Error(ui("The selected project is no longer available."));
         return {
           ...current,
           projects: current.projects.map(project => {
@@ -423,7 +426,7 @@ export default function VideoAnalyzer() {
           !current.assets.some(asset => asset.id === source.id)
         )
           throw new Error(
-            "The analyzed source is no longer in this workspace."
+            ui("The analyzed source is no longer in this workspace.")
           );
         return {
           ...current,
@@ -486,11 +489,14 @@ export default function VideoAnalyzer() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">Edit Intelligence</p>
-        <h1 className="text-3xl font-semibold">Video Analyzer</h1>
+        <p className="mono-eyebrow mb-2 text-primary">
+          {ui("Edit Intelligence")}
+        </p>
+        <h1 className="text-3xl font-semibold">{ui("Video Analyzer")}</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          Find the moments that earn attention. Review your video, identify
-          hooks and payoffs, and turn the evidence into a sharper short.
+          {ui(
+            "Find the moments that earn attention. Review your video, identify hooks and payoffs, and turn the evidence into a sharper short."
+          )}
         </p>
       </div>
 
@@ -502,11 +508,12 @@ export default function VideoAnalyzer() {
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
             <p className="text-sm font-medium">
-              AI analysis is temporarily unavailable
+              {ui("AI analysis is temporarily unavailable")}
             </p>
             <p className="mt-1 text-xs text-foreground/70">
-              You can still upload and organize your source while analysis is
-              unavailable.
+              {ui(
+                "A complete audiovisual review is being updated. Your credits stay available."
+              )}
             </p>
           </div>
         </div>
@@ -532,7 +539,7 @@ export default function VideoAnalyzer() {
               }`}
             >
               <Upload className="h-3.5 w-3.5" />
-              Upload or asset
+              {ui("Upload or asset")}
             </button>
             <button
               type="button"
@@ -552,7 +559,7 @@ export default function VideoAnalyzer() {
               }`}
             >
               <Link2 className="h-3.5 w-3.5" />
-              Public URL
+              {ui("Public URL")}
             </button>
           </div>
 
@@ -561,7 +568,7 @@ export default function VideoAnalyzer() {
               className="text-xs text-foreground/70"
               htmlFor="analysis-platform"
             >
-              Optimize for
+              {ui("Optimize for")}
             </label>
             <StudioSelect
               id="analysis-platform"
@@ -574,7 +581,7 @@ export default function VideoAnalyzer() {
             >
               {ANALYSIS_PLATFORMS.map(item => (
                 <option key={item.value} value={item.value}>
-                  {item.label}
+                  {ui(item.label)}
                 </option>
               ))}
             </StudioSelect>
@@ -617,9 +624,9 @@ export default function VideoAnalyzer() {
                       ? `${(file.size / 1024 / 1024).toFixed(1)} MB · uploads when analysis starts`
                       : capabilities.uploads
                         ? isDragging
-                          ? "Drop it here"
-                          : "Drop video here, or click · stored privately"
-                        : "Upload storage is not configured"}
+                          ? ui("Drop it here")
+                          : ui("Drop video here, or click · stored privately")
+                        : ui("Upload storage is not configured")}
                   </span>
                 </span>
               </button>
@@ -632,7 +639,7 @@ export default function VideoAnalyzer() {
                     />
                   </div>
                   <p className="mt-1 text-xs text-foreground/70">
-                    Uploading {uploadProgress}%
+                    {ui("Uploading")} {uploadProgress}%
                   </p>
                 </div>
               ) : null}
@@ -643,7 +650,7 @@ export default function VideoAnalyzer() {
                 className="mb-2 block text-xs font-medium"
                 htmlFor="existing-video"
               >
-                Or select a saved video
+                {ui("Or select a saved video")}
               </label>
               <StudioSelect
                 id="existing-video"
@@ -659,7 +666,7 @@ export default function VideoAnalyzer() {
                 }}
                 className="w-full rounded-lg border border-border bg-background px-3 py-3 text-sm"
               >
-                <option value="">No saved video selected</option>
+                <option value="">{ui("No saved video selected")}</option>
                 {videoAssets.map(asset => (
                   <option key={asset.id} value={asset.id}>
                     {asset.name}
@@ -667,7 +674,7 @@ export default function VideoAnalyzer() {
                 ))}
               </StudioSelect>
               <p className="mt-2 text-xs text-foreground/70">
-                Choose a video from this brand’s Library.
+                {ui("Choose a video from this brand’s Library.")}
               </p>
             </div>
           </div>
@@ -677,7 +684,7 @@ export default function VideoAnalyzer() {
               className="mb-2 block text-xs font-medium"
               htmlFor="public-video-url"
             >
-              Public HTTPS video URL
+              {ui("Public HTTPS video URL")}
             </label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/70" />
@@ -715,7 +722,7 @@ export default function VideoAnalyzer() {
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               {uploadProgress > 0 && uploadProgress < 100
-                ? "Uploading source"
+                ? ui("Uploading source")
                 : analysisStage || "Analyzing edit"}
             </>
           ) : (
@@ -723,7 +730,7 @@ export default function VideoAnalyzer() {
               <Sparkles className="h-4 w-4" />
               {sourceAsset?.duration
                 ? `Analyze video · ${analysisCreditCost} credits`
-                : "Prepare video · no credits"}
+                : ui("Prepare video · no credits")}
             </>
           )}
         </button>
@@ -762,10 +769,10 @@ export default function VideoAnalyzer() {
               <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                 <div className="max-w-3xl">
                   <p className="mono-eyebrow mb-2 text-primary">
-                    AI edit review
+                    {ui("AI edit review")}
                   </p>
                   <h2 className="text-xl font-semibold">
-                    Your editorial review
+                    {ui("Your editorial review")}
                   </h2>
                   <p className="mt-2 text-sm leading-relaxed text-foreground/65">
                     {result.summary}
@@ -774,63 +781,7 @@ export default function VideoAnalyzer() {
                     <AiProvenanceBadge provenance={result.provenance} />
                   </div>
                 </div>
-                <div className="grid shrink-0 grid-cols-2 gap-2">
-                  {[
-                    { label: "Hook", score: result.hook.score },
-                    { label: "Pacing", score: result.pacing.score },
-                  ].map(signal => (
-                    <div
-                      key={signal.label}
-                      className="min-w-24 rounded-lg border border-border bg-background p-3 text-center"
-                    >
-                      <p
-                        className={`text-2xl font-semibold ${signalColor(signal.score)}`}
-                      >
-                        {signal.score === null ? "—" : Math.round(signal.score)}
-                      </p>
-                      <p className="mt-0.5 text-xs uppercase tracking-wider text-foreground/70">
-                        {signal.label}
-                      </p>
-                    </div>
-                  ))}
-                </div>
               </div>
-
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
-                {[
-                  { label: "Hook assessment", value: result.hook },
-                  { label: "Pacing assessment", value: result.pacing },
-                ].map(item => (
-                  <div
-                    key={item.label}
-                    className="rounded-lg border border-border bg-background p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium">{item.label}</span>
-                      <span
-                        className={`text-xs font-mono ${signalColor(item.value.score)}`}
-                      >
-                        {item.value.score === null
-                          ? "Unknown"
-                          : `${Math.round(item.value.score)}/100`}
-                      </span>
-                    </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface">
-                      <div
-                        className={`h-full rounded-full ${signalBar(item.value.score)}`}
-                        style={{ width: `${clampScore(item.value.score)}%` }}
-                      />
-                    </div>
-                    <p className="mt-3 text-xs leading-relaxed text-foreground/70">
-                      {item.value.note}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-foreground/70">
-                Scores are the AI model&apos;s assessment of this source, not
-                measured reach or a guarantee of performance.
-              </p>
             </section>
 
             <div className="grid gap-6">
@@ -838,11 +789,43 @@ export default function VideoAnalyzer() {
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="flex items-center gap-2 font-medium">
                     <WandSparkles className="h-4 w-4 text-primary" />
-                    Actionable edit plan
+                    {ui("Actionable edit plan")}
                   </h2>
                   <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium uppercase tracking-wider text-primary">
-                    {result.changes.length} proposed
+                    {(result.recommendations?.length ?? 0) +
+                      result.changes.length}{" "}
+                    {ui("recommendations")}
                   </span>
+                </div>
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  {result.recommendations?.map(recommendation => (
+                    <article
+                      key={recommendation.id}
+                      className="analysis-recommendation rounded-xl border border-border bg-background p-5"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-mono text-xs text-primary">
+                          {recommendation.start.toFixed(1)}s–
+                          {recommendation.end.toFixed(1)}s
+                        </span>
+                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                          {recommendation.priority}
+                        </span>
+                      </div>
+                      <h3 className="mt-3 text-sm font-semibold">
+                        {recommendation.label}
+                      </h3>
+                      <p className="mt-2 text-sm leading-relaxed text-foreground/65">
+                        {recommendation.observation}
+                      </p>
+                      <p className="mt-3 text-sm font-medium leading-relaxed">
+                        {recommendation.action}
+                      </p>
+                      <p className="mt-2 text-xs leading-relaxed text-foreground/60">
+                        {recommendation.reason}
+                      </p>
+                    </article>
+                  ))}
                 </div>
                 <div className="mt-4 space-y-3">
                   {result.changes.map((change: EditOperation) => (
@@ -859,21 +842,23 @@ export default function VideoAnalyzer() {
                           </p>
                         </div>
                         <span className="rounded-full bg-foreground/[0.06] px-2 py-1 text-xs text-foreground/70">
-                          {confidencePercent(change.confidence)}% confidence
+                          {confidencePercent(change.confidence)}
+                          {ui("% confidence")}
                         </span>
                       </div>
                       <p className="mt-3 text-xs leading-relaxed text-foreground/60">
                         {change.reason}
                       </p>
                       <p className="mt-2 text-xs uppercase tracking-wider text-foreground/70">
-                        {change.intensity} intensity · review before accepting
+                        {change.intensity}{" "}
+                        {ui("intensity · review before accepting")}
                       </p>
                     </article>
                   ))}
                   {result.changes.length === 0 ? (
                     <p className="rounded-lg border border-border bg-background p-4 text-xs text-foreground/70">
-                      No edit operations were returned. Refine the source or try
-                      a different platform target.
+                      {result.noChangesReason ||
+                        "The recommendations above require an editorial decision; no automatic timeline operation is proposed."}
                     </p>
                   ) : null}
                 </div>
@@ -890,7 +875,7 @@ export default function VideoAnalyzer() {
                           className="mb-2 block text-xs font-medium"
                           htmlFor="analysis-project"
                         >
-                          Queue in project
+                          {ui("Queue in project")}
                         </label>
                         <div className="flex flex-col gap-2 sm:flex-row">
                           <StudioSelect
@@ -902,7 +887,9 @@ export default function VideoAnalyzer() {
                             }}
                             className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                           >
-                            <option value="">Choose an edit project</option>
+                            <option value="">
+                              {ui("Choose an edit project")}
+                            </option>
                             {workspace.projects
                               .filter(project =>
                                 project.clips.some(
@@ -924,11 +911,11 @@ export default function VideoAnalyzer() {
                             {queued ? (
                               <>
                                 <Check className="h-4 w-4" />
-                                Queued
+                                {ui("Queued")}
                               </>
                             ) : (
                               <>
-                                Queue changes
+                                {ui("Queue changes")}
                                 <ChevronRight className="h-4 w-4" />
                               </>
                             )}
@@ -939,15 +926,14 @@ export default function VideoAnalyzer() {
                             to={`/dashboard/edit?project=${encodeURIComponent(selectedProjectId)}`}
                             className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
                           >
-                            Open in Edit <ChevronRight className="h-4 w-4" />
+                            {ui("Open in Edit")}{" "}
+                            <ChevronRight className="h-4 w-4" />
                           </Link>
                         )}
                         <p className="mt-2 text-xs text-foreground/70">
-                          Changes enter the editor as proposed operations. Only
-                          occurrences of this exact analyzed source are
-                          eligible. Source times follow each clip’s trim and
-                          speed; locked or ambiguous changes are held for a
-                          timeline decision.
+                          {ui(
+                            "Changes enter the editor as proposed operations. Only occurrences of this exact analyzed source are eligible. Source times follow each clip’s trim and speed; locked or ambiguous changes are held for a timeline decision."
+                          )}
                         </p>
                       </>
                     ) : (
@@ -962,7 +948,7 @@ export default function VideoAnalyzer() {
                         ) : (
                           <Film className="h-4 w-4" />
                         )}
-                        Create edit project from this video
+                        {ui("Create edit project from this video")}
                       </button>
                     )}
                   </div>
@@ -979,11 +965,12 @@ export default function VideoAnalyzer() {
           >
             <Gauge className="h-9 w-9 text-primary/40" />
             <h2 className="mt-4 text-lg font-medium text-foreground/65">
-              Bring your short into focus
+              {ui("Bring your short into focus")}
             </h2>
             <p className="mt-2 max-w-md text-sm text-foreground/70">
-              Upload or select a video to review its hook, pacing, captions,
-              sound, and call to action.
+              {ui(
+                "Upload or select a video to review its hook, pacing, captions, sound, and call to action."
+              )}
             </p>
           </motion.section>
         )}

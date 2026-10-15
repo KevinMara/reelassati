@@ -1,7 +1,9 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
 import { platformApi } from "@/lib/platform-api";
 import type { OperationsStatus } from "@contracts/operations";
 export function OwnerOperations() {
+  const ui = useUiText();
   const [data, setData] = useState<OperationsStatus | null>(null),
     [error, setError] = useState("");
   useEffect(() => {
@@ -20,11 +22,11 @@ export function OwnerOperations() {
   }, []);
   return (
     <section className="mb-6 rounded-2xl border border-primary/30 bg-surface p-6">
-      <h2 className="text-xl font-semibold">Platform operations</h2>
+      <h2 className="text-xl font-semibold">{ui("Platform operations")}</h2>
       <p className="mt-1 text-sm text-foreground/70">
-        Private to the platform operator.
+        {ui("Private to the platform operator.")}
       </p>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{ui(error)}</p>}
       {data && (
         <>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -33,13 +35,14 @@ export function OwnerOperations() {
                 key={s.name}
                 className={`rounded-lg border p-3 text-sm ${s.configured ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"}`}
               >
-                {s.name} · {s.configured ? "Configured" : "Needs activation"}
+                {s.name} ·{" "}
+                {s.configured ? ui("Configured") : ui("Needs activation")}
               </div>
             ))}
           </div>
           {data.billingReadiness && !data.billingReadiness.ready ? (
             <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-              <h3 className="font-medium">Finish payment setup</h3>
+              <h3 className="font-medium">{ui("Finish payment setup")}</h3>
               <ul className="mt-3 space-y-2 text-sm">
                 {data.billingReadiness.checks.map(check => (
                   <li key={check.id} className="flex justify-between gap-4">
@@ -49,7 +52,7 @@ export function OwnerOperations() {
                         check.ready ? "text-emerald-500" : "text-amber-500"
                       }
                     >
-                      {check.ready ? "Ready" : "Needs setup"}
+                      {check.ready ? ui("Ready") : ui("Needs setup")}
                     </span>
                   </li>
                 ))}
@@ -60,7 +63,7 @@ export function OwnerOperations() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Open Stripe account setup
+                {ui("Open Stripe account setup")}
               </a>
             </div>
           ) : null}
@@ -78,22 +81,23 @@ export function OwnerOperations() {
             ))}
           </div>
           <p className="mt-4 text-sm">
-            Library: {data.counts.assets.toLocaleString()} assets ·{" "}
-            {(data.counts.storageBytes / 1024 ** 3).toFixed(2)} GB stored
+            {ui("Library:")} {data.counts.assets.toLocaleString()}{" "}
+            {ui("assets ·")} {(data.counts.storageBytes / 1024 ** 3).toFixed(2)}{" "}
+            {ui("GB stored")}
           </p>
           <p className="mt-2 text-sm">
-            Weekly trends:{" "}
+            {ui("Weekly trends:")}{" "}
             {data.trends.generatedAt
               ? `updated ${new Date(data.trends.generatedAt).toLocaleString()}`
-              : "Awaiting first successful update"}
+              : ui("Awaiting first successful update")}
             {data.trends.lastError
-              ? " · Latest refresh failed; previous feed preserved."
+              ? ui(" · Latest refresh failed; previous feed preserved.")
               : ""}
           </p>
           {data.paymentIssues.length > 0 && (
             <div className="mt-4 rounded-lg bg-amber-500/10 p-4">
               <p className="text-sm font-medium">
-                Reconcile these events in Stripe, then resend them
+                {ui("Reconcile these events in Stripe, then resend them")}
               </p>
               {data.paymentIssues.map(p => (
                 <p key={p.eventId} className="mt-2 break-all font-mono text-xs">
@@ -103,8 +107,10 @@ export function OwnerOperations() {
             </div>
           )}
           <p className="mt-3 text-xs text-foreground/65">
-            Configuration checks do not verify provider balances or live
-            payments. Updated {new Date(data.checkedAt).toLocaleTimeString()}.
+            {ui(
+              "Configuration checks do not verify provider balances or live payments. Updated"
+            )}{" "}
+            {new Date(data.checkedAt).toLocaleTimeString()}.
           </p>
         </>
       )}

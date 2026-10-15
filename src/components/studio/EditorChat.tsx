@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   useEffect,
   useRef,
@@ -137,6 +138,7 @@ export function EditorChat({
   onSeek,
   onAutoEdit,
 }: Props) {
+  const ui = useUiText();
   const chat = useEditorChat(project, { onSeek });
   const { workspace } = useWorkspace();
   const [prompt, setPrompt] = useState("");
@@ -226,13 +228,13 @@ export function EditorChat({
     if (!files.length) return;
     if (attachBusy) {
       setLocalError(
-        "Let the current files finish uploading before adding more."
+        ui("Let the current files finish uploading before adding more.")
       );
       return;
     }
     if (references.length + files.length > 8) {
       setLocalError(
-        "Attach up to 8 references per message. Remove one to make room."
+        ui("Attach up to 8 references per message. Remove one to make room.")
       );
       return;
     }
@@ -279,7 +281,7 @@ export function EditorChat({
       setLocalError("");
       input.current?.focus();
     } catch {
-      setLocalError("Enter a complete public https:// reference link.");
+      setLocalError(ui("Enter a complete public https:// reference link."));
     }
   }
   async function runChoice(id: string, callback: () => Promise<void>) {
@@ -303,7 +305,7 @@ export function EditorChat({
     if (!text || chat.busy || attachBusy || workingChoice) return;
     if (references.length > 8) {
       setLocalError(
-        "Attach up to 8 references per message. Remove one to make room."
+        ui("Attach up to 8 references per message. Remove one to make room.")
       );
       return;
     }
@@ -315,7 +317,9 @@ export function EditorChat({
       textReferences.reduce((sum, ref) => sum + ref.text.length, 0) > 40000
     ) {
       setLocalError(
-        "Shorten text references to 16,000 characters each and 40,000 total before sending."
+        ui(
+          "Shorten text references to 16,000 characters each and 40,000 total before sending."
+        )
       );
       return;
     }
@@ -386,14 +390,16 @@ export function EditorChat({
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">{EDITOR_ASSISTANT_NAME}</h2>
-          <p className="text-[11px] text-foreground/50">Your editing partner</p>
+          <p className="text-[11px] text-foreground/50">
+            {ui("Your editing partner")}
+          </p>
         </div>
         <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
-              aria-label="Chat preferences"
-              title="Chat preferences"
+              aria-label={ui("Chat preferences")}
+              title={ui("Chat preferences")}
               className="rounded-lg p-2 text-foreground/55 hover:bg-foreground/5 hover:text-foreground"
             >
               <Settings2 className="size-4" />
@@ -403,12 +409,14 @@ export function EditorChat({
             align="end"
             className="w-72 rounded-xl border-border bg-surface text-foreground"
           >
-            <h3 className="mb-3 text-sm font-semibold">How Reel works</h3>
+            <h3 className="mb-3 text-sm font-semibold">
+              {ui("How Reel works")}
+            </h3>
             <p className="mb-1.5 block text-xs text-foreground/60">
-              Optional improvements
+              {ui("Optional improvements")}
             </p>
             <CompactSelect
-              aria-label="Approval mode"
+              aria-label={ui("Approval mode")}
               value={chat.state.mode}
               disabled={busyChoice}
               onValueChange={value =>
@@ -424,16 +432,18 @@ export function EditorChat({
               ]}
             />
             <p className="mt-2 text-xs leading-relaxed text-foreground/55">
-              Requested edits and their necessary steps run directly.{" "}
+              {ui("Requested edits and their necessary steps run directly.")}{" "}
               {chat.state.mode === "ask"
-                ? "You choose whether to include additional suggestions."
-                : "Reel can include extra improvements within your credit limit."}
+                ? ui("You choose whether to include additional suggestions.")
+                : ui(
+                    "Reel can include extra improvements within your credit limit."
+                  )}
             </p>
             <label
               className="mb-1.5 mt-4 block text-xs text-foreground/60"
               htmlFor="reel-credit-limit"
             >
-              Credit limit per request
+              {ui("Credit limit per request")}
             </label>
             <div className="flex gap-2">
               <input
@@ -465,12 +475,13 @@ export function EditorChat({
                 }
                 className="rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-40"
               >
-                Save
+                {ui("Save")}
               </button>
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
-              Includes the 5-credit planning step and any paid actions. Approval
-              mode never raises this limit.
+              {ui(
+                "Includes the 5-credit planning step and any paid actions. Approval mode never raises this limit."
+              )}
             </p>
           </PopoverContent>
         </Popover>
@@ -481,7 +492,7 @@ export function EditorChat({
           onClick={onAutoEdit}
           className="ai-magic flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold"
         >
-          <Sparkles className="size-4" /> AI auto-edit
+          <Sparkles className="size-4" /> {ui("AI auto-edit")}
         </button>
         <button
           type="button"
@@ -499,7 +510,7 @@ export function EditorChat({
               : "border-border text-foreground/70 hover:bg-foreground/5"
           )}
         >
-          <ClipboardList className="size-4" /> Plan
+          <ClipboardList className="size-4" /> {ui("Plan")}
         </button>
       </div>
 
@@ -512,14 +523,14 @@ export function EditorChat({
               node.scrollHeight - node.scrollTop - node.clientHeight < 90;
         }}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4"
-        aria-label="Conversation"
+        aria-label={ui("Conversation")}
       >
         {project.proposedChanges.some(
           change => change.status === "proposed"
         ) && (
           <details className="mb-4 rounded-xl border border-border bg-background/35 p-3">
             <summary className="cursor-pointer text-sm font-medium">
-              Saved suggestions ·{" "}
+              {ui("Saved suggestions ·")}{" "}
               {
                 project.proposedChanges.filter(
                   change => change.status === "proposed"
@@ -527,7 +538,9 @@ export function EditorChat({
               }
             </summary>
             <p className="mt-2 text-xs text-foreground/60">
-              Earlier analysis suggestions are still available to review.
+              {ui(
+                "Earlier analysis suggestions are still available to review."
+              )}
             </p>
             {project.proposedChanges
               .filter(change => change.status === "proposed")
@@ -558,7 +571,7 @@ export function EditorChat({
                         )
                       }
                     >
-                      Apply change
+                      {ui("Apply change")}
                     </button>
                     <button
                       type="button"
@@ -570,7 +583,7 @@ export function EditorChat({
                         )
                       }
                     >
-                      Reject
+                      {ui("Reject")}
                     </button>
                   </div>
                 </div>
@@ -583,28 +596,30 @@ export function EditorChat({
               <MessageCircle className="size-5" />
             </div>
             <h3 className="text-lg font-semibold tracking-tight">
-              What are we making?
+              {ui("What are we making?")}
             </h3>
             <p className="mt-2 text-xs leading-relaxed text-foreground/55">
-              Tell Reel what you want to change. Attach a reference, point to a
-              moment, or start with an idea.
+              {ui(
+                "Tell Reel what you want to change. Attach a reference, point to a moment, or start with an idea."
+              )}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2">
               {STARTERS.map(item => (
                 <button
-                  key={item.label}
+                  key={ui(item.label)}
                   type="button"
                   onClick={() => starter(item.preset)}
                   className="flex min-h-16 flex-col items-start gap-2 rounded-xl border border-border bg-background/40 p-3 text-left text-xs text-foreground/75 transition-colors hover:border-primary/50 hover:bg-primary/5"
                 >
                   <item.icon className="size-4 text-primary" />
-                  {item.label}
+                  {ui(item.label)}
                 </button>
               ))}
             </div>
             <p className="mt-5 text-[11px] leading-relaxed text-foreground/40">
-              Changes appear on your timeline as they finish. You can keep
-              editing them by hand.
+              {ui(
+                "Changes appear on your timeline as they finish. You can keep editing them by hand."
+              )}
             </p>
           </div>
         ) : (
@@ -637,7 +652,7 @@ export function EditorChat({
                       <p className="mt-2 text-xs text-primary">
                         {editorTaskPreset(message.request.taskPreset)?.label}
                         {message.request.executionMode === "plan"
-                          ? " · Plan first"
+                          ? ui(" · Plan first")
                           : ""}
                       </p>
                     )}
@@ -670,7 +685,7 @@ export function EditorChat({
                         className="ai-status-text mt-3 flex items-center gap-2 text-xs"
                       >
                         <Loader2 className="size-3.5 animate-spin" />
-                        Reading your request and project…
+                        {ui("Reading your request and project…")}
                       </div>
                     )}
                     {!!message.plan?.actions.length && (
@@ -687,7 +702,7 @@ export function EditorChat({
                                       selectedActions.has(a.id)
                                   ).length
                                 }{" "}
-                                selected
+                                {ui("selected")}
                               </span>
                               <button
                                 type="button"
@@ -709,7 +724,7 @@ export function EditorChat({
                                   })
                                 }
                               >
-                                Select all / clear
+                                {ui("Select all / clear")}
                               </button>
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -754,8 +769,8 @@ export function EditorChat({
                                   }
                                 >
                                   {decision === "approve"
-                                    ? "Include selected · skip rest"
-                                    : "Skip selected · include rest"}
+                                    ? ui("Include selected · skip rest")
+                                    : ui("Skip selected · include rest")}
                                 </button>
                               ))}
                             </div>
@@ -829,8 +844,8 @@ export function EditorChat({
                           {message.plan.actions.some(
                             a => a.status === "completed"
                           )
-                            ? "Partly completed · review the steps above"
-                            : "Needs attention · review the steps above"}
+                            ? ui("Partly completed · review the steps above")
+                            : ui("Needs attention · review the steps above")}
                         </p>
                       )}
                     {message.status === "completed" &&
@@ -842,8 +857,8 @@ export function EditorChat({
                         <div className="mt-2 flex items-center gap-1 text-[10px] text-foreground/45">
                           <CheckCheck className="size-3" />
                           {message.plan.actions.length
-                            ? "Finished"
-                            : "No changes made"}
+                            ? ui("Finished")
+                            : ui("No changes made")}
                           {typeof message.usedCredits === "number"
                             ? ` · up to ${message.usedCredits} credits`
                             : ""}
@@ -879,7 +894,7 @@ export function EditorChat({
                   {seconds(range.start)}–{seconds(range.end)}
                   <button
                     type="button"
-                    aria-label="Remove time range"
+                    aria-label={ui("Remove time range")}
                     onClick={() => setRange(undefined)}
                     className="rounded p-0.5 hover:bg-primary/10"
                   >
@@ -889,10 +904,10 @@ export function EditorChat({
               )}
               {executionMode === "plan" && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs">
-                  <ClipboardList className="size-3" /> Plan first
+                  <ClipboardList className="size-3" /> {ui("Plan first")}
                   <button
                     type="button"
-                    aria-label="Exit planning mode"
+                    aria-label={ui("Exit planning mode")}
                     onClick={() => setExecutionMode("execute")}
                   >
                     <X className="size-3" />
@@ -905,7 +920,7 @@ export function EditorChat({
                   {editorTaskPreset(taskPreset)?.label}
                   <button
                     type="button"
-                    aria-label="Remove task preset"
+                    aria-label={ui("Remove task preset")}
                     onClick={() => setTaskPreset(undefined)}
                   >
                     <X className="size-3" />
@@ -915,11 +930,12 @@ export function EditorChat({
               {contextClip && (
                 <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs">
                   <span className="truncate" title={contextClip.label}>
-                    Target: {contextClip.graphic?.text || contextClip.label}
+                    {ui("Target:")}{" "}
+                    {contextClip.graphic?.text || contextClip.label}
                   </span>
                   <button
                     type="button"
-                    aria-label="Remove clip from chat context"
+                    aria-label={ui("Remove clip from chat context")}
                     onClick={() => setExcludedClip(contextClip.id)}
                   >
                     <X className="size-3" />
@@ -957,13 +973,15 @@ export function EditorChat({
           )}
           <textarea
             ref={input}
-            aria-label="Message Reel"
+            aria-label={ui("Message Reel")}
             placeholder={
               taskPreset
                 ? editorTaskPreset(taskPreset)?.hint
                 : executionMode === "plan"
-                  ? "Describe the result. Reel will make a plan for you to review…"
-                  : "Ask Reel to edit your video…"
+                  ? ui(
+                      "Describe the result. Reel will make a plan for you to review…"
+                    )
+                  : ui("Ask Reel to edit your video…")
             }
             value={prompt}
             onChange={event => setPrompt(event.target.value)}
@@ -985,7 +1003,7 @@ export function EditorChat({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  aria-label="Attach or choose an editing task"
+                  aria-label={ui("Attach or choose an editing task")}
                   disabled={attachBusy}
                   className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border text-foreground/60 hover:bg-foreground/5 disabled:opacity-40"
                 >
@@ -1003,15 +1021,15 @@ export function EditorChat({
               >
                 <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
                   <Paperclip />
-                  Attach reference files
+                  {ui("Attach reference files")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setUrlOpen(true)}>
                   <Link2 />
-                  Attach a reference link
+                  {ui("Attach a reference link")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-[10px] font-normal text-foreground/45">
-                  Start with a task
+                  {ui("Start with a task")}
                 </DropdownMenuLabel>
                 <DropdownMenuItem
                   onSelect={() => {
@@ -1019,7 +1037,7 @@ export function EditorChat({
                     input.current?.focus();
                   }}
                 >
-                  <ClipboardList /> Plan before editing
+                  <ClipboardList /> {ui("Plan before editing")}
                 </DropdownMenuItem>
                 {EDITOR_TASK_PRESETS.filter(
                   preset => preset.id !== "range"
@@ -1060,12 +1078,12 @@ export function EditorChat({
                   }}
                 >
                   <Clock3 />
-                  Edit around the playhead
+                  {ui("Edit around the playhead")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={onAutoEdit}>
                   <Sparkles />
-                  Advanced AI auto-edit
+                  {ui("Advanced AI auto-edit")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1082,7 +1100,7 @@ export function EditorChat({
                   className="mb-2 block text-xs font-medium"
                   htmlFor="reel-reference-url"
                 >
-                  Reference link
+                  {ui("Reference link")}
                 </label>
                 <input
                   id="reel-reference-url"
@@ -1099,15 +1117,16 @@ export function EditorChat({
                   className="h-9 w-full rounded-lg border border-border bg-background px-2 text-xs"
                 />
                 <p className="mt-2 text-[11px] leading-relaxed text-foreground/50">
-                  Use a public link. Upload the file if the source requires
-                  sign-in.
+                  {ui(
+                    "Use a public link. Upload the file if the source requires sign-in."
+                  )}
                 </p>
                 <button
                   type="button"
                   onClick={addLink}
                   className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
                 >
-                  Attach link
+                  {ui("Attach link")}
                 </button>
               </PopoverContent>
             </Popover>
@@ -1115,12 +1134,12 @@ export function EditorChat({
               type="button"
               onClick={() => setSettingsOpen(true)}
               className="flex min-w-0 items-center gap-1 rounded-lg px-1.5 py-1 text-[10px] text-foreground/50 hover:text-foreground"
-              title={`Optional improvements: ${chat.state.mode === "ask" ? "ask first" : "automatically approved"}. Limit: ${chat.state.maxCredits} credits.`}
+              title={`Optional improvements: ${chat.state.mode === "ask" ? ui("ask first") : ui("automatically approved")}. Limit: ${chat.state.maxCredits} credits.`}
             >
               <span className="truncate">
                 {chat.state.mode === "ask"
-                  ? "Ask before extras"
-                  : "Auto extras"}
+                  ? ui("Ask before extras")
+                  : ui("Auto extras")}
               </span>
               <ChevronDown className="size-3 shrink-0" />
             </button>
@@ -1131,8 +1150,8 @@ export function EditorChat({
               <button
                 type="button"
                 onClick={chat.stop}
-                aria-label="Stop after current action"
-                title="Stop after current action"
+                aria-label={ui("Stop after current action")}
+                title={ui("Stop after current action")}
                 className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"
               >
                 <Square className="size-3 fill-current" />
@@ -1141,8 +1160,8 @@ export function EditorChat({
               <button
                 type="submit"
                 disabled={!prompt.trim() || attachBusy || !!workingChoice}
-                aria-label="Send to Reel, 5 credits for planning"
-                title="Send · 5 credits for planning"
+                aria-label={ui("Send to Reel, 5 credits for planning")}
+                title={ui("Send · 5 credits for planning")}
                 className="ai-magic flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:cursor-not-allowed disabled:opacity-35"
               >
                 <ArrowUp className="size-4" />
@@ -1151,8 +1170,8 @@ export function EditorChat({
           </div>
         </form>
         <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-foreground/40">
-          <span>Planning: 5 credits · manual edits: free</span>
-          <span title="Shift + Enter for a new line">↵ Send</span>
+          <span>{ui("Planning: 5 credits · manual edits: free")}</span>
+          <span title={ui("Shift + Enter for a new line")}>{ui("↵ Send")}</span>
         </div>
         <input
           ref={fileInput}
@@ -1160,7 +1179,7 @@ export function EditorChat({
           multiple
           accept={ACCEPT_FILES}
           className="hidden"
-          aria-label="Attach reference files"
+          aria-label={ui("Attach reference files")}
           onChange={event => {
             const files = Array.from(event.target.files ?? []);
             event.target.value = "";
@@ -1172,9 +1191,11 @@ export function EditorChat({
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary bg-background/95 p-6">
           <div className="text-center">
             <Paperclip className="mx-auto mb-3 size-7 text-primary" />
-            <p className="text-sm font-medium">Drop a reference for Reel</p>
+            <p className="text-sm font-medium">
+              {ui("Drop a reference for Reel")}
+            </p>
             <p className="mt-1 text-xs text-foreground/50">
-              Files stay attached to your message.
+              {ui("Files stay attached to your message.")}
             </p>
           </div>
         </div>
@@ -1204,6 +1225,7 @@ function ActionCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const ui = useUiText();
   const needsChoice = canChooseChatAction(action);
   const recoverable =
     ["interrupted", "failed"].includes(action.status) &&
@@ -1264,7 +1286,9 @@ function ActionCard({
           <div className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] text-foreground/45">
             <span>{actionStateLabel(action)}</span>
             <span>
-              {action.credits ? `${action.credits} credits` : "No AI credits"}
+              {action.credits
+                ? `${action.credits} credits`
+                : ui("No AI credits")}
             </span>
           </div>
         </div>
@@ -1297,7 +1321,7 @@ function ActionCard({
               className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
             >
               {action.runtime?.approved
-                ? "Included · queued"
+                ? ui("Included · queued")
                 : `Include it${action.credits ? ` · ${action.credits} cr` : ""}`}
             </button>
             <button
@@ -1306,7 +1330,7 @@ function ActionCard({
               onClick={onSkip}
               className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground/60 hover:bg-foreground/5 disabled:opacity-40"
             >
-              Skip
+              {ui("Skip")}
             </button>
           </div>
         </div>
@@ -1314,7 +1338,7 @@ function ActionCard({
         action.reason && (
           <details className="mt-2 text-[11px] text-foreground/45">
             <summary className="cursor-pointer select-none">
-              Why this step
+              {ui("Why this step")}
             </summary>
             <p className="mt-1.5 leading-relaxed">{action.reason}</p>
           </details>
@@ -1328,13 +1352,13 @@ function ActionCard({
           className="mt-2 rounded-lg border border-border px-2.5 py-1.5 text-xs text-primary disabled:opacity-40"
         >
           {action.kind === "catalog-audio"
-            ? "Retry free sound"
-            : `Check ${action.kind === "generate" ? (action.media === "speech" ? "voiceover" : action.media === "sfx" ? "sound effect" : action.media) : action.kind === "transcribe" ? "saved captions" : "saved plan"}`}
+            ? ui("Retry free sound")
+            : `Check ${action.kind === "generate" ? (action.media === "speech" ? ui("voiceover") : action.media === "sfx" ? ui("sound effect") : action.media) : action.kind === "transcribe" ? ui("saved captions") : ui("saved plan")}`}
         </button>
       )}
       {action.status === "interrupted" && (
         <p className="mt-2 text-[10px] leading-relaxed text-foreground/45">
-          Interrupted work is not automatically submitted again.
+          {ui("Interrupted work is not automatically submitted again.")}
         </p>
       )}
     </div>
@@ -1350,6 +1374,7 @@ function RunControls({
   busy: boolean;
   onResume: (cap?: number, applyPlan?: boolean) => void;
 }) {
+  const ui = useUiText();
   const plan = message.plan;
   if (!plan)
     return message.request && message.status !== "planning" ? (
@@ -1359,7 +1384,7 @@ function RunControls({
         onClick={() => onResume()}
         className="mt-3 rounded-lg border border-border px-3 py-2 text-sm text-primary disabled:opacity-40"
       >
-        Recover saved plan
+        {ui("Recover saved plan")}
       </button>
     ) : null;
   const budget = message.maxCredits ?? plan.maxCredits;
@@ -1373,10 +1398,13 @@ function RunControls({
   if (needsBudget)
     return (
       <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
-        <p className="text-xs font-medium">This plan needs a higher limit</p>
+        <p className="text-xs font-medium">
+          {ui("This plan needs a higher limit")}
+        </p>
         <p className="mt-1 text-[11px] leading-relaxed text-foreground/60">
-          Up to {quotedTotal} credits including planning. Your current limit is{" "}
-          {budget}. Raising it does not approve optional extras.
+          {ui("Up to")} {quotedTotal}{" "}
+          {ui("credits including planning. Your current limit is")} {budget}
+          {ui(". Raising it does not approve optional extras.")}
         </p>
         <button
           type="button"
@@ -1386,10 +1414,10 @@ function RunControls({
           }
           className="mt-2 rounded-lg border border-amber-500/30 px-3 py-1.5 text-xs font-medium disabled:opacity-40"
         >
-          Set limit to {quotedTotal} &{" "}
+          {ui("Set limit to")} {quotedTotal} &{" "}
           {message.request?.executionMode === "plan" && !message.planApproved
-            ? "apply plan"
-            : "continue"}
+            ? ui("apply plan")
+            : ui("continue")}
         </button>
       </div>
     );
@@ -1400,11 +1428,14 @@ function RunControls({
   )
     return (
       <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
-        <p className="text-sm font-medium">Your plan is ready to review</p>
+        <p className="text-sm font-medium">
+          {ui("Your plan is ready to review")}
+        </p>
         <p className="mt-1 text-xs leading-relaxed text-foreground/65">
-          {plan.actions.length} steps · up to {quotedTotal} credits including
-          planning. Nothing has been changed. Optional extras follow your
-          approval preference.
+          {plan.actions.length} {ui("steps · up to")} {quotedTotal}{" "}
+          {ui(
+            "credits including planning. Nothing has been changed. Optional extras follow your approval preference."
+          )}
         </p>
         <button
           type="button"
@@ -1412,7 +1443,7 @@ function RunControls({
           onClick={() => onResume(undefined, true)}
           className="ai-magic mt-3 rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-40"
         >
-          Apply plan
+          {ui("Apply plan")}
         </button>
       </div>
     );
@@ -1424,7 +1455,7 @@ function RunControls({
         onClick={() => onResume()}
         className="mt-3 rounded-lg border border-border px-3 py-2 text-xs text-primary disabled:opacity-40"
       >
-        Continue remaining steps
+        {ui("Continue remaining steps")}
       </button>
     );
   return null;

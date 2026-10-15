@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -7,6 +8,7 @@ import { selectBrand } from "@/lib/workspace-scope";
 import { useWorkspace } from "@/providers/workspace";
 
 export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
+  const ui = useUiText();
   const { workspace, saving, error: workspaceError } = useWorkspace();
   const [data, setData] = useState<Awaited<
     ReturnType<typeof platformApi.brands>
@@ -62,10 +64,10 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
               <Building2 className="h-3.5 w-3.5" aria-hidden />
             </span>
           ) : null}
-          Brand workspace
+          {ui("Brand workspace")}
         </span>
         <StudioSelect
-          aria-label="Active brand workspace"
+          aria-label={ui("Active brand workspace")}
           disabled={!data || saving || !!workspaceError || busy}
           value={data?.activeId || "default"}
           onChange={e => selectBrand(workspace.profile.email, e.target.value)}
@@ -85,18 +87,19 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
       {manage && data && (
         <>
           <p className="mt-3 text-sm text-foreground/70">
-            {data.brands.length} of {data.limit} brands. Each has its own voice,
-            Library, projects, calendar, and social connections. Plan credits
-            are shared.
+            {data.brands.length} {ui("of")} {data.limit}{" "}
+            {ui(
+              "brands. Each has its own voice, Library, projects, calendar, and social connections. Plan credits are shared."
+            )}
           </p>
           {data.brands.length < data.limit ? (
             <div className="mt-4 flex gap-2">
               <input
-                aria-label="New brand name"
+                aria-label={ui("New brand name")}
                 value={name}
                 onChange={e => setName(e.target.value)}
                 maxLength={100}
-                placeholder="Brand name"
+                placeholder={ui("Brand name")}
                 className="min-w-0 flex-1 rounded-lg border border-border bg-background p-3 text-sm"
               />
               <button
@@ -105,7 +108,7 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
                 onClick={() => void create()}
                 className="rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
-                {busy ? "Creating…" : "Add brand"}
+                {busy ? ui("Creating…") : ui("Add brand")}
               </button>
             </div>
           ) : (
@@ -113,14 +116,14 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
               className="mt-3 inline-block text-sm font-medium text-primary"
               to="/dashboard/billing"
             >
-              Compare brand allowances
+              {ui("Compare brand allowances")}
             </Link>
           )}
         </>
       )}
       {error && (
         <p role="alert" className="mt-2 text-sm text-destructive">
-          {error}
+          {ui(error)}
         </p>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useMemo, useState } from "react";
 import { BookmarkPlus, SlidersHorizontal, Trash2 } from "lucide-react";
@@ -41,6 +42,7 @@ export function SavedEditorStyles({
   onDelete,
   disabled = false,
 }: SavedEditorStylesProps) {
+  const ui = useUiText();
   const [name, setName] = useState("");
   const [type, setType] = useState<EditorSavedStyleType>(
     selectedClip?.graphic ? "graphic" : "captions"
@@ -82,18 +84,21 @@ export function SavedEditorStyles({
   };
   return (
     <section
-      aria-label="Saved editor styles"
+      aria-label={ui("Saved editor styles")}
       className="space-y-3 border-t border-border pt-4"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Saved styles</h3>
+        <h3 className="text-sm font-semibold">{ui("Saved styles")}</h3>
         <span className="text-[11px] text-muted-foreground">
-          {saved.length}/{EDITOR_SAVED_STYLE_LIMIT} · editable
+          {saved.length}/{EDITOR_SAVED_STYLE_LIMIT} {ui("· editable")}
         </span>
       </div>
       <div className="space-y-2 rounded-xl border border-border bg-background/30 p-3">
-        <label htmlFor={`saved-style-kind-${project.id}`} className="block space-y-1 text-xs">
-          <span className="text-muted-foreground">Capture</span>
+        <label
+          htmlFor={`saved-style-kind-${project.id}`}
+          className="block space-y-1 text-xs"
+        >
+          <span className="text-muted-foreground">{ui("Capture")}</span>
           <StudioSelect
             id={`saved-style-kind-${project.id}`}
             value={type}
@@ -104,22 +109,22 @@ export function SavedEditorStyles({
             className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs"
           >
             <option value="graphic">
-              Selected graphic and its full animation
+              {ui("Selected graphic and its full animation")}
             </option>
-            <option value="captions">Project caption style</option>
+            <option value="captions">{ui("Project caption style")}</option>
             <option value="look">
-              Selected clip pose and grade at playhead
+              {ui("Selected clip pose and grade at playhead")}
             </option>
           </StudioSelect>
         </label>
         <label className="block space-y-1 text-xs">
-          <span className="text-muted-foreground">Style name</span>
+          <span className="text-muted-foreground">{ui("Style name")}</span>
           <input
             value={name}
             maxLength={60}
             disabled={blocked}
             onChange={event => setName(event.target.value)}
-            placeholder="Name this style"
+            placeholder={ui("Name this style")}
             className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs"
           />
         </label>
@@ -147,24 +152,29 @@ export function SavedEditorStyles({
           }
         >
           <BookmarkPlus size={14} />
-          {busy === "save" ? "Saving…" : "Save style"}
+          {busy === "save" ? ui("Saving…") : ui("Save style")}
         </button>
         {!canSave && (
           <p className="text-[11px] leading-relaxed text-muted-foreground">
             {type === "graphic"
-              ? "Select an editable graphic to capture its text, shape and motion."
-              : "Select a video or image and move the playhead inside it to capture the current pose and grade."}
+              ? ui(
+                  "Select an editable graphic to capture its text, shape and motion."
+                )
+              : ui(
+                  "Select a video or image and move the playhead inside it to capture the current pose and grade."
+                )}
           </p>
         )}
         {canSave && type === "graphic" && (
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            The full graphic animation is saved. Apply it to insert a new
-            editable graphic.
+            {ui(
+              "The full graphic animation is saved. Apply it to insert a new editable graphic."
+            )}
           </p>
         )}
         {saved.length >= EDITOR_SAVED_STYLE_LIMIT && (
           <p className="text-[11px] text-muted-foreground">
-            Delete a saved style to make room for another.
+            {ui("Delete a saved style to make room for another.")}
           </p>
         )}
       </div>
@@ -175,11 +185,11 @@ export function SavedEditorStyles({
       )}
       {saved.length > 0 && (
         <label className="block">
-          <span className="sr-only">Search saved styles</span>
+          <span className="sr-only">{ui("Search saved styles")}</span>
           <input
             value={query}
             onChange={event => setQuery(event.target.value)}
-            placeholder="Search saved styles…"
+            placeholder={ui("Search saved styles…")}
             className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs"
           />
         </label>
@@ -222,7 +232,9 @@ export function SavedEditorStyles({
                     title={
                       canApply
                         ? `Apply ${style.name}`
-                        : "Select an unlocked video or image to apply this look."
+                        : ui(
+                            "Select an unlocked video or image to apply this look."
+                          )
                     }
                     onClick={() =>
                       void run(`apply:${style.id}`, () => onApply(style))
@@ -230,10 +242,10 @@ export function SavedEditorStyles({
                     className="flex-1 rounded-md border border-border px-2 py-1.5 text-[11px] hover:border-primary/60 disabled:opacity-40"
                   >
                     {busy === `apply:${style.id}`
-                      ? "Applying…"
+                      ? ui("Applying…")
                       : style.type === "graphic"
-                        ? "Insert"
-                        : "Apply"}
+                        ? ui("Insert")
+                        : ui("Apply")}
                   </button>
                   <button
                     type="button"
@@ -253,8 +265,9 @@ export function SavedEditorStyles({
       </div>
       {!saved.length && (
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Save a graphic, caption style or clip look to reuse it across your
-          projects.
+          {ui(
+            "Save a graphic, caption style or clip look to reuse it across your projects."
+          )}
         </p>
       )}
     </section>
@@ -262,6 +275,7 @@ export function SavedEditorStyles({
 }
 
 function SavedStylePreview({ style }: { style: EditorSavedStyle }) {
+  const ui = useUiText();
   if (style.type === "captions")
     return (
       <CaptionStylePreview
@@ -299,15 +313,15 @@ function SavedStylePreview({ style }: { style: EditorSavedStyle }) {
     <div className="flex aspect-video flex-col items-center justify-center gap-1 rounded-lg bg-foreground/5 text-muted-foreground">
       <SlidersHorizontal size={19} />
       <span className="text-[9px]">
-        Brightness {style.settings.brightness.toFixed(2)}
+        {ui("Brightness")} {style.settings.brightness.toFixed(2)}
       </span>
       <span className="text-[9px]">
-        Contrast {style.settings.contrast.toFixed(2)} · Color{" "}
+        {ui("Contrast")} {style.settings.contrast.toFixed(2)} {ui("· Color")}{" "}
         {style.settings.saturation.toFixed(2)}
       </span>
       <span className="text-[9px]">
-        Opacity {Math.round(style.settings.visual.opacity * 100)}% · Zoom{" "}
-        {Math.round(style.settings.visual.scale * 100)}%
+        {ui("Opacity")} {Math.round(style.settings.visual.opacity * 100)}% ·
+        Zoom {Math.round(style.settings.visual.scale * 100)}%
       </span>
     </div>
   );

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { AudioPlayer } from "@/components/ui/audio-player";
 import { useState } from "react";
 import { GripVertical, Music2, Pencil, Check, X } from "lucide-react";
@@ -20,6 +21,7 @@ export function LibraryAssetCard({
   view?: "grid" | "list";
   onRename?: (name: string) => Promise<void>;
 }) {
+  const ui = useUiText();
   const [preview, setPreview] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(asset.name);
@@ -55,7 +57,7 @@ export function LibraryAssetCard({
           }}
           onClick={() => setPreview(true)}
           aria-label={`Preview ${asset.name}`}
-          title="Preview file · drag onto the timeline to place it"
+          title={ui("Preview file · drag onto the timeline to place it")}
           className={`group relative flex cursor-grab items-center justify-center overflow-hidden rounded-lg border border-border bg-background/70 active:cursor-grabbing ${view === "grid" ? "aspect-video w-full" : "h-12 w-16 shrink-0"}`}
         >
           {asset.kind === "audio" ? (
@@ -77,7 +79,7 @@ export function LibraryAssetCard({
               className="mt-1 flex min-w-0 items-center gap-1"
             >
               <input
-                aria-label="File name"
+                aria-label={ui("File name")}
                 ref={node => {
                   node?.focus();
                 }}
@@ -93,7 +95,7 @@ export function LibraryAssetCard({
               <button
                 type="submit"
                 disabled={busy || !name.trim()}
-                aria-label="Save file name"
+                aria-label={ui("Save file name")}
                 className="p-1 text-primary"
               >
                 <Check size={14} />
@@ -101,7 +103,7 @@ export function LibraryAssetCard({
               <button
                 type="button"
                 onClick={() => setEditing(false)}
-                aria-label="Cancel rename"
+                aria-label={ui("Cancel rename")}
                 className="p-1"
               >
                 <X size={13} />
@@ -145,8 +147,9 @@ export function LibraryAssetCard({
         <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-surface sm:max-w-2xl">
           <DialogTitle className="pr-7">{asset.name}</DialogTitle>
           <DialogDescription>
-            Preview your file. Drag its thumbnail onto the timeline at the time
-            you want it to start.
+            {ui(
+              "Preview your file. Drag its thumbnail onto the timeline at the time you want it to start."
+            )}
           </DialogDescription>
           {asset.kind === "image" ? (
             <img

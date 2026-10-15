@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, Pause, Play, Check } from "lucide-react";
 import { editorAudioCatalog, editorAudioUrl } from "@/lib/editor-audio-catalog";
@@ -7,6 +8,7 @@ import { CompactSelect } from "@/components/ui/compact-select";
 import { LibraryAssetCard } from "./LibraryAssetCard";
 
 export function EditorSoundLibrary() {
+  const ui = useUiText();
   const { workspace, updateWorkspace, capabilities } = useWorkspace();
   const [tab, setTab] = useState<"catalog" | "files">("catalog");
   const [query, setQuery] = useState("");
@@ -48,12 +50,12 @@ export function EditorSoundLibrary() {
     player.onended = () => setPlaying("");
     player.onerror = () => {
       setPlaying("");
-      setMessage("This preview could not load.");
+      setMessage(ui("This preview could not load."));
     };
     setPlaying(entry.id);
     void player.play().catch(() => {
       setPlaying("");
-      setMessage("This preview could not play. Try again.");
+      setMessage(ui("This preview could not play. Try again."));
     });
   }
   async function save(entry: (typeof editorAudioCatalog)[number]) {
@@ -63,7 +65,7 @@ export function EditorSoundLibrary() {
     try {
       const response = await fetch(editorAudioUrl(entry));
       if (!response.ok)
-        throw new Error("The sound file could not be downloaded.");
+        throw new Error(ui("The sound file could not be downloaded."));
       const blob = await response.blob();
       const extension = entry.file.split(".").pop() || "mp3";
       const type =
@@ -100,35 +102,35 @@ export function EditorSoundLibrary() {
     }
   }
   return (
-    <section aria-label="Sound library" className="space-y-3">
+    <section aria-label={ui("Sound library")} className="space-y-3">
       <div className="flex gap-1 rounded-lg bg-background/60 p-1">
         <button
           type="button"
           onClick={() => setTab("catalog")}
           className={`flex-1 rounded-md px-2 py-1.5 text-xs ${tab === "catalog" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
         >
-          Free sounds & music
+          {ui("Free sounds & music")}
         </button>
         <button
           type="button"
           onClick={() => setTab("files")}
           className={`flex-1 rounded-md px-2 py-1.5 text-xs ${tab === "files" ? "bg-primary/15 text-primary" : "text-foreground/60"}`}
         >
-          My audio files
+          {ui("My audio files")}
         </button>
       </div>
       <input
         type="search"
-        aria-label="Search sounds"
+        aria-label={ui("Search sounds")}
         value={query}
         onChange={e => setQuery(e.target.value)}
-        placeholder="Search sounds…"
+        placeholder={ui("Search sounds…")}
         className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs"
       />
       {tab === "catalog" ? (
         <>
           <CompactSelect
-            aria-label="Sound category"
+            aria-label={ui("Sound category")}
             value={category}
             onValueChange={setCategory}
             options={[
@@ -138,7 +140,7 @@ export function EditorSoundLibrary() {
             className="w-full"
           />
           <p className="text-[11px] leading-relaxed text-foreground/50">
-            Free to use · no AI credits
+            {ui("Free to use · no AI credits")}
           </p>
           <div className="space-y-2">
             {entries.map(entry => {
@@ -153,7 +155,7 @@ export function EditorSoundLibrary() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      aria-label={`${playing === entry.id ? "Pause" : "Preview"} ${entry.name}`}
+                      aria-label={`${playing === entry.id ? ui("Pause") : ui("Preview")} ${entry.name}`}
                       onClick={() => preview(entry)}
                       className="rounded-full border border-primary/25 p-2 text-primary"
                     >
@@ -183,7 +185,9 @@ export function EditorSoundLibrary() {
                           ? `${entry.name} saved to Library`
                           : `Save ${entry.name} to Library`
                       }
-                      title={saved ? "Saved to Library" : "Save to Library"}
+                      title={
+                        saved ? ui("Saved to Library") : ui("Save to Library")
+                      }
                       className="rounded-lg p-2 text-primary disabled:opacity-40"
                     >
                       {saving === entry.id ? (
@@ -197,7 +201,7 @@ export function EditorSoundLibrary() {
                   </div>
                   <details className="mt-1 text-[10px] text-foreground/40">
                     <summary className="cursor-pointer">
-                      Source & license
+                      {ui("Source & license")}
                     </summary>
                     <p className="mt-1">
                       {entry.author} · {entry.license} ·{" "}
@@ -207,7 +211,7 @@ export function EditorSoundLibrary() {
                         rel="noreferrer"
                         className="underline"
                       >
-                        Source
+                        {ui("Source")}
                       </a>
                     </p>
                   </details>
@@ -240,7 +244,7 @@ export function EditorSoundLibrary() {
           ))}
           {!files.length && (
             <p className="py-4 text-center text-xs text-foreground/50">
-              Save a free sound, upload audio, or generate a new track.
+              {ui("Save a free sound, upload audio, or generate a new track.")}
             </p>
           )}
         </div>

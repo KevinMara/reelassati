@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState, useCallback, useEffect, useLayoutEffect } from "react";
 import {
   BarChart3,
@@ -16,6 +17,7 @@ import { previewTheme, restoreThemePreference } from "@/hooks/useTheme";
 import { Logo } from "@/components/Logo";
 
 function StudioUnderlay() {
+  const ui = useUiText();
   const nav = [
     { label: "Dashboard", icon: BarChart3 },
     { label: "AI Video", icon: Film },
@@ -50,7 +52,7 @@ function StudioUnderlay() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center border-b border-border bg-background/90 px-6">
           <span className="mono-eyebrow text-foreground/45">
-            Editing Studio
+            {ui("Editing Studio")}
           </span>
           <div className="flex-1" />
           <Search className="mr-5 h-4 w-4 text-foreground/40" />
@@ -59,14 +61,18 @@ function StudioUnderlay() {
 
         <main className="flex-1 p-6 lg:p-10">
           <div className="mx-auto max-w-6xl">
-            <p className="mono-eyebrow mb-2 text-primary">Precision Studio</p>
+            <p className="mono-eyebrow mb-2 text-primary">
+              {ui("Precision Studio")}
+            </p>
             <div className="mb-8 flex items-end justify-between">
               <div>
                 <h1 className="text-3xl font-semibold md:text-4xl">
-                  Shape the next cut.
+                  {ui("Shape the next cut.")}
                 </h1>
                 <p className="mt-2 text-sm text-foreground/50">
-                  A reviewable short-form timeline, ready for your footage.
+                  {ui(
+                    "A reviewable short-form timeline, ready for your footage."
+                  )}
                 </p>
               </div>
               <Link
@@ -74,14 +80,16 @@ function StudioUnderlay() {
                 className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground sm:flex"
               >
                 <Sparkles className="h-4 w-4" />
-                Assist this cut
+                {ui("Assist this cut")}
               </Link>
             </div>
 
             <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
               <div className="flex h-12 items-center border-b border-border px-5">
                 <Play className="mr-3 h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Untitled short</span>
+                <span className="text-sm font-medium">
+                  {ui("Untitled short")}
+                </span>
                 <span className="ml-auto font-mono text-xs text-foreground/40">
                   00:00:00 / 00:00:18
                 </span>
@@ -124,6 +132,7 @@ function StudioUnderlay() {
 }
 
 export default function EntryDemo() {
+  const ui = useUiText();
   const [key, setKey] = useState(0);
   const [done, setDone] = useState(false);
 
@@ -158,7 +167,7 @@ export default function EntryDemo() {
             onClick={handleReplay}
             className="rounded-full border border-border bg-surface/90 px-5 py-2.5 text-sm font-medium shadow-card backdrop-blur hover:bg-surface"
           >
-            Replay animation
+            {ui("Replay animation")}
           </button>
         </div>
       )}

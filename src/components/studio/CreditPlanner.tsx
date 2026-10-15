@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import {
   AI_CREDIT_COSTS,
@@ -35,6 +36,7 @@ const ACTIVITIES = [
   { key: "research", label: "Research · one platform", cost: 8, initial: 4 },
 ];
 export function CreditPlanner() {
+  const ui = useUiText();
   const [counts, setCounts] = useState<Record<string, number>>(
     Object.fromEntries(ACTIVITIES.map(a => [a.key, a.initial]))
   );
@@ -50,17 +52,20 @@ export function CreditPlanner() {
     <section className="mt-6 rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 to-surface p-6">
       <div className="flex flex-wrap justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Plan your creative month</h2>
+          <h2 className="text-xl font-semibold">
+            {ui("Plan your creative month")}
+          </h2>
           <p className="mt-2 text-sm text-foreground/70">
-            Try a mix of work. The total updates as you go.
+            {ui("Try a mix of work. The total updates as you go.")}
           </p>
         </div>
         <div className="text-right">
           <p className="text-3xl font-semibold tabular-nums text-primary">
-            {total.toLocaleString()} <span className="text-sm">credits</span>
+            {total.toLocaleString()}{" "}
+            <span className="text-sm">{ui("credits")}</span>
           </p>
           <p className="mt-1 text-sm">
-            {fit ? `Fits in ${PLAN_NAME_BY_ID[fit]}` : "Studio + top-ups"}
+            {fit ? `Fits in ${PLAN_NAME_BY_ID[fit]}` : ui("Studio + top-ups")}
           </p>
         </div>
       </div>
@@ -86,7 +91,7 @@ export function CreditPlanner() {
               className="mt-2 w-full rounded-lg border border-border bg-background p-3 font-medium"
             />
             <span className="mt-2 block text-xs text-foreground/65">
-              {((counts[a.key] || 0) * a.cost).toLocaleString()} credits
+              {((counts[a.key] || 0) * a.cost).toLocaleString()} {ui("credits")}
             </span>
           </label>
         ))}
@@ -117,9 +122,9 @@ export function CreditPlanner() {
         })}
       </div>
       <p className="mt-4 text-xs text-foreground/70">
-        An estimate using the settings above. Duration, resolution, audio, and
-        continuation change video costs. Manual editing and MP4 export use no AI
-        credits.
+        {ui(
+          "An estimate using the settings above. Duration, resolution, audio, and continuation change video costs. Manual editing and MP4 export use no AI credits."
+        )}
       </p>
     </section>
   );

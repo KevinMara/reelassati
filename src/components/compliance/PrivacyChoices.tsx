@@ -1,7 +1,8 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
 import { Cookie, X } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+
 import {
   OPEN_PRIVACY_PREFERENCES_EVENT,
   PRIVACY_PREFERENCES_EVENT,
@@ -29,8 +30,8 @@ export function usePrivacyPreferences() {
 }
 
 export function PrivacyChoices() {
-  const { i18n } = useTranslation();
-  const isItalian = i18n.resolvedLanguage?.startsWith("it");
+  const ui = useUiText();
+
   const saved = usePrivacyPreferences();
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState(() => saved === null);
@@ -73,7 +74,7 @@ export function PrivacyChoices() {
           type="button"
           onClick={() => setOpen(false)}
           className="absolute right-3 top-3 rounded-lg p-2 text-foreground/55 hover:bg-background hover:text-foreground"
-          aria-label={isItalian ? "Chiudi preferenze" : "Close preferences"}
+          aria-label={ui("Close preferences")}
         >
           <X className="h-4 w-4" aria-hidden />
         </button>
@@ -84,12 +85,12 @@ export function PrivacyChoices() {
         </span>
         <div>
           <h2 id="privacy-choices-title" className="font-semibold">
-            {isItalian ? "Le tue scelte sulla privacy" : "Your privacy choices"}
+            {ui("Your privacy choices")}
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-foreground/65">
-            {isItalian
-              ? "I cookie necessari fanno funzionare lo studio. Analytics e contenuti social restano disattivati finché non li autorizzi."
-              : "Necessary cookies keep the studio working. Optional analytics and social embeds stay off until you choose."}
+            {ui(
+              "Necessary cookies keep the studio working. Optional analytics and social embeds stay off until you choose."
+            )}
           </p>
         </div>
       </div>
@@ -102,17 +103,15 @@ export function PrivacyChoices() {
               type="checkbox"
               checked
               disabled
-              aria-label={
-                isItalian ? "Tecnologie necessarie" : "Necessary technology"
-              }
+              aria-label={ui("Necessary technology")}
               className="mt-0.5 accent-primary"
             />
             <span>
-              <strong>{isItalian ? "Necessari" : "Necessary"}</strong>
+              <strong>{ui("Necessary")}</strong>
               <span className="mt-0.5 block text-xs text-foreground/55">
-                {isItalian
-                  ? "Accesso, sicurezza, saldo, preferenze e funzioni richieste."
-                  : "Sign-in, security, balance, preferences, and requested features."}
+                {ui(
+                  "Sign-in, security, balance, preferences, and requested features."
+                )}
               </span>
             </span>
           </div>
@@ -122,15 +121,13 @@ export function PrivacyChoices() {
               type="checkbox"
               checked={analytics}
               onChange={event => setAnalytics(event.target.checked)}
-              aria-label={isItalian ? "Consenti analytics" : "Allow analytics"}
+              aria-label={ui("Allow analytics")}
               className="mt-0.5 accent-primary"
             />
             <span>
-              <strong>Analytics</strong>
+              <strong>{ui("Analytics")}</strong>
               <span className="mt-0.5 block text-xs text-foreground/55">
-                {isItalian
-                  ? "Misurazione facoltativa per migliorare il prodotto."
-                  : "Optional measurement used to improve the product."}
+                {ui("Optional measurement used to improve the product.")}
               </span>
             </span>
           </div>
@@ -140,21 +137,15 @@ export function PrivacyChoices() {
               type="checkbox"
               checked={externalMedia}
               onChange={event => setExternalMedia(event.target.checked)}
-              aria-label={
-                isItalian
-                  ? "Consenti media social esterni"
-                  : "Allow external social media"
-              }
+              aria-label={ui("Allow external social media")}
               className="mt-0.5 accent-primary"
             />
             <span>
-              <strong>
-                {isItalian ? "Media social esterni" : "External social media"}
-              </strong>
+              <strong>{ui("External social media")}</strong>
               <span className="mt-0.5 block text-xs text-foreground/55">
-                {isItalian
-                  ? "Carica player di TikTok, Instagram e YouTube, che possono ricevere dati tecnici."
-                  : "Loads TikTok, Instagram, and YouTube players, which may receive technical data."}
+                {ui(
+                  "Loads TikTok, Instagram, and YouTube players, which may receive technical data."
+                )}
               </span>
             </span>
           </div>
@@ -166,7 +157,7 @@ export function PrivacyChoices() {
           to="/cookies"
           className="px-1 text-xs text-primary hover:underline"
         >
-          {isItalian ? "Leggi la Cookie Policy" : "Read the Cookie Policy"}
+          {ui("Read the Cookie Policy")}
         </Link>
         <div className="flex flex-1 flex-col gap-2 sm:ml-auto sm:flex-row sm:justify-end">
           <button
@@ -174,7 +165,7 @@ export function PrivacyChoices() {
             onClick={() => commit({ analytics: false, externalMedia: false })}
             className="rounded-pill border border-border bg-background px-4 py-2.5 text-sm font-medium hover:border-primary/35"
           >
-            {isItalian ? "Solo necessari" : "Necessary only"}
+            {ui("Necessary only")}
           </button>
           <button
             type="button"
@@ -187,20 +178,14 @@ export function PrivacyChoices() {
             }
             className="rounded-pill border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-primary/15"
           >
-            {expanded
-              ? isItalian
-                ? "Salva scelte"
-                : "Save choices"
-              : isItalian
-                ? "Personalizza"
-                : "Customize"}
+            {expanded ? ui("Save choices") : ui("Customize")}
           </button>
           <button
             type="button"
             onClick={() => commit({ analytics: true, externalMedia: true })}
             className="rounded-pill border border-border bg-background px-4 py-2.5 text-sm font-medium hover:border-primary/35"
           >
-            {isItalian ? "Consenti facoltativi" : "Allow optional"}
+            {ui("Allow optional")}
           </button>
         </div>
       </div>

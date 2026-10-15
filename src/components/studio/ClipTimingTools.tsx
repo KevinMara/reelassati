@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import type { EditProject, TimelineClip } from "@contracts/workspace";
 import { nextRollingClip } from "@/lib/editor-trimming";
@@ -13,6 +14,7 @@ export function ClipTimingTools({
   disabled?: boolean;
   onApply(mode: "slip" | "roll" | "stretch", value: number): Promise<void>;
 }) {
+  const ui = useUiText();
   const [offset, setOffset] = useState("0"),
     [cut, setCut] = useState("0"),
     [duration, setDuration] = useState(String(clip.duration));
@@ -20,18 +22,19 @@ export function ClipTimingTools({
   return (
     <details className="mt-4 rounded-xl border border-border p-3">
       <summary className="cursor-pointer text-sm font-medium">
-        Slip, rolling trim and rate stretch
+        {ui("Slip, rolling trim and rate stretch")}
       </summary>
       <div className="mt-3 space-y-3 text-sm">
         <p className="text-xs text-foreground/65">
-          Linked audio follows these edits. Source boundaries and measured
-          captions are preserved.
+          {ui(
+            "Linked audio follows these edits. Source boundaries and measured captions are preserved."
+          )}
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <label className="min-w-0 flex-1 text-xs">
-            Slip source by seconds
+            {ui("Slip source by seconds")}
             <input
-              aria-label="Slip source offset in seconds"
+              aria-label={ui("Slip source offset in seconds")}
               type="number"
               step={1 / (project.frameRate ?? 30)}
               value={offset}
@@ -47,14 +50,14 @@ export function ClipTimingTools({
             onClick={() => void onApply("slip", Number(offset))}
             className="rounded-lg border border-border px-3 py-2 disabled:opacity-40"
           >
-            Slip source
+            {ui("Slip source")}
           </button>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="min-w-0 flex-1 text-xs">
-            Move cut to {next?.label ?? "next clip"} by seconds
+            {ui("Move cut to")} {next?.label ?? "next clip"} {ui("by seconds")}
             <input
-              aria-label="Rolling cut offset in seconds"
+              aria-label={ui("Rolling cut offset in seconds")}
               type="number"
               step={1 / (project.frameRate ?? 30)}
               value={cut}
@@ -70,14 +73,14 @@ export function ClipTimingTools({
             onClick={() => void onApply("roll", Number(cut))}
             className="rounded-lg border border-border px-3 py-2 disabled:opacity-40"
           >
-            Roll cut
+            {ui("Roll cut")}
           </button>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="min-w-0 flex-1 text-xs">
-            Fit source span to seconds
+            {ui("Fit source span to seconds")}
             <input
-              aria-label="Rate stretch duration in seconds"
+              aria-label={ui("Rate stretch duration in seconds")}
               type="number"
               min={1 / (project.frameRate ?? 30)}
               step={1 / (project.frameRate ?? 30)}
@@ -97,7 +100,7 @@ export function ClipTimingTools({
             onClick={() => void onApply("stretch", Number(duration))}
             className="rounded-lg border border-border px-3 py-2 disabled:opacity-40"
           >
-            Rate stretch
+            {ui("Rate stretch")}
           </button>
         </div>
       </div>

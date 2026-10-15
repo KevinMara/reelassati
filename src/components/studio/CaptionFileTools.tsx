@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
 import type { TranscriptSegment } from "@contracts/workspace";
@@ -12,6 +13,7 @@ export function CaptionFileTools({
   duration: number;
   onImport: (segments: TranscriptSegment[]) => void;
 }) {
+  const ui = useUiText();
   const input = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState<ReturnType<
@@ -44,7 +46,7 @@ export function CaptionFileTools({
           className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs"
         >
           <Upload size={13} />
-          Import SRT / VTT
+          {ui("Import SRT / VTT")}
         </button>
         <button
           type="button"
@@ -53,7 +55,7 @@ export function CaptionFileTools({
           className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs disabled:opacity-40"
         >
           <Download size={13} />
-          Download SRT
+          {ui("Download SRT")}
         </button>
       </div>
       <input
@@ -61,14 +63,14 @@ export function CaptionFileTools({
         type="file"
         accept=".srt,.vtt,text/vtt,application/x-subrip"
         className="hidden"
-        aria-label="Import subtitle file"
+        aria-label={ui("Import subtitle file")}
         onChange={async event => {
           const file = event.target.files?.[0];
           event.target.value = "";
           if (!file) return;
           try {
             if (file.size > 2_000_000)
-              throw new Error("Choose a subtitle file smaller than 2 MB.");
+              throw new Error(ui("Choose a subtitle file smaller than 2 MB."));
             const result = parseSubtitleFile(await file.text(), duration);
             if (segments.length) {
               setPending(result);
@@ -86,8 +88,8 @@ export function CaptionFileTools({
       {pending && (
         <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs">
           <p>
-            Replace {segments.length} existing captions with{" "}
-            {pending.segments.length} imported captions?
+            {ui("Replace")} {segments.length} {ui("existing captions with")}{" "}
+            {pending.segments.length} {ui("imported captions?")}
           </p>
           <div className="mt-2 flex gap-2">
             <button
@@ -95,14 +97,14 @@ export function CaptionFileTools({
               onClick={() => apply(pending)}
               className="rounded-md bg-primary px-2.5 py-1.5 text-primary-foreground"
             >
-              Replace captions
+              {ui("Replace captions")}
             </button>
             <button
               type="button"
               onClick={() => setPending(null)}
               className="rounded-md border border-border px-2.5 py-1.5"
             >
-              Cancel
+              {ui("Cancel")}
             </button>
           </div>
         </div>

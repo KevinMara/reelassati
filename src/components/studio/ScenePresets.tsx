@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useState } from "react";
 import { useWorkspace } from "@/providers/workspace";
@@ -9,6 +10,7 @@ export function ScenePresets({
   direction: Record<string, string>;
   onSelect: (value: Record<string, string>) => void;
 }) {
+  const ui = useUiText();
   const { workspace, updateWorkspace, saving } = useWorkspace();
   const [name, setName] = useState(""),
     [notice, setNotice] = useState("");
@@ -42,9 +44,9 @@ export function ScenePresets({
   return (
     <div className="mb-5 rounded-xl border border-border bg-background/60 p-4">
       <label className="text-sm font-medium">
-        Saved scenes
+        {ui("Saved scenes")}
         <StudioSelect
-          aria-label="Reuse a saved scene"
+          aria-label={ui("Reuse a saved scene")}
           defaultValue=""
           onChange={e => {
             const preset = presets.find(p => p.id === e.target.value);
@@ -53,7 +55,7 @@ export function ScenePresets({
           className="mt-2 w-full rounded-lg border border-border bg-background p-2 text-sm"
         >
           <option value="" disabled>
-            Reuse a subject, setting, and style
+            {ui("Reuse a subject, setting, and style")}
           </option>
           {presets.map(p => (
             <option key={p.id} value={p.id}>
@@ -64,8 +66,8 @@ export function ScenePresets({
       </label>
       <div className="mt-3 flex gap-2">
         <input
-          aria-label="Scene name"
-          placeholder="Name this scene"
+          aria-label={ui("Scene name")}
+          placeholder={ui("Name this scene")}
           value={name}
           maxLength={80}
           onChange={e => setName(e.target.value)}
@@ -77,7 +79,7 @@ export function ScenePresets({
           onClick={() => void save()}
           className="rounded-lg border border-primary/30 px-3 text-sm font-medium text-primary disabled:opacity-60"
         >
-          Save scene
+          {ui("Save scene")}
         </button>
       </div>
       {notice && (

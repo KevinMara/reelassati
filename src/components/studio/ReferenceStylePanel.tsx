@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { WandSparkles } from "lucide-react";
 import type { Asset } from "@contracts/workspace";
@@ -49,6 +50,7 @@ function ReferenceStyleSession({
   purpose = "edit",
   projectId,
 }: ReferenceStylePanelProps) {
+  const ui = useUiText();
   const { workspace, updateWorkspace, getWorkspaceSnapshot, capabilities } =
     useWorkspace();
   const { user } = useAuth();
@@ -166,7 +168,9 @@ function ReferenceStyleSession({
         scope.brandId !== expected.brandId
       )
         throw new Error(
-          "Your account or brand changed. Start again in the intended workspace."
+          ui(
+            "Your account or brand changed. Start again in the intended workspace."
+          )
         );
       await task(scope, abort.signal, current, progress);
     } catch (cause) {
@@ -195,7 +199,7 @@ function ReferenceStyleSession({
       current();
       if (w.profile.email.toLowerCase() !== scope.ownerEmail)
         throw new Error(
-          "The destination workspace changed. Start the import again."
+          ui("The destination workspace changed. Start the import again.")
         );
       return {
         ...w,
@@ -273,7 +277,7 @@ function ReferenceStyleSession({
       await verifyUploadRequestScope(scope);
       current();
       if (!getWorkspaceSnapshot().assets.some(a => a.id === source.id))
-        throw new Error("The reference was removed.");
+        throw new Error(ui("The reference was removed."));
       await updateWorkspace(w => {
         current();
         return {
@@ -295,7 +299,7 @@ function ReferenceStyleSession({
     void run(async (scope, signal, current, progress) => {
       current();
       if (!getWorkspaceSnapshot().assets.some(a => a.id === source.id))
-        throw new Error("The reference was removed.");
+        throw new Error(ui("The reference was removed."));
       const response = await (
         await import("@/lib/analyze-media")
       ).analyzeMedia(
@@ -309,7 +313,7 @@ function ReferenceStyleSession({
       await verifyUploadRequestScope(scope);
       current();
       if (!getWorkspaceSnapshot().assets.some(a => a.id === source.id))
-        throw new Error("The reference was removed.");
+        throw new Error(ui("The reference was removed."));
       const evidence = buildReferenceEvidence(
         { assetId: source.id, duration: source.duration! },
         response,
@@ -328,21 +332,20 @@ function ReferenceStyleSession({
     <details className="my-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
       <summary className="cursor-pointer text-sm font-medium">
         {purpose === "script"
-          ? "Learn from a reference hook or script"
-          : "Match a reference style or video"}
+          ? ui("Learn from a reference hook or script")
+          : ui("Match a reference style or video")}
       </summary>
       <fieldset
         disabled={busy || disabled}
         className="mt-3 space-y-3 disabled:opacity-50"
       >
         <p className="text-xs text-foreground/70">
-          Choose an owned video, upload an original, or import a final video
-          file. Import and measurement use no AI credits. Analysis is a separate
-          action at the measured quote. Reference source timestamps are mapped
-          to your own footage when planning edits.
+          {ui(
+            "Choose an owned video, upload an original, or import a final video file. Import and measurement use no AI credits. Analysis is a separate action at the measured quote. Reference source timestamps are mapped to your own footage when planning edits."
+          )}
         </p>
         <CompactSelect
-          aria-label="Reference video"
+          aria-label={ui("Reference video")}
           value={assetId}
           onValueChange={value => {
             invalidate();
@@ -360,7 +363,7 @@ function ReferenceStyleSession({
           <>
             <input
               type="url"
-              aria-label="Reference direct video link"
+              aria-label={ui("Reference direct video link")}
               value={url}
               onChange={e => {
                 invalidate();
@@ -371,7 +374,8 @@ function ReferenceStyleSession({
               className="w-full rounded-lg border border-border bg-background p-2 text-sm"
             />
             <p className="text-xs text-foreground/70">
-              {DIRECT_VIDEO_HELP} Direct imports: up to 256 MB and 2 minutes.
+              {DIRECT_VIDEO_HELP}{" "}
+              {ui("Direct imports: up to 256 MB and 2 minutes.")}
             </p>
             <button
               type="button"
@@ -384,12 +388,12 @@ function ReferenceStyleSession({
               onClick={importLink}
               className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-40"
             >
-              Import private reference · no AI credits
+              {ui("Import private reference · no AI credits")}
             </button>
           </>
         )}
         <label className="block text-xs">
-          Upload reference
+          {ui("Upload reference")}
           <input
             type="file"
             accept="video/*"
@@ -409,7 +413,9 @@ function ReferenceStyleSession({
             setSelected(selected.length === aspects.length ? [] : [...aspects]);
           }}
         >
-          {selected.length === aspects.length ? "Deselect all" : "Select all"}
+          {selected.length === aspects.length
+            ? ui("Deselect all")
+            : ui("Select all")}
         </button>
         <div className="grid gap-2 sm:grid-cols-2">
           {aspects.map(aspect => (
@@ -439,8 +445,9 @@ function ReferenceStyleSession({
               setRights(e.target.checked);
             }}
           />
-          I may download this reference and submit it to the AI analysis
-          provider.
+          {ui(
+            "I may download this reference and submit it to the AI analysis provider."
+          )}
         </label>
         {asset && !measured && (
           <button
@@ -448,13 +455,13 @@ function ReferenceStyleSession({
             onClick={measureSelected}
             className="rounded-lg border border-border px-3 py-2 text-xs"
           >
-            Measure duration · no AI credits
+            {ui("Measure duration · no AI credits")}
           </button>
         )}
         {measured && (
           <p className="text-xs text-foreground/70">
-            Measured reference: {asset!.duration!.toFixed(2)} seconds · analysis
-            costs {cost} credits.
+            {ui("Measured reference:")} {asset!.duration!.toFixed(2)}{" "}
+            {ui("seconds · analysis costs")} {cost} {ui("credits.")}
           </p>
         )}
         <button
@@ -466,7 +473,7 @@ function ReferenceStyleSession({
           className="ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm disabled:opacity-40"
         >
           {cost === null
-            ? "Measure a reference before analysis"
+            ? ui("Measure a reference before analysis")
             : `Analyze reference · ${cost} credits`}
           <WandSparkles aria-hidden="true" className="h-3.5 w-3.5" />
         </button>
@@ -477,7 +484,7 @@ function ReferenceStyleSession({
           onClick={invalidate}
           className="mt-2 text-xs text-primary"
         >
-          Cancel
+          {ui("Cancel")}
         </button>
       )}
       {(busy || detail) && (

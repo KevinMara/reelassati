@@ -3,6 +3,8 @@ import { initReactI18next } from "react-i18next";
 import en from "./locales/en";
 import it from "./locales/it";
 import { globalLocales } from "./locales/global";
+import { loadUiLocale } from "./load-ui-locale";
+import { localizedLegacyKeys } from "./translation-resources";
 import { platformApiUrl } from "@/lib/runtime";
 
 export const supportedLanguages = [
@@ -126,23 +128,44 @@ export async function initializeI18n() {
   const manuallySelected = normalizeLanguage(
     window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
   );
-  const initialLanguage =
+  let initialLanguage =
     manuallySelected || (await locationLanguage()) || browserLanguage();
+  let initialUi: Record<string, string>;
+  try {
+    initialUi = await loadUiLocale(initialLanguage);
+  } catch {
+    initialLanguage = "en";
+    initialUi = {};
+  }
 
   await i18n.use(initReactI18next).init({
     lng: initialLanguage,
     resources: {
-      en: { translation: en },
-      it: { translation: it },
+      en: { translation: en, ui: {} },
+      it: {
+        translation:
+          initialLanguage === "it" ? localizedLegacyKeys(it, initialUi) : it,
+        ui: initialLanguage === "it" ? initialUi : {},
+      },
       ...Object.fromEntries(
         Object.entries(globalLocales).map(([code, translation]) => [
           code,
-          { translation },
+          {
+            translation:
+              code === initialLanguage
+                ? localizedLegacyKeys(translation, initialUi)
+                : translation,
+            ui: code === initialLanguage ? initialUi : {},
+          },
         ])
       ),
     },
     supportedLngs: supportedLanguages.map(([code]) => code),
     fallbackLng: "en",
+    defaultNS: "translation",
+    ns: ["translation", "ui"],
+    keySeparator: false,
+    nsSeparator: false,
     load: "languageOnly",
     interpolation: { escapeValue: false },
   });
@@ -150,7 +173,25 @@ export async function initializeI18n() {
   i18n.on("languageChanged", applyDocumentLanguage);
 }
 
+let languageSelection = 0;
 export async function selectLanguage(language: SupportedLanguage) {
+  const selection = ++languageSelection;
+  const ui = await loadUiLocale(language);
+  if (selection !== languageSelection) return;
+  i18n.addResourceBundle(language, "ui", ui, true, true);
+  const existing =
+    language === "it"
+      ? it
+      : language === "en"
+        ? en
+        : globalLocales[language] || {};
+  i18n.addResourceBundle(
+    language,
+    "translation",
+    localizedLegacyKeys(existing, ui),
+    true,
+    true
+  );
   window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
   await i18n.changeLanguage(language);
 }

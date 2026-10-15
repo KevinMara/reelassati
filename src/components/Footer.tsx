@@ -1,18 +1,16 @@
+import { useUiText } from "@/lib/i18n/ui";
+import { LanguagePicker } from "@/components/LanguagePicker";
 import { Link } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { Globe, Moon, Sun } from "lucide-react";
+
+import { Moon, Sun } from "lucide-react";
 import { Logo } from "./Logo";
 import { useTheme } from "@/hooks/useTheme";
 import { openPrivacyPreferences } from "@/lib/privacy-consent";
 
 export function Footer() {
-  const { i18n } = useTranslation();
-  const { theme, toggleTheme } = useTheme();
-  const isItalian = i18n.resolvedLanguage?.startsWith("it");
+  const ui = useUiText();
 
-  const toggleLang = () => {
-    void i18n.changeLanguage(isItalian ? "en" : "it");
-  };
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <footer className="mt-32 border-t border-border bg-background">
@@ -21,28 +19,26 @@ export function Footer() {
           <div className="col-span-2 md:col-span-5">
             <Logo size="lg" />
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-foreground/60">
-              {isItalian
-                ? "Lo studio short-form centrato sul montaggio: controllo manuale, assistenza revisionabile e un flusso completo dall’idea alla consegna."
-                : "The editing-first short-form studio: manual control, reviewable assistance, and one complete path from idea to delivery."}
+              {ui(
+                "The editing-first short-form studio: manual control, reviewable assistance, and one complete path from idea to delivery."
+              )}
             </p>
             <span className="mt-7 inline-flex rounded-pill bg-primary/10 px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-primary">
-              {isItalian
-                ? "Montaggio preciso · AI revisionabile"
-                : "Precise editing · Reviewable AI"}
+              {ui("Precise editing · Reviewable AI")}
             </span>
           </div>
 
           <FooterCol
-            title={isItalian ? "Prodotto" : "Product"}
+            title={ui("Product")}
             items={[
               {
-                label: isItalian ? "Funzioni" : "Capabilities",
+                label: ui("Capabilities"),
                 to: "/#features",
               },
-              { label: isItalian ? "Esempi" : "Walkthroughs", to: "/showcase" },
+              { label: ui("Walkthroughs"), to: "/showcase" },
               { label: "Prompt Director", to: "/templates" },
               {
-                label: isItalian ? "Prezzi" : "Pricing",
+                label: ui("Pricing"),
                 to: "/pricing",
               },
             ]}
@@ -51,36 +47,36 @@ export function Footer() {
             title="Studio"
             items={[
               {
-                label: isItalian ? "Montaggio" : "Editing",
+                label: ui("Editing"),
                 to: "/dashboard/edit",
               },
               { label: "Script", to: "/dashboard/script" },
               {
-                label: isItalian ? "Generazione video" : "Video generation",
+                label: ui("Video generation"),
                 to: "/dashboard/video",
               },
               {
-                label: isItalian ? "Consegna" : "Delivery",
+                label: ui("Delivery"),
                 to: "/dashboard/publish",
               },
             ]}
           />
           <FooterCol
-            title={isItalian ? "Aiuto" : "Help"}
+            title={ui("Help")}
             items={[
               {
-                label: isItalian ? "Piano locale" : "Local edit plan",
+                label: ui("Local edit plan"),
                 to: "/#edit-plan",
               },
               {
-                label: isItalian ? "Guida rapida" : "Quick start",
+                label: ui("Quick start"),
                 to: "/contact",
               },
               {
-                label: isItalian ? "Assistente" : "Support assistant",
+                label: ui("Support assistant"),
                 to: "/contact",
               },
-              { label: isItalian ? "Contatto" : "Contact", to: "/contact" },
+              { label: ui("Contact"), to: "/contact" },
             ]}
           />
         </div>
@@ -88,49 +84,47 @@ export function Footer() {
         <div className="mt-16 flex flex-col items-start gap-5 border-t border-border pt-8 lg:flex-row lg:items-center">
           <p className="mono-eyebrow text-foreground/40">
             &copy; {new Date().getFullYear()} REELassati ·{" "}
-            {isItalian ? "Tutti i diritti riservati" : "All rights reserved"}
+            {ui("All rights reserved")}
           </p>
           <nav
-            aria-label={
-              isItalian ? "Trasparenza e policy" : "Transparency and policies"
-            }
+            aria-label={ui("Transparency and policies")}
             className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-foreground/55 lg:ml-auto"
           >
             <Link
               to="/ai-transparency"
               className="transition-colors hover:text-foreground"
             >
-              {isItalian ? "Trasparenza AI" : "AI transparency"}
+              {ui("AI transparency")}
             </Link>
             <Link
               to="/responsible-use"
               className="transition-colors hover:text-foreground"
             >
-              {isItalian ? "Uso responsabile" : "Responsible use"}
+              {ui("Responsible use")}
             </Link>
             <Link
               to="/provenance"
               className="transition-colors hover:text-foreground"
             >
-              {isItalian ? "Verifica provenienza" : "Check provenance"}
+              {ui("Check provenance")}
             </Link>
             <Link
               to="/privacy"
               className="transition-colors hover:text-foreground"
             >
-              Privacy
+              {ui("Privacy")}
             </Link>
             <Link
               to="/terms"
               className="transition-colors hover:text-foreground"
             >
-              {isItalian ? "Termini" : "Terms"}
+              {ui("Terms")}
             </Link>
             <Link
               to="/refunds"
               className="transition-colors hover:text-foreground"
             >
-              {isItalian ? "Rimborsi" : "Refunds"}
+              {ui("Refunds")}
             </Link>
             <Link
               to="/cookies"
@@ -143,43 +137,29 @@ export function Footer() {
               onClick={openPrivacyPreferences}
               className="transition-colors hover:text-foreground"
             >
-              {isItalian ? "Scelte privacy" : "Privacy choices"}
+              {ui("Privacy choices")}
             </button>
             <Link
               to="/accessibility"
               className="transition-colors hover:text-foreground"
             >
-              {isItalian ? "Accessibilità" : "Accessibility"}
+              {ui("Accessibility")}
             </Link>
             <Link
               to="/legal"
               className="transition-colors hover:text-foreground"
             >
-              {isItalian ? "Informazioni legali" : "Legal notice"}
+              {ui("Legal notice")}
             </Link>
           </nav>
           <div className="flex items-center gap-1 lg:ml-2">
-            <button
-              type="button"
-              onClick={toggleLang}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-              aria-label={isItalian ? "Passa all’inglese" : "Switch to Italian"}
-            >
-              <Globe className="h-3.5 w-3.5" aria-hidden />{" "}
-              {isItalian ? "IT" : "EN"}
-            </button>
+            <LanguagePicker compact />
             <button
               type="button"
               onClick={toggleTheme}
               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
               aria-label={
-                theme === "light"
-                  ? isItalian
-                    ? "Attiva tema scuro"
-                    : "Use dark theme"
-                  : isItalian
-                    ? "Attiva tema chiaro"
-                    : "Use light theme"
+                theme === "light" ? ui("Use dark theme") : ui("Use light theme")
               }
             >
               {theme === "light" ? (

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   AlertCircle,
@@ -237,6 +238,7 @@ function toDisplayResult(
 }
 
 export default function ProvenanceDetector() {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const language: Language = i18n.resolvedLanguage?.startsWith("it")
     ? "it"
@@ -399,8 +401,7 @@ export default function ProvenanceDetector() {
                 className="w-full resize-y rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 outline-none transition-shadow placeholder:text-foreground/30 focus:ring-2 focus:ring-primary/30"
               />
               <p className="mt-2 text-right font-mono text-[10px] text-foreground/35">
-                {text.length.toLocaleString()}{" "}
-                {language === "it" ? "caratteri" : "characters"}
+                {text.length.toLocaleString()} {ui("characters")}
               </p>
             </div>
           ) : (
@@ -514,8 +515,7 @@ export default function ProvenanceDetector() {
                   </p>
                   {displayResult.recordId ? (
                     <p className="mt-3 font-mono text-[10px] text-foreground/40">
-                      {language === "it" ? "Record" : "Record"}:{" "}
-                      {displayResult.recordId}
+                      {ui("Record")}: {displayResult.recordId}
                     </p>
                   ) : null}
                 </div>
@@ -545,9 +545,7 @@ export default function ProvenanceDetector() {
               {displayResult.limitations.length ? (
                 <details className="mt-5 rounded-xl border border-border bg-background/65 p-4">
                   <summary className="cursor-pointer text-sm font-medium">
-                    {language === "it"
-                      ? "Limiti dell’ispezione"
-                      : "Inspection limitations"}
+                    {ui("Inspection limitations")}
                   </summary>
                   <ul className="mt-3 space-y-2 text-xs leading-5 text-foreground/50">
                     {displayResult.limitations.map(limitation => (

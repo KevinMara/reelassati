@@ -5,6 +5,12 @@ import {
 import { validateAnalysisProxyDuration } from "./analysis-media";
 import {
   normalizeVideoInsights,
+  normalizeVideoRecommendations,
+  normalizeVideoStructure,
+  scoreVideoInsights,
+  VIDEO_ANALYSIS_SCHEMA_VERSION,
+  VIDEO_ROLES,
+  videoAnalysisResponseSchema,
   VIDEO_ANALYSIS_RUBRIC,
 } from "../contracts/video-analysis";
 import { serviceDiagnostics } from "./service-diagnostics";
@@ -627,6 +633,7 @@ function capabilities(
         ? Boolean(env.KIMI_CODE_API_KEY)
         : Boolean(env.OPENROUTER_API_KEY)),
     analysis: Boolean(env.OPENROUTER_API_KEY && provenanceReady),
+    analysisSchemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
     transcription: Boolean(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
@@ -3853,7 +3860,9 @@ async function chatJson(
   userContent: unknown,
   model?: string,
   requireJsonMode = true,
-  maxOutputTokens?: number
+  maxOutputTokens?: number,
+  deferCompletion = false,
+  responseSchema?: Record<string, unknown>
 ): Promise<{
   output: Record<string, unknown>;
   invocation: AiInvocationContext;
@@ -3910,10 +3919,22 @@ async function chatJson(
               content: modelUserContent(userContent),
             },
           ],
-          ...(requireJsonMode
-            ? { response_format: { type: "json_object" } }
-            : {}),
-          temperature: 0.45,
+          ...(responseSchema
+            ? {
+                response_format: {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "reelassati_video_analysis_v2",
+                    strict: true,
+                    schema: responseSchema,
+                  },
+                },
+                provider: { require_parameters: true },
+              }
+            : requireJsonMode
+              ? { response_format: { type: "json_object" } }
+              : {}),
+          temperature: responseSchema ? 0.1 : 0.45,
           ...(maxOutputTokens ? { max_tokens: maxOutputTokens } : {}),
         }),
       }
@@ -3923,7 +3944,7 @@ async function chatJson(
       await providerError(response, providerName);
     }
     const output = parseModelJson(await response.json());
-    await completeAiInvocation(env, invocation, output);
+    if (!deferCompletion) await completeAiInvocation(env, invocation, output);
     return { output, invocation };
   } catch (cause) {
     await failAiInvocation(env, invocation, "provider_or_parse_failure");
@@ -6259,7 +6280,21 @@ async function handleAi(
       platform?: string;
       sourceRightsConfirmed?: boolean;
       focus?: string;
+      schemaVersion?: string;
+      language?: string;
     }>(request);
+    if (
+      input.schemaVersion &&
+      input.schemaVersion !== VIDEO_ANALYSIS_SCHEMA_VERSION
+    )
+      return json(
+        {
+          error:
+            "This analysis version is unavailable. Refresh the Studio before continuing.",
+          analysisIncomplete: true,
+        },
+        409
+      );
     if (input.publicUrl !== undefined)
       return errorResponse(
         "Import a direct video file into your private Library, then analyze its owned asset ID. Raw external video URLs are unsupported.",
@@ -6348,7 +6383,42 @@ async function handleAi(
       6,
       Math.min(120, Math.ceil((analysisDuration || 1) / 2))
     );
-    const maximumOutputTokens = 1500 + maximumIntervals * 180;
+    const maximumOutputTokens = 2200 + maximumIntervals * 260;
+    const requestedLanguage = stringValue(input.language)
+      .toLowerCase()
+      .split("-")[0];
+    const analysisLanguage = [
+      "en",
+      "it",
+      "es",
+      "fr",
+      "de",
+      "pt",
+      "nl",
+      "pl",
+      "ro",
+      "tr",
+      "uk",
+      "ru",
+      "ar",
+      "hi",
+      "ja",
+      "ko",
+      "zh",
+      "vi",
+      "da",
+      "sv",
+      "no",
+      "fi",
+      "cs",
+      "hu",
+      "el",
+      "he",
+      "id",
+      "th",
+    ].includes(requestedLanguage)
+      ? requestedLanguage
+      : "en";
 
     return runPaidAiAction(
       env,
@@ -6369,7 +6439,7 @@ async function handleAi(
           env,
           user,
           "video-analysis",
-          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied video. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action in retention notes. For ending, identify the source timestamp after the last complete spoken phrase AND meaningful visual action, preserving intentional closing holds, CTAs, music and outros. Set completed true and trailingContent empty only when you observed the entire remaining tail and it contains no meaningful content; otherwise use unknown. Never infer an ending from sampled frames or a missing transcript. Set ending to null if timing or coverage cannot be established. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with summary, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote,ending:{time,confidence:0..1,completed:boolean,trailingContent:empty|meaningful|unknown,note}}, hook {score 0..100,note}, pacing {score 0..100,note}, retention [{start,end,score,note}], and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. ${VIDEO_ANALYSIS_RUBRIC} Each change follows the edit-plan schema: type,label,reason,start,end,confidence,intensity. Target platform: ${platformValue(input.platform)}.`,
+          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied full-duration temporal video and its available audio, not merely a transcript or representative stills. Source duration is ${analysisDuration} seconds; all ranges use this source clock. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action. For ending, identify the source timestamp after the last complete spoken phrase AND meaningful visual action, preserving intentional closing holds, CTAs, music and outros. Set completed true and trailingContent empty only when you observed the entire remaining tail and it contains no meaningful content; otherwise use unknown. Never infer an ending from sampled frames or a missing transcript. Set ending to null if timing or coverage cannot be established. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with schemaVersion, summary, insights, structure, recommendations, noChangesReason, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote,ending:{time,confidence:0..1,completed:boolean,trailingContent:empty|meaningful|unknown,note}}, hook {score 0..100|null,note}, pacing {score 0..100|null,note}, and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. ${VIDEO_ANALYSIS_RUBRIC} Executable changes use only type=trim|split|silence|pacing|audio|style|graphic with label,reason,evidence,start,end,confidence:0..1,intensity:light|balanced|aggressive,parameters. Each evidence field cites the actual interval observation. Trim requires parameters.sourceIn (source-media offset) and keeps exactly end-start seconds. Split marks an evidenced boundary. Silence removes only an observed non-meaningful interval, not a guessed gap in speech. Pacing requires parameters.speed:0.25..4. Audio requires parameters.volume:0..2. Style permits fit:cover|contain,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2,fadeIn/fadeOut:0..3. Graphic requires parameters.graphic {kind:text|callout|arrow|highlight,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16,animation:none|fade|pop|slide}; preserve readable captions and observed faces/products. Do not fabricate generated b-roll, replacement audio, captions without verified word timings, reshoots or factual claims as executable operations: put those in editorial recommendations. This is a reviewable plan, never already applied. Target platform: ${platformValue(input.platform)}. Write all human-readable text in language code ${analysisLanguage}; preserve original source quotes exactly and keep JSON keys/enums in English.`,
           [
             {
               type: "text",
@@ -6379,12 +6449,188 @@ async function handleAi(
           ],
           env.OPENROUTER_ANALYSIS_MODEL || "google/gemini-2.5-flash",
           true,
-          maximumOutputTokens
+          maximumOutputTokens,
+          true,
+          videoAnalysisResponseSchema(maximumIntervals, analysisDuration || 0)
         );
-        output.insights = normalizeVideoInsights(
+        const insights = normalizeVideoInsights(
           output.insights,
           analysisDuration || 0
         );
+        const overall = scoreVideoInsights(insights, analysisDuration || 0);
+        const structure = normalizeVideoStructure(output.structure, insights);
+        const recommendations = normalizeVideoRecommendations(
+          output.recommendations,
+          analysisDuration || 0
+        );
+        const noChangesReason = stringValue(output.noChangesReason).slice(
+          0,
+          1600
+        );
+        const sourceReview = recordValue(output.review);
+        const pacingAssessment = recordValue(output.pacing);
+        const rawChanges = Array.isArray(output.changes)
+          ? output.changes
+          : null;
+        // The analyzer is source-clock based and has no timeline clip/word map.
+        // Accept only directly representable, evidence-bound operations. Rewrites,
+        // reshoots, new assets and unverified captions stay editorial suggestions.
+        const validChange = (item: unknown) => {
+          const row = recordValue(item);
+          if (
+            !row ||
+            ![
+              "trim",
+              "split",
+              "silence",
+              "pacing",
+              "audio",
+              "style",
+              "graphic",
+            ].includes(stringValue(row.type)) ||
+            typeof row.start !== "number" ||
+            !Number.isFinite(row.start) ||
+            row.start < 0 ||
+            typeof row.end !== "number" ||
+            !Number.isFinite(row.end) ||
+            row.end <= row.start ||
+            row.end > (analysisDuration || 0) ||
+            !stringValue(row.label) ||
+            !stringValue(row.reason) ||
+            !stringValue(row.evidence) ||
+            typeof row.confidence !== "number" ||
+            !Number.isFinite(row.confidence) ||
+            row.confidence < 0 ||
+            row.confidence > 1 ||
+            !["light", "balanced", "aggressive"].includes(
+              stringValue(row.intensity)
+            )
+          )
+            return false;
+          if (
+            !insights.some(
+              interval =>
+                interval.start < (row.end as number) &&
+                interval.end > (row.start as number)
+            )
+          )
+            return false;
+          const params = recordValue(row.parameters) || {};
+          const bounded = (value: unknown, min: number, max: number) =>
+            typeof value === "number" &&
+            Number.isFinite(value) &&
+            value >= min &&
+            value <= max;
+          if (row.type === "trim")
+            return bounded(
+              params.sourceIn,
+              0,
+              (analysisDuration || 0) - (row.end - row.start)
+            );
+          if (row.type === "pacing") return bounded(params.speed, 0.25, 4);
+          if (row.type === "audio") return bounded(params.volume, 0, 2);
+          if (row.type === "style") {
+            const constraints = {
+              brightness: [-0.5, 0.5],
+              contrast: [0.5, 2],
+              saturation: [0, 2],
+              fadeIn: [0, 3],
+              fadeOut: [0, 3],
+            };
+            const entries = Object.entries(params).filter(
+              ([, value]) => value !== null
+            );
+            return (
+              entries.length > 0 &&
+              entries.every(([key, value]) =>
+                key === "fit"
+                  ? ["cover", "contain"].includes(String(value))
+                  : key in constraints &&
+                    bounded(
+                      value,
+                      constraints[key as keyof typeof constraints][0],
+                      constraints[key as keyof typeof constraints][1]
+                    )
+              )
+            );
+          }
+          if (row.type === "graphic") {
+            const graphic = recordValue(params.graphic);
+            return Boolean(
+              graphic &&
+              ["text", "callout", "arrow", "highlight"].includes(
+                stringValue(graphic.kind)
+              ) &&
+              normalizeGraphic(graphic)
+            );
+          }
+          return true;
+        };
+        const rawInsightsValid =
+          Array.isArray(output.insights) &&
+          output.insights.length === insights.length &&
+          output.insights.every(item => {
+            const row = recordValue(item);
+            return (
+              row &&
+              VIDEO_ROLES.includes(row.role as (typeof VIDEO_ROLES)[number])
+            );
+          });
+        const invalidReason =
+          output.schemaVersion !== VIDEO_ANALYSIS_SCHEMA_VERSION
+            ? "unsupported-schema"
+            : !rawInsightsValid
+              ? "invalid-intervals"
+              : overall.status !== "complete"
+                ? overall.reason
+                : structure.length !== 5
+                  ? "missing-story-assessment"
+                  : !stringValue(output.summary)
+                    ? "missing-summary"
+                    : !sourceReview ||
+                        !["present", "absent", "unknown"].includes(
+                          stringValue(sourceReview.captions)
+                        ) ||
+                        !["present", "absent", "unknown"].includes(
+                          stringValue(sourceReview.audio)
+                        ) ||
+                        !stringValue(sourceReview.captionNote) ||
+                        !stringValue(sourceReview.audioNote) ||
+                        !pacingAssessment ||
+                        !stringValue(pacingAssessment.note) ||
+                        (pacingAssessment.score !== null &&
+                          observedScore(pacingAssessment.score) === null)
+                      ? "missing-source-review"
+                      : !Array.isArray(output.recommendations) ||
+                          recommendations.length !==
+                            output.recommendations.length
+                        ? "invalid-recommendations"
+                        : !rawChanges ||
+                            rawChanges.length > 10 ||
+                            !rawChanges.every(validChange)
+                          ? "invalid-edit-plan"
+                          : !recommendations.length &&
+                              !rawChanges.length &&
+                              !noChangesReason
+                            ? "unexplained-empty-plan"
+                            : "";
+        if (invalidReason) {
+          await failAiInvocation(env, invocation, `analysis_${invalidReason}`);
+          return json(
+            {
+              error:
+                "The video review was incomplete. No analysis credits were used.",
+              analysisIncomplete: true,
+              creditsRefunded: true,
+              reason: invalidReason,
+            },
+            422
+          );
+        }
+        output.insights = insights;
+        output.structure = structure;
+        output.recommendations = recommendations;
+        output.overall = overall;
         if (analysisUsesProxy) {
           const review = recordValue(output.review) || {};
           output.review = {
@@ -6393,8 +6639,6 @@ async function handleAi(
             ...(review.captions === "absent"
               ? {
                   captions: "unknown",
-                  captionNote:
-                    "On-screen captions could not be confirmed from the analysis copy.",
                 }
               : {}),
           };
@@ -6418,32 +6662,22 @@ async function handleAi(
             submissionAction: "analyze-video",
           },
         });
-        const retention = Array.isArray(output.retention)
-          ? output.retention.slice(0, 20).flatMap(item => {
-              const row = recordValue(item);
-              if (
-                !row ||
-                typeof row.start !== "number" ||
-                typeof row.end !== "number" ||
-                !Number.isFinite(row.start) ||
-                !Number.isFinite(row.end) ||
-                row.start < 0 ||
-                row.end <= row.start ||
-                observedScore(row.score) === null ||
-                !analysisDuration ||
-                row.end > analysisDuration
-              )
-                return [];
-              return [
-                {
-                  start: row.start,
-                  end: row.end,
-                  score: boundedNumber(row.score, 50, 0, 100),
-                  note: stringValue(row.note, "Review this interval"),
-                },
-              ];
-            })
-          : [];
+        await completeAiInvocation(env, invocation, output);
+        // Compatibility intervals come from the same validated observations;
+        // a separate legacy attention report cannot override complete v2 data.
+        const retention = insights.map(interval => ({
+          start: interval.start,
+          end: interval.end,
+          score: interval.attention as number,
+          note: interval.rationale,
+        }));
+        const hookIntervals = insights.filter(
+          interval => interval.role === "hook"
+        );
+        const hookSeconds = hookIntervals.reduce(
+          (sum, interval) => sum + interval.end - interval.start,
+          0
+        );
         const hook =
           output.hook && typeof output.hook === "object"
             ? (output.hook as Record<string, unknown>)
@@ -6453,26 +6687,37 @@ async function handleAi(
             ? (output.pacing as Record<string, unknown>)
             : {};
         return json({
+          schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+          scoreScope: "audiovisual-editorial-only",
+          language: analysisLanguage,
           summary: stringValue(output.summary, "Analysis complete"),
           hook: {
-            score: observedScore(hook.score),
+            score: hookSeconds
+              ? Math.round(
+                  hookIntervals.reduce(
+                    (sum, interval) =>
+                      sum +
+                      (interval.attention as number) *
+                        (interval.end - interval.start),
+                    0
+                  ) / hookSeconds
+                )
+              : null,
             note: stringValue(
               hook.note,
-              "No supported hook assessment was returned."
+              structure.find(section => section.role === "hook")?.note || ""
             ),
           },
           pacing: {
             score: observedScore(pacing.score),
-            note: stringValue(
-              pacing.note,
-              "No supported pacing assessment was returned."
-            ),
+            note: stringValue(pacing.note, ""),
           },
           retention,
-          insights: normalizeVideoInsights(
-            output.insights,
-            analysisDuration || 0
-          ),
+          insights,
+          overall,
+          structure,
+          recommendations,
+          noChangesReason,
           coverage: {
             input: analysisUsesProxy
               ? "full-duration-proxy"
@@ -6480,12 +6725,19 @@ async function handleAi(
             durationSeconds: analysisDuration,
             proxyFramesPerSecond: analysisUsesProxy ? 8 : null,
             providerFrameSampling: "provider-controlled",
+            reviewedSeconds: insights.reduce(
+              (sum, interval) => sum + interval.end - interval.start,
+              0
+            ),
+            coveragePercent: overall.coveragePercent,
           },
           review: normalizeReview(output.review, analysisDuration),
-          changes: mapEditOperations(output.changes, 600).map(change => ({
-            ...change,
-            provenance,
-          })),
+          changes: mapEditOperations(rawChanges, analysisDuration || 0).map(
+            change => ({
+              ...change,
+              provenance,
+            })
+          ),
           provenance,
         });
       }
@@ -11542,6 +11794,7 @@ interface TrendSearchCitation {
   sourceUrl: string;
   title: string;
   content: string;
+  verification?: "reachable" | "access-limited";
 }
 
 export function trendSearchCitations(payload: unknown): TrendSearchCitation[] {
@@ -11586,7 +11839,7 @@ export function trendTextCitations(payload: unknown): TrendSearchCitation[] {
   return citations;
 }
 
-async function verifyTrendCitation(
+export async function verifyTrendCitation(
   citation: TrendSearchCitation
 ): Promise<TrendSearchCitation | null> {
   let verificationUrl = citation.sourceUrl;
@@ -11611,10 +11864,66 @@ async function verifyTrendCitation(
       redirect: "follow",
       signal: AbortSignal.timeout(8_000),
     });
-    await response.body?.cancel().catch(() => undefined);
-    return response.ok ? citation : null;
+    const finalUrl = response.url;
+    let accessLimited = !response.ok;
+    if (finalUrl) {
+      try {
+        const target = new URL(finalUrl);
+        const expected = new URL(verificationUrl);
+        accessLimited ||=
+          target.hostname !== expected.hostname ||
+          /\/(?:accounts\/login|login|signin|sign-in|challenge|checkpoint|consent|sorry)(?:\/|$)/i.test(
+            target.pathname
+          );
+      } catch {
+        accessLimited = true;
+      }
+    }
+    // A known missing/deleted source is ineligible even when an old indexed
+    // excerpt remains. Anti-bot, login, rate limits and transport failures do
+    // not prove deletion and must not erase the retrieved search evidence.
+    if (response.status === 404 || response.status === 410) {
+      await response.body?.cancel().catch(() => undefined);
+      return null;
+    }
+    if (
+      !response.ok &&
+      ![401, 403, 408, 425, 429].includes(response.status) &&
+      response.status < 500
+    ) {
+      await response.body?.cancel().catch(() => undefined);
+      return null;
+    }
+    let prefix = "";
+    const reader = response.body?.getReader();
+    if (reader) {
+      const decoder = new TextDecoder();
+      try {
+        while (prefix.length < 16_000) {
+          const part = await reader.read();
+          if (part.done) break;
+          prefix += decoder.decode(part.value, { stream: true });
+        }
+      } finally {
+        await reader.cancel().catch(() => undefined);
+      }
+    }
+    if (
+      /sorry, this page (?:isn't|is not) available|this (?:video|content|post) (?:is no longer available|is unavailable|isn't available|is not available)|(?:video|post) has been (?:removed|deleted)/i.test(
+        prefix
+      )
+    )
+      return null;
+    accessLimited ||=
+      /(?:<title[^>]*>\s*(?:log\s?in|sign\s?in|just a moment|access denied)|verify (?:you are|that you.re) (?:a human|human)|captcha|enable (?:javascript|cookies) to continue|log in to (?:continue|view|see))/i.test(
+        prefix
+      );
+    return {
+      ...citation,
+      verification: accessLimited ? "access-limited" : "reachable",
+    };
   } catch {
-    return null;
+    return { ...citation, verification: "access-limited" };
   }
 }
 
@@ -11659,7 +11968,15 @@ export function groundTrendOutput(
     trends.push({
       ...candidate,
       metrics: performanceFromSource(sourceText),
-      evidence: [brandEvidence, citation.content],
+      evidence: [
+        brandEvidence,
+        citation.content,
+        ...(citation.verification === "access-limited"
+          ? [
+              "Source facts are grounded in retrieved search excerpts. The direct platform access check was blocked or unavailable; public availability was not independently confirmed.",
+            ]
+          : []),
+      ],
       platform: citation.platform,
       sourceUrl: citation.sourceUrl,
       title: stringValue(candidate.title).slice(0, 160),
@@ -11849,6 +12166,15 @@ async function trendAvailableCredits(
   return availableCredits(env, user);
 }
 
+export function customTrendDiscoveryCohort(
+  scope: Pick<TrendScope, "query">
+): string {
+  const topic = scope.query.trim();
+  return topic
+    ? `Custom topic: ${topic}. Discover sector-specific breakout product demonstrations, transformations, customer results and founder/service stories from the last seven days. Use the topic's actual brand/product names as search leads, then retrieve the individual post's exact date, central brand action and labeled performance metrics. Avoid generic social-media advice and all-time viral roundups.`
+    : "Broad current-breakout discovery across product demonstrations and transformations (beauty, skincare, food, fashion, physical products), service/software outcomes and founder storytelling, and emerging independent brands. Seek this week's unusually high-reach individual brand-promotion posts across different countries; discover sector-specific brands first, then inspect exact current post dates and labeled metrics. No empty topic, generic brand-promotion query, all-time roundups or automatic familiar-brand selections.";
+}
+
 async function researchTrendSources(
   env: SitesEnvironment,
   user: AuthenticatedUser,
@@ -11895,7 +12221,7 @@ async function researchTrendSources(
     const taskInstruction =
       mode === "weekly"
         ? `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 7 * 86_400_000).toISOString()} and ${generatedAt} on ${platformInstruction}. This is the last seven days, refreshed weekly. These must be real posts where a brand, product, or service is central to the content, but the post itself is native organic content rather than a paid ad. Rank the strongest verified pieces by reported views and engagement. Return fewer results instead of adding a weak, generic, stale, or unverified example.`
-        : `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 7 * 86_400_000).toISOString()} and ${generatedAt} that answer this paid custom brief. Platform: ${platformInstruction}. Topic, niche, product, or audience: "${scope.query}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. The brand, product, or service must be central, while the post must be native organic content rather than a paid ad. Rank by verified views and engagement and return fewer results instead of filler.`;
+        : `Use the web search tool before answering. Find the most viral individual organic brand-promotion shorts published between ${new Date(Date.parse(generatedAt) - 7 * 86_400_000).toISOString()} and ${generatedAt} that answer this paid custom brief. Platform: ${platformInstruction}. Topic, niche, product, or audience: "${scope.query || "Broad discovery of this week's breakout product, service and founder content across sectors"}". Content type: ${contentTypeInstruction}. Primary objective: ${objectiveInstruction}. Audience region: ${scope.region}. Content language: ${scope.language}. The brand, product, or service must be central, while the post must be native organic content rather than a paid ad. Rank by verified views and engagement and return fewer results instead of filler.`;
     failureCode = "search_request_failure";
     const searchPlatforms: TrendPlatform[] =
       scope.platform === "all" ? ["tiktok", "instagram"] : [scope.platform];
@@ -11914,7 +12240,7 @@ async function researchTrendSources(
             "Service/software and founder storytelling: discover current breakout brand-owned posts from software, hospitality, local businesses and consumer services. Look for demonstrable product outcomes, customer proof, behind-the-scenes and founder stories, not generic social-media advice.",
             "Emerging and independent brands: identify this week's breakout product reveals, manufacturing/process videos and customer transformations across different countries. Avoid filling the list exclusively with large familiar brands.",
           ]
-        : [`Custom topic: ${scope.query}`];
+        : [customTrendDiscoveryCohort(scope)];
     const searchPasses = searchPlatforms.flatMap(platform =>
       discoveryCohorts.map(cohort => ({ platform, cohort }))
     );
@@ -11991,6 +12317,8 @@ async function researchTrendSources(
             mode === "weekly"
               ? "The weekly search sources are temporarily unavailable."
               : "The search sources are temporarily unavailable. No credits were used.",
+          reason: "source-search-unavailable",
+          ...(mode === "custom" ? { creditsRefunded: true } : {}),
         },
         502
       );
@@ -12017,6 +12345,10 @@ async function researchTrendSources(
             mode === "weekly"
               ? "The weekly update could not verify enough current source videos."
               : "The research could not verify enough current source videos. No credits were used.",
+          reason: citationMap.size
+            ? "source-unavailable"
+            : "no-grounded-citations",
+          ...(mode === "custom" ? { creditsRefunded: true } : {}),
         },
         502
       );
@@ -12043,14 +12375,14 @@ async function researchTrendSources(
               {
                 role: "system",
                 content:
-                  "You turn verified short-form search evidence into strict JSON. Use only the supplied direct-video URLs and factual evidence. Never invent a date, metric, creator, brand, or organic-status claim. Metrics may be numbers or compact strings such as 1.2M or 850K. Use null for a publication date or metric that the supplied evidence does not reveal, and say that the public metric is unavailable in viralityEvidence. Reject every source missing its exact date or a labeled performance metric. Include brandEvidence as a verbatim excerpt of the supplied source describing its specific brand/product promotion. Never treat a reachable URL as evidence of relevance or virality. Editorial hook/pattern/hypothesis/adaptation may be reasoned from the evidence but must stay distinct from observed facts. Return JSON only with one key, trends. Each usable item needs platform, title, creator, brandName, sourceUrl, hook, pattern, evidence, organicBrandPromotion=true, paidAd=false, organicEvidence, viralityEvidence, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics {views,likes,comments,shares}, thumbnailUrl, and publishedAt. Omit items lacking a source-backed date within the last seven days, a measured viral performance signal, a specific central brand promotion, or organic status.",
+                  "You turn retrieved short-form search evidence into strict JSON. Use only the supplied direct-video URLs and factual evidence. A source marked access-limited has grounded search excerpts but its current public availability could not be independently confirmed; do not claim it was directly inspected or verified live. Never invent a date, metric, creator, brand, or organic-status claim. Metrics may be numbers or compact strings such as 1.2M or 850K. Use null for a publication date or metric that the supplied evidence does not reveal, and say that the public metric is unavailable in viralityEvidence. Reject every source missing its exact date or a labeled performance metric. Include brandEvidence as a verbatim excerpt of the supplied source describing its specific brand/product promotion. Never treat a reachable URL as evidence of relevance or virality. Editorial hook/pattern/hypothesis/adaptation may be reasoned from the evidence but must stay distinct from observed facts. Return JSON only with one key, trends. Each usable item needs platform, title, creator, brandName, sourceUrl, hook, pattern, evidence, organicBrandPromotion=true, paidAd=false, organicEvidence, viralityEvidence, hypothesis, adaptation, passSignal, lifecycle, confidence, niche, region, language, metrics {views,likes,comments,shares}, thumbnailUrl, and publishedAt. Omit items lacking a source-backed date within the last seven days, a measured viral performance signal, a specific central brand promotion, or organic status.",
               },
               {
                 role: "user",
                 content: JSON.stringify({
                   scope,
                   observedAt: generatedAt,
-                  verifiedSources: citations,
+                  groundedSources: citations,
                   searchFindings: searchPayloads
                     .map(extractTextContent)
                     .map(text => text.slice(0, 12_000)),
@@ -12100,6 +12432,8 @@ async function researchTrendSources(
             mode === "weekly"
               ? "The weekly update could not verify enough current source videos."
               : "The research could not verify enough current source videos. No credits were used.",
+          reason: "no-eligible-sources",
+          ...(mode === "custom" ? { creditsRefunded: true } : {}),
         },
         502
       );
@@ -12429,7 +12763,9 @@ async function handleTrends(
   }
   const body = await parseJsonBody<{ scope?: unknown }>(request);
   const scope = cleanTrendScope(body.scope, language);
-  if (scope.query.length < 2) {
+  // An empty topic intentionally requests broad discovery; only an accidental
+  // one-character topic needs correction. Price and search budgets are unchanged.
+  if (scope.query.length === 1) {
     return errorResponse("Describe a niche, topic, product, or audience first");
   }
   const scopeJson = JSON.stringify(scope);

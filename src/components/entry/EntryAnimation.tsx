@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   useCallback,
   useEffect,
@@ -153,6 +154,7 @@ export default function EntryAnimation({
   force = false,
   onComplete,
 }: EntryAnimationProps) {
+  const ui = useUiText();
   const [phase, setPhase] = useState<"ready" | "playing" | "done">(() =>
     force || !hasEntryPlayed() ? "ready" : "done"
   );
@@ -237,7 +239,7 @@ export default function EntryAnimation({
         transition={{ delay: 0.1, duration: 0.2 }}
       >
         <div className="entry-anim-backdrop" />
-        <span className="sr-only">Opening REELassati Studio</span>
+        <span className="sr-only">{ui("Opening REELassati Studio")}</span>
         <div className="entry-lockup-layer">
           <StaticLockup />
         </div>
@@ -256,7 +258,7 @@ export default function EntryAnimation({
           ease: [0.22, 1, 0.36, 1],
         }}
       />
-      <span className="sr-only">Opening REELassati Studio</span>
+      <span className="sr-only">{ui("Opening REELassati Studio")}</span>
       <motion.div
         className="entry-lockup-layer"
         initial={{ opacity: 1 }}

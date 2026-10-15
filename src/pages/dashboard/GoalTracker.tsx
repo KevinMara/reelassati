@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useMemo, useState } from "react";
 import {
@@ -61,6 +62,7 @@ function progressFor(goal: Goal) {
 }
 
 export default function GoalTracker() {
+  const ui = useUiText();
   const { workspace, updateWorkspace, saving, error } = useWorkspace();
   const [showAdd, setShowAdd] = useState(false);
   const [label, setLabel] = useState("");
@@ -92,7 +94,7 @@ export default function GoalTracker() {
   const createGoal = async () => {
     const numericTarget = Number(target);
     if (!Number.isFinite(numericTarget) || numericTarget <= 0) {
-      setActionError("Enter a target greater than zero.");
+      setActionError(ui("Enter a target greater than zero."));
       return;
     }
     const now = new Date().toISOString();
@@ -138,7 +140,7 @@ export default function GoalTracker() {
   const updateProgress = async (goal: Goal) => {
     const value = Number(progressInputs[goal.id]);
     if (!Number.isFinite(value) || value < 0) {
-      setActionError("Progress must be zero or a positive number.");
+      setActionError(ui("Progress must be zero or a positive number."));
       return;
     }
     setActionError(null);
@@ -212,7 +214,7 @@ export default function GoalTracker() {
               <h3 className="truncate text-sm font-medium">{goal.label}</h3>
               <p className="mt-0.5 text-xs text-foreground/70">
                 {meta.label}
-                {goal.platform ? ` · ${goal.platform}` : " · all platforms"}
+                {goal.platform ? ` · ${goal.platform}` : ui(" · all platforms")}
               </p>
               {goal.deadline && (
                 <p className="mt-1 flex items-center gap-1 text-xs text-foreground/70">
@@ -247,7 +249,7 @@ export default function GoalTracker() {
             {goal.current.toLocaleString()} {meta.unit}
           </span>
           <span className="text-foreground/70">
-            Target {goal.target.toLocaleString()}
+            {ui("Target")} {goal.target.toLocaleString()}
           </span>
         </div>
 
@@ -281,7 +283,7 @@ export default function GoalTracker() {
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            Update
+            {ui("Update")}
           </button>
         </div>
       </article>
@@ -292,11 +294,14 @@ export default function GoalTracker() {
     <div className="mx-auto max-w-5xl">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">Progress system</p>
-          <h1 className="text-3xl font-semibold">Goal Tracker</h1>
+          <p className="mono-eyebrow mb-2 text-primary">
+            {ui("Progress system")}
+          </p>
+          <h1 className="text-3xl font-semibold">{ui("Goal Tracker")}</h1>
           <p className="mt-2 text-foreground/60">
-            Set measurable targets and update them from verified performance
-            data.
+            {ui(
+              "Set measurable targets and update them from verified performance data."
+            )}
           </p>
         </div>
         <button
@@ -305,7 +310,7 @@ export default function GoalTracker() {
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
         >
           <Plus className="h-4 w-4" />
-          New goal
+          {ui("New goal")}
         </button>
       </div>
 
@@ -321,19 +326,19 @@ export default function GoalTracker() {
       <div className="mb-8 grid grid-cols-3 gap-4">
         <div className="rounded-xl border border-border bg-surface p-5 text-center">
           <p className="text-3xl font-semibold">{activeGoals.length}</p>
-          <p className="text-sm text-foreground/70">Active</p>
+          <p className="text-sm text-foreground/70">{ui("Active")}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-5 text-center">
           <p className="text-3xl font-semibold text-emerald-500">
             {achievedGoals.length}
           </p>
-          <p className="text-sm text-foreground/70">Achieved</p>
+          <p className="text-sm text-foreground/70">{ui("Achieved")}</p>
         </div>
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 text-center">
           <p className="text-3xl font-semibold text-primary">
             {averageProgress}%
           </p>
-          <p className="text-sm text-foreground/70">Average progress</p>
+          <p className="text-sm text-foreground/70">{ui("Average progress")}</p>
         </div>
       </div>
 
@@ -343,20 +348,20 @@ export default function GoalTracker() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6 rounded-xl border border-primary/20 bg-surface p-5"
         >
-          <h2 className="mb-4 font-medium">Create a measurable goal</h2>
+          <h2 className="mb-4 font-medium">{ui("Create a measurable goal")}</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div className="lg:col-span-2">
               <label
                 htmlFor="goal-label"
                 className="mb-1.5 block text-xs font-medium"
               >
-                Goal name
+                {ui("Goal name")}
               </label>
               <input
                 id="goal-label"
                 value={label}
                 onChange={event => setLabel(event.target.value)}
-                placeholder="Reach the first 10K"
+                placeholder={ui("Reach the first 10K")}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               />
             </div>
@@ -365,7 +370,7 @@ export default function GoalTracker() {
                 htmlFor="goal-metric"
                 className="mb-1.5 block text-xs font-medium"
               >
-                Metric
+                {ui("Metric")}
               </label>
               <StudioSelect
                 id="goal-metric"
@@ -387,7 +392,7 @@ export default function GoalTracker() {
                 htmlFor="goal-target"
                 className="mb-1.5 block text-xs font-medium"
               >
-                Target
+                {ui("Target")}
               </label>
               <input
                 id="goal-target"
@@ -405,7 +410,7 @@ export default function GoalTracker() {
                 htmlFor="goal-deadline"
                 className="mb-1.5 block text-xs font-medium"
               >
-                Deadline
+                {ui("Deadline")}
               </label>
               <input
                 id="goal-deadline"
@@ -420,7 +425,7 @@ export default function GoalTracker() {
                 htmlFor="goal-platform"
                 className="mb-1.5 block text-xs font-medium"
               >
-                Platform
+                {ui("Platform")}
               </label>
               <StudioSelect
                 id="goal-platform"
@@ -432,7 +437,7 @@ export default function GoalTracker() {
               >
                 {PLATFORM_OPTIONS.map(option => (
                   <option key={option.value || "all"} value={option.value}>
-                    {option.label}
+                    {ui(option.label)}
                   </option>
                 ))}
               </StudioSelect>
@@ -446,14 +451,14 @@ export default function GoalTracker() {
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-40"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Create goal
+              {ui("Create goal")}
             </button>
             <button
               type="button"
               onClick={() => setShowAdd(false)}
               className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-background"
             >
-              Cancel
+              {ui("Cancel")}
             </button>
           </div>
         </motion.section>
@@ -465,7 +470,7 @@ export default function GoalTracker() {
           <div className="rounded-xl border border-dashed border-border py-14 text-center text-foreground/70">
             <TrendingUp className="mx-auto mb-2 h-8 w-8" />
             <p className="text-sm">
-              No active goals. Set the next measurable win.
+              {ui("No active goals. Set the next measurable win.")}
             </p>
           </div>
         )}
@@ -474,7 +479,7 @@ export default function GoalTracker() {
       {achievedGoals.length > 0 && (
         <section className="mt-10">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/70">
-            Achieved
+            {ui("Achieved")}
           </h2>
           <div className="space-y-3">
             {achievedGoals.map(goal => renderGoal(goal, true))}

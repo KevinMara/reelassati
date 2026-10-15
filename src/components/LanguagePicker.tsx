@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { Globe2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -9,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export function LanguagePicker({ compact = false }: { compact?: boolean }) {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const current = (i18n.resolvedLanguage || "en").split(
     "-"
@@ -22,14 +24,14 @@ export function LanguagePicker({ compact = false }: { compact?: boolean }) {
       )}
     >
       <Globe2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span className="sr-only">Language</span>
+      <span className="sr-only">{ui("Language")}</span>
       <StudioSelect
         value={current}
         onChange={event =>
           void selectLanguage(event.target.value as SupportedLanguage)
         }
         className="max-w-[8.5rem] cursor-pointer appearance-none bg-transparent pe-3 text-current outline-none"
-        aria-label="Language"
+        aria-label={ui("Language")}
       >
         {supportedLanguages.map(([code, label]) => (
           <option

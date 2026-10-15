@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useRef, useState } from "react";
 import { WandSparkles } from "lucide-react";
 export function TimelinePrompt({
@@ -13,6 +14,7 @@ export function TimelinePrompt({
     range: { start: number; end: number }
   ) => Promise<void>;
 }) {
+  const ui = useUiText();
   const [enabled, setEnabled] = useState(false);
   const [start, setStart] = useState(0);
   const [end, setEnd] = useState(Math.min(3, duration));
@@ -29,18 +31,19 @@ export function TimelinePrompt({
         onClick={() => setEnabled(!enabled)}
         className="ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"
       >
-        {enabled ? "Close range prompt" : "Edit a time range with AI"}
+        {enabled ? ui("Close range prompt") : ui("Edit a time range with AI")}
         <WandSparkles aria-hidden="true" className="h-3.5 w-3.5" />
       </button>
       {enabled && (
         <>
           <p className="my-2 text-xs text-foreground/70">
-            Drag across this time ruler, adjust the range, then describe the
-            change. Send the selection to Reel.
+            {ui(
+              "Drag across this time ruler, adjust the range, then describe the change. Send the selection to Reel."
+            )}
           </p>
           <div
             role="group"
-            aria-label="Drag to select editing range"
+            aria-label={ui("Drag to select editing range")}
             className="relative h-9 touch-none cursor-crosshair overflow-hidden rounded-lg border border-primary/30 bg-background"
             onPointerDown={e => {
               if (busy) return;
@@ -130,7 +133,7 @@ export function TimelinePrompt({
             onClick={() => setOpen(true)}
             className="mt-2 text-xs text-primary"
           >
-            Set range with controls
+            {ui("Set range with controls")}
           </button>
           {open && (
             <form
@@ -144,9 +147,9 @@ export function TimelinePrompt({
                 {low.toFixed(1)}–{high.toFixed(1)}s
               </p>
               <label className="block text-xs">
-                Range start
+                {ui("Range start")}
                 <input
-                  aria-label="Prompt range start"
+                  aria-label={ui("Prompt range start")}
                   type="range"
                   min={0}
                   max={duration}
@@ -157,9 +160,9 @@ export function TimelinePrompt({
                 />
               </label>
               <label className="block text-xs">
-                Range end
+                {ui("Range end")}
                 <input
-                  aria-label="Prompt range end"
+                  aria-label={ui("Prompt range end")}
                   type="range"
                   min={0}
                   max={duration}
@@ -170,24 +173,24 @@ export function TimelinePrompt({
                 />
               </label>
               <textarea
-                aria-label="Edit this range"
-                placeholder="What should change here?"
+                aria-label={ui("Edit this range")}
+                placeholder={ui("What should change here?")}
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
                 className="w-full rounded-lg border border-border bg-background p-2 text-sm"
                 rows={2}
               />
               <p className="text-xs text-foreground/60">
-                Local mode supports color, framing, fades, audio level, captions
-                editable graphics and existing overlays. Timing changes that
-                affect the rest of the edit need the main AI editor.
+                {ui(
+                  "Local mode supports color, framing, fades, audio level, captions editable graphics and existing overlays. Timing changes that affect the rest of the edit need the main AI editor."
+                )}
               </p>
               <button
                 type="submit"
                 disabled={busy || !prompt.trim() || high - low < 0.1}
                 className="ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs disabled:opacity-40"
               >
-                Send to Reel
+                {ui("Send to Reel")}
                 <WandSparkles aria-hidden="true" className="h-3.5 w-3.5" />
               </button>
             </form>

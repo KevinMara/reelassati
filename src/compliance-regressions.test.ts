@@ -52,11 +52,11 @@ describe("protected product and compliance invariants", () => {
       '{ separator: true, label: "", compact: true }'
     );
     expect(navEntries).toContain('{ group: "create" }');
-    expect(dashboard).toContain('label="Video"');
+    expect(dashboard).toMatch(/label=(?:"Video"|\{ui\("Video"\)\})/);
     expect(dashboard).toContain('to="/dashboard/video"');
-    expect(dashboard).toContain('"Immagini" : "Images"');
+    expect(dashboard).toContain('ui("Images")');
     expect(dashboard).toContain('to="/dashboard/image"');
-    expect(dashboard).toContain('label="Audio"');
+    expect(dashboard).toMatch(/label=(?:"Audio"|\{ui\("Audio"\)\})/);
     expect(dashboard).toContain('to="/dashboard/voice"');
     expect(dashboard).toContain(
       '<Navigate to="/dashboard/script?mode=interview" replace />'

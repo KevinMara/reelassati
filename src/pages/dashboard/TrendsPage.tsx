@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import {
   useEffect,
@@ -172,6 +173,7 @@ function videoEmbedUrl(trend: TrendEvidenceItem): string | null {
 }
 
 function TrendVideo({ trend }: { trend: TrendEvidenceItem }) {
+  const ui = useUiText();
   const embedUrl = videoEmbedUrl(trend);
   const preferences = usePrivacyPreferences();
   if (embedUrl) {
@@ -179,10 +181,13 @@ function TrendVideo({ trend }: { trend: TrendEvidenceItem }) {
       return (
         <div className="flex aspect-[9/12] flex-col items-center justify-center gap-3 bg-background p-6 text-center">
           <Play className="h-8 w-8 text-primary" aria-hidden />
-          <p className="text-sm font-medium">Load the original social video</p>
+          <p className="text-sm font-medium">
+            {ui("Load the original social video")}
+          </p>
           <p className="max-w-xs text-xs leading-relaxed text-foreground/70">
-            External players can receive device and interaction data. Allow them
-            in privacy choices or open the source directly.
+            {ui(
+              "External players can receive device and interaction data. Allow them in privacy choices or open the source directly."
+            )}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             <button
@@ -190,7 +195,7 @@ function TrendVideo({ trend }: { trend: TrendEvidenceItem }) {
               onClick={openPrivacyPreferences}
               className="rounded-full bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
             >
-              Privacy choices
+              {ui("Privacy choices")}
             </button>
             <a
               href={trend.sourceUrl}
@@ -198,7 +203,7 @@ function TrendVideo({ trend }: { trend: TrendEvidenceItem }) {
               rel="noreferrer"
               className="rounded-full border border-border px-3 py-2 text-xs font-medium"
             >
-              Open source
+              {ui("Open source")}
             </a>
           </div>
         </div>
@@ -259,6 +264,7 @@ function Metric({
 }
 
 export default function TrendsPage() {
+  const ui = useUiText();
   const { workspace, updateWorkspace, saving } = useWorkspace();
   const [weeklyFeed, setWeeklyFeed] = useState<TrendFeedResponse | null>(null);
   const [customFeed, setCustomFeed] = useState<TrendFeedResponse | null>(null);
@@ -539,18 +545,18 @@ export default function TrendsPage() {
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <p className="mono-eyebrow text-primary">
-              Weekly viral intelligence
+              {ui("Weekly viral intelligence")}
             </p>
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-xs font-medium uppercase tracking-wide text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Source-linked videos
+              {ui("Source-linked videos")}
             </span>
           </div>
-          <h1 className="text-3xl font-semibold">Trends</h1>
+          <h1 className="text-3xl font-semibold">{ui("Trends")}</h1>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-foreground/70">
-            Weekly picks use reachable direct TikTok and Reels source pages.
-            Public dates and performance appear only when indexed evidence
-            exposes them; unavailable values are never invented.
+            {ui(
+              "Weekly picks use reachable direct TikTok and Reels source pages. Public dates and performance appear only when indexed evidence exposes them; unavailable values are never invented."
+            )}
           </p>
         </div>
         <button
@@ -562,7 +568,7 @@ export default function TrendsPage() {
           className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover"
         >
           {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? "Close" : "New hypothesis"}
+          {showForm ? ui("Close") : ui("New hypothesis")}
         </button>
       </div>
 
@@ -580,10 +586,13 @@ export default function TrendsPage() {
           <Search className="h-4 w-4" />
         </span>
         <span className="flex-1">
-          <span className="block text-sm font-medium">Custom research</span>
+          <span className="block text-sm font-medium">
+            {ui("Custom research")}
+          </span>
           <span className="block text-xs text-foreground/70">
-            Find verified viral organic brand shorts for your exact brief · 8–15
-            credits
+            {ui(
+              "Find verified viral organic brand shorts for your exact brief · 8–15 credits"
+            )}
           </span>
         </span>
         <ChevronDown
@@ -601,26 +610,28 @@ export default function TrendsPage() {
             <div>
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Search className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-medium">Custom trend research</h2>
+                <h2 className="text-sm font-medium">
+                  {ui("Custom trend research")}
+                </h2>
                 <span className="rounded-full bg-background px-2 py-1 text-xs text-foreground/70">
-                  {researchCreditCost} credits when completed
+                  {researchCreditCost} {ui("credits when completed")}
                 </span>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <label className="text-xs">
                   <span className="mb-1.5 block text-foreground/70">
-                    Topic, niche, product, or audience
+                    {ui("Topic, niche, product, or audience")}
                   </span>
                   <input
                     value={query}
                     onChange={event => setQuery(event.target.value)}
-                    placeholder="Leave blank for an overall scan"
+                    placeholder={ui("Leave blank for an overall scan")}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </label>
                 <label className="text-xs">
                   <span className="mb-1.5 block text-foreground/70">
-                    Platform
+                    {ui("Platform")}
                   </span>
                   <StudioSelect
                     value={researchPlatform}
@@ -633,14 +644,14 @@ export default function TrendsPage() {
                   >
                     {TREND_RESEARCH_PLATFORM_OPTIONS.map(option => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {ui(option.label)}
                       </option>
                     ))}
                   </StudioSelect>
                 </label>
                 <label className="text-xs">
                   <span className="mb-1.5 block text-foreground/70">
-                    Content type
+                    {ui("Content type")}
                   </span>
                   <StudioSelect
                     value={contentType}
@@ -651,14 +662,14 @@ export default function TrendsPage() {
                   >
                     {CONTENT_TYPE_OPTIONS.map(option => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {ui(option.label)}
                       </option>
                     ))}
                   </StudioSelect>
                 </label>
                 <label className="text-xs">
                   <span className="mb-1.5 block text-foreground/70">
-                    Performance objective
+                    {ui("Performance objective")}
                   </span>
                   <StudioSelect
                     value={objective}
@@ -669,14 +680,14 @@ export default function TrendsPage() {
                   >
                     {OBJECTIVE_OPTIONS.map(option => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {ui(option.label)}
                       </option>
                     ))}
                   </StudioSelect>
                 </label>
                 <label className="text-xs">
                   <span className="mb-1.5 block text-foreground/70">
-                    Region
+                    {ui("Region")}
                   </span>
                   <input
                     value={region}
@@ -686,7 +697,7 @@ export default function TrendsPage() {
                 </label>
                 <label className="text-xs">
                   <span className="mb-1.5 block text-foreground/70">
-                    Language
+                    {ui("Language")}
                   </span>
                   <input
                     value={
@@ -711,18 +722,18 @@ export default function TrendsPage() {
                 <Zap className="h-4 w-4" />
               )}
               {researching
-                ? "Researching sources…"
+                ? ui("Researching sources…")
                 : `Research with ${researchCreditCost} credits`}
             </button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/35 px-5 py-3 text-xs text-foreground/70">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              {researchCreditCost} credits are used only after verified results
-              succeed.
+              {researchCreditCost}{" "}
+              {ui("credits are used only after verified results succeed.")}
             </span>
             <span className="font-medium text-foreground/65">
-              {availableCredits ?? "—"} credits available
+              {availableCredits ?? "—"} {ui("credits available")}
             </span>
           </div>
         </form>
@@ -748,7 +759,7 @@ export default function TrendsPage() {
             onClick={() => void loadWeeklyFeed()}
             className="inline-flex items-center gap-1.5 font-medium text-foreground/70 hover:text-foreground"
           >
-            <RefreshCw className="h-3.5 w-3.5" /> Retry weekly update
+            <RefreshCw className="h-3.5 w-3.5" /> {ui("Retry weekly update")}
           </button>
         </div>
       ) : null}
@@ -764,7 +775,7 @@ export default function TrendsPage() {
                 : "text-foreground/70 hover:text-foreground"
             }`}
           >
-            Weekly viral shorts
+            {ui("Weekly viral shorts")}
           </button>
           {customFeed ? (
             <button
@@ -776,7 +787,7 @@ export default function TrendsPage() {
                   : "text-foreground/70 hover:text-foreground"
               }`}
             >
-              Your latest research
+              {ui("Your latest research")}
             </button>
           ) : null}
         </div>
@@ -784,23 +795,23 @@ export default function TrendsPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="mono-eyebrow text-xs text-foreground/70">
-                Organic brand posts ·{" "}
+                {ui("Organic brand posts ·")}{" "}
                 {activeFeed?.status === "stale"
-                  ? "previous verified edition"
-                  : "current-week evidence"}{" "}
-                · no paid ads
+                  ? ui("previous verified edition")
+                  : ui("current-week evidence")}{" "}
+                {ui("· no paid ads")}
               </p>
               {activeFeed ? (
                 <span className="rounded-full border border-border bg-surface px-2 py-1 text-xs text-foreground/70">
                   {activeFeed.kind === "weekly"
                     ? activeFeed.status === "preparing"
-                      ? "Preparing"
+                      ? ui("Preparing")
                       : activeFeed.status === "unavailable"
-                        ? "Awaiting verified picks"
+                        ? ui("Awaiting verified picks")
                         : activeFeed.status === "stale"
-                          ? "Previous edition"
-                          : "Updated weekly"
-                    : "Credit research"}
+                          ? ui("Previous edition")
+                          : ui("Updated weekly")
+                    : ui("Credit research")}
                 </span>
               ) : null}
             </div>
@@ -808,25 +819,29 @@ export default function TrendsPage() {
               {activeFeed?.kind === "custom"
                 ? `Research for “${activeFeed.scope.query}”`
                 : activeFeed?.status === "stale"
-                  ? "Latest verified brand shorts"
-                  : "This week’s hyperviral brand shorts"}
+                  ? ui("Latest verified brand shorts")
+                  : ui("This week’s hyperviral brand shorts")}
             </h2>
             {activeFeed?.status === "ready" ||
             activeFeed?.status === "stale" ? (
               <p className="mt-1 text-xs text-foreground/70">
-                Updated {new Date(activeFeed.generatedAt).toLocaleString()} ·{" "}
+                {ui("Updated")}{" "}
+                {new Date(activeFeed.generatedAt).toLocaleString()} ·{" "}
                 {activeFeed.status === "stale"
-                  ? "A new edition is awaiting verification."
+                  ? ui("A new edition is awaiting verification.")
                   : activeFeed.cacheNote}
               </p>
             ) : activeFeed?.status === "preparing" ? (
               <p className="mt-1 text-xs text-foreground/70">
-                The first weekly format update is being prepared automatically.
+                {ui(
+                  "The first weekly format update is being prepared automatically."
+                )}
               </p>
             ) : activeFeed?.status === "unavailable" ? (
               <p className="mt-1 text-xs text-foreground/65">
-                No current examples have passed verification yet. The next check
-                runs automatically.
+                {ui(
+                  "No current examples have passed verification yet. The next check runs automatically."
+                )}
               </p>
             ) : null}
           </div>
@@ -837,11 +852,11 @@ export default function TrendsPage() {
                 setPlatformFilter(event.target.value as "all" | TrendPlatform)
               }
               className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
-              aria-label="Filter trend evidence by platform"
+              aria-label={ui("Filter trend evidence by platform")}
             >
               {TREND_FILTER_PLATFORM_OPTIONS.map(option => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {ui(option.label)}
                 </option>
               ))}
             </StudioSelect>
@@ -851,9 +866,9 @@ export default function TrendsPage() {
                 setLifecycleFilter(event.target.value as "all" | TrendLifecycle)
               }
               className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
-              aria-label="Filter trend evidence by lifecycle"
+              aria-label={ui("Filter trend evidence by lifecycle")}
             >
-              <option value="all">All lifecycle stages</option>
+              <option value="all">{ui("All lifecycle stages")}</option>
               {Object.entries(LIFECYCLE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -905,7 +920,7 @@ export default function TrendsPage() {
                         {trend.creator}
                       </p>
                       <p className="mt-0.5 truncate text-xs uppercase tracking-wide text-foreground/70">
-                        Organic promotion · {trend.brandName}
+                        {ui("Organic promotion ·")} {trend.brandName}
                       </p>
                       <h3 className="mt-1 line-clamp-2 text-sm font-medium leading-snug">
                         {trend.title}
@@ -916,7 +931,7 @@ export default function TrendsPage() {
                       target="_blank"
                       rel="noreferrer"
                       className="shrink-0 rounded-lg border border-border p-2 text-foreground/70 hover:border-primary/30 hover:text-primary"
-                      aria-label="Open original video"
+                      aria-label={ui("Open original video")}
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
@@ -930,28 +945,28 @@ export default function TrendsPage() {
                     <Metric
                       icon={<Eye className="h-3 w-3" />}
                       value={trend.metrics.views}
-                      label="Views reported by source"
+                      label={ui("Views reported by source")}
                     />
                     <Metric
                       icon={<Heart className="h-3 w-3" />}
                       value={trend.metrics.likes}
-                      label="Likes reported by source"
+                      label={ui("Likes reported by source")}
                     />
                     <Metric
                       icon={<MessageCircle className="h-3 w-3" />}
                       value={trend.metrics.comments}
-                      label="Comments reported by source"
+                      label={ui("Comments reported by source")}
                     />
                     <Metric
                       icon={<Share2 className="h-3 w-3" />}
                       value={trend.metrics.shares}
-                      label="Shares reported by source"
+                      label={ui("Shares reported by source")}
                     />
                   </div>
 
                   <div className="mt-4 rounded-xl bg-background p-3">
                     <p className="text-xs font-medium uppercase tracking-wide text-emerald-400">
-                      Observed evidence
+                      {ui("Observed evidence")}
                     </p>
                     <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-foreground/60">
                       <li className="flex gap-2">
@@ -974,10 +989,11 @@ export default function TrendsPage() {
                   <div className="mt-3 rounded-xl border border-primary/15 bg-primary/[0.05] p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-medium uppercase tracking-wide text-primary">
-                        AI hypothesis
+                        {ui("AI hypothesis")}
                       </p>
                       <span className="text-xs text-foreground/70">
-                        {Math.round(trend.confidence * 100)}% confidence
+                        {Math.round(trend.confidence * 100)}
+                        {ui("% confidence")}
                       </span>
                     </div>
                     <p className="mt-2 text-xs leading-relaxed text-foreground/65">
@@ -985,7 +1001,7 @@ export default function TrendsPage() {
                     </p>
                     <p className="mt-2 text-xs leading-relaxed text-foreground/70">
                       <span className="font-medium text-foreground/65">
-                        Test:
+                        {ui("Test:")}
                       </span>{" "}
                       {trend.adaptation}
                     </p>
@@ -996,8 +1012,8 @@ export default function TrendsPage() {
                     onClick={() => prefillFromTrend(trend)}
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-medium text-white hover:bg-primary-hover"
                   >
-                    <FlaskConical className="h-3.5 w-3.5" /> Turn into
-                    hypothesis
+                    <FlaskConical className="h-3.5 w-3.5" />{" "}
+                    {ui("Turn into hypothesis")}
                   </button>
                 </div>
               </article>
@@ -1008,24 +1024,30 @@ export default function TrendsPage() {
             <Search className="mx-auto h-7 w-7 text-primary" />
             <h3 className="mt-3 text-sm font-medium">
               {activeFeed?.status === "preparing"
-                ? "Weekly update in preparation"
+                ? ui("Weekly update in preparation")
                 : activeFeed?.status === "unavailable"
-                  ? "Your next idea can start here"
-                  : "No matching evidence"}
+                  ? ui("Your next idea can start here")
+                  : ui("No matching evidence")}
             </h3>
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-foreground/70">
               {activeFeed?.status === "preparing"
-                ? "REELassati updates this feed internally; no action or credits are required from you."
+                ? ui(
+                    "REELassati updates this feed internally; no action or credits are required from you."
+                  )
                 : activeFeed?.status === "unavailable"
-                  ? "Verified weekly picks are not available yet. Keep creating from your own idea while the next automatic check runs."
-                  : "Change the filters or run custom research. REELassati will show fewer results rather than fill the feed with stale, paid, generic, or unverified content."}
+                  ? ui(
+                      "Verified weekly picks are not available yet. Keep creating from your own idea while the next automatic check runs."
+                    )
+                  : ui(
+                      "Change the filters or run custom research. REELassati will show fewer results rather than fill the feed with stale, paid, generic, or unverified content."
+                    )}
             </p>
             {activeFeed?.status === "unavailable" ? (
               <Link
                 to="/dashboard/script"
                 className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
               >
-                Start with my idea
+                {ui("Start with my idea")}
               </Link>
             ) : null}
           </div>
@@ -1069,54 +1091,62 @@ export default function TrendsPage() {
         >
           <div className="mb-5 flex items-center gap-2">
             <FlaskConical className="h-5 w-5 text-primary" />
-            <h2 className="font-medium">Define a controlled test</h2>
+            <h2 className="font-medium">{ui("Define a controlled test")}</h2>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm sm:col-span-2">
-              <span className="mb-1.5 block font-medium">Format idea</span>
+              <span className="mb-1.5 block font-medium">
+                {ui("Format idea")}
+              </span>
               <input
                 value={title}
                 onChange={event => setTitle(event.target.value)}
-                placeholder="Example: Result first, process second"
+                placeholder={ui("Example: Result first, process second")}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
             <label className="text-sm sm:col-span-2">
               <span className="mb-1.5 block font-medium">
-                Opening line or first frame
+                {ui("Opening line or first frame")}
               </span>
               <textarea
                 value={hook}
                 onChange={event => setHook(event.target.value)}
                 rows={2}
-                placeholder="Write the concrete opening you will test"
+                placeholder={ui("Write the concrete opening you will test")}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
             <label className="text-sm">
               <span className="mb-1.5 block font-medium">
-                Observed evidence
+                {ui("Observed evidence")}
               </span>
               <textarea
                 value={evidence}
                 onChange={event => setEvidence(event.target.value)}
                 rows={5}
-                placeholder="Source, repeated pattern, audience comment, or result you personally observed"
+                placeholder={ui(
+                  "Source, repeated pattern, audience comment, or result you personally observed"
+                )}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1.5 block font-medium">Pass signal</span>
+              <span className="mb-1.5 block font-medium">
+                {ui("Pass signal")}
+              </span>
               <textarea
                 value={successSignal}
                 onChange={event => setSuccessSignal(event.target.value)}
                 rows={5}
-                placeholder="Example: Higher 3-second hold than the current baseline"
+                placeholder={ui(
+                  "Example: Higher 3-second hold than the current baseline"
+                )}
                 className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
             <label className="text-sm">
-              <span className="mb-1.5 block font-medium">Platform</span>
+              <span className="mb-1.5 block font-medium">{ui("Platform")}</span>
               <StudioSelect
                 value={platform}
                 onChange={event => setPlatform(event.target.value as Platform)}
@@ -1124,13 +1154,15 @@ export default function TrendsPage() {
               >
                 {PLATFORMS.map(option => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {ui(option.label)}
                   </option>
                 ))}
               </StudioSelect>
             </label>
             <label className="text-sm">
-              <span className="mb-1.5 block font-medium">Target duration</span>
+              <span className="mb-1.5 block font-medium">
+                {ui("Target duration")}
+              </span>
               <StudioSelect
                 value={duration}
                 onChange={event => setDuration(Number(event.target.value))}
@@ -1138,7 +1170,7 @@ export default function TrendsPage() {
               >
                 {[15, 20, 30, 45, 60].map(seconds => (
                   <option key={seconds} value={seconds}>
-                    {seconds} seconds
+                    {seconds} {ui("seconds")}
                   </option>
                 ))}
               </StudioSelect>
@@ -1150,7 +1182,7 @@ export default function TrendsPage() {
               disabled={saving}
               className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white disabled:opacity-45"
             >
-              <Beaker className="h-4 w-4" /> Save hypothesis
+              <Beaker className="h-4 w-4" /> {ui("Save hypothesis")}
             </button>
           </div>
         </form>
@@ -1161,9 +1193,9 @@ export default function TrendsPage() {
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="mono-eyebrow text-xs text-foreground/70">
-                Saved experiments
+                {ui("Saved experiments")}
               </p>
-              <h2 className="mt-1 font-medium">Format hypotheses</h2>
+              <h2 className="mt-1 font-medium">{ui("Format hypotheses")}</h2>
             </div>
             <StudioSelect
               value={filter}
@@ -1171,12 +1203,12 @@ export default function TrendsPage() {
                 setFilter(event.target.value as "all" | Platform)
               }
               className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
-              aria-label="Filter hypotheses by platform"
+              aria-label={ui("Filter hypotheses by platform")}
             >
-              <option value="all">All platforms</option>
+              <option value="all">{ui("All platforms")}</option>
               {PLATFORMS.map(option => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {ui(option.label)}
                 </option>
               ))}
             </StudioSelect>
@@ -1213,7 +1245,7 @@ export default function TrendsPage() {
                   <dl className="mt-5 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-lg bg-background p-3">
                       <dt className="text-xs uppercase tracking-wide text-foreground/70">
-                        Evidence
+                        {ui("Evidence")}
                       </dt>
                       <dd className="mt-1 whitespace-pre-line text-xs leading-relaxed text-foreground/60">
                         {hypothesis.body}
@@ -1221,7 +1253,7 @@ export default function TrendsPage() {
                     </div>
                     <div className="rounded-lg bg-background p-3">
                       <dt className="text-xs uppercase tracking-wide text-foreground/70">
-                        Pass signal
+                        {ui("Pass signal")}
                       </dt>
                       <dd className="mt-1 text-xs leading-relaxed text-foreground/60">
                         {hypothesis.cta}
@@ -1233,13 +1265,15 @@ export default function TrendsPage() {
                       to="/dashboard/edit"
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-primary"
                     >
-                      <Scissors className="h-3.5 w-3.5" /> Build the variant
+                      <Scissors className="h-3.5 w-3.5" />{" "}
+                      {ui("Build the variant")}
                     </Link>
                     <Link
                       to="/dashboard/script"
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/70 hover:text-primary"
                     >
-                      <FileText className="h-3.5 w-3.5" /> Write the script
+                      <FileText className="h-3.5 w-3.5" />{" "}
+                      {ui("Write the script")}
                     </Link>
                   </div>
                 </article>
@@ -1248,9 +1282,13 @@ export default function TrendsPage() {
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center">
               <Beaker className="mx-auto h-7 w-7 text-primary" />
-              <h3 className="mt-3 text-sm font-medium">No saved hypotheses</h3>
+              <h3 className="mt-3 text-sm font-medium">
+                {ui("No saved hypotheses")}
+              </h3>
               <p className="mt-1 text-xs text-foreground/70">
-                Use a source-linked trend above or add your own observation.
+                {ui(
+                  "Use a source-linked trend above or add your own observation."
+                )}
               </p>
             </div>
           )}
@@ -1259,9 +1297,11 @@ export default function TrendsPage() {
         <aside>
           <div className="mb-4">
             <p className="mono-eyebrow text-xs text-foreground/70">
-              Your evidence base
+              {ui("Your evidence base")}
             </p>
-            <h2 className="mt-1 font-medium">Workspace source material</h2>
+            <h2 className="mt-1 font-medium">
+              {ui("Workspace source material")}
+            </h2>
           </div>
           {sourceMaterials.length ? (
             <div className="space-y-3">
@@ -1279,7 +1319,7 @@ export default function TrendsPage() {
                     {source.title}
                   </span>
                   <span className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
-                    Use as starting point
+                    {ui("Use as starting point")}
                     <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
                   </span>
                 </button>
@@ -1288,10 +1328,13 @@ export default function TrendsPage() {
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-surface p-6">
               <Sparkles className="h-5 w-5 text-primary" />
-              <p className="mt-3 text-sm font-medium">No source material yet</p>
+              <p className="mt-3 text-sm font-medium">
+                {ui("No source material yet")}
+              </p>
               <p className="mt-1 text-xs leading-relaxed text-foreground/70">
-                Scripts and edit projects will appear here as additional inputs
-                for future tests.
+                {ui(
+                  "Scripts and edit projects will appear here as additional inputs for future tests."
+                )}
               </p>
             </div>
           )}

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -28,6 +29,7 @@ const COLORS = [
   "#e879f9",
 ];
 export function SocialPerformance() {
+  const ui = useUiText();
   const [result, setResult] = useState<SocialAnalyticsResponse | null>(null);
   const [days, setDays] = useState(30);
   const [metrics, setMetrics] = useState<SocialMetric[]>(["views", "likes"]);
@@ -102,22 +104,23 @@ export function SocialPerformance() {
     <section className="mb-6 rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 to-surface p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Social performance</h2>
+          <h2 className="text-xl font-semibold">{ui("Social performance")}</h2>
           <p className="mt-2 text-sm text-foreground/70">
-            Lifetime results for posts published in the selected period. Reach
-            is summed per post, not deduplicated across people.
+            {ui(
+              "Lifetime results for posts published in the selected period. Reach is summed per post, not deduplicated across people."
+            )}
           </p>
         </div>
         <div className="flex gap-2">
           <StudioSelect
-            aria-label="Social performance period"
+            aria-label={ui("Social performance period")}
             value={days}
             onChange={e => setDays(Number(e.target.value))}
             className="rounded-lg border border-border bg-background p-2 text-sm"
           >
-            <option value={7}>7 days</option>
-            <option value={30}>30 days</option>
-            <option value={90}>90 days</option>
+            <option value={7}>{ui("7 days")}</option>
+            <option value={30}>{ui("30 days")}</option>
+            <option value={90}>{ui("90 days")}</option>
           </StudioSelect>
           <button
             type="button"
@@ -125,7 +128,7 @@ export function SocialPerformance() {
             disabled={busy || !result?.configured || !result.connected}
             className="rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
-            {busy ? "Syncing…" : "Sync results"}
+            {busy ? ui("Syncing…") : ui("Sync results")}
           </button>
         </div>
       </div>
@@ -156,7 +159,7 @@ export function SocialPerformance() {
       </div>
       <div
         className="mt-5 h-60"
-        aria-label="Social metrics by publication date"
+        aria-label={ui("Social metrics by publication date")}
       >
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
@@ -220,32 +223,34 @@ export function SocialPerformance() {
       </div>
       {error && (
         <p role="alert" className="mt-3 text-sm text-destructive">
-          {error}
+          {ui(error)}
         </p>
       )}
       <p className="mt-4 text-sm text-foreground/70">
         {result?.syncedAt
           ? `Last sync: ${new Date(result.syncedAt).toLocaleString()}. Missing metrics show —. Results can keep growing after publication.`
-          : "Connect your accounts and sync to see real results. Missing data is not counted as zero."}
-        {result?.partial ? " Showing up to 1,000 recent posts." : ""}
+          : ui(
+              "Connect your accounts and sync to see real results. Missing data is not counted as zero."
+            )}
+        {result?.partial ? ui(" Showing up to 1,000 recent posts.") : ""}
       </p>
       {!result?.connected && (
         <Link
           to="/dashboard/social"
           className="mt-3 inline-block text-sm font-medium text-primary"
         >
-          Connect social accounts
+          {ui("Connect social accounts")}
         </Link>
       )}
       {posts.length > 0 && (
         <div className="mt-5 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <caption className="mb-3 text-left font-medium">
-              Top posts by {metrics[0]}
+              {ui("Top posts by")} {metrics[0]}
             </caption>
             <thead>
               <tr>
-                <th className="py-2">Post</th>
+                <th className="py-2">{ui("Post")}</th>
                 {metrics.map(metric => (
                   <th className="px-3 capitalize" key={metric}>
                     {metric}

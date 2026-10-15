@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { CompactSelect } from "@/components/ui/compact-select";
 import {
   graphicFrame,
@@ -23,6 +24,7 @@ export function GraphicMotionEditor({
   onPosition: (value: number) => void;
   onChange: (graphic: MotionGraphic) => void;
 }) {
+  const ui = useUiText();
   const points = graphic.motion ?? [];
   const selected = points.find(p => Math.abs(p.at - position) < 0.00001);
   const next = selected && points.find(point => point.at > selected.at);
@@ -40,7 +42,7 @@ export function GraphicMotionEditor({
   }
   return (
     <fieldset className="space-y-3 rounded-lg border border-border p-3">
-      <legend className="px-1 text-sm font-medium">Motion path</legend>
+      <legend className="px-1 text-sm font-medium">{ui("Motion path")}</legend>
       <div className="grid grid-cols-2 gap-2">
         {MOTION_CHOREOGRAPHIES.map(p => (
           <button
@@ -57,9 +59,9 @@ export function GraphicMotionEditor({
         ))}
       </div>
       <label className="block text-xs">
-        Preview · {(position * duration).toFixed(1)}s
+        {ui("Preview ·")} {(position * duration).toFixed(1)}s
         <input
-          aria-label="Graphic preview time"
+          aria-label={ui("Graphic preview time")}
           type="range"
           min={0}
           max={1}
@@ -70,8 +72,9 @@ export function GraphicMotionEditor({
         />
       </label>
       <p className="text-xs text-foreground/70">
-        Choose a time, add a keyframe, then set its position, scale and
-        rotation. The graphic moves between your keyframes.
+        {ui(
+          "Choose a time, add a keyframe, then set its position, scale and rotation. The graphic moves between your keyframes."
+        )}
       </p>
       <div className="flex flex-wrap gap-2">
         {points.map(point => (
@@ -116,7 +119,7 @@ export function GraphicMotionEditor({
           );
         }}
       >
-        Add keyframe here
+        {ui("Add keyframe here")}
       </button>
       {selected && (
         <>
@@ -156,9 +159,9 @@ export function GraphicMotionEditor({
           {next && (
             <div className="space-y-2 rounded-lg bg-foreground/[0.03] p-2.5">
               <div className="block text-xs">
-                Motion to next keyframe
+                {ui("Motion to next keyframe")}
                 <CompactSelect
-                  aria-label="Keyframe easing"
+                  aria-label={ui("Keyframe easing")}
                   value={selected.easing ?? "linear"}
                   onValueChange={value =>
                     save(
@@ -198,8 +201,8 @@ export function GraphicMotionEditor({
                   />
                 </svg>
                 <span>
-                  Applies until {(next.at * duration).toFixed(1)}s. Scrub the
-                  preview to see the motion.
+                  {ui("Applies until")} {(next.at * duration).toFixed(1)}
+                  {ui("s. Scrub the preview to see the motion.")}
                 </span>
               </div>
             </div>
@@ -209,7 +212,7 @@ export function GraphicMotionEditor({
             onClick={() => save(points.filter(p => p !== selected))}
             className="text-xs text-destructive"
           >
-            Remove selected keyframe
+            {ui("Remove selected keyframe")}
           </button>
         </>
       )}
@@ -219,7 +222,7 @@ export function GraphicMotionEditor({
           onClick={() => save([])}
           className="ml-3 text-xs text-foreground/70"
         >
-          Clear motion path
+          {ui("Clear motion path")}
         </button>
       )}
     </fieldset>

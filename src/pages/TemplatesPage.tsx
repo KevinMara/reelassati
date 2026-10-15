@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useMemo, useState, type ComponentType } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -62,6 +63,7 @@ const CATEGORY_META: Record<
 const ALL_LABEL = { en: "All", it: "Tutti" };
 
 export default function TemplatesPage() {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const reduceMotion = useReducedMotion();
   const language: Language = i18n.resolvedLanguage?.startsWith("it")
@@ -73,9 +75,9 @@ export default function TemplatesPage() {
     VIDEO_PROMPT_TEMPLATES[0]?.id ?? ""
   );
   const [subject, setSubject] = useState(
-    language === "it"
-      ? "Una creator mostra la texture di una crema viso e il modo corretto di applicarla."
-      : "A creator demonstrates the texture of a face cream and the correct way to apply it."
+    ui(
+      "A creator demonstrates the texture of a face cream and the correct way to apply it."
+    )
   );
 
   const filtered = useMemo(() => {
@@ -93,8 +95,7 @@ export default function TemplatesPage() {
   const selected =
     filtered.find(template => template.id === selectedId) ?? filtered[0];
   const compiledPrompt = selected?.buildPrompt(
-    subject.trim() ||
-      (language === "it" ? "Descrivi il soggetto." : "Describe the subject.")
+    subject.trim() || ui("Describe the subject.")
   );
   const categories: Category[] = [
     "all",
@@ -117,26 +118,24 @@ export default function TemplatesPage() {
               className="mb-4 inline-flex items-center gap-1 text-sm text-foreground/50 transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden />{" "}
-              {language === "it" ? "Torna alla home" : "Back to home"}
+              {ui("Back to home")}
             </Link>
-            <p className="mono-eyebrow mb-2 text-primary">Prompt Director</p>
+            <p className="mono-eyebrow mb-2 text-primary">
+              {ui("Prompt Director")}
+            </p>
             <h1 className="text-4xl font-semibold md:text-5xl">
-              {language === "it"
-                ? "Preset produttivi, non formule virali."
-                : "Production presets, not viral formulas."}
+              {ui("Production presets, not viral formulas.")}
             </h1>
             <p className="mt-4 max-w-2xl leading-relaxed text-foreground/60">
-              {language === "it"
-                ? "Dieci preset reali trasformano il tuo soggetto in direzione video più precisa: camera, luce, movimento, audio, continuità e vincoli. Nessun preset garantisce performance."
-                : "Ten real presets turn your subject into more precise video direction: camera, light, movement, audio, continuity, and exclusions. No preset guarantees performance."}
+              {ui(
+                "Ten real presets turn your subject into more precise video direction: camera, light, movement, audio, continuity, and exclusions. No preset guarantees performance."
+              )}
             </p>
           </div>
 
           <div className="mb-8 flex flex-wrap items-center gap-3">
             <label className="relative min-w-[240px] flex-1 sm:max-w-sm">
-              <span className="sr-only">
-                {language === "it" ? "Cerca preset" : "Search presets"}
-              </span>
+              <span className="sr-only">{ui("Search presets")}</span>
               <Search
                 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40"
                 aria-hidden
@@ -145,19 +144,13 @@ export default function TemplatesPage() {
                 type="search"
                 value={search}
                 onChange={event => setSearch(event.target.value)}
-                placeholder={
-                  language === "it" ? "Cerca preset…" : "Search presets…"
-                }
+                placeholder={ui("Search presets…")}
                 className="w-full rounded-lg border border-border bg-surface py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
             <div
               className="flex flex-wrap gap-1.5"
-              aria-label={
-                language === "it"
-                  ? "Filtra per categoria"
-                  : "Filter by category"
-              }
+              aria-label={ui("Filter by category")}
             >
               {categories.map(category => {
                 const label =
@@ -225,12 +218,8 @@ export default function TemplatesPage() {
                         </p>
                         <p className="mt-auto pt-4 font-mono text-[9px] uppercase tracking-wider text-primary">
                           {isSelected
-                            ? language === "it"
-                              ? "Aperto nel compiler"
-                              : "Open in compiler"
-                            : language === "it"
-                              ? "Ispeziona preset"
-                              : "Inspect preset"}
+                            ? ui("Open in compiler")
+                            : ui("Inspect preset")}
                         </p>
                       </motion.button>
                     );
@@ -239,9 +228,7 @@ export default function TemplatesPage() {
               ) : (
                 <div className="rounded-xl border border-dashed border-border p-12 text-center">
                   <p className="font-medium">
-                    {language === "it"
-                      ? "Nessun preset corrisponde alla ricerca."
-                      : "No preset matches that search."}
+                    {ui("No preset matches that search.")}
                   </p>
                   <button
                     type="button"
@@ -251,7 +238,7 @@ export default function TemplatesPage() {
                     }}
                     className="mt-3 text-sm font-medium text-primary hover:text-primary-hover"
                   >
-                    {language === "it" ? "Azzera filtri" : "Clear filters"}
+                    {ui("Clear filters")}
                   </button>
                 </div>
               )}
@@ -260,23 +247,19 @@ export default function TemplatesPage() {
             {selected ? (
               <aside
                 className="h-fit rounded-2xl border border-border bg-surface p-6 shadow-card lg:sticky lg:top-24 md:p-7"
-                aria-label={
-                  language === "it"
-                    ? "Compiler prompt locale"
-                    : "Local prompt compiler"
-                }
+                aria-label={ui("Local prompt compiler")}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="mono-eyebrow text-primary">
-                      {language === "it" ? "Compiler locale" : "Local compiler"}
+                      {ui("Local compiler")}
                     </p>
                     <h2 className="mt-2 text-2xl font-semibold">
                       {selected.name}
                     </h2>
                   </div>
                   <span className="rounded-pill bg-primary/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-primary">
-                    {language === "it" ? "Anteprima locale" : "Local preview"}
+                    {ui("Local preview")}
                   </span>
                 </div>
 
@@ -285,9 +268,7 @@ export default function TemplatesPage() {
                 </p>
                 <label className="mt-6 block">
                   <span className="text-xs font-medium">
-                    {language === "it"
-                      ? "Soggetto e azione"
-                      : "Subject and action"}
+                    {ui("Subject and action")}
                   </span>
                   <textarea
                     value={subject}
@@ -301,9 +282,7 @@ export default function TemplatesPage() {
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" aria-hidden />
                     <p className="font-mono text-[9px] uppercase tracking-wider text-primary">
-                      {language === "it"
-                        ? "Direzione compilata"
-                        : "Compiled direction"}
+                      {ui("Compiled direction")}
                     </p>
                   </div>
                   <p className="mt-3 max-h-64 overflow-y-auto text-xs leading-relaxed text-foreground/70">
@@ -329,15 +308,13 @@ export default function TemplatesPage() {
                   )}&subject=${encodeURIComponent(subject.trim().slice(0, 1200))}`}
                   className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
                 >
-                  {language === "it"
-                    ? "Apri Prompt Director"
-                    : "Open Prompt Director"}{" "}
+                  {ui("Open Prompt Director")}{" "}
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
                 <p className="mt-3 text-center text-[10px] leading-relaxed text-foreground/40">
-                  {language === "it"
-                    ? "La generazione nello Studio usa crediti REELassati e richiede una revisione esplicita."
-                    : "Generation in the Studio uses REELassati credits and requires explicit review."}
+                  {ui(
+                    "Generation in the Studio uses REELassati credits and requires explicit review."
+                  )}
                 </p>
               </aside>
             ) : null}

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
 import { Check, Search, Type, SlidersHorizontal } from "lucide-react";
 import {
@@ -32,6 +33,7 @@ export function EditorPresetLibrary({
   onFadePreset,
   disabled = false,
 }: EditorPresetLibraryProps) {
+  const ui = useUiText();
   const [query, setQuery] = useState("");
   const [hoveredCaption, setHoveredCaption] = useState<string>();
   const match = (p: { name: string; description: string }) =>
@@ -47,7 +49,7 @@ export function EditorPresetLibrary({
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{heading}</h3>
         <span className="text-[11px] text-muted-foreground">
-          Free · editable
+          {ui("Free · editable")}
         </span>
       </div>
       <label className="relative block">
@@ -59,7 +61,7 @@ export function EditorPresetLibrary({
         <input
           className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs"
           aria-label={`Search ${heading.toLowerCase()}`}
-          placeholder="Search presets…"
+          placeholder={ui("Search presets…")}
           value={query}
           onChange={event => setQuery(event.target.value)}
         />
@@ -92,7 +94,7 @@ export function EditorPresetLibrary({
                 <span className="truncate text-xs font-medium">{p.name}</span>
                 {(selectedCaptionId ?? "classic") === p.id && (
                   <Check
-                    aria-label="Selected"
+                    aria-label={ui("Selected")}
                     size={13}
                     className="shrink-0 text-primary"
                   />
@@ -134,7 +136,7 @@ export function EditorPresetLibrary({
       {mode === "looks" && (
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-muted-foreground">
-            Clip entrance & exit
+            {ui("Clip entrance & exit")}
           </h4>
           <div className="flex flex-wrap gap-2">
             {FADE_PRESETS.filter(match).map(p => (
@@ -157,18 +159,21 @@ export function EditorPresetLibrary({
       {mode === "captions" && (
         <p className="flex gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
           <Type size={13} className="mt-0.5 shrink-0" />
-          Styles apply to the editable captions below. Captions already inside a
-          source video remain part of that video.
+          {ui(
+            "Styles apply to the editable captions below. Captions already inside a source video remain part of that video."
+          )}
         </p>
       )}
       {mode === "graphics" && (
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Choose a preset, then edit its text, colors, timing and motion.
+          {ui(
+            "Choose a preset, then edit its text, colors, timing and motion."
+          )}
         </p>
       )}
       {mode === "looks" && disabled && (
         <p className="text-[11px] text-muted-foreground">
-          Select a video or image on the timeline to apply a look.
+          {ui("Select a video or image on the timeline to apply a look.")}
         </p>
       )}
     </section>

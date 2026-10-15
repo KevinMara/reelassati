@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import type { EditProject } from "@contracts/workspace";
 import {
   timelineTrackSettings,
@@ -24,6 +25,7 @@ export function TimelineMixer({
   ): Promise<void>;
   onReorder(lane: TimelineTrack, direction: "up" | "down"): Promise<void>;
 }) {
+  const ui = useUiText();
   const lanes = timelineLanes(project.clips).filter(
     lane =>
       project.clips.some(
@@ -38,9 +40,9 @@ export function TimelineMixer({
   return (
     <div className="space-y-4">
       <p className="text-sm text-foreground/65">
-        Track names and mix settings are saved with the project. Solo sound
-        isolates source audio; solo picture isolates visual layers. Reordering
-        changes layer order within the same track family.
+        {ui(
+          "Track names and mix settings are saved with the project. Solo sound isolates source audio; solo picture isolates visual layers. Reordering changes layer order within the same track family."
+        )}
       </p>
       {lanes.map(lane => {
         const row = timelineTrackSettings(project, lane);
@@ -96,7 +98,7 @@ export function TimelineMixer({
                 {sound && (
                   <>
                     <label className="flex min-w-[180px] flex-1 items-center gap-2 text-xs">
-                      Gain{" "}
+                      {ui("Gain")}{" "}
                       <input
                         type="range"
                         min={0}
@@ -136,7 +138,7 @@ export function TimelineMixer({
                       }
                       className={`rounded-lg border px-3 py-2 text-xs ${row?.soloSound ? "border-primary bg-primary/15 text-primary" : "border-border"}`}
                     >
-                      Solo sound
+                      {ui("Solo sound")}
                     </button>
                   </>
                 )}
@@ -150,7 +152,7 @@ export function TimelineMixer({
                     }
                     className={`rounded-lg border px-3 py-2 text-xs ${row?.soloPicture ? "border-primary bg-primary/15 text-primary" : "border-border"}`}
                   >
-                    Solo picture
+                    {ui("Solo picture")}
                   </button>
                 )}
               </div>
@@ -160,7 +162,7 @@ export function TimelineMixer({
       })}
       {!lanes.length && (
         <p className="text-sm text-foreground/65">
-          Add media to create a track.
+          {ui("Add media to create a track.")}
         </p>
       )}
     </div>

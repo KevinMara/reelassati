@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useId, useState } from "react";
 import { LoaderCircle, Pencil, Trash2, WandSparkles, X } from "lucide-react";
 import {
@@ -66,6 +67,7 @@ export function StoryBeatStrip({
   onChange,
   onGenerate,
 }: StoryBeatStripProps) {
+  const ui = useUiText();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState("");
@@ -113,17 +115,17 @@ export function StoryBeatStrip({
 
   return (
     <section
-      aria-label="Story sections"
+      aria-label={ui("Story sections")}
       className="rounded-xl border border-border bg-surface/55 px-3 py-2"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 items-center gap-2">
           <h3 className="text-xs font-semibold text-foreground">
-            Story sections
+            {ui("Story sections")}
           </h3>
           {stale && (
             <span role="status" className="text-[11px] text-amber-500">
-              Content changed · refresh sections
+              {ui("Content changed · refresh sections")}
             </span>
           )}
         </div>
@@ -156,9 +158,9 @@ export function StoryBeatStrip({
                 <WandSparkles size={13} />
               )}
               {busy
-                ? "Finding sections…"
+                ? ui("Finding sections…")
                 : validBeats.length
-                  ? "Refresh sections"
+                  ? ui("Refresh sections")
                   : generateLabel}
             </button>
           )}
@@ -169,7 +171,7 @@ export function StoryBeatStrip({
           <div
             className="relative mt-2 h-9 rounded-lg bg-background/60"
             role="group"
-            aria-label="Jump to a story section"
+            aria-label={ui("Jump to a story section")}
           >
             {validBeats.map(beat => {
               const active = time >= beat.start && time < beat.end;
@@ -206,15 +208,17 @@ export function StoryBeatStrip({
             <p className="mt-1 text-[10px] text-muted-foreground">
               {selected.label} · {timeLabel(selected.start)}–
               {timeLabel(selected.end)}
-              {selected.origin === "manual" ? " · Edited by you" : ""}
+              {selected.origin === "manual" ? ui(" · Edited by you") : ""}
             </p>
           )}
         </>
       ) : (
         <p className="py-2 text-xs leading-relaxed text-muted-foreground">
           {hasEvidence
-            ? "Find the hook, main idea and payoff in your footage."
-            : "Add footage, then find its story sections. These markers help you navigate without cutting the video."}
+            ? ui("Find the hook, main idea and payoff in your footage.")
+            : ui(
+                "Add footage, then find its story sections. These markers help you navigate without cutting the video."
+              )}
         </p>
       )}
       {draft && onChange && (
@@ -232,7 +236,9 @@ export function StoryBeatStrip({
             );
             if (!next) {
               setError(
-                "Use a name and a valid range within the video, without overlapping another section."
+                ui(
+                  "Use a name and a valid range within the video, without overlapping another section."
+                )
               );
               return;
             }
@@ -243,7 +249,7 @@ export function StoryBeatStrip({
             className="min-w-32 flex-1 space-y-1 text-[11px] text-muted-foreground"
             htmlFor={`${instanceId}-label`}
           >
-            <span>Section name</span>
+            <span>{ui("Section name")}</span>
             <input
               id={`${instanceId}-label`}
               value={draft.label}
@@ -256,13 +262,15 @@ export function StoryBeatStrip({
             />
           </label>
           <div className="w-32 space-y-1">
-            <span className="text-[11px] text-muted-foreground">Role</span>
+            <span className="text-[11px] text-muted-foreground">
+              {ui("Role")}
+            </span>
             <CompactSelect
               value={draft.kind}
               onValueChange={kind =>
                 setDraft({ ...draft, kind: kind as StoryBeatKind })
               }
-              aria-label="Story section role"
+              aria-label={ui("Story section role")}
               disabled={blocked}
               options={STORY_BEAT_KINDS.map(kind => ({
                 value: kind,
@@ -276,7 +284,9 @@ export function StoryBeatStrip({
               className="w-24 space-y-1 text-[11px] text-muted-foreground"
               htmlFor={`${instanceId}-${edge}`}
             >
-              <span>{edge === "start" ? "Start" : "End"} (seconds)</span>
+              <span>
+                {edge === "start" ? ui("Start") : ui("End")} {ui("(seconds)")}
+              </span>
               <input
                 id={`${instanceId}-${edge}`}
                 type="number"
@@ -298,13 +308,13 @@ export function StoryBeatStrip({
             disabled={blocked}
             className="h-8 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? ui("Saving…") : ui("Save")}
           </button>
           <button
             type="button"
             disabled={blocked}
-            aria-label="Remove section marker"
-            title="Remove section marker"
+            aria-label={ui("Remove section marker")}
+            title={ui("Remove section marker")}
             onClick={() => {
               void persist(beats.filter(beat => beat.id !== draft.id));
             }}
@@ -315,7 +325,7 @@ export function StoryBeatStrip({
           <button
             type="button"
             disabled={blocked}
-            aria-label="Close section editing"
+            aria-label={ui("Close section editing")}
             onClick={() => {
               setDraft(null);
               setError("");
@@ -330,8 +340,9 @@ export function StoryBeatStrip({
             </p>
           )}
           <p className="w-full text-[10px] text-muted-foreground">
-            These markers organize your story. Editing them does not cut or
-            remove footage.
+            {ui(
+              "These markers organize your story. Editing them does not cut or remove footage."
+            )}
           </p>
         </form>
       )}

@@ -602,21 +602,75 @@ async function migrateLegacyCredits(
     );
   }
   const priorTrendSpend = await env.DB.prepare(
-    "SELECT COALESCE(SUM(credit_cost), 0) AS credits FROM trend_research_runs WHERE owner_email = ?"
+    `WITH owner_ledger AS (SELECT * FROM credit_ledger WHERE owner_email = ?),
+     history AS (
+       SELECT COALESCE(SUM(credit_cost), 0) AS credits FROM trend_research_runs
+       WHERE owner_email = ? AND created_at < COALESCE(
+         (SELECT MIN(created_at) FROM owner_ledger WHERE category = 'trend-research'), '9999')
+     )
+     SELECT history.credits, migration.amount AS migrated_amount,
+       migration.topup_amount AS migrated_topup
+     FROM history LEFT JOIN owner_ledger migration
+       ON migration.operation_key = ? AND migration.status = 'settled' AND migration.applied = 1`
   )
-    .bind(ownerEmail)
-    .first<{ credits: number | null }>()
+    .bind(ownerEmail, ownerEmail, `legacy-trend-spend:${ownerEmail}`)
+    .first<{ credits: number | null; migrated_amount: number | null; migrated_topup: number | null }>()
     .catch(() => null);
   const spent = Math.max(0, Math.floor(Number(priorTrendSpend?.credits) || 0));
-  if (spent) {
-    await applyHistoricalDebit(
-      env,
-      ownerEmail,
-      spent,
-      `legacy-trend-spend:${ownerEmail}`,
-      "Previous custom trend research"
-    );
+  // A modern reservation precedes its saved run. Such runs are already debited
+  // by the ledger; they must never be migrated a second time.
+  if (spent) await applyHistoricalDebit(
+    env,
+    ownerEmail,
+    spent,
+    `legacy-trend-spend:${ownerEmail}`,
+    "Previous custom trend research"
+  );
+  // Repair only the provable excess in an already-applied migration. These
+  // grants use separate idempotency keys and restore the original credit buckets.
+  const excess = Math.max(0, -(priorTrendSpend?.migrated_amount || 0) - spent);
+  if (excess) {
+    const topup = Math.min(excess, Math.max(0, -(priorTrendSpend?.migrated_topup || 0)));
+    await correctLegacyTrendDebit(env, ownerEmail, excess - topup, topup);
   }
+}
+
+async function correctLegacyTrendDebit(
+  env: BillingEnvironment,
+  ownerEmail: string,
+  included: number,
+  topup: number
+) {
+  const operationKey = `legacy-trend-repair-v2:${ownerEmail}`;
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO credit_ledger
+      (id, owner_email, amount, included_amount, topup_amount, category, status,
+       operation_key, description, metadata_json, applied, created_at, settled_at)
+      VALUES (?, ?, ?, ?, ?, 'migration', 'settled', ?,
+       'Duplicate trend research charge correction', '{}', 0, ?, ?)
+      ON CONFLICT(operation_key) DO NOTHING`
+    ).bind(
+      crypto.randomUUID(),
+      ownerEmail,
+      included + topup,
+      included,
+      topup,
+      operationKey,
+      now,
+      now
+    ),
+    env.DB.prepare(
+      `UPDATE credit_accounts SET
+      included_balance = included_balance + COALESCE((SELECT included_amount FROM credit_ledger WHERE operation_key = ? AND applied = 0), 0),
+      topup_balance = topup_balance + COALESCE((SELECT topup_amount FROM credit_ledger WHERE operation_key = ? AND applied = 0), 0),
+      updated_at = ? WHERE owner_email = ?`
+    ).bind(operationKey, operationKey, now, ownerEmail),
+    env.DB.prepare(
+      "UPDATE credit_ledger SET applied = 1 WHERE operation_key = ? AND applied = 0"
+    ).bind(operationKey),
+  ]);
 }
 
 async function applyHistoricalDebit(
@@ -628,8 +682,11 @@ async function applyHistoricalDebit(
 ): Promise<void> {
   const current = await creditAccount(env, ownerEmail);
   const requested = Math.max(0, Math.floor(credits));
-  const included = Math.min(current.included_balance, requested);
-  const topUp = Math.min(current.topup_balance, requested - included);
+  const included = Math.min(Math.max(0, current.included_balance), requested);
+  const topUp = Math.min(
+    Math.max(0, current.topup_balance),
+    requested - included
+  );
   const amount = included + topUp;
   if (!amount) return;
   const now = new Date().toISOString();

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useId, useState } from "react";
 import { Play, Pause, Layers } from "lucide-react";
 import {
@@ -19,6 +20,7 @@ export function MotionKitLibrary({
   assets: Asset[];
   onInsert: (draft: MotionKitDraft) => Promise<void>;
 }) {
+  const ui = useUiText();
   const controlId = useId();
   const [draft, setDraft] = useState<MotionKitDraft>({
     kit: "brand-reveal",
@@ -57,16 +59,17 @@ export function MotionKitLibrary({
   const field =
     "mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm";
   return (
-    <section className="space-y-3" aria-label="Motion kits">
+    <section className="space-y-3" aria-label={ui("Motion kits")}>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Motion kits</h3>
+        <h3 className="text-sm font-semibold">{ui("Motion kits")}</h3>
         <span className="text-xs text-muted-foreground">
-          Free · editable layers
+          {ui("Free · editable layers")}
         </span>
       </div>
       <p className="text-xs text-muted-foreground">
-        Original animations rendered on your device. Customize, insert, then
-        refine each layer on the timeline.
+        {ui(
+          "Original animations rendered on your device. Customize, insert, then refine each layer on the timeline."
+        )}
       </p>
       <div className="grid grid-cols-2 gap-2">
         {MOTION_KITS.map(kit => (
@@ -121,7 +124,7 @@ export function MotionKitLibrary({
         className="flex items-center gap-2 text-xs"
       >
         {playing ? <Pause size={14} /> : <Play size={14} />}
-        {playing ? "Pause preview" : "Play preview"}
+        {playing ? ui("Pause preview") : ui("Play preview")}
       </button>
       <form
         className="space-y-3"
@@ -133,7 +136,9 @@ export function MotionKitLibrary({
           void onInsert(structuredClone(draft))
             .then(() =>
               setMessage(
-                "Added at the playhead. Select the layers to refine them; Undo removes the whole kit."
+                ui(
+                  "Added at the playhead. Select the layers to refine them; Undo removes the whole kit."
+                )
               )
             )
             .catch(cause =>
@@ -147,7 +152,7 @@ export function MotionKitLibrary({
         }}
       >
         <label className="block text-xs">
-          {draft.kit === "statistic" ? "Result label" : "Main text"}
+          {draft.kit === "statistic" ? ui("Result label") : ui("Main text")}
           <input
             required
             disabled={busy}
@@ -158,7 +163,7 @@ export function MotionKitLibrary({
           />
         </label>
         <label className="block text-xs">
-          Supporting text
+          {ui("Supporting text")}
           <input
             disabled={busy}
             maxLength={120}
@@ -169,7 +174,7 @@ export function MotionKitLibrary({
         </label>
         {draft.kit === "statistic" && (
           <label className="block text-xs">
-            Measured percentage
+            {ui("Measured percentage")}
             <input
               required
               disabled={busy}
@@ -184,10 +189,10 @@ export function MotionKitLibrary({
         )}
         {draft.kit === "brand-reveal" && (
           <label className="block text-xs" htmlFor={`${controlId}-logo`}>
-            Logo from Library
+            {ui("Logo from Library")}
             <CompactSelect
               id={`${controlId}-logo`}
-              aria-label="Logo from Library"
+              aria-label={ui("Logo from Library")}
               disabled={busy}
               value={draft.logoAssetId ?? "none"}
               onValueChange={value =>
@@ -201,13 +206,15 @@ export function MotionKitLibrary({
               ]}
             />
             <span className="text-muted-foreground">
-              Use a transparent PNG or WebP for a logo without a background.
+              {ui(
+                "Use a transparent PNG or WebP for a logo without a background."
+              )}
             </span>
           </label>
         )}
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-xs">
-            Accent color
+            {ui("Accent color")}
             <input
               disabled={busy}
               type="color"
@@ -217,7 +224,7 @@ export function MotionKitLibrary({
             />
           </label>
           <label className="block text-xs">
-            Duration (seconds)
+            {ui("Duration (seconds)")}
             <input
               required
               disabled={busy}
@@ -242,7 +249,7 @@ export function MotionKitLibrary({
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary p-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
           <Layers size={16} />
-          {busy ? "Adding…" : "Add kit at playhead"}
+          {busy ? ui("Adding…") : ui("Add kit at playhead")}
         </button>
       </form>
     </section>

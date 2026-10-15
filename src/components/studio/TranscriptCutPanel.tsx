@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useMemo, useState } from "react";
 import type { Asset, EditProject } from "@contracts/workspace";
 import {
@@ -51,6 +52,7 @@ function TranscriptCutPanelBody({
   canRestore,
   onRestore,
 }: TranscriptCutPanelProps) {
+  const ui = useUiText();
   const [selected, setSelected] = useState<TranscriptWordSelection[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -106,10 +108,10 @@ function TranscriptCutPanelBody({
   return (
     <section
       className="space-y-3 rounded-xl border border-border bg-background/50 p-4"
-      aria-label="Cut footage from transcript"
+      aria-label={ui("Cut footage from transcript")}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Cut footage by word</h3>
+        <h3 className="text-sm font-semibold">{ui("Cut footage by word")}</h3>
         <button
           type="button"
           disabled={disabled || !canRestore}
@@ -117,17 +119,19 @@ function TranscriptCutPanelBody({
           onClick={() => void perform(onRestore)}
           className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40"
         >
-          Restore last transcript cut
+          {ui("Restore last transcript cut")}
         </button>
       </div>
       <p className="text-xs leading-relaxed text-foreground/65">
-        Select spoken words to remove their measured time from the footage,
-        audio and other unlocked tracks, closing the gaps. No AI credits.
+        {ui(
+          "Select spoken words to remove their measured time from the footage, audio and other unlocked tracks, closing the gaps. No AI credits."
+        )}
       </p>
       {!words.length ? (
         <p className="rounded-lg border border-border p-3 text-xs text-foreground/65">
-          Word cuts need measured word timings attached to audible video or
-          audio. Captions without them remain editable in the caption controls.
+          {ui(
+            "Word cuts need measured word timings attached to audible video or audio. Captions without them remain editable in the caption controls."
+          )}
         </p>
       ) : (
         <>
@@ -148,7 +152,7 @@ function TranscriptCutPanelBody({
                       key={wordKey}
                       disabled={disabled}
                       aria-pressed={active}
-                      aria-label={`${active ? "Deselect" : "Select"} ${word.text}, ${word.start.toFixed(2)} to ${word.end.toFixed(2)} seconds`}
+                      aria-label={`${active ? ui("Deselect") : ui("Select")} ${word.text}, ${word.start.toFixed(2)} to ${word.end.toFixed(2)} seconds`}
                       title={`${word.start.toFixed(3)}–${word.end.toFixed(3)} s`}
                       onKeyDown={event => event.stopPropagation()}
                       onClick={() => {
@@ -189,15 +193,15 @@ function TranscriptCutPanelBody({
               }}
               className="rounded-lg border border-border px-3 py-1.5 text-xs disabled:opacity-40"
             >
-              Clear selection
+              {ui("Clear selection")}
             </button>
             <span
               className="flex-1 text-xs text-foreground/65"
               aria-live="polite"
             >
               {selected.length
-                ? `${selected.length} ${selected.length === 1 ? "word" : "words"} selected${validationError ? "" : ` · ${removedDuration.toFixed(3)} s removed`}`
-                : "Select words to cut"}
+                ? `${selected.length} ${selected.length === 1 ? ui("word") : ui("words")} selected${validationError ? "" : ` · ${removedDuration.toFixed(3)} s removed`}`
+                : ui("Select words to cut")}
             </span>
             <button
               type="button"
@@ -212,7 +216,7 @@ function TranscriptCutPanelBody({
               }
               className="rounded-lg bg-destructive px-3 py-2 text-xs font-medium text-destructive-foreground disabled:opacity-40"
             >
-              {pending ? "Saving…" : "Cut selected words"}
+              {pending ? ui("Saving…") : ui("Cut selected words")}
             </button>
           </div>
         </>

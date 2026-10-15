@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import type {
@@ -32,6 +33,7 @@ export function ServiceDiagnosticsPanel() {
 }
 
 function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
+  const ui = useUiText();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ServiceDiagnostics | null>(null);
   const [error, setError] = useState("");
@@ -72,7 +74,9 @@ function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
         !request.signal.aborted
       )
         setError(
-          "The service check could not complete. Sign in as the studio owner and retry."
+          ui(
+            "The service check could not complete. Sign in as the studio owner and retry."
+          )
         );
     } finally {
       if (mounted.current && controller.current === request) setBusy(false);
@@ -81,11 +85,11 @@ function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
 
   return (
     <article className="mt-6 rounded-xl border border-border bg-background p-4">
-      <h3 className="text-sm font-medium">Owner connection check</h3>
+      <h3 className="text-sm font-medium">{ui("Owner connection check")}</h3>
       <p className="mt-1 text-xs leading-relaxed text-foreground/65">
-        Check OpenRouter key authentication and sound service settings. This
-        check creates no media, spends no REELassati credits, and does not
-        verify a generation.
+        {ui(
+          "Check OpenRouter key authentication and sound service settings. This check creates no media, spends no REELassati credits, and does not verify a generation."
+        )}
       </p>
       <button
         type="button"
@@ -96,7 +100,7 @@ function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
         {busy ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
         ) : null}
-        {busy ? "Checking connections…" : "Check connections"}
+        {busy ? ui("Checking connections…") : ui("Check connections")}
       </button>
       <div
         aria-live="polite"
@@ -106,13 +110,15 @@ function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
         {error ? <p className="text-destructive">{error}</p> : null}
         {result ? (
           <>
-            <p className="font-medium">AI: {statusLabels[result.ai.status]}</p>
+            <p className="font-medium">
+              {ui("AI:")} {statusLabels[result.ai.status]}
+            </p>
             <p className="mt-1 text-foreground/70">{result.ai.note}</p>
             <p className="mt-3 font-medium">
-              Sound effects:{" "}
+              {ui("Sound effects:")}{" "}
               {result.soundEffects.configured
-                ? "Settings present"
-                : "Setup needed"}
+                ? ui("Settings present")
+                : ui("Setup needed")}
             </p>
             <p className="mt-1 text-foreground/70">
               {result.soundEffects.note}
@@ -123,8 +129,8 @@ function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
               </p>
             ) : null}
             <p className="mt-3 text-foreground/55">
-              Checked {new Date(result.checkedAt).toLocaleString()}. Generation
-              not tested.
+              {ui("Checked")} {new Date(result.checkedAt).toLocaleString()}
+              {ui(". Generation not tested.")}
             </p>
           </>
         ) : null}

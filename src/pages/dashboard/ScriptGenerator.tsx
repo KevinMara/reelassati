@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { ReferenceStylePanel } from "@/components/studio/ReferenceStylePanel";
 import { ScriptWritingPack } from "@/components/studio/ScriptWritingPack";
@@ -34,7 +35,8 @@ import {
 import { useWorkspace } from "@/providers/workspace";
 import { useAuth } from "@/hooks/useAuth";
 import { selectedBrand } from "@/lib/workspace-scope";
-import { WRITING_LANGUAGES } from "@/lib/languages";
+import { WRITING_LANGUAGES, localizedLanguageLabel } from "@/lib/languages";
+import { useTranslation } from "react-i18next";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { copyTextWithProvenance } from "@/lib/provenance";
 import posthog from "@/lib/posthog";
@@ -127,6 +129,7 @@ function createEvent(
 }
 
 function DirectScriptGenerator() {
+  const ui = useUiText();
   const { user, loading: authLoading } = useAuth();
   const { workspace, loading } = useWorkspace();
   if (
@@ -140,7 +143,7 @@ function DirectScriptGenerator() {
         role="status"
         className="mx-auto max-w-6xl rounded-xl border border-border bg-surface p-6 text-sm text-foreground/65"
       >
-        Opening your script workspace…
+        {ui("Opening your script workspace…")}
       </p>
     );
   const contextKey = JSON.stringify([
@@ -152,6 +155,8 @@ function DirectScriptGenerator() {
 }
 
 function DirectScriptSession() {
+  const ui = useUiText();
+  const { i18n } = useTranslation();
   const [referenceBrief, setReferenceBrief] = useState("");
   const {
     workspace,
@@ -233,7 +238,9 @@ function DirectScriptSession() {
         scope.brandId !== expected.brandId
       )
         throw new Error(
-          "Your account or brand changed. Start again in the intended workspace."
+          ui(
+            "Your account or brand changed. Start again in the intended workspace."
+          )
         );
       return scope;
     };
@@ -253,7 +260,7 @@ function DirectScriptSession() {
         task.current();
         if (current.profile.email.toLowerCase() !== task.scope.ownerEmail)
           throw new Error(
-            "The destination workspace changed before saving this script."
+            ui("The destination workspace changed before saving this script.")
           );
         return {
           ...current,
@@ -409,7 +416,9 @@ function DirectScriptSession() {
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setError(
-        "Clipboard access is blocked. Select the script text and copy it manually."
+        ui(
+          "Clipboard access is blocked. Select the script text and copy it manually."
+        )
       );
     }
   };
@@ -417,11 +426,14 @@ function DirectScriptSession() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">AI Script Engineering</p>
-        <h1 className="text-3xl font-semibold">Script Generator</h1>
+        <p className="mono-eyebrow mb-2 text-primary">
+          {ui("AI Script Engineering")}
+        </p>
+        <h1 className="text-3xl font-semibold">{ui("Script Generator")}</h1>
         <p className="mt-2 max-w-2xl text-foreground/60">
-          Direct the hook, voice, pacing, and platform. Every generated draft is
-          saved to your workspace automatically.
+          {ui(
+            "Direct the hook, voice, pacing, and platform. Every generated draft is saved to your workspace automatically."
+          )}
         </p>
       </div>
 
@@ -433,11 +445,12 @@ function DirectScriptSession() {
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
             <p className="text-sm font-medium">
-              Script generation needs AI setup
+              {ui("Script generation needs AI setup")}
             </p>
             <p className="mt-1 text-xs text-foreground/70">
-              Script generation is temporarily unavailable. Your prompts stay in
-              the browser until you choose Generate.
+              {ui(
+                "Script generation is temporarily unavailable. Your prompts stay in the browser until you choose Generate."
+              )}
             </p>
           </div>
         </div>
@@ -455,13 +468,15 @@ function DirectScriptSession() {
               className="mb-2 block text-sm font-medium"
               htmlFor="script-topic"
             >
-              Topic, product, or argument
+              {ui("Topic, product, or argument")}
             </label>
             <textarea
               id="script-topic"
               value={topic}
               onChange={event => setTopic(event.target.value)}
-              placeholder="Example: Why creators should edit for retention before adding effects"
+              placeholder={ui(
+                "Example: Why creators should edit for retention before adding effects"
+              )}
               rows={3}
               maxLength={1200}
               className="w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -473,7 +488,7 @@ function DirectScriptSession() {
                   className="mb-2 block text-sm font-medium"
                   htmlFor="script-platform"
                 >
-                  Platform
+                  {ui("Platform")}
                 </label>
                 <StudioSelect
                   id="script-platform"
@@ -485,7 +500,7 @@ function DirectScriptSession() {
                 >
                   {PLATFORMS.map(item => (
                     <option key={item.value} value={item.value}>
-                      {item.label}
+                      {ui(item.label)}
                     </option>
                   ))}
                 </StudioSelect>
@@ -495,7 +510,7 @@ function DirectScriptSession() {
                   className="mb-2 block text-sm font-medium"
                   htmlFor="script-tone"
                 >
-                  Tone
+                  {ui("Tone")}
                 </label>
                 <StudioSelect
                   id="script-tone"
@@ -507,7 +522,7 @@ function DirectScriptSession() {
                 >
                   {TONES.map(item => (
                     <option key={item} value={item}>
-                      {item}
+                      {ui(item)}
                     </option>
                   ))}
                 </StudioSelect>
@@ -517,7 +532,7 @@ function DirectScriptSession() {
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <fieldset>
                 <legend className="mb-2 text-sm font-medium">
-                  Target length
+                  {ui("Target length")}
                 </legend>
                 <div className="flex gap-2">
                   {DURATIONS.map(seconds => (
@@ -542,7 +557,7 @@ function DirectScriptSession() {
                   className="mb-2 block text-sm font-medium"
                   htmlFor="script-language"
                 >
-                  Language
+                  {ui("Language")}
                 </label>
                 <StudioSelect
                   id="script-language"
@@ -552,7 +567,10 @@ function DirectScriptSession() {
                 >
                   {WRITING_LANGUAGES.map(item => (
                     <option key={item.code} value={item.code}>
-                      {item.label}
+                      {localizedLanguageLabel(
+                        item.code,
+                        i18n.resolvedLanguage || "en"
+                      )}
                     </option>
                   ))}
                 </StudioSelect>
@@ -563,14 +581,18 @@ function DirectScriptSession() {
               className="mb-2 mt-4 block text-sm font-medium"
               htmlFor="hook-direction"
             >
-              Hook direction{" "}
-              <span className="font-normal text-foreground/65">(optional)</span>
+              {ui("Hook direction")}{" "}
+              <span className="font-normal text-foreground/65">
+                {ui("(optional)")}
+              </span>
             </label>
             <textarea
               id="hook-direction"
               value={hookDirection}
               onChange={event => setHookDirection(event.target.value)}
-              placeholder="Choose a pattern below or write the opening logic yourself."
+              placeholder={ui(
+                "Choose a pattern below or write the opening logic yourself."
+              )}
               rows={3}
               className="w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
@@ -591,12 +613,13 @@ function DirectScriptSession() {
               {generating ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Generating and saving
+                  {ui("Generating and saving")}
                 </>
               ) : (
                 <>
                   <WandSparkles className="h-4 w-4" />
-                  Generate script · {AI_CREDIT_COSTS.script} credits
+                  {ui("Generate script ·")} {AI_CREDIT_COSTS.script}{" "}
+                  {ui("credits")}
                 </>
               )}
             </button>
@@ -617,10 +640,10 @@ function DirectScriptSession() {
             >
               <span className="flex items-center gap-2 font-medium">
                 <MessageSquareText className="h-4 w-4 text-primary" />
-                Hook patterns
+                {ui("Hook patterns")}
               </span>
               <span className="text-xs text-foreground/65">
-                {showHooks ? "Hide" : "Show"}
+                {showHooks ? ui("Hide") : ui("Show")}
               </span>
             </button>
 
@@ -640,19 +663,22 @@ function DirectScriptSession() {
                         onClick={() => setHookDirection(hook.pattern)}
                         className="w-full rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/50"
                       >
-                        <span className="text-sm font-medium">{hook.name}</span>
+                        <span className="text-sm font-medium">
+                          {ui(hook.name)}
+                        </span>
                         <span className="mt-1 block text-xs leading-relaxed text-foreground/65">
                           {hook.pattern}
                         </span>
                         <span className="mt-2 block text-xs text-foreground/65">
-                          {hook.intent}
+                          {ui(hook.intent)}
                         </span>
                       </button>
                     ))}
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-foreground/65">
-                    These are writing structures, not performance guarantees.
-                    Edit the wording to match your proof, audience, and offer.
+                    {ui(
+                      "These are writing structures, not performance guarantees. Edit the wording to match your proof, audience, and offer."
+                    )}
                   </p>
                 </motion.div>
               ) : null}
@@ -676,7 +702,7 @@ function DirectScriptSession() {
                     </div>
                     <div className="min-w-0">
                       <input
-                        aria-label="Script title"
+                        aria-label={ui("Script title")}
                         disabled={
                           saving || saveState === "saving" || generating
                         }
@@ -709,18 +735,18 @@ function DirectScriptSession() {
                       aria-live="polite"
                     >
                       {saveState === "saving"
-                        ? "Saving"
+                        ? ui("Saving")
                         : saveState === "saved"
-                          ? "Saved"
+                          ? ui("Saved")
                           : saveState === "error"
-                            ? "Save failed"
-                            : "Edited"}
+                            ? ui("Save failed")
+                            : ui("Edited")}
                     </span>
                     <button
                       type="button"
                       onClick={() => void handleCopy()}
                       className="rounded-lg p-2 transition-colors hover:bg-background"
-                      aria-label="Copy complete script"
+                      aria-label={ui("Copy complete script")}
                     >
                       {copied ? (
                         <Check className="h-4 w-4 text-emerald-500" />
@@ -737,7 +763,7 @@ function DirectScriptSession() {
                       className="mb-2 block text-xs font-medium uppercase tracking-wider text-primary"
                       htmlFor="generated-hook"
                     >
-                      Hook
+                      {ui("Hook")}
                     </label>
                     <textarea
                       id="generated-hook"
@@ -755,7 +781,7 @@ function DirectScriptSession() {
                       className="mb-2 block text-xs font-medium uppercase tracking-wider text-foreground/65"
                       htmlFor="generated-body"
                     >
-                      Body
+                      {ui("Body")}
                     </label>
                     <textarea
                       id="generated-body"
@@ -773,7 +799,7 @@ function DirectScriptSession() {
                       className="mb-2 block text-xs font-medium uppercase tracking-wider text-foreground/65"
                       htmlFor="generated-cta"
                     >
-                      Call to action
+                      {ui("Call to action")}
                     </label>
                     <textarea
                       id="generated-cta"
@@ -793,8 +819,8 @@ function DirectScriptSession() {
                   className="mt-4 w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
                 >
                   {saveState === "saving" || saving
-                    ? "Saving edits"
-                    : "Save edits"}
+                    ? ui("Saving edits")
+                    : ui("Save edits")}
                 </button>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <Link
@@ -802,7 +828,7 @@ function DirectScriptSession() {
                     className="group flex items-center justify-center gap-2 rounded-lg border border-primary/25 bg-primary/[0.05] px-4 py-2.5 text-sm font-medium text-primary transition-all hover:-translate-y-0.5 hover:bg-primary/10"
                   >
                     <Film className="h-4 w-4" />
-                    Create visuals
+                    {ui("Create visuals")}
                     <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </Link>
                   <Link
@@ -810,7 +836,7 @@ function DirectScriptSession() {
                     className="group flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium transition-all hover:-translate-y-0.5 hover:border-primary/30"
                   >
                     <Mic className="h-4 w-4 text-primary" />
-                    Make voiceover
+                    {ui("Make voiceover")}
                     <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </Link>
                 </div>
@@ -838,11 +864,12 @@ function DirectScriptSession() {
                   <Sparkles className="h-8 w-8 text-primary/45" />
                 </div>
                 <h2 className="text-lg font-medium text-foreground/65">
-                  Direct the opening. Generate the draft.
+                  {ui("Direct the opening. Generate the draft.")}
                 </h2>
                 <p className="mt-2 max-w-sm text-sm text-foreground/65">
-                  The result stays editable and is stored in your content
-                  workspace, ready for the editor or Prompt Director.
+                  {ui(
+                    "The result stays editable and is stored in your content workspace, ready for the editor or Prompt Director."
+                  )}
                 </p>
               </motion.section>
             )}
@@ -852,7 +879,7 @@ function DirectScriptSession() {
             <section className="rounded-xl border border-border bg-surface p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Library className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-medium">Recent drafts</h2>
+                <h2 className="text-sm font-medium">{ui("Recent drafts")}</h2>
               </div>
               <div className="space-y-2">
                 {workspace.scripts.slice(0, 4).map(script => (
@@ -887,6 +914,7 @@ function DirectScriptSession() {
 }
 
 export default function ScriptGenerator() {
+  const ui = useUiText();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeMode =
     searchParams.get("mode") === "interview" ? "interview" : "generator";
@@ -903,7 +931,7 @@ export default function ScriptGenerator() {
       <div
         className="mx-auto mb-8 flex max-w-6xl rounded-xl border border-border bg-surface p-1.5"
         role="tablist"
-        aria-label="Script creation mode"
+        aria-label={ui("Script creation mode")}
       >
         <button
           type="button"
@@ -916,7 +944,7 @@ export default function ScriptGenerator() {
               : "text-foreground/70 hover:bg-background hover:text-foreground"
           }`}
         >
-          Write from a brief
+          {ui("Write from a brief")}
         </button>
         <button
           type="button"
@@ -929,7 +957,7 @@ export default function ScriptGenerator() {
               : "text-foreground/70 hover:bg-background hover:text-foreground"
           }`}
         >
-          Interview me
+          {ui("Interview me")}
         </button>
       </div>
 

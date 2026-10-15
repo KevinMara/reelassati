@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { SocialPerformance } from "@/components/studio/SocialPerformance";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -96,6 +97,7 @@ const ANALYTICS_RANGES = [
 ] as const;
 
 export default function AnalyticsPage() {
+  const ui = useUiText();
   const { workspace, loading } = useWorkspace();
   const [selectedMetrics, setSelectedMetrics] = useState<AnalyticsMetricKey[]>([
     "published",
@@ -238,24 +240,27 @@ export default function AnalyticsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">Measured workspace</p>
-        <h1 className="text-3xl font-semibold">Analytics</h1>
+        <p className="mono-eyebrow mb-2 text-primary">
+          {ui("Measured workspace")}
+        </p>
+        <h1 className="text-3xl font-semibold">{ui("Analytics")}</h1>
         <p className="mt-2 max-w-2xl text-sm text-foreground/70">
-          Track your content, publishing activity, and connected audience
-          metrics.
+          {ui(
+            "Track your content, publishing activity, and connected audience metrics."
+          )}
         </p>
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map(kpi => (
           <article
-            key={kpi.label}
+            key={ui(kpi.label)}
             className="group relative overflow-hidden rounded-xl border border-border bg-surface p-5 transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-primary/[0.06]"
           >
             <div className="pointer-events-none absolute -right-10 -top-12 h-24 w-24 rounded-full bg-primary/[0.06] blur-2xl transition group-hover:bg-primary/[0.11]" />
             <div className="mb-4 flex items-center justify-between">
               <p className="mono-eyebrow text-xs text-foreground/70">
-                {kpi.label}
+                {ui(kpi.label)}
               </p>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/[0.08] text-primary transition group-hover:scale-105 group-hover:bg-primary/[0.13]">
                 <kpi.icon className="h-4 w-4" />
@@ -279,22 +284,23 @@ export default function AnalyticsPage() {
                 <Sparkles className="h-3.5 w-3.5" />
               </span>
               <p className="mono-eyebrow text-xs text-primary">
-                Output momentum
+                {ui("Output momentum")}
               </p>
             </div>
             <h2 className="mt-2 text-lg font-medium">
-              Your last {rangeDays} days
+              {ui("Your last")} {rangeDays} {ui("days")}
             </h2>
             <p className="mt-1 text-xs text-foreground/70">
-              Toggle one metric or compare several. Every point comes from your
-              saved workspace records.
+              {ui(
+                "Toggle one metric or compare several. Every point comes from your saved workspace records."
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <div
               className="flex rounded-xl border border-border/70 bg-background/55 p-1 backdrop-blur"
               role="group"
-              aria-label="Analytics time range"
+              aria-label={ui("Analytics time range")}
             >
               {ANALYTICS_RANGES.map(range => {
                 const selected = rangeDays === range.days;
@@ -310,7 +316,7 @@ export default function AnalyticsPage() {
                         : "text-foreground/70 hover:bg-surface hover:text-foreground/75"
                     }`}
                   >
-                    {range.label}
+                    {ui(range.label)}
                   </button>
                 );
               })}
@@ -320,7 +326,7 @@ export default function AnalyticsPage() {
                 {selectedTotal}
               </p>
               <p className="text-xs uppercase tracking-wide text-foreground/70">
-                selected output
+                {ui("selected output")}
               </p>
             </div>
           </div>
@@ -329,7 +335,7 @@ export default function AnalyticsPage() {
         <div
           className="relative mb-5 flex flex-wrap gap-2"
           role="group"
-          aria-label="Chart metrics"
+          aria-label={ui("Chart metrics")}
         >
           {ANALYTICS_METRICS.map(metric => {
             const selected = selectedMetrics.includes(metric.key);
@@ -342,8 +348,8 @@ export default function AnalyticsPage() {
                 onClick={() => toggleMetric(metric.key)}
                 title={
                   isOnlySelection
-                    ? "Keep at least one metric selected"
-                    : `${selected ? "Hide" : "Show"} ${metric.label.toLowerCase()}`
+                    ? ui("Keep at least one metric selected")
+                    : `${selected ? ui("Hide") : ui("Show")} ${metric.label.toLowerCase()}`
                 }
                 className={`group/metric inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition duration-200 hover:-translate-y-px ${
                   selected
@@ -424,12 +430,12 @@ export default function AnalyticsPage() {
           <div className="mb-5 flex items-end justify-between gap-3">
             <div>
               <p className="mono-eyebrow text-xs text-foreground/70">
-                Distribution footprint
+                {ui("Distribution footprint")}
               </p>
-              <h2 className="mt-1 font-medium">Posts by platform</h2>
+              <h2 className="mt-1 font-medium">{ui("Posts by platform")}</h2>
             </div>
             <span className="text-xs text-foreground/70">
-              Workspace records only
+              {ui("Workspace records only")}
             </span>
           </div>
           {platformRows.length ? (
@@ -446,13 +452,13 @@ export default function AnalyticsPage() {
                         {PLATFORM_LABELS[row.platform]}
                       </p>
                       <span className="font-mono text-xs text-foreground/70">
-                        {total} {total === 1 ? "post" : "posts"}
+                        {total} {total === 1 ? ui("post") : ui("posts")}
                       </span>
                     </div>
                     <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
                       <div>
                         <dt className="text-xs uppercase tracking-wide text-foreground/70">
-                          Draft
+                          {ui("Draft")}
                         </dt>
                         <dd className="mt-1 text-sm font-semibold">
                           {row.drafts}
@@ -460,7 +466,7 @@ export default function AnalyticsPage() {
                       </div>
                       <div>
                         <dt className="text-xs uppercase tracking-wide text-foreground/70">
-                          Scheduled
+                          {ui("Scheduled")}
                         </dt>
                         <dd className="mt-1 text-sm font-semibold">
                           {row.scheduled}
@@ -468,7 +474,7 @@ export default function AnalyticsPage() {
                       </div>
                       <div>
                         <dt className="text-xs uppercase tracking-wide text-foreground/70">
-                          Published
+                          {ui("Published")}
                         </dt>
                         <dd className="mt-1 text-sm font-semibold">
                           {row.published}
@@ -482,11 +488,12 @@ export default function AnalyticsPage() {
           ) : (
             <div className="rounded-lg border border-dashed border-border p-8 text-center">
               <p className="text-sm font-medium">
-                No platform distribution data yet
+                {ui("No platform distribution data yet")}
               </p>
               <p className="mt-1 text-xs text-foreground/70">
-                Saving a draft with a connected account will create the first
-                record.
+                {ui(
+                  "Saving a draft with a connected account will create the first record."
+                )}
               </p>
             </div>
           )}
@@ -495,9 +502,9 @@ export default function AnalyticsPage() {
         <section className="rounded-xl border border-border bg-surface p-6">
           <div className="mb-5">
             <p className="mono-eyebrow text-xs text-foreground/70">
-              Verified output
+              {ui("Verified output")}
             </p>
-            <h2 className="mt-1 font-medium">Publication history</h2>
+            <h2 className="mt-1 font-medium">{ui("Publication history")}</h2>
           </div>
           {publicationHistory.length ? (
             <div className="space-y-3">
@@ -527,16 +534,18 @@ export default function AnalyticsPage() {
           ) : (
             <div className="rounded-lg border border-dashed border-border p-8 text-center">
               <p className="text-sm font-medium">
-                Nothing has been recorded as published
+                {ui("Nothing has been recorded as published")}
               </p>
               <p className="mt-1 text-xs text-foreground/70">
-                Publishing history will appear after a real distribution action.
+                {ui(
+                  "Publishing history will appear after a real distribution action."
+                )}
               </p>
               <Link
                 to="/dashboard/publish"
                 className="mt-4 inline-flex text-sm font-medium text-primary"
               >
-                Open Publisher
+                {ui("Open Publisher")}
               </Link>
             </div>
           )}

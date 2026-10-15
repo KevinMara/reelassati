@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import { CompactSelect } from "@/components/ui/compact-select";
 import {
@@ -23,6 +24,7 @@ export function ShotTransitionPanel({
   ) => Promise<void>;
   onRemove: (outgoingId: string, incomingId: string) => Promise<void>;
 }) {
+  const ui = useUiText();
   const [kind, setKind] =
     useState<Exclude<VisualTransition, "none">>("dissolve");
   const [seconds, setSeconds] = useState(0.4),
@@ -48,25 +50,27 @@ export function ShotTransitionPanel({
   return (
     <fieldset className="space-y-3 rounded-xl border border-border p-3">
       <legend className="px-1 text-sm font-medium">
-        Transition to next shot
+        {ui("Transition to next shot")}
       </legend>
       <p className="text-xs text-foreground/65">
         {next
           ? `${clip?.label} → ${next.label}`
-          : "Select an outgoing video shot that meets another video at its end."}
+          : ui(
+              "Select an outgoing video shot that meets another video at its end."
+            )}
       </p>
       <CompactSelect
-        aria-label="Transition between shots"
+        aria-label={ui("Transition between shots")}
         value={kind}
         onValueChange={v => setKind(v as typeof kind)}
         options={visualTransitions.filter(v => v.value !== "none")}
         disabled={disabled || !next}
       />
       <label className="block text-xs">
-        Duration{" "}
+        {ui("Duration")}{" "}
         <input
           type="number"
-          aria-label="Shot transition duration"
+          aria-label={ui("Shot transition duration")}
           min={0.05}
           max={5}
           step={0.05}
@@ -78,8 +82,9 @@ export function ShotTransitionPanel({
         s
       </label>
       <p className="text-xs text-foreground/55">
-        Uses unused footage around the cut. Speech timing and total edit length
-        stay fixed. Other overlapping video layers must be resolved first.
+        {ui(
+          "Uses unused footage around the cut. Speech timing and total edit length stay fixed. Other overlapping video layers must be resolved first."
+        )}
       </p>
       <button
         type="button"
@@ -95,13 +100,14 @@ export function ShotTransitionPanel({
           );
         }}
       >
-        Apply between shots
+        {ui("Apply between shots")}
       </button>
       {pair && (
         <div className="space-y-2">
           <p className="text-xs text-foreground/65">
-            Remove this transition before moving, trimming, splitting or
-            deleting its shots.
+            {ui(
+              "Remove this transition before moving, trimming, splitting or deleting its shots."
+            )}
           </p>
           <button
             type="button"
@@ -118,7 +124,7 @@ export function ShotTransitionPanel({
               );
             }}
           >
-            Remove transition
+            {ui("Remove transition")}
           </button>
         </div>
       )}

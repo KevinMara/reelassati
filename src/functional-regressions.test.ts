@@ -273,8 +273,12 @@ describe("platform-wide functional invariants", () => {
     const analytics = source("./pages/dashboard/AnalyticsPage.tsx");
     const analyticsData = source("./lib/analytics.ts");
 
-    expect(analytics).toContain("Your last {rangeDays} days");
-    expect(analytics).toContain('aria-label="Analytics time range"');
+    expect(analytics).toMatch(
+      /ui\("Your last"\)[\s\S]{0,40}\{rangeDays\}[\s\S]{0,40}ui\("days"\)/
+    );
+    expect(analytics).toMatch(
+      /aria-label=(?:"Analytics time range"|\{ui\("Analytics time range"\)\})/
+    );
     expect(analytics).toContain("setRangeDays(range.days)");
     expect(analytics).toContain("selectedMetrics.map");
     expect(analytics).toContain("aria-pressed={selected}");
@@ -382,7 +386,9 @@ describe("platform-wide functional invariants", () => {
       'const VideoGenerator = lazy(() => import("./dashboard/VideoGenerator"))'
     );
     expect(dashboard).toContain("<Suspense fallback={<StudioPageFallback />}>");
-    expect(dashboard).toContain('aria-label="Loading Studio tool"');
+    expect(dashboard).toMatch(
+      /aria-label=(?:"Loading Studio tool"|\{ui\("Loading Studio tool"\)\})/
+    );
   });
 
   it("keeps subtle Studio rewards grounded in real workspace activity", () => {
@@ -392,7 +398,9 @@ describe("platform-wide functional invariants", () => {
     expect(dashboard).toContain("Weekly momentum");
     expect(dashboard).toContain("estimatedMinutesSaved");
     expect(dashboard).toContain("weekActivity.reduce");
-    expect(dashboard).toContain('aria-label="Studio setup progress"');
+    expect(dashboard).toMatch(
+      /aria-label=(?:"Studio setup progress"|\{ui\("Studio setup progress"\)\})/
+    );
     expect(dashboard).toContain('className="studio-route-enter"');
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(styles).toContain(".studio-action-card:hover");
@@ -474,10 +482,16 @@ describe("platform-wide functional invariants", () => {
     expect(editor).toContain("addAssetToTimeline");
     expect(editor).toContain("addLibraryAssetAtPlayhead");
     expect(editor).toContain('searchParams.get("asset")');
-    expect(image).toContain('label="Add image to Edit"');
-    expect(video).toContain('label="Add video to Edit"');
-    expect(voice).toContain('label="Add audio to Edit"');
-    expect(library).toContain('label="Use in Edit"');
+    expect(image).toMatch(
+      /label=(?:"Add image to Edit"|\{ui\("Add image to Edit"\)\})/
+    );
+    expect(video).toMatch(
+      /label=(?:"Add video to Edit"|\{ui\("Add video to Edit"\)\})/
+    );
+    expect(voice).toMatch(
+      /label=(?:"Add audio to Edit"|\{ui\("Add audio to Edit"\)\})/
+    );
+    expect(library).toMatch(/label=(?:"Use in Edit"|\{ui\("Use in Edit"\)\})/);
     expect(library).toContain("platformApi.renameAsset");
     expect(api).toContain('"/api/ai/image"');
     expect(server).toContain('url.pathname === "/api/ai/image"');
@@ -504,7 +518,9 @@ describe("platform-wide functional invariants", () => {
     const signup = source("./pages/Signup.tsx");
     expect(analyzer).not.toContain("analysisAuthorized");
     expect(analyzer).not.toContain("I'm authorized to provide this video");
-    expect(analyzer).not.toContain("I am authorized to import and submit this video");
+    expect(analyzer).not.toContain(
+      "I am authorized to import and submit this video"
+    );
     expect(analyzer).not.toMatch(/platform\s+terms and privacy information/);
     expect(analyzer).toContain("!sourceReady || analyzing || !analysisReady");
     expect(signup).toContain("termsAccepted");

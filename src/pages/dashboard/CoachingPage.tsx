@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useMemo, useState } from "react";
 import {
   Activity,
@@ -22,7 +23,10 @@ function isWithin(timestamp: string | undefined, start: number) {
   return Number.isFinite(value) && value >= start;
 }
 
-function buildReport(workspace: WorkspaceDocument) {
+function buildReport(
+  workspace: WorkspaceDocument,
+  ui: ReturnType<typeof useUiText>
+) {
   const now = Date.now();
   const weekStart = now - 7 * DAY;
   const projectsTouched = workspace.projects.filter(project =>
@@ -61,39 +65,60 @@ function buildReport(workspace: WorkspaceDocument) {
   );
 
   const evidence = [
-    `${projectsTouched.length} project${projectsTouched.length === 1 ? "" : "s"} changed in the last 7 days.`,
-    `${postsCreated.length} publication record${postsCreated.length === 1 ? "" : "s"} created; ${postsPublished.length} confirmed published.`,
-    `${events.length} workspace action${events.length === 1 ? "" : "s"} recorded in the activity log.`,
-    `${connectedAccounts.length} publishing destination${connectedAccounts.length === 1 ? "" : "s"} currently connected.`,
+    ui("Projects updated in the last 7 days: {{count}}", {
+      count: projectsTouched.length,
+    }),
+    ui(
+      "Publication records: {{created}} · confirmed published: {{published}}",
+      { created: postsCreated.length, published: postsPublished.length }
+    ),
+    ui("Workspace actions recorded: {{count}}", { count: events.length }),
+    ui("Connected publishing destinations: {{count}}", {
+      count: connectedAccounts.length,
+    }),
   ];
 
   const recommendations: string[] = [];
   if (workspace.projects.length === 0) {
     recommendations.push(
-      "Start one editing project and define the intended platform before generating variants."
+      ui(
+        "Start one editing project and define the intended platform before generating variants."
+      )
     );
   } else if (editingProjects.length > 0) {
     recommendations.push(
-      `Move one of the ${editingProjects.length} open edit${editingProjects.length === 1 ? "" : "s"} to review or export before starting another.`
+      ui(
+        "Review or export one of your open edits before starting another. Open edits: {{count}}",
+        { count: editingProjects.length }
+      )
     );
   }
   if (draftPosts.length > 0) {
     recommendations.push(
-      `Resolve the ${draftPosts.length} saved publication draft${draftPosts.length === 1 ? "" : "s"}: schedule, publish, or delete each one.`
+      ui(
+        "Schedule, publish, or delete your saved publication drafts. Drafts: {{count}}",
+        { count: draftPosts.length }
+      )
     );
   }
   if (connectedAccounts.length === 0) {
     recommendations.push(
-      "Connect a verified destination in Social Hub before building a publishing cadence."
+      ui(
+        "Connect a verified destination in Social Hub before building a publishing cadence."
+      )
     );
   } else if (postsPublished.length === 0 && scheduledPosts.length === 0) {
     recommendations.push(
-      "Choose one finished asset and schedule a real publication; there is no confirmed shipment this week."
+      ui(
+        "Choose one finished asset and schedule a publication; nothing has been published this week."
+      )
     );
   }
   if (activeGoals.length === 0) {
     recommendations.push(
-      "Create one measurable goal so next week’s review can compare progress against a declared target."
+      ui(
+        "Create one measurable goal so next week’s review can compare progress against a declared target."
+      )
     );
   } else {
     const nearest = [...activeGoals].sort(
@@ -101,12 +126,17 @@ function buildReport(workspace: WorkspaceDocument) {
         left.target - left.current - (right.target - right.current)
     )[0];
     recommendations.push(
-      `Prioritize “${nearest.label}”; it is at ${Math.round((nearest.current / nearest.target) * 100)}% of target.`
+      ui("Prioritize “{{goal}}”; it is at {{percent}}% of target.", {
+        goal: nearest.label,
+        percent: Math.round((nearest.current / nearest.target) * 100),
+      })
     );
   }
   if (recommendations.length === 0) {
     recommendations.push(
-      "The workflow is moving. Keep the next cycle narrow: one edit, one review, one measured publication."
+      ui(
+        "The workflow is moving. Keep the next cycle narrow: one edit, one review, one measured publication."
+      )
     );
   }
 
@@ -122,10 +152,11 @@ function buildReport(workspace: WorkspaceDocument) {
 }
 
 export default function CoachingPage() {
+  const ui = useUiText();
   const { workspace, refresh, saving } = useWorkspace();
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
-  const report = useMemo(() => buildReport(workspace), [workspace]);
+  const report = useMemo(() => buildReport(workspace, ui), [workspace, ui]);
 
   const refreshReview = async () => {
     if (refreshing || saving) return;
@@ -134,14 +165,14 @@ export default function CoachingPage() {
     try {
       const refreshed = await refresh();
       if (!refreshed) {
-        setRefreshError("The latest workspace data could not be loaded.");
+        setRefreshError(ui("The latest workspace data could not be loaded."));
         return;
       }
     } catch (cause) {
       setRefreshError(
         cause instanceof Error
           ? cause.message
-          : "The workspace review could not be refreshed."
+          : ui("The workspace review could not be refreshed.")
       );
     } finally {
       setRefreshing(false);
@@ -152,11 +183,14 @@ export default function CoachingPage() {
     <div className="mx-auto max-w-5xl">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">Weekly momentum</p>
-          <h1 className="text-3xl font-semibold">Weekly Review</h1>
+          <p className="mono-eyebrow mb-2 text-primary">
+            {ui("Weekly momentum")}
+          </p>
+          <h1 className="text-3xl font-semibold">{ui("Weekly Review")}</h1>
           <p className="mt-2 max-w-2xl text-foreground/60">
-            A practical review built only from your saved projects, publishing
-            records, goals and activity.
+            {ui(
+              "A practical review built only from your saved projects, publishing records, goals and activity."
+            )}
           </p>
         </div>
         <button
@@ -169,10 +203,10 @@ export default function CoachingPage() {
             className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
           />
           {refreshing
-            ? "Refreshing"
+            ? ui("Refreshing")
             : saving
-              ? "Waiting for save"
-              : "Refresh review"}
+              ? ui("Waiting for save")
+              : ui("Refresh review")}
         </button>
       </div>
 
@@ -194,33 +228,35 @@ export default function CoachingPage() {
           <div className="rounded-xl border border-border bg-surface p-4">
             <FolderKanban className="mb-3 h-4 w-4 text-primary" />
             <p className="text-2xl font-semibold">{report.projectsTouched}</p>
-            <p className="text-xs text-foreground/70">Projects touched · 7d</p>
+            <p className="text-xs text-foreground/70">
+              {ui("Projects touched · 7d")}
+            </p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
             <Activity className="mb-3 h-4 w-4 text-blue-500" />
             <p className="text-2xl font-semibold">{report.postsCreated}</p>
             <p className="text-xs text-foreground/70">
-              Publication records · 7d
+              {ui("Publication records · 7d")}
             </p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
             <CheckCircle2 className="mb-3 h-4 w-4 text-emerald-500" />
             <p className="text-2xl font-semibold">{report.postsPublished}</p>
             <p className="text-xs text-foreground/70">
-              Confirmed published · 7d
+              {ui("Confirmed published · 7d")}
             </p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
             <Target className="mb-3 h-4 w-4 text-orange-500" />
             <p className="text-2xl font-semibold">{report.activeGoals}</p>
-            <p className="text-xs text-foreground/70">Active goals</p>
+            <p className="text-xs text-foreground/70">{ui("Active goals")}</p>
           </div>
         </div>
 
         <section className="rounded-xl border border-border bg-surface p-6">
           <h2 className="mb-4 flex items-center gap-2 font-medium">
             <BarChart3 className="h-4 w-4 text-primary" />
-            Your week at a glance
+            {ui("Your week at a glance")}
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {report.evidence.map(item => (
@@ -241,12 +277,12 @@ export default function CoachingPage() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-medium">
               <ArrowRight className="h-4 w-4 text-emerald-500" />
-              Next best actions
+              {ui("Next best actions")}
             </h2>
             {report.scheduledPosts > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs text-primary">
                 <Clock3 className="h-3 w-3" />
-                {report.scheduledPosts} scheduled
+                {report.scheduledPosts} {ui("scheduled")}
               </span>
             )}
           </div>

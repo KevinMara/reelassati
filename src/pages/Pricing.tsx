@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
@@ -133,6 +134,7 @@ const PLANS: Record<"en" | "it", Plan[]> = {
 };
 
 export default function Pricing() {
+  const ui = useUiText();
   const { user } = useAuth();
   const { i18n } = useTranslation();
   const isItalian = Boolean(i18n.resolvedLanguage?.startsWith("it"));
@@ -145,27 +147,21 @@ export default function Pricing() {
       <main className="pb-20 pt-24">
         <div className="container-page">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="mono-eyebrow text-primary">
-              {isItalian ? "Prezzi" : "Pricing"}
-            </p>
+            <p className="mono-eyebrow text-primary">{ui("Pricing")}</p>
             <h1 className="mt-3 text-4xl font-semibold md:text-5xl">
-              {isItalian ? "Scegli la scala." : "Choose the scale."}{" "}
-              <span className="serif-accent">
-                {isItalian ? "Mantieni il controllo." : "Keep the control."}
-              </span>
+              {ui("Choose the scale.")}{" "}
+              <span className="serif-accent">{ui("Keep the control.")}</span>
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-foreground/65">
-              {isItalian
-                ? "Tutti gli strumenti creativi. Scegli i crediti e gli account social adatti a te."
-                : "All the creation tools. Choose the credits and social accounts that fit your work."}
+              {ui(
+                "All the creation tools. Choose the credits and social accounts that fit your work."
+              )}
             </p>
 
             <div
               className="mx-auto mt-8 inline-flex rounded-pill border border-border bg-surface p-1 shadow-card"
               role="group"
-              aria-label={
-                isItalian ? "Periodo di fatturazione" : "Billing period"
-              }
+              aria-label={ui("Billing period")}
             >
               <button
                 type="button"
@@ -173,7 +169,7 @@ export default function Pricing() {
                 aria-pressed={billingCycle === "monthly"}
                 className={`rounded-pill px-5 py-2 text-sm font-medium transition-all ${billingCycle === "monthly" ? "bg-foreground text-background" : "text-foreground/70 hover:text-foreground"}`}
               >
-                {isItalian ? "Mensile" : "Monthly"}
+                {ui("Monthly")}
               </button>
               <button
                 type="button"
@@ -208,17 +204,15 @@ export default function Pricing() {
                 </span>
                 <div>
                   <p className="mono-eyebrow text-primary">
-                    {isItalian ? "Crediti REELassati" : "REELassati credits"}
+                    {ui("REELassati credits")}
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold">
-                    {isItalian
-                      ? "Un solo saldo per gli strumenti AI."
-                      : "One balance for every AI tool."}
+                    {ui("One balance for every AI tool.")}
                   </h2>
                   <p className="mt-3 max-w-2xl text-sm leading-relaxed text-foreground/60">
-                    {isItalian
-                      ? "Video, voce e altri strumenti AI usano crediti REELassati all’interno della piattaforma. Nessun prezzo esterno o dettaglio tecnico da gestire."
-                      : "Video, voice, and other AI tools use REELassati credits inside the platform. There are no external prices or technical integration details to manage."}
+                    {ui(
+                      "Video, voice, and other AI tools use REELassati credits inside the platform. There are no external prices or technical integration details to manage."
+                    )}
                   </p>
                 </div>
               </div>
@@ -226,23 +220,21 @@ export default function Pricing() {
 
             <div className="rounded-2xl border border-primary/25 bg-primary/[0.045] p-7 md:p-9">
               <p className="mono-eyebrow text-primary">
-                {isItalian ? "Serve più scala?" : "Need more scale?"}
+                {ui("Need more scale?")}
               </p>
               <h2 className="mt-2 text-2xl font-semibold">
-                {isItalian
-                  ? "Costruiamo il piano giusto."
-                  : "We’ll shape the right plan."}
+                {ui("We’ll shape the right plan.")}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-foreground/60">
-                {isItalian
-                  ? "Più brand, account o un flusso su misura: partiamo dai volumi reali."
-                  : "More brands, accounts, or a tailored workflow: we start from your real volume."}
+                {ui(
+                  "More brands, accounts, or a tailored workflow: we start from your real volume."
+                )}
               </p>
               <a
                 href="mailto:reelassati@gmail.com?subject=REELassati%20Studio%20plan"
                 className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-hover"
               >
-                {isItalian ? "Parliamone" : "Talk to us"}{" "}
+                {ui("Talk to us")}{" "}
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </a>
             </div>
@@ -252,18 +244,16 @@ export default function Pricing() {
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
               <div>
                 <p className="mono-eyebrow text-primary">
-                  {isItalian ? "Ricariche opzionali" : "Optional top-ups"}
+                  {ui("Optional top-ups")}
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold">
-                  {isItalian
-                    ? "Più crediti, senza cambiare piano."
-                    : "More credits, without changing plan."}
+                  {ui("More credits, without changing plan.")}
                 </h2>
               </div>
               <p className="text-sm text-foreground/70">
-                {isItalian
-                  ? "Crediti a un costo inferiore a tutti i piani · serve un abbonamento attivo"
-                  : "Lower credit prices than every plan · active subscription required"}
+                {ui(
+                  "Lower credit prices than every plan · active subscription required"
+                )}
               </p>
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -279,7 +269,7 @@ export default function Pricing() {
                       )}
                     </p>
                     <p className="text-sm text-foreground/70">
-                      {isItalian ? "crediti" : "credits"}
+                      {ui("credits")}
                     </p>
                   </div>
                   <div className="text-right">
@@ -296,9 +286,9 @@ export default function Pricing() {
               ))}
             </div>
             <p className="mt-4 text-sm text-foreground/70">
-              {isItalian
-                ? "Prezzi base in USD, imposte escluse. Al checkout puoi pagare nelle valute locali disponibili; Stripe calcola e aggiunge le imposte applicabili."
-                : "Base prices are in USD, excluding tax. Checkout offers supported local currencies; Stripe calculates and adds applicable taxes."}
+              {ui(
+                "Base prices are in USD, excluding tax. Checkout offers supported local currencies; Stripe calculates and adds applicable taxes."
+              )}
             </p>
           </section>
         </div>
@@ -319,6 +309,7 @@ function PlanCard({
   isItalian: boolean;
   signedIn: boolean;
 }) {
+  const ui = useUiText();
   const price =
     billingCycle === "monthly" ? plan.monthlyPrice : plan.annualMonthlyPrice;
   const priceLabel = new Intl.NumberFormat(isItalian ? "it-IT" : "en-IE", {
@@ -350,7 +341,7 @@ function PlanCard({
         <p className="mono-eyebrow text-primary">{plan.name}</p>
         {plan.featured && (
           <span className="rounded-pill bg-primary px-2.5 py-1 font-mono text-xs uppercase tracking-wider text-primary-foreground">
-            {isItalian ? "Consigliato" : "Recommended"}
+            {ui("Recommended")}
           </span>
         )}
       </div>
@@ -362,7 +353,7 @@ function PlanCard({
           {priceLabel}
         </span>
         <span className="pb-1 text-sm text-foreground/70">
-          USD /{isItalian ? "mese" : "month"}
+          USD /{ui("month")}
         </span>
       </div>
       <p className="mt-2 min-h-[20px] text-xs text-foreground/70">
@@ -370,9 +361,7 @@ function PlanCard({
           ? isItalian
             ? `${annualTotalLabel} USD fatturati annualmente`
             : `${annualTotalLabel} USD billed annually`
-          : isItalian
-            ? "Fatturazione mensile"
-            : "Billed monthly"}
+          : ui("Billed monthly")}
       </p>
       <div className="mt-4 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/[0.06] px-4 py-3">
         <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden />
@@ -381,7 +370,7 @@ function PlanCard({
             {creditLabel}
           </p>
           <p className="mt-1 text-xs text-foreground/70">
-            {isItalian ? "crediti ogni mese" : "credits every month"}
+            {ui("credits every month")}
           </p>
         </div>
         <p className="ml-auto max-w-[130px] text-right text-sm font-medium text-foreground">

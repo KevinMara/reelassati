@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import posthog from "@/lib/posthog";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -39,6 +40,7 @@ export function RenderExportPanel({
   onClose: () => void;
   onBrief: () => void;
 }) {
+  const ui = useUiText();
   const { workspace, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
   const requiresMarking = Boolean(
     project.transcriptProvenance ||
@@ -106,7 +108,9 @@ export function RenderExportPanel({
           !latest.projects.some(p => p.id === project.id)
         )
           throw new Error(
-            "The account, brand or project changed. Reopen export in the intended workspace."
+            ui(
+              "The account, brand or project changed. Reopen export in the intended workspace."
+            )
           );
       };
       assertTarget();
@@ -224,17 +228,18 @@ export function RenderExportPanel({
           if (busy) e.preventDefault();
         }}
       >
-        <DialogTitle>Export your video</DialogTitle>
+        <DialogTitle>{ui("Export your video")}</DialogTitle>
         <DialogDescription>
-          Your device renders your cuts, images, motion graphics, captions and
-          audio. Download the result or save it to your Library.
+          {ui(
+            "Your device renders your cuts, images, motion graphics, captions and audio. Download the result or save it to your Library."
+          )}
         </DialogDescription>
         <p className="font-medium">{project.title}</p>
         <label className="text-sm" htmlFor={`${settingsId}-destination`}>
-          Save to
+          {ui("Save to")}
           <CompactSelect
             id={`${settingsId}-destination`}
-            aria-label="Export destination"
+            aria-label={ui("Export destination")}
             disabled={busy || hasRender || requiresMarking}
             value={actualDestination}
             onValueChange={value => setDestination(value as ExportDestination)}
@@ -246,16 +251,17 @@ export function RenderExportPanel({
         </label>
         {requiresMarking && (
           <p className="text-xs text-foreground/70">
-            This project includes AI media. Library saving finalizes its AI
-            source marking before download.
+            {ui(
+              "This project includes AI media. Library saving finalizes its AI source marking before download."
+            )}
           </p>
         )}
 
         <label htmlFor={`${settingsId}-resolution`} className="text-sm">
-          Resolution
+          {ui("Resolution")}
           <CompactSelect
             id={`${settingsId}-resolution`}
-            aria-label="Resolution"
+            aria-label={ui("Resolution")}
             disabled={busy || hasRender}
             value={String(resolution)}
             onValueChange={value =>
@@ -271,10 +277,10 @@ export function RenderExportPanel({
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label htmlFor={`${settingsId}-frame-rate`} className="text-sm">
-            Frame rate
+            {ui("Frame rate")}
             <CompactSelect
               id={`${settingsId}-frame-rate`}
-              aria-label="Export frame rate"
+              aria-label={ui("Export frame rate")}
               className="mt-2"
               disabled={busy || hasRender}
               value={String(frameRate)}
@@ -288,10 +294,10 @@ export function RenderExportPanel({
             />
           </label>
           <label htmlFor={`${settingsId}-format`} className="text-sm">
-            Format
+            {ui("Format")}
             <CompactSelect
               id={`${settingsId}-format`}
-              aria-label="Export format"
+              aria-label={ui("Export format")}
               className="mt-2"
               disabled={busy || hasRender}
               value={format}
@@ -304,17 +310,19 @@ export function RenderExportPanel({
           </label>
         </div>
         <p className="text-sm text-foreground/70">
-          {project.aspectRatio} canvas ·{" "}
+          {project.aspectRatio} {ui("canvas ·")}{" "}
           {exportDimensions(project.aspectRatio, resolution).width} ×{" "}
           {exportDimensions(project.aspectRatio, resolution).height} ·{" "}
-          {frameRate} fps. Rendering uses this device’s processor and memory.
-          Keep this page open while exporting. Templates and rendering use no AI
-          credits; Library storage and AI generation have their own allowances.
+          {frameRate}{" "}
+          {ui(
+            "fps. Rendering uses this device’s processor and memory. Keep this page open while exporting. Templates and rendering use no AI credits; Library storage and AI generation have their own allowances."
+          )}
         </p>
         {resolution === 2160 && (
           <p className="text-sm text-foreground/70">
-            4K needs more memory and time, especially for long timelines or
-            several video layers.
+            {ui(
+              "4K needs more memory and time, especially for long timelines or several video layers."
+            )}
           </p>
         )}
         {busy && (
@@ -336,27 +344,30 @@ export function RenderExportPanel({
         )}
         {workspaceChanged ? (
           <p role="alert" className="text-sm text-destructive">
-            The workspace changed. Close this dialog and reopen export in the
-            intended workspace.
+            {ui(
+              "The workspace changed. Close this dialog and reopen export in the intended workspace."
+            )}
           </p>
         ) : localDone ? (
           <p
             role="status"
             className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm"
           >
-            Your video is ready to download. No copy was uploaded to Library.
+            {ui(
+              "Your video is ready to download. No copy was uploaded to Library."
+            )}
           </p>
         ) : saved ? (
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
             <p className="flex items-center gap-2 font-medium">
               <CheckCircle2 className="h-5 w-5" />
-              Your video is ready
+              {ui("Your video is ready")}
             </p>
             <Link
               to={`/dashboard/publish?asset=${encodeURIComponent(saved.id)}`}
               className="mt-4 block rounded-lg bg-primary p-3 text-center font-medium text-primary-foreground"
             >
-              Prepare publication
+              {ui("Prepare publication")}
             </Link>
           </div>
         ) : (
@@ -372,9 +383,9 @@ export function RenderExportPanel({
               <Download className="h-4 w-4" />
             )}
             {busy
-              ? "Exporting…"
+              ? ui("Exporting…")
               : hasRender
-                ? "Retry saving to Library"
+                ? ui("Retry saving to Library")
                 : `Create ${format === "mp4" ? "MP4" : "WebM"}`}
           </button>
         )}
@@ -384,7 +395,7 @@ export function RenderExportPanel({
             className="text-sm text-foreground/70"
             onClick={() => abort.current?.abort()}
           >
-            Cancel export
+            {ui("Cancel export")}
           </button>
         )}
         {download && !workspaceChanged && (
@@ -393,7 +404,7 @@ export function RenderExportPanel({
             download={download.name}
             className="text-center text-sm font-medium text-primary"
           >
-            Download {format === "webm" ? "WebM" : "MP4"}
+            {ui("Download")} {format === "webm" ? "WebM" : "MP4"}
           </a>
         )}
         <button
@@ -402,7 +413,7 @@ export function RenderExportPanel({
           className="text-sm text-foreground/70 underline underline-offset-4"
           onClick={onBrief}
         >
-          Download edit brief instead
+          {ui("Download edit brief instead")}
         </button>
         <a
           href="/open-source.html"
@@ -410,7 +421,7 @@ export function RenderExportPanel({
           rel="noreferrer"
           className="text-center text-xs text-foreground/60"
         >
-          Export engine licenses
+          {ui("Export engine licenses")}
         </a>
       </DialogContent>
     </Dialog>

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import {
@@ -31,6 +32,7 @@ export function EditorShortcuts({
   bindings?: EditorKeybindings;
   onChange?: (bindings: EditorKeybindings) => void;
 }) {
+  const ui = useUiText();
   const [query, setQuery] = useState("");
   const [localBindings, setLocalBindings] = useState(loadEditorKeybindings);
   const [editing, setEditing] = useState<EditingBinding | null>(null);
@@ -55,7 +57,9 @@ export function EditorShortcuts({
       setLocalBindings(result.bindings!);
       if (!saveEditorKeybindings(result.bindings!)) {
         setError(
-          "Shortcuts changed for this session. Your browser could not save the preference."
+          ui(
+            "Shortcuts changed for this session. Your browser could not save the preference."
+          )
         );
         return true;
       }
@@ -108,12 +112,11 @@ export function EditorShortcuts({
           setError("");
         }}
       >
-        <DialogTitle>Keyboard shortcuts</DialogTitle>
+        <DialogTitle>{ui("Keyboard shortcuts")}</DialogTitle>
         <DialogDescription>
-          Customize timeline commands. Preferences stay in this browser. Text
-          fields and dialogs keep their normal typing shortcuts. Mod means Ctrl
-          on Windows/Linux and ⌘ on macOS. Recorded shortcuts use physical keys,
-          including on other keyboard layouts.
+          {ui(
+            "Customize timeline commands. Preferences stay in this browser. Text fields and dialogs keep their normal typing shortcuts. Mod means Ctrl on Windows/Linux and ⌘ on macOS. Recorded shortcuts use physical keys, including on other keyboard layouts."
+          )}
         </DialogDescription>
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-w-48 flex-1 items-center gap-2 rounded-lg border border-border bg-background px-3">
@@ -121,8 +124,8 @@ export function EditorShortcuts({
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Find an action…"
-              aria-label="Search shortcuts"
+              placeholder={ui("Find an action…")}
+              aria-label={ui("Search shortcuts")}
               className="w-full bg-transparent py-2.5 text-sm outline-none"
             />
           </label>
@@ -136,7 +139,7 @@ export function EditorShortcuts({
               }
             }}
           >
-            Reset defaults
+            {ui("Reset defaults")}
           </button>
         </div>
         {error && (
@@ -161,7 +164,7 @@ export function EditorShortcuts({
                       <dt className="text-sm">{action.label}</dt>
                       <dd className="flex max-w-[60%] flex-wrap items-center justify-end gap-1.5 text-xs text-foreground/70">
                         {!activeBindings[action.id].length && (
-                          <span>Unassigned</span>
+                          <span>{ui("Unassigned")}</span>
                         )}
                         {activeBindings[action.id].map((chord, index) => (
                           <span
@@ -209,7 +212,7 @@ export function EditorShortcuts({
                             )
                           }
                         >
-                          Add
+                          {ui("Add")}
                         </button>
                       </dd>
                     </div>
@@ -219,13 +222,13 @@ export function EditorShortcuts({
                           htmlFor={`shortcut-${action.id}`}
                           className="mb-1 block text-xs text-foreground/70"
                         >
-                          Shortcut for {action.label}
+                          {ui("Shortcut for")} {action.label}
                         </label>
                         <div className="flex flex-wrap gap-2">
                           <input
                             id={`shortcut-${action.id}`}
                             value={editing.draft}
-                            placeholder="e.g. Mod+Shift+S"
+                            placeholder={ui("e.g. Mod+Shift+S")}
                             className="min-w-32 flex-1 rounded border border-border bg-background px-2 py-1.5 text-sm"
                             onChange={event =>
                               setEditing({
@@ -245,7 +248,7 @@ export function EditorShortcuts({
                             className="rounded border border-border px-2 py-1.5 text-xs"
                             onClick={() => setRecording(value => !value)}
                           >
-                            {recording ? "Stop recording" : "Record"}
+                            {recording ? ui("Stop recording") : ui("Record")}
                           </button>
                           <button
                             type="button"
@@ -253,7 +256,7 @@ export function EditorShortcuts({
                             disabled={!editing.draft.trim() || recording}
                             onClick={applyBinding}
                           >
-                            Apply
+                            {ui("Apply")}
                           </button>
                           <button
                             type="button"
@@ -264,7 +267,7 @@ export function EditorShortcuts({
                               setError("");
                             }}
                           >
-                            Cancel
+                            {ui("Cancel")}
                           </button>
                         </div>
                         <p
@@ -272,8 +275,12 @@ export function EditorShortcuts({
                           className="mt-2 text-xs text-foreground/60"
                         >
                           {recording
-                            ? "Press the new key combination. Esc stops recording; Tab moves focus."
-                            : "Click Record or type a chord. Enter Escape to assign Esc. Remove every shortcut to disable an action."}
+                            ? ui(
+                                "Press the new key combination. Esc stops recording; Tab moves focus."
+                              )
+                            : ui(
+                                "Click Record or type a chord. Enter Escape to assign Esc. Remove every shortcut to disable an action."
+                              )}
                         </p>
                       </div>
                     )}
@@ -284,24 +291,29 @@ export function EditorShortcuts({
           ) : null;
         })}
         <section className="rounded-xl border border-border bg-background/60 p-4 text-sm leading-relaxed">
-          <h3 className="mb-2 font-semibold">Selecting and moving clips</h3>
-          Hold <kbd>Shift</kbd> and click to add or remove clips from the
-          selection. Drag a selected clip to move the group. Copy, duplicate and
-          delete work on the selection. Unlock clips before moving or deleting
-          them.
+          <h3 className="mb-2 font-semibold">
+            {ui("Selecting and moving clips")}
+          </h3>
+          {ui("Hold")} <kbd>{ui("Shift")}</kbd>{" "}
+          {ui(
+            "and click to add or remove clips from the selection. Drag a selected clip to move the group. Copy, duplicate and delete work on the selection. Unlock clips before moving or deleting them."
+          )}
           <p className="mt-3">
-            Ripple delete removes the selected time intervals from every
-            unlocked track and closes the gaps. Undo restores the complete edit.
+            {ui(
+              "Ripple delete removes the selected time intervals from every unlocked track and closes the gaps. Undo restores the complete edit."
+            )}
           </p>
           <p className="mt-3">
-            Snapping aligns clip edges with nearby clips and the playhead. Hold{" "}
-            <kbd>Alt</kbd> / <kbd>Option</kbd> while dragging for exact
-            placement.
+            {ui(
+              "Snapping aligns clip edges with nearby clips and the playhead. Hold"
+            )}{" "}
+            <kbd>Alt</kbd> / <kbd>Option</kbd>{" "}
+            {ui("while dragging for exact placement.")}
           </p>
         </section>
         {!found.length && (
           <p className="py-4 text-sm text-foreground/60">
-            No matching shortcut.
+            {ui("No matching shortcut.")}
           </p>
         )}
       </DialogContent>

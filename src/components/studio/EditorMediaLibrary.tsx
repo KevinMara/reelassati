@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { v4 as createUuid } from "uuid";
 import {
@@ -11,7 +12,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
-import { captureUploadRequestScope, verifyUploadRequestScope, platformApi } from "@/lib/platform-api";
+import {
+  captureUploadRequestScope,
+  verifyUploadRequestScope,
+  platformApi,
+} from "@/lib/platform-api";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { DirectVideoImport } from "./DirectVideoImport";
 import { resolveMediaDuration } from "@/lib/media-metadata";
@@ -26,6 +31,7 @@ import {
 } from "@/components/ui/select";
 
 export function EditorMediaLibrary() {
+  const ui = useUiText();
   const { workspace, updateWorkspace, capabilities } = useWorkspace();
   const [folderId, setFolderId] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -42,7 +48,13 @@ export function EditorMediaLibrary() {
   const uploadGeneration = useRef(0);
   const owner = workspace.profile.email.toLowerCase();
   const brand = selectedBrand(owner);
-  useEffect(() => () => { uploadGeneration.current++; uploadController.current?.abort(); }, [owner, brand]);
+  useEffect(
+    () => () => {
+      uploadGeneration.current++;
+      uploadController.current?.abort();
+    },
+    [owner, brand]
+  );
   const folders = workspace.mediaFolders ?? [];
   const currentFolder = folders.find(f => f.id === folderId);
   const reviewedContent = useMemo(() => {
@@ -116,8 +128,12 @@ export function EditorMediaLibrary() {
       uploadController.current = controller;
       const scope = await captureUploadRequestScope();
       controller.signal.throwIfAborted();
-      if (scope.ownerEmail !== owner || scope.brandId !== brand || generation !== uploadGeneration.current)
-        throw new Error("The Library workspace changed before uploading.");
+      if (
+        scope.ownerEmail !== owner ||
+        scope.brandId !== brand ||
+        generation !== uploadGeneration.current
+      )
+        throw new Error(ui("The Library workspace changed before uploading."));
       const destination = folderId;
       for (const file of checked.files) {
         controller.signal.throwIfAborted();
@@ -129,16 +145,30 @@ export function EditorMediaLibrary() {
             : file.type.startsWith("audio/")
               ? "audio"
               : "video",
-          undefined, undefined, { scope, signal: controller.signal }
+          undefined,
+          undefined,
+          { scope, signal: controller.signal }
         );
         controller.signal.throwIfAborted();
         await verifyUploadRequestScope(scope);
         // Save the upload before metadata probing, so a failed probe never loses a file.
         await updateWorkspace(w => {
           controller.signal.throwIfAborted();
-          if (generation !== uploadGeneration.current || w.profile.email.toLowerCase() !== scope.ownerEmail || selectedBrand(scope.ownerEmail) !== scope.brandId)
-            throw new Error("The Library workspace changed before saving the upload.");
-          return { ...w, assets: [...w.assets.filter(a => a.id !== asset.id), { ...asset, folderId: destination || undefined }] };
+          if (
+            generation !== uploadGeneration.current ||
+            w.profile.email.toLowerCase() !== scope.ownerEmail ||
+            selectedBrand(scope.ownerEmail) !== scope.brandId
+          )
+            throw new Error(
+              ui("The Library workspace changed before saving the upload.")
+            );
+          return {
+            ...w,
+            assets: [
+              ...w.assets.filter(a => a.id !== asset.id),
+              { ...asset, folderId: destination || undefined },
+            ],
+          };
         });
         const duration = await resolveMediaDuration(asset).catch(
           () => undefined
@@ -148,13 +178,28 @@ export function EditorMediaLibrary() {
         if (duration)
           await updateWorkspace(w => {
             controller.signal.throwIfAborted();
-            if (generation !== uploadGeneration.current || w.profile.email.toLowerCase() !== scope.ownerEmail || selectedBrand(scope.ownerEmail) !== scope.brandId)
-              throw new Error("The Library workspace changed before saving the measured duration.");
-            return { ...w, assets: w.assets.map(a => a.id === asset.id ? { ...a, duration } : a) };
+            if (
+              generation !== uploadGeneration.current ||
+              w.profile.email.toLowerCase() !== scope.ownerEmail ||
+              selectedBrand(scope.ownerEmail) !== scope.brandId
+            )
+              throw new Error(
+                ui(
+                  "The Library workspace changed before saving the measured duration."
+                )
+              );
+            return {
+              ...w,
+              assets: w.assets.map(a =>
+                a.id === asset.id ? { ...a, duration } : a
+              ),
+            };
           });
       }
       setMessage(
-        "Uploaded to Library. Drag a thumbnail onto the timeline to place it."
+        ui(
+          "Uploaded to Library. Drag a thumbnail onto the timeline to place it."
+        )
       );
       uploadController.current = null;
     });
@@ -185,7 +230,7 @@ export function EditorMediaLibrary() {
   }
   return (
     <section
-      aria-label="Media library"
+      aria-label={ui("Media library")}
       onDragOver={e => {
         if (e.dataTransfer.types.includes("Files")) {
           e.preventDefault();
@@ -216,13 +261,30 @@ export function EditorMediaLibrary() {
           e.target.value = "";
         }}
       />
-      <DirectVideoImport key={`${owner}:${brand}:${folderId}`} disabled={busy || !capabilities.uploads} onImported={async (asset, scope) => {
-        await updateWorkspace(w => {
-          if (w.profile.email.toLowerCase() !== scope.ownerEmail || selectedBrand(scope.ownerEmail) !== scope.brandId)
-            throw new Error("The Library workspace changed before saving the imported video.");
-          return { ...w, assets: [...w.assets.filter(a => a.id !== asset.id), { ...asset, folderId: folderId || undefined }] };
-        });
-      }} />
+      <DirectVideoImport
+        key={`${owner}:${brand}:${folderId}`}
+        disabled={busy || !capabilities.uploads}
+        onImported={async (asset, scope) => {
+          await updateWorkspace(w => {
+            if (
+              w.profile.email.toLowerCase() !== scope.ownerEmail ||
+              selectedBrand(scope.ownerEmail) !== scope.brandId
+            )
+              throw new Error(
+                ui(
+                  "The Library workspace changed before saving the imported video."
+                )
+              );
+            return {
+              ...w,
+              assets: [
+                ...w.assets.filter(a => a.id !== asset.id),
+                { ...asset, folderId: folderId || undefined },
+              ],
+            };
+          });
+        }}
+      />
       <div className="mb-3 flex flex-wrap gap-2">
         <button
           type="button"
@@ -231,13 +293,13 @@ export function EditorMediaLibrary() {
           className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-40"
         >
           <Upload size={15} />
-          Upload
+          {ui("Upload")}
         </button>
         <button
           type="button"
           disabled={busy}
-          title="Create folder"
-          aria-label="Create folder"
+          title={ui("Create folder")}
+          aria-label={ui("Create folder")}
           onClick={() => {
             setEditingFolder("new");
             setFolderName("");
@@ -248,7 +310,7 @@ export function EditorMediaLibrary() {
         </button>
         <button
           type="button"
-          aria-label="Thumbnail view"
+          aria-label={ui("Thumbnail view")}
           aria-pressed={view === "grid"}
           onClick={() => setView("grid")}
           className={`ml-auto rounded-lg p-2 ${view === "grid" ? "bg-primary/15 text-primary" : ""}`}
@@ -257,7 +319,7 @@ export function EditorMediaLibrary() {
         </button>
         <button
           type="button"
-          aria-label="List view"
+          aria-label={ui("List view")}
           aria-pressed={view === "list"}
           onClick={() => setView("list")}
           className={`rounded-lg p-2 ${view === "list" ? "bg-primary/15 text-primary" : ""}`}
@@ -269,7 +331,7 @@ export function EditorMediaLibrary() {
         <button
           type="button"
           disabled={!folderId}
-          aria-label="Parent folder"
+          aria-label={ui("Parent folder")}
           onClick={() => setFolderId(currentFolder?.parentId ?? "")}
           className="p-1 disabled:opacity-30"
         >
@@ -279,7 +341,7 @@ export function EditorMediaLibrary() {
           {currentFolder?.name ?? "Media library"}
         </span>
         <span className="ml-auto text-xs text-foreground/60">
-          {assets.length} {assets.length === 1 ? "file" : "files"}
+          {assets.length} {assets.length === 1 ? ui("file") : ui("files")}
         </span>
       </div>
       {editingFolder && (
@@ -294,7 +356,7 @@ export function EditorMediaLibrary() {
             ref={node => {
               node?.focus();
             }}
-            aria-label="Folder name"
+            aria-label={ui("Folder name")}
             value={folderName}
             maxLength={100}
             onChange={e => setFolderName(e.target.value)}
@@ -305,21 +367,21 @@ export function EditorMediaLibrary() {
             disabled={busy || !folderName.trim()}
             className="text-sm text-primary"
           >
-            Save
+            {ui("Save")}
           </button>
           <button
             type="button"
             onClick={() => setEditingFolder(null)}
             className="text-xs"
           >
-            Cancel
+            {ui("Cancel")}
           </button>
         </form>
       )}
       <input
         type="search"
-        aria-label="Search library"
-        placeholder="Search files…"
+        aria-label={ui("Search library")}
+        placeholder={ui("Search files…")}
         value={query}
         onChange={e => setQuery(e.target.value)}
         className="mb-2 w-full rounded-lg border border-border bg-background p-2 text-sm"
@@ -327,7 +389,7 @@ export function EditorMediaLibrary() {
       <div className="mb-3 grid grid-cols-2 gap-2">
         <Select value={kind} onValueChange={setKind}>
           <SelectTrigger
-            aria-label="Media type"
+            aria-label={ui("Media type")}
             size="sm"
             className="w-full min-w-0 border-border bg-background text-xs"
           >
@@ -351,7 +413,7 @@ export function EditorMediaLibrary() {
         </Select>
         <Select value={sort} onValueChange={setSort}>
           <SelectTrigger
-            aria-label="Sort files"
+            aria-label={ui("Sort files")}
             size="sm"
             className="w-full min-w-0 border-border bg-background text-xs"
           >
@@ -405,7 +467,7 @@ export function EditorMediaLibrary() {
               <button
                 type="button"
                 aria-label={`Remove empty folder ${f.name}`}
-                title="Only empty folders can be removed"
+                title={ui("Only empty folders can be removed")}
                 disabled={
                   busy ||
                   workspace.assets.some(a => a.folderId === f.id) ||
@@ -430,12 +492,13 @@ export function EditorMediaLibrary() {
       </div>
       {query.trim() && (
         <p className="mb-2 text-xs text-foreground/60">
-          Searching all folders and saved AI observations. Unreviewed footage is
-          matched by filename.
+          {ui(
+            "Searching all folders and saved AI observations. Unreviewed footage is matched by filename."
+          )}
         </p>
       )}
       <p className="mb-3 text-[11px] text-foreground/45">
-        Click to preview · drag to place on the timeline
+        {ui("Click to preview · drag to place on the timeline")}
       </p>
       <div className={view === "grid" ? "grid grid-cols-2 gap-2" : "space-y-2"}>
         {assets.map(asset => (
@@ -507,7 +570,7 @@ export function EditorMediaLibrary() {
                 position="popper"
                 className="border-border bg-surface text-foreground"
               >
-                <SelectItem value="__root">Root folder</SelectItem>
+                <SelectItem value="__root">{ui("Root folder")}</SelectItem>
                 {folders.map(f => (
                   <SelectItem key={f.id} value={f.id}>
                     {f.name}
@@ -520,7 +583,7 @@ export function EditorMediaLibrary() {
       </div>
       {!assets.length && (
         <p className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-foreground/60">
-          Drop media here, upload files, or open a folder.
+          {ui("Drop media here, upload files, or open a folder.")}
         </p>
       )}
       {message && (

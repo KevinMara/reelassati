@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { colorGradeMatrix } from "@/lib/color-grade";
 import { visualFrame } from "@contracts/clip-visual";
 import { CaptionLayer } from "./CaptionLayer";
@@ -224,6 +225,7 @@ export function TimelinePreview({
   zoom?: number;
   pan?: { x: number; y: number };
 }) {
+  const ui = useUiText();
   const active = effectiveTimelineClips(project)
     .filter(
       c =>
@@ -269,8 +271,8 @@ export function TimelinePreview({
       {!active.length && (
         <p className="absolute inset-0 flex items-center justify-center p-8 text-center text-sm text-white/50">
           {project.clips.length
-            ? "No media at this time"
-            : "Add footage from your Library or upload it below"}
+            ? ui("No media at this time")
+            : ui("Add footage from your Library or upload it below")}
         </p>
       )}
       <CaptionLayer

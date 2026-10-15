@@ -1,4 +1,5 @@
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
+import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
 import type { Asset } from "@contracts/workspace";
 import {
   PlatformApiError,
@@ -26,10 +27,13 @@ export async function analyzeMedia(
   focus?: string,
   onProgress?: (stage: string) => void,
   signal?: AbortSignal,
-  requestScope?: UploadRequestScope
+  requestScope?: UploadRequestScope,
+  language = "en"
 ) {
   const scope = requestScope ?? (await captureUploadRequestScope());
   const input = {
+    schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+    language,
     assetId: asset.id,
     platform,
     focus,

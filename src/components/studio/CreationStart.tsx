@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Film } from "lucide-react";
@@ -10,6 +11,7 @@ const GOALS = [
   "Tell my founder story",
 ];
 export function CreationStart() {
+  const ui = useUiText();
   const { workspace, updateWorkspace } = useWorkspace();
   const navigate = useNavigate();
   const [name, setName] = useState(
@@ -27,11 +29,12 @@ export function CreationStart() {
       <section className="mb-6 flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-primary/30 bg-primary/10 p-6">
         <div>
           <p className="text-sm font-medium text-primary">
-            Pick up where you left off
+            {ui("Pick up where you left off")}
           </p>
           <h2 className="mt-2 text-2xl font-semibold">{latest.title}</h2>
           <p className="mt-2 text-sm text-foreground/70">
-            {latest.clips.length} clips · {latest.aspectRatio} · {latest.status}
+            {latest.clips.length} {ui("clips ·")} {latest.aspectRatio} ·{" "}
+            {latest.status}
           </p>
         </div>
         <Link
@@ -39,7 +42,7 @@ export function CreationStart() {
           className="flex items-center gap-2 rounded-pill bg-primary px-6 py-3 font-medium text-primary-foreground"
         >
           <Film className="h-4 w-4" />
-          Continue editing
+          {ui("Continue editing")}
           <ArrowRight className="h-4 w-4" />
         </Link>
       </section>
@@ -73,10 +76,10 @@ export function CreationStart() {
     <section className="mb-6 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-surface p-6">
       <p className="flex items-center gap-2 text-sm font-medium text-primary">
         <CheckCircle2 className="h-4 w-4" />
-        Your first creation
+        {ui("Your first creation")}
       </p>
       <h2 className="mt-2 text-2xl font-semibold">
-        What would you like to make?
+        {ui("What would you like to make?")}
       </h2>
       <div className="mt-4 flex flex-wrap gap-2">
         {GOALS.map(value => (
@@ -93,22 +96,22 @@ export function CreationStart() {
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
-          Brand or product
+          {ui("Brand or product")}
           <input
             value={name}
             onChange={e => setName(e.target.value)}
             maxLength={100}
-            placeholder="What are you creating content for?"
+            placeholder={ui("What are you creating content for?")}
             className="mt-2 w-full rounded-lg border border-border bg-background p-3"
           />
         </label>
         <label className="text-sm">
-          Who is it for?
+          {ui("Who is it for?")}
           <input
             value={audience}
             onChange={e => setAudience(e.target.value)}
             maxLength={500}
-            placeholder="Your audience and what they care about"
+            placeholder={ui("Your audience and what they care about")}
             className="mt-2 w-full rounded-lg border border-border bg-background p-3"
           />
         </label>
@@ -120,10 +123,10 @@ export function CreationStart() {
           onClick={() => void start()}
           className="rounded-pill bg-primary px-6 py-3 font-medium text-primary-foreground disabled:opacity-60"
         >
-          {busy ? "Saving your brand…" : "Start with a script"}
+          {busy ? ui("Saving your brand…") : ui("Start with a script")}
         </button>
         <span className="text-sm text-foreground/70">
-          Your brand details carry through to your creation tools.
+          {ui("Your brand details carry through to your creation tools.")}
         </span>
       </div>
       {error && (

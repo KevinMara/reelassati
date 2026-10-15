@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, KeyRound, Send } from "lucide-react";
@@ -6,6 +7,7 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function ForgotPassword() {
+  const ui = useUiText();
   const { t } = useTranslation();
   const { resetPassword, loading, error, clearError } = useAuth();
   const [email, setEmail] = useState("");
@@ -61,7 +63,7 @@ export default function ForgotPassword() {
             disabled={loading}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-50"
           >
-            {loading ? "Sending…" : t("auth.send_reset")}
+            {loading ? ui("Sending…") : t("auth.send_reset")}
             <Send className="h-4 w-4" />
           </button>
         </form>

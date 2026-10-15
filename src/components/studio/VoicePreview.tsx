@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Pause, Play, RotateCcw } from "lucide-react";
 import { findVoice } from "../../../contracts/voices";
@@ -35,6 +36,7 @@ function VoicePreviewPlayer({
   voice: string;
   disabled?: boolean;
 }) {
+  const ui = useUiText();
   const audio = useRef<HTMLAudioElement>(null);
   const requestVersion = useRef({ value: 0 });
   const [url, setUrl] = useState("");
@@ -99,7 +101,7 @@ function VoicePreviewPlayer({
           disabled={disabled || busy}
           onClick={() => void toggleSample()}
           className="flex shrink-0 items-center gap-1.5 rounded-md text-xs font-medium text-primary outline-none hover:text-primary/80 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-          aria-label={`${playing ? "Pause" : "Listen to"} ${name} sample`}
+          aria-label={`${playing ? ui("Pause") : ui("Listen to")} ${name} sample`}
         >
           {busy ? (
             <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
@@ -109,10 +111,10 @@ function VoicePreviewPlayer({
             <Play className="size-3.5" aria-hidden="true" />
           )}
           {busy
-            ? "Preparing sample…"
+            ? ui("Preparing sample…")
             : playing
-              ? "Pause sample"
-              : "Listen to sample"}
+              ? ui("Pause sample")
+              : ui("Listen to sample")}
         </button>
         {duration > 0 && !error ? (
           <>
@@ -136,7 +138,7 @@ function VoicePreviewPlayer({
           </>
         ) : (
           <span className="ml-auto text-[10px] text-muted-foreground">
-            Voice sample
+            {ui("Voice sample")}
           </span>
         )}
       </div>
@@ -159,7 +161,7 @@ function VoicePreviewPlayer({
           sampleCache.delete(voice);
           setUrl("");
           setPlaying(false);
-          setError("This sample could not play. Try loading it again.");
+          setError(ui("This sample could not play. Try loading it again."));
         }}
       />
       {error && (
@@ -172,7 +174,7 @@ function VoicePreviewPlayer({
             type="button"
             disabled={busy || disabled}
             onClick={() => void toggleSample()}
-            aria-label="Retry voice sample"
+            aria-label={ui("Retry voice sample")}
             className="shrink-0 rounded p-0.5 hover:bg-destructive/10"
           >
             <RotateCcw className="size-3.5" />

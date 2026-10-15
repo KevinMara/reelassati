@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   useEffect,
   useLayoutEffect,
@@ -99,6 +100,7 @@ export function TimelineTracks({
   onCaptionSelect,
   onTrackToggle,
 }: Props) {
+  const ui = useUiText();
   const [drop, setDrop] = useState<{ lane: string; time: number } | null>(null);
   const [trimDraft, setTrimDraft] = useState<TimelineClip | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -325,11 +327,13 @@ export function TimelineTracks({
             onSnappingChange(!snapping);
             setSnapGuide(null);
           }}
-          title="Align moved clips and trimmed edges with the playhead and other clips."
+          title={ui(
+            "Align moved clips and trimmed edges with the playhead and other clips."
+          )}
           className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${snapping ? "bg-primary/15 text-primary" : "text-foreground/50 hover:bg-foreground/5"}`}
         >
           <Magnet className="h-3.5 w-3.5" />
-          Clip snapping {snapping ? "on" : "off"}
+          {ui("Clip snapping")} {snapping ? ui("on") : ui("off")}
         </button>
         <span
           role="status"
@@ -344,12 +348,12 @@ export function TimelineTracks({
       <div
         ref={scrollRef}
         className="editor-timeline-scroll overflow-x-auto"
-        aria-label="Editing timeline"
+        aria-label={ui("Editing timeline")}
       >
         <div style={{ width: canvasWidth }}>
           <div className="grid grid-cols-[92px_minmax(0,1fr)] border-b border-border bg-background/45">
             <div className="border-r border-border px-3 py-2 font-mono text-xs uppercase tracking-wider text-foreground/60">
-              Time
+              {ui("Time")}
             </div>
             <div
               className="relative mx-1.5 h-9 cursor-crosshair"
@@ -382,7 +386,7 @@ export function TimelineTracks({
                 value={time}
                 onChange={e => onSeek(Number(e.currentTarget.value))}
                 onPointerDown={e => e.stopPropagation()}
-                aria-label="Timeline playhead"
+                aria-label={ui("Timeline playhead")}
                 aria-valuetext={fmt(time)}
                 className="absolute inset-x-0 bottom-0 h-1 w-full cursor-col-resize accent-primary opacity-50 hover:opacity-100"
               />
@@ -583,7 +587,7 @@ export function TimelineTracks({
                       <span className="pointer-events-none absolute inset-0 flex items-center px-3 text-[10px] text-foreground/30">
                         {lane.number > 1
                           ? `Drop to layer ${lane.number}`
-                          : `Drop ${lane.kind === "audio" ? "audio" : "video or images"} here`}
+                          : `Drop ${lane.kind === "audio" ? ui("audio") : ui("video or images")} here`}
                       </span>
                     )}
                     {lane.kind === "captions" &&

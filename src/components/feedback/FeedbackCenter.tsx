@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
@@ -13,7 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
+
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -69,9 +70,10 @@ function contextBlock() {
 }
 
 export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
-  const { i18n } = useTranslation();
+  const ui = useUiText();
+
   const { user } = useAuth();
-  const isItalian = i18n.resolvedLanguage?.startsWith("it");
+
   const [type, setType] = useState<FeedbackType>("bug");
   const [impact, setImpact] = useState<Impact>("minor");
   const [title, setTitle] = useState("");
@@ -243,20 +245,20 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="mono-eyebrow text-primary">
-                {isItalian ? "Aiutaci a migliorare" : "Help us improve"}
+                {ui("Help us improve")}
               </p>
               <h2 className="mt-2 text-2xl font-semibold">
-                {isItalian ? "Invia un report" : "Send a report"}
+                {ui("Send a report")}
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-foreground/55">
-                {isItalian
-                  ? "Segnala un problema o proponi un miglioramento. Il contesto tecnico viene aggiunto automaticamente."
-                  : "Report a problem or suggest an improvement. Technical context is attached automatically."}
+                {ui(
+                  "Report a problem or suggest an improvement. Technical context is attached automatically."
+                )}
               </p>
             </div>
             <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-600">
               <ShieldCheck className="h-3.5 w-3.5" />
-              {isItalian ? "Nessun dato sensibile" : "No sensitive data"}
+              {ui("No sensitive data")}
             </span>
           </div>
 
@@ -264,27 +266,15 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
             <TypeButton
               active={type === "bug"}
               icon={AlertTriangle}
-              title={isItalian ? "Segnala un bug" : "Report a bug"}
-              description={
-                isItalian
-                  ? "Qualcosa non funziona come dovrebbe"
-                  : "Something is not working as expected"
-              }
+              title={ui("Report a bug")}
+              description={ui("Something is not working as expected")}
               onClick={() => setType("bug")}
             />
             <TypeButton
               active={type === "feedback"}
               icon={Lightbulb}
-              title={
-                isItalian
-                  ? "Suggerisci un miglioramento"
-                  : "Suggest an improvement"
-              }
-              description={
-                isItalian
-                  ? "Un’idea per rendere REELassati migliore"
-                  : "An idea that would make REELassati better"
-              }
+              title={ui("Suggest an improvement")}
+              description={ui("An idea that would make REELassati better")}
               onClick={() => setType("feedback")}
             />
           </div>
@@ -292,7 +282,7 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
           <div className="mt-6 grid gap-5">
             {!user ? (
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={isItalian ? "Nome" : "Name"}>
+                <Field label={ui("Name")}>
                   <input
                     value={name}
                     onChange={event =>
@@ -318,7 +308,7 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
               </div>
             ) : null}
 
-            <Field label={isItalian ? "Titolo" : "Title"}>
+            <Field label={ui("Title")}>
               <input
                 value={title}
                 onChange={event => setTitle(event.target.value.slice(0, 180))}
@@ -326,8 +316,8 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
                 minLength={4}
                 placeholder={
                   type === "bug"
-                    ? "Example: Video export stops at 80%"
-                    : "Example: Add reusable caption presets"
+                    ? ui("Example: Video export stops at 80%")
+                    : ui("Example: Add reusable caption presets")
                 }
                 className={FIELD_INPUT}
               />
@@ -336,12 +326,8 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
             <Field
               label={
                 type === "bug"
-                  ? isItalian
-                    ? "Cosa è successo?"
-                    : "What happened?"
-                  : isItalian
-                    ? "Cosa dovremmo migliorare?"
-                    : "What should we improve?"
+                  ? ui("What happened?")
+                  : ui("What should we improve?")
               }
             >
               <textarea
@@ -353,19 +339,15 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
                 minLength={10}
                 rows={5}
                 className={`${FIELD_INPUT} resize-y`}
-                placeholder={
-                  isItalian
-                    ? "Descrivi il problema o l’idea con il maggior dettaglio possibile."
-                    : "Describe the problem or idea with as much useful detail as possible."
-                }
+                placeholder={ui(
+                  "Describe the problem or idea with as much useful detail as possible."
+                )}
               />
             </Field>
 
             {type === "bug" ? (
               <div className="grid gap-4 lg:grid-cols-2">
-                <Field
-                  label={isItalian ? "Risultato atteso" : "Expected result"}
-                >
+                <Field label={ui("Expected result")}>
                   <textarea
                     value={expected}
                     onChange={event =>
@@ -375,11 +357,7 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
                     className={`${FIELD_INPUT} resize-y`}
                   />
                 </Field>
-                <Field
-                  label={
-                    isItalian ? "Passaggi per riprodurlo" : "Steps to reproduce"
-                  }
-                >
+                <Field label={ui("Steps to reproduce")}>
                   <textarea
                     value={steps}
                     onChange={event =>
@@ -387,34 +365,34 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
                     }
                     rows={3}
                     className={`${FIELD_INPUT} resize-y`}
-                    placeholder="1. Open…\n2. Select…\n3. Click…"
+                    placeholder={ui("1. Open…\\n2. Select…\\n3. Click…")}
                   />
                 </Field>
               </div>
             ) : null}
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <Field label={isItalian ? "Impatto" : "Impact"}>
+              <Field label={ui("Impact")}>
                 <StudioSelect
                   value={impact}
                   onChange={event => setImpact(event.target.value as Impact)}
                   className={FIELD_INPUT}
                 >
-                  <option value="blocking">Blocking — I cannot continue</option>
-                  <option value="major">
-                    Major — important workflow affected
+                  <option value="blocking">
+                    {ui("Blocking — I cannot continue")}
                   </option>
-                  <option value="minor">Minor — workaround available</option>
-                  <option value="idea">Idea — improvement request</option>
+                  <option value="major">
+                    {ui("Major — important workflow affected")}
+                  </option>
+                  <option value="minor">
+                    {ui("Minor — workaround available")}
+                  </option>
+                  <option value="idea">
+                    {ui("Idea — improvement request")}
+                  </option>
                 </StudioSelect>
               </Field>
-              <Field
-                label={
-                  isItalian
-                    ? "Link screenshot/video (facoltativo)"
-                    : "Screenshot/video link (optional)"
-                }
-              >
+              <Field label={ui("Screenshot/video link (optional)")}>
                 <input
                   type="url"
                   value={referenceUrl}
@@ -437,11 +415,9 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
             <div className="mt-5 flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-4 py-3 text-sm">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
               <div>
-                <p className="font-medium">
-                  {isItalian ? "Report ricevuto" : "Report received"}
-                </p>
+                <p className="font-medium">{ui("Report received")}</p>
                 <p className="mt-0.5 text-foreground/55">
-                  {isItalian ? "Riferimento" : "Reference"}: {submittedId}
+                  {ui("Reference")}: {submittedId}
                 </p>
               </div>
             </div>
@@ -459,14 +435,14 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
             ) : (
               <MessageSquareMore className="h-4 w-4" />
             )}
-            {isItalian ? "Invia report" : "Submit report"}
+            {ui("Submit report")}
           </button>
           <p className="mt-3 text-xs text-foreground/45">
-            {isItalian
-              ? "Il report include il contesto tecnico elencato sopra ed è trattato secondo l’"
-              : "The report includes the technical context listed above and is handled under the "}
+            {ui(
+              "The report includes the technical context listed above and is handled under the "
+            )}
             <Link to="/privacy" className="text-primary hover:underline">
-              {isItalian ? "Informativa privacy" : "Privacy Notice"}
+              {ui("Privacy Notice")}
             </Link>
             .
           </p>
@@ -475,30 +451,20 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
         <aside className="space-y-4">
           <InfoCard
             icon={Sparkles}
-            title={isItalian ? "Cosa succede dopo" : "What happens next"}
+            title={ui("What happens next")}
             items={[
-              isItalian
-                ? "Il report entra nella coda del prodotto"
-                : "Your report enters the product queue",
-              isItalian
-                ? "Bug e idee vengono classificati per impatto"
-                : "Bugs and ideas are triaged by impact",
-              isItalian
-                ? "Lo stato viene aggiornato dal team"
-                : "The team updates its status",
+              ui("Your report enters the product queue"),
+              ui("Bugs and ideas are triaged by impact"),
+              ui("The team updates its status"),
             ]}
           />
           <InfoCard
             icon={ShieldCheck}
-            title={isItalian ? "Invia in sicurezza" : "Send safely"}
+            title={ui("Send safely")}
             items={[
-              isItalian
-                ? "Non includere password o codici"
-                : "Never include passwords or codes",
-              isItalian ? "Non condividere chiavi API" : "Never share API keys",
-              isItalian
-                ? "Rimuovi dati personali dai media"
-                : "Remove personal data from media",
+              ui("Never include passwords or codes"),
+              ui("Never share API keys"),
+              ui("Remove personal data from media"),
             ]}
           />
         </aside>
@@ -539,6 +505,7 @@ function OwnerInbox({
     changes: Partial<Pick<FeedbackRecord, "status" | "priority">>
   ) => Promise<void>;
 }) {
+  const ui = useUiText();
   const open = feedback.filter(item => item.status === "open").length;
   const urgent = feedback.filter(item => item.priority === "urgent").length;
   const planned = feedback.filter(item => item.status === "planned").length;
@@ -548,26 +515,29 @@ function OwnerInbox({
     <section className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.07] via-surface to-surface p-5 shadow-card sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="mono-eyebrow text-primary">Owner workspace</p>
-          <h2 className="mt-2 text-2xl font-semibold">Feedback inbox</h2>
+          <p className="mono-eyebrow text-primary">{ui("Owner workspace")}</p>
+          <h2 className="mt-2 text-2xl font-semibold">
+            {ui("Feedback inbox")}
+          </h2>
           <p className="mt-2 text-sm text-foreground/55">
-            Review client reports, set priority, and move work through the
-            product queue.
+            {ui(
+              "Review client reports, set priority, and move work through the product queue."
+            )}
           </p>
         </div>
         <a
           href="#send-feedback"
           className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium hover:border-primary/30"
         >
-          Submit a report <ChevronRight className="h-3.5 w-3.5" />
+          {ui("Submit a report")} <ChevronRight className="h-3.5 w-3.5" />
         </a>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="New" value={open} tone="primary" />
-        <Metric label="Urgent" value={urgent} tone="danger" />
-        <Metric label="Planned" value={planned} tone="warning" />
-        <Metric label="Fixed" value={fixed} tone="success" />
+        <Metric label={ui("New")} value={open} tone="primary" />
+        <Metric label={ui("Urgent")} value={urgent} tone="danger" />
+        <Metric label={ui("Planned")} value={planned} tone="warning" />
+        <Metric label={ui("Fixed")} value={fixed} tone="success" />
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[370px_minmax(0,1fr)]">
@@ -578,7 +548,7 @@ function OwnerInbox({
               <input
                 value={search}
                 onChange={event => setSearch(event.target.value)}
-                placeholder="Search reports"
+                placeholder={ui("Search reports")}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none"
               />
             </label>
@@ -590,7 +560,7 @@ function OwnerInbox({
                 }
                 className="rounded-lg border border-border bg-surface px-2.5 py-2 text-xs"
               >
-                <option value="all">All statuses</option>
+                <option value="all">{ui("All statuses")}</option>
                 {statuses.map(status => (
                   <option value={status} key={status}>
                     {STATUS_LABELS[status]}
@@ -604,9 +574,9 @@ function OwnerInbox({
                 }
                 className="rounded-lg border border-border bg-surface px-2.5 py-2 text-xs"
               >
-                <option value="all">Bugs + ideas</option>
-                <option value="bug">Bugs</option>
-                <option value="feedback">Ideas</option>
+                <option value="all">{ui("Bugs + ideas")}</option>
+                <option value="bug">{ui("Bugs")}</option>
+                <option value="feedback">{ui("Ideas")}</option>
               </StudioSelect>
             </div>
           </div>
@@ -654,7 +624,7 @@ function OwnerInbox({
             ) : (
               <div className="flex h-36 flex-col items-center justify-center text-center text-sm text-foreground/45">
                 <ClipboardList className="mb-2 h-5 w-5" />
-                No reports match these filters.
+                {ui("No reports match these filters.")}
               </div>
             )}
           </div>
@@ -682,7 +652,7 @@ function OwnerInbox({
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <Field label="Status">
+                <Field label={ui("Status")}>
                   <StudioSelect
                     value={selected.status}
                     onChange={event =>
@@ -699,7 +669,7 @@ function OwnerInbox({
                     ))}
                   </StudioSelect>
                 </Field>
-                <Field label="Priority">
+                <Field label={ui("Priority")}>
                   <StudioSelect
                     value={selected.priority}
                     onChange={event =>
@@ -727,7 +697,7 @@ function OwnerInbox({
           ) : (
             <div className="flex h-full min-h-[360px] flex-col items-center justify-center text-center text-foreground/40">
               <CircleDot className="mb-3 h-6 w-6" />
-              Select a report to review it.
+              {ui("Select a report to review it.")}
             </div>
           )}
         </div>

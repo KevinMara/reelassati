@@ -2,6 +2,7 @@ import type {
   ContentProvenance,
   PublicationComplianceReview,
 } from "./compliance";
+import type { InterfaceLanguage } from "./interface-language";
 
 export type Platform =
   | "tiktok"
@@ -26,6 +27,8 @@ export interface CapabilityState {
   uploads: boolean;
   ai: boolean;
   analysis: boolean;
+  /** Paid analysis requires a matching complete audiovisual response contract. */
+  analysisSchemaVersion?: string;
   transcription: boolean;
   speech: boolean;
   musicGeneration?: boolean;
@@ -46,7 +49,7 @@ export interface WorkspaceProfile {
   email: string;
   name: string;
   workspaceName: string;
-  language: "en" | "it";
+  language: InterfaceLanguage;
   contentLanguage: string;
   timezone: string;
   credits: number;

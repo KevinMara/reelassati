@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { AudioPlayer } from "@/components/ui/audio-player";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { resolveMediaDuration } from "@/lib/media-metadata";
@@ -31,7 +32,8 @@ import {
   PlatformApiError,
 } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
-import { CONTENT_LANGUAGES } from "@/lib/languages";
+import { CONTENT_LANGUAGES, localizedLanguageLabel } from "@/lib/languages";
+import { useTranslation } from "react-i18next";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
 import {
   withoutTextProvenanceMarker,
@@ -73,6 +75,8 @@ function createEvent(
 }
 
 export default function VoiceNotes() {
+  const ui = useUiText();
+  const { i18n } = useTranslation();
   const { workspace, capabilities, loading, updateWorkspace } = useWorkspace();
   const [searchParams] = useSearchParams();
   const requestedScriptId = searchParams.get("script") ?? "";
@@ -205,9 +209,9 @@ export default function VoiceNotes() {
 
   const uploadSelectedFile = async () => {
     if (sourceAsset) return sourceAsset;
-    if (!file) throw new Error("Choose an audio file first.");
+    if (!file) throw new Error(ui("Choose an audio file first."));
     if (!capabilities.uploads)
-      throw new Error("Upload storage is not configured.");
+      throw new Error(ui("Upload storage is not configured."));
 
     const uploaded = await platformApi.uploadAsset(
       file,
@@ -258,7 +262,7 @@ export default function VoiceNotes() {
         undefined
       );
       if (!result.provenance)
-        throw new Error("No speech was found in this recording.");
+        throw new Error(ui("No speech was found in this recording."));
       setTranscription(result.transcript);
       setTranscriptionProvenance(result.provenance);
       setSpeechText(withoutTextProvenanceMarker(result.transcript));
@@ -423,7 +427,9 @@ export default function VoiceNotes() {
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setError(
-        "Clipboard access is blocked. Select the script and copy it manually."
+        ui(
+          "Clipboard access is blocked. Select the script and copy it manually."
+        )
       );
     }
   };
@@ -447,12 +453,12 @@ export default function VoiceNotes() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">Voice Studio</p>
-        <h1 className="text-3xl font-semibold">Voice to Content</h1>
+        <p className="mono-eyebrow mb-2 text-primary">{ui("Voice Studio")}</p>
+        <h1 className="text-3xl font-semibold">{ui("Voice to Content")}</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          Upload a real audio asset, transcribe it by asset ID, shape the
-          transcript into a short-form script, or synthesize a production-ready
-          voice track.
+          {ui(
+            "Upload a real audio asset, transcribe it by asset ID, shape the transcript into a short-form script, or synthesize a production-ready voice track."
+          )}
         </p>
       </div>
 
@@ -466,10 +472,13 @@ export default function VoiceNotes() {
         >
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
-            <p className="text-sm font-medium">Some voice tools need setup</p>
+            <p className="text-sm font-medium">
+              {ui("Some voice tools need setup")}
+            </p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/70">
-              Available controls stay active; unavailable AI actions are
-              disabled without pretending to process audio.
+              {ui(
+                "Available controls stay active; unavailable AI actions are disabled without pretending to process audio."
+              )}
             </p>
           </div>
         </div>
@@ -480,14 +489,14 @@ export default function VoiceNotes() {
           <section className="rounded-xl border border-border bg-surface p-6">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-medium">Source voice note</h2>
+                <h2 className="font-medium">{ui("Source voice note")}</h2>
                 <p
                   id="voice-source-description"
                   className="mt-1 text-xs text-foreground/65"
                 >
-                  The uploaded workspace asset—not a local blob URL—is sent for
-                  transcription. Use Transcribe below to create its text
-                  alternative.
+                  {ui(
+                    "The uploaded workspace asset—not a local blob URL—is sent for transcription. Use Transcribe below to create its text alternative."
+                  )}
                 </p>
               </div>
               <Mic className="h-5 w-5 text-primary" />
@@ -497,13 +506,13 @@ export default function VoiceNotes() {
               className="mb-2 block text-xs font-medium"
               htmlFor="voice-title"
             >
-              Working title
+              {ui("Working title")}
             </label>
             <input
               id="voice-title"
               value={title}
               onChange={event => setTitle(event.target.value)}
-              placeholder="Launch idea — raw voice note"
+              placeholder={ui("Launch idea — raw voice note")}
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             />
 
@@ -539,8 +548,8 @@ export default function VoiceNotes() {
                   {file
                     ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
                     : isDragging
-                      ? "Drop it here"
-                      : "Drop audio here, or click · MP3, WAV, M4A"}
+                      ? ui("Drop it here")
+                      : ui("Drop audio here, or click · MP3, WAV, M4A")}
                 </span>
               </span>
             </button>
@@ -555,12 +564,12 @@ export default function VoiceNotes() {
                 {busyAction === "upload" ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading {uploadProgress}%
+                    {ui("Uploading")} {uploadProgress}%
                   </>
                 ) : (
                   <>
                     <Upload className="h-4 w-4" />
-                    Upload to workspace
+                    {ui("Upload to workspace")}
                   </>
                 )}
               </button>
@@ -570,7 +579,7 @@ export default function VoiceNotes() {
               <div className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
                   <Check className="h-4 w-4" />
-                  Stored as {sourceAsset.name}
+                  {ui("Stored as")} {sourceAsset.name}
                 </div>
                 <AudioPlayer
                   key={sourceAsset.id}
@@ -593,7 +602,7 @@ export default function VoiceNotes() {
             <div className="my-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-border" />
               <span className="text-xs uppercase tracking-wider text-foreground/70">
-                or existing asset
+                {ui("or existing asset")}
               </span>
               <div className="h-px flex-1 bg-border" />
             </div>
@@ -602,7 +611,7 @@ export default function VoiceNotes() {
               className="mb-2 block text-xs font-medium"
               htmlFor="saved-audio"
             >
-              Saved audio
+              {ui("Saved audio")}
             </label>
             <StudioSelect
               id="saved-audio"
@@ -624,7 +633,7 @@ export default function VoiceNotes() {
               }}
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             >
-              <option value="">No saved audio selected</option>
+              <option value="">{ui("No saved audio selected")}</option>
               {audioAssets.map(asset => (
                 <option key={asset.id} value={asset.id}>
                   {asset.name}
@@ -634,18 +643,21 @@ export default function VoiceNotes() {
 
             <p className="mt-4 flex items-center gap-1.5 text-xs text-foreground/65">
               <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
-              REELassati AI transcription
+              {ui("REELassati AI transcription")}
             </p>
             <div className="mt-2 flex gap-2">
               <StudioSelect
-                aria-label="Transcription language"
+                aria-label={ui("Transcription language")}
                 value={language}
                 onChange={event => setLanguage(event.target.value)}
                 className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
               >
                 {CONTENT_LANGUAGES.map(item => (
                   <option key={item.code} value={item.code}>
-                    {item.label}
+                    {localizedLanguageLabel(
+                      item.code,
+                      i18n.resolvedLanguage || "en"
+                    )}
                   </option>
                 ))}
               </StudioSelect>
@@ -665,17 +677,17 @@ export default function VoiceNotes() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {uploadProgress > 0 && uploadProgress < 100
                       ? `Uploading ${uploadProgress}%`
-                      : "Transcribing"}
+                      : ui("Transcribing")}
                   </>
                 ) : (
                   <>
                     <AudioLines className="h-4 w-4" />
-                    Transcribe ·{" "}
+                    {ui("Transcribe ·")}{" "}
                     {timedCreditCost(
                       sourceAsset?.duration ?? fileDuration,
                       AI_CREDIT_COSTS.transcriptionPerMinute
                     )}{" "}
-                    credits
+                    {ui("credits")}
                   </>
                 )}
               </button>
@@ -685,9 +697,9 @@ export default function VoiceNotes() {
           <section className="rounded-xl border border-border bg-surface p-6">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-medium">Speech synthesis</h2>
+                <h2 className="font-medium">{ui("Speech synthesis")}</h2>
                 <p className="mt-1 text-xs text-foreground/65">
-                  Render approved copy into a saved audio asset.
+                  {ui("Render approved copy into a saved audio asset.")}
                 </p>
               </div>
               <Volume2 className="h-5 w-5 text-primary" />
@@ -696,21 +708,21 @@ export default function VoiceNotes() {
               className="mb-2 block text-xs font-medium"
               htmlFor="speech-asset-name"
             >
-              Audio name
+              {ui("Audio name")}
             </label>
             <input
               id="speech-asset-name"
               value={speechAssetName}
               maxLength={110}
               onChange={event => setSpeechAssetName(event.target.value)}
-              placeholder="Launch voice-over — final"
+              placeholder={ui("Launch voice-over — final")}
               className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             />
             <label
               className="mb-2 block text-xs font-medium"
               htmlFor="speech-copy"
             >
-              Copy to speak
+              {ui("Copy to speak")}
             </label>
             <textarea
               id="speech-copy"
@@ -721,14 +733,16 @@ export default function VoiceNotes() {
                 invalidateVoiceAttestation();
               }}
               rows={7}
-              placeholder="Paste final voice-over copy or transcribe a note first."
+              placeholder={ui(
+                "Paste final voice-over copy or transcribe a note first."
+              )}
               className="w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-relaxed"
             />
             <label
               className="mb-2 mt-4 block text-sm font-medium"
               htmlFor="voice-id"
             >
-              Voice
+              {ui("Voice")}
             </label>
             <VoiceSelector
               id="voice-id"
@@ -739,12 +753,13 @@ export default function VoiceNotes() {
               }}
             />
             <p className="mt-2 text-sm text-foreground/70">
-              Choose the voice that fits your story. Your generated audio stays
-              in this brand’s Library.
+              {ui(
+                "Choose the voice that fits your story. Your generated audio stays in this brand’s Library."
+              )}
             </p>
             <p className="mt-3 flex items-center gap-1.5 text-xs text-foreground/65">
               <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
-              REELassati AI-generated audio
+              {ui("REELassati AI-generated audio")}
             </p>
             <label className="mt-2 flex items-start gap-2 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground/60">
               <input
@@ -756,9 +771,9 @@ export default function VoiceNotes() {
                 className="mt-0.5 accent-primary"
               />
               <span>
-                I may use this text and voice. If the voice identifies a real
-                person, I have documented consent or another verified legal
-                basis.
+                {ui(
+                  "I may use this text and voice. If the voice identifies a real person, I have documented consent or another verified legal basis."
+                )}
               </span>
             </label>
             <button
@@ -777,12 +792,12 @@ export default function VoiceNotes() {
               {busyAction === "speech" ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Synthesizing
+                  {ui("Synthesizing")}
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Generate speech · {speechCredits} credits
+                  {ui("Generate speech ·")} {speechCredits} {ui("credits")}
                 </>
               )}
             </button>
@@ -795,7 +810,7 @@ export default function VoiceNotes() {
               >
                 <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                   <Save className="h-3.5 w-3.5" />
-                  Saved to your audio library
+                  {ui("Saved to your audio library")}
                 </div>
                 <div className="mt-2">
                   <AiProvenanceBadge provenance={speechAsset.provenance} />
@@ -810,11 +825,11 @@ export default function VoiceNotes() {
                   className="mt-3 w-full"
                 />
                 <p id="generated-speech-transcript" className="sr-only">
-                  Spoken text: {speechText}
+                  {ui("Spoken text:")} {speechText}
                 </p>
                 <EditAssetLink
                   assetId={speechAsset.id}
-                  label="Add audio to Edit"
+                  label={ui("Add audio to Edit")}
                   className="mt-3"
                 />
               </motion.div>
@@ -833,13 +848,15 @@ export default function VoiceNotes() {
               >
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="mono-eyebrow mb-1 text-primary">Transcript</p>
+                    <p className="mono-eyebrow mb-1 text-primary">
+                      {ui("Transcript")}
+                    </p>
                     <h2 className="font-medium">
-                      Clean the thought before writing
+                      {ui("Clean the thought before writing")}
                     </h2>
                   </div>
                   <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 text-xs text-foreground/65">
-                    {segmentCount} timestamped segments
+                    {segmentCount} {ui("timestamped segments")}
                   </span>
                 </div>
                 <AiProvenanceBadge
@@ -855,12 +872,13 @@ export default function VoiceNotes() {
                     setGeneratedScript(null);
                   }}
                   rows={15}
-                  aria-label="Editable transcript"
+                  aria-label={ui("Editable transcript")}
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-3 text-sm leading-relaxed"
                 />
                 <p className="mt-2 text-xs text-foreground/65">
-                  Transcript edits affect the script brief. The original
-                  uploaded audio asset remains unchanged.
+                  {ui(
+                    "Transcript edits affect the script brief. The original uploaded audio asset remains unchanged."
+                  )}
                 </p>
 
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
@@ -869,12 +887,12 @@ export default function VoiceNotes() {
                     onChange={event =>
                       setScriptPlatform(event.target.value as Platform)
                     }
-                    aria-label="Script platform"
+                    aria-label={ui("Script platform")}
                     className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                   >
                     {SCRIPT_PLATFORMS.map(item => (
                       <option key={item.value} value={item.value}>
-                        {item.label}
+                        {ui(item.label)}
                       </option>
                     ))}
                   </StudioSelect>
@@ -891,12 +909,12 @@ export default function VoiceNotes() {
                     {busyAction === "script" ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Writing from transcript
+                        {ui("Writing from transcript")}
                       </>
                     ) : (
                       <>
                         <FileText className="h-4 w-4" />
-                        Turn into short-form script
+                        {ui("Turn into short-form script")}
                       </>
                     )}
                   </button>
@@ -911,11 +929,12 @@ export default function VoiceNotes() {
               >
                 <AudioLines className="h-9 w-9 text-primary/40" />
                 <h2 className="mt-4 text-lg font-medium text-foreground/65">
-                  Your transcript will stay editable
+                  {ui("Your transcript will stay editable")}
                 </h2>
                 <p className="mt-2 max-w-sm text-sm text-foreground/65">
-                  Select a stored audio asset or upload a new one. The app waits
-                  for the real transcription response before showing content.
+                  {ui(
+                    "Select a stored audio asset or upload a new one. The app waits for the real transcription response before showing content."
+                  )}
                 </p>
               </motion.section>
             )}
@@ -929,7 +948,9 @@ export default function VoiceNotes() {
             >
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <p className="mono-eyebrow mb-1 text-primary">Saved script</p>
+                  <p className="mono-eyebrow mb-1 text-primary">
+                    {ui("Saved script")}
+                  </p>
                   <h2 className="font-medium">{generatedScript.title}</h2>
                   <p className="mt-1 text-xs text-foreground/65">
                     {generatedScript.platform} · {generatedScript.duration}s
@@ -944,7 +965,7 @@ export default function VoiceNotes() {
                   type="button"
                   onClick={() => void copyScript()}
                   className="rounded-lg p-2 hover:bg-background"
-                  aria-label="Copy generated script"
+                  aria-label={ui("Copy generated script")}
                 >
                   {copied ? (
                     <Check className="h-4 w-4 text-emerald-500" />
@@ -956,7 +977,7 @@ export default function VoiceNotes() {
               <div className="space-y-3">
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
                   <p className="text-xs font-medium uppercase tracking-wider text-primary">
-                    Hook
+                    {ui("Hook")}
                   </p>
                   <p className="mt-2 text-base font-semibold">
                     {generatedScript.hook}
@@ -969,7 +990,7 @@ export default function VoiceNotes() {
                 </div>
                 <div className="rounded-lg border border-border bg-background p-4">
                   <p className="text-xs font-medium uppercase tracking-wider text-foreground/65">
-                    Call to action
+                    {ui("Call to action")}
                   </p>
                   <p className="mt-2 text-sm font-medium">
                     {generatedScript.cta}
@@ -986,7 +1007,7 @@ export default function VoiceNotes() {
               disabled={Boolean(busyAction)}
               className="w-full rounded-lg border border-border bg-surface py-2.5 text-sm font-medium transition-colors hover:border-primary/45 disabled:opacity-45"
             >
-              Start a new voice note
+              {ui("Start a new voice note")}
             </button>
           ) : null}
 
@@ -996,7 +1017,7 @@ export default function VoiceNotes() {
               role="alert"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>{error}</p>
+              <p>{ui(error)}</p>
             </div>
           ) : null}
         </div>

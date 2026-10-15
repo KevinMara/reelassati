@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { isPrimaryFootage } from "@contracts/timeline-layers";
 import { insertMotionKit } from "@/lib/motion-kits";
 import { normalizeReview } from "@contracts/source-review";
@@ -76,7 +77,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { resolveMediaDuration } from "@/lib/media-metadata";
-import { useTranslation } from "react-i18next";
+
 import { EditorPresetLibrary } from "@/components/studio/EditorPresetLibrary";
 import {
   buildStoryBeatEvidence,
@@ -259,8 +260,8 @@ async function readMediaDuration(file: File): Promise<number | undefined> {
 }
 
 export default function EditorPage() {
-  const { i18n } = useTranslation();
-  const italian = i18n.resolvedLanguage?.startsWith("it");
+  const ui = useUiText();
+
   const {
     workspace,
     capabilities,
@@ -629,11 +630,13 @@ export default function EditorPage() {
         );
         if (!assets.length)
           throw new Error(
-            "Add source video or a transcript to find story sections."
+            ui("Add source video or a transcript to find story sections.")
           );
         if (assets.length > 19)
           throw new Error(
-            "This timeline needs more source analysis than one request allows. Analyze the main footage first, then find sections."
+            ui(
+              "This timeline needs more source analysis than one request allows. Analyze the main footage first, then find sections."
+            )
           );
         const { analyzeMedia } = await import("@/lib/analyze-media");
         for (const asset of assets) {
@@ -673,14 +676,16 @@ export default function EditorPage() {
       const markerAction = response.actions.find(a => a.kind === "story-beats");
       if (!markerAction || markerAction.kind !== "story-beats")
         throw new Error(
-          "No reliable story sections were found in this footage."
+          ui("No reliable story sections were found in this footage.")
         );
       await commitProject("Story sections found", p => {
         if (
           !storyBeatsAreCurrent(markerAction.beats, buildStoryBeatEvidence(p))
         )
           throw new Error(
-            "The footage changed while sections were being found. Refresh sections for the current edit."
+            ui(
+              "The footage changed while sections were being found. Refresh sections for the current edit."
+            )
           );
         return { ...p, storyBeats: markerAction.beats };
       });
@@ -1135,7 +1140,7 @@ export default function EditorPage() {
       () =>
         commitProject("Nudged selection", p => {
           const anchor = p.clips.find(c => c.id === selectedClip.id);
-          if (!anchor) throw new Error("Select a clip to nudge.");
+          if (!anchor) throw new Error(ui("Select a clip to nudge."));
           return moveClipGroup(
             p,
             selectedIds,
@@ -1301,7 +1306,7 @@ export default function EditorPage() {
   };
   const applySavedStyle = async (style: EditorSavedStyle) => {
     if (style.type === "look" && !selectedClip)
-      throw new Error("Select a video or image to apply this look.");
+      throw new Error(ui("Select a video or image to apply this look."));
     await commitProject(`Applied saved style: ${style.name}`, p => {
       if (style.type === "captions")
         return {
@@ -1318,7 +1323,7 @@ export default function EditorPage() {
           clip.track === "audio" ||
           clip.track === "captions"
         )
-          throw new Error("Select a video or image to apply this look.");
+          throw new Error(ui("Select a video or image to apply this look."));
         return replaceTimelineClip(
           p,
           clip.id,
@@ -1328,7 +1333,9 @@ export default function EditorPage() {
       }
       if (playhead >= p.duration)
         throw new Error(
-          "Move the playhead inside the edit before inserting a saved graphic."
+          ui(
+            "Move the playhead inside the edit before inserting a saved graphic."
+          )
         );
       const id = createId("saved-graphic");
       const next = applyEditOperation(p, {
@@ -1495,7 +1502,7 @@ export default function EditorPage() {
           s.end > project.duration
       )
     ) {
-      setLocalError("Correct the caption time ranges before saving.");
+      setLocalError(ui("Correct the caption time ranges before saving."));
       return;
     }
 
@@ -1506,7 +1513,9 @@ export default function EditorPage() {
     ) {
       setTranscriptConflict(true);
       setLocalError(
-        "Captions changed while you were editing. Load the saved captions before applying another revision."
+        ui(
+          "Captions changed while you were editing. Load the saved captions before applying another revision."
+        )
       );
       return;
     }
@@ -1638,7 +1647,7 @@ export default function EditorPage() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex items-center gap-3 text-sm text-foreground/60">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          Opening your studio
+          {ui("Opening your studio")}
         </div>
       </div>
     );
@@ -1649,19 +1658,22 @@ export default function EditorPage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="mono-eyebrow mb-2 text-primary">Editing studio</p>
+            <p className="mono-eyebrow mb-2 text-primary">
+              {ui("Editing studio")}
+            </p>
             <h1 className="max-w-2xl text-3xl font-semibold sm:text-4xl">
-              Start with footage. Keep control of every cut.
+              {ui("Start with footage. Keep control of every cut.")}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/60">
-              Build on a real timeline, then use AI for inspectable changes you
-              can accept, reject, and undo.
+              {ui(
+                "Build on a real timeline, then use AI for inspectable changes you can accept, reject, and undo."
+              )}
             </p>
           </div>
           {workspace.projects.length > 0 && (
             <span className="text-xs text-foreground/70">
-              {workspace.projects.length} saved{" "}
-              {workspace.projects.length === 1 ? "project" : "projects"}
+              {workspace.projects.length} {ui("saved")}{" "}
+              {workspace.projects.length === 1 ? ui("project") : ui("projects")}
             </span>
           )}
         </div>
@@ -1687,13 +1699,17 @@ export default function EditorPage() {
                 )}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="mono-eyebrow text-primary">Ready for Edit</p>
+                <p className="mono-eyebrow text-primary">
+                  {ui("Ready for Edit")}
+                </p>
                 <h2 className="mt-1 truncate font-medium">
                   {pendingAsset.name}
                 </h2>
                 <p className="mt-1 text-xs text-foreground/70">
-                  Choose an existing project below or start a new timeline with
-                  this {pendingAsset.kind} already placed.
+                  {ui(
+                    "Choose an existing project below or start a new timeline with this"
+                  )}{" "}
+                  {pendingAsset.kind} {ui("already placed.")}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1704,15 +1720,15 @@ export default function EditorPage() {
                   className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5 disabled:opacity-45"
                 >
                   {busyAction === "library-handoff"
-                    ? "Adding…"
-                    : "New edit with media"}
+                    ? ui("Adding…")
+                    : ui("New edit with media")}
                 </button>
                 <button
                   type="button"
                   onClick={clearPendingAsset}
                   className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground/70 hover:text-foreground"
                 >
-                  Cancel
+                  {ui("Cancel")}
                 </button>
               </div>
             </div>
@@ -1739,15 +1755,15 @@ export default function EditorPage() {
           </span>
           <span className="text-base font-medium">
             {newEditDrop.isDragging
-              ? "Drop files to start the edit"
-              : "Upload footage to a new edit"}
+              ? ui("Drop files to start the edit")
+              : ui("Upload footage to a new edit")}
           </span>
           <span className="mt-1 text-sm text-foreground/70">
-            Drop video, image, or audio here, or click to choose.
+            {ui("Drop video, image, or audio here, or click to choose.")}
           </span>
           {uploadProgress !== null && (
             <span className="mt-4 font-mono text-xs text-primary">
-              Uploading {uploadProgress}%
+              {ui("Uploading")} {uploadProgress}%
             </span>
           )}
         </button>
@@ -1761,9 +1777,11 @@ export default function EditorPage() {
         />
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-medium">Start from a structure</h2>
+          <h2 className="text-base font-medium">
+            {ui("Start from a structure")}
+          </h2>
           <span className="text-xs text-foreground/70">
-            No irreversible auto-edit
+            {ui("No irreversible auto-edit")}
           </span>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
@@ -1792,7 +1810,9 @@ export default function EditorPage() {
 
         {workspace.projects.length > 0 && (
           <div className="mt-10">
-            <h2 className="mb-4 text-base font-medium">Saved projects</h2>
+            <h2 className="mb-4 text-base font-medium">
+              {ui("Saved projects")}
+            </h2>
             <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {workspace.projects.map(item => (
                 <button
@@ -1806,18 +1826,22 @@ export default function EditorPage() {
                   className="min-w-0 rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary/30"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate font-medium">{item.title}</span>
+                    <span className="min-w-0 truncate font-medium">
+                      {item.title}
+                    </span>
                     <span className="mono-eyebrow shrink-0 text-foreground/70">
                       {item.aspectRatio}
                     </span>
                   </div>
                   <div className="mt-3 flex items-center gap-3 text-xs text-foreground/70">
-                    <span>{item.clips.length} clips</span>
+                    <span>
+                      {item.clips.length} {ui("clips")}
+                    </span>
                     <span>{formatTime(item.duration)}</span>
                     <span className="capitalize">{item.status}</span>
                     {pendingAsset ? (
                       <span className="ml-auto font-medium text-primary">
-                        Add here
+                        {ui("Add here")}
                       </span>
                     ) : null}
                   </div>
@@ -1833,10 +1857,10 @@ export default function EditorPage() {
   const canvasContent = (
     <div className="grid gap-4">
       <label className="text-sm" htmlFor="editor-project-frame-rate">
-        Project frame rate
+        {ui("Project frame rate")}
         <CompactSelect
           id="editor-project-frame-rate"
-          aria-label="Project frame rate"
+          aria-label={ui("Project frame rate")}
           value={String(project.frameRate ?? 30)}
           disabled={Boolean(busyAction)}
           options={[24, 25, 30, 60].map(value => ({
@@ -1861,12 +1885,12 @@ export default function EditorPage() {
         onClick={() => setMixerOpen(true)}
         className="rounded-lg border border-border px-3 py-2 text-sm"
       >
-        Tracks and audio mixer
+        {ui("Tracks and audio mixer")}
       </button>
       <label className="flex items-center gap-2 text-sm">
-        {italian ? "Durata video" : "Video duration"}
+        {ui("Video duration")}
         <input
-          aria-label="Total video duration in seconds"
+          aria-label={ui("Total video duration in seconds")}
           type="text"
           inputMode="decimal"
           value={durationDraft ?? project.duration.toFixed(1)}
@@ -1896,7 +1920,7 @@ export default function EditorPage() {
         }
         className="rounded-lg border border-border px-3 py-2 text-sm"
       >
-        {italian ? "Imposta fine" : "Set end"}
+        {ui("Set end")}
       </button>
       <button
         type="button"
@@ -1912,7 +1936,7 @@ export default function EditorPage() {
         }
         className="rounded-lg border border-border px-3 py-2 text-sm"
       >
-        {italian ? "Adatta al contenuto" : "Fit to content"}
+        {ui("Fit to content")}
       </button>
     </div>
   );
@@ -1921,7 +1945,7 @@ export default function EditorPage() {
       <p className="text-sm text-foreground/65">
         {selectedClip
           ? `Apply to ${selectedClip.label}`
-          : "Select a video or image on the timeline."}
+          : ui("Select a video or image on the timeline.")}
       </p>{" "}
       <EditorPresetLibrary
         mode="looks"
@@ -2032,7 +2056,9 @@ export default function EditorPage() {
                         JSON.stringify(expectedGraphic)
                     )
                       throw new Error(
-                        "The source or graphic changed during tracking. Track the current version again."
+                        ui(
+                          "The source or graphic changed during tracking. Track the current version again."
+                        )
                       );
                     return {
                       ...current,
@@ -2126,7 +2152,7 @@ export default function EditorPage() {
         <div>
           <details className="mb-4 rounded-xl border border-border p-3">
             <summary className="cursor-pointer text-sm font-medium">
-              Caption style library
+              {ui("Caption style library")}
             </summary>
             <div className="mt-3">
               <EditorPresetLibrary
@@ -2172,16 +2198,18 @@ export default function EditorPage() {
           </div>
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <p className="mono-eyebrow text-primary">Editable transcript</p>
+              <p className="mono-eyebrow text-primary">
+                {ui("Editable transcript")}
+              </p>
               <h2 className="mt-2 text-lg font-medium">
-                Words are edit points
+                {ui("Words are edit points")}
               </h2>
             </div>
             <button
               type="button"
               onClick={addTranscriptSegment}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-background"
-              aria-label="Add transcript line"
+              aria-label={ui("Add transcript line")}
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
@@ -2192,8 +2220,9 @@ export default function EditorPage() {
               role="status"
               className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm"
             >
-              Captions changed while you had an unsaved draft. Your draft is
-              kept here for comparison.
+              {ui(
+                "Captions changed while you had an unsaved draft. Your draft is kept here for comparison."
+              )}
               <button
                 type="button"
                 className="mt-2 block font-medium underline"
@@ -2211,7 +2240,7 @@ export default function EditorPage() {
                   setTranscriptConflict(false);
                 }}
               >
-                Load saved captions
+                {ui("Load saved captions")}
               </button>
             </div>
           )}
@@ -2247,7 +2276,7 @@ export default function EditorPage() {
               ) : (
                 <AudioLines className="h-3.5 w-3.5" />
               )}
-              Transcribe active media
+              {ui("Transcribe active media")}
             </button>
           )}
 
@@ -2284,7 +2313,7 @@ export default function EditorPage() {
                     className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
                     aria-label={`Line ${index + 1} start`}
                   />
-                  <span className="text-xs text-foreground/70">to</span>
+                  <span className="text-xs text-foreground/70">{ui("to")}</span>
                   <input
                     type="number"
                     min={0}
@@ -2322,7 +2351,7 @@ export default function EditorPage() {
                       event.currentTarget.selectionStart;
                   }}
                   rows={2}
-                  placeholder="Type the spoken line"
+                  placeholder={ui("Type the spoken line")}
                   onChange={event =>
                     mutateTranscript(current =>
                       current.map((item, itemIndex) =>
@@ -2347,7 +2376,7 @@ export default function EditorPage() {
                     onClick={() => seekTimeline(segment.start)}
                     className="rounded-md border border-border px-2 py-1.5"
                   >
-                    Preview
+                    {ui("Preview")}
                   </button>
                   <button
                     type="button"
@@ -2374,12 +2403,12 @@ export default function EditorPage() {
                     }}
                     className="rounded-md border border-border px-2 py-1.5"
                   >
-                    Split at playhead
+                    {ui("Split at playhead")}
                   </button>
-                  <EditorInfo label="Split a caption">
-                    Place the playhead at the spoken break, then put the text
-                    cursor before the next phrase. Split keeps those words and
-                    uses your chosen time; it does not guess word timing.
+                  <EditorInfo label={ui("Split a caption")}>
+                    {ui(
+                      "Place the playhead at the spoken break, then put the text cursor before the next phrase. Split keeps those words and uses your chosen time; it does not guess word timing."
+                    )}
                   </EditorInfo>
                   {index < transcriptDraft.length - 1 && (
                     <button
@@ -2391,7 +2420,9 @@ export default function EditorPage() {
                       title={
                         segment.sourceClipId !==
                         transcriptDraft[index + 1]?.sourceClipId
-                          ? "Keep captions from different source clips separate."
+                          ? ui(
+                              "Keep captions from different source clips separate."
+                            )
                           : undefined
                       }
                       onClick={() =>
@@ -2407,7 +2438,7 @@ export default function EditorPage() {
                       }
                       className="rounded-md border border-border px-2 py-1.5"
                     >
-                      Merge next
+                      {ui("Merge next")}
                     </button>
                   )}
                 </div>
@@ -2427,8 +2458,9 @@ export default function EditorPage() {
 
           {transcriptDraft.length === 0 && (
             <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm leading-5 text-foreground/70">
-              Add lines manually or transcribe the selected media when the
-              speech service is connected.
+              {ui(
+                "Add lines manually or transcribe the selected media when the speech service is connected."
+              )}
             </div>
           )}
           <button
@@ -2436,7 +2468,7 @@ export default function EditorPage() {
             onClick={() => void saveTranscript()}
             className="mt-4 w-full rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
           >
-            Save transcript revision
+            {ui("Save transcript revision")}
           </button>
         </div>
       }
@@ -2463,7 +2495,7 @@ export default function EditorPage() {
           }}
           className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground"
           disabled={saving || Boolean(busyAction)}
-          aria-label="Back to projects"
+          aria-label={ui("Back to projects")}
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -2480,7 +2512,7 @@ export default function EditorPage() {
                 );
             }}
             className="w-full border-0 bg-transparent p-0 text-xl font-semibold outline-none placeholder:text-foreground/70"
-            aria-label="Project title"
+            aria-label={ui("Project title")}
           />
           <div className="mt-1 flex items-center gap-2 text-xs text-foreground/70">
             <span className="capitalize">{project.platform}</span>
@@ -2505,7 +2537,11 @@ export default function EditorPage() {
             ) : (
               <Check className="h-3 w-3 text-success" />
             )}
-            {saving ? "Saving" : workspaceError ? "Save failed" : "Saved"}
+            {saving
+              ? ui("Saving")
+              : workspaceError
+                ? ui("Save failed")
+                : ui("Saved")}
           </span>
           <button
             type="button"
@@ -2513,7 +2549,7 @@ export default function EditorPage() {
             className="flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
           >
             <Maximize2 className="h-3.5 w-3.5" />
-            {italian ? "Esporta video" : "Export video"}
+            {ui("Export video")}
           </button>
         </div>
       </header>
@@ -2527,7 +2563,7 @@ export default function EditorPage() {
           <button
             type="button"
             onClick={() => setLocalError(null)}
-            aria-label="Dismiss error"
+            aria-label={ui("Dismiss error")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -2577,7 +2613,7 @@ export default function EditorPage() {
           />
           <details className="border-t border-border p-4">
             <summary className="cursor-pointer text-sm font-medium">
-              Search project footage
+              {ui("Search project footage")}
             </summary>
             <div className="mt-4">
               <ProjectFootageSearch
@@ -2593,7 +2629,7 @@ export default function EditorPage() {
           </details>
           <details className="border-t border-border p-4">
             <summary className="cursor-pointer text-sm font-medium">
-              Saved graphics and styles
+              {ui("Saved graphics and styles")}
             </summary>
             <div className="mt-4">
               <SavedEditorStyles
@@ -2633,7 +2669,7 @@ export default function EditorPage() {
           >
             <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-white/60 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-[#A894FF]" />
-              {italian ? "Anteprima timeline" : "Timeline preview"}
+              {ui("Timeline preview")}
             </div>
             <div
               className={`relative flex h-[490px] touch-none items-center justify-center overflow-hidden p-7 ${previewZoom > 100 ? "cursor-grab active:cursor-grabbing" : ""}`}
@@ -2664,7 +2700,7 @@ export default function EditorPage() {
             >
               {previewDrop.isDragging ? (
                 <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border border-dashed border-[#A894FF] bg-black/75 text-sm font-medium text-white backdrop-blur-sm">
-                  Drop media into this edit
+                  {ui("Drop media into this edit")}
                 </div>
               ) : null}
               <TimelinePreview
@@ -2681,7 +2717,9 @@ export default function EditorPage() {
                 type="button"
                 onClick={() => void toggleTimelinePlayback()}
                 className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/15"
-                aria-label={playing ? "Pause timeline" : "Play timeline"}
+                aria-label={
+                  playing ? ui("Pause timeline") : ui("Play timeline")
+                }
               >
                 {playing ? (
                   <Pause className="h-3.5 w-3.5 fill-current" />
@@ -2701,7 +2739,7 @@ export default function EditorPage() {
                 onChange={event => seekTimeline(Number(event.target.value))}
                 onPointerUp={persistPlayhead}
                 className="h-1 w-full max-w-md accent-[#8A76EA]"
-                aria-label="Playhead"
+                aria-label={ui("Playhead")}
               />
               <span className="w-20 text-right font-mono text-xs text-white/40">
                 {formatTime(project.duration)}
@@ -2709,7 +2747,7 @@ export default function EditorPage() {
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-surface px-3 py-2 text-sm text-foreground">
               <CompactSelect
-                aria-label="Preview aspect ratio"
+                aria-label={ui("Preview aspect ratio")}
                 value={project.aspectRatio}
                 onValueChange={value => {
                   setPreviewPan({ x: 0, y: 0 });
@@ -2736,18 +2774,20 @@ export default function EditorPage() {
                     className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-sm"
                   >
                     <ZoomIn className="size-4" />
-                    {previewZoom === 100 ? "Fit" : `${previewZoom}%`}
+                    {previewZoom === 100 ? ui("Fit") : `${previewZoom}%`}
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-64 rounded-xl">
-                  <p className="mb-3 text-sm font-semibold">Preview zoom</p>
+                  <p className="mb-3 text-sm font-semibold">
+                    {ui("Preview zoom")}
+                  </p>
                   <input
                     type="range"
                     min={25}
                     max={400}
                     step={5}
                     value={previewZoom}
-                    aria-label="Preview zoom"
+                    aria-label={ui("Preview zoom")}
                     onChange={e => {
                       setPreviewZoom(Number(e.target.value));
                       setPreviewPan({ x: 0, y: 0 });
@@ -2765,13 +2805,14 @@ export default function EditorPage() {
                           setPreviewPan({ x: 0, y: 0 });
                         }}
                       >
-                        {value === 100 ? "Fit" : `${value}%`}
+                        {value === 100 ? ui("Fit") : `${value}%`}
                       </button>
                     ))}
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-foreground/65">
-                    Zoom is for inspecting your edit. Drag the enlarged preview
-                    to pan. Export framing stays unchanged.
+                    {ui(
+                      "Zoom is for inspecting your edit. Drag the enlarged preview to pan. Export framing stays unchanged."
+                    )}
                   </p>
                 </PopoverContent>
               </Popover>
@@ -2780,7 +2821,7 @@ export default function EditorPage() {
                 onClick={() => setInspectorOpen(true)}
                 className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-2 text-sm"
               >
-                <SlidersHorizontal className="size-4" /> Adjust
+                <SlidersHorizontal className="size-4" /> {ui("Adjust")}
               </button>
             </div>
           </section>
@@ -2805,9 +2846,11 @@ export default function EditorPage() {
                 ) : (
                   <Upload className="h-3.5 w-3.5" />
                 )}
-                Upload
+                {ui("Upload")}
               </button>
-              <span className="mx-3 text-xs text-foreground/45">or</span>
+              <span className="mx-3 text-xs text-foreground/45">
+                {ui("or")}
+              </span>
               <button
                 type="button"
                 onClick={openLibrary}
@@ -2815,7 +2858,7 @@ export default function EditorPage() {
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <Library className="h-3.5 w-3.5" />
-                Add from library
+                {ui("Add from library")}
               </button>
               <span className="mx-1 h-5 w-px bg-border" />
               <Popover>
@@ -2824,7 +2867,7 @@ export default function EditorPage() {
                     type="button"
                     className="rounded-lg px-3 py-2 text-xs font-medium hover:bg-background"
                   >
-                    Groups and links
+                    {ui("Groups and links")}
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-64 space-y-2">
@@ -2837,7 +2880,8 @@ export default function EditorPage() {
                     }}
                     className="w-full rounded-lg border border-border px-3 py-2 text-left text-sm"
                   >
-                    Select grouped clips: {selectGroups ? "On" : "Off"}
+                    {ui("Select grouped clips:")}{" "}
+                    {selectGroups ? ui("On") : ui("Off")}
                   </button>
                   {(["group", "ungroup", "link", "unlink"] as const).map(
                     kind => (
@@ -2854,13 +2898,14 @@ export default function EditorPage() {
                         onClick={() => void editMembership(kind)}
                         className="block w-full rounded-lg px-3 py-2 text-left text-sm capitalize hover:bg-background disabled:opacity-40"
                       >
-                        {kind} selection
+                        {kind} {ui("selection")}
                       </button>
                     )
                   )}
                   <p className="text-xs text-foreground/65">
-                    Linked video and audio move and trim together. Unlink to
-                    edit them independently.
+                    {ui(
+                      "Linked video and audio move and trim together. Unlink to edit them independently."
+                    )}
                   </p>
                 </PopoverContent>
               </Popover>
@@ -2869,7 +2914,7 @@ export default function EditorPage() {
                 onClick={() => setMixerOpen(true)}
                 className="rounded-lg px-3 py-2 text-xs font-medium hover:bg-background"
               >
-                Tracks and mixer
+                {ui("Tracks and mixer")}
               </button>
               <button
                 type="button"
@@ -2877,48 +2922,50 @@ export default function EditorPage() {
                 disabled={Boolean(busyAction)}
                 className="rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-40"
               >
-                Beat cuts and zoom
+                {ui("Beat cuts and zoom")}
               </button>
 
               <button
                 type="button"
                 disabled={!selectedClips.length || selectionLocked}
-                title="Split at playhead"
+                title={ui("Split at playhead")}
                 onClick={() => void splitSelectedClip()}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-30"
               >
                 <Scissors className="h-3.5 w-3.5" />
-                Split
+                {ui("Split")}
               </button>
               <button
                 type="button"
                 disabled={!selectedClip}
-                title="Duplicate selection"
+                title={ui("Duplicate selection")}
                 onClick={() => void duplicateSelectedClip()}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:opacity-30"
               >
                 <Copy className="h-3.5 w-3.5" />
-                Duplicate
+                {ui("Duplicate")}
               </button>
               <button
                 type="button"
                 disabled={!selectedClips.length || selectionLocked}
-                title="Delete selection"
+                title={ui("Delete selection")}
                 onClick={() => void deleteSelectedClip()}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-30"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                Delete
+                {ui("Delete")}
                 {selectedClips.length > 1 ? ` (${selectedClips.length})` : ""}
               </button>
               <button
                 type="button"
                 disabled={!selectedClips.length || selectionLocked}
-                title="Remove the selected time intervals across all unlocked tracks and close the gaps"
+                title={ui(
+                  "Remove the selected time intervals across all unlocked tracks and close the gaps"
+                )}
                 onClick={() => void rippleDeleteSelected()}
                 className="rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-30"
               >
-                Ripple delete
+                {ui("Ripple delete")}
               </button>
 
               <div className="ml-auto flex items-center gap-2 pr-1">
@@ -2927,7 +2974,7 @@ export default function EditorPage() {
                   disabled={revisionCursor <= 0}
                   onClick={() => void undo()}
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground disabled:opacity-30"
-                  aria-label="Undo"
+                  aria-label={ui("Undo")}
                 >
                   <Undo2 className="h-4 w-4" />
                 </button>
@@ -2936,7 +2983,7 @@ export default function EditorPage() {
                   disabled={revisionCursor >= project.revisions.length - 1}
                   onClick={() => void redo()}
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground disabled:opacity-30"
-                  aria-label="Redo"
+                  aria-label={ui("Redo")}
                 >
                   <Redo2 className="h-4 w-4" />
                 </button>
@@ -2959,7 +3006,7 @@ export default function EditorPage() {
                     )
                   }
                   className="h-1 w-36 sm:w-44 accent-primary"
-                  aria-label="Timeline zoom"
+                  aria-label={ui("Timeline zoom")}
                   aria-valuetext={`${Math.round(timelineZoom)}%`}
                 />
                 <button
@@ -2967,16 +3014,16 @@ export default function EditorPage() {
                   onClick={() => setTimelineZoom(100)}
                   className="rounded-md px-2 py-1 text-xs text-foreground/65 hover:bg-background"
                 >
-                  Fit
+                  {ui("Fit")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShortcutsOpen(true)}
-                  title="Keyboard shortcuts (Ctrl/⌘ + /)"
+                  title={ui("Keyboard shortcuts (Ctrl/⌘ + /)")}
                   className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs"
                 >
                   <Keyboard className="size-4" />
-                  <span className="hidden sm:inline">Shortcuts</span>
+                  <span className="hidden sm:inline">{ui("Shortcuts")}</span>
                 </button>
               </div>
             </div>
@@ -3122,15 +3169,17 @@ export default function EditorPage() {
           setKeybindings(next);
           if (!saveEditorKeybindings(next))
             setLocalError(
-              "These shortcuts work for this session, but this browser could not save them."
+              ui(
+                "These shortcuts work for this session, but this browser could not save them."
+              )
             );
         }}
       />
       <Dialog open={rhythmOpen} onOpenChange={setRhythmOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogTitle>Beat cuts and speech zoom</DialogTitle>
+          <DialogTitle>{ui("Beat cuts and speech zoom")}</DialogTitle>
           <DialogDescription>
-            Measure existing audio and make reversible rhythm edits.
+            {ui("Measure existing audio and make reversible rhythm edits.")}
           </DialogDescription>
           <RhythmTools
             key={project.id}
@@ -3147,9 +3196,9 @@ export default function EditorPage() {
       </Dialog>
       <Dialog open={mixerOpen} onOpenChange={setMixerOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogTitle>Tracks and audio mixer</DialogTitle>
+          <DialogTitle>{ui("Tracks and audio mixer")}</DialogTitle>
           <DialogDescription>
-            Rename, reorder and mix the tracks in this project.
+            {ui("Rename, reorder and mix the tracks in this project.")}
           </DialogDescription>
           <TimelineMixer
             project={project}
@@ -3177,9 +3226,9 @@ export default function EditorPage() {
       </Dialog>
       <Dialog open={inspectorOpen} onOpenChange={setInspectorOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogTitle>Adjust</DialogTitle>
+          <DialogTitle>{ui("Adjust")}</DialogTitle>
           <DialogDescription>
-            Clip settings, canvas and the end of your edit.
+            {ui("Clip settings, canvas and the end of your edit.")}
           </DialogDescription>
           {clipDraft && (
             <div className="rounded-xl border border-border bg-black p-3">
@@ -3202,7 +3251,7 @@ export default function EditorPage() {
               <label className="mt-3 flex items-center gap-3 text-sm text-white">
                 <span className="tabular-nums">{playhead.toFixed(1)}s</span>
                 <input
-                  aria-label="Adjustment preview time"
+                  aria-label={ui("Adjustment preview time")}
                   type="range"
                   min={0}
                   max={project.duration}
@@ -3220,9 +3269,11 @@ export default function EditorPage() {
 
       <Dialog open={autoEditOpen} onOpenChange={setAutoEditOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
-          <DialogTitle>AI auto-edit</DialogTitle>
+          <DialogTitle>{ui("AI auto-edit")}</DialogTitle>
           <DialogDescription>
-            Build a complete edit from your footage and a reference style.
+            {ui(
+              "Build a complete edit from your footage and a reference style."
+            )}
           </DialogDescription>
           <AutonomousEditor
             key={project.id}

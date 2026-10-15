@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { PublicationReadiness } from "@/components/studio/PublicationReadiness";
 import { useMemo, useState, type FormEvent } from "react";
@@ -163,6 +164,7 @@ function createId(prefix: string) {
 }
 
 export default function CalendarPage() {
+  const ui = useUiText();
   const { workspace, loading, saving, updateWorkspace } = useWorkspace();
   const [openedAt] = useState(() => Date.now());
   const [currentDate, setCurrentDate] = useState(() => {
@@ -294,7 +296,7 @@ export default function CalendarPage() {
     formEvent.preventDefault();
     const title = eventForm.title.trim();
     if (!title || !eventForm.date) {
-      setFormError("Add a title and date.");
+      setFormError(ui("Add a title and date."));
       return;
     }
     if (
@@ -302,7 +304,7 @@ export default function CalendarPage() {
       eventForm.endTime &&
       eventForm.endTime <= eventForm.startTime
     ) {
-      setFormError("End time must be after start time.");
+      setFormError(ui("End time must be after start time."));
       return;
     }
 
@@ -394,16 +396,19 @@ export default function CalendarPage() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">Plan and publish</p>
-          <h1 className="text-3xl font-semibold">Content Calendar</h1>
+          <p className="mono-eyebrow mb-2 text-primary">
+            {ui("Plan and publish")}
+          </p>
+          <h1 className="text-3xl font-semibold">{ui("Content Calendar")}</h1>
           <p className="mt-2 text-sm text-foreground/70">
-            Your events and publication schedule, together in {timeZone}.
+            {ui("Your events and publication schedule, together in")} {timeZone}
+            .
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link to="/dashboard/publish">
-              <Send /> Compose or schedule
+              <Send /> {ui("Compose or schedule")}
             </Link>
           </Button>
           <Button
@@ -411,7 +416,7 @@ export default function CalendarPage() {
             onClick={() => openCreateEvent()}
             className="shadow-sm shadow-primary/20"
           >
-            <CalendarPlus /> New event
+            <CalendarPlus /> {ui("New event")}
           </Button>
         </div>
       </div>
@@ -425,11 +430,11 @@ export default function CalendarPage() {
             )
           }
           className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium"
-          aria-label="Filter calendar items"
+          aria-label={ui("Filter calendar items")}
         >
-          <option value="all">All calendar items</option>
-          <option value="events">My events</option>
-          <option value="publications">Publications</option>
+          <option value="all">{ui("All calendar items")}</option>
+          <option value="events">{ui("My events")}</option>
+          <option value="publications">{ui("Publications")}</option>
         </StudioSelect>
         {showPosts ? (
           <>
@@ -441,14 +446,14 @@ export default function CalendarPage() {
                 )
               }
               className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium"
-              aria-label="Filter by publication status"
+              aria-label={ui("Filter by publication status")}
             >
-              <option value="all">All dated posts</option>
-              <option value="draft">Dated drafts</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="publishing">Publishing</option>
-              <option value="published">Published</option>
-              <option value="failed">Failed</option>
+              <option value="all">{ui("All dated posts")}</option>
+              <option value="draft">{ui("Dated drafts")}</option>
+              <option value="scheduled">{ui("Scheduled")}</option>
+              <option value="publishing">{ui("Publishing")}</option>
+              <option value="published">{ui("Published")}</option>
+              <option value="failed">{ui("Failed")}</option>
             </StudioSelect>
             <StudioSelect
               value={platformFilter}
@@ -456,9 +461,9 @@ export default function CalendarPage() {
                 setPlatformFilter(event.target.value as "all" | Platform)
               }
               className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium"
-              aria-label="Filter by platform"
+              aria-label={ui("Filter by platform")}
             >
-              <option value="all">All platforms</option>
+              <option value="all">{ui("All platforms")}</option>
               {availablePlatforms.map(platform => (
                 <option key={platform} value={platform}>
                   {PLATFORM_META[platform].label}
@@ -468,7 +473,7 @@ export default function CalendarPage() {
           </>
         ) : null}
         <span className="self-center text-xs text-foreground/65">
-          Select any day to plan something there.
+          {ui("Select any day to plan something there.")}
         </span>
       </div>
 
@@ -483,7 +488,7 @@ export default function CalendarPage() {
                 type="button"
                 onClick={() => moveMonth(-1)}
                 className="rounded-lg p-2 transition-transform hover:-translate-y-0.5 hover:bg-background"
-                aria-label="Previous month"
+                aria-label={ui("Previous month")}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -498,13 +503,13 @@ export default function CalendarPage() {
                 }}
                 className="rounded-lg px-3 py-2 text-xs font-medium hover:bg-background"
               >
-                Today
+                {ui("Today")}
               </button>
               <button
                 type="button"
                 onClick={() => moveMonth(1)}
                 className="rounded-lg p-2 transition-transform hover:-translate-y-0.5 hover:bg-background"
-                aria-label="Next month"
+                aria-label={ui("Next month")}
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -593,7 +598,7 @@ export default function CalendarPage() {
                       })}
                       {items.length > 3 ? (
                         <p className="text-xs text-foreground/65">
-                          +{items.length - 3} more
+                          +{items.length - 3} {ui("more")}
                         </p>
                       ) : null}
                     </div>
@@ -603,7 +608,7 @@ export default function CalendarPage() {
             })}
           </div>
           <p className="mt-4 text-center text-xs text-foreground/70">
-            Tip: double-click a day to create an event immediately.
+            {ui("Tip: double-click a day to create an event immediately.")}
           </p>
         </section>
 
@@ -617,7 +622,7 @@ export default function CalendarPage() {
                         undefined,
                         { weekday: "long", month: "long", day: "numeric" }
                       )
-                    : "Coming up"}
+                    : ui("Coming up")}
                 </h2>
                 {selectedDate ? (
                   <Button
@@ -626,7 +631,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     onClick={() => openCreateEvent(selectedDate)}
                   >
-                    <Plus /> Add
+                    <Plus /> {ui("Add")}
                   </Button>
                 ) : (
                   <CalendarDays className="h-4 w-4 text-primary" />
@@ -660,10 +665,12 @@ export default function CalendarPage() {
                 <div className="rounded-lg border border-dashed border-border p-6 text-center">
                   <Sparkles className="mx-auto mb-2 h-5 w-5 text-primary/70" />
                   <p className="text-sm font-medium">
-                    {selectedDate ? "This day is open" : "Nothing coming up"}
+                    {selectedDate
+                      ? ui("This day is open")
+                      : ui("Nothing coming up")}
                   </p>
                   <p className="mt-1 text-xs text-foreground/65">
-                    Add your own event or schedule a publication.
+                    {ui("Add your own event or schedule a publication.")}
                   </p>
                   <Button
                     type="button"
@@ -672,7 +679,7 @@ export default function CalendarPage() {
                     className="mt-4"
                     onClick={() => openCreateEvent()}
                   >
-                    <CalendarPlus /> Add event
+                    <CalendarPlus /> {ui("Add event")}
                   </Button>
                 </div>
               )}
@@ -682,7 +689,7 @@ export default function CalendarPage() {
             to="/dashboard/publish"
             className="block rounded-xl border border-border bg-surface p-4 text-sm font-medium text-primary transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-sm"
           >
-            Open the publication queue
+            {ui("Open the publication queue")}
           </Link>
         </aside>
       </div>
@@ -692,11 +699,12 @@ export default function CalendarPage() {
           <form onSubmit={saveEvent} className="space-y-5">
             <DialogHeader>
               <DialogTitle>
-                {editingEvent ? "Edit event" : "Add calendar event"}
+                {editingEvent ? ui("Edit event") : ui("Add calendar event")}
               </DialogTitle>
               <DialogDescription>
-                Plan shoots, meetings, deadlines, tasks, or anything else around
-                your content.
+                {ui(
+                  "Plan shoots, meetings, deadlines, tasks, or anything else around your content."
+                )}
               </DialogDescription>
             </DialogHeader>
 
@@ -705,7 +713,7 @@ export default function CalendarPage() {
                 htmlFor="calendar-event-title"
                 className="block space-y-1.5 text-sm font-medium"
               >
-                Title
+                {ui("Title")}
                 <Input
                   id="calendar-event-title"
                   required
@@ -717,7 +725,7 @@ export default function CalendarPage() {
                       title: event.target.value,
                     }))
                   }
-                  placeholder="Film product demo"
+                  placeholder={ui("Film product demo")}
                 />
               </label>
 
@@ -726,7 +734,7 @@ export default function CalendarPage() {
                   htmlFor="calendar-event-date"
                   className="block space-y-1.5 text-sm font-medium"
                 >
-                  Date
+                  {ui("Date")}
                   <Input
                     id="calendar-event-date"
                     type="date"
@@ -744,7 +752,7 @@ export default function CalendarPage() {
                   htmlFor="calendar-event-kind"
                   className="block space-y-1.5 text-sm font-medium"
                 >
-                  Type
+                  {ui("Type")}
                   <StudioSelect
                     id="calendar-event-kind"
                     value={eventForm.kind}
@@ -777,7 +785,7 @@ export default function CalendarPage() {
                   }
                   className="h-4 w-4 rounded border-border accent-primary"
                 />
-                All-day event
+                {ui("All-day event")}
               </label>
 
               {!eventForm.allDay ? (
@@ -786,7 +794,7 @@ export default function CalendarPage() {
                     htmlFor="calendar-event-start"
                     className="block space-y-1.5 text-sm font-medium"
                   >
-                    Starts
+                    {ui("Starts")}
                     <Input
                       id="calendar-event-start"
                       type="time"
@@ -804,7 +812,7 @@ export default function CalendarPage() {
                     htmlFor="calendar-event-end"
                     className="block space-y-1.5 text-sm font-medium"
                   >
-                    Ends (optional)
+                    {ui("Ends (optional)")}
                     <Input
                       id="calendar-event-end"
                       type="time"
@@ -824,7 +832,7 @@ export default function CalendarPage() {
                 htmlFor="calendar-event-notes"
                 className="block space-y-1.5 text-sm font-medium"
               >
-                Notes (optional)
+                {ui("Notes (optional)")}
                 <Textarea
                   id="calendar-event-notes"
                   maxLength={2000}
@@ -836,7 +844,7 @@ export default function CalendarPage() {
                       notes: event.target.value,
                     }))
                   }
-                  placeholder="Location, brief, people involved…"
+                  placeholder={ui("Location, brief, people involved…")}
                 />
               </label>
 
@@ -853,14 +861,14 @@ export default function CalendarPage() {
                 variant="outline"
                 onClick={() => setDialogOpen(false)}
               >
-                Cancel
+                {ui("Cancel")}
               </Button>
               <Button type="submit" disabled={saving}>
                 {saving
-                  ? "Saving…"
+                  ? ui("Saving…")
                   : editingEvent
-                    ? "Save changes"
-                    : "Add event"}
+                    ? ui("Save changes")
+                    : ui("Add event")}
               </Button>
             </DialogFooter>
           </form>
@@ -883,6 +891,7 @@ function EventCard({
   onEdit: (event: CalendarEvent) => void;
   onDelete: (event: CalendarEvent) => void;
 }) {
+  const ui = useUiText();
   const meta = EVENT_KIND_META[event.kind];
   return (
     <article
@@ -927,7 +936,7 @@ function EventCard({
         {showDate ? `${event.date} · ` : ""}
         {event.startTime
           ? `${event.startTime}${event.endTime ? `–${event.endTime}` : ""}`
-          : "All day"}
+          : ui("All day")}
       </p>
     </article>
   );
@@ -942,6 +951,7 @@ function PostCard({
   timeZone: string;
   showDate: boolean;
 }) {
+  const ui = useUiText();
   const value = postDate(post);
   return (
     <article className="rounded-lg border border-border bg-background p-3 transition-transform hover:-translate-y-0.5">
@@ -966,7 +976,7 @@ function PostCard({
             to={`/dashboard/publish?draft=${encodeURIComponent(post.id)}`}
             className="mt-3 inline-flex text-sm font-medium text-primary"
           >
-            Continue preparing →
+            {ui("Continue preparing →")}
           </Link>
         </>
       )}

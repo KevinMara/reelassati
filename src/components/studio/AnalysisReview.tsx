@@ -1,63 +1,122 @@
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Activity,
   ArrowDownRight,
   ArrowUpRight,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Eye,
+  Film,
+  Lightbulb,
   Maximize2,
   Pause,
   Play,
+  ScanLine,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import type { Asset } from "@contracts/workspace";
-import type { VideoInsight } from "@contracts/video-analysis";
+import {
+  VIDEO_ANALYSIS_SCHEMA_VERSION,
+  normalizeVideoInsights,
+  scoreVideoInsights,
+  type VideoInsight,
+  type VideoRole,
+} from "@contracts/video-analysis";
 import { mediaTime } from "@/components/ui/audio-player";
 import { CompactSelect } from "@/components/ui/compact-select";
+import "./AnalysisReview.css";
 
 const channels = [
   {
     id: "attention",
     label: "Attention",
-    color: "#53b9f5",
+    color: "#59c7ff",
     description: "Reason to keep watching",
   },
   {
     id: "stimulation",
     label: "Stimulation",
-    color: "#ad94f5",
+    color: "#b09aff",
     description: "Movement, edits and sound",
   },
   {
     id: "processingLoad",
     label: "Processing load",
-    color: "#86bac8",
+    color: "#86c5da",
     description: "Competing information",
   },
   {
     id: "clarity",
     label: "Clarity",
-    color: "#35cfad",
+    color: "#38dfb6",
     description: "Message and story coherence",
   },
 ] as const;
-const roles = {
+const roleLabels: Record<VideoRole, string> = {
   hook: "Hook",
   core: "Core",
   proof: "Proof",
   payoff: "Payoff",
   cta: "CTA",
   other: "Other",
+  unclassified: "Unclassified",
 };
+const roleColors: Record<VideoRole, string> = {
+  hook: "#b09aff",
+  core: "#59c7ff",
+  proof: "#38dfb6",
+  payoff: "#f4c56a",
+  cta: "#ff8db2",
+  other: "#93a2b8",
+  unclassified: "#93a2b8",
+};
+type Channel = (typeof channels)[number]["id"];
 type Result = {
+  schemaVersion?: string;
   insights?: VideoInsight[];
-  retention: { start: number; end: number; score: number; note: string }[];
+  retention?: { start: number; end: number; score: number; note: string }[];
   coverage?: { input: string; proxyFramesPerSecond: number | null };
+  structure?: {
+    role: "hook" | "core" | "proof" | "payoff" | "cta";
+    status: "present" | "absent" | "uncertain";
+    note: string;
+  }[];
 };
+const scoreText = (score: number | null | undefined) =>
+  score == null ? "—" : Math.round(score);
+const channelStyle = (color: string): CSSProperties =>
+  ({ "--signal": color }) as CSSProperties;
+const clamp = (value: number, end: number) => Math.max(0, Math.min(value, end));
 
-/** Every score and marker is sourced from an evidenced model interval. Playback
- * is the original file; suggested edits are never shown as rendered footage. */
+/** A step joins consecutive observed intervals. Coverage gaps are never
+ * interpolated into invented scores or decorative fluctuations. */
+function signalPath(
+  intervals: VideoInsight[],
+  channel: Channel,
+  duration: number
+) {
+  let path = "";
+  let prior: VideoInsight | undefined;
+  for (const row of intervals) {
+    const score = row[channel];
+    if (score === null) {
+      prior = undefined;
+      continue;
+    }
+    const x = (row.start / duration) * 1000;
+    const end = (row.end / duration) * 1000;
+    const y = 206 - score * 1.76;
+    path += `${prior && Math.abs(prior.end - row.start) < 0.02 ? " L" : " M"} ${x.toFixed(2)} ${y.toFixed(2)} L ${end.toFixed(2)} ${y.toFixed(2)}`;
+    prior = row;
+  }
+  return path;
+}
+
+/** Versioned observations back every displayed signal. Original video is the
+ * only playback source; editorial proposals never masquerade as footage. */
 export function AnalysisReview({
   asset,
   result,
@@ -65,6 +124,8 @@ export function AnalysisReview({
   asset: Asset;
   result: Result;
 }) {
+  const { t: ui } = useTranslation("ui");
+  const chartId = useId().replace(/:/g, "");
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -74,88 +135,98 @@ export function AnalysisReview({
     Boolean(asset.height && asset.width && asset.height > asset.width)
   );
   const [floor, setFloor] = useState(40);
-  const [mode, setMode] = useState<"evidence" | "improvements">("evidence");
-  const [visible, setVisible] = useState<string[]>(channels.map(c => c.id));
-  const [playbackError, setPlaybackError] = useState("");
-  const intervals = useMemo<VideoInsight[]>(
-    () =>
-      result.insights?.length
-        ? result.insights
-        : result.retention.map(row => ({
-            start: row.start,
-            end: row.end,
-            attention: row.score,
-            label: "Source observation",
-            role: "other",
-            stimulation: null,
-            processingLoad: null,
-            clarity: null,
-            confidence: null,
-            visualEvidence: row.note,
-            audioEvidence: "",
-            strength: "",
-            improvement: "",
-            rationale: "",
-          })),
-    [result]
+  const [mode, setMode] = useState<"evidence" | "improvements">("improvements");
+  const [showAll, setShowAll] = useState(false);
+  const [visible, setVisible] = useState<Channel[]>(
+    channels.map(channel => channel.id)
   );
-  const current =
-    intervals.find(row => row.start <= time && time < row.end) ??
-    (time === duration ? intervals.at(-1) : undefined);
-  const previous = current
-    ? intervals[intervals.indexOf(current) - 1]
-    : undefined;
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [playbackError, setPlaybackError] = useState("");
+  const versioned = result.schemaVersion === VIDEO_ANALYSIS_SCHEMA_VERSION;
+  // Legacy retention notes do not establish multi-signal or story evidence.
+  const intervals = useMemo(
+    () => (versioned ? normalizeVideoInsights(result.insights, duration) : []),
+    [versioned, result.insights, duration]
+  );
+  const aggregate = useMemo(
+    () => scoreVideoInsights(intervals, duration),
+    [intervals, duration]
+  );
+  const complete = versioned && aggregate.status === "complete";
+  const selectedIndex = intervals.findIndex(
+    row => row.start <= time && time < row.end
+  );
+  const currentIndex =
+    selectedIndex === -1 && time === duration
+      ? intervals.length - 1
+      : selectedIndex;
+  const current = intervals[currentIndex];
+  const previous = currentIndex > 0 ? intervals[currentIndex - 1] : undefined;
+  const hovered =
+    hoverTime === null
+      ? undefined
+      : intervals.find(row => row.start <= hoverTime && hoverTime < row.end);
   const risks = intervals.filter(
     row => row.attention !== null && row.attention < floor
   );
+  const structure = versioned ? result.structure || [] : [];
+  const percent = duration > 0 ? (clamp(time, duration) / duration) * 100 : 0;
+  const confidence = current?.confidence;
   const seek = (next: number) => {
-    if (video.current) video.current.currentTime = next;
-    setTime(next);
+    const position = clamp(next, duration);
+    if (video.current) video.current.currentTime = position;
+    setTime(position);
   };
   const toggle = () => {
     const player = video.current;
     if (!player) return;
-    if (playing) player.pause();
+    if (!player.paused) player.pause();
     else
       void player
         .play()
         .catch(() =>
           setPlaybackError(
-            "Playback could not start. Reload the source and try again."
+            ui("Playback could not start. Reload the source and try again.")
           )
         );
   };
-  const percent = duration > 0 ? Math.min(100, (time / duration) * 100) : 0;
+  const shownMoments = showAll ? intervals : current ? [current] : [];
+
   return (
     <section
-      className="overflow-hidden rounded-2xl border border-border bg-surface"
-      aria-label="Synchronized video evidence review"
+      className="analysis-review"
+      aria-label={ui("Your video, moment by moment")}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+      <header className="ar-heading">
         <div>
-          <p className="mono-eyebrow text-primary">Short-form intelligence</p>
-          <h2 className="mt-1 text-lg font-semibold tracking-tight">
-            See where your story holds attention
-          </h2>
+          <p className="ar-eyebrow">
+            <ScanLine aria-hidden="true" />
+            {ui("Short-form intelligence")}
+          </p>
+          <h2>{ui("Your video, moment by moment")}</h2>
         </div>
-        <span className="rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-          Full-duration video · available audio
+        <span
+          className={`ar-report-status ${complete ? "is-complete" : "is-incomplete"}`}
+        >
+          {complete ? (
+            <Check aria-hidden="true" />
+          ) : (
+            <Activity aria-hidden="true" />
+          )}
+          {ui(complete ? "Evidence complete" : "Incomplete report")}
         </span>
-      </div>
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="min-w-0 border-b border-border bg-black lg:border-b-0 lg:border-r">
-          <div className="relative flex min-h-48 items-center justify-center">
+      </header>
+      <div
+        className={`ar-theater ${portrait ? "is-portrait" : "is-landscape"}`}
+      >
+        <div className="ar-source">
+          <div className="ar-screen">
             <video
               ref={video}
               src={asset.url}
               playsInline
               preload="metadata"
-              className={
-                portrait
-                  ? "h-[65vh] max-h-[42rem] w-auto max-w-full object-contain"
-                  : "aspect-video max-h-[65vh] w-full object-contain"
-              }
-              aria-label={`Analyzed source: ${asset.name}`}
+              aria-label={asset.name}
               onTimeUpdate={event => setTime(event.currentTarget.currentTime)}
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}
@@ -173,155 +244,235 @@ export function AnalysisReview({
               }}
               onError={() =>
                 setPlaybackError(
-                  "The source preview could not load. Reload its Library link to refresh access."
+                  ui(
+                    "The source preview could not load. Refresh the Library link."
+                  )
                 )
               }
             />
-            <span className="absolute left-4 top-4 rounded-full border border-white/15 bg-black/65 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-              Original source
+            <span className="ar-source-badge">
+              <span />
+              {ui("Original source")}
             </span>
-            {current && (
+            {current ? (
               <button
                 type="button"
                 onClick={() => seek(current.start)}
-                className="absolute bottom-4 left-4 max-w-[calc(100%-2rem)] rounded-lg border border-white/15 bg-black/70 px-3 py-2 text-left text-xs text-white backdrop-blur"
+                className="ar-moment-overlay"
+                style={channelStyle(roleColors[current.role])}
               >
-                {roles[current.role]}{" "}
-                <span className="ml-2 text-white/65">{current.label}</span>
+                <span className="ar-role-dot" />
+                <span>
+                  <strong>{ui(roleLabels[current.role])}</strong>
+                  <span>{current.label}</span>
+                </span>
+                <span className="ar-overlay-time">
+                  {mediaTime(current.start)}
+                </span>
               </button>
-            )}
+            ) : null}
           </div>
-          <div className="flex items-center gap-3 border-t border-white/10 px-4 py-3 text-white">
+          <div className="ar-transport">
             <button
               type="button"
+              className="ar-play"
               onClick={toggle}
-              aria-label={
-                playing ? "Pause analysis video" : "Play analysis video"
-              }
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20"
+              aria-label={ui(playing ? "Pause video" : "Play video")}
             >
               {playing ? (
-                <Pause className="size-4" />
+                <Pause aria-hidden="true" />
               ) : (
-                <Play className="size-4" />
+                <Play aria-hidden="true" />
               )}
             </button>
-            <span className="w-24 shrink-0 font-mono text-xs tabular-nums text-white/65">
-              {mediaTime(time)} / {mediaTime(duration)}
+            <span className="ar-clock">
+              <strong>{mediaTime(time)}</strong>
+              <span>/ {mediaTime(duration)}</span>
             </span>
             <input
               type="range"
-              aria-label="Analysis playback position"
+              className="media-seek ar-seek"
+              aria-label={ui("Playback position")}
               min={0}
               max={duration || 1}
               step={0.05}
               value={Math.min(time, duration || 1)}
               onChange={event => seek(Number(event.target.value))}
-              className="media-seek min-w-5 flex-1"
               style={{
-                background: `linear-gradient(to right,#ad94f5 ${percent}%,#ffffff25 ${percent}%)`,
+                background: `linear-gradient(to right,#b09aff ${percent}%,#ffffff24 ${percent}%)`,
               }}
             />
             <button
               type="button"
+              className="ar-icon-button"
+              aria-label={ui(muted ? "Unmute video" : "Mute video")}
               onClick={() => {
                 if (video.current) video.current.muted = !muted;
                 setMuted(!muted);
               }}
-              aria-label={muted ? "Unmute video" : "Mute video"}
-              className="rounded-lg p-2 text-white/60 hover:text-white"
             >
               {muted ? (
-                <VolumeX className="size-4" />
+                <VolumeX aria-hidden="true" />
               ) : (
-                <Volume2 className="size-4" />
+                <Volume2 aria-hidden="true" />
               )}
             </button>
             <button
               type="button"
-              aria-label="Fullscreen video"
+              className="ar-icon-button"
+              aria-label={ui("Fullscreen video")}
               onClick={() =>
                 void video.current
                   ?.requestFullscreen()
                   .catch(() =>
                     setPlaybackError(
-                      "Fullscreen is unavailable in this browser."
+                      ui("Fullscreen is unavailable in this browser.")
                     )
                   )
               }
-              className="rounded-lg p-2 text-white/60 hover:text-white"
             >
-              <Maximize2 className="size-4" />
+              <Maximize2 aria-hidden="true" />
             </button>
           </div>
-          {playbackError && (
-            <p className="px-4 pb-3 text-xs text-rose-300" role="alert">
+          {playbackError ? (
+            <p className="ar-playback-error" role="alert">
               {playbackError}
             </p>
-          )}
+          ) : null}
         </div>
-        <aside className="flex flex-col gap-4 p-5">
-          <div className="flex items-center justify-between">
-            <p className="mono-eyebrow text-foreground/50">
-              Response at {mediaTime(time)}
-            </p>
-            <Activity className="size-4 text-primary" />
+        <aside className="ar-intelligence">
+          <div className="ar-overall">
+            <div
+              className={`ar-score-orbit ${complete ? "is-scored" : ""}`}
+              style={
+                { "--score": complete ? aggregate.score : 0 } as CSSProperties
+              }
+            >
+              <div>
+                <strong>{complete ? scoreText(aggregate.score) : "—"}</strong>
+                <span>/ 100</span>
+              </div>
+            </div>
+            <div className="ar-overall-copy">
+              <p className="ar-eyebrow">{ui("Overall score")}</p>
+              <h3>
+                {ui(complete ? "Editorial score" : "Overall score unavailable")}
+              </h3>
+              <p>
+                {ui(
+                  complete
+                    ? "Average across the video"
+                    : "Full coverage and all four signals are required."
+                )}
+              </p>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-1 lg:gap-y-4">
+          <div className="ar-response-heading">
+            <p className="ar-eyebrow">
+              {ui("Response at {{time}}", { time: mediaTime(time) })}
+            </p>
+            <div className="ar-moment-navigation">
+              <button
+                type="button"
+                aria-label={ui("Previous moment")}
+                disabled={currentIndex <= 0}
+                onClick={() => seek(intervals[currentIndex - 1].start)}
+              >
+                <ChevronLeft aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label={ui("Next moment")}
+                disabled={
+                  !intervals.length || currentIndex >= intervals.length - 1
+                }
+                onClick={() =>
+                  seek(intervals[Math.max(0, currentIndex + 1)].start)
+                }
+              >
+                <ChevronRight aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          <div className="ar-signal-grid">
             {channels.map(channel => {
               const score = current?.[channel.id];
               const prior = previous?.[channel.id];
               const delta =
                 score != null && prior != null ? score - prior : null;
               return (
-                <div key={channel.id}>
-                  <div className="flex items-end justify-between gap-2">
-                    <span
-                      className="text-3xl font-light tabular-nums tracking-tight"
-                      style={{ color: channel.color }}
-                    >
-                      {score == null ? "—" : Math.round(score)}
-                    </span>
-                    {delta !== null && delta !== 0 && (
-                      <span className="flex items-center text-[11px] text-muted-foreground">
+                <div
+                  className={`ar-signal-card ${score == null ? "is-unavailable" : ""}`}
+                  key={channel.id}
+                  style={channelStyle(channel.color)}
+                >
+                  <div className="ar-signal-top">
+                    <span className="ar-signal-dot" />
+                    <span>{ui(channel.label)}</span>
+                  </div>
+                  <div className="ar-signal-value">
+                    <strong>{scoreText(score)}</strong>
+                    <span>{score == null ? ui("Unavailable") : "/ 100"}</span>
+                  </div>
+                  <div className="ar-signal-track">
+                    <span style={{ width: `${score ?? 0}%` }} />
+                  </div>
+                  <div className="ar-signal-bottom">
+                    <span>{ui(channel.description)}</span>
+                    {delta !== null && delta !== 0 ? (
+                      <span
+                        className="ar-delta"
+                        title={ui("vs previous moment")}
+                      >
                         {delta > 0 ? (
-                          <ArrowUpRight className="size-3" />
+                          <ArrowUpRight aria-hidden="true" />
                         ) : (
-                          <ArrowDownRight className="size-3" />
+                          <ArrowDownRight aria-hidden="true" />
                         )}
                         {delta > 0 ? "+" : ""}
-                        {Math.round(delta)} vs prior
+                        {Math.round(delta)}
                       </span>
-                    )}
-                  </div>
-                  <div className="mt-1 flex justify-between text-xs">
-                    <span>{channel.label}</span>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                      Estimate
-                    </span>
-                  </div>
-                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full transition-[width] duration-150"
-                      style={{
-                        width: `${score ?? 0}%`,
-                        background: channel.color,
-                      }}
-                    />
+                    ) : null}
                   </div>
                 </div>
               );
             })}
           </div>
-          <p className="mt-auto text-[11px] leading-relaxed text-muted-foreground">
-            Editorial content signals, linked to the evidence below. Audience
-            response is established by real viewing data.
-          </p>
+          <div className="ar-evidence-stats">
+            <div>
+              <span>{ui("Source coverage")}</span>
+              <strong>
+                {versioned ? `${Math.round(aggregate.coveragePercent)}%` : "—"}
+              </strong>
+            </div>
+            <div>
+              <span>{ui("Evidence confidence")}</span>
+              <strong>
+                {confidence == null ? "—" : `${Math.round(confidence * 100)}%`}
+              </strong>
+            </div>
+          </div>
+          {!complete ? (
+            <p className="ar-incomplete-note">
+              {ui(
+                "Analysis data is incomplete. Run a new full-video analysis to populate all signals and story sections."
+              )}
+            </p>
+          ) : null}
         </aside>
       </div>
-      <div className="border-t border-border px-5 py-5">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-4">
+      <div className="ar-timeline-panel">
+        <div className="ar-section-heading">
+          <div>
+            <p className="ar-eyebrow">{ui("Source time")}</p>
+            <h3>{ui("Signal timeline")}</h3>
+          </div>
+          <span className="ar-small-label">
+            {ui("{{count}} observed moments", { count: intervals.length })}
+          </span>
+        </div>
+        <div className="ar-chart-toolbar">
+          <div className="ar-chart-legend">
             {channels.map(channel => (
               <button
                 key={channel.id}
@@ -334,284 +485,500 @@ export function AnalysisReview({
                       : [...current, channel.id]
                   )
                 }
-                className={`flex items-center gap-1.5 text-xs font-medium transition-opacity ${visible.includes(channel.id) ? "opacity-100" : "opacity-35"}`}
+                className={visible.includes(channel.id) ? "is-visible" : ""}
+                style={channelStyle(channel.color)}
               >
-                <span
-                  className="size-2 rounded-full"
-                  style={{ background: channel.color }}
-                />
-                {channel.label}
+                <span />
+                <span>{ui(channel.label)}</span>
+                <strong>{scoreText(current?.[channel.id])}</strong>
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span>Review below</span>
-            <div className="w-16">
-              <CompactSelect
-                aria-label="Attention review threshold"
-                value={String(floor)}
-                onValueChange={value => setFloor(Number(value))}
-                options={[25, 40, 50, 60].map(value => ({
-                  value: String(value),
-                  label: String(value),
-                }))}
-              />
-            </div>
+          <div className="ar-threshold">
+            <span>{ui("Review below")}</span>
+            <CompactSelect
+              aria-label={ui("Review below")}
+              value={String(floor)}
+              onValueChange={value => setFloor(Number(value))}
+              options={[25, 40, 50, 60].map(value => ({
+                value: String(value),
+                label: String(value),
+              }))}
+            />
           </div>
         </div>
         {intervals.length && duration > 0 ? (
           <>
-            <svg
-              viewBox="0 0 1000 220"
-              className="h-44 w-full cursor-crosshair sm:h-56"
-              preserveAspectRatio="none"
-              role="img"
-              aria-label="Editorial signal scores by source time. Use the time buttons below to seek."
-              onClick={event => {
-                const bounds = event.currentTarget.getBoundingClientRect();
-                seek(
-                  Math.max(
-                    0,
-                    Math.min(
-                      duration,
-                      ((event.clientX - bounds.left) / bounds.width) * duration
+            <div className="ar-chart" onPointerLeave={() => setHoverTime(null)}>
+              <svg
+                viewBox="0 0 1000 240"
+                preserveAspectRatio="none"
+                role="img"
+                aria-label={ui("Editorial signals by source time")}
+                onPointerMove={event => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  setHoverTime(
+                    clamp(
+                      ((event.clientX - bounds.left) / bounds.width) * duration,
+                      duration
                     )
-                  )
-                );
-              }}
-            >
-              {[0, 25, 50, 75, 100].map(score => (
+                  );
+                }}
+                onClick={event => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  seek(
+                    ((event.clientX - bounds.left) / bounds.width) * duration
+                  );
+                }}
+              >
+                <defs>
+                  <linearGradient
+                    id={`ar-attention-${chartId}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="0%" stopColor="#59c7ff" stopOpacity="0.14" />
+                    <stop
+                      offset="100%"
+                      stopColor="#59c7ff"
+                      stopOpacity="0.01"
+                    />
+                  </linearGradient>
+                </defs>
+                {[0, 25, 50, 75, 100].map(score => (
+                  <g key={score}>
+                    <line
+                      x1={0}
+                      x2={1000}
+                      y1={206 - score * 1.76}
+                      y2={206 - score * 1.76}
+                      stroke="currentColor"
+                      opacity={0.08}
+                    />
+                    <text
+                      x={4}
+                      y={201 - score * 1.76}
+                      className="ar-chart-scale"
+                    >
+                      {score}
+                    </text>
+                  </g>
+                ))}
+                {risks.map(row => (
+                  <g key={`${row.start}-${row.end}`}>
+                    <rect
+                      x={(row.start / duration) * 1000}
+                      y={20}
+                      width={((row.end - row.start) / duration) * 1000}
+                      height={188}
+                      rx={8}
+                      fill="#ff6689"
+                      opacity={0.12}
+                    />
+                    <path
+                      d={`M ${(row.start / duration) * 1000 + 5} 13 l 5 5 l -5 5 l -5 -5 Z`}
+                      fill="#ff6689"
+                    />
+                  </g>
+                ))}
                 <line
-                  key={score}
                   x1={0}
                   x2={1000}
-                  y1={190 - score * 1.7}
-                  y2={190 - score * 1.7}
-                  stroke="currentColor"
-                  opacity={0.07}
+                  y1={206 - floor * 1.76}
+                  y2={206 - floor * 1.76}
+                  stroke="#ff6689"
+                  opacity={0.44}
+                  strokeDasharray="4 6"
                 />
-              ))}
-              {risks.map(row => (
-                <rect
-                  key={`${row.start}-${row.end}`}
-                  x={(row.start / duration) * 1000}
-                  y={15}
-                  width={((row.end - row.start) / duration) * 1000}
-                  height={175}
-                  rx={5}
-                  fill="#f35f78"
-                  opacity={0.09}
+                {visible.includes("attention")
+                  ? intervals
+                      .filter(row => row.attention !== null)
+                      .map(row => (
+                        <path
+                          key={row.start}
+                          d={`M ${(row.start / duration) * 1000} 206 V ${206 - row.attention! * 1.76} H ${(row.end / duration) * 1000} V 206 Z`}
+                          fill={`url(#ar-attention-${chartId})`}
+                        />
+                      ))
+                  : null}
+                {channels
+                  .filter(channel => visible.includes(channel.id))
+                  .map(channel => (
+                    <path
+                      key={channel.id}
+                      d={signalPath(intervals, channel.id, duration)}
+                      fill="none"
+                      stroke={channel.color}
+                      strokeWidth={channel.id === "attention" ? 2.7 : 1.8}
+                      opacity={channel.id === "attention" ? 1 : 0.85}
+                      strokeLinejoin="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ))}
+                <line
+                  x1={percent * 10}
+                  x2={percent * 10}
+                  y1={12}
+                  y2={220}
+                  stroke="#ffffff"
+                  opacity={0.85}
+                  vectorEffect="non-scaling-stroke"
                 />
-              ))}
-              <line
-                x1={0}
-                x2={1000}
-                y1={190 - floor * 1.7}
-                y2={190 - floor * 1.7}
-                stroke="#f35f78"
-                opacity={0.5}
-                strokeDasharray="4 5"
-              />
-              {channels
-                .filter(c => visible.includes(c.id))
-                .map(channel => (
-                  <path
-                    key={channel.id}
-                    d={intervals
-                      .flatMap(row =>
-                        row[channel.id] === null
-                          ? []
-                          : [
-                              `M ${(row.start / duration) * 1000} ${190 - row[channel.id]! * 1.7} L ${(row.end / duration) * 1000} ${190 - row[channel.id]! * 1.7}`,
-                            ]
+                {current
+                  ? channels
+                      .filter(
+                        channel =>
+                          visible.includes(channel.id) &&
+                          current[channel.id] !== null
                       )
-                      .join(" ")}
-                    fill="none"
-                    stroke={channel.color}
-                    strokeWidth={2.5}
+                      .map(channel => (
+                        <circle
+                          key={channel.id}
+                          cx={percent * 10}
+                          cy={206 - current[channel.id]! * 1.76}
+                          r={3.5}
+                          fill={channel.color}
+                          stroke="#101016"
+                          strokeWidth={1.5}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      ))
+                  : null}
+                {hoverTime !== null ? (
+                  <line
+                    x1={(hoverTime / duration) * 1000}
+                    x2={(hoverTime / duration) * 1000}
+                    y1={12}
+                    y2={220}
+                    stroke="#ffffff"
+                    opacity={0.25}
+                    strokeDasharray="2 4"
                     vectorEffect="non-scaling-stroke"
                   />
-                ))}
-              <line
-                x1={percent * 10}
-                x2={percent * 10}
-                y1={10}
-                y2={200}
-                stroke="currentColor"
-                opacity={0.65}
-                strokeWidth={1}
-                vectorEffect="non-scaling-stroke"
-              />
-            </svg>
-            <div className="flex justify-between font-mono text-[10px] text-muted-foreground">
+                ) : null}
+              </svg>
+              {hovered && hoverTime !== null ? (
+                <div
+                  className="ar-chart-tooltip"
+                  style={{
+                    left: `${clamp((hoverTime / duration) * 100, 78)}%`,
+                  }}
+                >
+                  <span>
+                    {mediaTime(hoverTime)} · {ui(roleLabels[hovered.role])}
+                  </span>
+                  {channels.map(channel => (
+                    <div key={channel.id} style={channelStyle(channel.color)}>
+                      <span>{ui(channel.label)}</span>
+                      <strong>{scoreText(hovered[channel.id])}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div className="ar-time-axis">
               {[0, 0.25, 0.5, 0.75, 1].map(fraction => (
                 <button
                   key={fraction}
                   type="button"
+                  aria-label={ui("Seek to {{time}}", {
+                    time: mediaTime(duration * fraction),
+                  })}
                   onClick={() => seek(duration * fraction)}
-                  className="rounded px-1 py-2 hover:text-primary"
                 >
                   {mediaTime(duration * fraction)}
                 </button>
               ))}
             </div>
-            <div
-              className="relative mt-3 h-8 overflow-hidden rounded-lg bg-muted/50"
-              aria-label="Automatically detected story sections"
-            >
+            <div className="ar-role-lane" aria-label={ui("Story structure")}>
               {intervals.map(row => (
                 <button
                   key={`${row.start}-${row.end}`}
-                  title={`${roles[row.role]} · ${mediaTime(row.start)}–${mediaTime(row.end)} · ${row.label}`}
                   type="button"
+                  aria-label={ui("Select {{section}} section", {
+                    section: `${ui(roleLabels[row.role])} ${mediaTime(row.start)}`,
+                  })}
+                  title={`${ui(roleLabels[row.role])} · ${mediaTime(row.start)}–${mediaTime(row.end)} · ${row.label}`}
                   onClick={() => seek(row.start)}
-                  className={`absolute top-0 flex h-full items-center justify-center overflow-hidden border-r border-background/70 px-1 text-[10px] font-medium transition ${current === row ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary hover:bg-primary/20"}`}
+                  className={current === row ? "is-current" : ""}
                   style={{
+                    ...channelStyle(roleColors[row.role]),
                     left: `${(row.start / duration) * 100}%`,
                     width: `${((row.end - row.start) / duration) * 100}%`,
                   }}
                 >
-                  {roles[row.role]}
+                  <span>{ui(roleLabels[row.role])}</span>
                 </button>
               ))}
             </div>
+            <input
+              type="range"
+              className="sr-only"
+              aria-label={ui("Analysis playback position")}
+              min={0}
+              max={duration}
+              step={0.05}
+              value={clamp(time, duration)}
+              onChange={event => seek(Number(event.target.value))}
+            />
           </>
         ) : (
-          <p className="rounded-lg bg-muted/40 p-5 text-sm text-muted-foreground">
-            This review has no timestamped signal evidence. Run a new full-video
-            analysis to populate the graph.
-          </p>
+          <div className="ar-empty-chart">
+            <Activity aria-hidden="true" />
+            <p>
+              {ui("No complete signal timeline is available for this report.")}
+            </p>
+          </div>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-          <span className="mr-1 text-xs text-muted-foreground">
-            {risks.length} intervals to review
+        <div className="ar-risk-list">
+          <span>
+            <span className="ar-risk-diamond" />
+            {ui("Review moments")} <strong>{risks.length}</strong>
           </span>
           {risks.map(row => (
             <button
               key={row.start}
               type="button"
               onClick={() => seek(row.start)}
-              className="flex items-center gap-2 rounded-full border border-rose-500/20 bg-rose-500/5 px-3 py-1.5 font-mono text-xs"
             >
-              <span className="size-1.5 rotate-45 bg-rose-400" />
+              <span className="ar-risk-diamond" />
               {mediaTime(row.start)}
+              <ChevronRight aria-hidden="true" />
             </button>
           ))}
+          {intervals.length > 0 && !risks.length ? (
+            <small>{ui("No low-attention intervals at this threshold.")}</small>
+          ) : null}
         </div>
       </div>
-      <div className="border-t border-border p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold">Inside this moment</h3>
-          <div className="flex rounded-lg bg-muted/60 p-1">
+      {structure.length ? (
+        <div className="ar-structure-summary">
+          <span className="ar-small-label">{ui("Story structure")}</span>
+          <div>
+            {structure.map(section => {
+              const first = intervals.find(row => row.role === section.role);
+              return (
+                <button
+                  type="button"
+                  key={section.role}
+                  disabled={!first}
+                  onClick={() => first && seek(first.start)}
+                  title={section.note}
+                  style={channelStyle(roleColors[section.role])}
+                  className={`is-${section.status}`}
+                >
+                  <span className="ar-role-dot" />
+                  <strong>{ui(roleLabels[section.role])}</strong>
+                  <span>
+                    {ui(
+                      section.status === "present"
+                        ? "Present"
+                        : section.status === "absent"
+                          ? "Absent"
+                          : "Uncertain"
+                    )}
+                  </span>
+                  {first ? <ChevronRight aria-hidden="true" /> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+      <div className="ar-moment-panel">
+        <div className="ar-section-heading">
+          <div>
+            <p className="ar-eyebrow">{ui("Current moment")}</p>
+            <h3>{current?.label || ui("No evidence covers this moment.")}</h3>
+          </div>
+          <div className="ar-view-tabs">
             {(["evidence", "improvements"] as const).map(value => (
               <button
-                key={value}
                 type="button"
+                key={value}
                 aria-pressed={mode === value}
                 onClick={() => setMode(value)}
-                className={`rounded-md px-3 py-1.5 text-xs capitalize transition ${mode === value ? "bg-surface font-medium shadow-sm" : "text-muted-foreground"}`}
+                className={mode === value ? "is-active" : ""}
               >
-                {value}
+                {value === "evidence" ? (
+                  <Eye aria-hidden="true" />
+                ) : (
+                  <Lightbulb aria-hidden="true" />
+                )}
+                {ui(value === "evidence" ? "Evidence" : "Improvements")}
               </button>
             ))}
           </div>
         </div>
-        {current ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {mode === "evidence" ? (
-              <>
-                <Evidence
-                  label="Visual evidence"
-                  text={current.visualEvidence}
-                />
-                <Evidence label="Audio evidence" text={current.audioEvidence} />
-              </>
-            ) : (
-              <>
-                <Evidence label="What works" text={current.strength} good />
-                <Evidence label="Improve next" text={current.improvement} />
-              </>
-            )}
-            {current.rationale && (
-              <div className="md:col-span-2">
-                <Evidence label="Why this matters" text={current.rationale} />
-              </div>
-            )}
-            <p className="text-[11px] text-muted-foreground md:col-span-2">
-              {mediaTime(current.start)}–{mediaTime(current.end)} ·{" "}
-              {roles[current.role]}
-              {current.confidence !== null
-                ? ` · ${Math.round(current.confidence * 100)}% evidence confidence`
-                : ""}
-            </p>
+        {intervals.length > 1 ? (
+          <button
+            type="button"
+            className="ar-all-moments"
+            aria-expanded={showAll}
+            onClick={() => setShowAll(value => !value)}
+          >
+            {ui(showAll ? "Show selected moment" : "Show all moments")}
+            <ChevronRight aria-hidden="true" />
+          </button>
+        ) : null}
+        {shownMoments.length ? (
+          <div className="ar-observations">
+            {shownMoments.map(row => (
+              <article
+                key={row.start}
+                className={`ar-observation ${current === row ? "is-selected" : ""}`}
+              >
+                <div className="ar-observation-heading">
+                  <button
+                    type="button"
+                    onClick={() => seek(row.start)}
+                    style={channelStyle(roleColors[row.role])}
+                  >
+                    <span className="ar-role-dot" />
+                    <strong>{ui(roleLabels[row.role])}</strong>
+                    <span>
+                      {mediaTime(row.start)}–{mediaTime(row.end)}
+                    </span>
+                    <Play aria-hidden="true" />
+                  </button>
+                  <span>
+                    {row.confidence == null
+                      ? ui("Unavailable")
+                      : `${Math.round(row.confidence * 100)}%`}{" "}
+                    · {ui("Confidence")}
+                  </span>
+                </div>
+                <div className="ar-evidence-grid">
+                  {mode === "evidence" ? (
+                    <>
+                      <Evidence
+                        label={ui("Visual evidence")}
+                        text={row.visualEvidence}
+                        empty={ui("No supported observation was returned.")}
+                        kind="visual"
+                      />
+                      <Evidence
+                        label={ui("Audio evidence")}
+                        text={row.audioEvidence}
+                        empty={ui("No supported observation was returned.")}
+                        kind="audio"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Evidence
+                        label={ui("What works")}
+                        text={row.strength}
+                        empty={ui("No supported observation was returned.")}
+                        kind="strength"
+                      />
+                      <Evidence
+                        label={ui("Improve next")}
+                        text={row.improvement}
+                        empty={ui("No supported observation was returned.")}
+                        kind="improvement"
+                      />
+                    </>
+                  )}
+                  {row.rationale ? (
+                    <div className="ar-rationale">
+                      <span>{ui("Why it matters")}</span>
+                      <p>{row.rationale}</p>
+                    </div>
+                  ) : null}
+                  {mode === "evidence" && row.roleReason ? (
+                    <div className="ar-role-evidence">
+                      <span>{ui("Section evidence")}</span>
+                      <p>{row.roleReason}</p>
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+            ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            Seek to an observed interval to inspect its evidence. Gaps are left
-            unscored.
+          <p className="ar-missing-evidence">
+            {ui(
+              "Analysis data is incomplete. Run a new full-video analysis to populate all signals and story sections."
+            )}
           </p>
         )}
-        <details className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
-          <summary className="cursor-pointer font-medium text-foreground/70">
-            How to read this review
-          </summary>
-          <div className="mt-3 space-y-2 leading-relaxed">
-            <p>
-              Scores are model estimates from the supplied temporal video and
-              available audio. Lines span observed intervals; missing channels
-              and gaps stay empty. The review threshold is an editorial filter.
-              Delta compares adjacent source intervals, rather than predicting
-              the effect of an unrendered edit.
-            </p>
-            <p>
-              {result.coverage?.input === "full-duration-proxy"
-                ? `The complete duration and audio were supplied in a reduced-resolution ${result.coverage.proxyFramesPerSecond ?? 8} fps video copy.`
-                : "The complete source file was supplied to the multimodal reviewer."}{" "}
-              The provider controls its internal frame sampling. Source playback
-              above remains original footage.
-            </p>
-            <p>
-              Research context:{" "}
-              <a
-                className="underline hover:text-primary"
-                href="https://doi.org/10.1111/j.1460-2466.2000.tb02833.x"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Lang’s limited-capacity model of message processing
-              </a>{" "}
-              informs the distinction between information demands and clarity.
-              This editorial rubric has not been calibrated as an audience or
-              neural predictor.
-            </p>
-          </div>
-        </details>
       </div>
+      <details className="ar-methodology">
+        <summary>
+          {ui("How this score is calculated")}
+          <ChevronRight aria-hidden="true" />
+        </summary>
+        <div>
+          <p>
+            {ui(
+              "Scores follow a fixed editorial rubric. They are not measured audience or neural responses."
+            )}
+          </p>
+          <p>
+            {ui(
+              "Overall = 45% attention + 35% clarity + 20% processing ease. Processing ease = 100 − processing load. Stimulation describes intensity and is not rewarded automatically."
+            )}
+          </p>
+          <p>
+            {ui(
+              result.coverage?.input === "full-duration-proxy"
+                ? "Full-duration video copy · {{fps}} fps"
+                : "Complete source video and available audio",
+              { fps: result.coverage?.proxyFramesPerSecond ?? 8 }
+            )}
+            . {ui("The provider controls internal frame sampling.")}
+          </p>
+          <p>
+            {ui("Research context")}:{" "}
+            <a
+              href="https://doi.org/10.1111/j.1460-2466.2000.tb02833.x"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {ui("Limited-capacity model of message processing")}
+            </a>
+            .{" "}
+            {ui(
+              "This rubric has not been calibrated as an audience or neural predictor."
+            )}
+          </p>
+        </div>
+      </details>
     </section>
   );
 }
+
 function Evidence({
   label,
   text,
-  good = false,
+  empty,
+  kind,
 }: {
   label: string;
   text: string;
-  good?: boolean;
+  empty: string;
+  kind: "visual" | "audio" | "strength" | "improvement";
 }) {
   return (
-    <div className="rounded-xl border border-border/80 bg-background/50 p-4">
-      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {good ? (
-          <Check className="size-3 text-emerald-500" />
-        ) : (
-          <Eye className="size-3 text-primary" />
-        )}
-        {label}
-      </p>
-      <p className="text-sm leading-relaxed text-foreground/75">
-        {text || "No supported observation was returned for this channel."}
-      </p>
+    <div className={`ar-evidence-card is-${kind}`}>
+      <div>
+        <span>
+          {kind === "strength" ? (
+            <Check aria-hidden="true" />
+          ) : kind === "improvement" ? (
+            <Lightbulb aria-hidden="true" />
+          ) : kind === "visual" ? (
+            <Film aria-hidden="true" />
+          ) : (
+            <Volume2 aria-hidden="true" />
+          )}
+        </span>
+        <h4>{label}</h4>
+      </div>
+      <p>{text || empty}</p>
     </div>
   );
 }

@@ -1,7 +1,9 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { platformApi } from "@/lib/platform-api";
 export function AccountDataControls() {
+  const ui = useUiText();
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [confirm, setConfirm] = useState("");
@@ -43,10 +45,11 @@ export function AccountDataControls() {
   }
   return (
     <section className="mt-8 rounded-xl border border-border bg-surface p-6">
-      <h2 className="font-semibold">Your account and data</h2>
+      <h2 className="font-semibold">{ui("Your account and data")}</h2>
       <p className="mt-2 text-sm text-foreground/70">
-        Download projects, scripts, settings, and media links across all your
-        brands.
+        {ui(
+          "Download projects, scripts, settings, and media links across all your brands."
+        )}
       </p>
       <button
         type="button"
@@ -54,23 +57,23 @@ export function AccountDataControls() {
         onClick={() => void download()}
         className="mt-4 rounded-lg border border-primary/30 px-4 py-2 text-sm font-medium text-primary disabled:opacity-60"
       >
-        Download my data
+        {ui("Download my data")}
       </button>
       <details className="mt-5">
         <summary className="cursor-pointer text-sm text-foreground/75">
-          Request account deletion
+          {ui("Request account deletion")}
         </summary>
         <p className="mt-3 text-sm text-foreground/70">
-          This requests removal of your account and all brand workspaces.
-          Support checks subscription cancellation and any records that must be
-          retained. A request does not cancel billing automatically.{" "}
+          {ui(
+            "This requests removal of your account and all brand workspaces. Support checks subscription cancellation and any records that must be retained. A request does not cancel billing automatically."
+          )}{" "}
           <Link to="/dashboard/billing" className="text-primary underline">
-            Manage your subscription
+            {ui("Manage your subscription")}
           </Link>
           .
         </p>
         <label className="mt-4 block text-xs">
-          Type DELETE MY ACCOUNT
+          {ui("Type DELETE MY ACCOUNT")}
           <input
             value={confirm}
             onChange={e => setConfirm(e.target.value)}
@@ -83,7 +86,7 @@ export function AccountDataControls() {
           onClick={() => void requestDeletion()}
           className="mt-3 rounded-lg border border-destructive/40 px-4 py-2 text-sm text-destructive disabled:opacity-60"
         >
-          Submit deletion request
+          {ui("Submit deletion request")}
         </button>
       </details>
       {notice && (

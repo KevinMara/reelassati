@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useId, useState } from "react";
 import { Play, Pause } from "lucide-react";
 import { CompactSelect } from "@/components/ui/compact-select";
@@ -27,6 +28,7 @@ export function GraphicComposer({
   busy?: boolean;
   duration?: number;
 }) {
+  const ui = useUiText();
   const controlId = useId();
   const [g, setG] = useState<MotionGraphic>(() =>
     normalizeGraphic(initial ?? draft ?? { kind: "text", text: "" })!
@@ -76,7 +78,7 @@ export function GraphicComposer({
           ["text", "callout", "spatial-title"].includes(g.kind) &&
           !g.text.trim()
         ) {
-          setError("Write the words for your graphic before adding it.");
+          setError(ui("Write the words for your graphic before adding it."));
           return;
         }
         setSaving(true);
@@ -89,7 +91,9 @@ export function GraphicComposer({
       }}
     >
       <p className="text-sm text-foreground/70">
-        Editable graphics, with the same animation in preview and export.
+        {ui(
+          "Editable graphics, with the same animation in preview and export."
+        )}
       </p>
       <div
         className="relative aspect-video overflow-hidden rounded-lg bg-black"
@@ -110,13 +114,13 @@ export function GraphicComposer({
         ) : (
           <Play className="size-3.5" />
         )}
-        {playing ? "Pause motion preview" : "Play motion preview"}
+        {playing ? ui("Pause motion preview") : ui("Play motion preview")}
       </button>
       <label className="block text-sm" htmlFor={`${controlId}-type`}>
-        Graphic
+        {ui("Graphic")}
         <CompactSelect
           id={`${controlId}-type`}
-          aria-label="Graphic type"
+          aria-label={ui("Graphic type")}
           value={g.kind}
           onValueChange={value => patch("kind", value)}
           options={GRAPHIC_KINDS.map(k => ({
@@ -129,9 +133,9 @@ export function GraphicComposer({
       </label>
       {["text", "callout", "spatial-title"].includes(g.kind) && (
         <label className="block text-sm">
-          Text
+          {ui("Text")}
           <textarea
-            placeholder="Write your title or callout…"
+            placeholder={ui("Write your title or callout…")}
             maxLength={g.kind === "spatial-title" ? 28 : 180}
             className={field}
             value={g.text}
@@ -140,8 +144,9 @@ export function GraphicComposer({
           {g.kind === "spatial-title" &&
             spatialTitleText(g.text) !== g.text.trim() && (
               <span className="text-xs text-foreground/60">
-                3D titles support Latin characters and symbols. Use Text for
-                other scripts.
+                {ui(
+                  "3D titles support Latin characters and symbols. Use Text for other scripts."
+                )}
               </span>
             )}
         </label>
@@ -157,7 +162,7 @@ export function GraphicComposer({
         ].includes(g.kind) && (
           <>
             <CompactSelect
-              aria-label="Graphic composition"
+              aria-label={ui("Graphic composition")}
               value={g.composition ?? "plain"}
               onValueChange={value => patch("composition", value)}
               options={[
@@ -170,20 +175,20 @@ export function GraphicComposer({
               ]}
             />
             <label className="block text-sm">
-              Supporting text
+              {ui("Supporting text")}
               <input
                 className={field}
                 maxLength={120}
                 value={g.secondaryText ?? ""}
-                placeholder="Role, attribution, or a short explanation…"
+                placeholder={ui("Role, attribution, or a short explanation…")}
                 onChange={e => patch("secondaryText", e.target.value)}
               />
             </label>
             <label className="block text-sm">
-              Accent color
+              {ui("Accent color")}
               <input
                 type="color"
-                aria-label="Graphic accent color"
+                aria-label={ui("Graphic accent color")}
                 value={g.accent ?? g.color}
                 onChange={e => patch("accent", e.target.value)}
               />
@@ -280,9 +285,9 @@ export function GraphicComposer({
       )}
       <div className="grid grid-cols-2 gap-2">
         <label className="text-sm">
-          Color
+          {ui("Color")}
           <input
-            aria-label="Graphic color"
+            aria-label={ui("Graphic color")}
             type="color"
             className="block h-9 w-full"
             value={g.color}
@@ -290,9 +295,9 @@ export function GraphicComposer({
           />
         </label>
         <label className="text-sm">
-          Card color
+          {ui("Card color")}
           <input
-            aria-label="Graphic card color"
+            aria-label={ui("Graphic card color")}
             type="color"
             className="block h-9 w-full"
             value={g.background}
@@ -304,7 +309,12 @@ export function GraphicComposer({
         [
           ["x", "Horizontal position", 10, 90],
           ["y", "Vertical position", 10, 90],
-          ["size", isSpatialGraphic(g) ? "Object size" : "Text size", 2, 16],
+          [
+            "size",
+            isSpatialGraphic(g) ? ui("Object size") : ui("Text size"),
+            2,
+            16,
+          ],
           ["rotation", "Rotation", -360, 360],
         ] as const
       ).map(([key, label, min, max]) => (
@@ -324,7 +334,9 @@ export function GraphicComposer({
       ))}
       {isSpatialGraphic(g) && g.spatial && (
         <fieldset className="space-y-2 rounded-xl border border-border p-3">
-          <legend className="px-1 text-sm font-medium">3D appearance</legend>
+          <legend className="px-1 text-sm font-medium">
+            {ui("3D appearance")}
+          </legend>
           {(
             [
               ["pitch", "Tilt", -70, 70, 1],
@@ -332,7 +344,9 @@ export function GraphicComposer({
               ["depth", "Extrusion", 0.02, 0.65, 0.01],
               [
                 "turns",
-                g.kind === "spatial-title" ? "Rocking cycles" : "Revolutions",
+                g.kind === "spatial-title"
+                  ? ui("Rocking cycles")
+                  : ui("Revolutions"),
                 -3,
                 3,
                 0.1,
@@ -367,10 +381,10 @@ export function GraphicComposer({
         </fieldset>
       )}
       <label className="block text-sm" htmlFor={`${controlId}-animation`}>
-        Entrance and exit
+        {ui("Entrance and exit")}
         <CompactSelect
           id={`${controlId}-animation`}
-          aria-label="Graphic animation"
+          aria-label={ui("Graphic animation")}
           value={g.animation}
           onValueChange={value => patch("animation", value)}
           options={["none", "fade", "pop", "slide"].map(value => ({
@@ -388,9 +402,9 @@ export function GraphicComposer({
       />
       {!initial && (
         <label className="block text-sm">
-          Duration · {seconds.toFixed(1)}s
+          {ui("Duration ·")} {seconds.toFixed(1)}s
           <input
-            aria-label="Graphic duration"
+            aria-label={ui("Graphic duration")}
             type="range"
             min={0.5}
             max={30}
@@ -411,7 +425,11 @@ export function GraphicComposer({
         disabled={busy || saving}
         className="w-full rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-40"
       >
-        {saving ? "Saving…" : initial ? "Save graphic" : "Add at playhead"}
+        {saving
+          ? ui("Saving…")
+          : initial
+            ? ui("Save graphic")
+            : ui("Add at playhead")}
       </button>
     </form>
   );
