@@ -32,6 +32,12 @@ export function VisualControls({
   onSeek: (time: number) => void;
 }) {
   const ui = useUiText();
+  const blendLabels = { normal: ui("Normal"), multiply: ui("Multiply"), screen: ui("Screen"), overlay: ui("Overlay"), darken: ui("Darken"), lighten: ui("Lighten"), difference: ui("Difference") };
+  const transitionLabels = {
+    none: ui("None"), dissolve: ui("Dissolve"), "wipe-left": ui("Wipe from left"), "wipe-right": ui("Wipe from right"),
+    "wipe-up": ui("Wipe from top"), "wipe-down": ui("Wipe from bottom"), "slide-left": ui("Slide from left"),
+    "slide-right": ui("Slide from right"), zoom: ui("Zoom reveal"),
+  };
   const v = normalizeVisual(clip.visual),
     p = visualProgress(clip, time),
     clock = visualClock(clip);
@@ -94,11 +100,11 @@ export function VisualControls({
       </div>
       {(
         [
-          ["x", "Horizontal position", -100, 100, 1, "%"],
-          ["y", "Vertical position", -100, 100, 1, "%"],
-          ["scale", "Scale", 0.1, 4, 0.01, "×"],
-          ["rotation", "Rotation", -360, 360, 1, "°"],
-          ["opacity", "Opacity", 0, 1, 0.01, ""],
+          ["x", ui("Horizontal position"), -100, 100, 1, "%"],
+          ["y", ui("Vertical position"), -100, 100, 1, "%"],
+          ["scale", ui("Scale"), 0.1, 4, 0.01, "×"],
+          ["rotation", ui("Rotation"), -360, 360, 1, "°"],
+          ["opacity", ui("Opacity"), 0, 1, 0.01, ""],
         ] as const
       ).map(([key, label, min, max, step, unit]) => (
         <label
@@ -109,7 +115,7 @@ export function VisualControls({
           <span className="flex items-center gap-1">
             <input
               className={field}
-              aria-label={`${label} value`}
+              aria-label={ui("{{label}} value", { label })}
               disabled={keyframeLimit}
               type="number"
               min={min}
@@ -143,8 +149,8 @@ export function VisualControls({
       <div className="flex gap-2">
         {(
           [
-            ["flipX", "Flip horizontally", FlipHorizontal2],
-            ["flipY", "Flip vertically", FlipVertical2],
+            ["flipX", ui("Flip horizontally"), FlipHorizontal2],
+            ["flipY", ui("Flip vertically"), FlipVertical2],
           ] as const
         ).map(([key, label, Icon]) => (
           <button
@@ -175,7 +181,7 @@ export function VisualControls({
           "difference",
         ].map(value => ({
           value,
-          label: value[0].toUpperCase() + value.slice(1),
+          label: blendLabels[value as ClipVisual["blendMode"]],
         }))}
       />
       <section className="space-y-3 rounded-xl border border-border p-3">
@@ -241,11 +247,11 @@ export function VisualControls({
                   })
                 }
                 options={[
-                  { value: "linear", label: "Linear" },
-                  { value: "ease-in-out", label: "Smooth in and out" },
-                  { value: "ease-in", label: "Accelerate" },
-                  { value: "ease-out", label: "Decelerate" },
-                  { value: "hold", label: "Hold until next keyframe" },
+                  { value: "linear", label: ui("Linear") },
+                  { value: "ease-in-out", label: ui("Smooth in and out") },
+                  { value: "ease-in", label: ui("Accelerate") },
+                  { value: "ease-out", label: ui("Decelerate") },
+                  { value: "hold", label: ui("Hold until next keyframe") },
                 ]}
               />
             )}
@@ -292,9 +298,9 @@ export function VisualControls({
                 key={edge}
                 className="flex items-center justify-between gap-2 text-sm capitalize"
               >
-                {edge}
+                {edge === "top" ? ui("Top") : edge === "right" ? ui("Right") : edge === "bottom" ? ui("Bottom") : ui("Left")}
                 <input
-                  aria-label={`Crop ${edge}`}
+                  aria-label={ui(edge === "top" ? "Crop top" : edge === "right" ? "Crop right" : edge === "bottom" ? "Crop bottom" : "Crop left")}
                   className={field}
                   type="number"
                   min={0}
@@ -314,10 +320,10 @@ export function VisualControls({
             value={v.mask}
             onValueChange={mask => update({ mask: mask as ClipVisual["mask"] })}
             options={[
-              { value: "none", label: "No mask" },
-              { value: "ellipse", label: "Ellipse" },
-              { value: "rounded", label: "Rounded frame" },
-              { value: "polygon", label: "Editable polygon" },
+              { value: "none", label: ui("No mask") },
+              { value: "ellipse", label: ui("Ellipse") },
+              { value: "rounded", label: ui("Rounded frame") },
+              { value: "polygon", label: ui("Editable polygon") },
             ]}
           />
           {v.mask === "polygon" ? (
@@ -344,7 +350,7 @@ export function VisualControls({
                         max={100}
                         step={1}
                         value={point[axis]}
-                        aria-label={`Mask point ${index + 1} ${axis}`}
+                        aria-label={ui("Mask point {{number}} {{axis}}", { number: index + 1, axis })}
                         className="ml-1 w-16 rounded border border-border bg-background p-1"
                         onChange={e =>
                           update({
@@ -361,7 +367,7 @@ export function VisualControls({
                   <button
                     type="button"
                     disabled={v.polygon.length <= 3}
-                    aria-label={`Remove mask point ${index + 1}`}
+                    aria-label={ui("Remove mask point {{number}}", { number: index + 1 })}
                     onClick={() =>
                       update({
                         polygon: v.polygon.filter((_, i) => i !== index),
@@ -437,13 +443,13 @@ export function VisualControls({
         </p>
         {(["entrance", "exit"] as const).map(key => (
           <div key={key} className="space-y-2">
-            <label className="text-sm capitalize">{key}</label>
+            <label className="text-sm capitalize">{key === "entrance" ? ui("Entrance") : ui("Exit")}</label>
             <div className="flex items-center gap-2">
               <CompactSelect
-                aria-label={`${key} transition`}
+                aria-label={ui(key === "entrance" ? "Entrance transition" : "Exit transition")}
                 className="flex-1"
                 value={v[key].kind}
-                options={visualTransitions}
+                options={visualTransitions.map(option => ({ ...option, label: transitionLabels[option.value] }))}
                 onValueChange={kind =>
                   update({
                     [key]: {
@@ -457,7 +463,7 @@ export function VisualControls({
               {v[key].kind !== "none" && (
                 <label className="flex items-center gap-1 text-sm">
                   <input
-                    aria-label={`${key} duration`}
+                    aria-label={ui(key === "entrance" ? "Entrance duration" : "Exit duration")}
                     className={field}
                     type="number"
                     min={0.05}

@@ -1,7 +1,6 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useEffect, useId, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import { ArrowUpRight, BookOpen, Keyboard, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,11 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import {
-  getPageGuide,
-  type GuideLanguage,
-  type PageGuide,
-} from "@/lib/page-guides";
+import { getPageGuide, type PageGuide } from "@/lib/page-guides";
 
 interface PageGuideButtonProps {
   className?: string;
@@ -56,27 +51,21 @@ function PageGuideDialog({
   compact = false,
 }: PageGuideButtonProps & { guide: PageGuide }) {
   const ui = useUiText();
-  const { i18n } = useTranslation();
-  const language: GuideLanguage = (
-    i18n.resolvedLanguage || i18n.language
-  ).startsWith("it")
-    ? "it"
-    : "en";
+  const locale = getUiLocale();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const searchId = useId();
-  const isItalian = language === "it";
   const guideLabel = ui("Guide");
-  const title = guide.title[language];
-  const normalizedQuery = query.trim().toLocaleLowerCase(language);
+  const title = ui(guide.title.en);
+  const normalizedQuery = query.trim().toLocaleLowerCase(locale);
   const visibleSections = guide.sections.filter(item =>
-    `${item.title[language]} ${item.body[language]}`
-      .toLocaleLowerCase(language)
+    `${ui(item.title.en)} ${ui(item.body.en)}`
+      .toLocaleLowerCase(locale)
       .includes(normalizedQuery)
   );
   const visibleShortcuts = (guide.shortcuts ?? []).filter(item =>
-    `${item.keys} ${item.action[language]}`
-      .toLocaleLowerCase(language)
+    `${item.keys} ${ui(item.action.en)}`
+      .toLocaleLowerCase(locale)
       .includes(normalizedQuery)
   );
   const hasResults = visibleSections.length > 0 || visibleShortcuts.length > 0;
@@ -126,9 +115,9 @@ function PageGuideDialog({
           type="button"
           variant="outline"
           size="sm"
-          aria-label={isItalian ? `Guida: ${title}` : `Guide: ${title}`}
+          aria-label={ui("Guide: {{title}}", { title })}
           aria-keyshortcuts="?"
-          title={`${guideLabel}: ${title} (?)`}
+          title={ui("Guide: {{title}} (?)", { title })}
           className={cn(
             "h-9 gap-1.5 border-border bg-background/80 text-foreground/75 hover:text-foreground",
             className
@@ -150,7 +139,7 @@ function PageGuideDialog({
             {title}
           </DialogTitle>
           <DialogDescription className="pr-5 leading-relaxed">
-            {guide.description[language]}
+            {ui(guide.description.en)}
           </DialogDescription>
           {guide.sections.length > 4 || guide.shortcuts ? (
             <div className="relative mt-2">
@@ -186,10 +175,10 @@ function PageGuideDialog({
                   </span>
                   <div className="min-w-0">
                     <h3 className="text-sm font-semibold leading-6">
-                      {item.title[language]}
+                      {ui(item.title.en)}
                     </h3>
                     <p className="mt-1 text-sm leading-relaxed text-foreground/70">
-                      {item.body[language]}
+                      {ui(item.body.en)}
                     </p>
                   </div>
                 </li>
@@ -223,7 +212,7 @@ function PageGuideDialog({
                     className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-xs"
                   >
                     <dt className="text-foreground/75">
-                      {shortcut.action[language]}
+                      {ui(shortcut.action.en)}
                     </dt>
                     <dd>
                       <kbd className="inline-block rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] text-foreground">

@@ -446,7 +446,7 @@ export function EditorCreationDock({
               {graphicPreset && (
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <span className="truncate font-medium">
-                    {graphicPreset.preset.name}
+                    {ui(graphicPreset.preset.name)}
                   </span>
                   <button
                     type="button"
@@ -498,7 +498,7 @@ export function EditorCreationDock({
             >
               {kind === "voice"
                 ? ui("Voiceover script")
-                : `Describe your ${kind}`}
+                : ui("Describe your {{kind}}", { kind: kind === "image" ? ui("image") : ui("video") })}
             </label>
             <textarea
               id={`generation-prompt-${project.id}`}
@@ -558,7 +558,7 @@ export function EditorCreationDock({
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {ui("Generate")} {count > 1 ? `${count} files · ` : "· "}
+              {ui("Generate")} {count > 1 ? ui("{{count}} files · ", { count }) : "· "}
               {unitCost * count} {ui("credits")}
             </button>
             {!available && (

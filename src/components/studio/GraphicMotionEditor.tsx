@@ -126,17 +126,17 @@ export function GraphicMotionEditor({
           <div className="grid grid-cols-2 gap-2">
             {(
               [
-                ["x", "Horizontal %", 0, 100, 1],
-                ["y", "Vertical %", 0, 100, 1],
-                ["scale", "Scale", 0.1, 4, 0.1],
-                ["rotation", "Rotation °", -720, 720, 1],
-                ["opacity", "Opacity", 0, 1, 0.05],
+                ["x", ui("Horizontal %"), 0, 100, 1],
+                ["y", ui("Vertical %"), 0, 100, 1],
+                ["scale", ui("Scale"), 0.1, 4, 0.1],
+                ["rotation", ui("Rotation °"), -720, 720, 1],
+                ["opacity", ui("Opacity"), 0, 1, 0.05],
               ] as const
             ).map(([key, label, min, max, step]) => (
               <label key={key} className="text-xs">
                 {label}
                 <input
-                  aria-label={`Keyframe ${label}`}
+                  aria-label={ui("Keyframe {{label}}", { label })}
                   type="number"
                   min={min}
                   max={max}
@@ -173,11 +173,11 @@ export function GraphicMotionEditor({
                     )
                   }
                   options={[
-                    { value: "linear", label: "Steady speed" },
-                    { value: "ease-in", label: "Start slowly" },
-                    { value: "ease-out", label: "Land softly" },
-                    { value: "ease-in-out", label: "Smooth start and finish" },
-                    { value: "hold", label: "Hold, then jump" },
+                    { value: "linear", label: ui("Steady speed") },
+                    { value: "ease-in", label: ui("Start slowly") },
+                    { value: "ease-out", label: ui("Land softly") },
+                    { value: "ease-in-out", label: ui("Smooth start and finish") },
+                    { value: "hold", label: ui("Hold, then jump") },
                   ]}
                 />
               </div>

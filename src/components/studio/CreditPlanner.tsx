@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import {
   AI_CREDIT_COSTS,
@@ -61,7 +61,7 @@ export function CreditPlanner() {
         </div>
         <div className="text-right">
           <p className="text-3xl font-semibold tabular-nums text-primary">
-            {total.toLocaleString()}{" "}
+            {total.toLocaleString(getUiLocale())}{" "}
             <span className="text-sm">{ui("credits")}</span>
           </p>
           <p className="mt-1 text-sm">
@@ -95,7 +95,8 @@ export function CreditPlanner() {
               className="mt-2 w-full rounded-lg border border-border bg-background p-3 font-medium"
             />
             <span className="mt-2 block text-xs text-foreground/65">
-              {((counts[a.key] || 0) * a.cost).toLocaleString()} {ui("credits")}
+              {((counts[a.key] || 0) * a.cost).toLocaleString(getUiLocale())}{" "}
+              {ui("credits")}
             </span>
           </label>
         ))}
@@ -113,10 +114,14 @@ export function CreditPlanner() {
                 <span>
                   {total <= allowance
                     ? ui("{{credits}} left", {
-                        credits: (allowance - total).toLocaleString(),
+                        credits: (allowance - total).toLocaleString(
+                          getUiLocale()
+                        ),
                       })
                     : ui("{{credits}} extra", {
-                        credits: (total - allowance).toLocaleString(),
+                        credits: (total - allowance).toLocaleString(
+                          getUiLocale()
+                        ),
                       })}
                 </span>
               </div>

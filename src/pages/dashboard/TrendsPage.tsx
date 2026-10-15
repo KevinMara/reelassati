@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import {
   useEffect,
@@ -127,21 +127,27 @@ function createId() {
 
 function compactNumber(value: number | null): string | null {
   if (value === null) return null;
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat(getUiLocale(), {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
 }
 
-function relativeTime(value: string | null): string {
-  if (!value) return "Date unavailable";
+function relativeTime(
+  value: string | null,
+  ui: ReturnType<typeof useUiText>
+): string {
+  if (!value) return ui("Date unavailable");
   const difference = Date.now() - Date.parse(value);
-  if (!Number.isFinite(difference)) return "Date unavailable";
+  if (!Number.isFinite(difference)) return ui("Date unavailable");
   const days = Math.max(0, Math.floor(difference / 86_400_000));
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 30) return `${days} days ago`;
-  return new Date(value).toLocaleDateString();
+  if (days === 0) return ui("Today");
+  if (days === 1) return ui("Yesterday");
+  if (days < 30)
+    return new Intl.RelativeTimeFormat(getUiLocale(), {
+      numeric: "auto",
+    }).format(-days, "day");
+  return new Date(value).toLocaleDateString(getUiLocale());
 }
 
 function platformLabel(platform: TrendPlatform): string {
@@ -213,7 +219,10 @@ function TrendVideo({ trend }: { trend: TrendEvidenceItem }) {
       <div className="aspect-[9/12] overflow-hidden bg-black">
         <iframe
           src={embedUrl}
-          title={`${trend.title} on ${platformLabel(trend.platform)}`}
+          title={ui("{{title}} on {{platform}}", {
+            title: trend.title,
+            platform: platformLabel(trend.platform),
+          })}
           loading="lazy"
           allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
@@ -376,7 +385,7 @@ export default function TrendsPage() {
         hook: script.hook,
         evidence: `Workspace script created ${new Date(
           script.createdAt
-        ).toLocaleDateString()}.`,
+        ).toLocaleDateString(getUiLocale())}.`,
       }));
     const projects = workspace.projects.map(project => ({
       id: `project-${project.id}`,
@@ -723,7 +732,9 @@ export default function TrendsPage() {
               )}
               {researching
                 ? ui("Researching sources…")
-                : `Research with ${researchCreditCost} credits`}
+                : ui("Research with {{credits}} credits", {
+                    credits: researchCreditCost,
+                  })}
             </button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/35 px-5 py-3 text-xs text-foreground/70">
@@ -744,7 +755,7 @@ export default function TrendsPage() {
           role="alert"
           className="mb-5 rounded-xl border border-red-500/20 bg-red-500/[0.08] px-4 py-3 text-sm text-red-400"
         >
-          {researchError}
+          {ui(researchError)}
         </div>
       ) : null}
 
@@ -753,7 +764,7 @@ export default function TrendsPage() {
           role="alert"
           className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-4 py-3 text-sm text-amber-500"
         >
-          <span>{weeklyError}</span>
+          <span>{ui(weeklyError)}</span>
           <button
             type="button"
             onClick={() => void loadWeeklyFeed()}
@@ -817,7 +828,9 @@ export default function TrendsPage() {
             </div>
             <h2 id="trend-evidence-heading" className="mt-1 font-medium">
               {activeFeed?.kind === "custom"
-                ? `Research for “${activeFeed.scope.query}”`
+                ? ui("Research for “{{query}}”", {
+                    query: activeFeed.scope.query,
+                  })
                 : activeFeed?.status === "stale"
                   ? ui("Latest verified brand shorts")
                   : ui("This week’s hyperviral brand shorts")}
@@ -826,10 +839,18 @@ export default function TrendsPage() {
             activeFeed?.status === "stale" ? (
               <p className="mt-1 text-xs text-foreground/70">
                 {ui("Updated")}{" "}
-                {new Date(activeFeed.generatedAt).toLocaleString()} ·{" "}
+                {new Date(activeFeed.generatedAt).toLocaleString(getUiLocale())}{" "}
+                ·{" "}
                 {activeFeed.status === "stale"
                   ? ui("A new edition is awaiting verification.")
-                  : activeFeed.cacheNote}
+                  : activeFeed.kind === "custom"
+                    ? ui(
+                        "{{credits}} credits used for this completed custom research.",
+                        { credits: activeFeed.creditCost }
+                      )
+                    : ui(
+                        "Curated automatically from hyperviral organic TikToks and Reels."
+                      )}
               </p>
             ) : activeFeed?.status === "preparing" ? (
               <p className="mt-1 text-xs text-foreground/70">
@@ -871,7 +892,7 @@ export default function TrendsPage() {
               <option value="all">{ui("All lifecycle stages")}</option>
               {Object.entries(LIFECYCLE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
-                  {label}
+                  {ui(label)}
                 </option>
               ))}
             </StudioSelect>
@@ -940,7 +961,7 @@ export default function TrendsPage() {
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-foreground/70">
                     <span className="inline-flex items-center gap-1">
                       <Clock3 className="h-3 w-3" />{" "}
-                      {relativeTime(trend.publishedAt)}
+                      {relativeTime(trend.publishedAt, ui)}
                     </span>
                     <Metric
                       icon={<Eye className="h-3 w-3" />}
@@ -1056,17 +1077,21 @@ export default function TrendsPage() {
 
       <div className="mb-6 grid gap-3 sm:grid-cols-4">
         {[
-          ["01", "Observe", "Use the exact source and measurable signal."],
-          ["02", "Isolate", "Change one creative variable at a time."],
-          ["03", "Define", "Choose what would count as a real win."],
-          ["04", "Produce", "Build controlled variants in the Studio."],
+          [
+            "01",
+            ui("Observe"),
+            ui("Use the exact source and measurable signal."),
+          ],
+          ["02", ui("Isolate"), ui("Change one creative variable at a time.")],
+          ["03", ui("Define"), ui("Choose what would count as a real win.")],
+          ["04", ui("Produce"), ui("Build controlled variants in the Studio.")],
         ].map(([step, label, detail]) => (
           <div
             key={step}
             className="rounded-xl border border-border bg-surface p-4"
           >
             <p className="font-mono text-xs text-primary">{step}</p>
-            <p className="mt-2 text-sm font-medium">{label}</p>
+            <p className="mt-2 text-sm font-medium">{ui(label)}</p>
             <p className="mt-1 text-xs leading-relaxed text-foreground/70">
               {detail}
             </p>
@@ -1079,7 +1104,7 @@ export default function TrendsPage() {
           role="status"
           className="mb-5 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary"
         >
-          <CheckCircle2 className="h-4 w-4" /> {notice}
+          <CheckCircle2 className="h-4 w-4" /> {ui(notice)}
         </div>
       ) : null}
 
@@ -1237,7 +1262,9 @@ export default function TrendsPage() {
                       onClick={() => void deleteHypothesis(hypothesis)}
                       disabled={saving}
                       className="rounded-md p-2 text-foreground/70 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
-                      aria-label={`Delete ${hypothesis.title}`}
+                      aria-label={ui("Delete {{name}}", {
+                        name: hypothesis.title,
+                      })}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -1313,7 +1340,7 @@ export default function TrendsPage() {
                   className="group w-full rounded-xl border border-border bg-surface p-4 text-left hover:border-primary/35"
                 >
                   <span className="text-xs uppercase tracking-wide text-foreground/70">
-                    {source.type}
+                    {ui(source.type)}
                   </span>
                   <span className="mt-1 block text-sm font-medium">
                     {source.title}

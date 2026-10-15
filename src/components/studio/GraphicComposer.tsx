@@ -29,6 +29,12 @@ export function GraphicComposer({
   duration?: number;
 }) {
   const ui = useUiText();
+  const graphicKindLabels = {
+    text: ui("Text"), callout: ui("Callout"), counter: ui("Counter"), countdown: ui("Countdown"),
+    arrow: ui("Arrow"), highlight: ui("Highlight"), rectangle: ui("Rectangle"), ellipse: ui("Ellipse"),
+    star: ui("Star"), line: ui("Line"), "spatial-title": ui("3D title"), "spatial-cube": ui("3D cube"), "spatial-orbit": ui("3D orbit"),
+  };
+  const animationLabels = { none: ui("None"), fade: ui("Fade"), pop: ui("Pop"), slide: ui("Slide") };
   const controlId = useId();
   const [g, setG] = useState<MotionGraphic>(() =>
     normalizeGraphic(initial ?? draft ?? { kind: "text", text: "" })!
@@ -125,9 +131,7 @@ export function GraphicComposer({
           onValueChange={value => patch("kind", value)}
           options={GRAPHIC_KINDS.map(k => ({
             value: k,
-            label: k.startsWith("spatial-")
-              ? `3D ${k.slice(8)}`
-              : k[0].toUpperCase() + k.slice(1),
+            label: graphicKindLabels[k],
           }))}
         />
       </label>
@@ -166,12 +170,12 @@ export function GraphicComposer({
               value={g.composition ?? "plain"}
               onValueChange={value => patch("composition", value)}
               options={[
-                { value: "plain", label: "Plain title / label" },
-                { value: "lower-third", label: "Name + role with accent bar" },
-                { value: "chapter", label: "Chapter with top rule" },
-                { value: "quote", label: "Quote + attribution" },
-                { value: "statistic", label: "Statistic + explanation" },
-                { value: "progress", label: "Timed progress indicator" },
+                { value: "plain", label: ui("Plain title / label") },
+                { value: "lower-third", label: ui("Name + role with accent bar") },
+                { value: "chapter", label: ui("Chapter with top rule") },
+                { value: "quote", label: ui("Quote + attribution") },
+                { value: "statistic", label: ui("Statistic + explanation") },
+                { value: "progress", label: ui("Timed progress indicator") },
               ]}
             />
             <label className="block text-sm">
@@ -200,9 +204,9 @@ export function GraphicComposer({
         <div className="grid grid-cols-2 gap-2">
           {(
             [
-              ["width", "Shape width %", 1, 90, 30],
-              ["height", "Shape height % of width", 0.2, 60, 12],
-              ["strokeWidth", "Stroke width %", 0, 4, 0],
+              ["width", ui("Shape width %"), 1, 90, 30],
+              ["height", ui("Shape height % of width"), 0.2, 60, 12],
+              ["strokeWidth", ui("Stroke width %"), 0, 4, 0],
             ] as const
           )
             .filter(
@@ -229,8 +233,8 @@ export function GraphicComposer({
         <div className="grid grid-cols-2 gap-2">
           {(
             [
-              ["padding", "Card padding", 1.5],
-              ["cornerRadius", "Corner radius", 0],
+              ["padding", ui("Card padding"), 1.5],
+              ["cornerRadius", ui("Corner radius"), 0],
             ] as const
           )
             .filter(([key]) => key !== "padding" || g.kind === "callout")
@@ -254,9 +258,9 @@ export function GraphicComposer({
         <div className="grid grid-cols-2 gap-2">
           {(["from", "to"] as const).map(k => (
             <label key={k} className="text-sm">
-              {k}
+              {k === "from" ? ui("From") : ui("To")}
               <input
-                aria-label={`Counter ${k}`}
+                aria-label={ui(k === "from" ? "Counter from" : "Counter to")}
                 type="number"
                 min={-1e9}
                 max={1e9}
@@ -272,7 +276,7 @@ export function GraphicComposer({
         <div className="grid grid-cols-2 gap-2">
           {(["prefix", "suffix"] as const).map(k => (
             <label key={k} className="text-sm">
-              {k}
+              {k === "prefix" ? ui("Prefix") : ui("Suffix")}
               <input
                 maxLength={12}
                 className={field}
@@ -307,15 +311,15 @@ export function GraphicComposer({
       </div>
       {(
         [
-          ["x", "Horizontal position", 10, 90],
-          ["y", "Vertical position", 10, 90],
+          ["x", ui("Horizontal position"), 10, 90],
+          ["y", ui("Vertical position"), 10, 90],
           [
             "size",
             isSpatialGraphic(g) ? ui("Object size") : ui("Text size"),
             2,
             16,
           ],
-          ["rotation", "Rotation", -360, 360],
+          ["rotation", ui("Rotation"), -360, 360],
         ] as const
       ).map(([key, label, min, max]) => (
         <label key={key} className="block text-sm">
@@ -339,9 +343,9 @@ export function GraphicComposer({
           </legend>
           {(
             [
-              ["pitch", "Tilt", -70, 70, 1],
-              ["yaw", "Turn", -70, 70, 1],
-              ["depth", "Extrusion", 0.02, 0.65, 0.01],
+              ["pitch", ui("Tilt"), -70, 70, 1],
+              ["yaw", ui("Turn"), -70, 70, 1],
+              ["depth", ui("Extrusion"), 0.02, 0.65, 0.01],
               [
                 "turns",
                 g.kind === "spatial-title"
@@ -351,7 +355,7 @@ export function GraphicComposer({
                 3,
                 0.1,
               ],
-              ["perspective", "Camera distance", 3, 12, 0.1],
+              ["perspective", ui("Camera distance"), 3, 12, 0.1],
             ] as const
           ).map(([key, label, min, max, step]) => (
             <label key={key} className="block text-xs text-foreground/80">
@@ -360,7 +364,7 @@ export function GraphicComposer({
                 <span className="tabular-nums">{g.spatial![key]}</span>
               </span>
               <input
-                aria-label={`3D ${label}`}
+                aria-label={ui("3D {{label}}", { label })}
                 className="block w-full accent-primary"
                 type="range"
                 min={min}
@@ -389,7 +393,7 @@ export function GraphicComposer({
           onValueChange={value => patch("animation", value)}
           options={["none", "fade", "pop", "slide"].map(value => ({
             value,
-            label: value[0].toUpperCase() + value.slice(1),
+            label: animationLabels[value as "none" | "fade" | "pop" | "slide"],
           }))}
         />
       </label>

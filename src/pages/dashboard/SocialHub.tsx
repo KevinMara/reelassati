@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -220,7 +220,7 @@ export default function SocialHub() {
         <div className="rounded-xl border border-border bg-surface p-5">
           <p className="text-sm font-medium">
             {lastSyncedAt
-              ? new Date(lastSyncedAt).toLocaleTimeString([], {
+              ? new Date(lastSyncedAt).toLocaleTimeString(getUiLocale(), {
                   hour: "2-digit",
                   minute: "2-digit",
                 })

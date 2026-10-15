@@ -291,14 +291,14 @@ export function RhythmTools({
             <p className="text-sm" role="status">
               {stale
                 ? ui("Timeline changed. Measure again.")
-                : `${times.length} measured cut points in this source's timeline interval.`}
+                : ui("{{count}} measured cut points in this source's timeline interval.", { count: times.length })}
             </p>
             <div className="flex max-h-32 flex-wrap gap-1 overflow-auto">
               {times.slice(0, 96).map(t => (
                 <button
                   key={t}
                   type="button"
-                  aria-label={`Preview beat at ${t.toFixed(2)} seconds`}
+                  aria-label={ui("Preview beat at {{time}} seconds", { time: t.toFixed(2) })}
                   onClick={() => onSeek(t)}
                   className="rounded border border-border px-2 py-1 text-xs tabular-nums"
                 >

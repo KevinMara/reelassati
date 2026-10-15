@@ -1,9 +1,40 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
 import { platformApi } from "@/lib/platform-api";
 import type { OperationsStatus } from "@contracts/operations";
 export function OwnerOperations() {
   const ui = useUiText();
+  const locale = getUiLocale();
+  const readinessLabels: Record<string, string> = {
+    "Server API key with the required restricted permissions": ui(
+      "Server API key with the required restricted permissions"
+    ),
+    "Signed billing webhook": ui("Signed billing webhook"),
+    "Six subscription prices and three credit packs": ui(
+      "Six subscription prices and three credit packs"
+    ),
+    "Customer portal for invoices, plan changes and cancellation": ui(
+      "Customer portal for invoices, plan changes and cancellation"
+    ),
+    "Correct Stripe account with payment acceptance enabled": ui(
+      "Correct Stripe account with payment acceptance enabled"
+    ),
+    "Stripe Managed Payments handles indirect tax compliance": ui(
+      "Stripe Managed Payments handles indirect tax compliance"
+    ),
+    "Tax collection explicitly disabled by the operator": ui(
+      "Tax collection explicitly disabled by the operator"
+    ),
+    "Active tax settings and a recorded tax registration": ui(
+      "Active tax settings and a recorded tax registration"
+    ),
+    "Stripe amounts, currencies and billing intervals match the website": ui(
+      "Stripe amounts, currencies and billing intervals match the website"
+    ),
+    "Active portal with invoices and cancellation": ui(
+      "Active portal with invoices and cancellation"
+    ),
+  };
   const [data, setData] = useState<OperationsStatus | null>(null),
     [error, setError] = useState("");
   useEffect(() => {
@@ -46,7 +77,9 @@ export function OwnerOperations() {
               <ul className="mt-3 space-y-2 text-sm">
                 {data.billingReadiness.checks.map(check => (
                   <li key={check.id} className="flex justify-between gap-4">
-                    <span>{check.message}</span>
+                    <span>
+                      {readinessLabels[check.message] ?? check.message}
+                    </span>
                     <span
                       className={
                         check.ready ? "text-emerald-500" : "text-amber-500"
@@ -69,10 +102,10 @@ export function OwnerOperations() {
           ) : null}
           <div className="mt-5 grid gap-3 sm:grid-cols-4">
             {[
-              ["Payment issues", data.counts.failedPayments],
-              ["AI failures · 7 days", data.counts.failedGenerations],
-              ["Jobs over 30 minutes", data.counts.stalledGenerations],
-              ["Open support", data.counts.openSupport],
+              [ui("Payment issues"), data.counts.failedPayments],
+              [ui("AI failures · 7 days"), data.counts.failedGenerations],
+              [ui("Jobs over 30 minutes"), data.counts.stalledGenerations],
+              [ui("Open support"), data.counts.openSupport],
             ].map(([label, n]) => (
               <div key={label} className="rounded-lg border border-border p-3">
                 <p className="text-xs text-foreground/70">{label}</p>
@@ -81,14 +114,18 @@ export function OwnerOperations() {
             ))}
           </div>
           <p className="mt-4 text-sm">
-            {ui("Library:")} {data.counts.assets.toLocaleString()}{" "}
+            {ui("Library:")} {data.counts.assets.toLocaleString(locale)}{" "}
             {ui("assets ·")} {(data.counts.storageBytes / 1024 ** 3).toFixed(2)}{" "}
             {ui("GB stored")}
           </p>
           <p className="mt-2 text-sm">
             {ui("Weekly trends:")}{" "}
             {data.trends.generatedAt
-              ? `updated ${new Date(data.trends.generatedAt).toLocaleString()}`
+              ? ui("updated {{date}}", {
+                  date: new Date(data.trends.generatedAt).toLocaleString(
+                    locale
+                  ),
+                })
               : ui("Awaiting first successful update")}
             {data.trends.lastError
               ? ui(" · Latest refresh failed; previous feed preserved.")
@@ -110,7 +147,7 @@ export function OwnerOperations() {
             {ui(
               "Configuration checks do not verify provider balances or live payments. Updated"
             )}{" "}
-            {new Date(data.checkedAt).toLocaleTimeString()}.
+            {new Date(data.checkedAt).toLocaleTimeString(locale)}.
           </p>
         </>
       )}

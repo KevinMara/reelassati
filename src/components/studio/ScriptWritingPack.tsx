@@ -93,7 +93,7 @@ export function ScriptCtaOptions({
             </p>
             <button
               type="button"
-              aria-label={`Use call to action ${index + 1}`}
+              aria-label={ui("Use call to action {{number}}", { number: index + 1 })}
               aria-pressed={selected}
               disabled={disabled || selected}
               onClick={() => onUseCta(cta)}
@@ -188,7 +188,7 @@ export function ScriptWritingPack({
                   <div className="flex items-start gap-3">
                     <span
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-medium text-primary"
-                      aria-label={`Rank ${hook.rank}`}
+                      aria-label={ui("Rank {{number}}", { number: hook.rank })}
                     >
                       {hook.rank}
                     </span>
@@ -215,7 +215,7 @@ export function ScriptWritingPack({
                   </details>
                   <button
                     type="button"
-                    aria-label={`Use hook ${hook.rank}`}
+                    aria-label={ui("Use hook {{number}}", { number: hook.rank })}
                     aria-pressed={selected}
                     disabled={disabled || selected}
                     onClick={() => onUseHook(hook.spoken)}

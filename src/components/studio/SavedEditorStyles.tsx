@@ -231,7 +231,7 @@ export function SavedEditorStyles({
                     disabled={blocked || !canApply}
                     title={
                       canApply
-                        ? `Apply ${style.name}`
+                        ? ui("Apply {{name}}", { name: style.name })
                         : ui(
                             "Select an unlocked video or image to apply this look."
                           )
@@ -250,7 +250,7 @@ export function SavedEditorStyles({
                   <button
                     type="button"
                     disabled={blocked}
-                    aria-label={`Delete saved style ${style.name}`}
+                    aria-label={ui("Delete saved style {{name}}", { name: style.name })}
                     onClick={() =>
                       void run(`delete:${style.id}`, () => onDelete(style.id))
                     }

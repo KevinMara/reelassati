@@ -145,7 +145,10 @@ export default function VideoAnalyzer() {
   };
 
   const acceptVideoFiles = (files: File[]) => {
-    const selection = validateFileSelection(files, { purpose: "video" });
+    const selection = validateFileSelection(files, {
+      purpose: "video",
+      text: ui,
+    });
     if (selection.error) {
       setError(selection.error);
       return;

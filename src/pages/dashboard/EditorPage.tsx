@@ -1003,6 +1003,7 @@ export default function EditorPage() {
 
   const acceptMediaFiles = (files: File[]) => {
     const selection = validateFileSelection(files, {
+      text: ui,
       multiple: true,
       purpose: "media",
     });
@@ -1800,9 +1801,9 @@ export default function EditorPage() {
               <span className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <item.icon className="h-4 w-4" />
               </span>
-              <span className="block font-medium">{item.name}</span>
+              <span className="block font-medium">{ui(item.name)}</span>
               <span className="mt-2 block text-sm leading-5 text-foreground/70">
-                {item.description}
+                {ui(item.description)}
               </span>
             </button>
           ))}
@@ -1944,7 +1945,7 @@ export default function EditorPage() {
     <div className="space-y-4">
       <p className="text-sm text-foreground/65">
         {selectedClip
-          ? `Apply to ${selectedClip.label}`
+          ? ui("Apply to {{name}}", { name: selectedClip.label })
           : ui("Select a video or image on the timeline.")}
       </p>{" "}
       <EditorPresetLibrary
@@ -2311,7 +2312,7 @@ export default function EditorPage() {
                       )
                     }
                     className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
-                    aria-label={`Line ${index + 1} start`}
+                    aria-label={ui("Line {{number}} start", { number: index + 1 })}
                   />
                   <span className="text-xs text-foreground/70">{ui("to")}</span>
                   <input
@@ -2329,7 +2330,7 @@ export default function EditorPage() {
                       )
                     }
                     className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
-                    aria-label={`Line ${index + 1} end`}
+                    aria-label={ui("Line {{number}} end", { number: index + 1 })}
                   />
                   <button
                     type="button"
@@ -2339,7 +2340,7 @@ export default function EditorPage() {
                       )
                     }
                     className="ml-auto text-foreground/70 hover:text-destructive"
-                    aria-label={`Delete line ${index + 1}`}
+                    aria-label={ui("Delete line {{number}}", { number: index + 1 })}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -3112,6 +3113,7 @@ export default function EditorPage() {
               }
               onFilesDrop={async (files, time, lane) => {
                 const selection = validateFileSelection(files, {
+                  text: ui,
                   multiple: true,
                   purpose: "media",
                 });

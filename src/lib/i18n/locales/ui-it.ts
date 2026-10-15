@@ -1,4 +1,7 @@
 import { extraItalianUi } from "./ui-it-extra";
+import { italianPublicUi } from "./ui-it-public";
+import { italianPricingUi } from "./ui-it-pricing";
+import { italianGuideUi } from "./ui-it-guides";
 
 /** Interface translations only; never applied to user or generated content. */
 const reviewedItalianUi: Record<string, string> = {
@@ -2522,5 +2525,8 @@ const reviewedItalianUi: Record<string, string> = {
 
 export const italianUi: Record<string, string> = {
   ...reviewedItalianUi,
+  ...italianPublicUi,
+  ...italianPricingUi,
+  ...italianGuideUi,
   ...extraItalianUi,
 };

@@ -26,7 +26,8 @@ function utcDayKey(value: string): string | null {
 export function buildAnalyticsSeries(
   workspace: WorkspaceDocument,
   dayCount = 14,
-  now = new Date()
+  now = new Date(),
+  locale?: string
 ): AnalyticsDataPoint[] {
   const safeDayCount = Math.min(90, Math.max(7, Math.floor(dayCount)));
   const end = Date.UTC(
@@ -41,12 +42,12 @@ export function buildAnalyticsSeries(
     const key = date.toISOString().slice(0, 10);
     points.set(key, {
       date: key,
-      label: date.toLocaleDateString(undefined, {
+      label: date.toLocaleDateString(locale, {
         month: "short",
         day: "numeric",
         timeZone: "UTC",
       }),
-      fullLabel: date.toLocaleDateString(undefined, {
+      fullLabel: date.toLocaleDateString(locale, {
         weekday: "short",
         month: "short",
         day: "numeric",

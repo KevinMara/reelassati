@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -30,6 +30,17 @@ const COLORS = [
 ];
 export function SocialPerformance() {
   const ui = useUiText();
+  const locale = getUiLocale();
+  const metricLabels: Record<SocialMetric, string> = {
+    views: ui("Views"),
+    reach: ui("Reach"),
+    likes: ui("Likes"),
+    comments: ui("Comments"),
+    shares: ui("Shares"),
+    saves: ui("Saves"),
+    impressions: ui("Impressions"),
+    clicks: ui("Clicks"),
+  };
   const [result, setResult] = useState<SocialAnalyticsResponse | null>(null);
   const [days, setDays] = useState(30);
   const [metrics, setMetrics] = useState<SocialMetric[]>(["views", "likes"]);
@@ -153,7 +164,7 @@ export function SocialPerformance() {
               className="mr-2 inline-block h-2 w-2 rounded-full"
               style={{ background: COLORS[i] }}
             />
-            {metric}
+            {metricLabels[metric]}
           </button>
         ))}
       </div>
@@ -175,7 +186,12 @@ export function SocialPerformance() {
             />
             <XAxis
               dataKey="day"
-              tickFormatter={day => String(day).slice(5)}
+              tickFormatter={day =>
+                new Date(`${String(day)}T00:00:00Z`).toLocaleDateString(
+                  locale,
+                  { month: "short", day: "numeric", timeZone: "UTC" }
+                )
+              }
               minTickGap={25}
               tick={{ fontSize: 12, fill: "currentColor" }}
             />
@@ -185,6 +201,18 @@ export function SocialPerformance() {
               domain={[0, "auto"]}
             />
             <Tooltip
+              labelFormatter={day =>
+                new Date(`${String(day)}T00:00:00Z`).toLocaleDateString(
+                  locale,
+                  { timeZone: "UTC" }
+                )
+              }
+              formatter={(value, name) => [
+                typeof value === "number"
+                  ? value.toLocaleString(locale)
+                  : value,
+                metricLabels[name as SocialMetric] || name,
+              ]}
               contentStyle={{
                 background: "hsl(var(--background))",
                 borderRadius: 12,
@@ -213,10 +241,12 @@ export function SocialPerformance() {
             <div key={metric}>
               <p className="text-2xl font-semibold">
                 {values.length
-                  ? values.reduce((a, b) => a + b, 0).toLocaleString()
+                  ? values.reduce((a, b) => a + b, 0).toLocaleString(locale)
                   : "—"}
               </p>
-              <p className="text-sm capitalize text-foreground/70">{metric}</p>
+              <p className="text-sm capitalize text-foreground/70">
+                {metricLabels[metric]}
+              </p>
             </div>
           );
         })}
@@ -228,7 +258,10 @@ export function SocialPerformance() {
       )}
       <p className="mt-4 text-sm text-foreground/70">
         {result?.syncedAt
-          ? `Last sync: ${new Date(result.syncedAt).toLocaleString()}. Missing metrics show —. Results can keep growing after publication.`
+          ? ui(
+              "Last sync: {{date}}. Missing metrics show —. Results can keep growing after publication.",
+              { date: new Date(result.syncedAt).toLocaleString(locale) }
+            )
           : ui(
               "Connect your accounts and sync to see real results. Missing data is not counted as zero."
             )}
@@ -246,14 +279,16 @@ export function SocialPerformance() {
         <div className="mt-5 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <caption className="mb-3 text-left font-medium">
-              {ui("Top posts by")} {metrics[0]}
+              {ui("Top posts by {{metric}}", {
+                metric: metricLabels[metrics[0]],
+              })}
             </caption>
             <thead>
               <tr>
                 <th className="py-2">{ui("Post")}</th>
                 {metrics.map(metric => (
                   <th className="px-3 capitalize" key={metric}>
-                    {metric}
+                    {metricLabels[metric]}
                   </th>
                 ))}
               </tr>
@@ -275,12 +310,13 @@ export function SocialPerformance() {
                       post.content.slice(0, 90) || post.platform
                     )}
                     <p className="text-xs text-foreground/65">
-                      {post.publishedAt.slice(0, 10)} · {post.platform}
+                      {new Date(post.publishedAt).toLocaleDateString(locale)} ·{" "}
+                      {post.platform}
                     </p>
                   </td>
                   {metrics.map(metric => (
                     <td className="px-3" key={metric}>
-                      {post.metrics[metric]?.toLocaleString() ?? "—"}
+                      {post.metrics[metric]?.toLocaleString(locale) ?? "—"}
                     </td>
                   ))}
                 </tr>

@@ -16,6 +16,7 @@ try {
     stdin: {
       contents: [
         'export {uiLocales} from "./src/lib/i18n/locales/ui";',
+        'export {default as legacyEnglish} from "./src/lib/i18n/locales/en";',
         'export {INTERFACE_LANGUAGE_CODES} from "./contracts/interface-language";',
         'export {westernUi} from "./src/lib/i18n/locales/ui-critical-west";',
         'export {CAPTION_PRESETS, GRAPHIC_PRESETS, CLIP_LOOK_PRESETS, FADE_PRESETS} from "./contracts/editor-presets";',
@@ -23,6 +24,10 @@ try {
         'export {MOTION_KITS} from "./contracts/motion-kits";',
         'export {EDITOR_KEYBOARD_ACTIONS} from "./src/lib/editor-keybindings";',
         'export {EDITOR_TASK_PRESETS} from "./contracts/editor-chat-presets";',
+        'export {VIDEO_PROMPT_TEMPLATES} from "./src/lib/videoPromptTemplates";',
+        'export {BILLING_OPERATION_LABELS, BILLING_LEDGER_UI_DESCRIPTIONS} from "./contracts/billing-ui";',
+        'export {FILE_SELECTION_UI_COPY} from "./src/lib/file-validation";',
+        'export {WORKSPACE_ACTIVITY_UI_LABELS} from "./contracts/workspace-activity-ui";',
         'export {VOICE_CATALOG} from "./contracts/voices";',
         'export {generationKindLabel} from "./contracts/editor-generations";',
       ].join("\n"),
@@ -36,6 +41,15 @@ try {
   });
   catalogs = await import(pathToFileURL(outfile).href);
 } finally {
+  const cleanupTarget = path.resolve(temporary);
+  if (
+    path.dirname(cleanupTarget) !== path.resolve(os.tmpdir()) ||
+    !path.basename(cleanupTarget).startsWith("reelassati-locales-")
+  ) {
+    throw new Error(
+      "Localization audit temporary directory is outside its expected location."
+    );
+  }
   await fs.rm(temporary, { recursive: true, force: true });
 }
 
@@ -54,6 +68,30 @@ await walk(path.join(root, "src/components"));
 const keys = new Set();
 const rawInterfaceCopy = [];
 const dynamicBindingsForReview = [];
+const pageGuideFile = path.join(root, "src/lib/page-guides.ts");
+const pageGuideSource = ts.createSourceFile(
+  pageGuideFile,
+  await fs.readFile(pageGuideFile, "utf8"),
+  ts.ScriptTarget.Latest,
+  true,
+  ts.ScriptKind.TS
+);
+function collectGuideCopy(node) {
+  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+    const indexes =
+      node.expression.text === "text"
+        ? [0]
+        : node.expression.text === "section"
+          ? [0, 2]
+          : [];
+    for (const index of indexes) {
+      const argument = node.arguments[index];
+      if (argument && ts.isStringLiteralLike(argument)) keys.add(argument.text);
+    }
+  }
+  ts.forEachChild(node, collectGuideCopy);
+}
+collectGuideCopy(pageGuideSource);
 const neutral = new Set([
   "REEL",
   "assati",
@@ -135,6 +173,31 @@ const importedInterfaceCatalogs = [
     source: "contracts/editor-chat-presets.ts",
     collection: "EDITOR_TASK_PRESETS",
     fields: ["label", "hint"],
+  },
+  {
+    source: "src/lib/videoPromptTemplates.ts",
+    collection: "VIDEO_PROMPT_TEMPLATES",
+    fields: ["name", "description", "preview", "finishingNote", "category"],
+  },
+  {
+    source: "contracts/billing-ui.ts",
+    collection: "BILLING_OPERATION_LABELS",
+    shape: "record-values",
+  },
+  {
+    source: "contracts/billing-ui.ts",
+    collection: "BILLING_LEDGER_UI_DESCRIPTIONS",
+    fields: ["description"],
+  },
+  {
+    source: "src/lib/file-validation.ts",
+    collection: "FILE_SELECTION_UI_COPY",
+    shape: "record-values",
+  },
+  {
+    source: "contracts/workspace-activity-ui.ts",
+    collection: "WORKSPACE_ACTIVITY_UI_LABELS",
+    fields: ["label"],
   },
   {
     source: "contracts/voices.ts",
@@ -228,6 +291,19 @@ for (const filename of files) {
   const descriptorFields = new Set();
   const displayedLiteralLists = new Set();
   function visit(node) {
+    // Legacy semantic keys can also be selected from descriptor tables.
+    // Their canonical English value is the literal key used by the shared UI catalog.
+    if (ts.isStringLiteralLike(node)) {
+      const legacySource = catalogs.legacyEnglish[node.text];
+      if (
+        typeof legacySource === "string" &&
+        legacySource.trim() &&
+        legacySource !== "you@example.com" &&
+        !neutral.has(legacySource)
+      ) {
+        keys.add(legacySource);
+      }
+    }
     if (
       ts.isCallExpression(node) &&
       ["ui", "translateUi"].includes(node.expression.getText(source))

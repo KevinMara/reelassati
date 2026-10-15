@@ -113,6 +113,7 @@ export function EditorMediaLibrary() {
   }
   async function upload(files: File[]) {
     const checked = validateFileSelection(files, {
+      text: ui,
       purpose: "media",
       multiple: true,
       maxFiles: 50,
@@ -455,7 +456,7 @@ export function EditorMediaLibrary() {
               </button>
               <button
                 type="button"
-                aria-label={`Rename ${f.name}`}
+                aria-label={ui("Rename {{name}}", { name: f.name })}
                 disabled={busy}
                 onClick={() => {
                   setEditingFolder(f.id);
@@ -466,7 +467,7 @@ export function EditorMediaLibrary() {
               </button>
               <button
                 type="button"
-                aria-label={`Remove empty folder ${f.name}`}
+                aria-label={ui("Remove empty folder {{name}}", { name: f.name })}
                 title={ui("Only empty folders can be removed")}
                 disabled={
                   busy ||
@@ -560,7 +561,7 @@ export function EditorMediaLibrary() {
               }}
             >
               <SelectTrigger
-                aria-label={`Move ${asset.name} to folder`}
+                aria-label={ui("Move {{name}} to folder", { name: asset.name })}
                 size="sm"
                 className="mt-2 w-full min-w-0 border-border text-[11px]"
               >

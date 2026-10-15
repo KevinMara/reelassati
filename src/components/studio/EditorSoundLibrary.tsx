@@ -155,7 +155,7 @@ export function EditorSoundLibrary() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      aria-label={`${playing === entry.id ? ui("Pause") : ui("Preview")} ${entry.name}`}
+                      aria-label={ui(playing === entry.id ? "Pause {{name}}" : "Preview {{name}}", { name: entry.name })}
                       onClick={() => preview(entry)}
                       className="rounded-full border border-primary/25 p-2 text-primary"
                     >
@@ -182,8 +182,8 @@ export function EditorSoundLibrary() {
                       onClick={() => void save(entry)}
                       aria-label={
                         saved
-                          ? `${entry.name} saved to Library`
-                          : `Save ${entry.name} to Library`
+                          ? ui("{{name}} saved to Library", { name: entry.name })
+                          : ui("Save {{name}} to Library", { name: entry.name })
                       }
                       title={
                         saved ? ui("Saved to Library") : ui("Save to Library")

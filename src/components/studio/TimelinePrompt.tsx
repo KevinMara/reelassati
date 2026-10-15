@@ -96,7 +96,7 @@ export function TimelinePrompt({
                 type="button"
                 role="slider"
                 data-range-edge={edge}
-                aria-label={`Selected range ${edge}`}
+                aria-label={ui(edge === "start" ? "Selected range start" : "Selected range end")}
                 aria-valuemin={0}
                 aria-valuemax={duration}
                 aria-valuenow={edge === "start" ? low : high}

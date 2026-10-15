@@ -136,8 +136,8 @@ export function StoryBeatStrip({
               onClick={editSelected}
               disabled={blocked}
               className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"
-              aria-label={`Edit ${selected.label} section`}
-              title={`Edit ${selected.label}`}
+              aria-label={ui("Edit {{name}} section", { name: selected.label })}
+              title={ui("Edit {{name}}", { name: selected.label })}
             >
               <Pencil size={13} />
             </button>
@@ -184,9 +184,9 @@ export function StoryBeatStrip({
                     setSelectedId(beat.id);
                     onSeek(beat.start);
                   }}
-                  aria-label={`${beat.label}, ${timeLabel(beat.start)} to ${timeLabel(beat.end)}`}
+                  aria-label={ui("{{name}}, {{start}} to {{end}}", { name: beat.label, start: timeLabel(beat.start), end: timeLabel(beat.end) })}
                   aria-current={active ? "true" : undefined}
-                  title={`${beat.label} · ${timeLabel(beat.start)}–${timeLabel(beat.end)}. Select to seek; use Edit to rename or adjust.`}
+                  title={ui("{{name}} · {{start}}–{{end}}. Select to seek; use Edit to rename or adjust.", { name: beat.label, start: timeLabel(beat.start), end: timeLabel(beat.end) })}
                   className={cn(
                     "absolute inset-y-0 overflow-hidden rounded-md border px-2 text-left text-[11px] font-medium transition-colors focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50",
                     colours[beat.kind],

@@ -26,6 +26,7 @@ export function TimelineMixer({
   onReorder(lane: TimelineTrack, direction: "up" | "down"): Promise<void>;
 }) {
   const ui = useUiText();
+  const trackNames = { video: ui("Video"), audio: ui("Audio"), text: ui("Text"), graphics: ui("Graphics"), captions: ui("Captions") };
   const lanes = timelineLanes(project.clips).filter(
     lane =>
       project.clips.some(
@@ -48,7 +49,7 @@ export function TimelineMixer({
         const row = timelineTrackSettings(project, lane);
         const name =
           row?.name ??
-          `${lane.kind[0].toUpperCase()}${lane.kind.slice(1)} ${lane.number}`;
+          `${trackNames[lane.kind]} ${lane.number}`;
         const family = lanes.filter(other => other.kind === lane.kind);
         const index = family.findIndex(other => other.number === lane.number);
         const sound = ["audio", "video"].includes(lane.kind);
@@ -61,7 +62,7 @@ export function TimelineMixer({
             <div className="flex items-center gap-2">
               <input
                 key={name}
-                aria-label={`Name of ${lane.kind} track ${lane.number}`}
+                aria-label={ui("Name of {{kind}} track {{number}}", { kind: trackNames[lane.kind], number: lane.number })}
                 defaultValue={name}
                 maxLength={60}
                 disabled={disabled}
@@ -77,7 +78,7 @@ export function TimelineMixer({
               <button
                 type="button"
                 disabled={disabled || index <= 0}
-                aria-label={`Move ${name} up`}
+                aria-label={ui("Move {{name}} up", { name })}
                 onClick={() => void onReorder(lane, "up")}
                 className="rounded-lg border border-border px-2 py-2 text-sm disabled:opacity-40"
               >
@@ -86,7 +87,7 @@ export function TimelineMixer({
               <button
                 type="button"
                 disabled={disabled || index >= family.length - 1}
-                aria-label={`Move ${name} down`}
+                aria-label={ui("Move {{name}} down", { name })}
                 onClick={() => void onReorder(lane, "down")}
                 className="rounded-lg border border-border px-2 py-2 text-sm disabled:opacity-40"
               >
@@ -104,7 +105,7 @@ export function TimelineMixer({
                         min={0}
                         max={2}
                         step={0.01}
-                        aria-label={`Gain for ${name}`}
+                        aria-label={ui("Gain for {{name}}", { name })}
                         disabled={disabled}
                         defaultValue={row?.gain ?? 1}
                         key={`${name}:${row?.gain}`}

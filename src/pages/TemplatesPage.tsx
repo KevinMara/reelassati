@@ -14,7 +14,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
-import { useTranslation } from "react-i18next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import {
@@ -22,53 +21,46 @@ import {
   type PromptTemplate,
 } from "@/lib/videoPromptTemplates";
 
-type Language = "en" | "it";
 type Category = "all" | PromptTemplate["category"];
 
 const CATEGORY_META: Record<
   PromptTemplate["category"],
   {
-    label: Record<Language, string>;
+    label: string;
     icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
     color: string;
   }
 > = {
   realistic: {
-    label: { en: "Realistic", it: "Realistico" },
+    label: "Realistic",
     icon: Camera,
     color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-300",
   },
   cinematic: {
-    label: { en: "Cinematic", it: "Cinematico" },
+    label: "Cinematic",
     icon: Film,
     color: "bg-violet-500/10 text-violet-600 dark:text-violet-300",
   },
   product: {
-    label: { en: "Product", it: "Prodotto" },
+    label: "Product",
     icon: Shapes,
     color: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
   },
   social: {
-    label: { en: "Social", it: "Social" },
+    label: "Social",
     icon: Smartphone,
     color: "bg-pink-500/10 text-pink-600 dark:text-pink-300",
   },
   educational: {
-    label: { en: "Educational", it: "Educativo" },
+    label: "Educational",
     icon: GraduationCap,
     color: "bg-blue-500/10 text-blue-600 dark:text-blue-300",
   },
 };
 
-const ALL_LABEL = { en: "All", it: "Tutti" };
-
 export default function TemplatesPage() {
   const ui = useUiText();
-  const { i18n } = useTranslation();
   const reduceMotion = useReducedMotion();
-  const language: Language = i18n.resolvedLanguage?.startsWith("it")
-    ? "it"
-    : "en";
   const [activeCategory, setActiveCategory] = useState<Category>("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState(
@@ -86,11 +78,11 @@ export default function TemplatesPage() {
       if (activeCategory !== "all" && template.category !== activeCategory)
         return false;
       if (!query) return true;
-      return `${template.name} ${template.description} ${template.preview}`
+      return `${template.name} ${template.description} ${template.preview} ${ui(template.name)} ${ui(template.description)} ${ui(template.preview)}`
         .toLowerCase()
         .includes(query);
     });
-  }, [activeCategory, search]);
+  }, [activeCategory, search, ui]);
 
   const selected =
     filtered.find(template => template.id === selectedId) ?? filtered[0];
@@ -153,10 +145,9 @@ export default function TemplatesPage() {
               aria-label={ui("Filter by category")}
             >
               {categories.map(category => {
-                const label =
-                  category === "all"
-                    ? ALL_LABEL[language]
-                    : CATEGORY_META[category].label[language];
+                const label = ui(
+                  category === "all" ? "All" : CATEGORY_META[category].label
+                );
                 return (
                   <button
                     key={category}
@@ -211,10 +202,10 @@ export default function TemplatesPage() {
                           </span>
                         </div>
                         <h2 className="mt-5 text-lg font-semibold">
-                          {template.name}
+                          {ui(template.name)}
                         </h2>
                         <p className="mt-2 text-sm leading-relaxed text-foreground/55">
-                          {template.description}
+                          {ui(template.description)}
                         </p>
                         <p className="mt-auto pt-4 font-mono text-[9px] uppercase tracking-wider text-primary">
                           {isSelected
@@ -255,7 +246,7 @@ export default function TemplatesPage() {
                       {ui("Local compiler")}
                     </p>
                     <h2 className="mt-2 text-2xl font-semibold">
-                      {selected.name}
+                      {ui(selected.name)}
                     </h2>
                   </div>
                   <span className="rounded-pill bg-primary/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-primary">
@@ -264,7 +255,7 @@ export default function TemplatesPage() {
                 </div>
 
                 <p className="mt-4 text-sm leading-relaxed text-foreground/60">
-                  {selected.preview}
+                  {ui(selected.preview)}
                 </p>
                 <label className="mt-6 block">
                   <span className="text-xs font-medium">
@@ -297,7 +288,7 @@ export default function TemplatesPage() {
                       aria-hidden
                     />
                     <p className="text-xs leading-relaxed text-foreground/55">
-                      {selected.finishingNote}
+                      {ui(selected.finishingNote)}
                     </p>
                   </div>
                 ) : null}

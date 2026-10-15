@@ -1,4 +1,8 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
+import {
+  BILLING_OPERATION_LABELS,
+  isBillingInterfaceDescription,
+} from "@contracts/billing-ui";
 import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { CreditPlanner } from "@/components/studio/CreditPlanner";
@@ -53,22 +57,7 @@ function formatDate(value: string | null, locale: string): string {
 }
 
 function actionLabel(category: string): string {
-  const labels: Record<string, string> = {
-    subscription: "Plan credits",
-    topup: "Credit top-up",
-    referral: "Referral reward",
-    script: "Script",
-    "edit-plan": "Edit plan",
-    analysis: "Video analysis",
-    transcription: "Transcription",
-    speech: "Voice",
-    audio: "Music & sound effects",
-    image: "Image",
-    video: "Video",
-    "trend-research": "Trend research",
-    migration: "Balance migration",
-  };
-  return labels[category] || category.replace(/-/g, " ");
+  return BILLING_OPERATION_LABELS[category] || category.replace(/-/g, " ");
 }
 
 export default function BillingPage() {
@@ -369,7 +358,7 @@ export default function BillingPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-2xl font-semibold">
-                      {pack.credits.toLocaleString()}
+                      {pack.credits.toLocaleString(getUiLocale())}
                     </p>
                     <p className="text-xs text-foreground/70">
                       {ui("credits")}
@@ -451,7 +440,9 @@ export default function BillingPage() {
                 <span className="text-5xl font-semibold tracking-tight">
                   {loading
                     ? "—"
-                    : (summary?.availableCredits || 0).toLocaleString()}
+                    : (summary?.availableCredits || 0).toLocaleString(
+                        getUiLocale()
+                      )}
                 </span>
               </div>
               <p className="mt-2 text-sm text-foreground/70">
@@ -466,7 +457,7 @@ export default function BillingPage() {
           </div>
           {!!summary?.adjustmentDebt && (
             <p className="relative mt-4 text-sm text-foreground/75">
-              {summary.adjustmentDebt.toLocaleString()}{" "}
+              {summary.adjustmentDebt.toLocaleString(getUiLocale())}{" "}
               {ui(
                 "credits deducted for a payment refund or dispute. Your available balance includes this adjustment."
               )}
@@ -476,7 +467,7 @@ export default function BillingPage() {
             <div className="rounded-xl border border-border/70 bg-background/55 p-4 backdrop-blur">
               <p className="text-xs text-foreground/70">{ui("Plan credits")}</p>
               <p className="mt-1 text-xl font-semibold">
-                {(summary?.includedCredits || 0).toLocaleString()}
+                {(summary?.includedCredits || 0).toLocaleString(getUiLocale())}
               </p>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-foreground/10">
                 <div
@@ -490,7 +481,7 @@ export default function BillingPage() {
                 {ui("Rollover top-ups")}
               </p>
               <p className="mt-1 text-xl font-semibold">
-                {(summary?.topUpCredits || 0).toLocaleString()}
+                {(summary?.topUpCredits || 0).toLocaleString(getUiLocale())}
               </p>
               <p className="mt-3 text-xs text-foreground/70">
                 {ui("Extra credits stay in your balance.")}
@@ -590,7 +581,7 @@ export default function BillingPage() {
                     ? "—"
                     : Math.floor(
                         (summary?.availableCredits || 0) / Number(cost)
-                      ).toLocaleString()}
+                      ).toLocaleString(getUiLocale())}
                 </p>
                 <p className="mt-1 text-sm text-foreground/75">{label}</p>
               </div>
@@ -621,14 +612,20 @@ export default function BillingPage() {
                       {ui(actionLabel(item.category))}
                     </p>
                     <p className="truncate text-xs text-foreground/65">
-                      {item.description} · {formatDate(item.createdAt, locale)}
+                      {isBillingInterfaceDescription(
+                        item.category,
+                        item.description
+                      )
+                        ? ui(item.description)
+                        : item.description}{" "}
+                      · {formatDate(item.createdAt, locale)}
                     </p>
                   </div>
                   <span
                     className={`font-mono text-xs font-medium ${item.amount >= 0 ? "text-emerald-500" : item.status === "released" ? "text-foreground/70 line-through" : "text-foreground"}`}
                   >
                     {item.amount > 0 ? "+" : ""}
-                    {item.amount.toLocaleString()}
+                    {item.amount.toLocaleString(getUiLocale())}
                   </span>
                 </div>
               ))
@@ -868,6 +865,7 @@ function UsageChart({
   loading: boolean;
 }) {
   const ui = useUiText();
+  const locale = getUiLocale();
   const [range, setRange] = useState(30);
   const data = useMemo(() => {
     const end = new Date(summary?.usage?.through || new Date().toISOString());
@@ -899,7 +897,7 @@ function UsageChart({
             {ui("Your creative activity")}
           </h2>
           <p className="mt-2 text-3xl font-semibold">
-            {loading || !summary?.usage ? "—" : total.toLocaleString()}{" "}
+            {loading || !summary?.usage ? "—" : total.toLocaleString(locale)}{" "}
             <span className="text-sm font-normal text-foreground/70">
               {ui("credits used")}
             </span>
@@ -918,7 +916,10 @@ function UsageChart({
       <div
         className="mt-5 h-56"
         role="img"
-        aria-label={`Daily credit usage by tool over ${range} days: ${total} credits. Exact totals listed below.`}
+        aria-label={ui(
+          "Daily credit usage by tool over {{days}} days: {{credits}} credits. Exact totals listed below.",
+          { days: range, credits: total }
+        )}
       >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
@@ -934,7 +935,12 @@ function UsageChart({
             />
             <XAxis
               dataKey="date"
-              tickFormatter={date => String(date).slice(5)}
+              tickFormatter={date =>
+                new Date(`${String(date)}T00:00:00Z`).toLocaleDateString(
+                  locale,
+                  { month: "short", day: "numeric", timeZone: "UTC" }
+                )
+              }
               minTickGap={28}
               tick={{ fill: "currentColor", fontSize: 12 }}
               axisLine={false}
@@ -948,6 +954,15 @@ function UsageChart({
               tickLine={false}
             />
             <Tooltip
+              labelFormatter={date =>
+                new Date(`${String(date)}T00:00:00Z`).toLocaleDateString(
+                  locale,
+                  { timeZone: "UTC" }
+                )
+              }
+              formatter={value =>
+                typeof value === "number" ? value.toLocaleString(locale) : value
+              }
               contentStyle={{
                 background: "hsl(var(--background))",
                 border: "1px solid hsl(var(--border))",
@@ -984,7 +999,7 @@ function UsageChart({
             <span className="font-mono">
               {loading || !summary?.usage
                 ? "—"
-                : category.total.toLocaleString()}
+                : category.total.toLocaleString(locale)}
             </span>
           </div>
         ))}

@@ -169,7 +169,7 @@ function AudioMixControls({
                   className={field}
                   value={key.at}
                   disabled={clip.locked}
-                  aria-label={`Audio gain key ${index + 1} source second`}
+                  aria-label={ui("Audio gain key {{number}} source second", { number: index + 1 })}
                   title={
                     inClip
                       ? ui("Key inside this clip")
@@ -203,7 +203,7 @@ function AudioMixControls({
                   className={field}
                   value={Number(key.gain.toFixed(3))}
                   disabled={clip.locked}
-                  aria-label={`Audio gain key ${index + 1} gain multiplier`}
+                  aria-label={ui("Audio gain key {{number}} gain multiplier", { number: index + 1 })}
                   onChange={event =>
                     update(current => ({
                       ...current,
@@ -218,7 +218,7 @@ function AudioMixControls({
                 <button
                   type="button"
                   disabled={!inClip}
-                  aria-label={`Go to audio gain key ${index + 1}`}
+                  aria-label={ui("Go to audio gain key {{number}}", { number: index + 1 })}
                   onClick={() =>
                     onSeek(
                       clip.start + (key.at - clip.inPoint) / (clip.speed ?? 1)
@@ -231,7 +231,7 @@ function AudioMixControls({
                 <button
                   type="button"
                   disabled={clip.locked}
-                  aria-label={`Remove audio gain key ${index + 1}`}
+                  aria-label={ui("Remove audio gain key {{number}}", { number: index + 1 })}
                   onClick={() =>
                     update(current => ({
                       ...current,
@@ -512,8 +512,8 @@ export function ClipInspector({
                   disabled={draft.locked}
                   onValueChange={value => set("fit", value)}
                   options={[
-                    { value: "contain", label: "Fit whole shot" },
-                    { value: "cover", label: "Fill frame" },
+                    { value: "contain", label: ui("Fit whole shot") },
+                    { value: "cover", label: ui("Fill frame") },
                   ]}
                   className="mt-2"
                 />

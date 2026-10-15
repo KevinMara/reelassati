@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import {
   ArrowRight,
   Check,
@@ -9,156 +10,90 @@ import {
   UserRoundCheck,
   X,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { PublicComplianceShell } from "@/components/compliance/PublicComplianceShell";
 
-type Language = "en" | "it";
-
-const COPY = {
-  en: {
-    back: "Back to home",
-    eyebrow: "Responsible use",
-    title: "Creative tools, with a clear boundary.",
+function createCopy(ui: ReturnType<typeof useUiText>) {
+  return {
+    back: ui("Back to home"),
+    eyebrow: ui("Responsible use"),
+    title: ui("Creative tools, with a clear boundary."),
     intro:
-      "REELassati is intended for human-directed creative and marketing production. It is not designed to make consequential decisions about people, infer sensitive traits, or present deceptive synthetic media as authentic.",
-    updated: "Policy · 4 August 2026",
-    scopeEyebrow: "Intended purpose",
-    scopeTitle: "Create, edit, review, deliver",
+      ui("REELassati is intended for human-directed creative and marketing production. It is not designed to make consequential decisions about people, infer sensitive traits, or present deceptive synthetic media as authentic."),
+    updated: ui("Policy · 4 August 2026"),
+    scopeEyebrow: ui("Intended purpose"),
+    scopeTitle: ui("Create, edit, review, deliver"),
     scopeBody:
-      "Use the Studio to develop scripts, edit media, analyze creative structure, generate supporting shots or narration, and prepare approved content for distribution.",
-    allowedTitle: "Designed for",
-    boundaryTitle: "Not supported",
-    workflowEyebrow: "Before delivery",
-    workflowTitle: "Three checks protect the work",
-    reportTitle: "Report misuse or a rights concern",
+      ui("Use the Studio to develop scripts, edit media, analyze creative structure, generate supporting shots or narration, and prepare approved content for distribution."),
+    allowedTitle: ui("Designed for"),
+    boundaryTitle: ui("Not supported"),
+    workflowEyebrow: ui("Before delivery"),
+    workflowTitle: ui("Three checks protect the work"),
+    reportTitle: ui("Report misuse or a rights concern"),
     reportBody:
-      "If content appears to misuse your likeness, voice, work, or personal information, contact the human support channel with the relevant page, asset, or publication reference.",
-    reportAction: "Open support",
-    transparencyAction: "See AI transparency",
-    officialTitle: "Official legal reference",
+      ui("If content appears to misuse your likeness, voice, work, or personal information, contact the human support channel with the relevant page, asset, or publication reference."),
+    reportAction: ui("Open support"),
+    transparencyAction: ui("See AI transparency"),
+    officialTitle: ui("Official legal reference"),
     officialBody:
-      "This policy is informed by the consolidated AI Act current from 27 July 2026 and Regulation (EU) 2026/1744. The official text remains authoritative.",
-    consolidated: "Current consolidated AI Act",
-    amendment: "2026 amending regulation",
+      ui("This policy is informed by the consolidated AI Act current from 27 July 2026 and Regulation (EU) 2026/1744. The official text remains authoritative."),
+    consolidated: ui("Current consolidated AI Act"),
+    amendment: ui("2026 amending regulation"),
     closing:
-      "When evidence is missing, pause publication and resolve the rights, review, provenance, or transparency question first.",
-  },
-  it: {
-    back: "Torna alla home",
-    eyebrow: "Uso responsabile",
-    title: "Strumenti creativi, con un confine chiaro.",
-    intro:
-      "REELassati è destinato alla produzione creativa e marketing diretta da persone. Non è progettato per prendere decisioni rilevanti sulle persone, inferire caratteristiche sensibili o presentare media sintetici ingannevoli come autentici.",
-    updated: "Policy · 4 agosto 2026",
-    scopeEyebrow: "Finalità prevista",
-    scopeTitle: "Crea, monta, revisiona, consegna",
-    scopeBody:
-      "Usa lo Studio per sviluppare script, montare media, analizzare la struttura creativa, generare scene o narrazioni di supporto e preparare contenuti approvati alla distribuzione.",
-    allowedTitle: "Progettato per",
-    boundaryTitle: "Non supportato",
-    workflowEyebrow: "Prima della consegna",
-    workflowTitle: "Tre controlli proteggono il lavoro",
-    reportTitle: "Segnala un abuso o un problema di diritti",
-    reportBody:
-      "Se un contenuto sembra usare impropriamente la tua immagine, voce, opera o informazioni personali, contatta il supporto umano indicando la pagina, l’asset o la pubblicazione interessata.",
-    reportAction: "Apri il supporto",
-    transparencyAction: "Vedi trasparenza AI",
-    officialTitle: "Riferimento giuridico ufficiale",
-    officialBody:
-      "Questa policy è informata dal testo consolidato dell’AI Act aggiornato al 27 luglio 2026 e dal Regolamento (UE) 2026/1744. Il testo ufficiale resta autoritativo.",
-    consolidated: "AI Act consolidato attuale",
-    amendment: "Regolamento di modifica 2026",
-    closing:
-      "Quando manca l’evidenza, sospendi la pubblicazione e risolvi prima la questione relativa a diritti, revisione, provenienza o trasparenza.",
-  },
-} as const;
+      ui("When evidence is missing, pause publication and resolve the rights, review, provenance, or transparency question first."),
+  };
+}
 
-const ALLOWED = {
-  en: [
-    "Original scripts, story structures, captions, and creative variants.",
-    "Reviewable edit suggestions that a person can accept, reject, or ignore.",
-    "Generated supporting footage or narration when you hold the necessary rights.",
-    "Analysis of media you are authorized to process.",
-    "Human-approved publishing and scheduling for connected accounts.",
-  ],
-  it: [
-    "Script originali, strutture narrative, caption e varianti creative.",
-    "Suggerimenti di montaggio revisionabili che una persona può accettare, rifiutare o ignorare.",
-    "Scene o narrazioni generate quando possiedi i diritti necessari.",
-    "Analisi di media che sei autorizzato a trattare.",
-    "Pubblicazione e programmazione approvate da una persona su account collegati.",
-  ],
-} as const;
+function createAllowed(ui: ReturnType<typeof useUiText>) {
+  return [
+    ui("Original scripts, story structures, captions, and creative variants."),
+    ui("Reviewable edit suggestions that a person can accept, reject, or ignore."),
+    ui("Generated supporting footage or narration when you hold the necessary rights."),
+    ui("Analysis of media you are authorized to process."),
+    ui("Human-approved publishing and scheduling for connected accounts."),
+  ];
+}
 
-const BOUNDARIES = {
-  en: [
-    "Employment, worker management, education admissions, credit, insurance, housing, medical, legal, policing, migration, or similar decisions about people.",
-    "Biometric identification or categorization, emotion inference, social scoring, or inference of sensitive personal traits.",
-    "Manipulation, exploitation of vulnerability, unlawful surveillance, or collection of faces from the internet or CCTV to build recognition datasets.",
-    "Non-consensual impersonation, voice or likeness cloning, intimate synthetic content, harassment, fraud, or deceptive identity claims.",
-    "Realistic synthetic or public-interest content presented as authentic when a clear disclosure is required.",
-    "Content that violates law, intellectual-property, privacy, publicity, platform, or contractual rights.",
-  ],
-  it: [
-    "Decisioni su lavoro, gestione dei lavoratori, ammissione educativa, credito, assicurazioni, casa, salute, diritto, polizia, migrazione o ambiti simili.",
-    "Identificazione o categorizzazione biometrica, inferenza delle emozioni, social scoring o inferenza di caratteristiche personali sensibili.",
-    "Manipolazione, sfruttamento di vulnerabilità, sorveglianza illecita o raccolta di volti da internet o CCTV per creare dataset di riconoscimento.",
-    "Impersonificazione senza consenso, clonazione di voce o immagine, contenuti intimi sintetici, molestie, frode o dichiarazioni d’identità ingannevoli.",
-    "Contenuti sintetici realistici o di interesse pubblico presentati come autentici quando è richiesta un’indicazione chiara.",
-    "Contenuti che violano legge, proprietà intellettuale, privacy, diritto all’immagine, regole di piattaforma o obblighi contrattuali.",
-  ],
-} as const;
+function createBoundaries(ui: ReturnType<typeof useUiText>) {
+  return [
+    ui("Employment, worker management, education admissions, credit, insurance, housing, medical, legal, policing, migration, or similar decisions about people."),
+    ui("Biometric identification or categorization, emotion inference, social scoring, or inference of sensitive personal traits."),
+    ui("Manipulation, exploitation of vulnerability, unlawful surveillance, or collection of faces from the internet or CCTV to build recognition datasets."),
+    ui("Non-consensual impersonation, voice or likeness cloning, intimate synthetic content, harassment, fraud, or deceptive identity claims."),
+    ui("Realistic synthetic or public-interest content presented as authentic when a clear disclosure is required."),
+    ui("Content that violates law, intellectual-property, privacy, publicity, platform, or contractual rights."),
+  ];
+}
 
-const WORKFLOW = {
-  en: [
+function createWorkflow(ui: ReturnType<typeof useUiText>) {
+  return [
     {
-      title: "Rights",
+      title: ui("Rights"),
       detail:
-        "Confirm you may use every source file, reference frame, identifiable person, voice, brand, and third-party work.",
+        ui("Confirm you may use every source file, reference frame, identifiable person, voice, brand, and third-party work."),
       icon: FileCheck2,
     },
     {
-      title: "Human review",
+      title: ui("Human review"),
       detail:
-        "Check factual claims, identity, context, captions, timing, and the final media—not only the prompt or model response.",
+        ui("Check factual claims, identity, context, captions, timing, and the final media—not only the prompt or model response."),
       icon: UserRoundCheck,
     },
     {
-      title: "Provenance and disclosure",
+      title: ui("Provenance and disclosure"),
       detail:
-        "Preserve available origin evidence and add a clear, appropriately placed disclosure when realistic synthetic or public-interest content requires it.",
+        ui("Preserve available origin evidence and add a clear, appropriately placed disclosure when realistic synthetic or public-interest content requires it."),
       icon: Flag,
     },
-  ],
-  it: [
-    {
-      title: "Diritti",
-      detail:
-        "Conferma di poter usare ogni file sorgente, frame di riferimento, persona identificabile, voce, brand e opera di terzi.",
-      icon: FileCheck2,
-    },
-    {
-      title: "Revisione umana",
-      detail:
-        "Controlla claim, identità, contesto, caption, timing e media finale—non solo il prompt o la risposta del modello.",
-      icon: UserRoundCheck,
-    },
-    {
-      title: "Provenienza e indicazioni di trasparenza",
-      detail:
-        "Conserva l’evidenza disponibile sull’origine e aggiungi un’indicazione chiara e ben posizionata quando richiesta per contenuti sintetici realistici o di interesse pubblico.",
-      icon: Flag,
-    },
-  ],
-} as const;
+  ];
+}
 
 export default function ResponsibleUse() {
-  const { i18n } = useTranslation();
-  const language: Language = i18n.resolvedLanguage?.startsWith("it")
-    ? "it"
-    : "en";
-  const copy = COPY[language];
+  const ui = useUiText();
+  const copy = createCopy(ui);
+  const workflow = createWorkflow(ui);
+  const boundaries = createBoundaries(ui);
+  const allowed = createAllowed(ui);
 
   return (
     <PublicComplianceShell
@@ -189,7 +124,7 @@ export default function ResponsibleUse() {
             <h2 className="text-xl font-semibold">{copy.allowedTitle}</h2>
           </div>
           <ul className="mt-6 space-y-4">
-            {ALLOWED[language].map(item => (
+            {allowed.map(item => (
               <li
                 key={item}
                 className="flex gap-3 text-sm leading-6 text-foreground/60"
@@ -212,7 +147,7 @@ export default function ResponsibleUse() {
             <h2 className="text-xl font-semibold">{copy.boundaryTitle}</h2>
           </div>
           <ul className="mt-6 space-y-4">
-            {BOUNDARIES[language].map(item => (
+            {boundaries.map(item => (
               <li
                 key={item}
                 className="flex gap-3 text-sm leading-6 text-foreground/60"
@@ -232,7 +167,7 @@ export default function ResponsibleUse() {
         <p className="mono-eyebrow text-primary">{copy.workflowEyebrow}</p>
         <h2 className="mt-3 text-3xl font-semibold">{copy.workflowTitle}</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {WORKFLOW[language].map((step, index) => (
+          {workflow.map((step, index) => (
             <article
               key={step.title}
               className="rounded-2xl border border-border bg-surface p-6"

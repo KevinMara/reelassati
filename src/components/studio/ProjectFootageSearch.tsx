@@ -16,11 +16,6 @@ import type { ProjectFootageMatch } from "@/lib/project-footage-search";
 import { useAuth } from "@/hooks/useAuth";
 import { selectedBrand } from "@/lib/workspace-scope";
 
-const labels: Record<FootageSearchEvidence, string> = {
-  transcript: "Transcript",
-  "observed-scene": "Observed scene",
-  "clip-name": "Clip name",
-};
 function timeLabel(seconds: number) {
   const tenths = Math.round(seconds * 10),
     minutes = Math.floor(tenths / 600);
@@ -37,6 +32,11 @@ export function ProjectFootageSearch({
   onSelect: (clipId: string, time: number) => void;
 }) {
   const ui = useUiText();
+  const labels: Record<FootageSearchEvidence, string> = {
+    transcript: ui("Transcript"),
+    "observed-scene": ui("Observed scene"),
+    "clip-name": ui("Clip name"),
+  };
   const inputId = useId();
   const { user } = useAuth();
   const [query, setQuery] = useState("");
@@ -206,7 +206,7 @@ export function ProjectFootageSearch({
           className="text-xs text-foreground/60"
         >
           {matches.length
-            ? `${matches.length} matching ${matches.length === 1 ? ui("moment") : ui("moments")}${matches.length === PROJECT_FOOTAGE_SEARCH_LIMITS.results ? ui(" (showing the first 50)") : ""}`
+            ? ui(matches.length === 1 ? "{{count}} matching moment{{suffix}}" : "{{count}} matching moments{{suffix}}", { count: matches.length, suffix: matches.length === PROJECT_FOOTAGE_SEARCH_LIMITS.results ? ui(" (showing the first 50)") : "" })
             : ui(
                 "No matching source evidence. Try words from a caption or a shorter description."
               )}
@@ -226,7 +226,7 @@ export function ProjectFootageSearch({
             type="button"
             onClick={() => onSelect(match.clipId, match.start)}
             className="group w-full rounded-xl border border-border bg-background p-3 text-left transition-colors hover:border-primary/45 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-            aria-label={`Go to ${labels[match.evidence]} match in ${match.clipLabel} at ${timeLabel(match.start)}`}
+            aria-label={ui("Go to {{evidence}} match in {{name}} at {{time}}", { evidence: labels[match.evidence], name: match.clipLabel, time: timeLabel(match.start) })}
           >
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
               <span className="rounded bg-foreground/5 px-1.5 py-0.5 font-medium text-foreground/75">

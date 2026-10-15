@@ -26,7 +26,7 @@ export function AssetThumbnail({ asset }: { asset: Asset }) {
   return (
     <video
       src={`${asset.url}#t=0.1`}
-      aria-label={`Preview of ${asset.name}`}
+      aria-label={ui("Preview of {{name}}", { name: asset.name })}
       muted
       playsInline
       preload="metadata"

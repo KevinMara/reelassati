@@ -1,4 +1,4 @@
-/** Reviewed Portuguese interface copy; content language is independent. */
+/** Reviewed interface supplement; generated content language is independent. */
 export const portugueseUi: Record<string, string> = {
   "1,000-character voice clips": "clips de voz de 1.000 caracteres",
   "15s 720p videos without audio": "vídeos de 15 s em 720p sem áudio",
@@ -2909,4 +2909,1141 @@ export const portugueseUi: Record<string, string> = {
   "· ready to generate": "· pronto a gerar",
   "· speech timing": "· tempos da fala",
   "↵ Send": "↵ Enviar",
+  "2026 amending regulation": "Regulamento de alteração de 2026",
+  "A Studio tool is not working":
+    "Uma ferramenta do Studio não está a funcionar",
+  "A clean 9:16 timeline with every decision under your control.":
+    "Uma timeline 9:16 limpa, com cada decisão sob o seu controlo.",
+  "A clear teaching shot with space for editable graphics":
+    "Uma imagem didática clara com espaço para elementos gráficos editáveis",
+  "AI edit operations show an interval, reason, and confidence. They require approval and do not alter media automatically.":
+    "As operações de edição com IA mostram intervalo, motivo e confiança. Exigem aprovação e não alteram o conteúdo automaticamente.",
+  "AI music generation": "Geração de música com IA",
+  "AI processing happens only after a person requests the relevant action. Editing, project organization, trends notes, analytics summaries, and the landing-page preview do not silently invoke AI.":
+    "O processamento por IA só acontece depois de uma pessoa pedir a ação relevante. A edição, organização de projetos, notas de tendências, resumos estatísticos e pré-visualização da página inicial não invocam IA silenciosamente.",
+  "AI sfx generation": "Geração de efeitos sonoros com IA",
+  "Add exact labels, diagrams, and captions in the Studio so typography stays editable and correct.":
+    "Adicione etiquetas, diagramas e legendas exatos no Studio para manter a tipografia editável e correta.",
+  "Analysis of media you are authorized to process.":
+    "Análise de conteúdo que tem autorização para tratar.",
+  "Artifact and record verified": "Ficheiro e registo verificados",
+  "Assistance stays reviewable": "A assistência permanece verificável",
+  "Audio generation": "Geração de áudio",
+  "Authentic record token": "Token de registo autêntico",
+  "Authentic record, different artifact":
+    "Registo autêntico, ficheiro diferente",
+  "Balance migration": "Migração do saldo",
+  "Before delivery": "Antes da entrega",
+  "Biometric identification or categorization, emotion inference, social scoring, or inference of sensitive personal traits.":
+    "Identificação ou categorização biométrica, inferência de emoções, pontuação social ou inferência de características pessoais sensíveis.",
+  "Blank vertical edit": "Edição vertical em branco",
+  "Calendar event deleted": "Evento do calendário eliminado",
+  "Check factual claims, identity, context, captions, timing, and the final media—not only the prompt or model response.":
+    "Verifique afirmações factuais, identidade, contexto, legendas, tempos e o conteúdo final, além do pedido ou da resposta do modelo.",
+  "Check the evidence. Never guess the origin.":
+    "Verifique as provas. Nunca adivinhe a origem.",
+  "Choose a video file.": "Escolha um ficheiro de vídeo.",
+  "Choose file": "Escolher ficheiro",
+  "Choose one file at a time for this section.":
+    "Escolha um ficheiro de cada vez para esta secção.",
+  "Choose {{kind}}.": "Escolha {{kind}}.",
+  "Cinematic narrative": "Narrativa cinematográfica",
+  "Clean desk or board, deliberate gestures, graphic-safe negative space":
+    "Secretária ou quadro limpo, gestos deliberados, espaço livre para grafismos",
+  "Clean studio image for demos, education, and product proof":
+    "Imagem de estúdio limpa para demonstrações, ensino e provas do produto",
+  "Clean surface, tactile detail, realistic hand interaction":
+    "Superfície limpa, detalhe tátil, interação realista das mãos",
+  Clear: "Limpar",
+  "Clear about where AI works—and where it does not.":
+    "Clareza sobre onde a IA funciona e onde não funciona.",
+  "Commission Article 50 guidelines":
+    "Orientações da Comissão sobre o artigo 50.º",
+  "Confirm you may use every source file, reference frame, identifiable person, voice, brand, and third-party work.":
+    "Confirme que pode usar cada ficheiro original, fotograma de referência, pessoa identificável, voz, marca e obra de terceiros.",
+  "Content that violates law, intellectual-property, privacy, publicity, platform, or contractual rights.":
+    "Conteúdo que viole a lei ou direitos de propriedade intelectual, privacidade, imagem, plataforma ou contrato.",
+  "Controlled studio": "Estúdio controlado",
+  "Conversational delivery with natural facial and hand motion":
+    "Apresentação conversacional com movimentos naturais do rosto e das mãos",
+  "Create, edit, review, deliver": "Criar, editar, rever, entregar",
+  "Creates a named image from a directed prompt and stores the marked output in the private media library.":
+    "Cria uma imagem com nome a partir de um pedido dirigido e guarda o resultado marcado na biblioteca multimédia privada.",
+  "Creates scripts and proposed edit operations through a managed production route.":
+    "Cria guiões e operações de edição propostas através de um percurso de produção gerido.",
+  "Creative tools, with a clear boundary.":
+    "Ferramentas criativas com um limite claro.",
+  "Credit top-up": "Recarga de créditos",
+  "Current consolidated AI Act": "Regulamento de IA consolidado atual",
+  "Current official sources": "Fontes oficiais atuais",
+  "Current product behavior": "Funcionamento atual do produto",
+  "Current progress for {{name}} in {{unit}}":
+    "Progresso atual de {{name}} em {{unit}}",
+  "Current {{unit}}": "Valor atual: {{unit}}",
+  "DV camcorder": "Câmara de vídeo DV",
+  "Data path": "Percurso dos dados",
+  "Delete “{{name}}”?": "Eliminar «{{name}}»?",
+  "Designed for": "Concebido para",
+  "Dialogue-first pacing with room for captions and supporting shots.":
+    "Ritmo centrado no diálogo, com espaço para legendas e planos de apoio.",
+  "Direct-to-camera": "Direto para a câmara",
+  "Drop a file here, or click to choose":
+    "Largue um ficheiro aqui ou clique para escolher",
+  "Early-digital camcorder texture with spontaneous movement":
+    "Textura das primeiras câmaras digitais com movimento espontâneo",
+  "Edit plan": "Plano de edição",
+  "Edit planning": "Planeamento da edição",
+  "Edit {{name}}": "Editar {{name}}",
+  "Editable outputs": "Resultados editáveis",
+  "Educational clean plate": "Base didática limpa",
+  "Embedded media marker": "Marcador multimédia incorporado",
+  "Employment, worker management, education admissions, credit, insurance, housing, medical, legal, policing, migration, or similar decisions about people.":
+    "Decisões sobre emprego, gestão de trabalhadores, admissão escolar, crédito, seguros, habitação, medicina, direito, policiamento, migração ou decisões semelhantes sobre pessoas.",
+  "Evidence-based inspection": "Inspeção baseada em provas",
+  "Eye-level medium close-up, clean voice, gentle background falloff":
+    "Plano médio aproximado ao nível dos olhos, voz limpa, fundo suavemente desfocado",
+  "Faded color, chroma noise, autofocus hunting, candid motion":
+    "Cores desbotadas, ruído cromático, focagem automática instável, movimento espontâneo",
+  File: "Ficheiro",
+  "File to inspect": "Ficheiro a inspecionar",
+  "Forward motion with a readable environment and real cadence":
+    "Movimento em frente com ambiente legível e cadência real",
+  "Generate a clean visual bed; render exact type in Studio":
+    "Gere uma base visual limpa; crie o texto exato no Studio",
+  "Generated supporting footage or narration when you hold the necessary rights.":
+    "Filmagens de apoio ou narração geradas quando tem os direitos necessários.",
+  "Generates a new clip or continues a previous one from a directed prompt and optional reference frames.":
+    "Gera uma nova clip ou continua uma anterior a partir de um pedido dirigido e fotogramas de referência opcionais.",
+  "Handheld phone camera, window light, authentic room tone":
+    "Câmara de telemóvel à mão, luz de janela, som ambiente autêntico",
+  "Help me with publishing": "Ajude-me com a publicação",
+  "Hi — I’m REELassati Support. Tell me what you’re trying to do and what happened. I’ll troubleshoot it step by step, or prepare a complete support ticket when human help is the better route.":
+    "Olá, sou o Apoio REELassati. Diga-me o que está a tentar fazer e o que aconteceu. Vou ajudar passo a passo ou preparar um pedido completo de apoio quando a ajuda humana for o melhor caminho.",
+  "High-contrast plate, graphic-safe space, rhythmic visual movement":
+    "Base de alto contraste, espaço seguro para grafismos, movimento visual rítmico",
+  "Hook and proof": "Gancho e prova",
+  "Human control": "Controlo humano",
+  "Human review": "Revisão humana",
+  "Human-approved publishing and scheduling for connected accounts.":
+    "Publicação e agendamento aprovados por uma pessoa para contas ligadas.",
+  "I can't access my account": "Não consigo aceder à conta",
+  "I need to open a support ticket": "Preciso de abrir um pedido de apoio",
+  "If content appears to misuse your likeness, voice, work, or personal information, contact the human support channel with the relevant page, asset, or publication reference.":
+    "Se o conteúdo parecer usar indevidamente a sua imagem, voz, obra ou informações pessoais, contacte o apoio humano com a referência da página, ficheiro ou publicação relevante.",
+  "Image generation": "Geração de imagens",
+  "Image, video, audio, JSON, or text · up to 64 MB · not retained":
+    "Imagem, vídeo, áudio, JSON ou texto · até 64 MB · não conservado",
+  Informational: "Informativo",
+  "Inspect available provenance": "Inspecionar a proveniência disponível",
+  "Inspect pasted text or a media file for a REELassati provenance record and supported machine-readable signals. Inspection input is not retained. A missing signal means “not verified,” not “human-made.”":
+    "Inspecione texto colado ou um ficheiro multimédia à procura de um registo de proveniência REELassati e sinais legíveis por máquina suportados. A entrada da inspeção não é conservada. Um sinal em falta significa «não verificado», não «feito por uma pessoa».",
+  "Inspect provenance": "Inspecionar proveniência",
+  "Inspecting evidence": "A inspecionar provas",
+  "Inspection result": "Resultado da inspeção",
+  "Intended purpose": "Finalidade prevista",
+  "Intentional blocking, motivated light, and restrained movement":
+    "Posicionamento deliberado, luz motivada e movimento contido",
+  "Landscape video": "Vídeo horizontal",
+  "Macro material detail and a clear product action":
+    "Detalhe macro dos materiais e uma ação clara do produto",
+  "Managed processing": "Processamento gerido",
+  "Manipulation, exploitation of vulnerability, unlawful surveillance, or collection of faces from the internet or CCTV to build recognition datasets.":
+    "Manipulação, exploração de vulnerabilidades, vigilância ilegal ou recolha de rostos da internet ou de CCTV para criar conjuntos de dados de reconhecimento.",
+  Marking: "Marcação",
+  "Match method": "Método de correspondência",
+  "Media transcription": "Transcrição multimédia",
+  Meeting: "Reunião",
+  Missing: "Em falta",
+  "Motion-graphic plate": "Base para grafismos animados",
+  "Motivated camera move, atmospheric depth, filmic contrast":
+    "Movimento de câmara motivado, profundidade atmosférica, contraste cinematográfico",
+  "Music & sound effects": "Música e efeitos sonoros",
+  "Natural phone footage with believable framing imperfections":
+    "Filmagens naturais de telemóvel com imperfeições de enquadramento credíveis",
+  "Night color contrast": "Contraste de cor noturno",
+  "No result yet": "Ainda sem resultado",
+  "No verified match": "Sem correspondência verificada",
+  "Non-consensual impersonation, voice or likeness cloning, intimate synthetic content, harassment, fraud, or deceptive identity claims.":
+    "Personificação não consentida, clonagem de voz ou imagem, conteúdo sintético íntimo, assédio, fraude ou alegações de identidade enganadoras.",
+  "Not found": "Não encontrado",
+  "Not reported": "Não comunicado",
+  "Not required": "Não obrigatório",
+  "Not supported": "Não suportado",
+  "Nothing is sent for AI processing or publishing until you trigger generation, analysis, transcription, speech, or publishing.":
+    "Nada é enviado para processamento por IA ou publicação até iniciar geração, análise, transcrição, fala ou publicação.",
+  "Official legal reference": "Referência legal oficial",
+  "Official reference": "Referência oficial",
+  "Open provenance detector": "Abrir detetor de proveniência",
+  "Open support": "Abrir apoio",
+  Operation: "Operação",
+  "Original scripts, story structures, captions, and creative variants.":
+    "Guiões originais, estruturas de história, legendas e variantes criativas.",
+  "Output evidence": "Provas do resultado",
+  Partial: "Parcial",
+  "Paste the complete text or exported provenance block…":
+    "Cole o texto completo ou o bloco de proveniência exportado…",
+  "Pasted text": "Texto colado",
+  "Plans, not silent edits": "Planos, sem edições silenciosas",
+  "Platform record": "Registo da plataforma",
+  "Policy · 4 August 2026": "Política · 4 de agosto de 2026",
+  "Preserve available origin evidence and add a clear, appropriately placed disclosure when realistic synthetic or public-interest content requires it.":
+    "Preserve as provas de origem disponíveis e adicione uma divulgação clara e bem colocada quando o conteúdo sintético realista ou de interesse público o exigir.",
+  "Product proof": "Prova do produto",
+  "Prompts, brand context, interview answers, and the selected project context.":
+    "Pedidos, contexto da marca, respostas à entrevista e contexto do projeto selecionado.",
+  "Provenance and disclosure": "Proveniência e divulgação",
+  "Provenance can help identify origin and processing history. It does not prove that the content is accurate, lawful, authorized, or safe to publish.":
+    "A proveniência pode ajudar a identificar a origem e o histórico de processamento. Não prova que o conteúdo seja correto, legal, autorizado ou seguro para publicar.",
+  "Provenance detector": "Detetor de proveniência",
+  "Publication marking": "Marcação da publicação",
+  "REELassati combines manual production tools with reviewable AI assistance. This page identifies where AI is used, the information sent when you invoke it, and the controls that remain with you.":
+    "O REELassati combina ferramentas manuais de produção com assistência de IA verificável. Esta página identifica onde é usada IA, os dados enviados quando a invoca e os controlos que permanecem consigo.",
+  "REELassati is intended for human-directed creative and marketing production. It is not designed to make consequential decisions about people, infer sensitive traits, or present deceptive synthetic media as authentic.":
+    "O REELassati destina-se à produção criativa e de marketing dirigida por pessoas. Não foi concebido para tomar decisões de impacto sobre pessoas, inferir características sensíveis ou apresentar conteúdo sintético enganador como autêntico.",
+  "Realistic synthetic or public-interest content presented as authentic when a clear disclosure is required.":
+    "Conteúdo sintético realista ou de interesse público apresentado como autêntico quando é obrigatória uma divulgação clara.",
+  "Recorded at": "Registado em",
+  "Recorded origin": "Origem registada",
+  "Reel editing chat": "Chat de edição Reel",
+  "Reels, TikTok, Shorts": "Reels, TikTok, Shorts",
+  "Referral reward": "Recompensa por recomendação",
+  "Reflective night texture without generic cyberpunk excess":
+    "Textura noturna refletora sem excessos cyberpunk genéricos",
+  "Regulation (EU) 2026/1744": "Regulamento (UE) 2026/1744",
+  "Reply: {{label}}": "Responder: {{label}}",
+  "Report misuse or a rights concern":
+    "Comunicar uso indevido ou uma questão de direitos",
+  "Returned scripts, plans, transcripts, media, and publication packages remain visible and reviewable.":
+    "Os guiões, planos, transcrições, ficheiros e pacotes de publicação devolvidos permanecem visíveis e sujeitos a revisão.",
+  "Reviewable edit suggestions that a person can accept, reject, or ignore.":
+    "Sugestões de edição verificáveis que uma pessoa pode aceitar, rejeitar ou ignorar.",
+  "Reviews a supplied video for editorial hook, pacing, and time-based suggestions. Scores are rubric assessments, not predicted views.":
+    "Revê um vídeo fornecido quanto ao gancho editorial, ritmo e sugestões por tempo. As pontuações são avaliações de uma grelha, não previsões de visualizações.",
+  Rights: "Direitos",
+  "SHA-256 fingerprint": "Impressão digital SHA-256",
+  "Script generation": "Geração de guiões",
+  "Scripts and transcripts can be corrected before reuse. Generated media is previewed as a separate saved asset.":
+    "Os guiões e transcrições podem ser corrigidos antes de reutilizar. O conteúdo gerado é pré-visualizado como um ficheiro guardado separado.",
+  "See AI transparency": "Ver transparência da IA",
+  "Server mediates": "O servidor faz a mediação",
+  Shoot: "Filmagem",
+  "Square feed": "Feed quadrado",
+  "Structure product footage around an opening claim and visual proof.":
+    "Estruture as filmagens de produto à volta de uma afirmação inicial e de prova visual.",
+  "Support assistance": "Assistência de apoio",
+  "Support could not respond. Email {{email}}.":
+    "O apoio não conseguiu responder. Envie um e-mail para {{email}}.",
+  "System register": "Registo do sistema",
+  "Talking-head cut": "Edição de pessoa a falar para a câmara",
+  Task: "Tarefa",
+  "Text to inspect": "Texto a inspecionar",
+  "Text token": "Token de texto",
+  "The browser sends the request to REELassati; service credentials are never exposed to client code.":
+    "O navegador envia o pedido ao REELassati; as credenciais do serviço nunca são expostas no código do cliente.",
+  "The chosen video asset or a public HTTPS video URL.":
+    "O ficheiro de vídeo escolhido ou um URL HTTPS público de vídeo.",
+  "The compiled prompt, output settings, and optional reference-frame URLs.":
+    "O pedido compilado, as definições de saída e os URLs opcionais dos fotogramas de referência.",
+  "The content may come from another platform or may have had metadata removed.":
+    "O conteúdo pode vir de outra plataforma ou ter perdido os metadados.",
+  "The detector checks for a platform record and supported file or text signals. It returns an unknown or incomplete result when evidence is absent; it never guesses that content is AI-generated.":
+    "O detetor procura um registo da plataforma e sinais suportados no ficheiro ou texto. Devolve resultado desconhecido ou incompleto quando não há provas; nunca adivinha que o conteúdo foi gerado por IA.",
+  "The detector will show verified, partial, missing, and unsupported signals separately.":
+    "O detetor mostra separadamente os sinais verificados, parciais, em falta e não suportados.",
+  "The product does not present editorial scores as measured reach or guaranteed performance.":
+    "O produto não apresenta pontuações editoriais como alcance medido ou desempenho garantido.",
+  "The prompt, aspect ratio, resolution, and rights confirmations.":
+    "O pedido, a proporção, a resolução e as confirmações de direitos.",
+  "The provenance evidence could not be inspected.":
+    "Não foi possível inspecionar as provas de proveniência.",
+  "The record uses policy {{version}}; check for any material changes made afterward.":
+    "O registo usa a política {{version}}; verifique se houve alterações relevantes depois dessa versão.",
+  "The selected audio/video for transcription, or the copy and voice ID for speech.":
+    "O áudio/vídeo selecionado para transcrição ou o texto e ID da voz para fala.",
+  "The service did not find a verifiable REELassati record for the supplied evidence. This does not prove that the content was human-made.":
+    "O serviço não encontrou um registo REELassati verificável para as provas fornecidas. Isto não prova que o conteúdo tenha sido feito por uma pessoa.",
+  "The supplied text or file matches the REELassati record fingerprint. This verifies recorded provenance, not whether the content is true.":
+    "O texto ou ficheiro fornecido corresponde à impressão digital do registo REELassati. Isto verifica a proveniência registada, não a veracidade do conteúdo.",
+  "The task input, selected settings, and necessary technical request metadata are sent through REELassati's managed AI service. Service credentials stay on the server.":
+    "A entrada da tarefa, as definições selecionadas e os metadados técnicos necessários são enviados através do serviço gerido de IA do REELassati. As credenciais permanecem no servidor.",
+  "The task input, selected settings, and necessary technical request metadata are transferred to the managed AI or publishing service.":
+    "A entrada da tarefa, as definições selecionadas e os metadados técnicos necessários são transferidos para o serviço gerido de IA ou publicação.",
+  "The token belongs to an authentic record, but the supplied text or file does not match its fingerprint. Do not use this token as evidence for the current artifact.":
+    "O token pertence a um registo autêntico, mas o texto ou ficheiro fornecido não corresponde à sua impressão digital. Não use este token como prova do ficheiro atual.",
+  "The token identifies an authentic record, but no complete artifact was supplied for fingerprint comparison. This does not verify a specific text or file.":
+    "O token identifica um registo autêntico, mas não foi fornecido um ficheiro completo para comparar impressões digitais. Não verifica um texto ou ficheiro específico.",
+  "The verification service is not connected yet. Your input was not classified locally and no result was invented.":
+    "O serviço de verificação ainda não está ligado. A entrada não foi classificada localmente e não foi inventado nenhum resultado.",
+  "This page describes the product routes currently implemented. Managed AI actions remain unavailable until the service is ready, and an interface state is never presented as evidence that generation occurred.":
+    "Esta página descreve os percursos do produto atualmente implementados. As ações de IA geridas permanecem indisponíveis até o serviço estar pronto, e um estado da interface nunca é apresentado como prova de que ocorreu uma geração.",
+  "This page explains product behavior. It does not replace the official regulation or legal advice for a specific use.":
+    "Esta página explica o funcionamento do produto. Não substitui o regulamento oficial nem aconselhamento jurídico para um uso específico.",
+  "This policy is informed by the consolidated AI Act current from 27 July 2026 and Regulation (EU) 2026/1744. The official text remains authoritative.":
+    "Esta política baseia-se no Regulamento de IA consolidado em vigor desde 27 de julho de 2026 e no Regulamento (UE) 2026/1744. O texto oficial prevalece.",
+  "This transparency program uses the consolidated AI Act current from 27 July 2026, its amending regulation, and the Commission’s final Article 50 guidance. Product wording stays separate so the interface remains concise.":
+    "Este programa de transparência usa o Regulamento de IA consolidado em vigor desde 27 de julho de 2026, o regulamento que o altera e as orientações finais da Comissão sobre o artigo 50.º. O texto do produto mantém-se separado para a interface continuar concisa.",
+  "Three checks protect the work": "Três verificações protegem o trabalho",
+  "Three-point light, neutral background, precise focus":
+    "Iluminação de três pontos, fundo neutro, foco preciso",
+  "Timeline rendering": "Renderização da timeline",
+  "To verify the artifact, paste the complete text or upload the original file.":
+    "Para verificar o ficheiro, cole o texto completo ou carregue o ficheiro original.",
+  "Transcription and speech": "Transcrição e fala",
+  "Trend research": "Pesquisa de tendências",
+  "Truthful uncertainty": "Incerteza transparente",
+  "Turns selected media into editable text or approved copy into a generated narration asset.":
+    "Transforma o conteúdo selecionado em texto editável ou o texto aprovado num ficheiro de narração gerado.",
+  "Typography, counters, and CTA cards are added as deterministic Studio layers after generation.":
+    "A tipografia, os contadores e os cartões de apelo à ação são adicionados como camadas precisas do Studio após a geração.",
+  "UGC phone capture": "Captura UGC por telemóvel",
+  "Unknown type": "Tipo desconhecido",
+  Unsupported: "Não suportado",
+  "Updated 24 August 2026": "Atualizado em 24 de agosto de 2026",
+  "Upload up to {{count}} files at a time.":
+    "Carregue até {{count}} ficheiros de cada vez.",
+  "Use the Studio to develop scripts, edit media, analyze creative structure, generate supporting shots or narration, and prepare approved content for distribution.":
+    "Use o Studio para desenvolver guiões, editar conteúdo, analisar a estrutura criativa, gerar planos de apoio ou narração e preparar conteúdo aprovado para distribuição.",
+  Verified: "Verificado",
+  "Video analysis": "Análise de vídeo",
+  "Video review": "Revisão de vídeo",
+  "Walking follow shot, environmental detail, gentle body cadence":
+    "Plano de seguimento a caminhar, detalhes do ambiente, cadência corporal suave",
+  "Walking vlog": "Vlog a caminhar",
+  "Wet-surface reflections, practical lights, restrained atmosphere":
+    "Reflexos em superfícies molhadas, luzes práticas, atmosfera contida",
+  "What leaves the browser": "O que sai do navegador",
+  "What this result means": "O que significa este resultado",
+  "What uses AI": "O que usa IA",
+  "When evidence is missing, pause publication and resolve the rights, review, provenance, or transparency question first.":
+    "Quando faltam provas, pause a publicação e resolva primeiro a questão dos direitos, revisão, proveniência ou transparência.",
+  "Writing and edit planning": "Escrita e planeamento da edição",
+  "You choose": "Escolhe",
+  "You review": "Revê",
+  "a video file": "um ficheiro de vídeo",
+  "a video, audio, or image file": "um ficheiro de vídeo, áudio ou imagem",
+  "an audio file": "um ficheiro de áudio",
+  "an image, video, audio, JSON, Markdown, or text file":
+    "um ficheiro de imagem, vídeo, áudio, JSON, Markdown ou texto",
+  cinematic: "cinematográfico",
+  followers: "seguidores",
+  product: "produto",
+  realistic: "realista",
+  social: "social",
+  views: "visualizações",
+  "“{{name}}” is empty.": "«{{name}}» está vazio.",
+  "“{{name}}” is not supported here. Choose {{kind}}.":
+    "«{{name}}» não é suportado aqui. Escolha {{kind}}.",
+  "1 brand workspace": "1 espaço de marca",
+  "1 connected social account": "1 conta social ligada",
+  "10 brand workspaces": "10 espaços de marca",
+  "10 connected social accounts": "10 contas sociais ligadas",
+  "3 brand workspaces": "3 espaços de marca",
+  "5 connected social accounts": "5 contas sociais ligadas",
+  "Annual · pay for {{months}} months": "Anual · pague {{months}} meses",
+  "Calendar event created": "Evento do calendário criado",
+  "Calendar event updated": "Evento do calendário atualizado",
+  "Content activity charts and usage tracking":
+    "Gráficos de atividade de conteúdos e acompanhamento de utilização",
+  "Content library and publishing queue":
+    "Biblioteca de conteúdos e fila de publicação",
+  "Everything in Creator": "Tudo do Creator",
+  "Everything in Pro": "Tudo do Pro",
+  "For creators and small teams running several channels.":
+    "Para criadores e pequenas equipas que gerem vários canais.",
+  "For creators producing a larger volume of content.":
+    "Para criadores que produzem um volume maior de conteúdo.",
+  "For one creator building a repeatable short-form system.":
+    "Para um criador que constrói um sistema repetível de vídeos curtos.",
+  "Goal achieved": "Objetivo atingido",
+  "Goal progress updated": "Progresso do objetivo atualizado",
+  "Higher generation and publishing allowances":
+    "Limites de geração e publicação superiores",
+  "Image generated": "Imagem gerada",
+  "Library media added": "Conteúdo da Biblioteca adicionado",
+  "Media uploaded and added": "Conteúdo carregado e adicionado",
+  "Post published": "Publicação publicada",
+  "Post scheduled": "Publicação agendada",
+  "Precision Studio and reviewable edit plans":
+    "Estúdio de precisão e planos de edição verificáveis",
+  "Project created": "Projeto criado",
+  "Publication draft saved": "Rascunho de publicação guardado",
+  "Publication status updated": "Estado da publicação atualizado",
+  "Script generated": "Guião gerado",
+  "Script updated": "Guião atualizado",
+  "Scripts, Prompt Director, calendar, and analytics":
+    "Guiões, Diretor de pedidos, calendário e estatísticas",
+  "Shared library across creation tools":
+    "Biblioteca partilhada entre as ferramentas de criação",
+  "Speech generated": "Fala gerada",
+  "Version history and finished MP4 exports":
+    "Histórico de versões e exportações MP4 concluídas",
+  "Video continuation started": "Continuação do vídeo iniciada",
+  "Video generated": "Vídeo gerado",
+  "Video generation failed": "A geração do vídeo falhou",
+  "Video generation started": "Geração de vídeo iniciada",
+  "Voice note transcribed": "Nota de voz transcrita",
+  "Voice note turned into script": "Nota de voz transformada em guião",
+  "Voice note uploaded": "Nota de voz carregada",
+  "{{total}} USD billed annually": "{{total}} USD faturados anualmente",
+  "Already have an account?": "Já tem uma conta?",
+  "Analyze a video": "Analisar um vídeo",
+  "Back to login": "Voltar ao início de sessão",
+  "Build a shootable draft from your brief and Brand DNA.":
+    "Crie um rascunho pronto a filmar a partir do seu briefing e do DNA da marca.",
+  "Check your inbox for the reset link.":
+    "Veja na sua caixa de entrada a ligação de reposição.",
+  "Continue with Google": "Continuar com o Google",
+  "Create account": "Criar conta",
+  "Don't have an account?": "Não tem uma conta?",
+  "Enter your password": "Introduza a sua palavra-passe",
+  "Exit studio": "Sair do estúdio",
+  Features: "Funcionalidades",
+  "Forgot password?": "Esqueceu-se da palavra-passe?",
+  "Get started.": "Vamos começar.",
+  "Good afternoon": "Boa tarde",
+  "Good evening": "Boa noite",
+  "Good morning": "Bom dia",
+  "Inspect hook, pacing, and concrete edit opportunities.":
+    "Examine a abertura, o ritmo e oportunidades concretas de edição.",
+  "Let's start slow. Three steps to turn on the studio.":
+    "Vamos começar com calma. Três passos para ativar o estúdio.",
+  "Log in": "Iniciar sessão",
+  Login: "Início de sessão",
+  Password: "Palavra-passe",
+  "Pick up where you left off.": "Retome de onde ficou.",
+  "Posts this week": "Publicações desta semana",
+  "Publish a draft": "Publicar um rascunho",
+  "Reset password": "Repor palavra-passe",
+  "Save a draft or submit through configured destinations.":
+    "Guarde um rascunho ou envie através dos destinos configurados.",
+  "Send reset link": "Enviar ligação de reposição",
+  "Sign up": "Registar",
+  Social: "Redes sociais",
+  "Start from here": "Comece por aqui",
+  "We'll send you a reset link": "Vamos enviar-lhe uma ligação de reposição",
+  "Welcome back.": "Bem-vindo de volta.",
+  "Welcome to Reelassati.": "Bem-vindo ao Reelassati.",
+  "Write a script": "Escrever um guião",
+  "Your creative workspace, projects, and media in one secure account.":
+    "O seu espaço criativo, projetos e conteúdos numa única conta segura.",
+  " · {{duration}} s removed": " · {{duration}} s removidos",
+  "3D cube": "Cubo 3D",
+  "3D orbit": "Órbita 3D",
+  "3D title": "Título 3D",
+  "3D {{label}}": "{{label}} 3D",
+  "AI failures · 7 days": "Falhas de IA · 7 dias",
+  "About {{label}}": "Sobre {{label}}",
+  Accelerate: "Acelerar",
+  "Active portal with invoices and cancellation":
+    "Portal ativo com faturas e cancelamento",
+  "Active tax settings and a recorded tax registration":
+    "Definições fiscais ativas e um registo fiscal registado",
+  "Adapt the direction": "Adaptar a direção",
+  "Add an event with its title, date, and details. Edit or remove your event from its card when the plan changes.":
+    "Adicione um evento com título, data e detalhes. Edite ou remova o evento no respetivo cartão quando o plano mudar.",
+  "Add useful context": "Adicionar contexto útil",
+  "After sign-in, return to your studio. If you arrived from a plan choice, review the checkout that follows.":
+    "Depois de iniciar sessão, regresse ao estúdio. Se veio da escolha de um plano, reveja o pagamento que se segue.",
+  "Aligned to {{target}} · {{time}}": "Alinhado com {{target}} · {{time}}",
+  "Allow the sign-in step to finish. Your next page opens when the session is ready.":
+    "Deixe o início de sessão terminar. A página seguinte abre quando a sessão estiver pronta.",
+  "Answer each question in your own words. Include examples, turning points, and what changed for you.":
+    "Responda a cada pergunta pelas suas próprias palavras. Inclua exemplos, momentos decisivos e o que mudou para si.",
+  "Answer the follow-ups": "Responder às perguntas seguintes",
+  "Apply a creator code": "Aplicar um código de criador",
+  "Apply the workflow": "Aplicar o fluxo de trabalho",
+  "Apply to {{name}}": "Aplicar a {{name}}",
+  "Apply {{name}}": "Aplicar {{name}}",
+  Arrow: "Seta",
+  "Ask a focused question": "Fazer uma pergunta focada",
+  "Ask a specific question": "Fazer uma pergunta específica",
+  "Ask-first mode requests approval for optional additions beyond your brief. Auto mode allows those extras. Requested work and its necessary steps do not need repeated approval; paid actions still use the displayed credit limits.":
+    "O modo de perguntar primeiro pede aprovação para adições opcionais além do seu briefing. O modo automático permite esses extras. O trabalho pedido e os passos necessários não exigem aprovação repetida; as ações pagas continuam sujeitas aos limites de créditos apresentados.",
+  "Audience or engagement metrics appear only when the connection provides them. An unavailable value is not a measured zero.":
+    "As métricas de público ou interação só aparecem quando a ligação as fornece. Um valor indisponível não é um zero medido.",
+  "Audio gain key {{number}} gain multiplier":
+    "Multiplicador de ganho da chave de áudio {{number}}",
+  "Audio gain key {{number}} source second":
+    "Segundo de origem da chave de ganho de áudio {{number}}",
+  "Authorization rejected": "Autorização rejeitada",
+  "Billing verification is not active yet.":
+    "A verificação da faturação ainda não está ativa.",
+  Bottom: "Inferior",
+  "Brand DNA controls creative defaults. Appearance changes how the studio looks for you, including the light or dark theme.":
+    "O DNA da marca controla as predefinições criativas. A aparência muda o aspeto do estúdio para si, incluindo o tema claro ou escuro.",
+  "Bring a recording": "Trazer uma gravação",
+  "Browse the feature sections to see how writing, media creation, editing, and publishing fit together.":
+    "Percorra as secções de funcionalidades para ver como a escrita, a criação de conteúdos, a edição e a publicação se articulam.",
+  "Build a clear hook, useful middle, and ending that fits your audience.":
+    "Construa uma abertura clara, um desenvolvimento útil e um final adequado ao seu público.",
+  "Build a controlled test": "Construir um teste controlado",
+  "Build a motion kit": "Construir um kit de movimento",
+  "Build controlled variants in the Studio.":
+    "Crie variantes controladas no Estúdio.",
+  Callout: "Chamada visual",
+  "Camera distance": "Distância da câmara",
+  "Capabilities shows which services are connected. If a tool is unavailable, use the status information when asking support for help.":
+    "Capacidades mostra os serviços ligados. Se uma ferramenta estiver indisponível, use a informação de estado ao pedir ajuda ao suporte.",
+  "Card padding": "Margem interna do cartão",
+  "Carry useful ideas into your own brief with your subject, message, and references. Check the result against your actual source material.":
+    "Leve ideias úteis para o seu briefing com o seu tema, mensagem e referências. Confira o resultado com o material de origem real.",
+  "Change one creative variable at a time.":
+    "Altere uma variável criativa de cada vez.",
+  "Chapter with top rule": "Capítulo com linha superior",
+  "Check available credits and recent credit activity. The credit guide explains the actions you can run; paid generation shows its cost before it starts.":
+    "Veja os créditos disponíveis e a atividade recente. O guia de créditos explica as ações que pode executar; a geração paga mostra o custo antes de começar.",
+  "Check connection status": "Verificar o estado da ligação",
+  "Check database, media storage, AI, and publishing availability. A configured service may still return a specific error for an individual request.":
+    "Verifique a disponibilidade da base de dados, armazenamento, IA e publicação. Um serviço configurado pode ainda devolver um erro específico num pedido individual.",
+  "Check details, text, and composition in the result. Find recent images here or reuse the saved file from Library in an edit.":
+    "Verifique detalhes, texto e composição no resultado. Encontre aqui imagens recentes ou reutilize numa edição o ficheiro guardado na Biblioteca.",
+  "Check the available format, duration, and audio controls. Where a reference or continuity control is offered, use it to keep the next shot consistent.":
+    "Verifique os controlos de formato, duração e áudio disponíveis. Quando existir um controlo de referência ou continuidade, use-o para manter o plano seguinte consistente.",
+  "Check the displayed qualification rules and reward history. A signup and a verified reward are different stages.":
+    "Leia as regras de qualificação e o histórico de recompensas apresentados. Um registo e uma recompensa verificada são etapas diferentes.",
+  "Check the services and workspace information behind the tools you use.":
+    "Verifique os serviços e a informação do espaço de trabalho por trás das ferramentas que utiliza.",
+  "Check tool availability": "Verificar a disponibilidade das ferramentas",
+  "Check unavailable": "Verificação indisponível",
+  "Check your inbox and spam folder. Open the reset link in the email to choose a new password.":
+    "Verifique a caixa de entrada e a pasta de spam. Abra a ligação de reposição no email para escolher uma nova palavra-passe.",
+  "Choose a category relevant to the content you want to make.":
+    "Escolha uma categoria relevante para o conteúdo que pretende criar.",
+  "Choose a clear metric, target, and deadline. A concrete goal such as finishing four edits is easier to act on than “grow faster”.":
+    "Escolha uma métrica, meta e prazo claros. Um objetivo concreto, como terminar quatro edições, é mais fácil de executar do que «crescer mais depressa».",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview. Complete the release questions shown for that content.":
+    "Escolha um recurso terminado, escreva a legenda e as hashtags e reveja a pré-visualização da plataforma. Complete as perguntas de publicação apresentadas para esse conteúdo.",
+  "Choose a plan or top-up": "Escolher um plano ou carregamento",
+  "Choose a plan. If you are signed out, finish sign-in or signup with that plan selected, then review checkout before paying.":
+    "Escolha um plano. Se não tiver sessão iniciada, conclua o início de sessão ou registo com esse plano selecionado e reveja o pagamento antes de pagar.",
+  "Choose a platform and describe your niche, audience, or question. Narrow briefs return more relevant material than “what is viral?” alone.":
+    "Escolha uma plataforma e descreva o nicho, público ou pergunta. Briefings específicos devolvem material mais relevante do que apenas «o que é viral?».",
+  "Choose a relevant follow-up or write your own message. Keep the conversation focused on one issue for a clearer result.":
+    "Escolha uma resposta seguinte relevante ou escreva a sua própria mensagem. Mantenha a conversa centrada num problema para obter um resultado mais claro.",
+  "Choose a specific action, such as finishing an edit or preparing a draft, then follow the relevant tool link.":
+    "Escolha uma ação específica, como terminar uma edição ou preparar um rascunho, e siga a ligação da ferramenta correspondente.",
+  "Choose a starting style and adapt its brief to your project.":
+    "Escolha um estilo inicial e adapte o briefing ao seu projeto.",
+  "Choose a voice by listening": "Escolher uma voz ouvindo-a",
+  "Choose how extras are handled": "Escolher como são tratados os extras",
+  "Choose text or file": "Escolher texto ou ficheiro",
+  "Choose the billing period": "Escolher o período de faturação",
+  "Choose the brand": "Escolher a marca",
+  "Choose the destination": "Escolher o destino",
+  "Choose the output": "Escolher o resultado",
+  "Choose the platform and complete its authorization flow. Check the account name when you return to the studio.":
+    "Escolha a plataforma e conclua o fluxo de autorização. Confira o nome da conta quando regressar ao estúdio.",
+  "Choose the scope": "Escolher o âmbito",
+  "Choose the source": "Escolher a origem",
+  "Choose what would count as a real win.":
+    "Escolha o que contará como um resultado real.",
+  "Choose your brand": "Escolher a sua marca",
+  "Choose your sign-in method": "Escolher o método de início de sessão",
+  "Choose your starting point": "Escolher o ponto de partida",
+  "Click a clip to select it and move the playhead. Use its adjustments to refine it, drag its edges to trim, and use Split or Duplicate for another version. Higher numbered video tracks appear in front of lower ones.":
+    "Clique num clip para o selecionar e mover o cursor de reprodução. Use os ajustes para o aperfeiçoar, arraste as extremidades para aparar e use Dividir ou Duplicar para criar outra versão. As faixas de vídeo com números superiores aparecem à frente das inferiores.",
+  Clicks: "Cliques",
+  "Clip end": "Fim do clip",
+  "Clip name": "Nome do clip",
+  "Clip start": "Início do clip",
+  Comments: "Comentários",
+  "Compare plans and review the final terms in checkout.":
+    "Compare os planos e reveja as condições finais no pagamento.",
+  "Compare posts and publication history, then choose one improvement for the next piece. Use Goals or Weekly Review to keep that action visible.":
+    "Compare publicações e respetivo histórico e escolha uma melhoria para a peça seguinte. Use Objetivos ou Revisão semanal para manter essa ação visível.",
+  "Compare the displayed credits, connected-account limits, and billing period. Choose the option you need, then review the final checkout amount and terms.":
+    "Compare os créditos, limites de contas ligadas e período de faturação apresentados. Escolha a opção necessária e reveja o valor e as condições finais do pagamento.",
+  "Complete any verification shown after signup. If you already have an account, use Sign in to keep your existing work together.":
+    "Conclua qualquer verificação apresentada após o registo. Se já tem conta, use Iniciar sessão para manter o trabalho existente reunido.",
+  "Complete the password reset opened from your email link.":
+    "Conclua a reposição de palavra-passe aberta a partir da ligação no email.",
+  "Completing sign-in": "A concluir o início de sessão",
+  "Confirm the new password": "Confirmar a nova palavra-passe",
+  "Connect an account": "Ligar uma conta",
+  "Connect the accounts your studio will use for publishing and available metrics.":
+    "Ligue as contas que o estúdio usará para publicar e consultar as métricas disponíveis.",
+  "Contact & support": "Contacto e suporte",
+  "Continue to checkout": "Continuar para o pagamento",
+  "Continue your task": "Continuar a sua tarefa",
+  "Cookie policy": "Política de cookies",
+  "Copy selected clip": "Copiar clip selecionado",
+  "Copy your personal creator link or use the share control. Keep the referral code in the link so the signup can be attributed.":
+    "Copie a sua ligação pessoal de criador ou use o controlo de partilha. Mantenha o código de referência na ligação para permitir atribuir o registo.",
+  "Corner radius": "Raio dos cantos",
+  "Correct Stripe account with payment acceptance enabled":
+    "Conta Stripe correta com aceitação de pagamentos ativa",
+  Counter: "Contador",
+  "Counter from": "Contador de",
+  "Counter to": "Contador até",
+  "Create an account": "Criar uma conta",
+  "Create an image for a scene, cover, campaign, or visual reference.":
+    "Crie uma imagem para uma cena, capa, campanha ou referência visual.",
+  "Create without losing your place": "Criar sem perder o lugar",
+  "Crop bottom": "Recorte inferior",
+  "Crop left": "Recorte esquerdo",
+  "Crop right": "Recorte direito",
+  "Crop top": "Recorte superior",
+  "Curated automatically from hyperviral organic TikToks and Reels.":
+    "Selecionados automaticamente de TikToks e Reels orgânicos hipervirais.",
+  "Customer portal for invoices, plan changes and cancellation":
+    "Portal do cliente para faturas, mudanças de plano e cancelamento",
+  "Customize before using": "Personalizar antes de usar",
+  "Cut selected clip": "Cortar clip selecionado",
+  "Daily credit usage by tool over {{days}} days: {{credits}} credits. Exact totals listed below.":
+    "Utilização diária de créditos por ferramenta ao longo de {{days}} dias: {{credits}} créditos. Totais exatos apresentados abaixo.",
+  Darken: "Escurecer",
+  "Date unavailable": "Data indisponível",
+  Decelerate: "Desacelerar",
+  Define: "Definir",
+  "Define the research": "Definir a pesquisa",
+  "Delete line {{number}}": "Eliminar linha {{number}}",
+  "Delete saved style {{name}}": "Eliminar estilo guardado {{name}}",
+  "Delete selected clip": "Eliminar clip selecionado",
+  "Describe the audience and what you want to improve: hook, clarity, pace, or another editing goal. Review the displayed cost before analysis.":
+    "Descreva o público e o que pretende melhorar: abertura, clareza, ritmo ou outro objetivo de edição. Reveja o custo apresentado antes da análise.",
+  "Describe the composition": "Descrever a composição",
+  "Describe the idea, audience, and outcome. Concrete experiences give the interview more useful material than broad claims.":
+    "Descreva a ideia, público e resultado. Experiências concretas dão à entrevista material mais útil do que afirmações abrangentes.",
+  "Describe the outcome": "Descrever o resultado",
+  "Describe the problem": "Descrever o problema",
+  "Describe the shot": "Descrever o plano",
+  "Describe what makes it specific": "Descrever o que o torna específico",
+  "Describe your {{kind}}": "Descreva {{kind}}",
+  "Deselect {{word}}, {{start}} to {{end}} seconds":
+    "Desselecionar {{word}}, de {{start}} a {{end}} segundos",
+  Difference: "Diferença",
+  "Direct Reel in plain language": "Dirigir o Reel em linguagem simples",
+  Dissolve: "Dissolução",
+  Done: "Concluído",
+  "Drop to layer {{number}}": "Largar na camada {{number}}",
+  "Drop {{kind}} here": "Largue {{kind}} aqui",
+  "Duplicate selected clip": "Duplicar clip selecionado",
+  "Edit project": "Projeto de edição",
+  "Edit the selected clip": "Editar o clip selecionado",
+  "Edit {{name}} section": "Editar a secção {{name}}",
+  "Editable polygon": "Polígono editável",
+  "Enter the account email": "Introduzir o email da conta",
+  "Enter the same new password in both fields and follow the requirements displayed by the form.":
+    "Introduza a mesma nova palavra-passe nos dois campos e siga os requisitos apresentados pelo formulário.",
+  Entrance: "Entrada",
+  "Entrance duration": "Duração da entrada",
+  "Entrance transition": "Transição de entrada",
+  Exit: "Saída",
+  "Exit duration": "Duração da saída",
+  "Exit transition": "Transição de saída",
+  "Explore REELassati": "Explorar o REELassati",
+  "Explore examples and inspect the direction behind each one.":
+    "Explore exemplos e examine a direção por trás de cada um.",
+  "Explore the presentation": "Explorar a apresentação",
+  "Explore the tools": "Explorar as ferramentas",
+  Extrusion: "Extrusão",
+  Fade: "Desvanecimento",
+  "Fill frame": "Preencher o enquadramento",
+  "Fill in positioning, audience, and voice using concrete examples. Add the colors, visual references, and editing preferences that should stay consistent.":
+    "Preencha posicionamento, público e voz com exemplos concretos. Adicione as cores, referências visuais e preferências de edição que devem manter-se consistentes.",
+  "Filter the examples": "Filtrar os exemplos",
+  "Find a starting point": "Encontrar um ponto de partida",
+  "Find and organize footage, generated files, exports, and saved scripts.":
+    "Encontre e organize filmagens, ficheiros gerados, exportações e guiões guardados.",
+  "Find the date": "Encontrar a data",
+  "Find the operator information and official contact details published here.":
+    "Encontre a informação do operador e os contactos oficiais publicados aqui.",
+  "Find the right file": "Encontrar o ficheiro certo",
+  "Find the workflow you need, then open your studio.":
+    "Encontre o fluxo de trabalho de que precisa e abra o estúdio.",
+  "Finish one useful step": "Terminar um passo útil",
+  "Finish the update": "Concluir a atualização",
+  "Fit whole shot": "Enquadrar o plano completo",
+  "Flip horizontally": "Virar horizontalmente",
+  "Flip vertically": "Virar verticalmente",
+  "Follow the generation": "Acompanhar a geração",
+  "Follow the next step": "Seguir o passo seguinte",
+  "Follow the source links": "Seguir as ligações de origem",
+  "For a suggestion, describe the task you are trying to finish and how the change would help. Review the form before sending.":
+    "Para uma sugestão, descreva a tarefa que tenta terminar e como a mudança ajudaria. Reveja o formulário antes de enviar.",
+  From: "De",
+  "Gain for {{name}}": "Ganho de {{name}}",
+  "Generate a directed shot with a clear subject, action, and camera plan.":
+    "Gere um plano dirigido com tema, ação e plano de câmara claros.",
+  "Generated video preview: {{name}}":
+    "Pré-visualização do vídeo gerado: {{name}}",
+  Generating: "A gerar",
+  "Get focused help": "Obter ajuda focada",
+  "Get help with a specific task or send an issue for human review.":
+    "Obtenha ajuda para uma tarefa específica ou envie um problema para análise humana.",
+  "Give files descriptive names and use the available folders and favorites. Keep source footage distinct from final exports.":
+    "Dê nomes descritivos aos ficheiros e use as pastas e os favoritos disponíveis. Mantenha as filmagens de origem distintas das exportações finais.",
+  "Give the draft substance": "Dar substância ao rascunho",
+  "Go to Dashboard after sign-in to create and edit real projects.":
+    "Depois de iniciar sessão, vá ao Dashboard para criar e editar projetos reais.",
+  "Go to Publisher to select destinations for a post. Disconnect an account only when you no longer want the studio to use that connection.":
+    "Vá a Publicar para selecionar os destinos de uma publicação. Desligue uma conta apenas quando já não quiser que o estúdio use essa ligação.",
+  "Go to audio gain key {{number}}":
+    "Ir para a chave de ganho de áudio {{number}}",
+  "Go to {{evidence}} match in {{name}} at {{time}}":
+    "Ir para a correspondência {{evidence}} em {{name}} às {{time}}",
+  Graphics: "Elementos gráficos",
+  "Guide: {{title}}": "Guia: {{title}}",
+  "Guide: {{title}} (?)": "Guia: {{title}} (?)",
+  Highlight: "Realçar",
+  "Hold until next keyframe": "Manter até ao fotograma-chave seguinte",
+  "Hold, then jump": "Manter, depois saltar",
+  "Horizontal %": "Horizontal %",
+  "Horizontal position": "Posição horizontal",
+  "If a ticket is prepared, review its subject, description, and contact details before sending it. A prepared ticket is sent only after you submit it.":
+    "Se for preparado um pedido de suporte, reveja o assunto, descrição e contactos antes de o enviar. Um pedido preparado só é enviado depois da sua submissão.",
+  "If the page reports a failure, return to Sign in and try the same account method again. Include the error when contacting support.":
+    "Se a página indicar uma falha, regresse a Iniciar sessão e tente de novo com o mesmo método da conta. Inclua o erro quando contactar o suporte.",
+  "If you received a code, enter it in the claim section and read the confirmation or eligibility message.":
+    "Se recebeu um código, introduza-o na secção de resgate e leia a mensagem de confirmação ou elegibilidade.",
+  "If you used a social sign-in provider, use that provider’s access flow. Contact support if the account remains inaccessible.":
+    "Se usou um fornecedor de início de sessão social, use o fluxo de acesso desse fornecedor. Contacte o suporte se a conta continuar inacessível.",
+  Impressions: "Impressões",
+  "In Studio profile, review your details and timezone. Save changes before leaving the section.":
+    "No perfil do Estúdio, reveja os seus dados e fuso horário. Guarde as alterações antes de sair da secção.",
+  "In speech synthesis, filter voices and languages, read their tags, and play a sample. Generate from the final text after reviewing the credit cost, then use the audio file in your edit.":
+    "Na síntese de voz, filtre vozes e idiomas, leia as etiquetas e ouça uma amostra. Gere a partir do texto final depois de rever o custo em créditos e use o ficheiro de áudio na edição.",
+  "Include the project or file name and any error message. Keep passwords and API keys out of the report.":
+    "Inclua o nome do projeto ou ficheiro e qualquer mensagem de erro. Não inclua palavras-passe nem chaves API no relatório.",
+  "Include your specific example, evidence, and intended takeaway. Describe the tone you want and any facts or promises the script must avoid.":
+    "Inclua o seu exemplo específico, evidências e conclusão pretendida. Descreva o tom desejado e os factos ou promessas que o guião deve evitar.",
+  "Inspect and save": "Examinar e guardar",
+  "Inspect the preset": "Examinar a predefinição",
+  "Inspect the source": "Examinar a origem",
+  "Inspect your workspace": "Examinar o espaço de trabalho",
+  Interrupted: "Interrompido",
+  Isolate: "Isolar",
+  "Jobs over 30 minutes": "Tarefas acima de 30 minutos",
+  "Join REELassati with my creator link.":
+    "Junte-se ao REELassati através da minha ligação de criador.",
+  "Join REELassati with my creator link. I earn {{credits}} credits ({{value}} of product value) after you buy a paid plan.":
+    "Junte-se ao REELassati através da minha ligação de criador. Recebo {{credits}} créditos ({{value}} de valor do produto) depois de comprar um plano pago.",
+  "Keep brand and appearance separate": "Separar marca e aparência",
+  "Keep each brand’s audience, voice, visual identity, and editing defaults together.":
+    "Mantenha juntos o público, voz, identidade visual e predefinições de edição de cada marca.",
+  "Keep files recognizable": "Manter os ficheiros reconhecíveis",
+  "Keep progress current": "Manter o progresso atualizado",
+  "Key accepted": "Chave aceite",
+  "Key spending limit reached": "Limite de gastos da chave atingido",
+  "Keyframe {{label}}": "Fotograma-chave {{label}}",
+  "Land softly": "Terminar suavemente",
+  "Last sync: {{date}}. Missing metrics show —. Results can keep growing after publication.":
+    "Última sincronização: {{date}}. As métricas em falta mostram —. Os resultados podem continuar a crescer depois da publicação.",
+  Left: "Esquerda",
+  Lighten: "Clarear",
+  Likes: "Gostos",
+  Line: "Linha",
+  "Line {{number}} end": "Fim da linha {{number}}",
+  "Line {{number}} start": "Início da linha {{number}}",
+  Linear: "Linear",
+  "Linked accounts retained for future verification.":
+    "Contas ligadas mantidas para verificação futura.",
+  "Linked accounts that have not bought a paid plan.":
+    "Contas ligadas que não compraram um plano pago.",
+  "Linked {{date}} · waiting for paid plan":
+    "Ligação em {{date}} · à espera de um plano pago",
+  "Listen to {{name}} sample": "Ouvir amostra de {{name}}",
+  "Look for verifiable REELassati origin information in text or a file.":
+    "Procure informação de origem verificável do REELassati num texto ou ficheiro.",
+  "Manage an existing subscription": "Gerir uma subscrição existente",
+  "Manage the actual post": "Gerir a publicação real",
+  "Manage your plan later": "Gerir o plano mais tarde",
+  "Manage your profile, brand defaults, appearance, and available capabilities.":
+    "Gira o perfil, predefinições da marca, aparência e capacidades disponíveis.",
+  "Mask point {{number}} {{axis}}": "Ponto da máscara {{number}} {{axis}}",
+  "Move between months or return to today. Select a day to see its items; filters separate your events from publications.":
+    "Avance entre meses ou regresse a hoje. Selecione um dia para ver os respetivos itens; os filtros separam os seus eventos das publicações.",
+  "Move playhead by 1/30 second":
+    "Mover o cursor de reprodução 1/30 de segundo",
+  "Move playhead by one second": "Mover o cursor de reprodução um segundo",
+  "Move {{name}} down": "Mover {{name}} para baixo",
+  "Move {{name}} to folder": "Mover {{name}} para a pasta",
+  "Move {{name}} up": "Mover {{name}} para cima",
+  Multiply: "Multiplicar",
+  "Name + role with accent bar": "Nome + função com barra de destaque",
+  "Name of {{kind}} track {{number}}": "Nome da faixa {{kind}} {{number}}",
+  "Name the subject, setting, action, and visual style. For a timed sequence, say what should happen first and what changes next.":
+    "Indique tema, cenário, ação e estilo visual. Para uma sequência temporizada, diga o que deve acontecer primeiro e o que muda depois.",
+  "Needs attention": "Requer atenção",
+  "No mask": "Sem máscara",
+  "No match does not prove human authorship. Editing or re-encoding a file can also change its verifiable information.":
+    "A ausência de correspondência não prova autoria humana. Editar ou recodificar um ficheiro também pode alterar a informação verificável.",
+  None: "Nenhum",
+  Normal: "Normal",
+  Observe: "Observar",
+  "Observed scene": "Cena observada",
+  "Only confirmed paid-plan purchases count.":
+    "Só contam compras confirmadas de planos pagos.",
+  "Open Graphics → Motion kits for a brand reveal, speaker introduction, chapter, quote, statistic or closing card. Edit the text, accent and duration; the brand reveal can use a logo from Library. Add at the playhead, then refine the grouped layers on the timeline. Undo removes the whole insertion. These native templates use no AI credits.":
+    "Abra Gráficos → Kits de movimento para uma revelação de marca, apresentação de orador, capítulo, citação, estatística ou cartão final. Edite texto, destaque e duração; a revelação de marca pode usar um logótipo da Biblioteca. Adicione no cursor de reprodução e aperfeiçoe as camadas agrupadas na cronologia. Anular remove toda a inserção. Estes modelos nativos não usam créditos de IA.",
+  "Open a preset to read its direction and editable prompt. A preset supplies structure; your subject and source files make the result specific.":
+    "Abra uma predefinição para ler a direção e o prompt editável. A predefinição fornece estrutura; o seu tema e ficheiros de origem tornam o resultado específico.",
+  "Open a publication in Publisher to change its draft or schedule. A calendar event plans work; it does not publish a post. Check the displayed workspace timezone.":
+    "Abra uma publicação em Publicar para alterar o rascunho ou agendamento. Um evento de calendário planeia trabalho; não publica um post. Confira o fuso horário do espaço de trabalho apresentado.",
+  "Open a result and review its source link, date, and available evidence. A hypothesis is a proposed test, not proof that a format will perform.":
+    "Abra um resultado e reveja a ligação de origem, data e evidências disponíveis. Uma hipótese é um teste proposto, não uma prova de que um formato terá desempenho.",
+  "Open a walkthrough": "Abrir um guia prático",
+  "Open or create a project. Upload into Library, then drag a file to the exact time where it should begin. Preview, rename, sort, or organize files in folders before placing them.":
+    "Abra ou crie um projeto. Carregue para a Biblioteca e arraste um ficheiro para o instante exato em que deve começar. Pré-visualize, mude nomes, ordene ou organize os ficheiros em pastas antes de os colocar.",
+  "Open the brand you want to edit or create a new one. Confirm the active brand before changing its defaults.":
+    "Abra a marca que pretende editar ou crie uma nova. Confirme a marca ativa antes de alterar as predefinições.",
+  "Open the editor and drag the file from its Library panel to a specific time. Use a finished export when preparing a publication.":
+    "Abra o editor e arraste o ficheiro do painel Biblioteca para um instante específico. Use uma exportação concluída ao preparar uma publicação.",
+  "Open the evidence behind the next steps. Activity counts describe work done in the studio; they do not replace social performance metrics.":
+    "Abra as evidências por trás dos próximos passos. As contagens de atividade descrevem trabalho realizado no estúdio; não substituem métricas de desempenho social.",
+  "Open the reset email": "Abrir o email de reposição",
+  "Open the working studio": "Abrir o estúdio de trabalho",
+  "Open your studio": "Abrir o seu estúdio",
+  Overlay: "Sobrepor",
+  "Paid plan verified {{date}}": "Plano pago verificado em {{date}}",
+  "Pause {{name}}": "Pausar {{name}}",
+  "Pause {{name}} sample": "Pausar amostra de {{name}}",
+  Paused: "Em pausa",
+  "Payment issues": "Problemas de pagamento",
+  "Plain title / label": "Título / etiqueta simples",
+  "Plan a work session": "Planear uma sessão de trabalho",
+  Pop: "Salto",
+  Prefix: "Prefixo",
+  "Prepare the post": "Preparar a publicação",
+  "Prepare, review, and send a post to your connected accounts.":
+    "Prepare, reveja e envie uma publicação para as suas contas ligadas.",
+  "Preview beat at {{time}} seconds":
+    "Pré-visualizar batida aos {{time}} segundos",
+  "Preview of {{name}}": "Pré-visualização de {{name}}",
+  "Preview the studio’s introductory experience.":
+    "Pré-visualize a introdução do estúdio.",
+  "Preview {{name}}": "Pré-visualizar {{name}}",
+  "Privacy policy": "Política de privacidade",
+  Produce: "Produzir",
+  "Product value only; not withdrawable cash.":
+    "Apenas valor do produto; não é dinheiro levantável.",
+  "Quote + attribution": "Citação + atribuição",
+  "Rank {{number}}": "Posição {{number}}",
+  "Read how personal information is handled and which requests you can make.":
+    "Leia como são tratados os dados pessoais e que pedidos pode fazer.",
+  "Read how your inputs are processed and which controls you keep when creating and reviewing content.":
+    "Leia como são processados os seus dados de entrada e que controlos mantém ao criar e rever conteúdo.",
+  "Read missing data correctly": "Interpretar corretamente dados em falta",
+  "Read the accessibility statement and how to report a barrier.":
+    "Leia a declaração de acessibilidade e como comunicar uma barreira.",
+  "Read the applicable purchase and refund information before making a request.":
+    "Leia a informação aplicável de compra e reembolso antes de fazer um pedido.",
+  "Read the capability cards": "Ler os cartões de capacidades",
+  "Read the current text": "Ler o texto atual",
+  "Read the evidence and time ranges behind the suggestions. Queue useful changes in a project, then review the result in the editor.":
+    "Leia as evidências e os intervalos de tempo por trás das sugestões. Coloque alterações úteis em fila num projeto e reveja o resultado no editor.",
+  "Read the exact result": "Ler o resultado exato",
+  "Read the linked terms and privacy information before accepting and creating the account.":
+    "Leia os termos e a informação de privacidade ligados antes de aceitar e criar a conta.",
+  "Read the recommendation in context": "Ler a recomendação no contexto",
+  "Read the reward status": "Ler o estado da recompensa",
+  "Read the scope": "Ler o âmbito",
+  "Read the script aloud to check the pacing. Edit claims and wording, then save it for your next recording or editing project. Recent drafts keep previous work within reach.":
+    "Leia o guião em voz alta para verificar o ritmo. Edite as afirmações e a redação e guarde-o para a próxima gravação ou projeto de edição. Os rascunhos recentes mantêm o trabalho anterior à mão.",
+  "Recent activity links back to your work. The top bar opens your media and credit balance; each page has its own Guide.":
+    "A atividade recente liga de volta ao seu trabalho. A barra superior abre os conteúdos e saldo de créditos; cada página tem o seu Guia.",
+  "Recover access if needed": "Recuperar o acesso se necessário",
+  "Redo (also Ctrl + Y)": "Refazer (também Ctrl + Y)",
+  "Referral credits activate with verified paid-plan billing.":
+    "Os créditos de referências ativam-se com a verificação da faturação de planos pagos.",
+  "Refine, review, and export": "Aperfeiçoar, rever e exportar",
+  "Refresh the evidence": "Atualizar as evidências",
+  "Refresh the review to use the latest workspace activity. The review covers projects, drafts, publications, and active goals.":
+    "Atualize a revisão para usar a atividade mais recente do espaço de trabalho. A revisão abrange projetos, rascunhos, publicações e objetivos ativos.",
+  "Refund policy": "Política de reembolso",
+  "Relative depth": "Profundidade relativa",
+  "Remove audio gain key {{number}}":
+    "Remover chave de ganho de áudio {{number}}",
+  "Remove empty folder {{name}}": "Remover pasta vazia {{name}}",
+  "Remove mask point {{number}}": "Remover ponto da máscara {{number}}",
+  "Remove {{name}}": "Remover {{name}}",
+  "Replace generic details with your audience, message, and desired format, then continue with the available creation action.":
+    "Substitua detalhes genéricos pelo seu público, mensagem e formato pretendido e prossiga com a ação de criação disponível.",
+  "Report a concern": "Comunicar uma preocupação",
+  "Request a reset link for your existing account.":
+    "Peça uma ligação de reposição para a conta existente.",
+  "Research for “{{query}}”": "Pesquisa para «{{query}}»",
+  "Research formats and sources, then turn evidence into a testable idea.":
+    "Pesquise formatos e fontes e transforme evidências numa ideia testável.",
+  "Research with {{credits}} credits": "Pesquisar com {{credits}} créditos",
+  "Reset your password": "Repor a sua palavra-passe",
+  "Return to sign-in": "Regressar ao início de sessão",
+  "Return to the account that holds your projects and credits.":
+    "Regresse à conta que contém os seus projetos e créditos.",
+  "Review a support ticket": "Rever um pedido de suporte",
+  "Review and reuse": "Rever e reutilizar",
+  "Review available performance evidence and publication history.":
+    "Reveja as evidências de desempenho disponíveis e o histórico de publicação.",
+  "Review before applying": "Rever antes de aplicar",
+  "Review each account’s status and reconnect when requested. Available platforms and account limits are shown in the interface.":
+    "Reveja o estado de cada conta e volte a ligar quando solicitado. As plataformas disponíveis e os limites de contas são apresentados na interface.",
+  "Review recent studio activity and choose the next useful action.":
+    "Reveja a atividade recente do estúdio e escolha a próxima ação útil.",
+  "Review the account terms": "Rever os termos da conta",
+  "Review the credit cost before starting. Check the job status and the finished clip before using it; a generated file can be reused from Library.":
+    "Reveja o custo em créditos antes de começar. Confira o estado da tarefa e o clip concluído antes de o usar; um ficheiro gerado pode ser reutilizado a partir da Biblioteca.",
+  "Review the current value and update it with real results. Edit a goal when its scope changes rather than leaving an outdated target.":
+    "Reveja o valor atual e atualize-o com resultados reais. Edite um objetivo quando o seu âmbito mudar em vez de deixar uma meta desatualizada.",
+  "Review the generated hook, body, and ending. Check factual claims, then save the script or continue refining it.":
+    "Reveja a abertura, desenvolvimento e final gerados. Verifique as afirmações factuais e guarde o guião ou continue a aperfeiçoá-lo.",
+  "Review the next action": "Rever a ação seguinte",
+  "Review the product’s content rules and practical review steps.":
+    "Reveja as regras de conteúdo do produto e os passos práticos de revisão.",
+  "Review the relevant sections and the date shown on this page. Follow linked documents when you need the full context.":
+    "Reveja as secções relevantes e a data apresentada nesta página. Siga os documentos ligados quando precisar do contexto completo.",
+  "Review the reported match method and available record. Recorded origin, an embedded mark, and a verified file match provide different evidence.":
+    "Reveja o método de correspondência indicado e o registo disponível. Origem registada, marca incorporada e correspondência de ficheiro verificada fornecem evidências diferentes.",
+  "Review the systems": "Rever os sistemas",
+  "Review the terms that apply to your account and use of the service.":
+    "Reveja os termos aplicáveis à sua conta e utilização do serviço.",
+  "Review the whole edit before export. Your current device renders the video: keep the page open, and try 720p or a shorter edit if memory is limited. Download-only avoids a Library upload; Library saving makes the result available for later publication. AI media needs Library saving to finalize its source marking. Rendering uses no AI credits. AI generation, hosting and storage still have costs and allowances.":
+    "Reveja toda a edição antes de exportar. O dispositivo atual renderiza o vídeo: mantenha a página aberta e tente 720p ou uma edição mais curta se a memória for limitada. Só descarregar evita um carregamento para a Biblioteca; guardar na Biblioteca disponibiliza o resultado para publicação posterior. Conteúdos de IA precisam de ser guardados na Biblioteca para finalizar a marcação de origem. A renderização não usa créditos de IA. Geração de IA, alojamento e armazenamento continuam a ter custos e limites.",
+  "Review your plan, available credits, usage, and checkout options.":
+    "Reveja o plano, créditos disponíveis, utilização e opções de pagamento.",
+  Right: "Direita",
+  Rotation: "Rotação",
+  "Rotation °": "Rotação °",
+  "Rounded frame": "Moldura arredondada",
+  "Save a draft while refining the post. For scheduling, check the date, time, and timezone. Follow the returned status; a scheduled or submitted post is not yet proof of publication.":
+    "Guarde um rascunho enquanto aperfeiçoa a publicação. Ao agendar, confira data, hora e fuso horário. Siga o estado devolvido; uma publicação agendada ou submetida ainda não comprova a publicação efetiva.",
+  "Save and use the context": "Guardar e usar o contexto",
+  "Save the changes, then select that brand before writing or creating. Project-specific instructions can still refine the result.":
+    "Guarde as alterações e selecione essa marca antes de escrever ou criar. As instruções específicas do projeto podem ainda aperfeiçoar o resultado.",
+  "Save the useful format and define one change to test, such as the opening or pacing. Use workspace source material to connect the idea to your own content.":
+    "Guarde o formato útil e defina uma alteração a testar, como a abertura ou o ritmo. Use material de origem do espaço de trabalho para ligar a ideia ao seu conteúdo.",
+  "Save {{name}} to Library": "Guardar {{name}} na Biblioteca",
+  "Save, schedule, or publish": "Guardar, agendar ou publicar",
+  Saves: "Guardados",
+  "Say which page you used, what you expected, and what actually happened. Include the action that triggered the issue.":
+    "Indique a página usada, o que esperava e o que aconteceu. Inclua a ação que desencadeou o problema.",
+  Scale: "Escala",
+  "Scheduled for {{date}}.": "Agendado para {{date}}.",
+  Screen: "Ecrã",
+  "Search or filter by category, such as product, cinematic, social, or educational.":
+    "Pesquise ou filtre por categoria, como produto, cinematográfico, social ou educativo.",
+  "See a concrete example": "Ver um exemplo concreto",
+  "See dated posts and plan the work around them.":
+    "Veja publicações datadas e planeie o trabalho à sua volta.",
+  "Seek in {{kind}} {{number}}": "Procurar em {{kind}} {{number}}",
+  "Select a card to inspect its visual, prompt, and edit objective. Use those details to understand the choices behind the example.":
+    "Selecione um cartão para examinar o visual, prompt e objetivo de edição. Use esses detalhes para compreender as escolhas por trás do exemplo.",
+  "Select a workspace video, upload footage, or use a supported public video link. If a link cannot be read, upload the file you can access.":
+    "Selecione um vídeo do espaço de trabalho, carregue filmagens ou use uma ligação pública suportada. Se não for possível ler a ligação, carregue o ficheiro a que tem acesso.",
+  "Select the connected accounts that should receive the post. Connect or repair an account in Social Hub if it is unavailable.":
+    "Selecione as contas ligadas que devem receber a publicação. Ligue ou repare uma conta no Social Hub se estiver indisponível.",
+  "Select {{name}}": "Selecionar {{name}}",
+  "Select {{word}}, {{start}} to {{end}} seconds":
+    "Selecionar {{word}}, de {{start}} a {{end}} segundos",
+  "Selected range end": "Fim do intervalo selecionado",
+  "Selected range start": "Início do intervalo selecionado",
+  "Selected voice": "Voz selecionada",
+  "Send a reproducible issue or a focused product suggestion.":
+    "Envie um problema reproduzível ou uma sugestão de produto focada.",
+  "Send one clear request": "Enviar um pedido claro",
+  "Server API key with the required restricted permissions":
+    "Chave API do servidor com as permissões restritas necessárias",
+  "Set output and continuity": "Definir resultado e continuidade",
+  "Set studio preferences": "Definir preferências do estúdio",
+  "Set the image format for where it will be used. Review the displayed credit cost and any available reference settings before generating.":
+    "Defina o formato da imagem para onde será usada. Reveja o custo em créditos apresentado e as definições de referência disponíveis antes de gerar.",
+  "Set the subject": "Definir o tema",
+  "Set up access to your own studio.":
+    "Configure o acesso ao seu próprio estúdio.",
+  "Shape height % of width": "Altura da forma em % da largura",
+  "Shape the draft": "Dar forma ao rascunho",
+  "Shape the message": "Dar forma à mensagem",
+  "Shape width %": "Largura da forma %",
+  "Share the right link": "Partilhar a ligação certa",
+  "Share your creator link and follow verified referral rewards.":
+    "Partilhe a sua ligação de criador e acompanhe recompensas verificadas por referências.",
+  Shares: "Partilhas",
+  "Sign in": "Iniciar sessão",
+  "Sign in or create an account to work with your own files. Pricing explains the plans; Contact opens support.":
+    "Inicie sessão ou crie uma conta para trabalhar com os seus ficheiros. Preços explica os planos; Contacto abre o suporte.",
+  "Sign in with the email and password or the supported sign-in method you used before.":
+    "Inicie sessão com o email e palavra-passe ou com o método de início de sessão suportado que usou anteriormente.",
+  "Signed billing webhook": "Webhook de faturação assinado",
+  "Six subscription prices and three credit packs":
+    "Seis preços de subscrição e três pacotes de créditos",
+  Skipped: "Ignorado",
+  Slide: "Deslizamento",
+  "Slide from left": "Deslizar da esquerda",
+  "Slide from right": "Deslizar da direita",
+  "Smooth in and out": "Entrada e saída suaves",
+  "Smooth start and finish": "Início e fim suaves",
+  "Specify the subject, framing, background, lighting, and style. Include exact words only when the image needs text.":
+    "Especifique tema, enquadramento, fundo, iluminação e estilo. Inclua palavras exatas apenas quando a imagem precisar de texto.",
+  "Split selected clip at playhead":
+    "Dividir clip selecionado no cursor de reprodução",
+  "Spoken words from {{time}} seconds":
+    "Palavras faladas a partir dos {{time}} segundos",
+  "Start a project, continue recent work, or check what needs attention.":
+    "Inicie um projeto, continue trabalho recente ou verifique o que precisa de atenção.",
+  "Start slowly": "Começar com calma",
+  "Start with the allowed uses and stated boundaries for the content you intend to create.":
+    "Comece pelas utilizações permitidas e limites indicados para o conteúdo que pretende criar.",
+  "Start with your files": "Começar pelos seus ficheiros",
+  "Statistic + explanation": "Estatística + explicação",
+  "Steady speed": "Velocidade constante",
+  "Stripe Managed Payments handles indirect tax compliance":
+    "O Stripe Managed Payments trata das obrigações relativas a impostos indiretos",
+  "Stripe amounts, currencies and billing intervals match the website":
+    "Os valores, moedas e intervalos de faturação do Stripe correspondem ao site",
+  "Stroke width %": "Espessura do traço %",
+  "Studio introduction": "Introdução ao estúdio",
+  "Submit once and follow the confirmation to return to your account.":
+    "Submeta uma vez e siga a confirmação para regressar à conta.",
+  Suffix: "Sufixo",
+  "Switch between monthly and annual pricing before comparing. Check the total, included credits, and connected-account limit for each plan.":
+    "Alterne entre preços mensais e anuais antes de comparar. Confira o total, créditos incluídos e limite de contas ligadas de cada plano.",
+  "Tax collection explicitly disabled by the operator":
+    "Cobrança de impostos explicitamente desativada pelo operador",
+  "Tell Reel the result you want, such as “Add captions and a title for the first three seconds.” Use + or drop a reference into the chat for context. You can name a time range in your request.":
+    "Diga ao Reel o resultado pretendido, como «Adiciona legendas e um título nos primeiros três segundos.» Use + ou largue uma referência no chat para dar contexto. Pode indicar um intervalo de tempo no pedido.",
+  "Tell the support assistant what you are trying to do, which page you used, and the exact error. It can answer product questions and help prepare the next step.":
+    "Diga ao assistente de suporte o que tenta fazer, a página usada e o erro exato. Pode responder a perguntas sobre o produto e ajudar a preparar o passo seguinte.",
+  "The left tools hold Video, Image, Audio, Captions, and Graphics. Generated media appear as individual files with their own status; drag the finished result onto the timeline when you need it.":
+    "As ferramentas à esquerda incluem Vídeo, Imagem, Áudio, Legendas e Gráficos. Os conteúdos gerados aparecem como ficheiros individuais com estado próprio; arraste o resultado concluído para a cronologia quando precisar.",
+  "The register describes the AI functions offered by the platform and their intended use.":
+    "O registo descreve as funções de IA oferecidas pela plataforma e a sua utilização prevista.",
+  "The studio is finishing the provider’s sign-in response.":
+    "O estúdio está a concluir a resposta de início de sessão do fornecedor.",
+  "The ticket is securely recorded. For immediate delivery, also email {{email}} and include the reference above.":
+    "O pedido está registado em segurança. Para entrega imediata, envie também um email para {{email}} com a referência acima.",
+  "The workspace footprint summarizes stored work and connected resources. Use it to understand what is already present.":
+    "A dimensão do espaço de trabalho resume o trabalho guardado e os recursos ligados. Use-a para perceber o que já existe.",
+  "This form needs a valid reset session. If the page reports an expired or invalid link, request another reset.":
+    "Este formulário precisa de uma sessão de reposição válida. Se a página indicar uma ligação expirada ou inválida, peça outra reposição.",
+  "This page demonstrates the introduction and visual layout. Use the replay control to see the introduction again.":
+    "Esta página demonstra a introdução e disposição visual. Use o controlo de repetição para ver a introdução novamente.",
+  "Timed progress indicator": "Indicador de progresso temporizado",
+  "Timeline end": "Fim da cronologia",
+  "Timeline start": "Início da cronologia",
+  To: "Até",
+  Top: "Superior",
+  "Top posts by {{metric}}": "Melhores publicações por {{metric}}",
+  "Transcribe a voice note, shape it into a script, or generate a spoken track.":
+    "Transcreva uma nota de voz, transforme-a num guião ou gere uma faixa falada.",
+  "Trim end of {{name}}": "Aparar o fim de {{name}}",
+  "Trim start of {{name}}": "Aparar o início de {{name}}",
+  "Turn a content ambition into a measurable target and track progress.":
+    "Transforme uma ambição de conteúdo numa meta mensurável e acompanhe o progresso.",
+  "Turn evidence into a next step": "Transformar evidências num passo seguinte",
+  "Turn your own experience into a script through a guided conversation.":
+    "Transforme a sua experiência num guião através de uma conversa guiada.",
+  "Understand an absent match": "Compreender a ausência de correspondência",
+  "Understand necessary and optional technologies and your preference controls.":
+    "Compreenda as tecnologias necessárias e opcionais e os controlos das suas preferências.",
+  "Understand the balance": "Compreender o saldo",
+  "Understand the footage and turn time-specific findings into an edit plan.":
+    "Compreenda as filmagens e transforme conclusões temporais específicas num plano de edição.",
+  "Understand the workflow": "Compreender o fluxo de trabalho",
+  "Understand where AI is used and how to review its output.":
+    "Compreenda onde se usa IA e como rever os seus resultados.",
+  "Unexpected response": "Resposta inesperada",
+  "Unknown time": "Hora desconhecida",
+  "Upload an audio file or choose a saved source. Transcribe it, then review names and wording before using the text.":
+    "Carregue um ficheiro de áudio ou escolha uma origem guardada. Transcreva-o e reveja nomes e redação antes de usar o texto.",
+  "Use Forgot password to request a reset for an email-and-password account. Follow the message sent to that email address.":
+    "Use Esqueceu-se da palavra-passe para pedir uma reposição de uma conta com email e palavra-passe. Siga a mensagem enviada para esse endereço.",
+  "Use a file in your workflow": "Usar um ficheiro no seu fluxo de trabalho",
+  "Use an available sign-in provider or complete the name, email, and password fields. Use an email address you can access.":
+    "Use um fornecedor de início de sessão disponível ou preencha nome, email e palavra-passe. Use um endereço de email a que tenha acesso.",
+  "Use call to action {{number}}": "Usar chamada para ação {{number}}",
+  "Use connected accounts": "Usar contas ligadas",
+  "Use hook {{number}}": "Usar abertura {{number}}",
+  "Use search and type filters to narrow the library. Preview the asset to check its content before reusing it.":
+    "Use a pesquisa e filtros de tipo para restringir a biblioteca. Pré-visualize o recurso para verificar o conteúdo antes de o reutilizar.",
+  "Use the available account and period controls to compare the same scope. Check when the information was last synced.":
+    "Use os controlos de conta e período disponíveis para comparar o mesmo âmbito. Confira quando a informação foi sincronizada pela última vez.",
+  "Use the billing-management control for the options available to your subscription. If checkout does not open, read the on-page error or contact support with the selected plan.":
+    "Use o controlo de gestão de faturação para as opções disponíveis na sua subscrição. Se o pagamento não abrir, leia o erro na página ou contacte o suporte indicando o plano selecionado.",
+  "Use the brand switcher in the sidebar before working. Brand DNA holds the audience, voice, and visual direction for that brand.":
+    "Use o seletor de marca da barra lateral antes de trabalhar. O DNA da marca contém o público, voz e direção visual dessa marca.",
+  "Use the contact details in the document for a request. Include the section or account issue your question concerns.":
+    "Use os contactos no documento para fazer um pedido. Inclua a secção ou problema da conta a que a pergunta se refere.",
+  "Use the creation and review steps on this page before distributing the finished content.":
+    "Use os passos de criação e revisão desta página antes de distribuir o conteúdo concluído.",
+  "Use the email address associated with your account and submit the request.":
+    "Use o endereço de email associado à conta e submeta o pedido.",
+  "Use the exact source and measurable signal.":
+    "Use a origem exata e o sinal mensurável.",
+  "Use the linked policies and official sources for more detail, and Contact for a question about a specific workflow.":
+    "Use as políticas ligadas e fontes oficiais para mais detalhes e Contacto para uma pergunta sobre um fluxo específico.",
+  "Use the matching tab, then paste the text or select the original file you want to check.":
+    "Use o separador correspondente e cole o texto ou selecione o ficheiro original que pretende verificar.",
+  "Use the quick actions to write a script, create media, analyze footage, or open the editing studio. The sidebar keeps these tools available.":
+    "Use as ações rápidas para escrever um guião, criar conteúdos, analisar filmagens ou abrir o estúdio de edição. A barra lateral mantém estas ferramentas disponíveis.",
+  "Use the reported error": "Usar o erro apresentado",
+  "Use the reporting or contact links for a specific issue and provide enough context to identify the content.":
+    "Use as ligações de denúncia ou contacto para um problema específico e forneça contexto suficiente para identificar o conteúdo.",
+  "Use the reset link": "Usar a ligação de reposição",
+  "Use the suggested replies": "Usar as respostas sugeridas",
+  "Use the transcript as material for a short-form script. Give the script a clear audience and outcome rather than keeping every spoken detour.":
+    "Use a transcrição como material para um guião curto. Dê ao guião público e resultado claros em vez de manter todos os desvios da fala.",
+  "Use your active goals alongside Weekly Review to decide what to finish next.":
+    "Use os objetivos ativos com a Revisão semanal para decidir o que terminar a seguir.",
+  "Use your existing account": "Usar a conta existente",
+  "Vertical %": "Vertical %",
+  "Vertical position": "Posição vertical",
+  "Wait for the redirect": "Aguardar o redirecionamento",
+  "Walkthroughs show example workflows. Presets provide a starting direction that you can adapt to your own subject.":
+    "Os guias práticos mostram exemplos de fluxos de trabalho. As predefinições dão uma direção inicial que pode adaptar ao seu tema.",
+  "When reporting an issue, include the failing action and its error alongside the relevant status. Review the AI information available here when learning how the tools behave.":
+    "Ao comunicar um problema, inclua a ação que falha e o respetivo erro juntamente com o estado relevante. Reveja a informação de IA disponível aqui para aprender como funcionam as ferramentas.",
+  "Wipe from bottom": "Revelar de baixo",
+  "Wipe from left": "Revelar da esquerda",
+  "Wipe from right": "Revelar da direita",
+  "Wipe from top": "Revelar de cima",
+  Working: "A trabalhar",
+  "Write from a brief for a defined idea, or choose Interview me to develop it through questions. Set the audience, goal, and intended length.":
+    "Escreva a partir de um briefing para uma ideia definida ou escolha Entrevista-me para a desenvolver através de perguntas. Defina público, objetivo e duração pretendida.",
+  Yesterday: "Ontem",
+  "Your choice": "A sua escolha",
+  "Your media on the left, preview in the center, Reel on the right, and the timeline below.":
+    "Os seus conteúdos à esquerda, pré-visualização ao centro, Reel à direita e cronologia em baixo.",
+  "Your studio": "O seu estúdio",
+  "Your studio’s Plan & credits page holds balance, usage, top-ups, and the available subscription-management controls.":
+    "A página Plano e créditos do estúdio contém saldo, utilização, carregamentos e controlos de gestão de subscrição disponíveis.",
+  "Zoom reveal": "Revelação com zoom",
+  image: "imagem",
+  "updated {{date}}": "atualizado em {{date}}",
+  video: "vídeo",
+  "{{action}} clips in {{kind}} {{number}}":
+    "{{action}} clips em {{kind}} {{number}}",
+  "{{count}} files · ": "{{count}} ficheiros · ",
+  "{{count}} matching moments{{suffix}}":
+    "{{count}} momentos correspondentes{{suffix}}",
+  "{{count}} matching moment{{suffix}}":
+    "{{count}} momento correspondente{{suffix}}",
+  "{{count}} measured cut points in this source's timeline interval.":
+    "{{count}} pontos de corte medidos no intervalo de cronologia desta origem.",
+  "{{count}} of {{total}} preparation checks complete":
+    "{{count}} de {{total}} verificações de preparação concluídas",
+  "{{count}} word selected{{suffix}}":
+    "{{count}} palavra selecionada{{suffix}}",
+  "{{count}} words selected{{suffix}}":
+    "{{count}} palavras selecionadas{{suffix}}",
+  "{{credits}} credits used for this completed custom research.":
+    "{{credits}} créditos usados nesta pesquisa personalizada concluída.",
+  "{{credits}} earned through referrals.":
+    "{{credits}} ganhos através de referências.",
+  "{{label}} value": "Valor de {{label}}",
+  "{{name}} editing chat": "Chat de edição de {{name}}",
+  "{{name}} for still images": "{{name}} para imagens estáticas",
+  "{{name}} preview": "Pré-visualização de {{name}}",
+  "{{name}} sample playback position":
+    "Posição de reprodução da amostra de {{name}}",
+  "{{name}} saved to Library": "{{name}} guardado na Biblioteca",
+  "{{name}} voice sample": "Amostra de voz de {{name}}",
+  "{{name}} · Drag to move; drag edges to trim":
+    "{{name}} · Arraste para mover; arraste as extremidades para aparar",
+  "{{name}} · {{start}}–{{end}}. Select to seek; use Edit to rename or adjust.":
+    "{{name}} · {{start}}–{{end}}. Selecione para procurar; use Editar para mudar o nome ou ajustar.",
+  "{{name}}, {{kind}} {{number}}, {{start}} to {{end}}":
+    "{{name}}, {{kind}} {{number}}, de {{start}} a {{end}}",
+  "{{name}}, {{start}} to {{end}}": "{{name}}, de {{start}} a {{end}}",
+  "{{size}} MB": "{{size}} MB",
+  "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
+  "{{title}} on {{platform}}": "{{title}} em {{platform}}",
 };

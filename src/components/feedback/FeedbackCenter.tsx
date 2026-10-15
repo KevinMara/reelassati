@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
@@ -609,7 +609,9 @@ function OwnerInbox({
                       {item.type}
                     </span>
                     <span className="text-[10px] text-foreground/35">
-                      {new Date(item.createdAt).toLocaleDateString()}
+                      {new Date(item.createdAt).toLocaleDateString(
+                        getUiLocale()
+                      )}
                     </span>
                   </div>
                   <p className="mt-2 line-clamp-2 text-sm font-medium">
@@ -643,7 +645,7 @@ function OwnerInbox({
                   </h3>
                   <p className="mt-2 text-xs text-foreground/45">
                     {selected.requesterName} · {selected.requesterEmail} ·{" "}
-                    {new Date(selected.createdAt).toLocaleString()}
+                    {new Date(selected.createdAt).toLocaleString(getUiLocale())}
                   </p>
                 </div>
                 {savingId === selected.id ? (

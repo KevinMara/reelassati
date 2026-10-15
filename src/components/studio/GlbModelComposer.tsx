@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   DEFAULT_GLB_POSE,
@@ -144,7 +144,7 @@ export function GlbModelComposer({
       {model && (
         <>
           <p className="break-words text-xs text-foreground/60">
-            {model.name} · {model.triangles.toLocaleString()}{" "}
+            {model.name} · {model.triangles.toLocaleString(getUiLocale())}{" "}
             {ui("triangles ·")} {model.images} {ui("embedded textures")}
           </p>
           {controls.map(control => (

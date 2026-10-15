@@ -110,23 +110,23 @@ function referenceKey(ref: EditorChatReference) {
       ? `url:${ref.url}`
       : `text:${ref.name}:${ref.text}`;
 }
-function actionStateLabel(action: EditorChatAction) {
+function actionStateLabel(action: EditorChatAction, ui: ReturnType<typeof useUiText>) {
   const labels = {
-    pending: "Queued",
-    "awaiting-approval": "Your choice",
-    running: "Working",
-    completed: "Done",
-    skipped: "Skipped",
-    failed: "Needs attention",
-    blocked: "Paused",
-    interrupted: "Interrupted",
+    pending: ui("Queued"),
+    "awaiting-approval": ui("Your choice"),
+    running: ui("Working"),
+    completed: ui("Done"),
+    skipped: ui("Skipped"),
+    failed: ui("Needs attention"),
+    blocked: ui("Paused"),
+    interrupted: ui("Interrupted"),
   };
   if (
     action.status === "interrupted" &&
     action.kind === "generate" &&
     action.runtime?.jobId
   )
-    return "Generating";
+    return ui("Generating");
   return labels[action.status];
 }
 
@@ -361,7 +361,7 @@ export function EditorChat({
 
   return (
     <section
-      aria-label={`${EDITOR_ASSISTANT_NAME} editing chat`}
+      aria-label={ui("{{name}} editing chat", { name: EDITOR_ASSISTANT_NAME })}
       className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface"
       onDragEnter={event => {
         if (supportedDrop(event)) {
@@ -962,7 +962,7 @@ export function EditorChat({
                   </span>
                   <button
                     type="button"
-                    aria-label={`Remove ${refLabel(ref)}`}
+                    aria-label={ui("Remove {{name}}", { name: refLabel(ref) })}
                     onClick={() =>
                       setReferences(current =>
                         current.filter((_, i) => i !== index)
@@ -1271,7 +1271,7 @@ function ActionCard({
         {needsChoice ? (
           <input
             type="checkbox"
-            aria-label={`Select ${action.label}`}
+            aria-label={ui("Select {{name}}", { name: action.label })}
             checked={selected}
             onChange={onSelect}
             className="mt-1 size-4 shrink-0 appearance-none rounded-full border border-foreground/35 checked:border-primary checked:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
@@ -1298,7 +1298,7 @@ function ActionCard({
             {action.label}
           </p>
           <div className="mt-0.5 flex flex-wrap gap-x-2 text-[10px] text-foreground/45">
-            <span>{actionStateLabel(action)}</span>
+            <span>{actionStateLabel(action, ui)}</span>
             <span>
               {action.credits
                 ? ui("{{credits}} credits", { credits: action.credits })

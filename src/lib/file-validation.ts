@@ -8,10 +8,33 @@ interface FileLike {
 
 interface FileSelectionOptions {
   language?: "en" | "it";
+  text?: (source: string, values?: Record<string, string | number>) => string;
   maxFiles?: number;
   multiple?: boolean;
   purpose: FilePurpose;
 }
+
+export const FILE_SELECTION_UI_COPY = {
+  video: "a video file",
+  audio: "an audio file",
+  provenance: "an image, video, audio, JSON, Markdown, or text file",
+  media: "a video, audio, or image file",
+  choose: "Choose {{kind}}.",
+  single: "Choose one file at a time for this section.",
+  limit: "Upload up to {{count}} files at a time.",
+  empty: "“{{name}}” is empty.",
+  unsupported: "“{{name}}” is not supported here. Choose {{kind}}.",
+};
+
+const ITALIAN_FILE_SELECTION_COPY: Record<string, string> = {
+  [FILE_SELECTION_UI_COPY.choose]: "Scegli {{kind}}.",
+  [FILE_SELECTION_UI_COPY.single]:
+    "Scegli un solo file alla volta per questa sezione.",
+  [FILE_SELECTION_UI_COPY.limit]: "Carica fino a {{count}} file alla volta.",
+  [FILE_SELECTION_UI_COPY.empty]: "“{{name}}” è vuoto.",
+  [FILE_SELECTION_UI_COPY.unsupported]:
+    "“{{name}}” non è supportato qui. Scegli {{kind}}.",
+};
 
 export type FileSelectionResult<T extends FileLike> =
   { files: T[]; error: null } | { files: []; error: string };
@@ -81,34 +104,40 @@ export function validateFileSelection<T extends FileLike>(
     maxFiles = 12,
     multiple = false,
     purpose,
+    text,
   }: FileSelectionOptions
 ): FileSelectionResult<T> {
+  const ui =
+    text ??
+    ((source: string, values: Record<string, string | number> = {}) => {
+      const copy =
+        language === "it"
+          ? ITALIAN_FILE_SELECTION_COPY[source] || source
+          : source;
+      return copy.replace(/\{\{(\w+)\}\}/g, (token, key) =>
+        values[key] === undefined ? token : String(values[key])
+      );
+    });
+  const kind = text
+    ? text(FILE_SELECTION_UI_COPY[purpose])
+    : expectedFileLabel(purpose, language);
   const files = Array.from(candidates);
   if (files.length === 0) {
     return {
       files: [],
-      error:
-        language === "it"
-          ? `Scegli ${expectedFileLabel(purpose, language)}.`
-          : `Choose ${expectedFileLabel(purpose, language)}.`,
+      error: ui(FILE_SELECTION_UI_COPY.choose, { kind }),
     };
   }
   if (!multiple && files.length > 1) {
     return {
       files: [],
-      error:
-        language === "it"
-          ? "Scegli un solo file alla volta per questa sezione."
-          : "Choose one file at a time for this section.",
+      error: ui(FILE_SELECTION_UI_COPY.single),
     };
   }
   if (multiple && files.length > maxFiles) {
     return {
       files: [],
-      error:
-        language === "it"
-          ? `Carica fino a ${maxFiles} file alla volta.`
-          : `Upload up to ${maxFiles} files at a time.`,
+      error: ui(FILE_SELECTION_UI_COPY.limit, { count: maxFiles }),
     };
   }
 
@@ -116,10 +145,7 @@ export function validateFileSelection<T extends FileLike>(
   if (empty) {
     return {
       files: [],
-      error:
-        language === "it"
-          ? `“${empty.name}” è vuoto.`
-          : `“${empty.name}” is empty.`,
+      error: ui(FILE_SELECTION_UI_COPY.empty, { name: empty.name }),
     };
   }
 
@@ -127,10 +153,10 @@ export function validateFileSelection<T extends FileLike>(
   if (unsupported) {
     return {
       files: [],
-      error:
-        language === "it"
-          ? `“${unsupported.name}” non è supportato qui. Scegli ${expectedFileLabel(purpose, language)}.`
-          : `“${unsupported.name}” is not supported here. Choose ${expectedFileLabel(purpose, language)}.`,
+      error: ui(FILE_SELECTION_UI_COPY.unsupported, {
+        name: unsupported.name,
+        kind,
+      }),
     };
   }
 

@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
 import {
   Check,
@@ -16,6 +16,7 @@ import { writeClipboardText } from "@/lib/clipboard";
 
 export default function ReferralPage() {
   const ui = useUiText();
+  const locale = getUiLocale();
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [creditBalance, setCreditBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -101,8 +102,11 @@ export default function ReferralPage() {
         await navigator.share({
           title: "REELassati",
           text: billingReady
-            ? `Join REELassati with my creator link. I earn ${stats.rewardCredits} credits (${stats.rewardDollarValue} of product value) after you buy a paid plan.`
-            : "Join REELassati with my creator link.",
+            ? ui(
+                "Join REELassati with my creator link. I earn {{credits}} credits ({{value}} of product value) after you buy a paid plan.",
+                { credits: stats.rewardCredits, value: stats.rewardDollarValue }
+              )
+            : ui("Join REELassati with my creator link."),
           url: stats.shareUrl,
         });
         return;
@@ -172,31 +176,41 @@ export default function ReferralPage() {
         <Metric
           icon={Users}
           label={ui("Successful referrals")}
-          value={loading ? "—" : String(stats?.completedReferrals ?? 0)}
+          value={
+            loading
+              ? "—"
+              : (stats?.completedReferrals ?? 0).toLocaleString(locale)
+          }
           detail={
             billingReady
-              ? "Only confirmed paid-plan purchases count."
-              : "Billing verification is not active yet."
+              ? ui("Only confirmed paid-plan purchases count.")
+              : ui("Billing verification is not active yet.")
           }
         />
         <Metric
           icon={Link2}
           label={ui("Pending referrals")}
-          value={loading ? "—" : String(stats?.pendingReferrals ?? 0)}
+          value={
+            loading
+              ? "—"
+              : (stats?.pendingReferrals ?? 0).toLocaleString(locale)
+          }
           detail={
             billingReady
-              ? "Linked accounts that have not bought a paid plan."
-              : "Linked accounts retained for future verification."
+              ? ui("Linked accounts that have not bought a paid plan.")
+              : ui("Linked accounts retained for future verification.")
           }
         />
         <Metric
           icon={Coins}
           label={ui("Available credits")}
-          value={creditBalance.toLocaleString()}
+          value={creditBalance.toLocaleString(locale)}
           detail={
             billingReady
-              ? `${stats?.creditsEarned.toLocaleString() ?? 0} earned through referrals.`
-              : "Referral credits activate with verified paid-plan billing."
+              ? ui("{{credits}} earned through referrals.", {
+                  credits: (stats?.creditsEarned ?? 0).toLocaleString(locale),
+                })
+              : ui("Referral credits activate with verified paid-plan billing.")
           }
           tone="emerald"
         />
@@ -204,7 +218,7 @@ export default function ReferralPage() {
           icon={Gift}
           label={ui("Referral value earned")}
           value={stats?.dollarValue ?? "$0.00"}
-          detail="Product value only; not withdrawable cash."
+          detail={ui("Product value only; not withdrawable cash.")}
           tone="primary"
         />
       </div>
@@ -301,8 +315,16 @@ export default function ReferralPage() {
                     </p>
                     <p className="text-xs text-foreground/70">
                       {referral.status === "verified"
-                        ? `Paid plan verified ${new Date(referral.qualifiedAt ?? referral.createdAt).toLocaleDateString()}`
-                        : `Linked ${new Date(referral.createdAt).toLocaleDateString()} · waiting for paid plan`}
+                        ? ui("Paid plan verified {{date}}", {
+                            date: new Date(
+                              referral.qualifiedAt ?? referral.createdAt
+                            ).toLocaleDateString(locale),
+                          })
+                        : ui("Linked {{date}} · waiting for paid plan", {
+                            date: new Date(
+                              referral.createdAt
+                            ).toLocaleDateString(locale),
+                          })}
                     </p>
                   </div>
                   <div className="text-right">
@@ -310,7 +332,7 @@ export default function ReferralPage() {
                       className={`text-sm font-semibold ${referral.status === "verified" ? "text-emerald-500" : "text-foreground/70"}`}
                     >
                       {referral.status === "verified"
-                        ? `+${referral.creditsAwarded}`
+                        ? `+${referral.creditsAwarded.toLocaleString(locale)}`
                         : ui("Pending")}
                     </p>
                     <p className="text-xs text-foreground/70">
@@ -358,10 +380,10 @@ export default function ReferralPage() {
             {ui("Apply code")}
           </button>
           {notice ? (
-            <p className="mt-3 text-xs text-emerald-500">{notice}</p>
+            <p className="mt-3 text-xs text-emerald-500">{ui(notice)}</p>
           ) : null}
           {error ? (
-            <p className="mt-3 text-xs text-destructive">{error}</p>
+            <p className="mt-3 text-xs text-destructive">{ui(error)}</p>
           ) : null}
           <div className="mt-5 flex gap-2 border-t border-border pt-4">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />

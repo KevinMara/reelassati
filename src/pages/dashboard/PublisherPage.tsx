@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -479,7 +479,11 @@ function PublisherComposer() {
             : publishNow
               ? "The publishing service accepted your publication."
               : result.post.status === "scheduled"
-                ? `Scheduled for ${new Date(result.post.scheduledAt || scheduledAt!).toLocaleString()}.`
+                ? ui("Scheduled for {{date}}.", {
+                    date: new Date(
+                      result.post.scheduledAt || scheduledAt!
+                    ).toLocaleString(getUiLocale()),
+                  })
                 : "The publishing service accepted the schedule request and is still confirming its state."),
       });
       if (result.post.status !== "failed") {
@@ -717,7 +721,9 @@ function PublisherComposer() {
                 className="w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/30"
               />
               <p className="mt-1 text-right text-xs text-foreground/70">
-                {withoutTextProvenanceMarker(caption).length.toLocaleString()}{" "}
+                {withoutTextProvenanceMarker(caption).length.toLocaleString(
+                  getUiLocale()
+                )}{" "}
                 {ui("characters")}
               </p>
             </div>

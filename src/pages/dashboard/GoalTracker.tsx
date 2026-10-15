@@ -1,4 +1,5 @@
 import { useUiText } from "@/lib/i18n/ui";
+import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useMemo, useState } from "react";
 import {
@@ -63,6 +64,8 @@ function progressFor(goal: Goal) {
 
 export default function GoalTracker() {
   const ui = useUiText();
+  const { i18n } = useTranslation();
+  const interfaceLocale = i18n.resolvedLanguage || i18n.language || "en";
   const { workspace, updateWorkspace, saving, error } = useWorkspace();
   const [showAdd, setShowAdd] = useState(false);
   const [label, setLabel] = useState("");
@@ -173,7 +176,7 @@ export default function GoalTracker() {
   };
 
   const deleteGoal = async (goal: Goal) => {
-    if (!window.confirm(`Delete “${goal.label}”?`)) return;
+    if (!window.confirm(ui("Delete “{{name}}”?", { name: goal.label }))) return;
     setActionError(null);
     try {
       await updateWorkspace(current => ({
@@ -213,13 +216,15 @@ export default function GoalTracker() {
             <div className="min-w-0">
               <h3 className="truncate text-sm font-medium">{goal.label}</h3>
               <p className="mt-0.5 text-xs text-foreground/70">
-                {meta.label}
+                {ui(meta.label)}
                 {goal.platform ? ` · ${goal.platform}` : ui(" · all platforms")}
               </p>
               {goal.deadline && (
                 <p className="mt-1 flex items-center gap-1 text-xs text-foreground/70">
                   <CalendarDays className="h-3 w-3" />
-                  {new Date(`${goal.deadline}T12:00:00`).toLocaleDateString()}
+                  {new Date(`${goal.deadline}T12:00:00`).toLocaleDateString(
+                    interfaceLocale
+                  )}
                 </p>
               )}
             </div>
@@ -231,7 +236,7 @@ export default function GoalTracker() {
               onClick={() => void deleteGoal(goal)}
               disabled={saving}
               className="rounded-lg p-1.5 text-foreground/25 transition-colors hover:bg-red-500/10 hover:text-red-500"
-              aria-label={`Delete ${goal.label}`}
+              aria-label={ui("Delete {{name}}", { name: goal.label })}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -246,10 +251,10 @@ export default function GoalTracker() {
         </div>
         <div className="mt-2 flex items-center justify-between text-xs">
           <span className="text-foreground/70">
-            {goal.current.toLocaleString()} {meta.unit}
+            {goal.current.toLocaleString(interfaceLocale)} {ui(meta.unit)}
           </span>
           <span className="text-foreground/70">
-            {ui("Target")} {goal.target.toLocaleString()}
+            {ui("Target")} {goal.target.toLocaleString(interfaceLocale)}
           </span>
         </div>
 
@@ -268,8 +273,11 @@ export default function GoalTracker() {
             onKeyDown={event => {
               if (event.key === "Enter") void updateProgress(goal);
             }}
-            placeholder={`Current ${meta.unit}`}
-            aria-label={`Current progress for ${goal.label} in ${meta.unit}`}
+            placeholder={ui("Current {{unit}}", { unit: ui(meta.unit) })}
+            aria-label={ui("Current progress for {{name}} in {{unit}}", {
+              name: goal.label,
+              unit: ui(meta.unit),
+            })}
             className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs"
           />
           <button
@@ -319,7 +327,7 @@ export default function GoalTracker() {
           role="alert"
           className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-500"
         >
-          {actionError || error}
+          {ui(actionError || error || "")}
         </div>
       )}
 
@@ -382,7 +390,7 @@ export default function GoalTracker() {
               >
                 {Object.entries(METRIC_META).map(([value, meta]) => (
                   <option key={value} value={value}>
-                    {meta.label}
+                    {ui(meta.label)}
                   </option>
                 ))}
               </StudioSelect>

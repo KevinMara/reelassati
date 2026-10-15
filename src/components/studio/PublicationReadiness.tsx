@@ -37,7 +37,7 @@ export function PublicationReadiness({ post }: { post: ScheduledPost }) {
         ))}
       </div>
       <progress
-        aria-label={`${count} of ${checks.length} preparation checks complete`}
+        aria-label={ui("{{count}} of {{total}} preparation checks complete", { count, total: checks.length })}
         className="h-1 w-full accent-primary"
         value={count}
         max={checks.length}

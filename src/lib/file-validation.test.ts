@@ -1,9 +1,41 @@
 import { describe, expect, it } from "vitest";
+import { createInstance } from "i18next";
 import { validateFileSelection } from "./file-validation";
 
 const file = (name: string, type: string, size = 10) => ({ name, type, size });
 
 describe("file selection validation", () => {
+  it("uses the selected interface translator for errors while preserving source filenames", async () => {
+    const instance = createInstance();
+    await instance.init({
+      lng: "fr",
+      defaultNS: "ui",
+      keySeparator: false,
+      nsSeparator: false,
+      resources: {
+        fr: {
+          ui: {
+            "a video file": "un fichier vidéo",
+            "“{{name}}” is not supported here. Choose {{kind}}.":
+              "« {{name}} » n'est pas pris en charge ici. Choisissez {{kind}}.",
+          },
+        },
+      },
+      interpolation: { escapeValue: false },
+    });
+    const source = file("My English source.pdf", "application/pdf");
+    const result = validateFileSelection([source], {
+      purpose: "video",
+      language: "it",
+      text: (key, values) => instance.t(key, values),
+    });
+    expect(result).toEqual({
+      files: [],
+      error:
+        "« My English source.pdf » n'est pas pris en charge ici. Choisissez un fichier vidéo.",
+    });
+    expect(source.name).toBe("My English source.pdf");
+  });
   it("accepts the same valid media whether selected or dropped", () => {
     const files = [file("clip.mp4", "video/mp4")];
     expect(validateFileSelection(files, { purpose: "video" })).toEqual({

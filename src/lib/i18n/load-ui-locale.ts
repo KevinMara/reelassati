@@ -38,7 +38,18 @@ export function loadUiLocale(
       import("./locales/ui-critical-west"),
       supplement,
     ]).then(([critical, full]) => ({ ...full, ...critical.westernUi[code] }));
-  } else if (["ru", "uk", "pl", "ro", "tr"].includes(code)) {
+  } else if (["pl", "tr", "ro"].includes(code)) {
+    const supplement =
+      code === "pl"
+        ? import("./locales/ui-pl").then(module => module.polishUi)
+        : code === "tr"
+          ? import("./locales/ui-tr").then(module => module.turkishUi)
+          : import("./locales/ui-ro").then(module => module.romanianUi);
+    pending = Promise.all([
+      import("./locales/ui-critical-east"),
+      supplement,
+    ]).then(([critical, full]) => ({ ...full, ...critical.easternUi[code] }));
+  } else if (["ru", "uk"].includes(code)) {
     pending = import("./locales/ui-critical-east").then(
       module => module.easternUi[code]
     );
@@ -50,6 +61,18 @@ export function loadUiLocale(
     pending = import("./locales/ui-critical-asian").then(
       module => module.asianUi[code]
     );
+  } else if (["nl", "da"].includes(code)) {
+    const supplement =
+      code === "nl"
+        ? import("./locales/ui-nl").then(module => module.dutchUi)
+        : import("./locales/ui-da").then(module => module.danishUi);
+    pending = Promise.all([
+      import("./locales/ui-critical-europe"),
+      supplement,
+    ]).then(([critical, full]) => ({
+      ...full,
+      ...critical.europeanUi[code],
+    }));
   } else {
     pending = import("./locales/ui-critical-europe").then(
       module => module.europeanUi[code]

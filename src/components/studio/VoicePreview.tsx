@@ -45,7 +45,7 @@ function VoicePreviewPlayer({
   const [duration, setDuration] = useState(0);
   const [time, setTime] = useState(0);
   const [error, setError] = useState("");
-  const name = findVoice(voice)?.name || "Selected voice";
+  const name = findVoice(voice)?.name || ui("Selected voice");
 
   useEffect(() => {
     const player = audio.current;
@@ -101,7 +101,7 @@ function VoicePreviewPlayer({
           disabled={disabled || busy}
           onClick={() => void toggleSample()}
           className="flex shrink-0 items-center gap-1.5 rounded-md text-xs font-medium text-primary outline-none hover:text-primary/80 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-          aria-label={`${playing ? ui("Pause") : ui("Listen to")} ${name} sample`}
+          aria-label={ui(playing ? "Pause {{name}} sample" : "Listen to {{name}} sample", { name })}
         >
           {busy ? (
             <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
@@ -124,7 +124,7 @@ function VoicePreviewPlayer({
               max={duration}
               step={0.05}
               value={time}
-              aria-label={`${name} sample playback position`}
+              aria-label={ui("{{name}} sample playback position", { name })}
               onChange={event => {
                 const next = Number(event.target.value);
                 if (audio.current) audio.current.currentTime = next;
@@ -145,7 +145,7 @@ function VoicePreviewPlayer({
       <audio
         ref={audio}
         preload="none"
-        aria-label={`${name} voice sample`}
+        aria-label={ui("{{name}} voice sample", { name })}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}

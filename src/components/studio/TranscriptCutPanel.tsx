@@ -141,7 +141,7 @@ function TranscriptCutPanelBody({
                 key={group.id}
                 className="flex flex-wrap gap-1.5"
                 role="group"
-                aria-label={`Spoken words from ${group.words[0].start.toFixed(2)} seconds`}
+                aria-label={ui("Spoken words from {{time}} seconds", { time: group.words[0].start.toFixed(2) })}
               >
                 {group.words.map(word => {
                   const wordKey = transcriptWordSelectionKey(word);
@@ -152,7 +152,7 @@ function TranscriptCutPanelBody({
                       key={wordKey}
                       disabled={disabled}
                       aria-pressed={active}
-                      aria-label={`${active ? ui("Deselect") : ui("Select")} ${word.text}, ${word.start.toFixed(2)} to ${word.end.toFixed(2)} seconds`}
+                      aria-label={ui(active ? "Deselect {{word}}, {{start}} to {{end}} seconds" : "Select {{word}}, {{start}} to {{end}} seconds", { word: word.text, start: word.start.toFixed(2), end: word.end.toFixed(2) })}
                       title={`${word.start.toFixed(3)}–${word.end.toFixed(3)} s`}
                       onKeyDown={event => event.stopPropagation()}
                       onClick={() => {
@@ -200,7 +200,7 @@ function TranscriptCutPanelBody({
               aria-live="polite"
             >
               {selected.length
-                ? `${selected.length} ${selected.length === 1 ? ui("word") : ui("words")} selected${validationError ? "" : ` · ${removedDuration.toFixed(3)} s removed`}`
+                ? ui(selected.length === 1 ? "{{count}} word selected{{suffix}}" : "{{count}} words selected{{suffix}}", { count: selected.length, suffix: validationError ? "" : ui(" · {{duration}} s removed", { duration: removedDuration.toFixed(3) }) })
                 : ui("Select words to cut")}
             </span>
             <button

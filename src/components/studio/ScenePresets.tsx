@@ -84,7 +84,7 @@ export function ScenePresets({
       </div>
       {notice && (
         <p role="status" className="mt-2 text-xs text-foreground/70">
-          {notice}
+          {ui(notice)}
         </p>
       )}
     </div>

@@ -56,7 +56,7 @@ export function LibraryAssetCard({
             e.dataTransfer.effectAllowed = "copy";
           }}
           onClick={() => setPreview(true)}
-          aria-label={`Preview ${asset.name}`}
+          aria-label={ui("Preview {{name}}", { name: asset.name })}
           title={ui("Preview file · drag onto the timeline to place it")}
           className={`group relative flex cursor-grab items-center justify-center overflow-hidden rounded-lg border border-border bg-background/70 active:cursor-grabbing ${view === "grid" ? "aspect-video w-full" : "h-12 w-16 shrink-0"}`}
         >
@@ -124,7 +124,7 @@ export function LibraryAssetCard({
                     setName(asset.name);
                     setEditing(true);
                   }}
-                  aria-label={`Rename ${asset.name}`}
+                  aria-label={ui("Rename {{name}}", { name: asset.name })}
                   className="shrink-0 rounded p-1 text-foreground/45 hover:bg-primary/10 hover:text-primary"
                 >
                   <Pencil size={12} />

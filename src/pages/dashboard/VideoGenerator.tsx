@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { ScenePresets } from "@/components/studio/ScenePresets";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -516,13 +516,13 @@ export default function VideoGenerator() {
                   }`}
                 >
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">{item.name}</span>
+                    <span className="text-sm font-medium">{ui(item.name)}</span>
                     <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-xs uppercase tracking-wider text-foreground/65">
-                      {item.category}
+                      {ui(item.category)}
                     </span>
                   </span>
                   <span className="mt-1 block text-xs leading-relaxed text-foreground/65">
-                    {item.description}
+                    {ui(item.description)}
                   </span>
                 </button>
               ))}
@@ -565,7 +565,7 @@ export default function VideoGenerator() {
                       invalidateRightsAttestations();
                     }}
                     aria-pressed={ratio === item.id}
-                    title={item.description}
+                    title={ui(item.description)}
                     className={`rounded-lg border px-2 py-2.5 text-center transition-colors ${
                       ratio === item.id
                         ? "border-primary bg-primary/5 text-primary"
@@ -717,7 +717,9 @@ export default function VideoGenerator() {
                       return (
                         <option key={candidate.id} value={candidate.id}>
                           {asset?.name ?? "Generated clip"} ·{" "}
-                          {new Date(candidate.createdAt).toLocaleDateString()}
+                          {new Date(candidate.createdAt).toLocaleDateString(
+                            getUiLocale()
+                          )}
                         </option>
                       );
                     })}
@@ -1148,7 +1150,8 @@ export default function VideoGenerator() {
                 <>
                   <Sparkles className="h-4 w-4" />
                   {ui("Generate video ·")}{" "}
-                  {generationCreditCost.toLocaleString()} {ui("credits")}
+                  {generationCreditCost.toLocaleString(getUiLocale())}{" "}
+                  {ui("credits")}
                 </>
               )}
             </button>
@@ -1240,7 +1243,9 @@ export default function VideoGenerator() {
                   src={resultAsset.url}
                   controls
                   preload="metadata"
-                  aria-label={`Generated video preview: ${resultAsset.name}`}
+                  aria-label={ui("Generated video preview: {{name}}", {
+                    name: resultAsset.name,
+                  })}
                   aria-describedby="generated-video-caption-status"
                   className="h-full w-full object-contain"
                 />

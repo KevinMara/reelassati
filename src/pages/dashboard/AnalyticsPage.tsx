@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { SocialPerformance } from "@/components/studio/SocialPerformance";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -98,6 +98,7 @@ const ANALYTICS_RANGES = [
 
 export default function AnalyticsPage() {
   const ui = useUiText();
+  const locale = getUiLocale();
   const { workspace, loading } = useWorkspace();
   const [selectedMetrics, setSelectedMetrics] = useState<AnalyticsMetricKey[]>([
     "published",
@@ -107,8 +108,8 @@ export default function AnalyticsPage() {
   const [rangeDays, setRangeDays] = useState(14);
 
   const chartSeries = useMemo(
-    () => buildAnalyticsSeries(workspace, rangeDays),
-    [rangeDays, workspace]
+    () => buildAnalyticsSeries(workspace, rangeDays, new Date(), locale),
+    [rangeDays, workspace, locale]
   );
   const metricTotals = useMemo(
     () =>
@@ -529,7 +530,7 @@ export default function AnalyticsPage() {
                     <time dateTime={post.publishedAt || post.createdAt}>
                       {new Date(
                         post.publishedAt || post.createdAt
-                      ).toLocaleDateString()}
+                      ).toLocaleDateString(getUiLocale())}
                     </time>
                   </div>
                 </article>

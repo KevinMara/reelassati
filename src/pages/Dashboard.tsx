@@ -1,4 +1,5 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, translateUi, useUiText } from "@/lib/i18n/ui";
+import { isWorkspaceInterfaceActivity } from "@contracts/workspace-activity-ui";
 import { OwnerOperations } from "@/components/studio/OwnerOperations";
 import { CreationStart } from "@/components/studio/CreationStart";
 import { BrandSwitcher } from "@/components/studio/BrandSwitcher";
@@ -64,15 +65,14 @@ import { PageGuideButton } from "@/components/help/PageGuide";
 
 function formatActivityTime(timestamp: string, now: number): string {
   const time = new Date(timestamp).getTime();
-  if (!Number.isFinite(time)) return "Unknown time";
+  if (!Number.isFinite(time)) return translateUi("Unknown time");
   const days = Math.round((time - now) / 86_400_000);
   if (Math.abs(days) <= 30) {
-    return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(
-      days,
-      "day"
-    );
+    return new Intl.RelativeTimeFormat(getUiLocale(), {
+      numeric: "auto",
+    }).format(days, "day");
   }
-  return new Date(time).toLocaleDateString(undefined, {
+  return new Date(time).toLocaleDateString(getUiLocale(), {
     day: "numeric",
     month: "short",
     year:
@@ -496,7 +496,11 @@ function DashboardHome() {
                     {item.type.slice(0, 1).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{item.label}</p>
+                    <p className="text-sm font-medium">
+                      {isWorkspaceInterfaceActivity(item.type, item.label)
+                        ? ui(item.label)
+                        : item.label}
+                    </p>
                     <p className="text-xs text-foreground/70 truncate">
                       {item.detail}
                     </p>

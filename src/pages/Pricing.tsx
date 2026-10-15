@@ -27,119 +27,69 @@ type Plan = {
   featured?: boolean;
 };
 
-const PLANS: Record<"en" | "it", Plan[]> = {
-  en: [
+function createPlans(ui: ReturnType<typeof useUiText>): Plan[] {
+  return [
     {
       id: "creator",
       name: "Creator",
-      description: "For one creator building a repeatable short-form system.",
+      description: ui(
+        "For one creator building a repeatable short-form system."
+      ),
       monthlyPrice: PUBLIC_PLAN_PRICING.Creator.monthlyPrice,
       annualMonthlyPrice: annualMonthlyEquivalent("Creator"),
       annualTotal: PUBLIC_PLAN_PRICING.Creator.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Creator.monthlyCredits,
       features: [
-        "1 brand workspace",
-        "1 connected social account",
-        "Precision Studio and reviewable edit plans",
-        "Scripts, Prompt Director, calendar, and analytics",
-        "Version history and finished MP4 exports",
+        ui("1 brand workspace"),
+        ui("1 connected social account"),
+        ui("Precision Studio and reviewable edit plans"),
+        ui("Scripts, Prompt Director, calendar, and analytics"),
+        ui("Version history and finished MP4 exports"),
       ],
     },
     {
       id: "pro",
       name: "Pro",
-      description: "For creators and small teams running several channels.",
+      description: ui("For creators and small teams running several channels."),
       monthlyPrice: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
       annualMonthlyPrice: annualMonthlyEquivalent("Pro"),
       annualTotal: PUBLIC_PLAN_PRICING.Pro.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
       featured: true,
       features: [
-        "3 brand workspaces",
-        "5 connected social accounts",
-        "Everything in Creator",
-        "Content library and publishing queue",
-        "Content activity charts and usage tracking",
+        ui("3 brand workspaces"),
+        ui("5 connected social accounts"),
+        ui("Everything in Creator"),
+        ui("Content library and publishing queue"),
+        ui("Content activity charts and usage tracking"),
       ],
     },
     {
       id: "studio",
       name: "Studio",
-      description: "For creators producing a larger volume of content.",
+      description: ui("For creators producing a larger volume of content."),
       monthlyPrice: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
       annualMonthlyPrice: annualMonthlyEquivalent("Studio"),
       annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
       monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
       features: [
-        "10 brand workspaces",
-        "10 connected social accounts",
-        "Everything in Pro",
-        "Higher generation and publishing allowances",
-        "Shared library across creation tools",
+        ui("10 brand workspaces"),
+        ui("10 connected social accounts"),
+        ui("Everything in Pro"),
+        ui("Higher generation and publishing allowances"),
+        ui("Shared library across creation tools"),
       ],
     },
-  ],
-  it: [
-    {
-      id: "creator",
-      name: "Creator",
-      description:
-        "Per un creator che costruisce un sistema short-form ripetibile.",
-      monthlyPrice: PUBLIC_PLAN_PRICING.Creator.monthlyPrice,
-      annualMonthlyPrice: annualMonthlyEquivalent("Creator"),
-      annualTotal: PUBLIC_PLAN_PRICING.Creator.annualTotal,
-      monthlyCredits: PUBLIC_PLAN_PRICING.Creator.monthlyCredits,
-      features: [
-        "1 workspace brand",
-        "1 account social collegato",
-        "Studio di precisione e piani di montaggio revisionabili",
-        "Script, Prompt Director, calendario e analytics",
-        "Cronologia versioni ed export MP4",
-      ],
-    },
-    {
-      id: "pro",
-      name: "Pro",
-      description: "Per creator e piccoli team che gestiscono più canali.",
-      monthlyPrice: PUBLIC_PLAN_PRICING.Pro.monthlyPrice,
-      annualMonthlyPrice: annualMonthlyEquivalent("Pro"),
-      annualTotal: PUBLIC_PLAN_PRICING.Pro.annualTotal,
-      monthlyCredits: PUBLIC_PLAN_PRICING.Pro.monthlyCredits,
-      featured: true,
-      features: [
-        "3 workspace brand",
-        "5 account social collegati",
-        "Tutto il piano Creator",
-        "Libreria contenuti e coda di pubblicazione",
-        "Grafici attività contenuti e utilizzo",
-      ],
-    },
-    {
-      id: "studio",
-      name: "Studio",
-      description: "Per creator che producono un volume maggiore di contenuti.",
-      monthlyPrice: PUBLIC_PLAN_PRICING.Studio.monthlyPrice,
-      annualMonthlyPrice: annualMonthlyEquivalent("Studio"),
-      annualTotal: PUBLIC_PLAN_PRICING.Studio.annualTotal,
-      monthlyCredits: PUBLIC_PLAN_PRICING.Studio.monthlyCredits,
-      features: [
-        "10 workspace brand",
-        "10 account social collegati",
-        "Tutto il piano Pro",
-        "Più crediti e account social collegati",
-        "Libreria condivisa tra gli strumenti creativi",
-      ],
-    },
-  ],
-};
+  ];
+}
 
 export default function Pricing() {
   const ui = useUiText();
   const { user } = useAuth();
   const { i18n } = useTranslation();
-  const isItalian = Boolean(i18n.resolvedLanguage?.startsWith("it"));
+  const locale = i18n.resolvedLanguage || i18n.language || "en";
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
-  const plans = PLANS[isItalian ? "it" : "en"];
+  const plans = createPlans(ui);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -177,9 +127,9 @@ export default function Pricing() {
                 aria-pressed={billingCycle === "annual"}
                 className={`rounded-pill px-5 py-2 text-sm font-medium transition-all ${billingCycle === "annual" ? "bg-primary text-primary-foreground" : "text-foreground/70 hover:text-foreground"}`}
               >
-                {isItalian
-                  ? `Annuale · paghi ${ANNUAL_BILLED_MONTHS} mesi`
-                  : `Annual · pay for ${ANNUAL_BILLED_MONTHS} months`}
+                {ui("Annual · pay for {{months}} months", {
+                  months: ANNUAL_BILLED_MONTHS,
+                })}
               </button>
             </div>
           </div>
@@ -190,7 +140,7 @@ export default function Pricing() {
                 key={plan.name}
                 plan={plan}
                 billingCycle={billingCycle}
-                isItalian={isItalian}
+                locale={locale}
                 signedIn={Boolean(user)}
               />
             ))}
@@ -264,9 +214,7 @@ export default function Pricing() {
                 >
                   <div>
                     <p className="text-xl font-semibold">
-                      {pack.credits.toLocaleString(
-                        isItalian ? "it-IT" : "en-IE"
-                      )}
+                      {pack.credits.toLocaleString(locale)}
                     </p>
                     <p className="text-sm text-foreground/70">
                       {ui("credits")}
@@ -275,11 +223,11 @@ export default function Pricing() {
                   <div className="text-right">
                     <strong className="text-2xl">{pack.price} USD</strong>
                     <p className="mt-1 text-sm text-foreground/70">
-                      {((pack.price / pack.credits) * 1000).toFixed(2)}
-                      USD /{" "}
-                      {Number(1000).toLocaleString(
-                        isItalian ? "it-IT" : "en-IE"
+                      {((pack.price / pack.credits) * 1000).toLocaleString(
+                        locale,
+                        { minimumFractionDigits: 2, maximumFractionDigits: 2 }
                       )}
+                      USD / {Number(1000).toLocaleString(locale)}
                     </p>
                   </div>
                 </div>
@@ -301,27 +249,25 @@ export default function Pricing() {
 function PlanCard({
   plan,
   billingCycle,
-  isItalian,
+  locale,
   signedIn,
 }: {
   plan: Plan;
   billingCycle: BillingCycle;
-  isItalian: boolean;
+  locale: string;
   signedIn: boolean;
 }) {
   const ui = useUiText();
   const price =
     billingCycle === "monthly" ? plan.monthlyPrice : plan.annualMonthlyPrice;
-  const priceLabel = new Intl.NumberFormat(isItalian ? "it-IT" : "en-IE", {
+  const priceLabel = new Intl.NumberFormat(locale, {
     minimumFractionDigits: Number.isInteger(price) ? 0 : 2,
     maximumFractionDigits: 2,
   }).format(price);
-  const creditLabel = new Intl.NumberFormat(
-    isItalian ? "it-IT" : "en-IE"
-  ).format(plan.monthlyCredits);
-  const annualTotalLabel = new Intl.NumberFormat(
-    isItalian ? "it-IT" : "en-IE"
-  ).format(plan.annualTotal);
+  const creditLabel = new Intl.NumberFormat(locale).format(plan.monthlyCredits);
+  const annualTotalLabel = new Intl.NumberFormat(locale).format(
+    plan.annualTotal
+  );
   const billingPath = `/dashboard/billing?plan=${plan.id}&cycle=${billingCycle}`;
   const checkoutPath = signedIn
     ? billingPath
@@ -358,9 +304,7 @@ function PlanCard({
       </div>
       <p className="mt-2 min-h-[20px] text-xs text-foreground/70">
         {billingCycle === "annual"
-          ? isItalian
-            ? `${annualTotalLabel} USD fatturati annualmente`
-            : `${annualTotalLabel} USD billed annually`
+          ? ui("{{total}} USD billed annually", { total: annualTotalLabel })
           : ui("Billed monthly")}
       </p>
       <div className="mt-4 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/[0.06] px-4 py-3">
@@ -381,7 +325,7 @@ function PlanCard({
         to={checkoutPath}
         className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-pill px-5 py-3 text-sm font-medium transition-colors ${plan.featured ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "border border-border bg-background text-foreground hover:border-primary/35"}`}
       >
-        {isItalian ? `Scegli ${plan.name}` : `Choose ${plan.name}`}{" "}
+        {ui("Choose {{name}}", { name: plan.name })}{" "}
         <ArrowRight className="h-4 w-4" aria-hidden />
       </Link>
       <ul className="mt-6 flex-1 space-y-3 border-t border-border pt-5">

@@ -216,12 +216,13 @@ function ReferenceStyleSession({
 
   function upload(file: File) {
     const checked = validateFileSelection([file], {
+      text: ui,
       purpose: "media",
       multiple: false,
       maxFiles: 1,
     });
     if (checked.error || !file.type.startsWith("video/")) {
-      setError(checked.error || "Choose a video file.");
+      setError(checked.error || ui("Choose a video file."));
       return;
     }
     void run(async (scope, signal, current, progress) => {

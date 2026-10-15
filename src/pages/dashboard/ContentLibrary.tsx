@@ -267,7 +267,10 @@ export default function ContentLibrary() {
   };
 
   const acceptMediaFiles = (files: File[]) => {
-    const selection = validateFileSelection(files, { purpose: "media" });
+    const selection = validateFileSelection(files, {
+      purpose: "media",
+      text: ui,
+    });
     if (selection.error) {
       setNotice({ tone: "error", message: selection.error });
       return;

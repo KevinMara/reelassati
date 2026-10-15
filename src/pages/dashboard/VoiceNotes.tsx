@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { AudioPlayer } from "@/components/ui/audio-player";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { resolveMediaDuration } from "@/lib/media-metadata";
@@ -174,7 +174,10 @@ export default function VoiceNotes() {
   };
 
   const acceptAudioFiles = (files: File[]) => {
-    const selection = validateFileSelection(files, { purpose: "audio" });
+    const selection = validateFileSelection(files, {
+      purpose: "audio",
+      text: ui,
+    });
     if (selection.error) {
       setError(selection.error);
       return;
@@ -546,7 +549,12 @@ export default function VoiceNotes() {
                 </span>
                 <span className="mt-1 block text-xs text-foreground/65">
                   {file
-                    ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
+                    ? ui("{{size}} MB", {
+                        size: new Intl.NumberFormat(getUiLocale(), {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        }).format(file.size / 1024 / 1024),
+                      })
                     : isDragging
                       ? ui("Drop it here")
                       : ui("Drop audio here, or click · MP3, WAV, M4A")}

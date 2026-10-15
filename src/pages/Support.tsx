@@ -101,7 +101,9 @@ export default function Support() {
       setError(
         cause instanceof Error
           ? cause.message
-          : `Support could not respond. Email ${SUPPORT_EMAIL}.`
+          : ui("Support could not respond. Email {{email}}.", {
+              email: SUPPORT_EMAIL,
+            })
       );
     } finally {
       setBusy(false);
@@ -214,7 +216,9 @@ export default function Support() {
                         type="button"
                         onClick={() => void sendMessage(action.message)}
                         className="rounded-xl border border-primary/15 bg-primary/[0.035] px-3 py-2 text-left text-xs leading-relaxed text-foreground/70 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground"
-                        aria-label={`Reply: ${action.label}`}
+                        aria-label={ui("Reply: {{label}}", {
+                          label: action.label,
+                        })}
                       >
                         {action.label}
                       </button>
@@ -243,10 +247,10 @@ export default function Support() {
                       <button
                         type="button"
                         key={prompt}
-                        onClick={() => void sendMessage(prompt)}
+                        onClick={() => void sendMessage(ui(prompt))}
                         className="rounded-full border border-border bg-background px-3 py-1.5 text-[11px] text-foreground/60 transition-colors hover:border-primary/30 hover:text-foreground"
                       >
-                        {prompt}
+                        {ui(prompt)}
                       </button>
                     ))}
                   </div>
@@ -400,6 +404,7 @@ export default function Support() {
 }
 
 function ChatBubble({ message }: { message: SupportMessage }) {
+  const ui = useUiText();
   const assistant = message.role === "assistant";
   return (
     <div
@@ -418,7 +423,9 @@ function ChatBubble({ message }: { message: SupportMessage }) {
             : "rounded-tr-sm bg-primary text-primary-foreground shadow-[0_10px_26px_-18px_hsl(var(--primary))]"
         )}
       >
-        {message.content}
+        {message === initialMessage
+          ? ui(initialMessage.content)
+          : message.content}
       </div>
       {!assistant ? (
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06] text-foreground/55">
@@ -542,7 +549,10 @@ function TicketSuccess({ ticket }: { ticket: SupportTicketResult }) {
       <p className="mt-3 rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-[11px] text-foreground/55">
         {ticket.emailStatus === "sent"
           ? ui("Human support has been notified by email.")
-          : `The ticket is securely recorded. For immediate delivery, also email ${ticket.supportEmail} and include the reference above.`}
+          : ui(
+              "The ticket is securely recorded. For immediate delivery, also email {{email}} and include the reference above.",
+              { email: ticket.supportEmail }
+            )}
       </p>
     </div>
   );

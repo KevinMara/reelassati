@@ -35,6 +35,19 @@ describe("interface localization", () => {
       expect(translation["nav.logout"], code).toBe(
         uiLocales[code]["Exit Studio"]
       );
+      for (const [key, source] of [
+        ["dash.greet_morning", "Good morning"],
+        ["dash.onboarding_title", "Welcome to Reelassati."],
+        ["auth.send_reset", "Send reset link"],
+      ]) {
+        const translated = uiLocales[code][source];
+        if (translated !== undefined) {
+          const reviewed = globalLocales[code]?.[key];
+          expect(translation[key], `${code}: ${key}`).toBe(
+            reviewed && reviewed !== source ? reviewed : translated
+          );
+        }
+      }
     }
     expect(
       localizedLegacyKeys(
@@ -42,6 +55,8 @@ describe("interface localization", () => {
         { Login: "Replacement" }
       )["nav.login"]
     ).toBe("Already reviewed");
+    expect(uiLocales.fr["Good morning"]).toBeTruthy();
+    expect(uiLocales.fr["Send reset link"]).toBeTruthy();
   });
   it("covers the complete analyzer and shared-control catalog in every advertised locale", () => {
     const criticalKeys = Object.keys(westernUi.es);
@@ -61,14 +76,15 @@ describe("interface localization", () => {
     }
   });
 
-  it("preserves interpolated content and links throughout supplemental catalogs", () => {
-    const links = (text: string) =>
-      [...text.matchAll(/https?:\/\/[a-z0-9][^\s<>"')}]*/gi)]
-        .map(match => match[0].replace(/[.,;!?]+$/, ""))
-        .sort();
-    const markup = (text: string) =>
-      [...text.matchAll(/<\/?[a-z][^>]*>/gi)].map(match => match[0]).sort();
-    for (const [code, dictionary] of Object.entries(uiLocales)) {
+  it.each(Object.entries(uiLocales))(
+    "preserves interpolated content and links in the %s catalog",
+    (code, dictionary) => {
+      const links = (text: string) =>
+        [...text.matchAll(/https?:\/\/[a-z0-9][^\s<>"')}]*/gi)]
+          .map(match => match[0].replace(/[.,;!?]+$/, ""))
+          .sort();
+      const markup = (text: string) =>
+        [...text.matchAll(/<\/?[a-z][^>]*>/gi)].map(match => match[0]).sort();
       for (const [key, value] of Object.entries(dictionary)) {
         expect(value.trim(), `${code}: ${key}`).not.toBe("");
         expect(placeholders(value), `${code}: ${key}`).toEqual(
@@ -78,7 +94,7 @@ describe("interface localization", () => {
         expect(markup(value), `${code}: ${key}`).toEqual(markup(key));
       }
     }
-  });
+  );
 
   it("keeps the image resolution distinct from the purchased image count", () => {
     const key = "1K images if used only for images.";

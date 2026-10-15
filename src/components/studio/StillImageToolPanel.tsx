@@ -79,7 +79,7 @@ export function StillImageToolPanel({
       : null;
   const busy = status.key === contextKey && status.busy;
   const message = status.key === contextKey ? status.message : "";
-  const name = kind === "person" ? "Person cutout" : "Relative depth";
+  const name = kind === "person" ? ui("Person cutout") : ui("Relative depth");
 
   useEffect(
     () => () => {
@@ -282,7 +282,7 @@ export function StillImageToolPanel({
   }
 
   return (
-    <section aria-label={`${name} for still images`} className="space-y-3">
+    <section aria-label={ui("{{name}} for still images", { name })} className="space-y-3">
       <p className="text-sm font-medium">{name}</p>
       <p className="text-xs leading-relaxed text-foreground/65">
         {kind === "person"
@@ -396,7 +396,7 @@ export function StillImageToolPanel({
             >
               <img
                 src={activePreview.url}
-                alt={`${name} preview`}
+                alt={ui("{{name}} preview", { name })}
                 className="max-h-72 w-full object-contain"
               />
             </div>

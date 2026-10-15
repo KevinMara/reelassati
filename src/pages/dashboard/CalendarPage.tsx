@@ -356,7 +356,8 @@ export default function CalendarPage() {
   };
 
   const deleteEvent = async (event: CalendarEvent) => {
-    if (!window.confirm(`Delete “${event.title}”?`)) return;
+    if (!window.confirm(ui("Delete “{{name}}”?", { name: event.title })))
+      return;
     const now = new Date().toISOString();
     try {
       await updateWorkspace(current => ({
@@ -770,7 +771,7 @@ export default function CalendarPage() {
                   >
                     {Object.entries(EVENT_KIND_META).map(([kind, meta]) => (
                       <option key={kind} value={kind}>
-                        {meta.label}
+                        {ui(meta.label)}
                       </option>
                     ))}
                   </StudioSelect>
@@ -905,7 +906,7 @@ function EventCard({
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-foreground/70">
             <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-            {meta.label}
+            {ui(meta.label)}
           </p>
           <p className="mt-1.5 truncate text-sm font-medium">{event.title}</p>
         </div>
@@ -915,7 +916,7 @@ function EventCard({
             onClick={() => onEdit(event)}
             disabled={saving}
             className="rounded-md p-1.5 hover:bg-background/70 disabled:opacity-40"
-            aria-label={`Edit ${event.title}`}
+            aria-label={ui("Edit {{name}}", { name: event.title })}
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -924,7 +925,7 @@ function EventCard({
             onClick={() => onDelete(event)}
             disabled={saving}
             className="rounded-md p-1.5 text-foreground/70 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
-            aria-label={`Delete ${event.title}`}
+            aria-label={ui("Delete {{name}}", { name: event.title })}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

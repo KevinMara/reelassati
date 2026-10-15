@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { Info } from "lucide-react";
 import {
   Popover,
@@ -13,12 +14,13 @@ export function EditorInfo({
   label: string;
   children: ReactNode;
 }) {
+  const ui = useUiText();
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`About ${label}`}
+          aria-label={ui("About {{label}}", { label })}
           className="inline-flex shrink-0 items-center rounded p-1 text-foreground/50 hover:text-primary"
         >
           <Info className="size-3.5" />

@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { mapChatTranscript } from "@/lib/editor-chat-execution";
 import { v4 as createUuid } from "uuid";
 import { appendEditorRevisions } from "@/lib/editor-history";
@@ -683,7 +683,8 @@ export function AutonomousEditor({
           </details>
           <div className="border-t border-border pt-3">
             <p className="text-2xl font-semibold">
-              {ui("Up to")} {estimate.toLocaleString()} {ui("credits")}
+              {ui("Up to")} {estimate.toLocaleString(getUiLocale())}{" "}
+              {ui("credits")}
             </p>
             <p className="mt-1 text-xs text-foreground/70">
               {ui("Review")} {analysisCost} {ui("· speech timing")}{" "}

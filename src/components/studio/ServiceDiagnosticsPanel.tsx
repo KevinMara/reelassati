@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import type {
@@ -8,15 +8,6 @@ import type {
 import { captureUploadRequestScope, platformApi } from "@/lib/platform-api";
 import { useAuth } from "@/hooks/useAuth";
 import { selectedBrand } from "@/lib/workspace-scope";
-
-const statusLabels: Record<AiConnectionStatus, string> = {
-  "not-configured": "Setup needed",
-  authenticated: "Key accepted",
-  "key-limit-reached": "Key spending limit reached",
-  "authorization-rejected": "Authorization rejected",
-  "temporarily-unavailable": "Check unavailable",
-  "invalid-response": "Unexpected response",
-};
 
 export function ServiceDiagnosticsPanel() {
   const { user } = useAuth();
@@ -34,6 +25,14 @@ export function ServiceDiagnosticsPanel() {
 
 function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
   const ui = useUiText();
+  const statusLabels: Record<AiConnectionStatus, string> = {
+    "not-configured": ui("Setup needed"),
+    authenticated: ui("Key accepted"),
+    "key-limit-reached": ui("Key spending limit reached"),
+    "authorization-rejected": ui("Authorization rejected"),
+    "temporarily-unavailable": ui("Check unavailable"),
+    "invalid-response": ui("Unexpected response"),
+  };
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ServiceDiagnostics | null>(null);
   const [error, setError] = useState("");
@@ -129,7 +128,8 @@ function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
               </p>
             ) : null}
             <p className="mt-3 text-foreground/55">
-              {ui("Checked")} {new Date(result.checkedAt).toLocaleString()}
+              {ui("Checked")}{" "}
+              {new Date(result.checkedAt).toLocaleString(getUiLocale())}
               {ui(". Generation not tested.")}
             </p>
           </>

@@ -18,7 +18,6 @@ import { platformApi, PlatformApiError } from "@/lib/platform-api";
 import { validateFileSelection } from "@/lib/file-validation";
 import type { ProvenanceDetectionResult } from "@contracts/compliance";
 
-type Language = "en" | "it";
 type InputMode = "text" | "file";
 
 interface DisplayResult {
@@ -34,72 +33,46 @@ interface DisplayResult {
   limitations: string[];
 }
 
-const COPY = {
-  en: {
-    back: "Back to home",
-    eyebrow: "Provenance detector",
-    title: "Check the evidence. Never guess the origin.",
-    intro:
-      "Inspect pasted text or a media file for a REELassati provenance record and supported machine-readable signals. Inspection input is not retained. A missing signal means “not verified,” not “human-made.”",
-    updated: "Evidence-based inspection",
-    textTab: "Pasted text",
-    fileTab: "File",
-    textLabel: "Text to inspect",
-    textPlaceholder: "Paste the complete text or exported provenance block…",
-    fileLabel: "File to inspect",
-    fileIdle: "Drop a file here, or click to choose",
-    fileDragging: "Drop it here",
-    fileTypes:
-      "Image, video, audio, JSON, or text · up to 64 MB · not retained",
-    chooseFile: "Choose file",
-    inspect: "Inspect provenance",
-    inspecting: "Inspecting evidence",
-    reset: "Clear",
-    result: "Inspection result",
-    noResultTitle: "No result yet",
-    noResultBody:
-      "The detector will show verified, partial, missing, and unsupported signals separately.",
-    truthfulTitle: "What this result means",
-    truthfulBody:
-      "Provenance can help identify origin and processing history. It does not prove that the content is accurate, lawful, authorized, or safe to publish.",
-    unavailable:
-      "The verification service is not connected yet. Your input was not classified locally and no result was invented.",
-    genericError: "The provenance evidence could not be inspected.",
-  },
-  it: {
-    back: "Torna alla home",
-    eyebrow: "Rilevatore di provenienza",
-    title: "Controlla l’evidenza. Non indovinare mai l’origine.",
-    intro:
-      "Ispeziona un testo incollato o un file media per cercare un record di provenienza REELassati e segnali leggibili automaticamente. L’input dell’ispezione non viene conservato. Un segnale assente significa “non verificato”, non “creato da una persona”.",
-    updated: "Ispezione basata su evidenza",
-    textTab: "Testo incollato",
-    fileTab: "File",
-    textLabel: "Testo da ispezionare",
-    textPlaceholder:
-      "Incolla il testo completo o il blocco di provenienza esportato…",
-    fileLabel: "File da ispezionare",
-    fileIdle: "Trascina un file qui o fai clic per scegliere",
-    fileDragging: "Rilascialo qui",
-    fileTypes:
-      "Immagine, video, audio, JSON o testo · fino a 64 MB · non conservato",
-    chooseFile: "Scegli file",
-    inspect: "Ispeziona provenienza",
-    inspecting: "Ispezione evidenza",
-    reset: "Pulisci",
-    result: "Risultato ispezione",
-    noResultTitle: "Nessun risultato",
-    noResultBody:
-      "Il rilevatore mostrerà separatamente i segnali verificati, parziali, mancanti e non supportati.",
-    truthfulTitle: "Cosa significa il risultato",
-    truthfulBody:
-      "La provenienza può aiutare a identificare origine e cronologia di elaborazione. Non prova che il contenuto sia accurato, lecito, autorizzato o sicuro da pubblicare.",
-    unavailable:
-      "Il servizio di verifica non è ancora collegato. Il tuo input non è stato classificato localmente e non è stato inventato alcun risultato.",
-    genericError:
-      "Non è stato possibile ispezionare l’evidenza di provenienza.",
-  },
-} as const;
+function createCopy(ui: ReturnType<typeof useUiText>) {
+  return {
+    back: ui("Back to home"),
+    eyebrow: ui("Provenance detector"),
+    title: ui("Check the evidence. Never guess the origin."),
+    intro: ui(
+      "Inspect pasted text or a media file for a REELassati provenance record and supported machine-readable signals. Inspection input is not retained. A missing signal means “not verified,” not “human-made.”"
+    ),
+    updated: ui("Evidence-based inspection"),
+    textTab: ui("Pasted text"),
+    fileTab: ui("File"),
+    textLabel: ui("Text to inspect"),
+    textPlaceholder: ui(
+      "Paste the complete text or exported provenance block…"
+    ),
+    fileLabel: ui("File to inspect"),
+    fileIdle: ui("Drop a file here, or click to choose"),
+    fileDragging: ui("Drop it here"),
+    fileTypes: ui(
+      "Image, video, audio, JSON, or text · up to 64 MB · not retained"
+    ),
+    chooseFile: ui("Choose file"),
+    inspect: ui("Inspect provenance"),
+    inspecting: ui("Inspecting evidence"),
+    reset: ui("Clear"),
+    result: ui("Inspection result"),
+    noResultTitle: ui("No result yet"),
+    noResultBody: ui(
+      "The detector will show verified, partial, missing, and unsupported signals separately."
+    ),
+    truthfulTitle: ui("What this result means"),
+    truthfulBody: ui(
+      "Provenance can help identify origin and processing history. It does not prove that the content is accurate, lawful, authorized, or safe to publish."
+    ),
+    unavailable: ui(
+      "The verification service is not connected yet. Your input was not classified locally and no result was invented."
+    ),
+    genericError: ui("The provenance evidence could not be inspected."),
+  };
+}
 
 function resultTone(status: DisplayResult["status"]) {
   if (status === "verified") {
@@ -125,33 +98,27 @@ function resultTone(status: DisplayResult["status"]) {
 
 function toDisplayResult(
   result: ProvenanceDetectionResult,
-  language: Language
+  ui: ReturnType<typeof useUiText>,
+  locale: string
 ): DisplayResult {
   if (!result.provenance || result.verification === "unmatched") {
     return {
       status: "not-found",
-      label:
-        language === "it"
-          ? "Nessuna corrispondenza verificata"
-          : "No verified match",
-      summary:
-        language === "it"
-          ? "Il servizio non ha trovato un record REELassati verificabile per l’evidenza fornita. Questo non dimostra che il contenuto sia stato creato da una persona."
-          : "The service did not find a verifiable REELassati record for the supplied evidence. This does not prove that the content was human-made.",
+      label: ui("No verified match"),
+      summary: ui(
+        "The service did not find a verifiable REELassati record for the supplied evidence. This does not prove that the content was human-made."
+      ),
       signals: [
         {
-          label: language === "it" ? "Record piattaforma" : "Platform record",
-          value:
-            language === "it"
-              ? "Nessuna corrispondenza verificata"
-              : "No verified match",
+          label: ui("Platform record"),
+          value: ui("No verified match"),
           status: "missing",
         },
       ],
       limitations: [
-        language === "it"
-          ? "Il contenuto potrebbe provenire da un’altra piattaforma o avere metadati rimossi."
-          : "The content may come from another platform or may have had metadata removed.",
+        ui(
+          "The content may come from another platform or may have had metadata removed."
+        ),
       ],
     };
   }
@@ -159,63 +126,83 @@ function toDisplayResult(
   const provenance = result.provenance;
   const artifactVerified = result.verification === "artifact-verified";
   const artifactMismatch = result.verification === "artifact-mismatch";
+  const origins = {
+    human: ui("Human-created"),
+    uploaded: ui("Uploaded source"),
+    "ai-assisted": ui("AI-assisted"),
+    "ai-generated": ui("AI-generated"),
+    "ai-manipulated": ui("AI-manipulated"),
+    "standard-edit": ui("Standard edit"),
+  };
+  const operations = {
+    "script-generation": ui("Script generation"),
+    "edit-planning": ui("Edit planning"),
+    "video-analysis": ui("Video analysis"),
+    transcription: ui("Transcription"),
+    "speech-synthesis": ui("Speech synthesis"),
+    "audio-generation": ui("Audio generation"),
+    "image-generation": ui("Image generation"),
+    "video-generation": ui("Video generation"),
+    "trend-research": ui("Trend research"),
+    "support-assistance": ui("Support assistance"),
+    "publication-marking": ui("Publication marking"),
+    "timeline-render": ui("Timeline rendering"),
+  };
+  const marking = {
+    "not-required": ui("Not required"),
+    pending: ui("Pending"),
+    verified: ui("Verified"),
+    failed: ui("Failed"),
+  };
+  const methods = {
+    "text-token": ui("Text token"),
+    "sha256-fingerprint": ui("SHA-256 fingerprint"),
+    "embedded-media-marker": ui("Embedded media marker"),
+  };
+  const signalStatus = artifactVerified ? "verified" : "informational";
   return {
     status: artifactVerified ? "verified" : "partial",
     label: artifactVerified
-      ? language === "it"
-        ? "Contenuto e record verificati"
-        : "Artifact and record verified"
+      ? ui("Artifact and record verified")
       : artifactMismatch
-        ? language === "it"
-          ? "Record autentico, contenuto diverso"
-          : "Authentic record, different artifact"
-        : language === "it"
-          ? "Token del record autentico"
-          : "Authentic record token",
+        ? ui("Authentic record, different artifact")
+        : ui("Authentic record token"),
     summary: artifactVerified
-      ? language === "it"
-        ? "Il testo o file fornito corrisponde all’impronta del record REELassati. Questo verifica la provenienza registrata, non la veridicità del contenuto."
-        : "The supplied text or file matches the REELassati record fingerprint. This verifies recorded provenance, not whether the content is true."
+      ? ui(
+          "The supplied text or file matches the REELassati record fingerprint. This verifies recorded provenance, not whether the content is true."
+        )
       : artifactMismatch
-        ? language === "it"
-          ? "Il token appartiene a un record autentico, ma il testo o file fornito non corrisponde alla sua impronta. Non usare questo token come prova per il contenuto attuale."
-          : "The token belongs to an authentic record, but the supplied text or file does not match its fingerprint. Do not use this token as evidence for the current artifact."
-        : language === "it"
-          ? "Il token identifica un record autentico, ma non è stato fornito il contenuto completo per confrontarne l’impronta. Questo risultato non verifica un testo o file specifico."
-          : "The token identifies an authentic record, but no complete artifact was supplied for fingerprint comparison. This does not verify a specific text or file.",
+        ? ui(
+            "The token belongs to an authentic record, but the supplied text or file does not match its fingerprint. Do not use this token as evidence for the current artifact."
+          )
+        : ui(
+            "The token identifies an authentic record, but no complete artifact was supplied for fingerprint comparison. This does not verify a specific text or file."
+          ),
     signals: [
       {
-        label: language === "it" ? "Origine registrata" : "Recorded origin",
-        value: provenance.origin.replaceAll("-", " "),
-        status: artifactVerified ? "verified" : "informational",
+        label: ui("Recorded origin"),
+        value: origins[provenance.origin],
+        status: signalStatus,
       },
       {
-        label: language === "it" ? "Operazione" : "Operation",
-        value: provenance.operation.replaceAll("-", " "),
-        status: artifactVerified ? "verified" : "informational",
+        label: ui("Operation"),
+        value: operations[provenance.operation],
+        status: signalStatus,
+      },
+      { label: ui("System"), value: "REELassati AI", status: signalStatus },
+      {
+        label: ui("Recorded at"),
+        value: new Date(provenance.generatedAt).toLocaleString(locale),
+        status: signalStatus,
       },
       {
-        label: language === "it" ? "Sistema" : "System",
-        value: "REELassati AI",
-        status: artifactVerified ? "verified" : "informational",
+        label: ui("Match method"),
+        value: result.method ? methods[result.method] : ui("Not reported"),
+        status: signalStatus,
       },
       {
-        label: language === "it" ? "Data record" : "Recorded at",
-        value: new Date(provenance.generatedAt).toLocaleString(
-          language === "it" ? "it-IT" : "en-GB"
-        ),
-        status: artifactVerified ? "verified" : "informational",
-      },
-      {
-        label: language === "it" ? "Metodo di corrispondenza" : "Match method",
-        value:
-          result.method?.replaceAll("-", " ") ??
-          (language === "it" ? "Non indicato" : "Not reported"),
-        status: artifactVerified ? "verified" : "informational",
-      },
-      {
-        label: language === "it" ? "Marcatura" : "Marking",
-        value: provenance.markingStatus.replaceAll("-", " "),
+        label: ui("Marking"),
+        value: marking[provenance.markingStatus],
         status:
           provenance.markingStatus === "verified"
             ? "verified"
@@ -226,24 +213,43 @@ function toDisplayResult(
       ...(artifactVerified
         ? []
         : [
-            language === "it"
-              ? "Per verificare il contenuto, incolla il testo completo o carica il file originale."
-              : "To verify the artifact, paste the complete text or upload the original file.",
+            ui(
+              "To verify the artifact, paste the complete text or upload the original file."
+            ),
           ]),
-      language === "it"
-        ? `Il record usa la policy ${provenance.policyVersion}; verifica eventuali modifiche sostanziali successive.`
-        : `The record uses policy ${provenance.policyVersion}; check for any material changes made afterward.`,
+      ui(
+        "The record uses policy {{version}}; check for any material changes made afterward.",
+        { version: provenance.policyVersion }
+      ),
     ],
   };
+}
+
+function statusLabel(
+  status: DisplayResult["status"] | DisplayResult["signals"][number]["status"],
+  ui: ReturnType<typeof useUiText>
+) {
+  switch (status) {
+    case "verified":
+      return ui("Verified");
+    case "partial":
+      return ui("Partial");
+    case "not-found":
+      return ui("Not found");
+    case "unsupported":
+      return ui("Unsupported");
+    case "informational":
+      return ui("Informational");
+    case "missing":
+      return ui("Missing");
+  }
 }
 
 export default function ProvenanceDetector() {
   const ui = useUiText();
   const { i18n } = useTranslation();
-  const language: Language = i18n.resolvedLanguage?.startsWith("it")
-    ? "it"
-    : "en";
-  const copy = COPY[language];
+  const locale = i18n.resolvedLanguage || i18n.language || "en";
+  const copy = createCopy(ui);
   const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const checkedTokenRef = useRef<string | null>(null);
@@ -262,7 +268,7 @@ export default function ProvenanceDetector() {
 
   const acceptDetectorFiles = (files: File[]) => {
     const selection = validateFileSelection(files, {
-      language,
+      text: ui,
       purpose: "provenance",
     });
     if (selection.error) {
@@ -298,13 +304,19 @@ export default function ProvenanceDetector() {
           cause instanceof PlatformApiError &&
           [404, 501, 503].includes(cause.status)
         ) {
-          setError(copy.unavailable);
+          setError(
+            "The verification service is not connected yet. Your input was not classified locally and no result was invented."
+          );
         } else {
-          setError(cause instanceof Error ? cause.message : copy.genericError);
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "The provenance evidence could not be inspected."
+          );
         }
       })
       .finally(() => setChecking(false));
-  }, [copy.genericError, copy.unavailable, searchParams]);
+  }, [searchParams]);
 
   const inspect = async () => {
     if (checking || (mode === "text" ? !text.trim() : !file)) return;
@@ -321,9 +333,15 @@ export default function ProvenanceDetector() {
         cause instanceof PlatformApiError &&
         [404, 501, 503].includes(cause.status)
       ) {
-        setError(copy.unavailable);
+        setError(
+          "The verification service is not connected yet. Your input was not classified locally and no result was invented."
+        );
       } else {
-        setError(cause instanceof Error ? cause.message : copy.genericError);
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "The provenance evidence could not be inspected."
+        );
       }
     } finally {
       setChecking(false);
@@ -337,7 +355,9 @@ export default function ProvenanceDetector() {
     setError(null);
   };
 
-  const displayResult = result ? toDisplayResult(result, language) : null;
+  const displayResult = result
+    ? toDisplayResult(result, ui, i18n.resolvedLanguage || i18n.language)
+    : null;
   const tone = displayResult ? resultTone(displayResult.status) : null;
   const ResultIcon = tone?.icon;
 
@@ -401,7 +421,7 @@ export default function ProvenanceDetector() {
                 className="w-full resize-y rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 outline-none transition-shadow placeholder:text-foreground/30 focus:ring-2 focus:ring-primary/30"
               />
               <p className="mt-2 text-right font-mono text-[10px] text-foreground/35">
-                {text.length.toLocaleString()} {ui("characters")}
+                {text.length.toLocaleString(locale)} {ui("characters")}
               </p>
             </div>
           ) : (
@@ -439,7 +459,13 @@ export default function ProvenanceDetector() {
                 </span>
                 <span className="mt-1 text-xs leading-5 text-foreground/45">
                   {file
-                    ? `${(file.size / 1024 / 1024).toFixed(2)} MB · ${file.type || "unknown type"}`
+                    ? ui("{{size}} MB · {{type}}", {
+                        size: new Intl.NumberFormat(locale, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }).format(file.size / 1024 / 1024),
+                        type: file.type || ui("Unknown type"),
+                      })
                     : copy.fileTypes}
                 </span>
                 {!file ? (
@@ -484,7 +510,7 @@ export default function ProvenanceDetector() {
                 className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
                 aria-hidden
               />
-              {error}
+              {ui(error)}
             </div>
           ) : null}
         </section>
@@ -507,7 +533,7 @@ export default function ProvenanceDetector() {
                     <span
                       className={`rounded-pill bg-background px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider ${tone.text}`}
                     >
-                      {displayResult.status.replace("-", " ")}
+                      {statusLabel(displayResult.status, ui)}
                     </span>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-foreground/60">
@@ -535,7 +561,7 @@ export default function ProvenanceDetector() {
                         </p>
                       </div>
                       <span className="shrink-0 rounded-pill bg-surface px-2 py-1 font-mono text-[8px] uppercase tracking-wider text-foreground/45">
-                        {signal.status}
+                        {statusLabel(signal.status, ui)}
                       </span>
                     </div>
                   </div>
