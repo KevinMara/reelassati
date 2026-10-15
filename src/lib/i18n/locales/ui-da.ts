@@ -3102,4 +3102,5 @@ export const danishUi: Record<string, string> = {
   "{{size}} MB": "{{size}} MB",
   "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
   "{{title}} on {{platform}}": "{{title}} på {{platform}}",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Vælg en færdig fil, skriv billedtekst og hashtags, og gennemgå platformforhåndsvisningen.",
 };

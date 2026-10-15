@@ -3746,4 +3746,5 @@ export const spanishUi: Record<string, string> = {
   "{{size}} MB": "{{size}} MB",
   "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
   "{{title}} on {{platform}}": "{{title}} en {{platform}}",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Elige un archivo terminado, escribe el texto y los hashtags y revisa la vista previa de la plataforma.",
 };

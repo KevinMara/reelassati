@@ -3100,5 +3100,6 @@ export const czechUi: Record<string, string> = {
   "{{name}}, {{start}} to {{end}}": "{{name}}, {{start}} až {{end}}",
   "{{size}} MB": "{{size}} MB",
   "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
-  "{{title}} on {{platform}}": "{{title}} na {{platform}}"
+  "{{title}} on {{platform}}": "{{title}} na {{platform}}",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Vyberte hotový soubor, napište popisek a hashtagy a zkontrolujte náhled platformy.",
 };

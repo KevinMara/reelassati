@@ -69,13 +69,15 @@ export function loadUiLocale(
     pending = import("./locales/ui-critical-asian").then(
       module => module.asianUi[code]
     );
-  } else if (["nl", "da", "cs"].includes(code)) {
+  } else if (["nl", "da", "cs", "sv"].includes(code)) {
     const supplement =
       code === "nl"
         ? import("./locales/ui-nl").then(module => module.dutchUi)
         : code === "da"
           ? import("./locales/ui-da").then(module => module.danishUi)
-          : import("./locales/ui-cs").then(module => module.czechUi);
+          : code === "cs"
+            ? import("./locales/ui-cs").then(module => module.czechUi)
+            : import("./locales/ui-sv").then(module => module.swedishUi);
     pending = Promise.all([
       import("./locales/ui-critical-europe"),
       supplement,

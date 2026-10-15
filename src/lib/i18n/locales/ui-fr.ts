@@ -3106,5 +3106,6 @@ export const frenchUi: Record<string, string> = {
   "{{name}}, {{start}} to {{end}}": "{{name}}, de {{start}} à {{end}}",
   "{{size}} MB": "{{size}} MB",
   "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
-  "{{title}} on {{platform}}": "{{title}} sur {{platform}}"
+  "{{title}} on {{platform}}": "{{title}} sur {{platform}}",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Choisissez un fichier finalisé, rédigez la légende et les hashtags, puis vérifiez l’aperçu de la plateforme.",
 };

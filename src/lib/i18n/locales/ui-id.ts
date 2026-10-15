@@ -4006,4 +4006,5 @@ export const indonesianUi: Record<string, string> = {
   "{{size}} MB": "{{size}} MB",
   "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
   "{{title}} on {{platform}}": "{{title}} di {{platform}}",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Pilih aset selesai, tulis takarir dan tagar, lalu tinjau pratinjau platform.",
 };

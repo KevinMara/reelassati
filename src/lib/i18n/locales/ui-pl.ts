@@ -4026,4 +4026,5 @@ export const polishUi: Record<string, string> = {
   "{{size}} MB": "{{size}} MB",
   "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
   "{{title}} on {{platform}}": "{{title}} na {{platform}}",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Wybierz gotowy materiał, napisz opis i hashtagi, a następnie sprawdź podgląd platformy.",
 };

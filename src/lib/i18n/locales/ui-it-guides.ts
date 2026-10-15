@@ -472,4 +472,5 @@ export const italianGuideUi: Record<string, string> = {
   "Ask a specific question": "Fai una domanda specifica",
   "Use the contact details in the document for a request. Include the section or account issue your question concerns.":
     "Usa i contatti nel documento per una richiesta. Indica la sezione o il problema dell’account a cui si riferisce.",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Scegli un file finale, scrivi testo e hashtag e controlla l’anteprima della piattaforma.",
 };

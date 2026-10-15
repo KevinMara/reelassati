@@ -16,6 +16,7 @@ import { romanianUi } from "./ui-ro";
 import { danishUi } from "./ui-da";
 import { czechUi } from "./ui-cs";
 import { indonesianUi } from "./ui-id";
+import { swedishUi } from "./ui-sv";
 
 /** Literal-source keys make untranslated interface copy visible to the audit. */
 export const uiLocales: Record<string, Record<string, string>> = {
@@ -37,4 +38,5 @@ export const uiLocales: Record<string, Record<string, string>> = {
   da: { ...danishUi, ...europeanUi.da },
   cs: { ...czechUi, ...europeanUi.cs },
   id: { ...indonesianUi, ...asianUi.id },
+  sv: { ...swedishUi, ...europeanUi.sv },
 };

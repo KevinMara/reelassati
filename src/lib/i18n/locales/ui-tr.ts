@@ -3989,4 +3989,5 @@ export const turkishUi: Record<string, string> = {
   "{{size}} MB": "{{size}} MB",
   "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
   "{{title}} on {{platform}}": "{{platform}} üzerinde {{title}}",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Tamamlanmış bir varlık seçin, açıklamayı ve etiketleri yazın, platform önizlemesini inceleyin.",
 };

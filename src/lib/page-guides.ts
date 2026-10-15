@@ -413,8 +413,8 @@ const guides: Record<string, PageGuide> = {
       section(
         "Prepare the post",
         "Prepara il post",
-        "Choose a finished asset, write the caption and hashtags, and review the platform preview. Complete the release questions shown for that content.",
-        "Scegli un file finale, scrivi testo e hashtag e controlla l’anteprima della piattaforma. Completa le domande di pubblicazione mostrate per il contenuto."
+        "Choose a finished asset, write the caption and hashtags, and review the platform preview.",
+        "Scegli un file finale, scrivi testo e hashtag e controlla l’anteprima della piattaforma."
       ),
       section(
         "Save, schedule, or publish",

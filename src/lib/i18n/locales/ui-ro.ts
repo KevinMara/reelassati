@@ -4040,4 +4040,5 @@ export const romanianUi: Record<string, string> = {
   "{{size}} MB": "{{size}} MB",
   "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
   "{{title}} on {{platform}}": "{{title}} pe {{platform}}",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Alege un material finalizat, scrie descrierea și hashtagurile, apoi verifică previzualizarea pentru platformă.",
 };

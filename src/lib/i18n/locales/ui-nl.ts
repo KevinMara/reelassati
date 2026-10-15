@@ -3108,4 +3108,5 @@ export const dutchUi: Record<string, string> = {
   "{{size}} MB": "{{size}} MB",
   "{{size}} MB · {{type}}": "{{size}} MB · {{type}}",
   "{{title}} on {{platform}}": "{{title}} op {{platform}}",
+  "Choose a finished asset, write the caption and hashtags, and review the platform preview.": "Kies een afgerond bestand, schrijf de tekst en hashtags en controleer de platformvoorvertoning.",
 };
