@@ -21,6 +21,10 @@ import { hungarianUi } from "./ui-hu";
 import { norwegianUi } from "./ui-no";
 import { vietnameseUi } from "./ui-vi";
 import { greekUi } from "./ui-el";
+import { japaneseUi } from "./ui-ja";
+import { finnishUi } from "./ui-fi";
+import { chineseUi } from "./ui-zh";
+import { ukrainianUi } from "./ui-uk";
 
 /** Literal-source keys make untranslated interface copy visible to the audit. */
 export const uiLocales: Record<string, Record<string, string>> = {
@@ -47,4 +51,8 @@ export const uiLocales: Record<string, Record<string, string>> = {
   no: { ...norwegianUi, ...europeanUi.no },
   vi: { ...vietnameseUi, ...asianUi.vi },
   el: { ...greekUi, ...europeanUi.el },
+  ja: { ...japaneseUi, ...cjkArabicUi.ja },
+  fi: { ...finnishUi, ...europeanUi.fi },
+  zh: { ...chineseUi, ...cjkArabicUi.zh },
+  uk: { ...ukrainianUi, ...easternUi.uk },
 };

@@ -38,22 +38,36 @@ export function loadUiLocale(
       import("./locales/ui-critical-west"),
       supplement,
     ]).then(([critical, full]) => ({ ...full, ...critical.westernUi[code] }));
-  } else if (["pl", "tr", "ro"].includes(code)) {
+  } else if (["pl", "tr", "ro", "uk"].includes(code)) {
     const supplement =
       code === "pl"
         ? import("./locales/ui-pl").then(module => module.polishUi)
         : code === "tr"
           ? import("./locales/ui-tr").then(module => module.turkishUi)
-          : import("./locales/ui-ro").then(module => module.romanianUi);
+          : code === "ro"
+            ? import("./locales/ui-ro").then(module => module.romanianUi)
+            : import("./locales/ui-uk").then(module => module.ukrainianUi);
     pending = Promise.all([
       import("./locales/ui-critical-east"),
       supplement,
     ]).then(([critical, full]) => ({ ...full, ...critical.easternUi[code] }));
-  } else if (["ru", "uk"].includes(code)) {
+  } else if (code === "ru") {
     pending = import("./locales/ui-critical-east").then(
       module => module.easternUi[code]
     );
-  } else if (["ar", "ja", "ko", "zh"].includes(code)) {
+  } else if (["ja", "zh"].includes(code)) {
+    const supplement =
+      code === "ja"
+        ? import("./locales/ui-ja").then(module => module.japaneseUi)
+        : import("./locales/ui-zh").then(module => module.chineseUi);
+    pending = Promise.all([
+      import("./locales/ui-critical-cjk-ar"),
+      supplement,
+    ]).then(([critical, full]) => ({
+      ...full,
+      ...critical.cjkArabicUi[code],
+    }));
+  } else if (["ar", "ko"].includes(code)) {
     pending = import("./locales/ui-critical-cjk-ar").then(
       module => module.cjkArabicUi[code]
     );
@@ -73,7 +87,7 @@ export function loadUiLocale(
     pending = import("./locales/ui-critical-asian").then(
       module => module.asianUi[code]
     );
-  } else if (["nl", "da", "cs", "sv", "hu", "no", "el"].includes(code)) {
+  } else if (["nl", "da", "cs", "sv", "hu", "no", "el", "fi"].includes(code)) {
     const supplement =
       code === "nl"
         ? import("./locales/ui-nl").then(module => module.dutchUi)
@@ -87,7 +101,11 @@ export function loadUiLocale(
                 ? import("./locales/ui-hu").then(module => module.hungarianUi)
                 : code === "no"
                   ? import("./locales/ui-no").then(module => module.norwegianUi)
-                  : import("./locales/ui-el").then(module => module.greekUi);
+                  : code === "el"
+                    ? import("./locales/ui-el").then(module => module.greekUi)
+                    : import("./locales/ui-fi").then(
+                        module => module.finnishUi
+                      );
     pending = Promise.all([
       import("./locales/ui-critical-europe"),
       supplement,
