@@ -556,7 +556,7 @@ export default function ContentLibrary() {
         <div
           className={
             viewMode === "grid"
-              ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              ? "grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
               : "space-y-3"
           }
         >
@@ -568,7 +568,7 @@ export default function ContentLibrary() {
             return (
               <article
                 key={item.id}
-                className={`relative overflow-visible rounded-xl border border-border bg-surface transition-shadow focus-within:z-30 hover:shadow-card-hover ${
+                className={`relative min-w-0 overflow-visible rounded-xl border border-border bg-surface transition-shadow focus-within:z-30 hover:shadow-card-hover ${
                   viewMode === "list" ? "flex items-center gap-4 p-4" : ""
                 }`}
               >
@@ -616,9 +616,9 @@ export default function ContentLibrary() {
                     <Icon className="h-7 w-7 text-primary" />
                   )}
                 </div>
-                <div className={viewMode === "grid" ? "p-4" : "min-w-0 flex-1"}>
+                <div className={viewMode === "grid" ? "min-w-0 p-4" : "min-w-0 flex-1"}>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${meta.color}`}
                       >
@@ -647,7 +647,7 @@ export default function ContentLibrary() {
                         />
                       </div>
                     </div>
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex shrink-0 items-center gap-0.5">
                       {item.source === "asset" ? (
                         <button
                           type="button"

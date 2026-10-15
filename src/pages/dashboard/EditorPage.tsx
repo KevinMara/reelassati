@@ -1793,7 +1793,7 @@ export default function EditorPage() {
         {workspace.projects.length > 0 && (
           <div className="mt-10">
             <h2 className="mb-4 text-base font-medium">Saved projects</h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {workspace.projects.map(item => (
                 <button
                   key={item.id}
@@ -1803,10 +1803,10 @@ export default function EditorPage() {
                       ? addPendingAssetToProject(item)
                       : openProject(item))
                   }
-                  className="rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary/30"
+                  className="min-w-0 rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary/30"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="truncate font-medium">{item.title}</span>
+                    <span className="min-w-0 truncate font-medium">{item.title}</span>
                     <span className="mono-eyebrow shrink-0 text-foreground/70">
                       {item.aspectRatio}
                     </span>

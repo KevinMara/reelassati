@@ -218,6 +218,15 @@ without rerunning analysis merely to create a project. Queued edits link to the
 exact owned project in Edit. New projects retain the complete original source
 clock, and proposed operations still require review before acceptance.
 
+The first official release was GitHub commit `4adc420`, confirmed successful by
+both configured Vercel projects. Production browser review covered 21 desktop
+routes and 20 mobile routes. At 390 px, long media/project titles exposed implicit
+grid-track minimums in Library and saved Edit projects; those grids now use an
+explicit single column and shrinkable cards/text. The other reviewed mobile
+routes stayed within the viewport. The setup-card link was exercised and opened
+Social Hub. This was read-only navigation, with no generation, analysis, social
+posting, credit purchase or settings mutation.
+
 Browser verification uses a clearly labeled, isolated interaction fixture with
 the actual new components and an existing native-motion QA export. Fixture
 scores are never inserted into the platform or presented as customer analysis.
