@@ -829,7 +829,7 @@ function PlanChooser({
                 {formatDate(summary.plan.currentPeriodEnd, locale)}
               </>
             ) : (
-              "Your billing account"
+              ui("Plan & credits")
             )}
           </span>
           <button

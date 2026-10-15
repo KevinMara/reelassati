@@ -249,10 +249,15 @@ for (const catalog of importedInterfaceCatalogs) {
   catalog.keyCount = catalogKeys.size;
 }
 function isDisplayConditional(node, source) {
-  const parent = node.parent;
+  let branch = node;
+  let parent = node.parent;
+  while (parent && ts.isParenthesizedExpression(parent)) {
+    branch = parent;
+    parent = parent.parent;
+  }
   if (
     !ts.isConditionalExpression(parent) ||
-    (parent.whenTrue !== node && parent.whenFalse !== node)
+    (parent.whenTrue !== branch && parent.whenFalse !== branch)
   )
     return false;
   for (let ancestor = parent.parent; ancestor; ancestor = ancestor.parent) {

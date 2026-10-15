@@ -57,15 +57,25 @@ export function loadUiLocale(
     pending = import("./locales/ui-critical-cjk-ar").then(
       module => module.cjkArabicUi[code]
     );
-  } else if (["hi", "vi", "he", "id", "th"].includes(code)) {
+  } else if (code === "id") {
+    pending = Promise.all([
+      import("./locales/ui-critical-asian"),
+      import("./locales/ui-id"),
+    ]).then(([critical, full]) => ({
+      ...full.indonesianUi,
+      ...critical.asianUi.id,
+    }));
+  } else if (["hi", "vi", "he", "th"].includes(code)) {
     pending = import("./locales/ui-critical-asian").then(
       module => module.asianUi[code]
     );
-  } else if (["nl", "da"].includes(code)) {
+  } else if (["nl", "da", "cs"].includes(code)) {
     const supplement =
       code === "nl"
         ? import("./locales/ui-nl").then(module => module.dutchUi)
-        : import("./locales/ui-da").then(module => module.danishUi);
+        : code === "da"
+          ? import("./locales/ui-da").then(module => module.danishUi)
+          : import("./locales/ui-cs").then(module => module.czechUi);
     pending = Promise.all([
       import("./locales/ui-critical-europe"),
       supplement,
