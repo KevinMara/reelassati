@@ -728,14 +728,14 @@ export default function Dashboard() {
   > = [
     { icon: LayoutDashboard, label: t("nav.dashboard"), to: "/dashboard" },
     { separator: true, label: "", compact: true },
-    { icon: Flame, label: "Trends", to: "/dashboard/trends" },
+    { icon: Flame, label: ui("Trends"), to: "/dashboard/trends" },
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
     { group: "create" },
     { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
     { icon: BrainCircuit, label: t("nav.analyze"), to: "/dashboard/analyze" },
     { icon: Send, label: t("nav.publish"), to: "/dashboard/publish" },
     { icon: BarChart3, label: t("nav.analytics"), to: "/dashboard/analytics" },
-    { separator: true, label: "Workspace" },
+    { separator: true, label: ui("Workspace") },
     { icon: Users, label: t("nav.clients"), to: "/dashboard/clients" },
     { icon: Calendar, label: t("nav.calendar"), to: "/dashboard/calendar" },
     {
@@ -743,7 +743,7 @@ export default function Dashboard() {
       label: ui("Weekly Coach"),
       to: "/dashboard/coaching",
     },
-    { separator: true, label: "Account" },
+    { separator: true, label: ui("Account") },
     { icon: Library, label: t("nav.library"), to: "/dashboard/library" },
     { icon: AtSign, label: t("nav.social"), to: "/dashboard/social" },
     {

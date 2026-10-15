@@ -57,19 +57,23 @@ export function loadUiLocale(
     pending = import("./locales/ui-critical-cjk-ar").then(
       module => module.cjkArabicUi[code]
     );
-  } else if (code === "id") {
+  } else if (["id", "vi"].includes(code)) {
+    const supplement =
+      code === "id"
+        ? import("./locales/ui-id").then(module => module.indonesianUi)
+        : import("./locales/ui-vi").then(module => module.vietnameseUi);
     pending = Promise.all([
       import("./locales/ui-critical-asian"),
-      import("./locales/ui-id"),
+      supplement,
     ]).then(([critical, full]) => ({
-      ...full.indonesianUi,
-      ...critical.asianUi.id,
+      ...full,
+      ...critical.asianUi[code],
     }));
-  } else if (["hi", "vi", "he", "th"].includes(code)) {
+  } else if (["hi", "he", "th"].includes(code)) {
     pending = import("./locales/ui-critical-asian").then(
       module => module.asianUi[code]
     );
-  } else if (["nl", "da", "cs", "sv"].includes(code)) {
+  } else if (["nl", "da", "cs", "sv", "hu", "no", "el"].includes(code)) {
     const supplement =
       code === "nl"
         ? import("./locales/ui-nl").then(module => module.dutchUi)
@@ -77,7 +81,13 @@ export function loadUiLocale(
           ? import("./locales/ui-da").then(module => module.danishUi)
           : code === "cs"
             ? import("./locales/ui-cs").then(module => module.czechUi)
-            : import("./locales/ui-sv").then(module => module.swedishUi);
+            : code === "sv"
+              ? import("./locales/ui-sv").then(module => module.swedishUi)
+              : code === "hu"
+                ? import("./locales/ui-hu").then(module => module.hungarianUi)
+                : code === "no"
+                  ? import("./locales/ui-no").then(module => module.norwegianUi)
+                  : import("./locales/ui-el").then(module => module.greekUi);
     pending = Promise.all([
       import("./locales/ui-critical-europe"),
       supplement,
