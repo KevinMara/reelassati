@@ -26,16 +26,22 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "24"
-          cache: npm
+          package-manager-cache: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          version: 10
+          cache: true
+          cache_dependency_path: pnpm-lock.yaml
       - name: Install locked dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Check types
-        run: npm run check
+        run: pnpm run check
       - name: Require complete interface translations
-        run: npm run check:localization
+        run: pnpm run check:localization
       - name: Lint source
-        run: npm run lint
+        run: pnpm run lint
       - name: Build client and server
-        run: npm run build
+        run: pnpm run build
       - name: Run regressions
-        run: npm test -- --pool=threads --maxWorkers=1 --testTimeout=30000 --hookTimeout=30000
+        run: pnpm exec vitest run --pool=threads --maxWorkers=1 --testTimeout=30000 --hookTimeout=30000
