@@ -264,6 +264,12 @@ export const asianUi: Record<string, Record<string, string>> = {
     Sidebar: "साइडबार",
     "Displays the mobile sidebar.": "मोबाइल साइडबार दिखाता है।",
     "Toggle Sidebar": "साइडबार खोलें या बंद करें",
+
+    "Demonstrate my product": "मेरा उत्पाद प्रदर्शित करें",
+    "Teach something useful": "कुछ उपयोगी सिखाएँ",
+    "Tell my founder story": "संस्थापक के रूप में मेरी कहानी बताएँ",
+    "Video uploaded for analysis": "विश्लेषण के लिए वीडियो अपलोड किया गया",
+    "Video analysis completed": "वीडियो विश्लेषण पूरा हुआ",
   },
   vi: {
     "The workspace changed before the imported video could be saved.":
@@ -529,6 +535,12 @@ export const asianUi: Record<string, Record<string, string>> = {
     Sidebar: "Thanh bên",
     "Displays the mobile sidebar.": "Hiển thị thanh bên trên thiết bị di động.",
     "Toggle Sidebar": "Bật hoặc tắt thanh bên",
+
+    "Demonstrate my product": "Trình diễn sản phẩm của tôi",
+    "Teach something useful": "Dạy điều hữu ích",
+    "Tell my founder story": "Kể câu chuyện sáng lập của tôi",
+    "Video uploaded for analysis": "Đã tải video lên để phân tích",
+    "Video analysis completed": "Đã hoàn tất phân tích video",
   },
   he: {
     "The workspace changed before the imported video could be saved.":
@@ -789,6 +801,12 @@ export const asianUi: Record<string, Record<string, string>> = {
     Sidebar: "סרגל צד",
     "Displays the mobile sidebar.": "מציג את סרגל הצד בנייד.",
     "Toggle Sidebar": "הצגה או הסתרה של סרגל הצד",
+
+    "Demonstrate my product": "להדגים את המוצר שלי",
+    "Teach something useful": "ללמד משהו שימושי",
+    "Tell my founder story": "לספר את סיפור ההקמה שלי",
+    "Video uploaded for analysis": "הסרטון הועלה לניתוח",
+    "Video analysis completed": "ניתוח הסרטון הושלם",
   },
   id: {
     "The workspace changed before the imported video could be saved.":
@@ -1057,6 +1075,12 @@ export const asianUi: Record<string, Record<string, string>> = {
     "Displays the mobile sidebar.":
       "Menampilkan panel samping pada perangkat seluler.",
     "Toggle Sidebar": "Tampilkan atau sembunyikan panel samping",
+
+    "Demonstrate my product": "Demonstrasikan produk saya",
+    "Teach something useful": "Ajarkan sesuatu yang bermanfaat",
+    "Tell my founder story": "Ceritakan kisah saya sebagai pendiri",
+    "Video uploaded for analysis": "Video diunggah untuk dianalisis",
+    "Video analysis completed": "Analisis video selesai",
   },
   th: {
     "The workspace changed before the imported video could be saved.":
@@ -1320,5 +1344,11 @@ export const asianUi: Record<string, Record<string, string>> = {
     Sidebar: "แถบด้านข้าง",
     "Displays the mobile sidebar.": "แสดงแถบด้านข้างบนมือถือ",
     "Toggle Sidebar": "แสดงหรือซ่อนแถบด้านข้าง",
+
+    "Demonstrate my product": "สาธิตผลิตภัณฑ์ของฉัน",
+    "Teach something useful": "สอนสิ่งที่มีประโยชน์",
+    "Tell my founder story": "เล่าเรื่องของฉันในฐานะผู้ก่อตั้ง",
+    "Video uploaded for analysis": "อัปโหลดวิดีโอเพื่อวิเคราะห์แล้ว",
+    "Video analysis completed": "วิเคราะห์วิดีโอเสร็จแล้ว",
   },
 };

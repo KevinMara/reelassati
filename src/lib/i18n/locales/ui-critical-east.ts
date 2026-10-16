@@ -265,6 +265,12 @@ export const easternUi: Record<string, Record<string, string>> = {
     "Displays the mobile sidebar.":
       "Показывает боковую панель на мобильном устройстве.",
     "Toggle Sidebar": "Показать или скрыть боковую панель",
+
+    "Demonstrate my product": "Продемонстрировать мой продукт",
+    "Teach something useful": "Научить чему-то полезному",
+    "Tell my founder story": "Рассказать мою историю основателя",
+    "Video uploaded for analysis": "Видео загружено для анализа",
+    "Video analysis completed": "Анализ видео завершён",
   },
   uk: {
     "The workspace changed before the imported video could be saved.":
@@ -530,6 +536,12 @@ export const easternUi: Record<string, Record<string, string>> = {
     "Displays the mobile sidebar.":
       "Показує бічну панель на мобільному пристрої.",
     "Toggle Sidebar": "Показати або приховати бічну панель",
+
+    "Demonstrate my product": "Продемонструвати мій продукт",
+    "Teach something useful": "Навчити чогось корисного",
+    "Tell my founder story": "Розповісти мою історію засновника",
+    "Video uploaded for analysis": "Відео завантажено для аналізу",
+    "Video analysis completed": "Аналіз відео завершено",
   },
   pl: {
     "The workspace changed before the imported video could be saved.":
@@ -798,6 +810,12 @@ export const easternUi: Record<string, Record<string, string>> = {
     "Displays the mobile sidebar.":
       "Wyświetla panel boczny na urządzeniu mobilnym.",
     "Toggle Sidebar": "Pokaż lub ukryj panel boczny",
+
+    "Demonstrate my product": "Zaprezentować mój produkt",
+    "Teach something useful": "Nauczyć czegoś przydatnego",
+    "Tell my founder story": "Opowiedzieć moją historię jako założyciela",
+    "Video uploaded for analysis": "Film przesłany do analizy",
+    "Video analysis completed": "Analiza filmu zakończona",
   },
   ro: {
     "The workspace changed before the imported video could be saved.":
@@ -1064,6 +1082,12 @@ export const easternUi: Record<string, Record<string, string>> = {
     Sidebar: "Bară laterală",
     "Displays the mobile sidebar.": "Afișează bara laterală pe mobil.",
     "Toggle Sidebar": "Afișează sau ascunde bara laterală",
+
+    "Demonstrate my product": "Prezintă produsul meu",
+    "Teach something useful": "Predă ceva util",
+    "Tell my founder story": "Spune povestea mea de fondator",
+    "Video uploaded for analysis": "Videoclip încărcat pentru analiză",
+    "Video analysis completed": "Analiza videoclipului finalizată",
   },
   tr: {
     "The workspace changed before the imported video could be saved.":
@@ -1329,5 +1353,11 @@ export const easternUi: Record<string, Record<string, string>> = {
     Sidebar: "Yan panel",
     "Displays the mobile sidebar.": "Mobil yan paneli gösterir.",
     "Toggle Sidebar": "Yan paneli aç veya kapat",
+
+    "Demonstrate my product": "Ürünümü göster",
+    "Teach something useful": "Yararlı bir şey öğret",
+    "Tell my founder story": "Kurucu hikâyemi anlat",
+    "Video uploaded for analysis": "Video analiz için yüklendi",
+    "Video analysis completed": "Video analizi tamamlandı",
   },
 };

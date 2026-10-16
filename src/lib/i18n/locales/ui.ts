@@ -25,6 +25,12 @@ import { japaneseUi } from "./ui-ja";
 import { finnishUi } from "./ui-fi";
 import { chineseUi } from "./ui-zh";
 import { ukrainianUi } from "./ui-uk";
+import { koreanUi } from "./ui-ko";
+import { thaiUi } from "./ui-th";
+import { russianUi } from "./ui-ru";
+import { arabicUi } from "./ui-ar";
+import { hindiUi } from "./ui-hi";
+import { hebrewUi } from "./ui-he";
 
 /** Literal-source keys make untranslated interface copy visible to the audit. */
 export const uiLocales: Record<string, Record<string, string>> = {
@@ -55,4 +61,10 @@ export const uiLocales: Record<string, Record<string, string>> = {
   fi: { ...finnishUi, ...europeanUi.fi },
   zh: { ...chineseUi, ...cjkArabicUi.zh },
   uk: { ...ukrainianUi, ...easternUi.uk },
+  ko: { ...koreanUi, ...cjkArabicUi.ko },
+  th: { ...thaiUi, ...asianUi.th },
+  ru: { ...russianUi, ...easternUi.ru },
+  ar: { ...arabicUi, ...cjkArabicUi.ar },
+  hi: { ...hindiUi, ...asianUi.hi },
+  he: { ...hebrewUi, ...asianUi.he },
 };

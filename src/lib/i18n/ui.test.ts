@@ -19,8 +19,9 @@ describe("interface localization", () => {
     const italian = loadUiLocale("it");
     expect(loadUiLocale("it")).toBe(italian);
     expect((await italian)["Clarity"]).toBe("Chiarezza");
-    expect((await loadUiLocale("ja"))["Clarity"]).toBe(uiLocales.ja.Clarity);
-    expect((await loadUiLocale("fr"))["Settings"]).toBe(uiLocales.fr.Settings);
+    for (const code of INTERFACE_LANGUAGE_CODES) {
+      expect(await loadUiLocale(code), code).toEqual(uiLocales[code]);
+    }
   });
 
   it("connects legacy navigation keys to the selected interface catalog", () => {

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Film } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
+import type { ProjectStatus } from "@contracts/workspace";
 import posthog from "@/lib/posthog";
 
 const GOALS = [
@@ -21,6 +22,13 @@ export function CreationStart() {
   const [goal, setGoal] = useState(GOALS[0]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const projectStatus: Record<ProjectStatus, string> = {
+    draft: ui("Draft"),
+    editing: ui("Editing"),
+    review: ui("Review"),
+    scheduled: ui("Scheduled"),
+    published: ui("Published"),
+  };
   const latest = [...workspace.projects].sort((a, b) =>
     b.updatedAt.localeCompare(a.updatedAt)
   )[0];
@@ -34,7 +42,7 @@ export function CreationStart() {
           <h2 className="mt-2 text-2xl font-semibold">{latest.title}</h2>
           <p className="mt-2 text-sm text-foreground/70">
             {latest.clips.length} {ui("clips ·")} {latest.aspectRatio} ·{" "}
-            {latest.status}
+            {projectStatus[latest.status]}
           </p>
         </div>
         <Link
@@ -64,11 +72,7 @@ export function CreationStart() {
         `/dashboard/script?topic=${encodeURIComponent(`${goal} for ${name.trim()}. Audience: ${audience.trim()}.`)}`
       );
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Your brand could not be saved."
-      );
+      setError(cause instanceof Error ? cause.message : ui("Save failed"));
       setBusy(false);
     }
   }
@@ -90,7 +94,7 @@ export function CreationStart() {
             onClick={() => setGoal(value)}
             className={`rounded-pill border px-4 py-2 text-sm ${goal === value ? "border-primary bg-primary/15" : "border-border bg-background"}`}
           >
-            {value}
+            {ui(value)}
           </button>
         ))}
       </div>

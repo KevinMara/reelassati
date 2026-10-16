@@ -242,8 +242,8 @@ function DashboardHome() {
         account => account.status === "connected"
       ).length,
       sub: capabilities.publishing
-        ? "Publishing is connected"
-        : "Publishing setup required",
+        ? ui("Publishing connection is ready")
+        : ui("Publishing setup is incomplete"),
       icon: AtSign,
       to: "/dashboard/social",
     },
@@ -315,12 +315,12 @@ function DashboardHome() {
   );
   const momentumMessage =
     weekActivity.length === 0
-      ? "Your first small win is one action away."
+      ? ui("Your next idea can start here")
       : weekActivity.length < 3
-        ? "Nice start. Keep the next action small."
+        ? ui("Finish one useful step")
         : weekActivity.length < 7
-          ? "Momentum is building naturally."
-          : "A strong week—keep the rhythm sustainable.";
+          ? ui("Keep progress current")
+          : ui("Refine, review, and export");
 
   if (loading) {
     return (
@@ -338,7 +338,8 @@ function DashboardHome() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold">
-              {t(greetKey)}, {user?.name || "Creator"}.
+              {t(greetKey)}
+              {user?.name ? `, ${user.name}` : ""}.
             </h1>
             <p className="text-sm text-foreground/70 mt-2">
               {ui("What will you make impossible to scroll past today?")}
@@ -377,9 +378,7 @@ function DashboardHome() {
               </span>
               <div>
                 <p className="text-xs font-medium">{ui("Weekly momentum")}</p>
-                <p className="text-xs text-foreground/70">
-                  {ui(momentumMessage)}
-                </p>
+                <p className="text-xs text-foreground/70">{momentumMessage}</p>
               </div>
             </div>
           </div>
@@ -502,7 +501,14 @@ function DashboardHome() {
                         : item.label}
                     </p>
                     <p className="text-xs text-foreground/70 truncate">
-                      {item.detail}
+                      {item.type === "generation" &&
+                      item.label === "Voice note transcribed"
+                        ? item.detail.replace(
+                            / · (\d+) timestamped segments$/,
+                            (_suffix, count: string) =>
+                              ` · ${ui("timestamped segments")}: ${Number(count).toLocaleString(getUiLocale())}`
+                          )
+                        : item.detail}
                     </p>
                   </div>
                   <span className="text-xs text-foreground/70">

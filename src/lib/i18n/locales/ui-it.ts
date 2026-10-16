@@ -2529,4 +2529,10 @@ export const italianUi: Record<string, string> = {
   ...italianPricingUi,
   ...italianGuideUi,
   ...extraItalianUi,
+
+  "Demonstrate my product": "Mostra il mio prodotto",
+  "Teach something useful": "Insegna qualcosa di utile",
+  "Tell my founder story": "Racconta la mia storia da fondatore",
+  "Video uploaded for analysis": "Video caricato per l'analisi",
+  "Video analysis completed": "Analisi video completata",
 };

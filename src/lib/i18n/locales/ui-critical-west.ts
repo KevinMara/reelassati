@@ -1200,6 +1200,42 @@ const criticalUiRows = [
     "Seitenleiste ein- oder ausblenden",
     "Mostrar ou ocultar a barra lateral",
   ],
+
+  [
+    "Demonstrate my product",
+    "Demostrar mi producto",
+    "Présenter mon produit",
+    "Mein Produkt vorführen",
+    "Demonstrar o meu produto",
+  ],
+  [
+    "Teach something useful",
+    "Enseñar algo útil",
+    "Enseigner quelque chose d'utile",
+    "Etwas Nützliches vermitteln",
+    "Ensinar algo útil",
+  ],
+  [
+    "Tell my founder story",
+    "Contar mi historia como fundador",
+    "Raconter mon parcours de fondateur",
+    "Meine Gründungsgeschichte erzählen",
+    "Contar a minha história como fundador",
+  ],
+  [
+    "Video uploaded for analysis",
+    "Vídeo subido para analizar",
+    "Vidéo importée pour analyse",
+    "Video zur Analyse hochgeladen",
+    "Vídeo carregado para análise",
+  ],
+  [
+    "Video analysis completed",
+    "Análisis del vídeo completado",
+    "Analyse vidéo terminée",
+    "Videoanalyse abgeschlossen",
+    "Análise do vídeo concluída",
+  ],
 ] as const;
 
 export const westernUi: Record<

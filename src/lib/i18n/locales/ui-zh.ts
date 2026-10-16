@@ -107,7 +107,7 @@ export const chineseUi: Record<string, string> = {
   "A subtle, editable vertical motion path.": "细微且可编辑的垂直运动路径。",
   "A sunlit working studio": "阳光照耀的工作室",
   "A supporting video failed. Completed assets are saved; retry from your Library.":
-    "一个辅助视频生成失败。已完成资源已保存；请从媒体库重试。",
+    "一个辅助视频生成失败。已完成资源已保存；请从素材库重试。",
   "A vector star with independent width and height.":
     "宽度和高度可独立调整的矢量星形。",
   "AI Image Studio": "AI 图像工作室",
@@ -187,10 +187,10 @@ export const chineseUi: Record<string, string> = {
     "在 Studio 中添加准确标签、图解和字幕，确保文字排版可编辑且正确。",
   "Add favorite": "添加收藏",
   "Add footage from your Library or upload it below":
-    "从媒体库添加素材或在下方上传",
+    "从素材库添加素材或在下方上传",
   "Add footage, then find its story sections. These markers help you navigate without cutting the video.":
     "添加素材，然后查找故事分段。这些标记可帮助导航，不会裁切视频。",
-  "Add from library": "从媒体库添加",
+  "Add from library": "从素材库添加",
   "Add here": "在此添加",
   "Add image to Edit": "添加图像到剪辑",
   "Add key": "添加关键帧",
@@ -436,7 +436,7 @@ export const chineseUi: Record<string, string> = {
     "根据你的素材和参考风格构建完整剪辑。",
   "Build a controlled test": "建立可控测试",
   "Build a motion kit": "创建动效组件组",
-  "Build a reusable, private media library.": "建立可复用的私人媒体库。",
+  "Build a reusable, private media library.": "建立可复用的私人素材库。",
   "Build a shootable draft from your brief and Brand DNA.":
     "根据创作说明和品牌 DNA 编写可拍摄的草稿。",
   "Build controlled variants in the Studio.": "在 Studio 中创建可控变体。",
@@ -517,7 +517,7 @@ export const chineseUi: Record<string, string> = {
   "Check database, media storage, AI, and publishing availability. A configured service may still return a specific error for an individual request.":
     "检查数据库、媒体存储、AI 和发布的可用性。已配置服务仍可能针对单个请求返回具体错误。",
   "Check details, text, and composition in the result. Find recent images here or reuse the saved file from Library in an edit.":
-    "检查结果中的细节、文字和构图。在这里查找近期图像，或在剪辑中复用媒体库已保存文件。",
+    "检查结果中的细节、文字和构图。在这里查找近期图像，或在剪辑中复用素材库已保存文件。",
   "Check factual claims, identity, context, captions, timing, and the final media—not only the prompt or model response.":
     "检查事实主张、身份、背景、字幕、时间和最终媒体，而不仅是提示词或模型回答。",
   "Check provenance": "检查来源",
@@ -539,7 +539,7 @@ export const chineseUi: Record<string, string> = {
   "Checking connections…": "正在检查连接…",
   "Children and changes": "儿童与更改",
   "Chinese (Mandarin)": "中文（普通话）",
-  "Choose a Library image": "选择媒体库图像",
+  "Choose a Library image": "选择素材库图像",
   "Choose a category relevant to the content you want to make.":
     "选择与你想创作的内容相关的类别。",
   "Choose a clear metric, target, and deadline. A concrete goal such as finishing four edits is easier to act on than “grow faster”.":
@@ -596,7 +596,7 @@ export const chineseUi: Record<string, string> = {
   "Choose the scope": "选择范围",
   "Choose the source": "选择来源",
   "Choose the voice that fits your story. Your generated audio stays in this brand’s Library.":
-    "选择适合故事的声音。生成的音频会保存在此品牌的媒体库中。",
+    "选择适合故事的声音。生成的音频会保存在此品牌的素材库中。",
   "Choose what would count as a real win.": "选择什么才算真正成功。",
   "Choose your brand": "选择你的品牌",
   "Choose your sign-in method": "选择登录方式",
@@ -712,7 +712,7 @@ export const chineseUi: Record<string, string> = {
   Connected: "已连接",
   "Connected accounts": "已连接账号",
   "Connected destinations": "已连接目标",
-  "Connected library": "已连接媒体库",
+  "Connected library": "已连接素材库",
   "Connected publishing": "连接式发布",
   "Connected publishing destinations: {{count}}": "已连接发布目标：{{count}}",
   "Connected social accounts: {{count}}": "已连接社交账号：{{count}}",
@@ -789,7 +789,7 @@ export const chineseUi: Record<string, string> = {
   "Create a graphic": "创建图形",
   "Create a measurable goal": "创建可衡量目标",
   "Create a named visual and send it straight to your Library or timeline.":
-    "创建具名视觉资源，直接发送到媒体库或时间轴。",
+    "创建具名视觉资源，直接发送到素材库或时间轴。",
   "Create a script": "创建脚本",
   "Create a visual": "创建视觉资源",
   "Create account": "创建账号",
@@ -812,7 +812,7 @@ export const chineseUi: Record<string, string> = {
   "Created media": "已创建媒体",
   "Created scripts": "已创建脚本",
   "Creates a named image from a directed prompt and stores the marked output in the private media library.":
-    "根据有明确方向的提示词创建具名图像，并将带来源标记的结果存入私人媒体库。",
+    "根据有明确方向的提示词创建具名图像，并将带来源标记的结果存入私人素材库。",
   "Creates an independently editable audio clip with the same timing and mutes the source video's sound. One Undo restores both.":
     "创建时间一致、可独立编辑的音频片段，并静音源视频。一次撤销即可同时恢复两项。",
   "Creates scripts and proposed edit operations through a managed production route.":
@@ -1166,14 +1166,14 @@ export const chineseUi: Record<string, string> = {
     "用具体实例填写定位、受众和语调。添加需要保持一致的颜色、视觉参考和剪辑偏好。",
   "Film product demo": "拍摄产品演示",
   "Filmstrip unavailable": "胶片条不可用",
-  "Filter Library by project": "按项目筛选媒体库",
+  "Filter Library by project": "按项目筛选素材库",
   "Filter by category": "按类别筛选",
   "Filter by platform": "按平台筛选",
   "Filter by publication status": "按发布状态筛选",
   "Filter calendar items": "筛选日历项目",
   "Filter examples": "筛选示例",
   "Filter hypotheses by platform": "按平台筛选假设",
-  "Filter library": "筛选媒体库",
+  "Filter library": "筛选素材库",
   "Filter the examples": "筛选示例",
   "Filter trend evidence by lifecycle": "按生命周期筛选趋势证据",
   "Filter trend evidence by platform": "按平台筛选趋势证据",
@@ -1277,7 +1277,7 @@ export const chineseUi: Record<string, string> = {
     "通过清晰的主体、动作和摄影计划生成有明确方向的镜头。",
   "Generate an image": "生成图像",
   "Generate campaign images, thumbnails, backgrounds, and supporting visuals. Every result is saved automatically to your connected media library under the name you choose.":
-    "生成营销图像、缩略图、背景和辅助视觉素材。每个结果按你选择的名称，自动保存到已连接媒体库。",
+    "生成营销图像、缩略图、背景和辅助视觉素材。每个结果按你选择的名称，自动保存到已连接素材库。",
   "Generate image ·": "生成图像 ·",
   "Generate music & sound effects with AI": "用 AI 生成音乐与音效",
   "Generate one clip first. Completed clips will appear here as continuity sources.":
@@ -1310,7 +1310,7 @@ export const chineseUi: Record<string, string> = {
     "Studio 中的生成使用 REELassati 积分，并需要明确审核。",
   "Generation prompt": "生成提示词",
   "Generation started. Your audio will appear in Generated files and Library.":
-    "生成已开始。音频将显示在生成文件和媒体库中。",
+    "生成已开始。音频将显示在生成文件和素材库中。",
   "Generation uses REELassati credits inside your workspace.":
     "生成使用工作区内的 REELassati 积分。",
   German: "德语",
@@ -1577,9 +1577,9 @@ export const chineseUi: Record<string, string> = {
     "先慢慢来。三个步骤启动工作室。",
   "Letters reveal within each measured word's speech interval.":
     "字母在每个测得单词的发音时间区间内显现。",
-  "Library media added": "媒体库资源已添加",
-  "Library, MP4 export and content calendar": "媒体库、MP4 导出和内容日历",
-  "Library:": "媒体库：",
+  "Library media added": "素材库资源已添加",
+  "Library, MP4 export and content calendar": "素材库、MP4 导出和内容日历",
+  "Library:": "素材库：",
   "Lifetime results for posts published in the selected period. Reach is summed per post, not deduplicated across people.":
     "所选期间发布帖子的累计结果。触达按帖子相加，不按人数去重。",
   Light: "明亮",
@@ -1628,7 +1628,7 @@ export const chineseUi: Record<string, string> = {
   "Lock / unlock": "锁定 / 解锁",
   "Log in": "登录",
   Login: "登录",
-  "Logo from Library": "媒体库中的标志",
+  "Logo from Library": "素材库中的标志",
   "Logo or wordmark, tagline and a rising accent.":
     "标志或字标、标语和上升的强调元素。",
   "Look for verifiable REELassati origin information in text or a file.":
@@ -1691,7 +1691,7 @@ export const chineseUi: Record<string, string> = {
   "Measures percussive onsets from the actual waveform, up to five minutes / 16 MB. Review points before cutting. This does not infer downbeats or rearrange shots.":
     "从实际波形测量打击性起音，最多五分钟 / 16 MB。剪切前请审核点位。此功能不推断强拍或重排镜头。",
   "Media assets": "媒体资源",
-  "Media library": "媒体库",
+  "Media library": "素材库",
   "Media storage": "媒体存储",
   "Media storage needs configuration.": "媒体存储需要配置。",
   "Media tools": "媒体工具",
@@ -1894,8 +1894,8 @@ export const chineseUi: Record<string, string> = {
   Open: "打开",
   "Open Adjust": "打开调整",
   "Open Graphics → Motion kits for a brand reveal, speaker introduction, chapter, quote, statistic or closing card. Edit the text, accent and duration; the brand reveal can use a logo from Library. Add at the playhead, then refine the grouped layers on the timeline. Undo removes the whole insertion. These native templates use no AI credits.":
-    "打开图形 → 动效组件组，制作品牌揭晓、讲者介绍、章节、引言、统计或结尾卡。编辑文字、强调色和时长；品牌揭晓可使用媒体库标志。在播放头处添加，再在时间轴上调整分组图层。撤销会移除整次插入。这些原生模板不使用 AI 积分。",
-  "Open Library": "打开媒体库",
+    "打开图形 → 动效组件组，制作品牌揭晓、讲者介绍、章节、引言、统计或结尾卡。编辑文字、强调色和时长；品牌揭晓可使用素材库标志。在播放头处添加，再在时间轴上调整分组图层。撤销会移除整次插入。这些原生模板不使用 AI 积分。",
+  "Open Library": "打开素材库",
   "Open Prompt Director": "打开提示词导演",
   "Open Publisher": "打开发布工具",
   "Open Stripe account setup": "打开 Stripe 账号设置",
@@ -1918,7 +1918,7 @@ export const chineseUi: Record<string, string> = {
   "Open menu": "打开菜单",
   "Open navigation": "打开导航",
   "Open or create a project. Upload into Library, then drag a file to the exact time where it should begin. Preview, rename, sort, or organize files in folders before placing them.":
-    "打开或创建项目。上传到媒体库，再将文件拖到应该开始的准确时间。放置前可预览、重命名、排序或按文件夹整理。",
+    "打开或创建项目。上传到素材库，再将文件拖到应该开始的准确时间。放置前可预览、重命名、排序或按文件夹整理。",
   "Open original video": "打开原始视频",
   "Open plan and credits": "打开套餐与积分",
   "Open privacy preferences": "打开隐私偏好",
@@ -1929,7 +1929,7 @@ export const chineseUi: Record<string, string> = {
   "Open the brand you want to edit or create a new one. Confirm the active brand before changing its defaults.":
     "打开要编辑的品牌或创建新品牌。更改默认值前请确认当前品牌。",
   "Open the editor and drag the file from its Library panel to a specific time. Use a finished export when preparing a publication.":
-    "打开编辑器，将文件从媒体库面板拖到具体时间。准备发布时使用完成的导出文件。",
+    "打开编辑器，将文件从素材库面板拖到具体时间。准备发布时使用完成的导出文件。",
   "Open the evidence behind the next steps. Activity counts describe work done in the studio; they do not replace social performance metrics.":
     "查看下一步背后的证据。活动计数描述工作室内完成的工作，不能代替社交表现指标。",
   "Open the full Brand DNA editor": "打开完整品牌 DNA 编辑器",
@@ -2062,7 +2062,7 @@ export const chineseUi: Record<string, string> = {
   Portuguese: "葡萄牙语",
   "Pose saved": "姿态已保存",
   "Pose saved. Drag the image from Library onto a visual timeline track.":
-    "姿态已保存。将图像从媒体库拖到视觉时间轴轨道。",
+    "姿态已保存。将图像从素材库拖到视觉时间轴轨道。",
   "Position is a percentage of the canvas. Once keyframes exist, changing a value adds or updates a keyframe at the playhead. Trimming and splitting preserve the animation's source timing.":
     "位置为画布百分比。存在关键帧后，更改值会在播放头处添加或更新关键帧。修剪和拆分保留动画的源时间。",
   Positioning: "定位",
@@ -2262,7 +2262,7 @@ export const chineseUi: Record<string, string> = {
   Ready: "就绪",
   "Ready assets": "就绪资源",
   "Ready files are saved to Library. Drag them onto the timeline whenever you need them.":
-    "就绪文件会保存到媒体库。需要时可随时拖到时间轴。",
+    "就绪文件会保存到素材库。需要时可随时拖到时间轴。",
   "Ready for Edit": "可用于剪辑",
   "Ready to generate": "可以生成",
   "Realistic synthetic or public-interest content presented as authentic when a clear disclosure is required.":
@@ -2410,7 +2410,7 @@ export const chineseUi: Record<string, string> = {
   "Retrieves the existing output · no new generation or credit charge.":
     "取回现有输出 · 无新生成或积分费用。",
   "Retry free sound": "重试免费声音",
-  "Retry saving to Library": "重试保存到媒体库",
+  "Retry saving to Library": "重试保存到素材库",
   "Retry voice sample": "重试声音样例",
   "Retry weekly update": "重试每周更新",
   "Return to sign-in": "返回登录",
@@ -2439,7 +2439,7 @@ export const chineseUi: Record<string, string> = {
     "回顾近期工作室活动，选择下一个有用行动。",
   "Review the account terms": "审核账号条款",
   "Review the credit cost before starting. Check the job status and the finished clip before using it; a generated file can be reused from Library.":
-    "开始前检查积分费用。使用前检查任务状态和完成的片段；生成文件可从媒体库复用。",
+    "开始前检查积分费用。使用前检查任务状态和完成的片段；生成文件可从素材库复用。",
   "Review the current value and update it with real results. Edit a goal when its scope changes rather than leaving an outdated target.":
     "查看当前值，并用真实结果更新。目标范围变化时应编辑目标，不要保留过时指标。",
   "Review the generated hook, body, and ending. Check factual claims, then save the script or continue refining it.":
@@ -2455,7 +2455,7 @@ export const chineseUi: Record<string, string> = {
   "Review the terms that apply to your account and use of the service.":
     "阅读适用于账号和服务使用的条款。",
   "Review the whole edit before export. Your current device renders the video: keep the page open, and try 720p or a shorter edit if memory is limited. Download-only avoids a Library upload; Library saving makes the result available for later publication. AI media needs Library saving to finalize its source marking. Rendering uses no AI credits. AI generation, hosting and storage still have costs and allowances.":
-    "导出前检查完整剪辑。视频由当前设备渲染：请保持页面打开；内存不足时尝试 720p 或更短剪辑。仅下载可避免上传到媒体库；保存到媒体库便于稍后发布。AI 媒体需要保存到媒体库以完成来源标记。渲染不使用 AI 积分。AI 生成、托管和存储仍有费用和额度。",
+    "导出前检查完整剪辑。视频由当前设备渲染：请保持页面打开；内存不足时尝试 720p 或更短剪辑。仅下载可避免上传到素材库；保存到素材库便于稍后发布。AI 媒体需要保存到素材库以完成来源标记。渲染不使用 AI 积分。AI 生成、托管和存储仍有费用和额度。",
   "Review tracked path ·": "检查跟踪路径 ·",
   "Review your plan, available credits, usage, and checkout options.":
     "查看套餐、可用积分、使用量和结账选项。",
@@ -2498,7 +2498,7 @@ export const chineseUi: Record<string, string> = {
   "Safe zone": "安全区",
   "Safe-zone inset": "安全区内缩",
   "Save Brand DNA": "保存品牌 DNA",
-  "Save PNG to Library": "将 PNG 保存到媒体库",
+  "Save PNG to Library": "将 PNG 保存到素材库",
   "Save a draft or submit through configured destinations.":
     "保存草稿，或通过已配置目标提交。",
   "Save a draft while refining the post. For scheduling, check the date, time, and timezone. Follow the returned status; a scheduled or submitted post is not yet proof of publication.":
@@ -2518,7 +2518,7 @@ export const chineseUi: Record<string, string> = {
   "Save generation name": "保存生成名称",
   "Save graphic": "保存图形",
   "Save hypothesis": "保存假设",
-  "Save pose to Library": "将姿态保存到媒体库",
+  "Save pose to Library": "将姿态保存到素材库",
   "Save private video · no AI credits": "保存私人视频 · 不使用 AI 积分",
   "Save profile": "保存资料",
   "Save scene": "保存场景",
@@ -2528,11 +2528,11 @@ export const chineseUi: Record<string, string> = {
   "Save the useful format and define one change to test, such as the opening or pacing. Use workspace source material to connect the idea to your own content.":
     "保存有用形式，并定义一项要测试的更改，例如开场或节奏。使用工作区源素材，将想法连接到自己的内容。",
   "Save to": "保存到",
-  "Save to Library": "保存到媒体库",
+  "Save to Library": "保存到素材库",
   "Save transcript revision": "保存转写修订",
   "Save your voice, audience, colors, and caption style.":
     "保存语调、受众、颜色和字幕样式。",
-  "Save {{name}} to Library": "将 {{name}} 保存到媒体库",
+  "Save {{name}} to Library": "将 {{name}} 保存到素材库",
   "Save, schedule, or publish": "保存、排期或发布",
   Saved: "已保存",
   "Saved audio": "已保存音频",
@@ -2547,7 +2547,7 @@ export const chineseUi: Record<string, string> = {
     "已保存工作室偏好及实时功能检查。",
   "Saved styles": "已保存样式",
   "Saved suggestions ·": "已保存建议 ·",
-  "Saved to Library": "已保存到媒体库",
+  "Saved to Library": "已保存到素材库",
   "Saved to the publishing queue": "已保存到发布队列",
   "Saved to your audio library": "已保存到音频库",
   "Saved to your image library": "已保存到图像库",
@@ -2596,7 +2596,7 @@ export const chineseUi: Record<string, string> = {
     "脚本、剪辑计划、分析、语音和视频",
   "Search by name or type": "按名称或类型搜索",
   "Search files…": "搜索文件…",
-  "Search library": "搜索媒体库",
+  "Search library": "搜索素材库",
   "Search narration, warm, Italian…": "搜索旁白、温暖、意大利语…",
   "Search or filter by category, such as product, cinematic, social, or educational.":
     "按产品、电影感、社交或教学等类别搜索或筛选。",
@@ -2724,7 +2724,7 @@ export const chineseUi: Record<string, string> = {
   "Share the right link": "分享正确链接",
   "Share your creator link and follow verified referral rewards.":
     "分享创作者链接，跟踪已验证推荐奖励。",
-  "Shared library across creation tools": "创作工具之间共享的媒体库",
+  "Shared library across creation tools": "创作工具之间共享的素材库",
   Shares: "分享次数",
   "Shares reported by source": "来源报告的分享次数",
   Shift: "Shift",
@@ -2880,7 +2880,7 @@ export const chineseUi: Record<string, string> = {
     "匹配丢失或不明确时停止。旋转、缩放变化、镜头切换和遮挡可能需要更短区间。应用会替换运动路径，并将图形限制到观察到的区间。",
   "Stored as": "保存为",
   "Stored assets: {{count}}": "已存储资源：{{count}}",
-  "Stored in your private library": "存储在你的私人媒体库",
+  "Stored in your private library": "存储在你的私人素材库",
   "Story extractor": "故事提取器",
   "Story progress": "故事进展",
   "Story section role": "故事分段角色",
@@ -2968,13 +2968,13 @@ export const chineseUi: Record<string, string> = {
   "Text-only publication": "纯文本发布",
   Thai: "泰语",
   "The Library workspace changed before saving the imported video.":
-    "保存导入视频前，媒体库工作区已更改。",
+    "保存导入视频前，素材库工作区已更改。",
   "The Library workspace changed before saving the measured duration.":
-    "保存测得时长前，媒体库工作区已更改。",
+    "保存测得时长前，素材库工作区已更改。",
   "The Library workspace changed before saving the upload.":
-    "保存上传文件前，媒体库工作区已更改。",
+    "保存上传文件前，素材库工作区已更改。",
   "The Library workspace changed before uploading.":
-    "上传前，媒体库工作区已更改。",
+    "上传前，素材库工作区已更改。",
   "The account or brand changed. Save the pose again in the intended workspace.":
     "账号或品牌已更改。请在目标工作区重新保存姿态。",
   "The account, brand or project changed. Reopen export in the intended workspace.":
@@ -3087,7 +3087,7 @@ export const chineseUi: Record<string, string> = {
   "The verification service is not connected yet. Your input was not classified locally and no result was invented.":
     "验证服务尚未连接。输入未在本地分类，也没有虚构结果。",
   "The video is still generating. It will remain available in your Library; your timeline is unchanged.":
-    "视频仍在生成。它会保留在媒体库；时间轴不变。",
+    "视频仍在生成。它会保留在素材库；时间轴不变。",
   "The workflow is moving. Keep the next cycle narrow: one edit, one review, one measured publication.":
     "工作流程正在推进。下一轮保持聚焦：一次剪辑、一次审核、一次测量发布。",
   "The workspace changed. Close this dialog and reopen export in the intended workspace.":
@@ -3119,11 +3119,11 @@ export const chineseUi: Record<string, string> = {
   "This clip has 24 keyframes. Select an existing keyframe to adjust its pose, or remove one before adding another.":
     "此片段已有 24 个关键帧。选择已有关键帧以调整姿态，或先移除一个再添加。",
   "This day is open": "此日期空闲",
-  "This file is no longer in Library.": "此文件已不在媒体库。",
+  "This file is no longer in Library.": "此文件已不在素材库。",
   "This form needs a valid reset session. If the page reports an expired or invalid link, request another reset.":
     "此表单需要有效重置会话。如果页面报告链接过期或无效，请重新请求重置。",
   "This generation service is not available yet. Your existing files remain available in Library.":
-    "此生成服务尚不可用。媒体库中已有文件仍可使用。",
+    "此生成服务尚不可用。素材库中已有文件仍可使用。",
   "This page demonstrates the introduction and visual layout. Use the replay control to see the introduction again.":
     "此页展示介绍和视觉布局。使用重播控件再次查看介绍。",
   "This page describes the product routes currently implemented. Managed AI actions remain unavailable until the service is ready, and an interface state is never presented as evidence that generation occurred.":
@@ -3136,7 +3136,7 @@ export const chineseUi: Record<string, string> = {
   "This preview could not load.": "无法加载此预览。",
   "This preview could not play. Try again.": "无法播放此预览。请重试。",
   "This project includes AI media. Library saving finalizes its AI source marking before download.":
-    "此项目含 AI 媒体。保存到媒体库会在下载前完成 AI 来源标记。",
+    "此项目含 AI 媒体。保存到素材库会在下载前完成 AI 来源标记。",
   "This requests removal of your account and all brand workspaces. Support checks subscription cancellation and any records that must be retained. A request does not cancel billing automatically.":
     "这会请求删除账号和所有品牌工作区。支持团队会检查订阅取消及必须保留的记录。请求不会自动取消计费。",
   "This reset link is missing or expired.": "此重置链接缺失或已过期。",
@@ -3301,7 +3301,7 @@ export const chineseUi: Record<string, string> = {
     "上传、修剪、拆分、加字幕、审核 AI 更改，并为短视频保存版本。",
   "Uploaded source": "已上传来源",
   "Uploaded to Library. Drag a thumbnail onto the timeline to place it.":
-    "已上传到媒体库。将缩略图拖到时间轴以放置。",
+    "已上传到素材库。将缩略图拖到时间轴以放置。",
   "Uploading {{progress}}%": "正在上传 {{progress}}%",
   "Upper captions that leave the lower frame clear.":
     "顶部字幕让画面下部保持清爽。",
@@ -3334,7 +3334,7 @@ export const chineseUi: Record<string, string> = {
   "Use light theme": "使用明亮主题",
   "Use playhead · source": "使用播放头 · 来源",
   "Use search and type filters to narrow the library. Preview the asset to check its content before reusing it.":
-    "使用搜索和类型筛选缩小媒体库范围。复用前预览资源，检查内容。",
+    "使用搜索和类型筛选缩小素材库范围。复用前预览资源，检查内容。",
   "Use the Studio to develop scripts, edit media, analyze creative structure, generate supporting shots or narration, and prepare approved content for distribution.":
     "使用 Studio 开发脚本、编辑媒体、分析创意结构、生成辅助镜头或旁白，并准备已批准内容以供分发。",
   "Use the available account and period controls to compare the same scope. Check when the information was last synced.":
@@ -3568,7 +3568,7 @@ export const chineseUi: Record<string, string> = {
   "Your account or brand changed. Start again in the intended workspace.":
     "账号或品牌已更改。请在目标工作区重新开始。",
   "Your account or brand changed. Start again with the current Library image.":
-    "账号或品牌已更改。请用当前媒体库图像重新开始。",
+    "账号或品牌已更改。请用当前素材库图像重新开始。",
   "Your activity starts with a real action.": "你的活动从真实操作开始。",
   "Your answer to:": "你的回答对应：",
   "Your audience and what they care about": "你的受众及其关注点",
@@ -3583,7 +3583,7 @@ export const chineseUi: Record<string, string> = {
     "一个安全账号，容纳创作工作区、项目和媒体。",
   "Your creator link": "你的创作者链接",
   "Your device renders your cuts, images, motion graphics, captions and audio. Download the result or save it to your Library.":
-    "设备渲染你的剪切、图像、动态图形、字幕和音频。下载结果或保存到媒体库。",
+    "设备渲染你的剪切、图像、动态图形、字幕和音频。下载结果或保存到素材库。",
   "Your direction mentions": "你的方向提到了",
   "Your editing partner": "你的剪辑搭档",
   "Your events and publication schedule, together in":
@@ -3606,10 +3606,10 @@ export const chineseUi: Record<string, string> = {
   "Your privacy choices": "你的隐私选项",
   "Your public-facing brand": "面向公众的品牌",
   "Your report enters the product queue": "报告进入产品队列",
-  "Your reusable library starts here": "可复用媒体库从这里开始",
+  "Your reusable library starts here": "可复用素材库从这里开始",
   "Your rights": "你的权利",
   "Your saved images and uploads remain available in the Library and Edit.":
-    "已保存图像和上传文件仍可在媒体库和剪辑中使用。",
+    "已保存图像和上传文件仍可在素材库和剪辑中使用。",
   "Your studio": "你的工作室",
   "Your studio’s Plan & credits page holds balance, usage, top-ups, and the available subscription-management controls.":
     "工作室的套餐与积分页面包含余额、使用量、充值和可用订阅管理控件。",
@@ -3620,7 +3620,7 @@ export const chineseUi: Record<string, string> = {
     "上传素材、生成媒体、导出文件和已保存脚本，可跨项目复用。",
   "Your video is ready": "视频已准备好",
   "Your video is ready to download. No copy was uploaded to Library.":
-    "视频可以下载。未向媒体库上传副本。",
+    "视频可以下载。未向素材库上传副本。",
   "Your video will appear here": "视频将在这里显示",
   "Your week at a glance": "本周概览",
   "Zoom is for inspecting your edit. Drag the enlarged preview to pan. Export framing stays unchanged.":
@@ -3646,7 +3646,7 @@ export const chineseUi: Record<string, string> = {
   audio: "音频",
   "automatically approved": "自动批准",
   "brands. Each has its own voice, Library, projects, calendar, and social connections. Plan credits are shared.":
-    "个品牌。每个品牌有自己的语调、媒体库、项目、日历和社交连接。套餐积分共用。",
+    "个品牌。每个品牌有自己的语调、素材库、项目、日历和社交连接。套餐积分共用。",
   "by seconds": "按秒",
   calm: "平静",
   "canvas ·": "画布 ·",
@@ -3690,7 +3690,7 @@ export const chineseUi: Record<string, string> = {
   files: "文件",
   followers: "粉丝",
   "fps. Rendering uses this device’s processor and memory. Keep this page open while exporting. Templates and rendering use no AI credits; Library storage and AI generation have their own allowances.":
-    "fps。渲染使用本设备处理器和内存。导出时保持页面打开。模板和渲染不使用 AI 积分；媒体库存储和 AI 生成有各自额度。",
+    "fps。渲染使用本设备处理器和内存。导出时保持页面打开。模板和渲染不使用 AI 积分；素材库存储和 AI 生成有各自额度。",
   funny: "有趣",
   happy: "开心",
   "hosting, network, storage, database, and authentication (Cloudflare/Sites, Vercel, and Supabase);":
@@ -3699,7 +3699,7 @@ export const chineseUi: Record<string, string> = {
   "imported captions?": "导入的字幕？",
   inspirational: "鼓舞人心",
   "is not available yet. You can use the free sounds below or upload audio to Library.":
-    "尚不可用。你可使用下方免费声音，或上传音频到媒体库。",
+    "尚不可用。你可使用下方免费声音，或上传音频到素材库。",
   keys: "关键帧",
   left: "剩余",
   mature: "成熟",
@@ -3800,10 +3800,10 @@ export const chineseUi: Record<string, string> = {
   "{{label}} value": "{{label}} 值",
   "{{name}} editing chat": "{{name}} 剪辑聊天",
   "{{name}} for still images": "{{name}}，用于静态图像",
-  "{{name}} is ready in your library.": "{{name}} 已在媒体库中准备好。",
+  "{{name}} is ready in your library.": "{{name}} 已在素材库中准备好。",
   "{{name}} preview": "{{name}} 预览",
   "{{name}} sample playback position": "{{name}} 样例播放位置",
-  "{{name}} saved to Library": "{{name}} 已保存到媒体库",
+  "{{name}} saved to Library": "{{name}} 已保存到素材库",
   "{{name}} voice sample": "{{name}} 声音样例",
   "{{name}} was copied.": "{{name}} 已复制。",
   "{{name}} was deleted.": "{{name}} 已删除。",

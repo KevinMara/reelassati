@@ -1,0 +1,41 @@
+name: Platform quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Check types
+        run: npm run check
+      - name: Require complete interface translations
+        run: npm run check:localization
+      - name: Lint source
+        run: npm run lint
+      - name: Build client and server
+        run: npm run build
+      - name: Run regressions
+        run: npm test -- --pool=threads --maxWorkers=1 --testTimeout=30000 --hookTimeout=30000
