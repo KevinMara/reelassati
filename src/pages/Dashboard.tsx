@@ -1,4 +1,5 @@
 import { getUiLocale, translateUi, useUiText } from "@/lib/i18n/ui";
+import { formatMinutesDuration } from "@/lib/format-duration";
 import { isWorkspaceInterfaceActivity } from "@contracts/workspace-activity-ui";
 import { OwnerOperations } from "@/components/studio/OwnerOperations";
 import { CreationStart } from "@/components/studio/CreationStart";
@@ -206,10 +207,10 @@ function DashboardHome() {
     };
     return total + minutesByAction[item.type];
   }, 0);
-  const formattedTimeSaved =
-    estimatedMinutesSaved >= 60
-      ? `${Math.floor(estimatedMinutesSaved / 60)}h ${estimatedMinutesSaved % 60 ? `${estimatedMinutesSaved % 60}m` : ""}`.trim()
-      : `${estimatedMinutesSaved}m`;
+  const formattedTimeSaved = formatMinutesDuration(
+    estimatedMinutesSaved,
+    getUiLocale()
+  );
   const stats = [
     {
       label: "Editing projects",

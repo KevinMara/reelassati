@@ -1,6 +1,8 @@
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { createElement, type ReactElement } from "react";
+import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
+import { beforeAll, describe, expect, it } from "vitest";
+import { createInstance } from "i18next";
+import { I18nextProvider } from "react-i18next";
 import type { ScriptWritingPack as WritingPack } from "@contracts/script-writing-pack";
 import { normalizeScriptWritingPack } from "@contracts/script-writing-pack";
 import { appendTextProvenanceMarker } from "@contracts/compliance";
@@ -9,6 +11,24 @@ import {
   ScriptCtaOptions,
   ScriptWritingPack,
 } from "./ScriptWritingPack";
+
+const interfaceI18n = createInstance();
+beforeAll(async () => {
+  await interfaceI18n.init({
+    lng: "en",
+    defaultNS: "ui",
+    keySeparator: false,
+    nsSeparator: false,
+    resources: { en: { ui: {} } },
+    interpolation: { escapeValue: false },
+  });
+});
+
+function renderToStaticMarkup(element: ReactElement) {
+  return renderMarkup(
+    createElement(I18nextProvider, { i18n: interfaceI18n }, element)
+  );
+}
 
 const scriptText =
   "Start with the result.\n\nShow the process.\n\nSave this example.";
@@ -177,6 +197,45 @@ describe("planned script beat table", () => {
 });
 
 describe("alternate calls to action", () => {
+  it("interpolates translated numbered choices without translating generated CTA text", async () => {
+    const italianI18n = createInstance();
+    await italianI18n.init({
+      lng: "it",
+      defaultNS: "ui",
+      keySeparator: false,
+      nsSeparator: false,
+      resources: {
+        it: {
+          ui: {
+            "Use call to action {{number}}":
+              "Usa l'invito all'azione {{number}}",
+          },
+        },
+      },
+      interpolation: { escapeValue: false },
+    });
+    const html = renderMarkup(
+      createElement(
+        I18nextProvider,
+        { i18n: italianI18n },
+        createElement(ScriptCtaOptions, {
+          ctas: pack.alternateCtas,
+          currentCta: pack.alternateCtas[1],
+          onUseCta: () => undefined,
+        })
+      )
+    );
+    expect(html).toContain(
+      'aria-label="Usa l&#x27;invito all&#x27;azione 1" aria-pressed="false"'
+    );
+    expect(html).toContain(
+      'aria-label="Usa l&#x27;invito all&#x27;azione 2" aria-pressed="true" disabled=""'
+    );
+    expect(html).not.toContain("{{number}}");
+    expect(html).toContain(pack.alternateCtas[0]);
+    expect(html).toContain(pack.alternateCtas[1]);
+  });
+
   it("offers both alternatives and identifies the one already in the editable script", () => {
     let actions = 0;
     const html = renderToStaticMarkup(
