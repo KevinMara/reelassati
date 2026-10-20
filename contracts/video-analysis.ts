@@ -350,7 +350,11 @@ export function videoAnalysisResponseSchema(
     sourceIn: nullableNumber,
     speed: nullableNumber,
     volume: nullableNumber,
-    fit: { type: ["string", "null"], enum: ["cover", "contain", null] },
+    // Keep null outside the string enum for providers whose schema adapter
+    // represents enum values as strings. This accepts the same three values.
+    fit: {
+      anyOf: [{ type: "string", enum: ["cover", "contain"] }, { type: "null" }],
+    },
     brightness: nullableNumber,
     contrast: nullableNumber,
     saturation: nullableNumber,

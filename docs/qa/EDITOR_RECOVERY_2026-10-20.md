@@ -13,8 +13,18 @@ Auto-edit now identifies the failed stage, HTTP status and safe provider support
 - The isolated browser used production editor components, local synthetic footage and simulated provider responses. Direct insertion at 2 seconds added a separate lane; Undo restored the original. Append placed a clip at the 4-second content end. A simulated HTTP 400 planning failure showed its stage/reference; retry saved the edited timeline and closed the modal.
 - At the reported 1011×668 viewport and a 390×844 mobile viewport, document width did not overflow. The Library footer began at the dock's bottom, without overlapping cards.
 
-## Production verification limit
+## Authorized production test
 
-The live official site also showed the existing generic AI-provider failure on Analyze. Native Sites project, credential and Worker-log calls returned “not available to the model,” so no production upstream status or provider message could be retrieved. The signed-in account did not expose the owner-only connection diagnostic. No backend binding, provider/model route or deployed backend version was changed.
+The user authorized one real auto-edit test, capped at 35 existing credits. A disposable project, `project-161d57fa-a8ac-4bf5-9ad0-51d016cdc472` (QA auto-edit diagnosis — 20 October 2026), used the existing four-second synthetic video `QA audio and motion — 14 October 2026.mp4`. The quote was 17 credits: review 10, speech timing 2, planning 5, optional media 0. Build was submitted exactly once at 14:04:51 UTC on 20 October. No subsequent paid retry was made.
 
-No paid AI generation was run during these checks. A real test capped at 35 existing credits was requested separately because the user requires free operation. The live AI rejection is **not verified as repaired** by the simulated recovery test. GitHub publication delivers the client workflow fixes; it does not establish provider availability or generated editing quality.
+The request failed during video review with HTTP 400 and support reference `daab0620-d474-4814-a792-27ee35733a56`, before transcription or edit planning. A fresh Billing page confirmed 801 credits before and after the test, a net cost of zero. No generated images or videos were requested or created. The original source clip remains in the diagnostic project.
+
+After the user signed into OpenRouter, its Upstream Requests log independently confirmed `google/gemini-2.5-flash` / Google AI Studio, HTTP 400, one upstream attempt, 2.3 seconds, generation ID `gen-1792505102-io4yKLGK7CI2zXigOKBv` (16:05 CEST). The request-detail drawer exposes routing and status but no error body. Native Sites Worker-log calls still returned “not available to the model.” The precise rejected field therefore remains unconfirmed.
+
+## Schema compatibility correction and remaining limit
+
+The analysis schema previously encoded fit as a nullable string type with a mixed enum `["cover", "contain", null]`. It now uses `anyOf` with a string enum `["cover", "contain"]` and a separate null branch. This preserves the accepted values while avoiding adapters that represent string enum entries as strings. Google's structured-output documentation describes string enums as string values and documents nullable unions: <https://ai.google.dev/gemini-api/docs/structured-output>.
+
+Seventeen focused tests passed across five files, including independent JSON-schema parsing of accepted/rejected fit values and checks that four-channel evidence, story structure, source bounds and nullable scores remain required. Active TypeScript checks, targeted lint, and the production client and Worker builds passed. This is a compatibility correction, **not proof of the live HTTP 400's cause**. It does not remove strict structured output, change the model, add a fallback generation, or relax the server's audiovisual evidence and full-coverage checks.
+
+No backend binding, model route, access policy or production backend version was changed during this investigation. The live AI rejection is **not verified as repaired**. GitHub publication delivers client changes but does not deploy the existing Sites Worker; a backend rollout and a separately authorized live verification remain outstanding.
