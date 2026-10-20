@@ -667,6 +667,77 @@ describe("authenticated paid editing chat route", () => {
     expect(balance()).toBe(before - 5);
     expect(providerCalls.length).toBe(calls + 1);
   });
+  it("retains safe diagnostics and releases a rejected review without buying another provider call", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    const requestId = "gen-1792505102-io4yKLGK7CI2zXigOKBv";
+    const failureLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    providerFailure = {
+      status: 400,
+      payload: {
+        id: requestId,
+        error: {
+          code: 400,
+          metadata: {
+            raw: JSON.stringify({
+              error: {
+                status: "INVALID_ARGUMENT",
+                message: "Invalid response_schema: PRIVATE_PROVIDER_DETAIL",
+                details: [
+                  {
+                    fieldViolations: [
+                      {
+                        field:
+                          "generation_config.response_schema.properties[changes].items.properties[parameters].properties[fit].enum[2]",
+                        description: "PRIVATE_PROVIDER_DETAIL",
+                      },
+                    ],
+                  },
+                ],
+              },
+            }),
+          },
+        },
+      },
+    };
+    try {
+      const response = await request("/api/ai/analyze", { assetId: "source" });
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as {
+        error: string;
+        reference: string;
+      };
+      expect(body.reference).toMatch(/^[a-f0-9-]{36}$/);
+      expect(Object.keys(body).sort()).toEqual(["error", "reference"]);
+      expect(JSON.stringify(body)).not.toMatch(
+        /PRIVATE|gen-|schema|Gemini|OpenRouter/
+      );
+      const logged = failureLog.mock.calls.find(
+        ([message, details]) =>
+          message === "REELassati provider operation failed" &&
+          details.reference === body.reference
+      )?.[1];
+      expect(logged).toMatchObject({
+        provider: "OpenRouter",
+        status: 400,
+        diagnostics: {
+          upstreamRequestId: requestId,
+          upstreamCode: "INVALID_ARGUMENT",
+          reportedIssue: "response-schema",
+        },
+        invocation: {
+          model: "google/gemini-2.5-flash",
+          purpose: "video-analysis",
+        },
+      });
+      expect(JSON.stringify(logged)).not.toContain("PRIVATE");
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before);
+    } finally {
+      providerFailure = undefined;
+      failureLog.mockRestore();
+    }
+  });
   it("supplies actual full-duration private video bytes and rejects foreign or shortened analysis proxies", async () => {
     nextOutput = videoAnalysisOutput();
     const before = balance();

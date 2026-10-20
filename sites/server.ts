@@ -28,6 +28,10 @@ import {
 import { modelUserContent, type ModelContentPart } from "./model-content";
 import { publicProviderFailure } from "./provider-failure";
 import {
+  openRouterErrorDiagnostics,
+  type ProviderDiagnostics,
+} from "./provider-diagnostics";
+import {
   buildStoryBeatEvidence,
   normalizeStoryBeats,
 } from "../contracts/story-beats";
@@ -3779,7 +3783,12 @@ function zernioExistingPostId(payload: Record<string, unknown> | null): string {
 function logProviderFailure(
   provider: string,
   operation: string,
-  details: { status?: number | string; providerCode?: string } = {}
+  details: {
+    status?: number | string;
+    providerCode?: string;
+    diagnostics?: ProviderDiagnostics;
+    invocation?: { id: string; model: string; purpose: AiOperation };
+  } = {}
 ): string {
   const reference = crypto.randomUUID();
   console.error("REELassati provider operation failed", {
@@ -3788,6 +3797,10 @@ function logProviderFailure(
     operation,
     ...(details.status !== undefined ? { status: details.status } : {}),
     ...(details.providerCode ? { providerCode: details.providerCode } : {}),
+    ...(details.diagnostics && Object.keys(details.diagnostics).length
+      ? { diagnostics: details.diagnostics }
+      : {}),
+    ...(details.invocation ? { invocation: details.invocation } : {}),
   });
   return reference;
 }
@@ -3801,13 +3814,18 @@ function clientProviderFailureMessage(
 
 async function providerError(
   response: Response,
-  provider: string
+  provider: string,
+  invocation?: { id: string; model: string; purpose: AiOperation }
 ): Promise<never> {
   const status =
     response.status >= 400 && response.status < 600 ? response.status : 502;
   const payload = await readProviderErrorPayload(response);
   const reference = logProviderFailure(provider, "provider-request", {
     status,
+    ...(provider === "OpenRouter"
+      ? { diagnostics: openRouterErrorDiagnostics(payload, response.headers) }
+      : {}),
+    ...(invocation ? { invocation } : {}),
   });
   const publicFailure = publicProviderFailure(provider, status, reference);
   const failure = json(publicFailure.body, publicFailure.status);
@@ -3941,7 +3959,11 @@ async function chatJson(
     );
     if (!response.ok) {
       await failAiInvocation(env, invocation, `provider_${response.status}`);
-      await providerError(response, providerName);
+      await providerError(response, providerName, {
+        id: invocation.id,
+        model: selectedModel,
+        purpose,
+      });
     }
     const output = parseModelJson(await response.json());
     if (!deferCompletion) await completeAiInvocation(env, invocation, output);
