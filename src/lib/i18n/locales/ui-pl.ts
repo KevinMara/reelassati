@@ -1,5 +1,21 @@
 /** Reviewed pl interface copy; generated content and user text are excluded. */
 export const polishUi: Record<string, string> = {
+  "Add to timeline": "Dodaj do osi czasu",
+  "Add {{name}} to timeline": "Dodaj {{name}} do osi czasu",
+  "Added to timeline": "Dodano do osi czasu",
+  "An insertion is already in progress.": "Wstawianie już trwa.",
+  "At end": "Na końcu",
+  "At playhead": "Przy głowicy odtwarzania",
+  "Completed preparation is reused.": "Ukończone przygotowanie jest używane ponownie.",
+  "Continue edit": "Kontynuuj montaż",
+  "Edit paused": "Montaż wstrzymany",
+  "Insert position": "Pozycja wstawiania",
+  "Move to folder": "Przenieś do folderu",
+  "Ready to add to your timeline.": "Gotowe do dodania do osi czasu.",
+  "The file could not be added.": "Nie udało się dodać pliku.",
+  "The project is no longer available.": "Projekt nie jest już dostępny.",
+  "Timeline": "Oś czasu",
+  "Your account or brand changed. Reopen the intended workspace.": "Zmieniono konto lub markę. Otwórz ponownie właściwy obszar roboczy.",
   " (showing the first 50)": " (wyświetlono pierwsze 50)",
   " Showing up to 1,000 recent posts.":
     " Wyświetlono maksymalnie 1000 ostatnich postów.",

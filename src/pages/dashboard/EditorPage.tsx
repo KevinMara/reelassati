@@ -77,6 +77,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { resolveMediaDuration } from "@/lib/media-metadata";
+import { placeLibraryAsset } from "@/lib/library-insertion";
+import { selectedBrand } from "@/lib/workspace-scope";
 
 import { EditorPresetLibrary } from "@/components/studio/EditorPresetLibrary";
 import {
@@ -86,7 +88,6 @@ import {
 import { StoryBeatStrip } from "@/components/studio/StoryBeatStrip";
 import { TimelineTracks } from "@/components/studio/TimelineTracks";
 import {
-  allocateTimelineLane,
   clipLaneKind,
   clipLaneNumber,
   trimTimelineClip,
@@ -156,7 +157,6 @@ import type {
   EditProject,
   EditRevision,
   TimelineClip,
-  TrackKind,
   TranscriptSegment,
 } from "@contracts/workspace";
 import { platformApi } from "@/lib/platform-api";
@@ -190,13 +190,6 @@ const PROJECT_TEMPLATES = [
     icon: WandSparkles,
   },
 ] as const;
-
-const TRACK_COLORS: Record<TrackKind, string> = {
-  video: "#6F5AD8",
-  overlay: "#B98B4B",
-  captions: "#4D8C72",
-  audio: "#B45F7A",
-};
 
 function createId(prefix: string) {
   const random =
@@ -296,6 +289,9 @@ export default function EditorPage() {
     oy: number;
   } | null>(null);
   const [autoEditOpen, setAutoEditOpen] = useState(false);
+  const [autoEditSummary, setAutoEditSummary] = useState("");
+  const autoEditFinished = useRef(false);
+  const libraryInsertLock = useRef(false);
   const [chatSeed, setChatSeed] = useState<{
     text: string;
     id: number;
@@ -721,44 +717,31 @@ export default function EditorPage() {
     insertAt?: number,
     destination?: TimelineLane
   ) => {
+    const owner = workspace.profile.email.toLowerCase();
+    const brand = selectedBrand(owner);
     asset = { ...asset, duration: await resolveMediaDuration(asset) };
     await updateWorkspace(current => {
+      if (
+        current.profile.email.toLowerCase() !== owner ||
+        selectedBrand(owner) !== brand
+      )
+        throw new Error(
+          ui("Your account or brand changed. Reopen the intended workspace.")
+        );
       const target = current.projects.find(item => item.id === targetProjectId);
-      if (!target) return current;
+      if (!target) throw new Error(ui("The project is no longer available."));
       const timelineEnd = target.clips.reduce(
         (latest, clip) => Math.max(latest, clip.start + clip.duration),
         0
       );
       const start = Math.max(0, insertAt ?? timelineEnd);
-      const duration =
-        asset.duration && asset.duration > 0
-          ? asset.duration
-          : asset.kind === "image"
-            ? 3
-            : 0;
-      const track: TrackKind = asset.kind === "audio" ? "audio" : "video";
-      const clip: TimelineClip = {
-        id: createId("clip"),
-        assetId: asset.id,
-        track,
-        lane: allocateTimelineLane(
-          target.clips,
-          track === "audio" ? "audio" : "video",
-          start,
-          duration,
-          destination?.kind === track ? destination.number : 1
-        ),
-        label: asset.name,
+      const clip = placeLibraryAsset(
+        target,
+        asset,
+        createId("clip"),
         start,
-        duration,
-        inPoint: 0,
-        outPoint: duration,
-        locked: false,
-        muted: false,
-        speed: 1,
-        volume: 1,
-        color: TRACK_COLORS[track],
-      };
+        destination
+      );
       const clips = [...target.clips, clip];
       const updatedProject = {
         ...target,
@@ -924,8 +907,13 @@ export default function EditorPage() {
     }
   };
 
-  const addLibraryAssetAtPlayhead = async (asset: Asset) => {
-    if (!project) return;
+  const addLibraryAssetAtPlayhead = async (
+    asset: Asset,
+    position: "playhead" | "end" = "playhead"
+  ) => {
+    if (!project || libraryInsertLock.current)
+      throw new Error(ui("An insertion is already in progress."));
+    libraryInsertLock.current = true;
     setBusyAction(`library-${asset.id}`);
     setLocalError(null);
     try {
@@ -933,7 +921,7 @@ export default function EditorPage() {
         asset,
         project.id,
         "Library media added",
-        playhead
+        position === "end" ? undefined : playhead
       );
       setRecentlyAddedAssetId(asset.id);
     } catch (cause) {
@@ -942,7 +930,9 @@ export default function EditorPage() {
           ? cause.message
           : "The library asset could not be added."
       );
+      throw cause;
     } finally {
+      libraryInsertLock.current = false;
       setBusyAction(null);
     }
   };
@@ -2312,7 +2302,9 @@ export default function EditorPage() {
                       )
                     }
                     className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
-                    aria-label={ui("Line {{number}} start", { number: index + 1 })}
+                    aria-label={ui("Line {{number}} start", {
+                      number: index + 1,
+                    })}
                   />
                   <span className="text-xs text-foreground/70">{ui("to")}</span>
                   <input
@@ -2330,7 +2322,9 @@ export default function EditorPage() {
                       )
                     }
                     className="w-16 rounded border border-border bg-surface px-1.5 py-1 font-mono text-xs"
-                    aria-label={ui("Line {{number}} end", { number: index + 1 })}
+                    aria-label={ui("Line {{number}} end", {
+                      number: index + 1,
+                    })}
                   />
                   <button
                     type="button"
@@ -2340,7 +2334,9 @@ export default function EditorPage() {
                       )
                     }
                     className="ml-auto text-foreground/70 hover:text-destructive"
-                    aria-label={ui("Delete line {{number}}", { number: index + 1 })}
+                    aria-label={ui("Delete line {{number}}", {
+                      number: index + 1,
+                    })}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -2570,11 +2566,29 @@ export default function EditorPage() {
           </button>
         </div>
       )}
+      {autoEditSummary && (
+        <div
+          role="status"
+          className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm"
+        >
+          <span className="flex items-start gap-2">
+            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+            {autoEditSummary}
+          </span>
+          <button
+            type="button"
+            aria-label={ui("Close")}
+            onClick={() => setAutoEditSummary("")}
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
 
-      <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(240px,0.85fr)_minmax(300px,1.35fr)_minmax(310px,1fr)] xl:items-start">
+      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.2fr)] md:items-start xl:grid-cols-[minmax(240px,0.85fr)_minmax(300px,1.35fr)_minmax(310px,1fr)]">
         <section
           id="editor-media-panel"
-          className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface xl:col-start-1 xl:row-start-1 xl:h-[620px] xl:overflow-y-auto"
+          className="min-w-0 max-h-[560px] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface md:col-start-1 md:row-start-1 md:h-[540px] xl:h-[620px] xl:max-h-none"
         >
           {" "}
           <EditorCreationDock
@@ -2662,7 +2676,7 @@ export default function EditorPage() {
         <main className="contents">
           <section
             {...previewDrop.dropZoneProps}
-            className={`relative min-w-0 overflow-hidden rounded-xl border xl:col-start-2 xl:row-start-1 xl:h-[620px] bg-[#0D0C0E] shadow-card transition-all ${
+            className={`relative min-w-0 overflow-hidden rounded-xl border md:col-start-2 md:row-start-1 md:h-[540px] xl:h-[620px] bg-[#0D0C0E] shadow-card transition-all ${
               previewDrop.isDragging
                 ? "border-[#A894FF] ring-4 ring-[#A894FF]/20"
                 : "border-white/5"
@@ -2673,7 +2687,7 @@ export default function EditorPage() {
               {ui("Timeline preview")}
             </div>
             <div
-              className={`relative flex h-[490px] touch-none items-center justify-center overflow-hidden p-7 ${previewZoom > 100 ? "cursor-grab active:cursor-grabbing" : ""}`}
+              className={`relative flex h-[400px] touch-none items-center justify-center overflow-hidden p-5 md:h-[410px] xl:h-[490px] ${previewZoom > 100 ? "cursor-grab active:cursor-grabbing" : ""}`}
               onPointerDown={e => {
                 if (previewZoom <= 100) return;
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -2828,8 +2842,10 @@ export default function EditorPage() {
           </section>
 
           <section
+            id="editor-timeline-panel"
+            tabIndex={-1}
             {...timelineDrop.dropZoneProps}
-            className={`min-w-0 overflow-hidden rounded-xl border bg-surface shadow-card xl:col-span-3 xl:row-start-2 transition-all ${
+            className={`min-w-0 overflow-hidden rounded-xl border bg-surface shadow-card md:col-span-2 md:row-start-2 xl:col-span-3 transition-all ${
               timelineDrop.isDragging
                 ? "border-primary ring-4 ring-primary/10"
                 : "border-border"
@@ -3149,7 +3165,7 @@ export default function EditorPage() {
 
         <aside
           id="editor-chat-panel"
-          className="min-w-0 overflow-hidden rounded-xl border border-primary/20 bg-surface xl:col-start-3 xl:row-start-1 xl:h-[620px]"
+          className="min-w-0 overflow-hidden rounded-xl border border-primary/20 bg-surface md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:h-[620px]"
         >
           <EditorChat
             key={project.id}
@@ -3270,7 +3286,17 @@ export default function EditorPage() {
       </Dialog>
 
       <Dialog open={autoEditOpen} onOpenChange={setAutoEditOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
+        <DialogContent
+          className="max-h-[85vh] overflow-y-auto sm:max-w-4xl"
+          onCloseAutoFocus={event => {
+            if (!autoEditFinished.current) return;
+            event.preventDefault();
+            autoEditFinished.current = false;
+            const timeline = document.getElementById("editor-timeline-panel");
+            timeline?.focus({ preventScroll: true });
+            timeline?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        >
           <DialogTitle>{ui("AI auto-edit")}</DialogTitle>
           <DialogDescription>
             {ui(
@@ -3280,7 +3306,9 @@ export default function EditorPage() {
           <AutonomousEditor
             key={project.id}
             project={project}
-            onFinished={() => {
+            onFinished={summary => {
+              setAutoEditSummary(summary);
+              autoEditFinished.current = true;
               setAutoEditOpen(false);
             }}
           />

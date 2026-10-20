@@ -1,5 +1,21 @@
 /** Reviewed interface supplement; generated content language is independent. */
 export const vietnameseUi: Record<string, string> = {
+  "Add to timeline": "Thêm vào dòng thời gian",
+  "Add {{name}} to timeline": "Thêm {{name}} vào dòng thời gian",
+  "Added to timeline": "Đã thêm vào dòng thời gian",
+  "An insertion is already in progress.": "Đang có một thao tác chèn.",
+  "At end": "Ở cuối",
+  "At playhead": "Tại đầu phát",
+  "Completed preparation is reused.": "Phần chuẩn bị đã hoàn tất được sử dụng lại.",
+  "Continue edit": "Tiếp tục chỉnh sửa",
+  "Edit paused": "Đã tạm dừng chỉnh sửa",
+  "Insert position": "Vị trí chèn",
+  "Move to folder": "Chuyển vào thư mục",
+  "Ready to add to your timeline.": "Sẵn sàng thêm vào dòng thời gian.",
+  "The file could not be added.": "Không thể thêm tệp.",
+  "The project is no longer available.": "Dự án không còn khả dụng.",
+  "Timeline": "Dòng thời gian",
+  "Your account or brand changed. Reopen the intended workspace.": "Tài khoản hoặc thương hiệu đã thay đổi. Hãy mở lại không gian làm việc mong muốn.",
   " (showing the first 50)": " (hiển thị 50 mục đầu tiên)",
   " Showing up to 1,000 recent posts.":
     " Hiển thị tối đa 1,000 bài đăng gần đây.",

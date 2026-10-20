@@ -33,17 +33,20 @@ interface ApiErrorBody {
   error?: string;
   message?: string;
   missing?: string[];
+  reference?: string;
 }
 
 export class PlatformApiError extends Error {
   status: number;
   missing: string[];
+  reference?: string;
 
-  constructor(message: string, status: number, missing: string[] = []) {
+  constructor(message: string, status: number, missing: string[] = [], reference?: string) {
     super(message);
     this.name = "PlatformApiError";
     this.status = status;
     this.missing = missing;
+    this.reference = reference;
   }
 }
 
@@ -187,7 +190,8 @@ async function requestJson<T>(
     throw new PlatformApiError(
       body.error || body.message || `Request failed (${response.status})`,
       response.status,
-      body.missing
+      body.missing,
+      typeof body.reference === "string" && /^[\w-]{1,100}$/.test(body.reference) ? body.reference : undefined
     );
   }
 

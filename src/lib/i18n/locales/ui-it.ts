@@ -5,6 +5,22 @@ import { italianGuideUi } from "./ui-it-guides";
 
 /** Interface translations only; never applied to user or generated content. */
 const reviewedItalianUi: Record<string, string> = {
+  "Add to timeline": "Aggiungi alla timeline",
+  "Add {{name}} to timeline": "Aggiungi {{name}} alla timeline",
+  "Added to timeline": "Aggiunto alla timeline",
+  "An insertion is already in progress.": "È già in corso un inserimento.",
+  "At end": "Alla fine",
+  "At playhead": "Al cursore",
+  "Completed preparation is reused.": "La preparazione completata viene riutilizzata.",
+  "Continue edit": "Continua il montaggio",
+  "Edit paused": "Montaggio in pausa",
+  "Insert position": "Posizione di inserimento",
+  "Move to folder": "Sposta nella cartella",
+  "Ready to add to your timeline.": "Pronto per essere aggiunto alla timeline.",
+  "The file could not be added.": "Impossibile aggiungere il file.",
+  "The project is no longer available.": "Il progetto non è più disponibile.",
+  "Timeline": "Timeline",
+  "Your account or brand changed. Reopen the intended workspace.": "L’account o il brand è cambiato. Riapri lo spazio di lavoro desiderato.",
   Attention: "Attenzione",
   Stimulation: "Stimolazione",
   "Processing load": "Carico cognitivo",

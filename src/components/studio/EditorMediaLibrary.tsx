@@ -1,4 +1,4 @@
-import { useUiText } from "@/lib/i18n/ui";
+import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { v4 as createUuid } from "uuid";
 import {
@@ -22,6 +22,8 @@ import { DirectVideoImport } from "./DirectVideoImport";
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { validateFileSelection } from "@/lib/file-validation";
 import { LibraryAssetCard } from "./LibraryAssetCard";
+import type { Asset } from "@contracts/workspace";
+import { Check, Loader2, Plus } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -30,11 +32,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export function EditorMediaLibrary() {
+export function EditorMediaLibrary({
+  playhead,
+  onInsert,
+}: {
+  playhead: number;
+  onInsert: (asset: Asset, position: "playhead" | "end") => Promise<void>;
+}) {
   const ui = useUiText();
   const { workspace, updateWorkspace, capabilities } = useWorkspace();
   const [folderId, setFolderId] = useState("");
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"grid" | "list">("list");
+  const [position, setPosition] = useState<"playhead" | "end">("playhead");
+  const [inserting, setInserting] = useState<string | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
+  const insertLock = useRef(false);
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [sort, setSort] = useState("newest");
@@ -57,6 +69,27 @@ export function EditorMediaLibrary() {
   );
   const folders = workspace.mediaFolders ?? [];
   const currentFolder = folders.find(f => f.id === folderId);
+  async function insert(asset: Asset) {
+    if (insertLock.current || asset.status !== "ready") return;
+    insertLock.current = true;
+    setInserting(asset.id);
+    setAdded(null);
+    setMessage("");
+    try {
+      await onInsert(asset, position);
+      setAdded(asset.id);
+      setMessage(ui("Added to timeline"));
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error
+          ? cause.message
+          : ui("The file could not be added.")
+      );
+    } finally {
+      insertLock.current = false;
+      setInserting(null);
+    }
+  }
   const reviewedContent = useMemo(() => {
     const index = new Map<string, string[]>();
     for (const project of workspace.projects) {
@@ -197,11 +230,7 @@ export function EditorMediaLibrary() {
             };
           });
       }
-      setMessage(
-        ui(
-          "Uploaded to Library. Drag a thumbnail onto the timeline to place it."
-        )
-      );
+      setMessage(ui("Ready to add to your timeline."));
       uploadController.current = null;
     });
   }
@@ -339,7 +368,7 @@ export function EditorMediaLibrary() {
           <ArrowLeft size={16} />
         </button>
         <span className="truncate">
-          {currentFolder?.name ?? "Media library"}
+          {currentFolder?.name ?? ui("Media library")}
         </span>
         <span className="ml-auto text-xs text-foreground/60">
           {assets.length} {assets.length === 1 ? ui("file") : ui("files")}
@@ -407,7 +436,7 @@ export function EditorMediaLibrary() {
               ["audio", "Audio"],
             ].map(([value, label]) => (
               <SelectItem key={value} value={value}>
-                {label}
+                {ui(label)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -432,7 +461,7 @@ export function EditorMediaLibrary() {
               ["size", "File size"],
             ].map(([value, label]) => (
               <SelectItem key={value} value={value}>
-                {label}
+                {ui(label)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -467,7 +496,9 @@ export function EditorMediaLibrary() {
               </button>
               <button
                 type="button"
-                aria-label={ui("Remove empty folder {{name}}", { name: f.name })}
+                aria-label={ui("Remove empty folder {{name}}", {
+                  name: f.name,
+                })}
                 title={ui("Only empty folders can be removed")}
                 disabled={
                   busy ||
@@ -498,31 +529,91 @@ export function EditorMediaLibrary() {
           )}
         </p>
       )}
-      <p className="mb-3 text-[11px] text-foreground/45">
-        {ui("Click to preview · drag to place on the timeline")}
-      </p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 p-2">
+        <span className="text-xs tabular-nums text-foreground/70">
+          {ui("Add to timeline")}
+        </span>
+        <Select
+          value={position}
+          onValueChange={value => setPosition(value as "playhead" | "end")}
+        >
+          <SelectTrigger
+            aria-label={ui("Insert position")}
+            size="sm"
+            className="w-auto min-w-0 gap-2 text-xs"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="playhead">
+              {ui("At playhead")} ·{" "}
+              {playhead.toLocaleString(getUiLocale(), {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              })}
+              s
+            </SelectItem>
+            <SelectItem value="end">{ui("At end")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {message && (
+        <p role="status" className="mb-3 text-xs text-foreground/70">
+          {message}
+        </p>
+      )}
       <div className={view === "grid" ? "grid grid-cols-2 gap-2" : "space-y-2"}>
         {assets.map(asset => (
           <div
             key={asset.id}
-            className="min-w-0 rounded-lg border border-border bg-background/50 p-2"
+            className={`group min-w-0 rounded-lg border bg-background/50 p-2 transition-colors ${added === asset.id ? "border-emerald-400/50 bg-emerald-400/5" : "border-border hover:border-primary/40"}`}
           >
-            <LibraryAssetCard
-              asset={asset}
-              view={view}
-              onRename={async name => {
-                await platformApi.renameAsset(asset.id, name);
-                await updateWorkspace(w => ({
-                  ...w,
-                  assets: w.assets.map(a =>
-                    a.id === asset.id ? { ...a, name } : a
-                  ),
-                  editorGenerations: w.editorGenerations?.map(g =>
-                    g.assetId === asset.id ? { ...g, name } : g
-                  ),
-                }));
-              }}
-            />
+            <div
+              className={
+                view === "list"
+                  ? "flex min-w-0 items-center gap-2"
+                  : "space-y-2"
+              }
+            >
+              <div className="min-w-0 flex-1">
+                <LibraryAssetCard
+                  asset={asset}
+                  view={view}
+                  onRename={async name => {
+                    await platformApi.renameAsset(asset.id, name);
+                    await updateWorkspace(w => ({
+                      ...w,
+                      assets: w.assets.map(a =>
+                        a.id === asset.id ? { ...a, name } : a
+                      ),
+                      editorGenerations: w.editorGenerations?.map(g =>
+                        g.assetId === asset.id ? { ...g, name } : g
+                      ),
+                    }));
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={
+                  busy || Boolean(inserting) || asset.status !== "ready"
+                }
+                aria-label={ui("Add {{name}} to timeline", {
+                  name: asset.name,
+                })}
+                onClick={() => void insert(asset)}
+                className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-2 text-xs font-medium text-primary transition hover:bg-primary/20 active:scale-95 disabled:opacity-40 ${view === "grid" ? "w-full" : ""}`}
+              >
+                {inserting === asset.id ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : added === asset.id ? (
+                  <Check size={14} />
+                ) : (
+                  <Plus size={14} />
+                )}
+                {ui("Add")}
+              </button>
+            </div>
             {query.trim() &&
               reviewedContent
                 .get(asset.id)
@@ -538,58 +629,60 @@ export function EditorMediaLibrary() {
                     {note}
                   </p>
                 ))}
-            <Select
-              disabled={busy}
-              value={asset.folderId || "__root"}
-              onValueChange={destination => {
-                void action(() =>
-                  updateWorkspace(w => ({
-                    ...w,
-                    assets: w.assets.map(a =>
-                      a.id === asset.id
-                        ? {
-                            ...a,
-                            folderId:
-                              destination === "__root"
-                                ? undefined
-                                : destination,
-                          }
-                        : a
-                    ),
-                  }))
-                );
-              }}
-            >
-              <SelectTrigger
-                aria-label={ui("Move {{name}} to folder", { name: asset.name })}
-                size="sm"
-                className="mt-2 w-full min-w-0 border-border text-[11px]"
+            <details className="mt-1 text-[11px] text-foreground/55">
+              <summary className="cursor-pointer py-1">
+                {ui("Move to folder")}
+              </summary>
+              <Select
+                disabled={busy}
+                value={asset.folderId || "__root"}
+                onValueChange={destination => {
+                  void action(() =>
+                    updateWorkspace(w => ({
+                      ...w,
+                      assets: w.assets.map(a =>
+                        a.id === asset.id
+                          ? {
+                              ...a,
+                              folderId:
+                                destination === "__root"
+                                  ? undefined
+                                  : destination,
+                            }
+                          : a
+                      ),
+                    }))
+                  );
+                }}
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                position="popper"
-                className="border-border bg-surface text-foreground"
-              >
-                <SelectItem value="__root">{ui("Root folder")}</SelectItem>
-                {folders.map(f => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectTrigger
+                  aria-label={ui("Move {{name}} to folder", {
+                    name: asset.name,
+                  })}
+                  size="sm"
+                  className="mt-2 w-full min-w-0 border-border text-[11px]"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  className="border-border bg-surface text-foreground"
+                >
+                  <SelectItem value="__root">{ui("Root folder")}</SelectItem>
+                  {folders.map(f => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </details>
           </div>
         ))}
       </div>
       {!assets.length && (
         <p className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-foreground/60">
           {ui("Drop media here, upload files, or open a folder.")}
-        </p>
-      )}
-      {message && (
-        <p role="status" className="mt-3 text-sm text-foreground/70">
-          {message}
         </p>
       )}
     </section>

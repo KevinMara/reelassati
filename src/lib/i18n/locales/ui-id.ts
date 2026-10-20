@@ -1,5 +1,21 @@
 /** Reviewed interface supplement; generated content language is independent. */
 export const indonesianUi: Record<string, string> = {
+  "Add to timeline": "Tambahkan ke linimasa",
+  "Add {{name}} to timeline": "Tambahkan {{name}} ke linimasa",
+  "Added to timeline": "Ditambahkan ke linimasa",
+  "An insertion is already in progress.": "Penyisipan sedang berlangsung.",
+  "At end": "Di akhir",
+  "At playhead": "Di posisi pemutar",
+  "Completed preparation is reused.": "Persiapan yang selesai digunakan kembali.",
+  "Continue edit": "Lanjutkan pengeditan",
+  "Edit paused": "Pengeditan dijeda",
+  "Insert position": "Posisi penyisipan",
+  "Move to folder": "Pindahkan ke folder",
+  "Ready to add to your timeline.": "Siap ditambahkan ke linimasa.",
+  "The file could not be added.": "File tidak dapat ditambahkan.",
+  "The project is no longer available.": "Proyek tidak lagi tersedia.",
+  "Timeline": "Linimasa",
+  "Your account or brand changed. Reopen the intended workspace.": "Akun atau merek Anda berubah. Buka kembali ruang kerja yang diinginkan.",
   " (showing the first 50)": " (menampilkan 50 pertama)",
   " Showing up to 1,000 recent posts.":
     " Menampilkan hingga 1.000 postingan terbaru.",

@@ -1,5 +1,21 @@
 /** Static Spanish interface copy; user material is never translated here. */
 export const spanishUi: Record<string, string> = {
+  "Add to timeline": "Añadir a la línea de tiempo",
+  "Add {{name}} to timeline": "Añadir {{name}} a la línea de tiempo",
+  "Added to timeline": "Añadido a la línea de tiempo",
+  "An insertion is already in progress.": "Ya hay una inserción en curso.",
+  "At end": "Al final",
+  "At playhead": "En el cabezal",
+  "Completed preparation is reused.": "Se reutiliza la preparación completada.",
+  "Continue edit": "Continuar edición",
+  "Edit paused": "Edición en pausa",
+  "Insert position": "Posición de inserción",
+  "Move to folder": "Mover a carpeta",
+  "Ready to add to your timeline.": "Listo para añadir a tu línea de tiempo.",
+  "The file could not be added.": "No se pudo añadir el archivo.",
+  "The project is no longer available.": "El proyecto ya no está disponible.",
+  "Timeline": "Línea de tiempo",
+  "Your account or brand changed. Reopen the intended workspace.": "Tu cuenta o marca ha cambiado. Vuelve a abrir el espacio de trabajo deseado.",
   " (showing the first 50)": " (se muestran los primeros 50)",
   " Showing up to 1,000 recent posts.":
     " Se muestran hasta 1.000 publicaciones recientes.",

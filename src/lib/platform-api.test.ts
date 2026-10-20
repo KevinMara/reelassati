@@ -13,6 +13,15 @@ afterEach(() => {
 });
 
 describe("platform API transport", () => {
+  it("retains a bounded support reference and HTTP status for a failed auto-edit step without retrying it", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({
+      error: "The AI service could not complete this request.", reference: "provider-failure-123",
+    }, { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(platformApi.generateEditPlan({ project: {} as never, command: "Edit the owned footage", selectedClipIds: [] }))
+      .rejects.toMatchObject({ status: 400, reference: "provider-failure-123" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it("pins speech retries to the reviewed request and workspace after a lost response", async () => {
     const scope = await captureUploadRequestScope();
     const input = {

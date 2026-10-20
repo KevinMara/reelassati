@@ -1,8 +1,10 @@
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
-import { mapChatTranscript } from "@/lib/editor-chat-execution";
 import { v4 as createUuid } from "uuid";
 import { appendEditorRevisions } from "@/lib/editor-history";
-import { normalizeReview } from "@contracts/source-review";
+import {
+  createAutonomousPreparationCache,
+  prepareAutonomousSources,
+} from "@/lib/autonomous-preparation";
 import {
   EDIT_RECIPES,
   auditAutomatedEdit,
@@ -10,7 +12,7 @@ import {
 } from "@/lib/editor-production";
 import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Sparkles, Square } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
 import type {
   Asset,
   EditProject,
@@ -24,6 +26,7 @@ import {
 } from "@contracts/billing";
 import { useWorkspace } from "@/providers/workspace";
 import {
+  PlatformApiError,
   captureUploadRequestScope,
   platformApi,
   verifyUploadRequestScope,
@@ -37,7 +40,7 @@ export function AutonomousEditor({
   onFinished,
 }: {
   project: EditProject;
-  onFinished: () => void;
+  onFinished: (summary: string) => void;
 }) {
   const ui = useUiText();
   const { workspace, getWorkspaceSnapshot, updateWorkspace, capabilities } =
@@ -61,6 +64,9 @@ export function AutonomousEditor({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [finished, setFinished] = useState(false);
+  const [failure, setFailure] = useState("");
+  const [stage, setStage] = useState("");
+  const preparationCache = useRef(createAutonomousPreparationCache());
   const stopped = useRef(false);
   const runController = useRef<AbortController | null>(null);
   const mounted = useRef(true);
@@ -129,6 +135,8 @@ export function AutonomousEditor({
     };
     setBusy(true);
     setFinished(false);
+    setFailure("");
+    setStage(ui("Review"));
     setStatus("Examining your footage…");
     const checkpoint = (
       current: WorkspaceDocument = getWorkspaceSnapshot()
@@ -166,58 +174,38 @@ export function AutonomousEditor({
           )
         );
       const requestOptions = { scope, signal };
-      const analysis: Array<{
-        assetId: string;
-        summary: string;
-        intervals: Awaited<
-          ReturnType<typeof platformApi.analyzeVideo>
-        >["retention"];
-      }> = [];
-      for (const asset of sources) {
-        checkpoint();
-        if (asset.kind === "video") {
+      const prepared = await prepareAutonomousSources({
+        project,
+        sources,
+        captions,
+        context: JSON.stringify([
+          destination,
+          workspace.profile.contentLanguage,
+          getUiLocale(),
+        ]),
+        cache: preparationCache.current,
+        checkpoint,
+        review: async asset => {
+          setStage(ui("Review"));
           setStatus(`Reviewing ${asset.name}…`);
           const { analyzeMedia } = await import("@/lib/analyze-media");
           checkpoint();
-          const result = await analyzeMedia(
+          return analyzeMedia(
             asset,
             project.platform,
             undefined,
             progress,
             signal,
-            scope
+            scope,
+            getUiLocale()
           );
-          checkpoint();
-          working.sourceReviews = [
-            ...(working.sourceReviews ?? []).filter(
-              r => r.assetId !== asset.id
-            ),
-            {
-              assetId: asset.id,
-              reviewedAt: new Date().toISOString(),
-              summary: result.summary,
-              ...normalizeReview(result.review),
-              moments: result.retention,
-            },
-          ];
-          analysis.push({
-            assetId: asset.id,
-            summary: result.summary,
-            intervals: result.retention,
-          });
-        }
-        checkpoint();
-        if (
-          captions &&
-          !project.transcript.length &&
-          !working.sourceReviews?.some(
-            r => r.assetId === asset.id && r.captions === "present"
-          )
-        ) {
+        },
+        transcribe: async asset => {
+          setStage(ui("Captions"));
           setStatus(`Transcribing ${asset.name}…`);
           const { transcribeMedia } = await import("@/lib/transcribe-media");
           checkpoint();
-          const result = await transcribeMedia(
+          return transcribeMedia(
             asset,
             workspace.profile.contentLanguage,
             project.id,
@@ -225,14 +213,10 @@ export function AutonomousEditor({
             signal,
             scope
           );
-          checkpoint();
-          if (result.provenance)
-            working.transcriptProvenance = result.provenance;
-          working.transcript.push(
-            ...mapChatTranscript(project, asset.id, result.segments)
-          );
-        }
-      }
+        },
+      });
+      working = prepared.working;
+      const analysis = prepared.analysis;
       checkpoint();
       if (automaticDuration)
         working = trimObservedEnding(working, workspace.assets);
@@ -240,6 +224,7 @@ export function AutonomousEditor({
         ? contentDuration(working.clips)
         : targetDuration;
       setStatus("Building the cut, pacing, captions, and visual treatment…");
+      setStage(ui("Edit plan"));
       const result = await platformApi.generateEditPlan(
         {
           project: working,
@@ -343,6 +328,7 @@ export function AutonomousEditor({
       }
       checkpoint();
       setStatus("Applying the edit to your timeline…");
+      setStage(ui("Timeline"));
       const allAssets = [...workspace.assets, ...generatedAssets];
       const unresolved: EditOperation[] = [];
       // Work backwards for source-time cuts so earlier operations keep their time coordinates.
@@ -466,15 +452,19 @@ export function AutonomousEditor({
       setStatus(
         `${result.summary}${unresolved.length ? ` ${unresolved.length} suggestions need review in AI assistant.` : ""} Your original edit is available with Undo.`
       );
+      onFinished(result.summary);
     } catch (e) {
       if (!mounted.current || runController.current !== controller) return;
-      setStatus(
+      setFailure(
         signal.aborted
           ? `Stopped. Provider work already submitted may still finish in your Library; no further steps will start. ${timelineSaveStarted ? "The timeline save had already started; review your project and use Undo if needed." : "Your original timeline is intact."}`
-          : e instanceof Error
-            ? e.message
-            : "The edit could not complete. Your original timeline is preserved."
+          : e instanceof PlatformApiError
+            ? `${e.message} (${e.status})${e.reference ? ` · ${ui("Reference")}: ${e.reference}` : ""}`
+            : e instanceof Error
+              ? e.message
+              : "The edit could not complete. Your original timeline is preserved."
       );
+      setStatus("");
     } finally {
       if (runController.current === controller) {
         runController.current = null;
@@ -712,7 +702,8 @@ export function AutonomousEditor({
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            {ui("Build my edit · ≤")} {estimate} {ui("credits")}
+            {failure ? ui("Continue edit") : ui("Build my edit · ≤")}{" "}
+            {failure ? "" : `${estimate} ${ui("credits")}`}
           </button>
           {busy && (
             <button
@@ -729,6 +720,21 @@ export function AutonomousEditor({
           )}
         </div>
       </div>
+      {failure && (
+        <div
+          role="alert"
+          className="mt-4 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm"
+        >
+          <p className="mb-1 flex items-center gap-2 font-medium">
+            <AlertCircle size={16} />
+            {ui("Edit paused")} · {stage}
+          </p>
+          <p className="break-words text-foreground/80">{failure}</p>
+          <p className="mt-2 text-xs text-foreground/60">
+            {ui("Completed preparation is reused.")}
+          </p>
+        </div>
+      )}
       {status && (
         <p
           role="status"
@@ -740,7 +746,7 @@ export function AutonomousEditor({
       {finished && (
         <button
           type="button"
-          onClick={onFinished}
+          onClick={() => onFinished(status)}
           className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground"
         >
           {ui("Review and export my edit")}

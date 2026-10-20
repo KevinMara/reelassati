@@ -133,7 +133,11 @@ export function LibraryAssetCard({
             </div>
           )}
           <p className="text-[11px] text-foreground/55">
-            {asset.kind}
+            {asset.kind === "audio"
+              ? ui("Audio")
+              : asset.kind === "image"
+                ? ui("Image")
+                : ui("Video")}
             {asset.duration ? ` · ${asset.duration.toFixed(1)}s` : ""}
           </p>
         </div>

@@ -57,6 +57,8 @@ export type DockKind =
 
 export function EditorCreationDock({
   project,
+  playhead,
+  onInsert,
   onAssist,
   activeTool,
   onToolChange,
@@ -74,7 +76,7 @@ export function EditorCreationDock({
   onMotionKit: (draft: MotionKitDraft) => Promise<void>;
   project: EditProject;
   playhead: number;
-  onInsert: (asset: Asset) => Promise<void>;
+  onInsert: (asset: Asset, position?: "playhead" | "end") => Promise<void>;
 }) {
   const ui = useUiText();
   const { workspace, capabilities, updateWorkspace, getWorkspaceSnapshot } =
@@ -241,10 +243,7 @@ export function EditorCreationDock({
   }
 
   return (
-    <section
-      aria-label={ui("Create and manage media")}
-      className="h-full min-w-0"
-    >
+    <section aria-label={ui("Create and manage media")} className="min-w-0">
       <div
         role="tablist"
         tabIndex={-1}
@@ -370,7 +369,7 @@ export function EditorCreationDock({
         {kind === "captions" ? (
           captions
         ) : kind === "library" ? (
-          <EditorMediaLibrary />
+          <EditorMediaLibrary playhead={playhead} onInsert={onInsert} />
         ) : kind === "graphics" ? (
           <div className="space-y-4">
             <div className="flex rounded-lg bg-background/60 p-1">
@@ -498,7 +497,9 @@ export function EditorCreationDock({
             >
               {kind === "voice"
                 ? ui("Voiceover script")
-                : ui("Describe your {{kind}}", { kind: kind === "image" ? ui("image") : ui("video") })}
+                : ui("Describe your {{kind}}", {
+                    kind: kind === "image" ? ui("image") : ui("video"),
+                  })}
             </label>
             <textarea
               id={`generation-prompt-${project.id}`}
@@ -558,7 +559,8 @@ export function EditorCreationDock({
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {ui("Generate")} {count > 1 ? ui("{{count}} files · ", { count }) : "· "}
+              {ui("Generate")}{" "}
+              {count > 1 ? ui("{{count}} files · ", { count }) : "· "}
               {unitCost * count} {ui("credits")}
             </button>
             {!available && (
