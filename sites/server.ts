@@ -426,6 +426,8 @@ interface ReferralClaimRow {
 }
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+// Kevin's selected multimodal review model. Shared by analysis and image references.
+const DEFAULT_ANALYSIS_MODEL = "moonshotai/kimi-k3";
 const KIMI_CODE_BASE = "https://api.kimi.com/coding/v1";
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 const MAX_WORKSPACE_BYTES = 2_000_000;
@@ -5597,7 +5599,7 @@ async function handleAi(
                   ]
                 : JSON.stringify(modelContext),
               mediaParts.length
-                ? env.OPENROUTER_ANALYSIS_MODEL || "google/gemini-2.5-flash"
+                ? env.OPENROUTER_ANALYSIS_MODEL || DEFAULT_ANALYSIS_MODEL
                 : undefined
             );
             let plan = normalizeEditorChatPlan(output, context);
@@ -5643,7 +5645,7 @@ async function handleAi(
                       validation: plan.blockedReasons,
                     }),
                 mediaParts.length
-                  ? env.OPENROUTER_ANALYSIS_MODEL || "google/gemini-2.5-flash"
+                  ? env.OPENROUTER_ANALYSIS_MODEL || DEFAULT_ANALYSIS_MODEL
                   : undefined
               );
               output = repaired.output;
@@ -6453,7 +6455,7 @@ async function handleAi(
             },
             { type: "video_url", video_url: { url: videoUrl } },
           ],
-          env.OPENROUTER_ANALYSIS_MODEL || "google/gemini-2.5-flash",
+          env.OPENROUTER_ANALYSIS_MODEL || DEFAULT_ANALYSIS_MODEL,
           true,
           maximumOutputTokens,
           true,

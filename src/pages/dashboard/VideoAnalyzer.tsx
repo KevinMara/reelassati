@@ -33,6 +33,7 @@ import {
   platformApi,
   captureUploadRequestScope,
   verifyUploadRequestScope,
+  PlatformApiError,
 } from "@/lib/platform-api";
 import {
   validateDirectVideoUrl,
@@ -108,7 +109,7 @@ export default function VideoAnalyzer() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [queued, setQueued] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | Error | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [analysisStage, setAnalysisStage] = useState("");
   const [analyzedAsset, setAnalyzedAsset] = useState<Asset | null>(null);
@@ -130,6 +131,7 @@ export default function VideoAnalyzer() {
     generation.current++;
     controller.current?.abort();
     setAnalyzing(false);
+    setError(null);
     setNotice(null);
     setAnalyzedAsset(null);
     analyzedScope.current = null;
@@ -319,9 +321,7 @@ export default function VideoAnalyzer() {
     } catch (cause) {
       if (id === generation.current && !abort.signal.aborted)
         setError(
-          cause instanceof Error
-            ? cause.message
-            : "The video could not be analyzed."
+          cause instanceof Error ? cause : "The video could not be analyzed."
         );
     } finally {
       if (id === generation.current) {
@@ -755,7 +755,18 @@ export default function VideoAnalyzer() {
         ) : null}
         {error ? (
           <p className="mt-3 text-sm text-red-500" role="alert">
-            {error}
+            {typeof error === "string" ? error : ui(error.message)}
+            {error instanceof PlatformApiError ? (
+              <span className="mt-1 block break-words text-xs">
+                {`HTTP ${error.status}`}
+                {error.reference ? (
+                  <>
+                    {" "}
+                    · {ui("Reference")}: {error.reference}
+                  </>
+                ) : null}
+              </span>
+            ) : null}
           </p>
         ) : null}
       </section>

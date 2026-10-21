@@ -621,7 +621,7 @@ describe("authenticated paid editing chat route", () => {
       model: string;
       messages: Array<{ content: unknown }>;
     };
-    expect(payload.model).toBe("google/gemini-2.5-flash");
+    expect(payload.model).toBe("moonshotai/kimi-k3");
     expect(payload.messages[1].content).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -726,7 +726,7 @@ describe("authenticated paid editing chat route", () => {
           reportedIssue: "response-schema",
         },
         invocation: {
-          model: "google/gemini-2.5-flash",
+          model: "moonshotai/kimi-k3",
           purpose: "video-analysis",
         },
       });
@@ -797,12 +797,22 @@ describe("authenticated paid editing chat route", () => {
     );
     expect(payload.messages[0].content).toContain("language code it");
     expect(payload).toMatchObject({
+      model: "moonshotai/kimi-k3",
       response_format: {
         type: "json_schema",
         json_schema: { name: "reelassati_video_analysis_v2", strict: true },
       },
       provider: { require_parameters: true },
     });
+    expect(providerCalls.length).toBe(calls + 1);
+    expect(payload).not.toHaveProperty("models");
+    expect(
+      sqlite
+        .prepare(
+          "SELECT model, provider FROM ai_invocations WHERE purpose = 'video-analysis' ORDER BY rowid DESC LIMIT 1"
+        )
+        .get()
+    ).toMatchObject({ model: "moonshotai/kimi-k3", provider: "OpenRouter" });
     expect(balance()).toBe(before - 10);
   });
   it("refunds incomplete, legacy, unsupported or empty analyzer reports instead of settling misleading scores", async () => {

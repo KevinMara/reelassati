@@ -273,7 +273,9 @@ nested-element, keyboard, touch, and server-rejection cases.
 Analysis, trend research, transcription, speech, and video generation remain explicit
 OpenRouter routes even when Kimi test mode is enabled:
 
-- analysis: `OPENROUTER_ANALYSIS_MODEL`;
+- analysis and image-referenced editor chat: `OPENROUTER_ANALYSIS_MODEL`, default
+  `moonshotai/kimi-k3` per Kevin's explicit model selection reaffirmed on
+  21 October 2026. Do not substitute Gemini or add an alternate-model fallback;
 - trend research: `OPENROUTER_TREND_MODEL`, defaulting to Kimi with grounded web search;
 - transcription: `OPENROUTER_STT_MODEL`;
 - speech: `OPENROUTER_TTS_MODEL` plus configured voice;
