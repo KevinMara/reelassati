@@ -1,4 +1,6 @@
 import { speechCreditCost, speechCharacterCount } from "@contracts/billing";
+import { ANALYZER_STREAM_TYPE } from "@contracts/analyzer-transport";
+import { unwrapAnalyzerResponse } from "./analyzer-response";
 import type {
   Asset,
   CapabilityState,
@@ -41,7 +43,12 @@ export class PlatformApiError extends Error {
   missing: string[];
   reference?: string;
 
-  constructor(message: string, status: number, missing: string[] = [], reference?: string) {
+  constructor(
+    message: string,
+    status: number,
+    missing: string[] = [],
+    reference?: string
+  ) {
     super(message);
     this.name = "PlatformApiError";
     this.status = status;
@@ -163,10 +170,16 @@ async function requestJson<T>(
     });
   };
 
-  let response = await send(session);
+  let response = await unwrapAnalyzerResponse(
+    await send(session),
+    init?.signal ?? undefined
+  );
   if (response.status === 401 && session?.access_token) {
     session = await recoverRejectedSession(session.access_token);
-    response = await send(session);
+    response = await unwrapAnalyzerResponse(
+      await send(session),
+      init?.signal ?? undefined
+    );
   }
   init?.signal?.throwIfAborted();
   if (scope) await verifyUploadRequestScope(scope);
@@ -191,7 +204,10 @@ async function requestJson<T>(
       body.error || body.message || `Request failed (${response.status})`,
       response.status,
       body.missing,
-      typeof body.reference === "string" && /^[\w-]{1,100}$/.test(body.reference) ? body.reference : undefined
+      typeof body.reference === "string" &&
+        /^[\w-]{1,100}$/.test(body.reference)
+        ? body.reference
+        : undefined
     );
   }
 
@@ -950,7 +966,7 @@ export const platformApi = {
       options?.scope
     ),
 
-  analyzeVideo: (
+  analyzeVideo: async (
     input: {
       schemaVersion?: typeof import("@contracts/video-analysis").VIDEO_ANALYSIS_SCHEMA_VERSION;
       language?: string;
@@ -964,45 +980,91 @@ export const platformApi = {
     },
     signal?: AbortSignal,
     scope?: UploadRequestScope
-  ) =>
-    requestJson<{
-      schemaVersion?: typeof import("@contracts/video-analysis").VIDEO_ANALYSIS_SCHEMA_VERSION;
-      scoreScope?: "audiovisual-editorial-only";
-      summary: string;
-      hook: { score: number | null; note: string };
-      pacing: { score: number | null; note: string };
-      insights?: import("@contracts/video-analysis").VideoInsight[];
-      overall?: import("@contracts/video-analysis").VideoEditorialScore;
-      structure?: import("@contracts/video-analysis").VideoStoryAssessment[];
-      recommendations?: import("@contracts/video-analysis").VideoEditorialRecommendation[];
-      noChangesReason?: string;
-      coverage?: {
-        input: "full-duration-original" | "full-duration-proxy";
-        durationSeconds: number;
-        proxyFramesPerSecond: number | null;
-        providerFrameSampling: "provider-controlled";
-      };
-      review?: ReturnType<
-        typeof import("@contracts/source-review").normalizeReview
-      >;
-      retention: Array<{
-        start: number;
-        end: number;
-        score: number;
-        note: string;
-      }>;
-      changes: EditOperation[];
-      provenance: ContentProvenance;
-    }>(
-      "/api/ai/analyze",
-      {
-        method: "POST",
-        signal,
-        body: JSON.stringify(input),
-      },
-      false,
-      scope
-    ),
+  ) => {
+    signal?.throwIfAborted();
+    const requestId = crypto.randomUUID();
+    const local = new AbortController();
+    let cancellation: Promise<void> | undefined;
+    const cancelOnce = () =>
+      (cancellation ??= requestJson(
+        "/api/ai/analyze/cancel",
+        {
+          method: "POST",
+          body: JSON.stringify({ requestId }),
+          keepalive: true,
+          signal: AbortSignal.timeout(10_000),
+        },
+        false,
+        scope
+      ).then(
+        () => undefined,
+        () => undefined
+      ));
+    const canceled = () => {
+      local.abort();
+      void cancelOnce();
+    };
+    signal?.addEventListener("abort", canceled, { once: true });
+    if (typeof window !== "undefined")
+      window.addEventListener("pagehide", canceled, { once: true });
+    try {
+      return await requestJson<{
+        schemaVersion?: typeof import("@contracts/video-analysis").VIDEO_ANALYSIS_SCHEMA_VERSION;
+        scoreScope?: "audiovisual-editorial-only";
+        summary: string;
+        hook: { score: number | null; note: string };
+        pacing: { score: number | null; note: string };
+        insights?: import("@contracts/video-analysis").VideoInsight[];
+        overall?: import("@contracts/video-analysis").VideoEditorialScore;
+        structure?: import("@contracts/video-analysis").VideoStoryAssessment[];
+        recommendations?: import("@contracts/video-analysis").VideoEditorialRecommendation[];
+        noChangesReason?: string;
+        coverage?: {
+          input: "full-duration-original" | "full-duration-proxy";
+          durationSeconds: number;
+          proxyFramesPerSecond: number | null;
+          providerFrameSampling: "provider-controlled";
+        };
+        review?: ReturnType<
+          typeof import("@contracts/source-review").normalizeReview
+        >;
+        retention: Array<{
+          start: number;
+          end: number;
+          score: number;
+          note: string;
+        }>;
+        changes: EditOperation[];
+        provenance: ContentProvenance;
+      }>(
+        "/api/ai/analyze",
+        {
+          method: "POST",
+          headers: { Accept: ANALYZER_STREAM_TYPE },
+          signal: local.signal,
+          body: JSON.stringify({ ...input, requestId }),
+        },
+        false,
+        scope
+      );
+    } catch (cause) {
+      if (!(cause instanceof PlatformApiError)) {
+        await cancelOnce();
+        if (!local.signal.aborted)
+          throw new PlatformApiError(
+            "The video review is incomplete. Please refresh before analyzing again.",
+            502,
+            undefined,
+            requestId
+          );
+      }
+      throw cause;
+    } finally {
+      signal?.removeEventListener("abort", canceled);
+      if (typeof window !== "undefined")
+        window.removeEventListener("pagehide", canceled);
+    }
+  },
 
   transcribe: (
     assetId: string,

@@ -1,10 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { platformApi, PlatformApiError, captureUploadRequestScope } from "./platform-api";
+import {
+  platformApi,
+  PlatformApiError,
+  captureUploadRequestScope,
+} from "./platform-api";
 import { supabase } from "@/lib/supabase/client";
+import { ANALYZER_STREAM_TYPE } from "@contracts/analyzer-transport";
 
 beforeEach(() => {
   vi.stubGlobal("sessionStorage", { getItem: () => null });
-  vi.spyOn(supabase.auth, "getSession").mockResolvedValue({ data: { session: { access_token: "test-owner-token", expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: "owner", email: "creator@example.com" } } }, error: null } as never);
+  vi.spyOn(supabase.auth, "getSession").mockResolvedValue({
+    data: {
+      session: {
+        access_token: "test-owner-token",
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: { id: "owner", email: "creator@example.com" },
+      },
+    },
+    error: null,
+  } as never);
 });
 
 afterEach(() => {
@@ -13,13 +27,85 @@ afterEach(() => {
 });
 
 describe("platform API transport", () => {
-  it("retains a bounded support reference and HTTP status for a failed auto-edit step without retrying it", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({
-      error: "The AI service could not complete this request.", reference: "provider-failure-123",
-    }, { status: 400 }));
+  it.each([200, 400, 504])(
+    "uses the streamed analyzer's terminal HTTP %s without repeating its paid request",
+    async status => {
+      const body =
+        status === 200
+          ? { summary: "Validated report" }
+          : { error: "Incomplete report", reference: "analysis-ref-123" };
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ type: "pending" }) +
+            "\n" +
+            JSON.stringify({
+              type: "result",
+              status,
+              body: JSON.stringify(body),
+            }) +
+            "\n",
+          { headers: { "Content-Type": ANALYZER_STREAM_TYPE } }
+        )
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const result = platformApi.analyzeVideo({
+        assetId: "owned",
+        platform: "tiktok",
+      });
+      if (status === 200) await expect(result).resolves.toMatchObject(body);
+      else
+        await expect(result).rejects.toMatchObject({
+          status,
+          reference: "analysis-ref-123",
+        });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
+        Accept: ANALYZER_STREAM_TYPE,
+      });
+    }
+  );
+  it("refuses a truncated analyzer stream and never reruns the paid request", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('{"type":"pending"}\n', {
+          headers: { "Content-Type": ANALYZER_STREAM_TYPE },
+        })
+      )
+      .mockResolvedValueOnce(Response.json({ canceled: true }));
     vi.stubGlobal("fetch", fetchMock);
-    await expect(platformApi.generateEditPlan({ project: {} as never, command: "Edit the owned footage", selectedClipIds: [] }))
-      .rejects.toMatchObject({ status: 400, reference: "provider-failure-123" });
+    await expect(
+      platformApi.analyzeVideo({ assetId: "owned", platform: "tiktok" })
+    ).rejects.toMatchObject({
+      status: 502,
+      reference: expect.stringMatching(/^[a-f0-9-]{36}$/),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain(
+      "/api/ai/analyze/cancel"
+    );
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).requestId).toBe(
+      JSON.parse(fetchMock.mock.calls[0][1].body).requestId
+    );
+  });
+  it("retains a bounded support reference and HTTP status for a failed auto-edit step without retrying it", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json(
+        {
+          error: "The AI service could not complete this request.",
+          reference: "provider-failure-123",
+        },
+        { status: 400 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      platformApi.generateEditPlan({
+        project: {} as never,
+        command: "Edit the owned footage",
+        selectedClipIds: [],
+      })
+    ).rejects.toMatchObject({ status: 400, reference: "provider-failure-123" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it("pins speech retries to the reviewed request and workspace after a lost response", async () => {
@@ -31,36 +117,71 @@ describe("platform API transport", () => {
       voice: "sarah",
       rightsConfirmed: true as const,
     };
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockRejectedValueOnce(new TypeError("Failed to fetch"))
-      .mockResolvedValueOnce(Response.json({ asset: { id: "saved-voice", kind: "audio" } }));
+      .mockResolvedValueOnce(
+        Response.json({ asset: { id: "saved-voice", kind: "audio" } })
+      );
     vi.stubGlobal("fetch", fetchMock);
-    await expect(platformApi.synthesizeSpeech(input, { scope })).rejects.toThrow("Failed to fetch");
+    await expect(
+      platformApi.synthesizeSpeech(input, { scope })
+    ).rejects.toThrow("Failed to fetch");
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await expect(platformApi.synthesizeSpeech(input, { scope })).resolves.toMatchObject({ id: "saved-voice" });
+    await expect(
+      platformApi.synthesizeSpeech(input, { scope })
+    ).resolves.toMatchObject({ id: "saved-voice" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls.map(call => JSON.parse(call[1].body))).toEqual([input, input]);
+    expect(fetchMock.mock.calls.map(call => JSON.parse(call[1].body))).toEqual([
+      input,
+      input,
+    ]);
     for (const call of fetchMock.mock.calls)
-      expect(call[1].headers).toMatchObject({ Authorization: "Bearer test-owner-token", "X-Reelassati-Brand": "default" });
+      expect(call[1].headers).toMatchObject({
+        Authorization: "Bearer test-owner-token",
+        "X-Reelassati-Brand": "default",
+      });
   });
 
-  it.each(["owner", "brand"])("discards a speech result when the %s changes during generation", async changed => {
-    const scope = await captureUploadRequestScope();
-    let finish!: (value: Response) => void;
-    const fetchMock = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
-    vi.stubGlobal("fetch", fetchMock);
-    const task = platformApi.synthesizeSpeech({
-      requestId: "speech-scoped-20261014", text: "Owned original copy", voice: "sarah", rightsConfirmed: true,
-    }, { scope });
-    const rejected = expect(task).rejects.toMatchObject({ status: 409 });
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    if (changed === "owner")
-      vi.spyOn(supabase.auth, "getSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
-    else vi.stubGlobal("sessionStorage", { getItem: () => "other-brand" });
-    finish(Response.json({ asset: { id: "original-owner-voice" } }));
-    await rejected;
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
+  it.each(["owner", "brand"])(
+    "discards a speech result when the %s changes during generation",
+    async changed => {
+      const scope = await captureUploadRequestScope();
+      let finish!: (value: Response) => void;
+      const fetchMock = vi.fn(
+        () =>
+          new Promise<Response>(resolve => {
+            finish = resolve;
+          })
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const task = platformApi.synthesizeSpeech(
+        {
+          requestId: "speech-scoped-20261014",
+          text: "Owned original copy",
+          voice: "sarah",
+          rightsConfirmed: true,
+        },
+        { scope }
+      );
+      const rejected = expect(task).rejects.toMatchObject({ status: 409 });
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      if (changed === "owner")
+        vi.spyOn(supabase.auth, "getSession").mockResolvedValue({
+          data: {
+            session: {
+              access_token: "other-token",
+              user: { id: "other", email: "other@example.com" },
+            },
+          },
+          error: null,
+        } as never);
+      else vi.stubGlobal("sessionStorage", { getItem: () => "other-brand" });
+      finish(Response.json({ asset: { id: "original-owner-voice" } }));
+      await rejected;
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it("refreshes a rejected browser session once and retries with the new token", async () => {
     vi.stubGlobal("sessionStorage", { getItem: () => null });
@@ -274,69 +395,176 @@ describe("platform API transport", () => {
 
   it("pins workspace writes and rejects an account changed while requestSession is awaiting", async () => {
     const scope = await captureUploadRequestScope();
-    vi.spyOn(supabase.auth, "getSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
-    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
-    await expect(platformApi.saveWorkspace({} as never, scope)).rejects.toMatchObject({ status: 409 });
+    vi.spyOn(supabase.auth, "getSession").mockResolvedValue({
+      data: {
+        session: {
+          access_token: "other-token",
+          user: { id: "other", email: "other@example.com" },
+        },
+      },
+      error: null,
+    } as never);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      platformApi.saveWorkspace({} as never, scope)
+    ).rejects.toMatchObject({ status: 409 });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects a brand switch before sending any media bytes", async () => {
     const scope = await captureUploadRequestScope();
     vi.stubGlobal("sessionStorage", { getItem: () => "other-brand" });
-    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
-    await expect(platformApi.uploadAsset(new File([new Uint8Array(33 * 1024 * 1024)], "video.mp4"), "video", undefined, undefined, { scope })).rejects.toMatchObject({ status: 409 });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      platformApi.uploadAsset(
+        new File([new Uint8Array(33 * 1024 * 1024)], "video.mp4"),
+        "video",
+        undefined,
+        undefined,
+        { scope }
+      )
+    ).rejects.toMatchObject({ status: 409 });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("never completes multipart uploads in a new account after parts return", async () => {
     const scope = await captureUploadRequestScope();
     let changed = false;
-    vi.spyOn(supabase.auth, "getSession").mockImplementation(async () => ({ data: { session: { access_token: changed ? "other-token" : "test-owner-token", user: { id: changed ? "other" : "owner", email: changed ? "other@example.com" : "creator@example.com" } } }, error: null }) as never);
-    const fetchMock = vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
-      if (url.endsWith("/api/assets/uploads")) return Response.json({ assetId: "partial", partSize: 16 * 1024 * 1024 });
-      expect(init.headers).toMatchObject({ "X-Reelassati-Brand": "default", Authorization: "Bearer test-owner-token" });
-      changed = true;
-      return Response.json({ partNumber: 1, etag: "part" });
-    });
+    vi.spyOn(supabase.auth, "getSession").mockImplementation(
+      async () =>
+        ({
+          data: {
+            session: {
+              access_token: changed ? "other-token" : "test-owner-token",
+              user: {
+                id: changed ? "other" : "owner",
+                email: changed ? "other@example.com" : "creator@example.com",
+              },
+            },
+          },
+          error: null,
+        }) as never
+    );
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async (url: string, init: RequestInit) => {
+        if (url.endsWith("/api/assets/uploads"))
+          return Response.json({
+            assetId: "partial",
+            partSize: 16 * 1024 * 1024,
+          });
+        expect(init.headers).toMatchObject({
+          "X-Reelassati-Brand": "default",
+          Authorization: "Bearer test-owner-token",
+        });
+        changed = true;
+        return Response.json({ partNumber: 1, etag: "part" });
+      });
     vi.stubGlobal("fetch", fetchMock);
-    await expect(platformApi.uploadAsset(new File([new Uint8Array(33 * 1024 * 1024)], "video.mp4"), "video", undefined, undefined, { scope })).rejects.toMatchObject({ status: 409 });
+    await expect(
+      platformApi.uploadAsset(
+        new File([new Uint8Array(33 * 1024 * 1024)], "video.mp4"),
+        "video",
+        undefined,
+        undefined,
+        { scope }
+      )
+    ).rejects.toMatchObject({ status: 409 });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/complete"))).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).endsWith("/complete"))
+    ).toBe(false);
   });
 
   it("does not retry paid analysis under an account recovered after a rejected token", async () => {
     const scope = await captureUploadRequestScope();
-    vi.spyOn(supabase.auth, "refreshSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "Expired" }, { status: 401 })));
-    await expect(platformApi.analyzeVideo({ assetId: "owned", platform: "tiktok", sourceRightsConfirmed: true }, undefined, scope)).rejects.toMatchObject({ status: 409 });
+    vi.spyOn(supabase.auth, "refreshSession").mockResolvedValue({
+      data: {
+        session: {
+          access_token: "other-token",
+          user: { id: "other", email: "other@example.com" },
+        },
+      },
+      error: null,
+    } as never);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(Response.json({ error: "Expired" }, { status: 401 }))
+    );
+    await expect(
+      platformApi.analyzeVideo(
+        { assetId: "owned", platform: "tiktok", sourceRightsConfirmed: true },
+        undefined,
+        scope
+      )
+    ).rejects.toMatchObject({ status: 409 });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("bounds actual downloaded bytes even when the server's size header is wrong", async () => {
     const scope = await captureUploadRequestScope();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Uint8Array(9), { headers: { "content-length": "1", "content-type": "image/png" } })));
-    await expect(platformApi.downloadAssetBlob("image", undefined, { scope, maxBytes: 8 })).rejects.toThrow("supported download size");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(new Uint8Array(9), {
+          headers: { "content-length": "1", "content-type": "image/png" },
+        })
+      )
+    );
+    await expect(
+      platformApi.downloadAssetBlob("image", undefined, { scope, maxBytes: 8 })
+    ).rejects.toThrow("supported download size");
   });
 
   it("never sends an upload after cancellation", async () => {
     const scope = await captureUploadRequestScope();
-    const controller = new AbortController(); controller.abort();
-    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
-    await expect(platformApi.uploadAsset(new File(["x"], "x.mp4"), "video", undefined, undefined, { scope, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    const controller = new AbortController();
+    controller.abort();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      platformApi.uploadAsset(
+        new File(["x"], "x.mp4"),
+        "video",
+        undefined,
+        undefined,
+        { scope, signal: controller.signal }
+      )
+    ).rejects.toMatchObject({ name: "AbortError" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects an account switched while the response body is being read", async () => {
     const scope = await captureUploadRequestScope();
     let changed = false;
-    vi.spyOn(supabase.auth, "getSession").mockImplementation(async () => ({ data: { session: { access_token: changed ? "other-token" : "test-owner-token", user: { id: changed ? "other" : "owner", email: changed ? "other@example.com" : "creator@example.com" } } }, error: null }) as never);
+    vi.spyOn(supabase.auth, "getSession").mockImplementation(
+      async () =>
+        ({
+          data: {
+            session: {
+              access_token: changed ? "other-token" : "test-owner-token",
+              user: {
+                id: changed ? "other" : "owner",
+                email: changed ? "other@example.com" : "creator@example.com",
+              },
+            },
+          },
+          error: null,
+        }) as never
+    );
     const response = Response.json({ workspace: { revision: 100 } });
     vi.spyOn(response, "text").mockImplementation(async () => {
       changed = true;
       return JSON.stringify({ workspace: { revision: 100 } });
     });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
-    await expect(platformApi.saveWorkspace({} as never, scope)).rejects.toMatchObject({ status: 409 });
+    await expect(
+      platformApi.saveWorkspace({} as never, scope)
+    ).rejects.toMatchObject({ status: 409 });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -349,58 +577,162 @@ describe("platform API transport", () => {
       return JSON.stringify({ summary: "Provider completed" });
     });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
-    await expect(platformApi.analyzeVideo({ assetId: "owned", platform: "tiktok", sourceRightsConfirmed: true }, controller.signal, scope)).rejects.toMatchObject({ name: "AbortError" });
-    expect(fetch).toHaveBeenCalledTimes(1);
+    await expect(
+      platformApi.analyzeVideo(
+        { assetId: "owned", platform: "tiktok", sourceRightsConfirmed: true },
+        controller.signal,
+        scope
+      )
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(String(vi.mocked(fetch).mock.calls[1][0])).toContain(
+      "/api/ai/analyze/cancel"
+    );
   });
 
   it("pins script generation before a delayed requestSession can resolve as another owner", async () => {
     const scope = await captureUploadRequestScope();
     let resolveSession!: (value: unknown) => void;
-    vi.spyOn(supabase.auth, "getSession").mockImplementationOnce(() => new Promise(resolve => { resolveSession = resolve; }) as never);
-    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
-    const task = platformApi.generateScript({ topic: "Original owner's brief", platform: "tiktok", tone: "professional", duration: 30, language: "en" }, { scope });
+    vi.spyOn(supabase.auth, "getSession").mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveSession = resolve;
+        }) as never
+    );
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const task = platformApi.generateScript(
+      {
+        topic: "Original owner's brief",
+        platform: "tiktok",
+        tone: "professional",
+        duration: 30,
+        language: "en",
+      },
+      { scope }
+    );
     const result = expect(task).rejects.toMatchObject({ status: 409 });
-    resolveSession({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null });
+    resolveSession({
+      data: {
+        session: {
+          access_token: "other-token",
+          user: { id: "other", email: "other@example.com" },
+        },
+      },
+      error: null,
+    });
     await result;
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it.each(["owner", "brand"])("rejects a script response if the %s switches while the provider request is pending", async changed => {
-    const scope = await captureUploadRequestScope();
-    let finish!: (value: Response) => void;
-    const fetchMock = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
-    vi.stubGlobal("fetch", fetchMock);
-    const task = platformApi.generateScript({ topic: "An owned brief", platform: "instagram", tone: "professional", duration: 30, language: "en" }, { scope });
-    const result = expect(task).rejects.toMatchObject({ status: 409 });
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock.mock.calls[0]).toEqual(["/api/ai/script", expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer test-owner-token", "X-Reelassati-Brand": "default" }) })]);
-    if (changed === "owner")
-      vi.spyOn(supabase.auth, "getSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
-    else vi.stubGlobal("sessionStorage", { getItem: () => "other-brand" });
-    finish(Response.json({ script: { fullScript: "Completed under the original owner" } }));
-    await result;
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
+  it.each(["owner", "brand"])(
+    "rejects a script response if the %s switches while the provider request is pending",
+    async changed => {
+      const scope = await captureUploadRequestScope();
+      let finish!: (value: Response) => void;
+      const fetchMock = vi.fn(
+        () =>
+          new Promise<Response>(resolve => {
+            finish = resolve;
+          })
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const task = platformApi.generateScript(
+        {
+          topic: "An owned brief",
+          platform: "instagram",
+          tone: "professional",
+          duration: 30,
+          language: "en",
+        },
+        { scope }
+      );
+      const result = expect(task).rejects.toMatchObject({ status: 409 });
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      expect(fetchMock.mock.calls[0]).toEqual([
+        "/api/ai/script",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer test-owner-token",
+            "X-Reelassati-Brand": "default",
+          }),
+        }),
+      ]);
+      if (changed === "owner")
+        vi.spyOn(supabase.auth, "getSession").mockResolvedValue({
+          data: {
+            session: {
+              access_token: "other-token",
+              user: { id: "other", email: "other@example.com" },
+            },
+          },
+          error: null,
+        } as never);
+      else vi.stubGlobal("sessionStorage", { getItem: () => "other-brand" });
+      finish(
+        Response.json({
+          script: { fullScript: "Completed under the original owner" },
+        })
+      );
+      await result;
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it("does not retry paid script generation as an owner recovered after a rejected token", async () => {
     const scope = await captureUploadRequestScope();
-    vi.spyOn(supabase.auth, "refreshSession").mockResolvedValue({ data: { session: { access_token: "other-token", user: { id: "other", email: "other@example.com" } } }, error: null } as never);
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ error: "Expired" }, { status: 401 }));
+    vi.spyOn(supabase.auth, "refreshSession").mockResolvedValue({
+      data: {
+        session: {
+          access_token: "other-token",
+          user: { id: "other", email: "other@example.com" },
+        },
+      },
+      error: null,
+    } as never);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ error: "Expired" }, { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
-    await expect(platformApi.generateScript({ topic: "An owned brief", platform: "tiktok", tone: "professional", duration: 30, language: "en" }, { scope })).rejects.toMatchObject({ status: 409 });
+    await expect(
+      platformApi.generateScript(
+        {
+          topic: "An owned brief",
+          platform: "tiktok",
+          tone: "professional",
+          duration: 30,
+          language: "en",
+        },
+        { scope }
+      )
+    ).rejects.toMatchObject({ status: 409 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not return a paid script after component cancellation during response reading", async () => {
     const scope = await captureUploadRequestScope();
     const controller = new AbortController();
-    const response = Response.json({ script: { fullScript: "Completed script" } });
+    const response = Response.json({
+      script: { fullScript: "Completed script" },
+    });
     vi.spyOn(response, "text").mockImplementation(async () => {
       controller.abort();
       return JSON.stringify({ script: { fullScript: "Completed script" } });
     });
-    const fetchMock = vi.fn().mockResolvedValue(response); vi.stubGlobal("fetch", fetchMock);
-    await expect(platformApi.generateScript({ topic: "An owned brief", platform: "tiktok", tone: "professional", duration: 30, language: "en" }, { scope, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    const fetchMock = vi.fn().mockResolvedValue(response);
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      platformApi.generateScript(
+        {
+          topic: "An owned brief",
+          platform: "tiktok",
+          tone: "professional",
+          duration: 30,
+          language: "en",
+        },
+        { scope, signal: controller.signal }
+      )
+    ).rejects.toMatchObject({ name: "AbortError" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

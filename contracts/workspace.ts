@@ -29,6 +29,7 @@ export interface CapabilityState {
   analysis: boolean;
   /** Paid analysis requires a matching complete audiovisual response contract. */
   analysisSchemaVersion?: string;
+  analysisTransportVersion?: "foreground-v1";
   transcription: boolean;
   speech: boolean;
   musicGeneration?: boolean;

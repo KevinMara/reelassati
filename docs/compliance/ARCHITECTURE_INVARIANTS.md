@@ -276,6 +276,11 @@ OpenRouter routes even when Kimi test mode is enabled:
 - analysis and image-referenced editor chat: `OPENROUTER_ANALYSIS_MODEL`, default
   `moonshotai/kimi-k3` per Kevin's explicit model selection reaffirmed on
   21 October 2026. Do not substitute Gemini or add an alternate-model fallback;
+- video analysis uses the foreground-v1 transport, one owned request/attempt,
+  streaming K3 at low reasoning effort and a cancellation-capable Fireworks
+  endpoint with provider fallback disabled. Keepalive and a five-minute deadline
+  belong only to the active response. Explicit cancellation and authenticated
+  billing reconciliation release failed/expired holds without model retries;
 - trend research: `OPENROUTER_TREND_MODEL`, defaulting to Kimi with grounded web search;
 - transcription: `OPENROUTER_STT_MODEL`;
 - speech: `OPENROUTER_TTS_MODEL` plus configured voice;

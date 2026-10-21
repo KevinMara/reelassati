@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import worker from "./server";
+import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
+import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
 import type { WorkspaceDocument } from "../contracts/workspace";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "../contracts/video-analysis";
 import { customTrendResearchCreditCost } from "../contracts/pricing";
@@ -110,6 +112,7 @@ let nextOutput: Record<string, unknown> = {
 };
 let providerGate: Promise<void> | undefined;
 let providerFailure: { status: number; payload: unknown } | undefined;
+let providerStreamFailure: "truncated" | "error" | undefined;
 let searchAnnotations: unknown[] | undefined;
 let trendVerificationStatus = 403;
 async function request(
@@ -118,16 +121,29 @@ async function request(
   owner = "owner@example.com",
   method = body ? "POST" : "GET"
 ) {
-  return worker.fetch(
-    new Request(`https://studio.example${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${owner}`,
-        "Content-Type": "application/json",
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    }),
-    env as never
+  return unwrapAnalyzerResponse(
+    await worker.fetch(
+      new Request(`https://studio.example${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${owner}`,
+          "Content-Type": "application/json",
+          ...(path === "/api/ai/analyze"
+            ? { Accept: ANALYZER_STREAM_TYPE }
+            : {}),
+        },
+        ...(body
+          ? {
+              body: JSON.stringify(
+                path === "/api/ai/analyze"
+                  ? { requestId: crypto.randomUUID(), ...(body as object) }
+                  : body
+              ),
+            }
+          : {}),
+      }),
+      env as never
+    )
   );
 }
 const chat = (requestId: string, extra: Record<string, unknown> = {}) => ({
@@ -274,11 +290,40 @@ beforeAll(async () => {
           status: trendVerificationStatus,
         });
       providerCalls.push(JSON.parse(String(init?.body || "{}")));
-      if (providerGate) await providerGate;
+      if (providerGate) {
+        const signal = init?.signal;
+        let canceled: (() => void) | undefined;
+        try {
+          await Promise.race([
+            providerGate,
+            new Promise<never>((_, reject) => {
+              canceled = () =>
+                reject(new DOMException("Canceled", "AbortError"));
+              if (signal?.aborted) canceled();
+              else signal?.addEventListener("abort", canceled, { once: true });
+            }),
+          ]);
+        } finally {
+          if (canceled) signal?.removeEventListener("abort", canceled);
+        }
+      }
       if (providerFailure)
         return Response.json(providerFailure.payload, {
           status: providerFailure.status,
         });
+      if (JSON.parse(String(init?.body || "{}")).stream) {
+        if (providerStreamFailure)
+          return new Response(
+            providerStreamFailure === "error"
+              ? 'data: {"error":{"message":"private upstream failure"}}\n\n'
+              : 'data: {"choices":[{"index":0,"delta":{"content":"{"}}]}\n\n',
+            { headers: { "Content-Type": "text/event-stream" } }
+          );
+        return new Response(
+          `: OPENROUTER PROCESSING\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: { reasoning: "Discard private reasoning", content: JSON.stringify(nextOutput) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+          { headers: { "Content-Type": "text/event-stream" } }
+        );
+      }
       return Response.json({
         choices: [
           {
@@ -802,7 +847,13 @@ describe("authenticated paid editing chat route", () => {
         type: "json_schema",
         json_schema: { name: "reelassati_video_analysis_v2", strict: true },
       },
-      provider: { require_parameters: true },
+      provider: {
+        require_parameters: true,
+        only: ["fireworks"],
+        allow_fallbacks: false,
+      },
+      stream: true,
+      reasoning: { effort: "low" },
     });
     expect(providerCalls.length).toBe(calls + 1);
     expect(payload).not.toHaveProperty("models");
@@ -815,6 +866,231 @@ describe("authenticated paid editing chat route", () => {
     ).toMatchObject({ model: "moonshotai/kimi-k3", provider: "OpenRouter" });
     expect(balance()).toBe(before - 10);
   });
+  it("refuses a legacy analyzer client before reserving credits or calling the provider", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    const response = await worker.fetch(
+      new Request("https://studio.example/api/ai/analyze", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer owner@example.com",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ assetId: "source", platform: "tiktok" }),
+      }),
+      env as never
+    );
+    expect(response.status).toBe(409);
+    expect(balance()).toBe(before);
+    expect(providerCalls.length).toBe(calls);
+  });
+
+  it.each(["truncated", "error"] as const)(
+    "releases the actual SQL reservation after an HTTP-200 %s provider stream, without retry",
+    async failure => {
+      const before = balance(),
+        calls = providerCalls.length;
+      const original = nextOutput;
+      nextOutput = videoAnalysisOutput();
+      providerStreamFailure = failure;
+      const log = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+      try {
+        const response = await request("/api/ai/analyze", {
+          assetId: "source",
+          platform: "tiktok",
+        });
+        expect(response.status).toBe(502);
+        expect(balance()).toBe(before);
+        expect(providerCalls.length).toBe(calls + 1);
+        expect(
+          sqlite
+            .prepare(
+              "SELECT status,error_code FROM ai_invocations WHERE purpose='video-analysis' ORDER BY rowid DESC LIMIT 1"
+            )
+            .get()
+        ).toMatchObject({
+          status: "failed",
+          error_code: "provider_or_parse_failure",
+        });
+        expect(
+          sqlite
+            .prepare(
+              "SELECT status FROM credit_ledger WHERE category='analysis' ORDER BY rowid DESC LIMIT 1"
+            )
+            .get()
+        ).toMatchObject({ status: "released" });
+        expect(JSON.stringify(await response.json())).not.toContain(
+          "private upstream failure"
+        );
+      } finally {
+        providerStreamFailure = undefined;
+        nextOutput = original;
+        log.mockRestore();
+      }
+    }
+  );
+
+  it("aborts the only K3 provider request and releases the actual reservation when the browser cancels its response", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    providerGate = new Promise<void>(() => undefined);
+    const retained: Promise<unknown>[] = [];
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const response = await worker.fetch(
+        new Request("https://studio.example/api/ai/analyze", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer owner@example.com",
+            "Content-Type": "application/json",
+            Accept: ANALYZER_STREAM_TYPE,
+            Origin: "https://www.reelassati.app",
+          },
+          body: JSON.stringify({
+            assetId: "source",
+            platform: "tiktok",
+            requestId: crypto.randomUUID(),
+          }),
+        }),
+        env as never,
+        { waitUntil: task => retained.push(task) }
+      );
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+        "https://www.reelassati.app"
+      );
+      const reader = response.body!.getReader();
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain(
+        "pending"
+      );
+      await vi.waitFor(() => expect(providerCalls.length).toBe(calls + 1));
+      expect(balance()).toBe(before - 10);
+      await reader.cancel();
+      await Promise.all(retained);
+      await vi.waitFor(() => expect(balance()).toBe(before));
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(
+        sqlite
+          .prepare(
+            "SELECT status FROM ai_invocations WHERE purpose='video-analysis' ORDER BY rowid DESC LIMIT 1"
+          )
+          .get()
+      ).toMatchObject({ status: "failed" });
+      expect(
+        sqlite
+          .prepare(
+            "SELECT status,metadata_json FROM credit_ledger WHERE category='analysis' ORDER BY rowid DESC LIMIT 1"
+          )
+          .get()
+      ).toMatchObject({
+        status: "released",
+        metadata_json: expect.stringContaining("analysisInvocationId"),
+      });
+    } finally {
+      providerGate = undefined;
+      log.mockRestore();
+    }
+  });
+
+  it("does not duplicate an active request, permits only its owner's cancellation, and prevents a late canceled submit", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    const requestId = crypto.randomUUID();
+    const earlyId = crypto.randomUUID();
+    providerGate = new Promise<void>(() => undefined);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const retained: Promise<unknown>[] = [];
+    try {
+      const original = await worker.fetch(
+        new Request("https://studio.example/api/ai/analyze", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer owner@example.com",
+            "Content-Type": "application/json",
+            Accept: ANALYZER_STREAM_TYPE,
+          },
+          body: JSON.stringify({
+            assetId: "source",
+            platform: "tiktok",
+            requestId,
+          }),
+        }),
+        env as never,
+        { waitUntil: task => retained.push(task) }
+      );
+      await vi.waitFor(() => expect(providerCalls.length).toBe(calls + 1));
+      expect(
+        (
+          await request("/api/ai/analyze", {
+            assetId: "source",
+            platform: "tiktok",
+            requestId,
+          })
+        ).status
+      ).toBe(409);
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before - 10);
+      await request(
+        "/api/ai/analyze/cancel",
+        { requestId },
+        "stranger@example.com"
+      );
+      expect(balance()).toBe(before - 10);
+      await request("/api/ai/analyze/cancel", { requestId });
+      expect(balance()).toBe(before);
+      await original.body!.cancel();
+      await Promise.all(retained);
+      await request("/api/ai/analyze/cancel", { requestId: earlyId });
+      expect(
+        (
+          await request("/api/ai/analyze", {
+            assetId: "source",
+            platform: "tiktok",
+            requestId: earlyId,
+          })
+        ).status
+      ).toBe(409);
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before);
+    } finally {
+      providerGate = undefined;
+      log.mockRestore();
+    }
+  });
+
+  it("allows only one paid provider call for concurrent submissions with the same request ID", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    const original = nextOutput;
+    nextOutput = videoAnalysisOutput();
+    let finish!: () => void;
+    providerGate = new Promise<void>(resolve => {
+      finish = resolve;
+    });
+    const requestId = crypto.randomUUID();
+    const input = { assetId: "source", platform: "tiktok", requestId };
+    const submissions = [
+      request("/api/ai/analyze", input),
+      request("/api/ai/analyze", input),
+    ];
+    try {
+      await vi.waitFor(() => expect(providerCalls.length).toBe(calls + 1));
+      expect((await Promise.race(submissions)).status).toBe(409);
+      expect(balance()).toBe(before - 10);
+      finish();
+      const results = await Promise.all(submissions);
+      expect(results.map(result => result.status).sort()).toEqual([200, 409]);
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before - 10);
+    } finally {
+      finish();
+      await Promise.allSettled(submissions);
+      providerGate = undefined;
+      nextOutput = original;
+    }
+  });
+
   it("refunds incomplete, legacy, unsupported or empty analyzer reports instead of settling misleading scores", async () => {
     const complete = videoAnalysisOutput();
     const failures = [

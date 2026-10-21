@@ -176,6 +176,7 @@ export default function VideoAnalyzer() {
       : Boolean(sourceAsset || !urlError);
   const analysisReady =
     capabilities.analysis &&
+    capabilities.analysisTransportVersion === "foreground-v1" &&
     capabilities.analysisSchemaVersion === VIDEO_ANALYSIS_SCHEMA_VERSION;
   const analysisCreditCost = timedCreditCost(
     sourceAsset?.duration,
@@ -744,6 +745,20 @@ export default function VideoAnalyzer() {
             </>
           )}
         </button>
+
+        {analyzing ? (
+          <button
+            type="button"
+            onClick={() => {
+              controller.current?.abort();
+              setAnalyzing(false);
+              setAnalysisStage("");
+            }}
+            className="mt-2 w-full rounded-lg border border-border py-2 text-sm"
+          >
+            {ui("Cancel")}
+          </button>
+        ) : null}
 
         {notice ? (
           <p

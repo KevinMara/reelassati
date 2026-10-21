@@ -4,6 +4,17 @@ import {
 } from "./paid-media-request";
 import { validateAnalysisProxyDuration } from "./analysis-media";
 import {
+  foregroundAnalysisResponse,
+  readAnalysisCompletion,
+  type AnalysisControl,
+} from "./analyzer-request";
+import {
+  reconcileAnalyzerCredits,
+  cancelAnalyzerCredits,
+  analyzerOperationKey,
+} from "./analyzer-credit-recovery";
+import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
+import {
   normalizeVideoInsights,
   normalizeVideoRecommendations,
   normalizeVideoStructure,
@@ -157,6 +168,7 @@ import {
   handleBillingApi,
   handleStripeWebhook,
   releaseCreditReservation,
+  initializeBillingSchema,
   reserveCredits,
   settleCreditReservation,
   settleMeasuredCreditReservation,
@@ -624,6 +636,7 @@ function capabilities(
         : Boolean(env.OPENROUTER_API_KEY)),
     analysis: Boolean(env.OPENROUTER_API_KEY && provenanceReady),
     analysisSchemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+    analysisTransportVersion: "foreground-v1",
     transcription: Boolean(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
@@ -3866,7 +3879,8 @@ async function chatJson(
   requireJsonMode = true,
   maxOutputTokens?: number,
   deferCompletion = false,
-  responseSchema?: Record<string, unknown>
+  responseSchema?: Record<string, unknown>,
+  analysisControl?: AnalysisControl
 ): Promise<{
   output: Record<string, unknown>;
   invocation: AiInvocationContext;
@@ -3895,6 +3909,7 @@ async function chatJson(
   const selectedModel = useKimiSubscription
     ? env.KIMI_CODE_MODEL || "k3-256k"
     : model || env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5";
+  analysisControl?.signal.throwIfAborted();
   const invocation = await beginAiInvocation(
     env,
     user,
@@ -3903,11 +3918,21 @@ async function chatJson(
     selectedModel,
     userContent
   );
+  analysisControl?.onAbort(() =>
+    env.DB.prepare(
+      "UPDATE ai_invocations SET status = 'failed', error_code = 'analysis_request_canceled', completed_at = ? WHERE id = ? AND owner_email = ? AND status = 'in_progress'"
+    )
+      .bind(new Date().toISOString(), invocation.id, user.email)
+      .run()
+  );
   try {
+    await analysisControl?.onInvocation?.(invocation.id);
+    analysisControl?.signal.throwIfAborted();
     const response = await fetch(
       `${useKimiSubscription ? KIMI_CODE_BASE : OPENROUTER_BASE}/chat/completions`,
       {
         method: "POST",
+        signal: analysisControl?.signal,
         headers: useKimiSubscription
           ? kimiCodeHeaders(env)
           : openRouterHeaders(env),
@@ -3933,12 +3958,20 @@ async function chatJson(
                     schema: responseSchema,
                   },
                 },
-                provider: { require_parameters: true },
+                provider: {
+                  require_parameters: true,
+                  ...(analysisControl
+                    ? { only: ["fireworks"], allow_fallbacks: false }
+                    : {}),
+                },
               }
             : requireJsonMode
               ? { response_format: { type: "json_object" } }
               : {}),
           temperature: responseSchema ? 0.1 : 0.45,
+          ...(analysisControl
+            ? { stream: true, reasoning: { effort: "low" } }
+            : {}),
           ...(maxOutputTokens ? { max_tokens: maxOutputTokens } : {}),
         }),
       }
@@ -3951,11 +3984,22 @@ async function chatJson(
         purpose,
       });
     }
-    const output = parseModelJson(await response.json());
+    const output = parseModelJson(
+      analysisControl
+        ? await readAnalysisCompletion(response, analysisControl.signal)
+        : await response.json()
+    );
+    analysisControl?.signal.throwIfAborted();
     if (!deferCompletion) await completeAiInvocation(env, invocation, output);
     return { output, invocation };
   } catch (cause) {
-    await failAiInvocation(env, invocation, "provider_or_parse_failure");
+    await failAiInvocation(
+      env,
+      invocation,
+      analysisControl?.signal.aborted
+        ? "analysis_request_canceled"
+        : "provider_or_parse_failure"
+    );
     throw cause;
   }
 }
@@ -5299,12 +5343,54 @@ async function runPaidAiAction(
     metadata?: Record<string, unknown>;
     prepareResponse?: (response: Response) => Promise<void>;
     settledDuringAction?: boolean;
+    analysisControl?: AnalysisControl;
   },
   action: (reservation: CreditReservation) => Promise<Response>
 ): Promise<Response> {
   const reservation = await requireCreditReservation(env, user, input);
+  if (input.analysisControl) {
+    const claim = await env.DB.prepare(
+      "SELECT status, json_extract(metadata_json, '$.analyzerAttempt') AS attempt FROM credit_ledger WHERE id = ? AND owner_email = ?"
+    )
+      .bind(reservation.id, user.email)
+      .first<{ status: string; attempt: string }>();
+    // A duplicate HTTP submit must neither buy a second model call nor release
+    // the first request's reservation. Only the winning attempt owns cleanup.
+    if (
+      claim?.status !== "reserved" ||
+      claim.attempt !== input.metadata?.analyzerAttempt
+    )
+      return errorResponse(
+        "The video review is incomplete. Please refresh before analyzing again.",
+        409
+      );
+  }
+  input.analysisControl?.onAbort(() =>
+    releaseCreditReservation(env, reservation)
+  );
+  if (input.analysisControl)
+    input.analysisControl.onInvocation = async id => {
+      const updated = await env.DB.prepare(
+        "UPDATE credit_ledger SET metadata_json = json_set(metadata_json, '$.analysisInvocationId', ?) WHERE id = ? AND owner_email = ? AND status = 'reserved'"
+      )
+        .bind(id, reservation.id, user.email)
+        .run();
+      if (updated.meta?.changes === 0)
+        throw new DOMException("Analysis request canceled", "AbortError");
+    };
+  if (input.analysisControl)
+    input.analysisControl.onCheck = async () => {
+      const hold = await env.DB.prepare(
+        "SELECT status FROM credit_ledger WHERE id = ? AND owner_email = ?"
+      )
+        .bind(reservation.id, user.email)
+        .first<{ status: string }>();
+      return hold?.status === "reserved" || hold?.status === "settled";
+    };
   try {
+    input.analysisControl?.signal.throwIfAborted();
     const response = await action(reservation);
+    input.analysisControl?.signal.throwIfAborted();
     if (response.ok) {
       await input.prepareResponse?.(response);
       if (!input.settledDuringAction)
@@ -5350,7 +5436,8 @@ async function handleAi(
   env: SitesEnvironment,
   user: AuthenticatedUser,
   url: URL,
-  mediaRequest?: PaidMediaRequestControl
+  mediaRequest?: PaidMediaRequestControl,
+  analysisControl?: AnalysisControl
 ): Promise<Response> {
   if (request.method !== "POST")
     return errorResponse("Method not allowed", 405);
@@ -6281,6 +6368,7 @@ async function handleAi(
 
   if (url.pathname === "/api/ai/analyze") {
     const input = await parseJsonBody<{
+      requestId?: string;
       assetId?: string;
       analysisAssetId?: string;
       analysisFramesPerSecond?: number;
@@ -6428,6 +6516,34 @@ async function handleAi(
       ? requestedLanguage
       : "en";
 
+    // Old clients cannot maintain the foreground response. Refuse before charging.
+    if (!analysisControl)
+      return errorResponse(
+        "This analysis version is unavailable. Refresh the Studio before continuing.",
+        409
+      );
+    if (!/^[a-zA-Z0-9-]{16,80}$/.test(input.requestId || ""))
+      return errorResponse(
+        "This analysis version is unavailable. Refresh the Studio before continuing.",
+        409
+      );
+    await initializeBillingSchema(env);
+    const operationKey = analyzerOperationKey(
+      user.email,
+      user.brandId || "default",
+      input.requestId!
+    );
+    if (
+      await env.DB.prepare(
+        "SELECT id FROM credit_ledger WHERE operation_key = ? AND owner_email = ?"
+      )
+        .bind(operationKey, user.email)
+        .first()
+    )
+      return errorResponse(
+        "The video review is incomplete. Please refresh before analyzing again.",
+        409
+      );
     return runPaidAiAction(
       env,
       user,
@@ -6436,11 +6552,17 @@ async function handleAi(
           analysisDuration,
           AI_CREDIT_COSTS.videoAnalysisPerMinute
         ),
-        operationKey: `video-analysis:${crypto.randomUUID()}`,
+        operationKey,
         category: "analysis",
         description: "Video analysis",
         referenceId: stringValue(input.assetId) || undefined,
-        metadata: { durationSeconds: analysisDuration || null },
+        metadata: {
+          durationSeconds: analysisDuration || null,
+          analyzerTransport: "foreground-v1",
+          analyzerDeadlineAt: analysisControl.deadlineAt,
+          analyzerAttempt: crypto.randomUUID(),
+        },
+        analysisControl,
       },
       async () => {
         const { output, invocation } = await chatJson(
@@ -6459,7 +6581,8 @@ async function handleAi(
           true,
           maximumOutputTokens,
           true,
-          videoAnalysisResponseSchema(maximumIntervals, analysisDuration || 0)
+          videoAnalysisResponseSchema(maximumIntervals, analysisDuration || 0),
+          analysisControl
         );
         const insights = normalizeVideoInsights(
           output.insights,
@@ -12636,7 +12759,8 @@ async function handleTrends(
 async function handleApi(
   request: Request,
   env: SitesEnvironment,
-  url: URL
+  url: URL,
+  analysisControl?: AnalysisControl
 ): Promise<Response> {
   if (url.pathname === "/api/health") {
     return json({
@@ -12773,6 +12897,10 @@ async function handleApi(
   }
 
   if (url.pathname.startsWith("/api/billing/")) {
+    if (url.pathname === "/api/billing/summary" && request.method === "GET") {
+      await initializeBillingSchema(env);
+      await reconcileAnalyzerCredits(env.DB, user.email);
+    }
     return handleBillingApi(request, env, user, url);
   }
 
@@ -12837,7 +12965,22 @@ async function handleApi(
   }
 
   if (url.pathname.startsWith("/api/ai/")) {
-    return handleAi(request, env, user, url);
+    if (url.pathname === "/api/ai/analyze/cancel") {
+      if (request.method !== "POST")
+        return errorResponse("Method not allowed", 405);
+      const input = await parseJsonBody<{ requestId?: string }>(request);
+      if (!/^[a-zA-Z0-9-]{16,80}$/.test(input.requestId || ""))
+        return errorResponse("Invalid analysis request", 400);
+      await initializeBillingSchema(env);
+      await cancelAnalyzerCredits(
+        env.DB,
+        user.email,
+        user.brandId || "default",
+        input.requestId!
+      );
+      return json({ canceled: true });
+    }
+    return handleAi(request, env, user, url, undefined, analysisControl);
   }
 
   if (
@@ -12916,6 +13059,39 @@ export default {
     if (url.pathname.startsWith("/api/")) {
       if (request.method === "OPTIONS") {
         return apiResponse(new Response(null, { status: 204 }), request);
+      }
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/ai/analyze" &&
+        request.headers.get("Accept")?.includes(ANALYZER_STREAM_TYPE)
+      ) {
+        return apiResponse(
+          foregroundAnalysisResponse(
+            request,
+            async (scopedRequest, control) => {
+              try {
+                return await handleApi(scopedRequest, env, url, control);
+              } catch (cause) {
+                if (cause instanceof Response) return cause;
+                const reference = crypto.randomUUID();
+                console.error("REELassati foreground analysis failed", {
+                  reference,
+                  errorType: cause instanceof Error ? cause.name : typeof cause,
+                });
+                return json(
+                  {
+                    error:
+                      "REELassati could not complete this request. Retry once; if it continues, contact support.",
+                    reference,
+                  },
+                  control.signal.aborted ? 504 : 502
+                );
+              }
+            },
+            cleanup => ctx?.waitUntil(cleanup)
+          ),
+          request
+        );
       }
       try {
         const operation = handleApi(request, env, url);
