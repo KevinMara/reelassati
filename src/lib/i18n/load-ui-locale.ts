@@ -1,3 +1,4 @@
+import { automaticResearchDisabled } from "./locales/ui-manual-only";
 import type { InterfaceLanguage } from "@contracts/interface-language";
 
 type InterfaceCatalog = Record<string, string>;
@@ -118,6 +119,11 @@ export function loadUiLocale(
       module => module.europeanUi[code]
     );
   }
+  if (code !== "en")
+    pending = pending.then(catalog => ({
+      ...catalog,
+      "Automatic research is disabled.": automaticResearchDisabled[code],
+    }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {
     if (pendingCatalogs.get(code) === pending) pendingCatalogs.delete(code);

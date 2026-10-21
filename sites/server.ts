@@ -175,7 +175,7 @@ import type {
   TrendScope,
 } from "../contracts/trends";
 import { weeklyTrendFeedStatus } from "../contracts/trends";
-import { createRemoteJWKSet, decodeJwt, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
 type AssetBinding = {
   fetch(request: Request): Promise<Response>;
@@ -432,28 +432,12 @@ const MAX_WORKSPACE_BYTES = 2_000_000;
 const MAX_PROVENANCE_UPLOAD_BYTES = 64 * 1024 * 1024;
 const REFERRAL_REWARD_CREDITS = 500;
 const REFERRAL_REWARD_CENTS = 500;
-const TREND_WEEKLY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const TREND_REFRESH_LEASE_MS = 10 * 60 * 1000;
 const TREND_WEEKLY_SCOPE_KEY = "weekly:organic-brand-hyperviral-shorts:v4";
 const TREND_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const TREND_MIN_VIEWS = 500_000;
 const TREND_MIN_LIKES = 50_000;
 const TREND_MIN_COMMENTS = 5_000;
 const TREND_MIN_SHARES = 10_000;
-const TREND_SYSTEM_OWNER: AuthenticatedUser = {
-  email: "trend-system@reelassati.app",
-  name: "REELassati Trends",
-};
-const VERCEL_TREND_PROJECT_ID = "prj_oMk2WHi81HNBQBU1AACAKMwFiycP";
-const VERCEL_TREND_TEAM_SLUG = "kevinmaras-projects";
-const VERCEL_TREND_ISSUERS = new Set([
-  "https://oidc.vercel.com",
-  `https://oidc.vercel.com/${VERCEL_TREND_TEAM_SLUG}`,
-]);
-const vercelTrendJwks = new Map<
-  string,
-  ReturnType<typeof createRemoteJWKSet>
->();
 const ALLOWED_UPLOAD_PREFIXES = ["video/", "audio/", "image/"];
 const ACTIVE_UPLOAD_TYPES = new Set(["image/svg+xml"]);
 const ZERNIO_PLATFORMS = new Set([
@@ -9128,41 +9112,7 @@ async function handleMaintenance(
   } catch {
     tasks.push({ task: "monthly credit renewals", ok: false });
   }
-  try {
-    await refreshWeeklyTrendFeed(env);
-    tasks.push({ task: "weekly trends", ok: true });
-  } catch {
-    tasks.push({ task: "weekly trends", ok: false });
-  }
-  if (env.OPENROUTER_API_KEY) {
-    const pending = await env.DB.prepare(
-      "SELECT id,owner_email,brand_id FROM generation_jobs WHERE status IN ('pending','in_progress') ORDER BY updated_at LIMIT 2"
-    ).all<{ id: string; owner_email: string; brand_id: string }>();
-    let failed = 0;
-    for (const job of pending.results) {
-      try {
-        const url = new URL(`https://reelassati.app/api/video/jobs/${job.id}`);
-        const response = await handleVideoJobs(
-          new Request(url),
-          env,
-          {
-            email: job.owner_email,
-            name: nameFromEmail(job.owner_email),
-            brandId: job.brand_id,
-          },
-          url
-        );
-        if (!response.ok) failed++;
-      } catch {
-        failed++;
-      }
-    }
-    tasks.push({
-      task: "generation recovery",
-      ok: failed === 0,
-      checked: pending.results.length,
-    });
-  }
+  // No research or generation recovery runs from unattended maintenance.
   if (env.ZERNIO_API_KEY) {
     await env.DB.prepare(
       "CREATE TABLE IF NOT EXISTS social_analytics_snapshots(owner_key TEXT NOT NULL,day TEXT NOT NULL,payload TEXT NOT NULL,synced_at TEXT NOT NULL,PRIMARY KEY(owner_key,day))"
@@ -12493,7 +12443,7 @@ function trendResponse(input: {
   availableCredits: number;
   cacheNote: string;
 }): TrendFeedResponse {
-  return input;
+  return { ...input, automaticResearchEnabled: false };
 }
 
 function weeklyTrendScope(): TrendScope {
@@ -12521,171 +12471,6 @@ async function latestWeeklyTrendSnapshot(
   )
     .bind(TREND_WEEKLY_SCOPE_KEY)
     .first<TrendSnapshotRow>();
-}
-
-async function refreshWeeklyTrendFeed(env: SitesEnvironment): Promise<{
-  refreshed: boolean;
-  reason?: "current" | "in_progress";
-  generatedAt?: string;
-  nextRefreshAt?: string;
-  resultCount?: number;
-}> {
-  await initializeSchema(env);
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const current = await latestWeeklyTrendSnapshot(env);
-  if (current && Date.parse(current.expires_at) > now.getTime()) {
-    return {
-      refreshed: false,
-      reason: "current",
-      generatedAt: current.generated_at,
-      nextRefreshAt: current.expires_at,
-    };
-  }
-
-  const leaseExpiresAt = new Date(
-    now.getTime() + TREND_REFRESH_LEASE_MS
-  ).toISOString();
-  const lease = await env.DB.prepare(
-    `
-      INSERT INTO trend_refresh_state
-        (refresh_key, lease_expires_at, last_started_at, last_completed_at, last_error)
-      VALUES (?, ?, ?, NULL, NULL)
-      ON CONFLICT(refresh_key) DO UPDATE SET
-        lease_expires_at = excluded.lease_expires_at,
-        last_started_at = excluded.last_started_at,
-        last_error = NULL
-      WHERE trend_refresh_state.lease_expires_at <= ?
-    `
-  )
-    .bind(TREND_WEEKLY_SCOPE_KEY, leaseExpiresAt, nowIso, nowIso)
-    .run();
-  if ((lease.meta?.changes || 0) !== 1) {
-    return { refreshed: false, reason: "in_progress" };
-  }
-
-  try {
-    const result = await researchTrendSources(
-      env,
-      TREND_SYSTEM_OWNER,
-      weeklyTrendScope(),
-      "weekly"
-    );
-    const nextRefreshAt = new Date(
-      Date.parse(result.generatedAt) + TREND_WEEKLY_TTL_MS
-    ).toISOString();
-    await env.DB.batch([
-      env.DB.prepare(
-        `
-          INSERT INTO trend_snapshots
-            (id, scope_key, payload_json, generated_at, expires_at)
-          VALUES (?, ?, ?, ?, ?)
-        `
-      ).bind(
-        crypto.randomUUID(),
-        TREND_WEEKLY_SCOPE_KEY,
-        JSON.stringify(result.trends),
-        result.generatedAt,
-        nextRefreshAt
-      ),
-      env.DB.prepare(
-        `
-          UPDATE trend_refresh_state
-          SET lease_expires_at = ?, last_completed_at = ?, last_error = NULL
-          WHERE refresh_key = ?
-        `
-      ).bind(result.generatedAt, result.generatedAt, TREND_WEEKLY_SCOPE_KEY),
-      env.DB.prepare(
-        `
-          DELETE FROM trend_snapshots
-          WHERE scope_key = ? AND generated_at < ?
-        `
-      ).bind(
-        TREND_WEEKLY_SCOPE_KEY,
-        new Date(Date.parse(result.generatedAt) - 56 * 86_400_000).toISOString()
-      ),
-    ]);
-    return {
-      refreshed: true,
-      generatedAt: result.generatedAt,
-      nextRefreshAt,
-      resultCount: result.trends.length,
-    };
-  } catch (cause) {
-    const failedAt = new Date().toISOString();
-    const failure = await env.DB.prepare(
-      "SELECT error_code FROM ai_invocations WHERE owner_email = ? AND purpose = 'trend-research' AND created_at >= ? ORDER BY created_at DESC LIMIT 1"
-    )
-      .bind(TREND_SYSTEM_OWNER.email, nowIso)
-      .first<{ error_code: string | null }>()
-      .catch(() => null);
-    await env.DB.prepare(
-      `
-        UPDATE trend_refresh_state
-        SET lease_expires_at = ?, last_error = ?
-        WHERE refresh_key = ?
-      `
-    )
-      .bind(
-        failedAt,
-        failure?.error_code || "provider_or_validation_failure",
-        TREND_WEEKLY_SCOPE_KEY
-      )
-      .run()
-      .catch(() => undefined);
-    throw cause;
-  }
-}
-
-async function handleWeeklyTrendRefresh(
-  request: Request,
-  env: SitesEnvironment
-): Promise<Response> {
-  if (request.method !== "GET" && request.method !== "POST") {
-    return errorResponse("Method not allowed", 405);
-  }
-  const authorization = request.headers.get("authorization") || "";
-  const token = authorization.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length).trim()
-    : "";
-  if (!token) return errorResponse("Unauthorized", 401);
-  const trustedRefreshToken = stringValue(env.TREND_REFRESH_TOKEN);
-  const hasTrustedRefreshToken =
-    trustedRefreshToken.length >= 32 &&
-    constantTimeEqual(token, trustedRefreshToken);
-  if (!hasTrustedRefreshToken) {
-    try {
-      const issuer = stringValue(decodeJwt(token).iss);
-      if (!VERCEL_TREND_ISSUERS.has(issuer)) {
-        return errorResponse("Unauthorized", 401);
-      }
-      let jwks = vercelTrendJwks.get(issuer);
-      if (!jwks) {
-        jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks`));
-        vercelTrendJwks.set(issuer, jwks);
-      }
-      const { payload } = await jwtVerify(token, jwks, {
-        issuer,
-        audience: `https://vercel.com/${VERCEL_TREND_TEAM_SLUG}`,
-        subject: `owner:${VERCEL_TREND_TEAM_SLUG}:project:reelassati:environment:production`,
-      });
-      if (
-        payload.project_id !== VERCEL_TREND_PROJECT_ID ||
-        payload.environment !== "production"
-      ) {
-        return errorResponse("Unauthorized", 401);
-      }
-    } catch {
-      return errorResponse("Unauthorized", 401);
-    }
-  }
-  try {
-    const result = await refreshWeeklyTrendFeed(env);
-    return json(result, result.reason === "in_progress" ? 202 : 200);
-  } catch (cause) {
-    if (cause instanceof Response) return cause;
-    return errorResponse("The weekly trend update could not be completed", 502);
-  }
 }
 
 async function saveTrendResearchRun(
@@ -12744,38 +12529,32 @@ async function handleTrends(
           trendResponse({
             trends,
             generatedAt: cached.generated_at,
-            nextRefreshAt: cached.expires_at,
+            nextRefreshAt: "",
             freshness: "cached",
             kind: "weekly",
             status: weeklyTrendFeedStatus(cached.expires_at, null),
             scope,
             creditCost: 0,
             availableCredits,
-            cacheNote:
-              "Curated automatically from hyperviral organic TikToks and Reels.",
+            cacheNote: "Automatic research is disabled.",
           })
         );
       } catch {
         // A malformed weekly snapshot never triggers user-initiated research.
       }
     }
-    const refresh = await env.DB.prepare(
-      "SELECT lease_expires_at FROM trend_refresh_state WHERE refresh_key = ?"
-    )
-      .bind(TREND_WEEKLY_SCOPE_KEY)
-      .first<{ lease_expires_at: string }>();
     return json(
       trendResponse({
         trends: [],
         generatedAt: "",
-        nextRefreshAt: new Date().toISOString(),
+        nextRefreshAt: "",
         freshness: "cached",
         kind: "weekly",
-        status: weeklyTrendFeedStatus(null, refresh?.lease_expires_at || null),
+        status: "unavailable",
         scope,
         creditCost: 0,
         availableCredits,
-        cacheNote: "The weekly update runs internally.",
+        cacheNote: "Automatic research is disabled.",
       })
     );
   }
@@ -12888,7 +12667,13 @@ async function handleApi(
   if (url.pathname === "/api/internal/maintenance")
     return handleMaintenance(request, env);
   if (url.pathname === "/api/internal/trends/weekly") {
-    return handleWeeklyTrendRefresh(request, env);
+    return json(
+      {
+        error: "Automatic research is disabled.",
+        code: "automatic-research-disabled",
+      },
+      410
+    );
   }
 
   if (url.pathname.startsWith("/api/support/")) {
@@ -13207,12 +12992,10 @@ export default {
     env: SitesEnvironment,
     ctx: { waitUntil(promise: Promise<unknown>): void }
   ): Promise<void> {
+    // Scheduled bookkeeping must never initiate paid provider work.
     ctx.waitUntil(
-      Promise.all([
-        refreshWeeklyTrendFeed(env),
-        applyAllDueAnnualCreditRenewals(env),
-      ]).catch(cause => {
-        console.error("Weekly trend refresh failed", {
+      applyAllDueAnnualCreditRenewals(env).catch(cause => {
+        console.error("Scheduled credit renewal failed", {
           errorType: cause instanceof Error ? cause.name : typeof cause,
         });
       })

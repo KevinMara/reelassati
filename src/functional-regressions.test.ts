@@ -230,12 +230,7 @@ describe("platform-wide functional invariants", () => {
     expect(
       readdirSync(new URL("../legacy-api", import.meta.url)).length
     ).toBeGreaterThan(0);
-    expect(vercel).toMatchObject({
-      functions: {
-        "api/trends-weekly.ts": { maxDuration: 300 },
-      },
-      crons: [{ path: "/api/trends-weekly", schedule: "0 5 * * 1" }],
-    });
+    expect(vercel).toMatchObject({ crons: [] });
   });
 
   it("keeps weekly trends internal and charges every completed custom research", () => {
@@ -256,8 +251,8 @@ describe("platform-wide functional invariants", () => {
     expect(server).toContain('type: "openrouter:web_search"');
     expect(server).toContain("max_uses");
     expect(server).not.toContain("citationFallbackTrendCandidates");
-    expect(server).toContain("TREND_WEEKLY_TTL_MS");
-    expect(server).toContain("await refreshWeeklyTrendFeed(env)");
+    expect(server).not.toContain("refreshWeeklyTrendFeed");
+    expect(server).toContain("automaticResearchEnabled: false");
     expect(server).not.toContain("On-demand weekly trend bootstrap failed");
     expect(server).toContain("TREND_MIN_VIEWS");
     expect(server).toContain("candidate.organicBrandPromotion !== true");
@@ -266,7 +261,7 @@ describe("platform-wide functional invariants", () => {
     expect(server).toContain("return availableCredits(env, user)");
     expect(server).not.toContain("TREND_STARTER_CREDITS");
     expect(server).not.toContain("TREND_PERSONAL_CACHE_MS");
-    expect(cron).toContain("/api/internal/trends/weekly");
+    expect(cron).toContain("automatic-research-disabled");
   });
 
   it("keeps Analytics grounded while allowing one or several chart metrics", () => {

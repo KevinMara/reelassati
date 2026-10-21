@@ -1,7 +1,5 @@
 name: Platform maintenance
 on:
-  schedule:
-    - cron: "17 5 * * *"
   workflow_dispatch:
     inputs:
       grant_email:

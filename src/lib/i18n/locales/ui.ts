@@ -1,3 +1,4 @@
+import { automaticResearchDisabled } from "./ui-manual-only";
 import { italianUi } from "./ui-it";
 import { existingItalianUi } from "./ui-it-existing";
 import { westernUi } from "./ui-critical-west";
@@ -68,3 +69,9 @@ export const uiLocales: Record<string, Record<string, string>> = {
   hi: { ...hindiUi, ...asianUi.hi },
   he: { ...hebrewUi, ...asianUi.he },
 };
+
+for (const [language, translation] of Object.entries(
+  automaticResearchDisabled
+)) {
+  uiLocales[language]["Automatic research is disabled."] = translation;
+}

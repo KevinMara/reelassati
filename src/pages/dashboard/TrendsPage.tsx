@@ -351,6 +351,9 @@ export default function TrendsPage() {
 
   const activeFeed =
     activeFeedKind === "custom" && customFeed ? customFeed : weeklyFeed;
+  const automaticResearchDisabled =
+    activeFeed?.kind === "weekly" &&
+    activeFeed.automaticResearchEnabled === false;
   const availableCredits =
     customFeed?.availableCredits ?? weeklyFeed?.availableCredits;
   const researchCreditCost = customTrendResearchCreditCost(researchPlatform);
@@ -814,15 +817,17 @@ export default function TrendsPage() {
               </p>
               {activeFeed ? (
                 <span className="rounded-full border border-border bg-surface px-2 py-1 text-xs text-foreground/70">
-                  {activeFeed.kind === "weekly"
-                    ? activeFeed.status === "preparing"
-                      ? ui("Preparing")
-                      : activeFeed.status === "unavailable"
-                        ? ui("Awaiting verified picks")
-                        : activeFeed.status === "stale"
-                          ? ui("Previous edition")
-                          : ui("Updated weekly")
-                    : ui("Credit research")}
+                  {automaticResearchDisabled
+                    ? ui("Automatic research is disabled.")
+                    : activeFeed.kind === "weekly"
+                      ? activeFeed.status === "preparing"
+                        ? ui("Preparing")
+                        : activeFeed.status === "unavailable"
+                          ? ui("Awaiting verified picks")
+                          : activeFeed.status === "stale"
+                            ? ui("Previous edition")
+                            : ui("Updated weekly")
+                      : ui("Credit research")}
                 </span>
               ) : null}
             </div>
@@ -831,7 +836,7 @@ export default function TrendsPage() {
                 ? ui("Research for “{{query}}”", {
                     query: activeFeed.scope.query,
                   })
-                : activeFeed?.status === "stale"
+                : automaticResearchDisabled || activeFeed?.status === "stale"
                   ? ui("Latest verified brand shorts")
                   : ui("This week’s hyperviral brand shorts")}
             </h2>
@@ -841,16 +846,18 @@ export default function TrendsPage() {
                 {ui("Updated")}{" "}
                 {new Date(activeFeed.generatedAt).toLocaleString(getUiLocale())}{" "}
                 ·{" "}
-                {activeFeed.status === "stale"
-                  ? ui("A new edition is awaiting verification.")
-                  : activeFeed.kind === "custom"
-                    ? ui(
-                        "{{credits}} credits used for this completed custom research.",
-                        { credits: activeFeed.creditCost }
-                      )
-                    : ui(
-                        "Curated automatically from hyperviral organic TikToks and Reels."
-                      )}
+                {automaticResearchDisabled
+                  ? ui("Automatic research is disabled.")
+                  : activeFeed.status === "stale"
+                    ? ui("A new edition is awaiting verification.")
+                    : activeFeed.kind === "custom"
+                      ? ui(
+                          "{{credits}} credits used for this completed custom research.",
+                          { credits: activeFeed.creditCost }
+                        )
+                      : ui(
+                          "Curated automatically from hyperviral organic TikToks and Reels."
+                        )}
               </p>
             ) : activeFeed?.status === "preparing" ? (
               <p className="mt-1 text-xs text-foreground/70">
@@ -860,9 +867,11 @@ export default function TrendsPage() {
               </p>
             ) : activeFeed?.status === "unavailable" ? (
               <p className="mt-1 text-xs text-foreground/65">
-                {ui(
-                  "No current examples have passed verification yet. The next check runs automatically."
-                )}
+                {automaticResearchDisabled
+                  ? ui("Automatic research is disabled.")
+                  : ui(
+                      "No current examples have passed verification yet. The next check runs automatically."
+                    )}
               </p>
             ) : null}
           </div>
@@ -1051,17 +1060,19 @@ export default function TrendsPage() {
                   : ui("No matching evidence")}
             </h3>
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-foreground/70">
-              {activeFeed?.status === "preparing"
-                ? ui(
-                    "REELassati updates this feed internally; no action or credits are required from you."
-                  )
-                : activeFeed?.status === "unavailable"
+              {automaticResearchDisabled
+                ? ui("Automatic research is disabled.")
+                : activeFeed?.status === "preparing"
                   ? ui(
-                      "Verified weekly picks are not available yet. Keep creating from your own idea while the next automatic check runs."
+                      "REELassati updates this feed internally; no action or credits are required from you."
                     )
-                  : ui(
-                      "Change the filters or run custom research. REELassati will show fewer results rather than fill the feed with stale, paid, generic, or unverified content."
-                    )}
+                  : activeFeed?.status === "unavailable"
+                    ? ui(
+                        "Verified weekly picks are not available yet. Keep creating from your own idea while the next automatic check runs."
+                      )
+                    : ui(
+                        "Change the filters or run custom research. REELassati will show fewer results rather than fill the feed with stale, paid, generic, or unverified content."
+                      )}
             </p>
             {activeFeed?.status === "unavailable" ? (
               <Link

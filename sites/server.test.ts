@@ -738,16 +738,20 @@ describe("Sites worker", () => {
     });
   });
 
-  it("rejects unsigned weekly trend refresh requests", async () => {
+  it("permanently rejects retired weekly research without any provider call", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
     const response = await worker.fetch(
       new Request("https://studio.example/api/internal/trends/weekly"),
       env as never
     );
 
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(410);
     await expect(response.json()).resolves.toMatchObject({
-      error: "Unauthorized",
+      code: "automatic-research-disabled",
     });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it("qualifies referral rewards only from a signed, idempotent billing event", async () => {

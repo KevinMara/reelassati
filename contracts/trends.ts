@@ -58,6 +58,7 @@ export interface TrendScope {
 }
 
 export interface TrendFeedResponse {
+  automaticResearchEnabled?: boolean;
   trends: TrendEvidenceItem[];
   generatedAt: string;
   nextRefreshAt: string;
