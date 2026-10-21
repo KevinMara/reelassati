@@ -1,4 +1,6 @@
 import { automaticResearchDisabled } from "./ui-manual-only";
+import { editingTemplateUi } from "./ui-edit-templates";
+import { editingTraitUi } from "./ui-edit-template-traits";
 import { italianUi } from "./ui-it";
 import { existingItalianUi } from "./ui-it-existing";
 import { westernUi } from "./ui-critical-west";
@@ -74,4 +76,11 @@ for (const [language, translation] of Object.entries(
   automaticResearchDisabled
 )) {
   uiLocales[language]["Automatic research is disabled."] = translation;
+}
+for (const [language, translation] of Object.entries(editingTemplateUi)) {
+  Object.assign(uiLocales[language], translation);
+}
+for (const [language, translation] of Object.entries(editingTraitUi)) {
+  for (const [key, value] of Object.entries(translation))
+    uiLocales[language][key] ??= value;
 }

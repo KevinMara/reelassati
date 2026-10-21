@@ -28,12 +28,14 @@ export async function analyzeMedia(
   onProgress?: (stage: string) => void,
   signal?: AbortSignal,
   requestScope?: UploadRequestScope,
-  language = "en"
+  language = "en",
+  extractStyle = false
 ) {
   const scope = requestScope ?? (await captureUploadRequestScope());
   const input = {
     schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
     language,
+    extractStyle,
     assetId: asset.id,
     platform,
     focus,

@@ -968,6 +968,7 @@ export const platformApi = {
 
   analyzeVideo: async (
     input: {
+      extractStyle?: boolean;
       schemaVersion?: typeof import("@contracts/video-analysis").VIDEO_ANALYSIS_SCHEMA_VERSION;
       language?: string;
       assetId?: string;
@@ -1012,6 +1013,7 @@ export const platformApi = {
         schemaVersion?: typeof import("@contracts/video-analysis").VIDEO_ANALYSIS_SCHEMA_VERSION;
         scoreScope?: "audiovisual-editorial-only";
         summary: string;
+        editingStyle?: import("@contracts/edit-style-template").EditStyleProfile;
         hook: { score: number | null; note: string };
         pacing: { score: number | null; note: string };
         insights?: import("@contracts/video-analysis").VideoInsight[];

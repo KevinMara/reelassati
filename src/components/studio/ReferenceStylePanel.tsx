@@ -1,6 +1,11 @@
 import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { WandSparkles } from "lucide-react";
+import { SaveEditStyleTemplate } from "./EditStyleTemplates";
+import {
+  normalizeReferenceEditStyle,
+  type EditStyleProfile,
+} from "@contracts/edit-style-template";
 import type { Asset } from "@contracts/workspace";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { AI_CREDIT_COSTS, timedCreditCost } from "@contracts/billing";
@@ -63,6 +68,7 @@ function ReferenceStyleSession({
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState("");
   const [result, setResult] = useState("");
+  const [styleProfile, setStyleProfile] = useState<EditStyleProfile>();
   const [error, setError] = useState("");
   const asset = workspace.assets.find(a => a.id === assetId);
   const measured =
@@ -110,6 +116,7 @@ function ReferenceStyleSession({
     controller.current = null;
     setBusy(false);
     setResult("");
+    setStyleProfile(undefined);
     setDetail("");
     onChange("");
   }
@@ -159,6 +166,7 @@ function ReferenceStyleSession({
     setDetail("");
     setResult("");
     onChange("");
+    setStyleProfile(undefined);
     try {
       const scope = await captureUploadRequestScope();
       current();
@@ -309,7 +317,9 @@ function ReferenceStyleSession({
         `Create an evidence-focused reference brief for ONLY these aspects: ${chosen.join(", ")}. Describe observed shot/action changes and relevant style or sound with source timestamps. Distinguish observations from unknowns. Exact font, color values, camera settings, sound identity and audio levels remain unknown unless measured. Editorial suggestions are not observations. Do not copy dialogue, melody or copyrighted assets. If the video cannot be inspected, say so; never invent a style.`,
         progress,
         signal,
-        scope
+        scope,
+        undefined,
+        purpose === "edit"
       );
       await verifyUploadRequestScope(scope);
       current();
@@ -322,6 +332,30 @@ function ReferenceStyleSession({
         purpose
       );
       setResult(evidence.summary);
+      if (purpose === "edit") {
+        const profile = normalizeReferenceEditStyle(response.editingStyle);
+        if (profile) {
+          if (!chosen.includes("Cut pacing")) {
+            profile.traits.pacing = "unknown";
+            profile.shotSeconds = null;
+          }
+          if (!chosen.includes("Framing and color")) {
+            profile.traits.framing = "unknown";
+            profile.traits.color = "unknown";
+            profile.traits.motion = "unknown";
+          }
+          if (!chosen.includes("Caption treatment"))
+            profile.traits.captions = "unknown";
+          if (!chosen.includes("Transitions and graphics")) {
+            profile.traits.transitions = "unknown";
+            profile.traits.graphics = "unknown";
+            profile.graphicsPerMinute = null;
+          }
+          if (!chosen.includes("Music mood and sound placement"))
+            profile.traits.sound = "unknown";
+          setStyleProfile(profile);
+        }
+      }
       onChange(referenceEvidenceBrief(evidence));
       setDetail(
         `${evidence.observations.length} valid source intervals. Exact technical parameters remain unknown.`
@@ -468,7 +502,12 @@ function ReferenceStyleSession({
         <button
           type="button"
           disabled={
-            !rights || !selected.length || !measured || !capabilities.analysis
+            !rights ||
+            !selected.length ||
+            !measured ||
+            !capabilities.analysis ||
+            capabilities.analysisTransportVersion !== "foreground-v1" ||
+            (purpose === "edit" && !capabilities.editStyleTemplates)
           }
           onClick={analyze}
           className="ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm disabled:opacity-40"
@@ -499,6 +538,15 @@ function ReferenceStyleSession({
         </p>
       )}
       {result && <p className="mt-3 whitespace-pre-wrap text-sm">{result}</p>}
+      {styleProfile && purpose === "edit" && (
+        <div className="mt-3">
+          <SaveEditStyleTemplate
+            profile={styleProfile}
+            source="reference"
+            disabled={disabled || busy}
+          />
+        </div>
+      )}
     </details>
   );
 }

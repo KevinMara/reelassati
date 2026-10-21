@@ -1,5 +1,9 @@
 import { editorAudioCatalog } from "../contracts/editor-audio-catalog";
 import {
+  normalizeEditStyleTemplate,
+  editStyleDirection,
+} from "../contracts/edit-style-template";
+import {
   catalogAudioPlacement,
   findCatalogAudio,
 } from "../contracts/editor-catalog-audio";
@@ -323,6 +327,11 @@ export function editorChatModelContext(context: EditorChatContext) {
       transcript: project.transcript,
       sourceReviews: project.sourceReviews,
       referenceStyleBrief: project.referenceStyleBrief,
+      editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
+        ?.profile,
+      styleAdaptation: project.editStyleTemplate
+        ? editStyleDirection(project.editStyleTemplate.profile)
+        : undefined,
     },
     assets: candidates.map(
       ({ id, name, kind, duration, width, height, status }) => ({

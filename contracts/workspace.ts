@@ -30,6 +30,7 @@ export interface CapabilityState {
   /** Paid analysis requires a matching complete audiovisual response contract. */
   analysisSchemaVersion?: string;
   analysisTransportVersion?: "foreground-v1";
+  editStyleTemplates?: boolean;
   transcription: boolean;
   speech: boolean;
   musicGeneration?: boolean;
@@ -243,6 +244,7 @@ export interface EditProject {
   captionAppearance?: import("./editor-presets").CaptionAppearance;
   sourceReviews?: import("./source-review").SourceReview[];
   referenceStyleBrief?: string;
+  editStyleTemplate?: import("./edit-style-template").EditStyleTemplate;
   id: string;
   title: string;
   template: string;
@@ -379,6 +381,7 @@ export interface GenerationJob {
 
 export interface WorkspaceDocument {
   editorStyles?: import("./editor-style-library").EditorSavedStyle[];
+  editStyleTemplates?: import("./edit-style-template").EditStyleTemplate[];
   version: 1;
   revision: number;
   profile: WorkspaceProfile;

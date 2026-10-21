@@ -2,6 +2,14 @@ import { useUiText } from "@/lib/i18n/ui";
 import { isPrimaryFootage } from "@contracts/timeline-layers";
 import { insertMotionKit } from "@/lib/motion-kits";
 import { normalizeReview } from "@contracts/source-review";
+import {
+  EditStyleTemplates,
+  SaveEditStyleTemplate,
+} from "@/components/studio/EditStyleTemplates";
+import {
+  captureEditStyle,
+  canCaptureEditStyle,
+} from "@contracts/edit-style-template";
 import { mapChatTranscript } from "@/lib/editor-chat-execution";
 import { normalizeTranscriptWords } from "@contracts/transcript-timing";
 import {
@@ -2567,21 +2575,32 @@ export default function EditorPage() {
         </div>
       )}
       {autoEditSummary && (
-        <div
-          role="status"
-          className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm"
-        >
-          <span className="flex items-start gap-2">
-            <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-            {autoEditSummary}
-          </span>
-          <button
-            type="button"
-            aria-label={ui("Close")}
-            onClick={() => setAutoEditSummary("")}
+        <div>
+          <div
+            role="status"
+            className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm"
           >
-            <X className="size-4" />
-          </button>
+            <span className="flex items-start gap-2">
+              <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+              {autoEditSummary}
+            </span>
+            <button
+              type="button"
+              aria-label={ui("Close")}
+              onClick={() => setAutoEditSummary("")}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          {canCaptureEditStyle(project) && (
+            <div className="mb-4">
+              <SaveEditStyleTemplate
+                profile={captureEditStyle(project)}
+                source="edit"
+                disabled={Boolean(busyAction)}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -2647,6 +2666,12 @@ export default function EditorPage() {
               {ui("Saved graphics and styles")}
             </summary>
             <div className="mt-4">
+              <div className="mb-4">
+                <EditStyleTemplates
+                  project={project}
+                  disabled={Boolean(busyAction)}
+                />
+              </div>
               <SavedEditorStyles
                 styles={workspace.editorStyles ?? []}
                 selectedClip={selectedClip}

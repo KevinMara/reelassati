@@ -11,6 +11,9 @@ import {
   trimObservedEnding,
 } from "@/lib/editor-production";
 import { ReferenceStylePanel } from "./ReferenceStylePanel";
+import { EditStyleTemplates } from "./EditStyleTemplates";
+import { editStyleDirection } from "@contracts/edit-style-template";
+import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
 import type {
@@ -117,7 +120,11 @@ export function AutonomousEditor({
     AI_CREDIT_COSTS.editPlan + analysisCost + transcriptCost + mediaCost;
   const ready =
     capabilities.ai &&
-    (!sources.some(a => a.kind === "video") || capabilities.analysis) &&
+    (!sources.some(a => a.kind === "video") ||
+      (capabilities.analysis &&
+        capabilities.analysisTransportVersion === "foreground-v1" &&
+        capabilities.analysisSchemaVersion ===
+          VIDEO_ANALYSIS_SCHEMA_VERSION)) &&
     (!transcriptCost || capabilities.transcription) &&
     (!images || capabilities.imageGeneration) &&
     (!videos || capabilities.videoGeneration);
@@ -162,6 +169,12 @@ export function AutonomousEditor({
     let timelineSaveStarted = false;
     try {
       checkpoint();
+      if (!ready)
+        throw new Error(
+          ui(
+            "The video review is incomplete. Please refresh before analyzing again."
+          )
+        );
       const scope = await captureUploadRequestScope();
       checkpoint();
       if (
@@ -216,6 +229,20 @@ export function AutonomousEditor({
         },
       });
       working = prepared.working;
+      const templateDirection = working.editStyleTemplate
+        ? editStyleDirection(working.editStyleTemplate.profile)
+        : "";
+      const captionTreatment =
+        working.editStyleTemplate?.profile.captionTreatment;
+      if (
+        captionTreatment &&
+        !working.sourceReviews?.some(r => r.captions === "present")
+      ) {
+        working.captionStyle = captionTreatment.preset;
+        working.captionAppearance = structuredClone(
+          captionTreatment.appearance
+        );
+      }
       const analysis = prepared.analysis;
       checkpoint();
       if (automaticDuration)
@@ -228,7 +255,7 @@ export function AutonomousEditor({
       const result = await platformApi.generateEditPlan(
         {
           project: working,
-          command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${plannedDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+          command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${plannedDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
           selectedClipIds: [],
           range: { start: 0, end: working.duration },
         },
@@ -393,7 +420,17 @@ export function AutonomousEditor({
             if (
               JSON.stringify(p.clips) !== originalClips ||
               JSON.stringify(p.transcript) !==
-                JSON.stringify(project.transcript)
+                JSON.stringify(project.transcript) ||
+              JSON.stringify([
+                p.captionStyle,
+                p.captionAppearance,
+                p.editStyleTemplate,
+              ]) !==
+                JSON.stringify([
+                  project.captionStyle,
+                  project.captionAppearance,
+                  project.editStyleTemplate,
+                ])
             )
               throw new Error(
                 ui(
@@ -421,8 +458,8 @@ export function AutonomousEditor({
               clips: working.clips,
               transcript: working.transcript,
               duration: contentDuration(working.clips),
-              captionStyle: p.captionStyle,
-              captionAppearance: p.captionAppearance,
+              captionStyle: working.captionStyle,
+              captionAppearance: working.captionAppearance,
               aspectRatio: p.aspectRatio,
               frameRate: p.frameRate,
               trackSettings: structuredClone(p.trackSettings),
@@ -432,13 +469,21 @@ export function AutonomousEditor({
                 before.clips,
                 before.transcript,
                 before.duration,
+                before.captionStyle,
+                before.captionAppearance,
               ]) !==
-              JSON.stringify([after.clips, after.transcript, after.duration]);
+              JSON.stringify([
+                after.clips,
+                after.transcript,
+                after.duration,
+                after.captionStyle,
+                after.captionAppearance,
+              ]);
             return {
               ...working,
               updatedAt: new Date().toISOString(),
-              captionStyle: p.captionStyle,
-              captionAppearance: p.captionAppearance,
+              captionStyle: working.captionStyle,
+              captionAppearance: working.captionAppearance,
               ...(hasChanges
                 ? appendEditorRevisions(p, [before, after], before)
                 : { revisions: p.revisions, revisionIndex: p.revisionIndex }),
@@ -495,6 +540,9 @@ export function AutonomousEditor({
               <p className="mt-2 whitespace-pre-wrap">{referenceBrief}</p>
             </details>
           )}
+          <div className="mb-4">
+            <EditStyleTemplates project={project} disabled={busy} />
+          </div>
           <label className="block text-sm font-medium">
             {ui("Describe the style and outcome")}
             <textarea

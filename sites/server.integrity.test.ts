@@ -14,6 +14,7 @@ import {
   type TimelineClip,
 } from "../contracts/workspace";
 import { normalizeEditorSavedStyles } from "../contracts/editor-style-library";
+import { captureEditStyle } from "../contracts/edit-style-template";
 import { normalizeVisual } from "../contracts/clip-visual";
 import {
   embedMediaProvenanceMarker,
@@ -1159,6 +1160,20 @@ describe("provenance integrity boundaries", () => {
         },
       ]);
       expect(workspace.editorStyles).toHaveLength(3);
+      workspace.editStyleTemplates = [
+        {
+          id: "template-house",
+          name: "House style",
+          source: "edit",
+          profile: captureEditStyle({
+            ...project,
+            clips: [{ ...clips[0], primaryFootage: true }],
+          }),
+        },
+      ];
+      workspace.projects[0].editStyleTemplate = structuredClone(
+        workspace.editStyleTemplates[0]
+      );
       const saved = await worker.fetch(
         new Request("https://studio.example/api/workspace", {
           method: "PUT",
@@ -1190,6 +1205,10 @@ describe("provenance integrity boundaries", () => {
       ).workspace;
       for (const actual of [savedWorkspace, persisted, reloaded]) {
         expect(actual.editorStyles).toEqual(workspace.editorStyles);
+        expect(actual.editStyleTemplates).toEqual(workspace.editStyleTemplates);
+        expect(actual.projects[0].editStyleTemplate).toEqual(
+          workspace.projects[0].editStyleTemplate
+        );
         expect(actual.projects[0]).toMatchObject({
           frameRate: 60,
           trackSettings: project.trackSettings,

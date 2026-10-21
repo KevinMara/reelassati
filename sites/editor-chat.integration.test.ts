@@ -5,6 +5,10 @@ import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
 import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
 import type { WorkspaceDocument } from "../contracts/workspace";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "../contracts/video-analysis";
+import {
+  captureEditStyle,
+  normalizeReferenceEditStyle,
+} from "../contracts/edit-style-template";
 import { customTrendResearchCreditCost } from "../contracts/pricing";
 import {
   extractTextProvenanceToken,
@@ -112,7 +116,8 @@ let nextOutput: Record<string, unknown> = {
 };
 let providerGate: Promise<void> | undefined;
 let providerFailure: { status: number; payload: unknown } | undefined;
-let providerStreamFailure: "truncated" | "error" | undefined;
+let providerStreamFailure: "truncated" | "error" | "invalid-sse" | undefined;
+let providerContentOverride: string | undefined;
 let searchAnnotations: unknown[] | undefined;
 let trendVerificationStatus = 403;
 async function request(
@@ -316,11 +321,13 @@ beforeAll(async () => {
           return new Response(
             providerStreamFailure === "error"
               ? 'data: {"error":{"message":"private upstream failure"}}\n\n'
-              : 'data: {"choices":[{"index":0,"delta":{"content":"{"}}]}\n\n',
+              : providerStreamFailure === "invalid-sse"
+                ? "data: {broken provider event\n\n"
+                : 'data: {"choices":[{"index":0,"delta":{"content":"{"}}]}\n\n',
             { headers: { "Content-Type": "text/event-stream" } }
           );
         return new Response(
-          `: OPENROUTER PROCESSING\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: { reasoning: "Discard private reasoning", content: JSON.stringify(nextOutput) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+          `: OPENROUTER PROCESSING\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: { reasoning: "Discard private reasoning", content: providerContentOverride ?? JSON.stringify(nextOutput) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
           { headers: { "Content-Type": "text/event-stream" } }
         );
       }
@@ -885,6 +892,56 @@ describe("authenticated paid editing chat route", () => {
     expect(providerCalls.length).toBe(calls);
   });
 
+  it("extracts reusable reference grammar in the same quoted analysis and rejects missing grammar without charging", async () => {
+    const original = nextOutput,
+      before = balance(),
+      calls = providerCalls.length;
+    const profile = captureEditStyle({
+      duration: 30,
+      clips: [
+        { id: "reference", assetId: "source", track: "video", duration: 30 },
+      ],
+      captionStyle: "classic",
+    } as never);
+    nextOutput = {
+      ...videoAnalysisOutput(),
+      editingStyle: {
+        ...profile,
+        assetId: "private-reference",
+        words: "PRIVATE SOURCE WORDS",
+      },
+    };
+    try {
+      const response = await request("/api/ai/analyze", {
+        assetId: "source",
+        extractStyle: true,
+      });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { editingStyle: unknown };
+      expect(body.editingStyle).toEqual(normalizeReferenceEditStyle(profile));
+      expect(JSON.stringify(body.editingStyle)).not.toContain("PRIVATE");
+      expect(JSON.stringify(providerCalls.at(-1)?.response_format)).toContain(
+        '"editingStyle"'
+      );
+      expect(providerCalls).toHaveLength(calls + 1);
+      expect(balance()).toBe(before - 10);
+      nextOutput = videoAnalysisOutput();
+      const missing = await request("/api/ai/analyze", {
+        assetId: "source",
+        extractStyle: true,
+      });
+      expect(missing.status).toBe(422);
+      expect(await missing.json()).toMatchObject({
+        reason: "missing-editing-style",
+        creditsRefunded: true,
+      });
+      expect(balance()).toBe(before - 10);
+      expect(providerCalls).toHaveLength(calls + 2);
+    } finally {
+      nextOutput = original;
+    }
+  });
+
   it.each(["truncated", "error"] as const)(
     "releases the actual SQL reservation after an HTTP-200 %s provider stream, without retry",
     async failure => {
@@ -927,6 +984,70 @@ describe("authenticated paid editing chat route", () => {
       } finally {
         providerStreamFailure = undefined;
         nextOutput = original;
+        log.mockRestore();
+      }
+    }
+  );
+
+  it.each(["invalid-sse", "invalid-json", "array-json"] as const)(
+    "contains %s as an incomplete review, releases credits, preserves the workspace and never retries",
+    async failure => {
+      const before = balance(),
+        calls = providerCalls.length;
+      const log = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+      const beforeWorkspace = sqlite
+        .prepare("SELECT document FROM workspace_state WHERE owner_email = ?")
+        .get("owner@example.com");
+      if (failure === "invalid-sse") providerStreamFailure = "invalid-sse";
+      else
+        providerContentOverride =
+          failure === "array-json"
+            ? "[]"
+            : '{"summary":"private source fragment';
+      try {
+        const response = await request("/api/ai/analyze", {
+          assetId: "source",
+          platform: "tiktok",
+        });
+        expect(response.status).toBe(502);
+        const body = (await response.json()) as {
+          analysisIncomplete: boolean;
+          reference: string;
+        };
+        expect(body.analysisIncomplete).toBe(true);
+        expect(body.reference).toMatch(/^[\da-f-]{36}$/);
+        expect(JSON.stringify(body)).not.toContain("private");
+        expect(balance()).toBe(before);
+        expect(providerCalls).toHaveLength(calls + 1);
+        expect(
+          sqlite
+            .prepare(
+              "SELECT status,error_code FROM ai_invocations WHERE id = ?"
+            )
+            .get(body.reference)
+        ).toMatchObject({
+          status: "failed",
+          error_code: "provider_invalid_json",
+        });
+        expect(
+          sqlite
+            .prepare(
+              "SELECT status FROM credit_ledger WHERE category='analysis' ORDER BY rowid DESC LIMIT 1"
+            )
+            .get()
+        ).toMatchObject({ status: "released" });
+        expect(
+          sqlite
+            .prepare(
+              "SELECT document FROM workspace_state WHERE owner_email = ?"
+            )
+            .get("owner@example.com")
+        ).toEqual(beforeWorkspace);
+      } finally {
+        providerStreamFailure = undefined;
+        providerContentOverride = undefined;
         log.mockRestore();
       }
     }

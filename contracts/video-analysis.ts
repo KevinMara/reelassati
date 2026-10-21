@@ -1,3 +1,4 @@
+import { referenceStyleSchema } from "./edit-style-template";
 /** Versioned source-clock evidence returned by the multimodal video reviewer. */
 export const VIDEO_ANALYSIS_SCHEMA_VERSION = "video-analysis-v2" as const;
 export const VIDEO_ROLES = [
@@ -320,7 +321,8 @@ export function normalizeVideoRecommendations(
  * null; a provider is never forced to invent a number to satisfy this schema. */
 export function videoAnalysisResponseSchema(
   maxIntervals: number,
-  duration: number
+  duration: number,
+  extractStyle = false
 ) {
   const object = (properties: Record<string, unknown>) => ({
     type: "object",
@@ -363,6 +365,7 @@ export function videoAnalysisResponseSchema(
     graphic,
   });
   return object({
+    ...(extractStyle ? { editingStyle: referenceStyleSchema() } : {}),
     schemaVersion: { type: "string", enum: [VIDEO_ANALYSIS_SCHEMA_VERSION] },
     summary: string,
     insights: {

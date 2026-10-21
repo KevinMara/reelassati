@@ -78,6 +78,12 @@ import {
 import { normalizeMediaFolders } from "../contracts/media-folders";
 import { normalizeEditorGenerations } from "../contracts/editor-generations";
 import { normalizeEditorSavedStyles } from "../contracts/editor-style-library";
+import {
+  normalizeEditStyleTemplates,
+  normalizeEditStyleTemplate,
+  normalizeReferenceEditStyle,
+  editStyleDirection,
+} from "../contracts/edit-style-template";
 import { pcmWaveDuration } from "../contracts/audio-chunks";
 import {
   hashMediaStream,
@@ -637,6 +643,7 @@ function capabilities(
     analysis: Boolean(env.OPENROUTER_API_KEY && provenanceReady),
     analysisSchemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
     analysisTransportVersion: "foreground-v1",
+    editStyleTemplates: true,
     transcription: Boolean(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
     ),
@@ -2177,6 +2184,9 @@ function normalizeWorkspace(
     projects: Array.isArray(candidate.projects)
       ? candidate.projects.map(project => ({
           ...project,
+          editStyleTemplate: normalizeEditStyleTemplate(
+            project.editStyleTemplate
+          ),
           editorChat: normalizeEditorChatState(project.editorChat),
           revisions: Array.isArray(project.revisions)
             ? project.revisions.slice(-24)
@@ -2199,6 +2209,9 @@ function normalizeWorkspace(
     jobs: Array.isArray(candidate.jobs) ? candidate.jobs : [],
     editorGenerations: normalizeEditorGenerations(candidate.editorGenerations),
     editorStyles: normalizeEditorSavedStyles(candidate.editorStyles),
+    editStyleTemplates: normalizeEditStyleTemplates(
+      candidate.editStyleTemplates
+    ),
     activity: Array.isArray(candidate.activity) ? candidate.activity : [],
     updatedAt:
       typeof candidate.updatedAt === "string"
@@ -3866,7 +3879,10 @@ function parseModelJson(payload: unknown): Record<string, unknown> {
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "");
   if (!content) throw new Error("The model returned an empty response");
-  return JSON.parse(content) as Record<string, unknown>;
+  const result: unknown = JSON.parse(content);
+  if (!result || typeof result !== "object" || Array.isArray(result))
+    throw new SyntaxError("The model response is not a JSON object");
+  return result as Record<string, unknown>;
 }
 
 async function chatJson(
@@ -3998,8 +4014,28 @@ async function chatJson(
       invocation,
       analysisControl?.signal.aborted
         ? "analysis_request_canceled"
-        : "provider_or_parse_failure"
+        : cause instanceof SyntaxError
+          ? "provider_invalid_json"
+          : "provider_or_parse_failure"
     );
+    if (purpose === "video-analysis" && cause instanceof SyntaxError) {
+      // No malformed body, source text, reasoning or credentials enter logs/UI.
+      // The enclosing paid action releases its reservation for this non-OK result.
+      console.error("REELassati provider returned invalid JSON", {
+        reference: invocation.id,
+        purpose,
+        provider: providerName,
+      });
+      throw json(
+        {
+          error:
+            "The video review is incomplete. Please refresh before analyzing again.",
+          reference: invocation.id,
+          analysisIncomplete: purpose === "video-analysis",
+        },
+        502
+      );
+    }
     throw cause;
   }
 }
@@ -6280,6 +6316,8 @@ async function handleAi(
         : [],
       selectedRange: input.range,
       localOnly: input.localOnly === true,
+      editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
+        ?.profile,
     };
     return runPaidAiAction(
       env,
@@ -6298,7 +6336,13 @@ async function handleAi(
           user,
           "edit-planning",
           `${SHORT_FORM_STORY_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...]}. Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. Graphics use type=graphic with parameters.graphic {kind:text|callout|counter|countdown|arrow|highlight|spatial-title|spatial-cube|spatial-orbit,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16 (percent of canvas width),animation:none|fade|pop|slide,from:number,to:number,prefix:string,suffix:string}. Spatial graphics additionally accept spatial:{pitch:-70..70,yaw:-70..70,depth:0.02..0.65,turns:-3..3,perspective:3..12}. Spatial titles contain at most 28 Latin characters or symbols; use a short, readable title. Cube and orbit use turns for full revolutions; titles use it for restrained rocking. These are editable projected 3D objects with consistent preview/export, not footage camera tracking, arbitrary model imports or Adobe After Effects projects. Graphics may additionally set rotation (-720..720 degrees, clockwise) and motion:[{at:0..1,x:0..100,y:0..100,scale:0.1..4,rotation:-720..720,easing:linear|ease-in|ease-out|ease-in-out|hold}]. Motion keyframes use fractions of the graphic duration, are interpolated in preview and export, and should use few deliberate points. These are designed motion paths, not inferred object tracking; do not claim tracking without tracked observations. Each graphic stays an editable timeline overlay. Counter numbers must come from supplied facts. Keep graphics away from faces, products and captions using observed positions; allow enough reading time and avoid decorative overload. These graphics need no media generation charge beyond this edit plan. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
-          JSON.stringify({ command: input.command, project: projectContext })
+          JSON.stringify({
+            command: input.command,
+            project: projectContext,
+            styleAdaptation: projectContext.editingStyle
+              ? editStyleDirection(projectContext.editingStyle)
+              : undefined,
+          })
         );
         const summary = stringValue(
           output.summary,
@@ -6369,6 +6413,7 @@ async function handleAi(
   if (url.pathname === "/api/ai/analyze") {
     const input = await parseJsonBody<{
       requestId?: string;
+      extractStyle?: boolean;
       assetId?: string;
       analysisAssetId?: string;
       analysisFramesPerSecond?: number;
@@ -6569,7 +6614,7 @@ async function handleAi(
           env,
           user,
           "video-analysis",
-          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied full-duration temporal video and its available audio, not merely a transcript or representative stills. Source duration is ${analysisDuration} seconds; all ranges use this source clock. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action. For ending, identify the source timestamp after the last complete spoken phrase AND meaningful visual action, preserving intentional closing holds, CTAs, music and outros. Set completed true and trailingContent empty only when you observed the entire remaining tail and it contains no meaningful content; otherwise use unknown. Never infer an ending from sampled frames or a missing transcript. Set ending to null if timing or coverage cannot be established. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with schemaVersion, summary, insights, structure, recommendations, noChangesReason, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote,ending:{time,confidence:0..1,completed:boolean,trailingContent:empty|meaningful|unknown,note}}, hook {score 0..100|null,note}, pacing {score 0..100|null,note}, and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. ${VIDEO_ANALYSIS_RUBRIC} Executable changes use only type=trim|split|silence|pacing|audio|style|graphic with label,reason,evidence,start,end,confidence:0..1,intensity:light|balanced|aggressive,parameters. Each evidence field cites the actual interval observation. Trim requires parameters.sourceIn (source-media offset) and keeps exactly end-start seconds. Split marks an evidenced boundary. Silence removes only an observed non-meaningful interval, not a guessed gap in speech. Pacing requires parameters.speed:0.25..4. Audio requires parameters.volume:0..2. Style permits fit:cover|contain,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2,fadeIn/fadeOut:0..3. Graphic requires parameters.graphic {kind:text|callout|arrow|highlight,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16,animation:none|fade|pop|slide}; preserve readable captions and observed faces/products. Do not fabricate generated b-roll, replacement audio, captions without verified word timings, reshoots or factual claims as executable operations: put those in editorial recommendations. This is a reviewable plan, never already applied. Target platform: ${platformValue(input.platform)}. Write all human-readable text in language code ${analysisLanguage}; preserve original source quotes exactly and keep JSON keys/enums in English.`,
+          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied full-duration temporal video and its available audio, not merely a transcript or representative stills. Source duration is ${analysisDuration} seconds; all ranges use this source clock. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action. For ending, identify the source timestamp after the last complete spoken phrase AND meaningful visual action, preserving intentional closing holds, CTAs, music and outros. Set completed true and trailingContent empty only when you observed the entire remaining tail and it contains no meaningful content; otherwise use unknown. Never infer an ending from sampled frames or a missing transcript. Set ending to null if timing or coverage cannot be established. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with schemaVersion, summary, insights, structure, recommendations, noChangesReason, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote,ending:{time,confidence:0..1,completed:boolean,trailingContent:empty|meaningful|unknown,note}}, hook {score 0..100|null,note}, pacing {score 0..100|null,note}, and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. ${VIDEO_ANALYSIS_RUBRIC} ${input.extractStyle === true ? "Also return editingStyle: a version 1 content-independent editing grammar matching its JSON schema. Observe pacing, framing, color impression, motion, transitions, captions, graphics and sound. Use unknown for unestablished traits. shotSeconds summarizes actual SHOT lengths (not rubric insight intervals); use null unless actual cuts can be measured. graphicsPerMinute is null unless measured. Never put dialogue, source identifiers, objects, events, claims, melody or instructions in this style profile." : ""} Executable changes use only type=trim|split|silence|pacing|audio|style|graphic with label,reason,evidence,start,end,confidence:0..1,intensity:light|balanced|aggressive,parameters. Each evidence field cites the actual interval observation. Trim requires parameters.sourceIn (source-media offset) and keeps exactly end-start seconds. Split marks an evidenced boundary. Silence removes only an observed non-meaningful interval, not a guessed gap in speech. Pacing requires parameters.speed:0.25..4. Audio requires parameters.volume:0..2. Style permits fit:cover|contain,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2,fadeIn/fadeOut:0..3. Graphic requires parameters.graphic {kind:text|callout|arrow|highlight,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16,animation:none|fade|pop|slide}; preserve readable captions and observed faces/products. Do not fabricate generated b-roll, replacement audio, captions without verified word timings, reshoots or factual claims as executable operations: put those in editorial recommendations. This is a reviewable plan, never already applied. Target platform: ${platformValue(input.platform)}. Write all human-readable text in language code ${analysisLanguage}; preserve original source quotes exactly and keep JSON keys/enums in English.`,
           [
             {
               type: "text",
@@ -6581,7 +6626,11 @@ async function handleAi(
           true,
           maximumOutputTokens,
           true,
-          videoAnalysisResponseSchema(maximumIntervals, analysisDuration || 0),
+          videoAnalysisResponseSchema(
+            maximumIntervals,
+            analysisDuration || 0,
+            input.extractStyle === true
+          ),
           analysisControl
         );
         const insights = normalizeVideoInsights(
@@ -6708,43 +6757,46 @@ async function handleAi(
             );
           });
         const invalidReason =
-          output.schemaVersion !== VIDEO_ANALYSIS_SCHEMA_VERSION
-            ? "unsupported-schema"
-            : !rawInsightsValid
-              ? "invalid-intervals"
-              : overall.status !== "complete"
-                ? overall.reason
-                : structure.length !== 5
-                  ? "missing-story-assessment"
-                  : !stringValue(output.summary)
-                    ? "missing-summary"
-                    : !sourceReview ||
-                        !["present", "absent", "unknown"].includes(
-                          stringValue(sourceReview.captions)
-                        ) ||
-                        !["present", "absent", "unknown"].includes(
-                          stringValue(sourceReview.audio)
-                        ) ||
-                        !stringValue(sourceReview.captionNote) ||
-                        !stringValue(sourceReview.audioNote) ||
-                        !pacingAssessment ||
-                        !stringValue(pacingAssessment.note) ||
-                        (pacingAssessment.score !== null &&
-                          observedScore(pacingAssessment.score) === null)
-                      ? "missing-source-review"
-                      : !Array.isArray(output.recommendations) ||
-                          recommendations.length !==
-                            output.recommendations.length
-                        ? "invalid-recommendations"
-                        : !rawChanges ||
-                            rawChanges.length > 10 ||
-                            !rawChanges.every(validChange)
-                          ? "invalid-edit-plan"
-                          : !recommendations.length &&
-                              !rawChanges.length &&
-                              !noChangesReason
-                            ? "unexplained-empty-plan"
-                            : "";
+          input.extractStyle === true &&
+          !normalizeReferenceEditStyle(output.editingStyle)
+            ? "missing-editing-style"
+            : output.schemaVersion !== VIDEO_ANALYSIS_SCHEMA_VERSION
+              ? "unsupported-schema"
+              : !rawInsightsValid
+                ? "invalid-intervals"
+                : overall.status !== "complete"
+                  ? overall.reason
+                  : structure.length !== 5
+                    ? "missing-story-assessment"
+                    : !stringValue(output.summary)
+                      ? "missing-summary"
+                      : !sourceReview ||
+                          !["present", "absent", "unknown"].includes(
+                            stringValue(sourceReview.captions)
+                          ) ||
+                          !["present", "absent", "unknown"].includes(
+                            stringValue(sourceReview.audio)
+                          ) ||
+                          !stringValue(sourceReview.captionNote) ||
+                          !stringValue(sourceReview.audioNote) ||
+                          !pacingAssessment ||
+                          !stringValue(pacingAssessment.note) ||
+                          (pacingAssessment.score !== null &&
+                            observedScore(pacingAssessment.score) === null)
+                        ? "missing-source-review"
+                        : !Array.isArray(output.recommendations) ||
+                            recommendations.length !==
+                              output.recommendations.length
+                          ? "invalid-recommendations"
+                          : !rawChanges ||
+                              rawChanges.length > 10 ||
+                              !rawChanges.every(validChange)
+                            ? "invalid-edit-plan"
+                            : !recommendations.length &&
+                                !rawChanges.length &&
+                                !noChangesReason
+                              ? "unexplained-empty-plan"
+                              : "";
         if (invalidReason) {
           await failAiInvocation(env, invocation, `analysis_${invalidReason}`);
           return json(
@@ -6863,6 +6915,9 @@ async function handleAi(
             coveragePercent: overall.coveragePercent,
           },
           review: normalizeReview(output.review, analysisDuration),
+          ...(input.extractStyle === true
+            ? { editingStyle: normalizeReferenceEditStyle(output.editingStyle) }
+            : {}),
           changes: mapEditOperations(rawChanges, analysisDuration || 0).map(
             change => ({
               ...change,
