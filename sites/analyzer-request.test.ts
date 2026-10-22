@@ -10,38 +10,46 @@ import { ANALYZER_DEADLINE_MS } from "../contracts/analyzer-transport";
 afterEach(() => vi.useRealTimers());
 
 describe("foreground analyzer transport", () => {
-  it("keeps a slow request readable past the observed 65-second cancellation without returning partial output", async () => {
-    vi.useFakeTimers();
-    let finish!: (value: Response) => void;
-    let control!: AnalysisControl;
-    const run = vi.fn((_, active: AnalysisControl) => {
-      control = active;
-      return new Promise<Response>(resolve => {
-        finish = resolve;
+  it.each(["analyze", "edit-plan"])(
+    "keeps a slow %s request readable past the observed 65-second cancellation without returning partial output",
+    async route => {
+      vi.useFakeTimers();
+      let finish!: (value: Response) => void;
+      let control!: AnalysisControl;
+      const run = vi.fn((_, active: AnalysisControl) => {
+        control = active;
+        return new Promise<Response>(resolve => {
+          finish = resolve;
+        });
       });
-    });
-    const response = foregroundAnalysisResponse(
-      new Request("https://test/api/ai/analyze"),
-      run
-    );
-    const reader = response.body!.getReader();
-    expect(new TextDecoder().decode((await reader.read()).value)).toContain(
-      '"type":"pending"'
-    );
-    await vi.advanceTimersByTimeAsync(70_000);
-    expect(control.signal.aborted).toBe(false);
-    const chunks: string[] = [];
-    for (let index = 0; index < 7; index++)
-      chunks.push(new TextDecoder().decode((await reader.read()).value));
-    expect(chunks.every(chunk => chunk === '{"type":"pending"}\n')).toBe(true);
-    finish(Response.json({ summary: "Complete validated report" }));
-    const terminal = new TextDecoder().decode((await reader.read()).value);
-    expect(JSON.parse(terminal)).toMatchObject({ type: "result", status: 200 });
-    expect(terminal).toContain("Complete validated report");
-    expect((await reader.read()).done).toBe(true);
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(vi.getTimerCount()).toBe(0);
-  });
+      const response = foregroundAnalysisResponse(
+        new Request(`https://test/api/ai/${route}`),
+        run
+      );
+      const reader = response.body!.getReader();
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain(
+        '"type":"pending"'
+      );
+      await vi.advanceTimersByTimeAsync(70_000);
+      expect(control.signal.aborted).toBe(false);
+      const chunks: string[] = [];
+      for (let index = 0; index < 7; index++)
+        chunks.push(new TextDecoder().decode((await reader.read()).value));
+      expect(chunks.every(chunk => chunk === '{"type":"pending"}\n')).toBe(
+        true
+      );
+      finish(Response.json({ summary: "Complete validated report" }));
+      const terminal = new TextDecoder().decode((await reader.read()).value);
+      expect(JSON.parse(terminal)).toMatchObject({
+        type: "result",
+        status: 200,
+      });
+      expect(terminal).toContain("Complete validated report");
+      expect((await reader.read()).done).toBe(true);
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
 
   it.each(["disconnect", "deadline"])(
     "aborts once and retains only DB cleanup after %s",

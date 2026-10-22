@@ -28,10 +28,12 @@ const incident = `SELECT l.* FROM credit_ledger l JOIN ai_invocations i
     AND EXISTS (SELECT 1 FROM credit_accounts a WHERE a.owner_email = l.owner_email)`;
 
 // Only reservations created by the bounded foreground transport are eligible.
+// Keep the legacy analyzer metadata keys for both analysis and new edit plans;
+// an ordinary historical planner hold must never match this reconciliation.
 // This is database reconciliation on an authenticated billing read, never a job
 // recovery loop, a scheduler, a provider request or a model-using watchdog.
 const expired = `SELECT * FROM credit_ledger
-  WHERE owner_email = ? AND category = 'analysis' AND status = 'reserved' AND applied = 1
+  WHERE owner_email = ? AND category IN ('analysis', 'edit-plan') AND status = 'reserved' AND applied = 1
     AND amount < 0 AND included_amount <= 0 AND topup_amount <= 0
     AND included_amount + topup_amount = amount
     AND CASE WHEN json_valid(metadata_json) THEN
@@ -79,7 +81,7 @@ export async function reconcileAnalyzerCredits(
     ).bind(owner, cutoff, stamp),
     DB.prepare(
       `WITH eligible AS (${expired}) UPDATE ai_invocations SET status = 'failed',
-      error_code = 'analysis_request_expired', completed_at = ? WHERE owner_email = ? AND purpose = 'video-analysis'
+      error_code = 'analysis_request_expired', completed_at = ? WHERE owner_email = ? AND purpose IN ('video-analysis', 'edit-planning')
       AND status = 'in_progress' AND id IN (SELECT json_extract(metadata_json, '$.analysisInvocationId') FROM eligible)`
     ).bind(owner, cutoff, stamp, owner),
     DB.prepare(
@@ -93,8 +95,10 @@ export async function reconcileAnalyzerCredits(
 export const analyzerOperationKey = (
   owner: string,
   brand: string,
-  requestId: string
-) => `video-analysis:${JSON.stringify([owner, brand, requestId])}`;
+  requestId: string,
+  category: "analysis" | "edit-plan" = "analysis"
+) =>
+  `${category === "edit-plan" ? "edit-plan" : "video-analysis"}:${JSON.stringify([owner, brand, requestId])}`;
 
 /** A manual cancellation can only release its authenticated owner's exact hold.
  * A zero-value tombstone also prevents a late reservation from starting a model. */
@@ -102,12 +106,13 @@ export async function cancelAnalyzerCredits(
   DB: RecoveryDatabase,
   owner: string,
   brand: string,
-  requestId: string
+  requestId: string,
+  category: "analysis" | "edit-plan" = "analysis"
 ) {
-  const key = analyzerOperationKey(owner, brand, requestId);
+  const key = analyzerOperationKey(owner, brand, requestId, category);
   const stamp = new Date().toISOString();
   const eligible = `SELECT * FROM credit_ledger WHERE owner_email = ? AND operation_key = ?
-    AND category = 'analysis' AND status = 'reserved' AND applied = 1 AND amount < 0
+    AND category = '${category}' AND status = 'reserved' AND applied = 1 AND amount < 0
     AND included_amount <= 0 AND topup_amount <= 0 AND included_amount + topup_amount = amount
     AND CASE WHEN json_valid(metadata_json) THEN json_extract(metadata_json, '$.analyzerTransport') = 'foreground-v1' ELSE 0 END
     AND EXISTS (SELECT 1 FROM credit_accounts a WHERE a.owner_email = credit_ledger.owner_email)`;
@@ -120,7 +125,7 @@ export async function cancelAnalyzerCredits(
     ).bind(owner, key, stamp),
     DB.prepare(
       `WITH eligible AS (${eligible}) UPDATE ai_invocations SET status = 'failed',
-      error_code = 'analysis_request_canceled', completed_at = ? WHERE owner_email = ? AND purpose = 'video-analysis'
+      error_code = 'analysis_request_canceled', completed_at = ? WHERE owner_email = ? AND purpose = '${category === "edit-plan" ? "edit-planning" : "video-analysis"}'
       AND status = 'in_progress' AND id IN (SELECT json_extract(metadata_json, '$.analysisInvocationId') FROM eligible)`
     ).bind(owner, key, stamp, owner),
     DB.prepare(
@@ -130,7 +135,7 @@ export async function cancelAnalyzerCredits(
     DB.prepare(
       `INSERT INTO credit_ledger
       (id,owner_email,amount,included_amount,topup_amount,category,status,operation_key,reference_id,description,metadata_json,applied,created_at,settled_at)
-      VALUES (?, ?, 0, 0, 0, 'analysis', 'released', ?, NULL, 'Video analysis', ?, 0, ?, ?)
+      VALUES (?, ?, 0, 0, 0, '${category}', 'released', ?, NULL, '${category === "edit-plan" ? "AI edit plan" : "Video analysis"}', ?, 0, ?, ?)
       ON CONFLICT(operation_key) DO NOTHING`
     ).bind(
       crypto.randomUUID(),

@@ -647,6 +647,8 @@ function capabilities(
     analysis: Boolean(env.OPENROUTER_API_KEY && provenanceReady),
     analysisSchemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
     analysisTransportVersion: "foreground-v1",
+    editPlanTransportVersion: "foreground-v1",
+    editingModel: DEFAULT_ANALYSIS_MODEL,
     editStyleTemplates: true,
     transcription: Boolean(
       env.OPENROUTER_API_KEY && env.BUCKET && provenanceReady
@@ -3908,7 +3910,10 @@ async function chatJson(
   // EU-AI-INV-COMP-005 — the subscription experiment is an owner entitlement,
   // not a global deployment switch. Explicit model routes always stay on
   // OpenRouter, and non-owner requests fall back to the official text route.
-  const useKimiSubscription = !model && isKimiTestOwner(env, user);
+  // Editing has an explicit K3 selection, independent of legacy text defaults
+  // and owner subscription experiments. Never silently route its text to K2.5.
+  const editing = purpose === "edit-planning";
+  const useKimiSubscription = !editing && !model && isKimiTestOwner(env, user);
   const credential = useKimiSubscription
     ? env.KIMI_CODE_API_KEY
     : env.OPENROUTER_API_KEY;
@@ -3926,9 +3931,11 @@ async function chatJson(
   }
 
   const providerName = useKimiSubscription ? "Kimi Code" : "OpenRouter";
-  const selectedModel = useKimiSubscription
-    ? env.KIMI_CODE_MODEL || "k3-256k"
-    : model || env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5";
+  const selectedModel = editing
+    ? DEFAULT_ANALYSIS_MODEL
+    : useKimiSubscription
+      ? env.KIMI_CODE_MODEL || "k3-256k"
+      : model || env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5";
   analysisControl?.signal.throwIfAborted();
   const invocation = await beginAiInvocation(
     env,
@@ -3940,9 +3947,16 @@ async function chatJson(
   );
   analysisControl?.onAbort(() =>
     env.DB.prepare(
-      "UPDATE ai_invocations SET status = 'failed', error_code = 'analysis_request_canceled', completed_at = ? WHERE id = ? AND owner_email = ? AND status = 'in_progress'"
+      "UPDATE ai_invocations SET status = 'failed', error_code = ?, completed_at = ? WHERE id = ? AND owner_email = ? AND status = 'in_progress'"
     )
-      .bind(new Date().toISOString(), invocation.id, user.email)
+      .bind(
+        analysisControl.purpose === "edit-planning"
+          ? "edit_request_canceled"
+          : "analysis_request_canceled",
+        new Date().toISOString(),
+        invocation.id,
+        user.email
+      )
       .run()
   );
   try {
@@ -4022,7 +4036,10 @@ async function chatJson(
           ? "provider_invalid_json"
           : "provider_or_parse_failure"
     );
-    if (purpose === "video-analysis" && cause instanceof SyntaxError) {
+    if (
+      (purpose === "video-analysis" || purpose === "edit-planning") &&
+      cause instanceof SyntaxError
+    ) {
       // No malformed body, source text, reasoning or credentials enter logs/UI.
       // The enclosing paid action releases its reservation for this non-OK result.
       console.error("REELassati provider returned invalid JSON", {
@@ -4033,7 +4050,9 @@ async function chatJson(
       throw json(
         {
           error:
-            "The video review is incomplete. Please refresh before analyzing again.",
+            purpose === "edit-planning"
+              ? "The edit plan is incomplete. No edit was applied."
+              : "The video review is incomplete. Please refresh before analyzing again.",
           reference: invocation.id,
           analysisIncomplete: purpose === "video-analysis",
         },
@@ -5431,6 +5450,11 @@ async function runPaidAiAction(
     input.analysisControl?.signal.throwIfAborted();
     const response = await action(reservation);
     input.analysisControl?.signal.throwIfAborted();
+    if (
+      input.analysisControl?.onCheck &&
+      !(await input.analysisControl.onCheck())
+    )
+      throw new DOMException("Foreground request canceled", "AbortError");
     if (response.ok) {
       await input.prepareResponse?.(response);
       if (!input.settledDuringAction)
@@ -6283,12 +6307,21 @@ async function handleAi(
 
   if (url.pathname === "/api/ai/edit-plan") {
     const input = await parseJsonBody<{
+      requestId?: string;
       project?: WorkspaceDocument["projects"][number];
       command?: string;
       selectedClipIds?: string[];
       range?: { start: number; end: number };
       localOnly?: boolean;
     }>(request);
+    if (
+      !analysisControl ||
+      !/^[a-zA-Z0-9-]{16,80}$/.test(input.requestId || "")
+    )
+      return errorResponse(
+        "Refresh the Studio before requesting an edit plan.",
+        409
+      );
     if (!input.project || !stringValue(input.command)) {
       return errorResponse("Choose a project and describe the edit");
     }
@@ -6330,11 +6363,23 @@ async function handleAi(
       user,
       {
         cost: AI_CREDIT_COSTS.editPlan,
-        operationKey: `edit-plan:${crypto.randomUUID()}`,
+        operationKey: analyzerOperationKey(
+          user.email,
+          user.brandId || "default",
+          input.requestId!,
+          "edit-plan"
+        ),
         category: "edit-plan",
         description: "AI edit plan",
         referenceId: projectId,
-        metadata: { projectId, duration },
+        metadata: {
+          projectId,
+          duration,
+          analyzerTransport: "foreground-v1",
+          analyzerDeadlineAt: analysisControl.deadlineAt,
+          analyzerAttempt: crypto.randomUUID(),
+        },
+        analysisControl,
       },
       async () => {
         const { output, invocation } = await chatJson(
@@ -6348,7 +6393,13 @@ async function handleAi(
             styleAdaptation: projectContext.editingStyle
               ? editStyleDirection(projectContext.editingStyle)
               : undefined,
-          })
+          }),
+          DEFAULT_ANALYSIS_MODEL,
+          true,
+          12000,
+          false,
+          undefined,
+          analysisControl
         );
         const summary = stringValue(
           output.summary,
@@ -13026,7 +13077,11 @@ async function handleApi(
   }
 
   if (url.pathname.startsWith("/api/ai/")) {
-    if (url.pathname === "/api/ai/analyze/cancel") {
+    if (
+      ["/api/ai/analyze/cancel", "/api/ai/edit-plan/cancel"].includes(
+        url.pathname
+      )
+    ) {
       if (request.method !== "POST")
         return errorResponse("Method not allowed", 405);
       const input = await parseJsonBody<{ requestId?: string }>(request);
@@ -13037,7 +13092,8 @@ async function handleApi(
         env.DB,
         user.email,
         user.brandId || "default",
-        input.requestId!
+        input.requestId!,
+        url.pathname === "/api/ai/edit-plan/cancel" ? "edit-plan" : "analysis"
       );
       return json({ canceled: true });
     }
@@ -13123,13 +13179,17 @@ export default {
       }
       if (
         request.method === "POST" &&
-        url.pathname === "/api/ai/analyze" &&
+        ["/api/ai/analyze", "/api/ai/edit-plan"].includes(url.pathname) &&
         request.headers.get("Accept")?.includes(ANALYZER_STREAM_TYPE)
       ) {
         return apiResponse(
           foregroundAnalysisResponse(
             request,
             async (scopedRequest, control) => {
+              control.purpose =
+                url.pathname === "/api/ai/edit-plan"
+                  ? "edit-planning"
+                  : "video-analysis";
               try {
                 return await handleApi(scopedRequest, env, url, control);
               } catch (cause) {
@@ -13149,7 +13209,13 @@ export default {
                 );
               }
             },
-            cleanup => ctx?.waitUntil(cleanup)
+            cleanup => ctx?.waitUntil(cleanup),
+            url.pathname === "/api/ai/edit-plan"
+              ? {
+                  error: "The edit plan is incomplete. No edit was applied.",
+                  analysisIncomplete: false,
+                }
+              : undefined
           ),
           request
         );

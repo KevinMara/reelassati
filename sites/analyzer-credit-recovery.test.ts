@@ -73,6 +73,72 @@ const entry = () =>
     .prepare("SELECT status, metadata_json FROM credit_ledger WHERE id=?")
     .get(ledger);
 describe("authorized canceled analyzer credit repair", () => {
+  it("releases only the exact canceled planner hold once, without touching a same-ID analysis", async () => {
+    const requestId = "plan-hold-20261022";
+    const insert = sqlite.prepare(
+      "INSERT INTO credit_ledger VALUES (?, 'owner', -5, -2, -3, ?, 'reserved', ?, 'project', 'AI edit plan', ?, 1, 'now', NULL)"
+    );
+    insert.run(
+      "plan",
+      "edit-plan",
+      analyzerOperationKey("owner", "brand", requestId, "edit-plan"),
+      JSON.stringify({ analyzerTransport: "foreground-v1" })
+    );
+    insert.run(
+      "analysis",
+      "analysis",
+      analyzerOperationKey("owner", "brand", requestId),
+      JSON.stringify({ analyzerTransport: "foreground-v1" })
+    );
+    await cancelAnalyzerCredits(
+      DB,
+      "owner",
+      "other-brand",
+      requestId,
+      "edit-plan"
+    );
+    expect(balance()).toEqual({ included_balance: 0, topup_balance: 791 });
+    await cancelAnalyzerCredits(DB, "owner", "brand", requestId, "edit-plan");
+    await cancelAnalyzerCredits(DB, "owner", "brand", requestId, "edit-plan");
+    expect(balance()).toEqual({ included_balance: 2, topup_balance: 794 });
+    expect(
+      sqlite
+        .prepare("SELECT status FROM credit_ledger WHERE id='analysis'")
+        .get()
+    ).toMatchObject({ status: "reserved" });
+  });
+  it("reconciles an expired foreground planner after a crashed request but preserves an untagged legacy hold", async () => {
+    sqlite.exec("UPDATE ai_invocations SET model='unrelated'");
+    const insert = sqlite.prepare(
+      "INSERT INTO credit_ledger VALUES (?, 'owner', -5, 0, -5, 'edit-plan', 'reserved', ?, 'project', 'AI edit plan', ?, 1, 'old', NULL)"
+    );
+    insert.run(
+      "expired-plan",
+      "expired-plan",
+      JSON.stringify({
+        analyzerTransport: "foreground-v1",
+        analyzerDeadlineAt: now - 40_000,
+        analysisInvocationId: "expired-planner",
+      })
+    );
+    insert.run("legacy-plan", "legacy-plan", "{}");
+    sqlite.exec(
+      "INSERT INTO ai_invocations (id,owner_email,purpose,status) VALUES ('expired-planner','owner','edit-planning','in_progress')"
+    );
+    await reconcileAnalyzerCredits(DB, "owner", now);
+    await reconcileAnalyzerCredits(DB, "owner", now);
+    expect(balance()).toEqual({ included_balance: 0, topup_balance: 796 });
+    expect(
+      sqlite
+        .prepare("SELECT status FROM credit_ledger WHERE id='legacy-plan'")
+        .get()
+    ).toMatchObject({ status: "reserved" });
+    expect(
+      sqlite
+        .prepare("SELECT status FROM ai_invocations WHERE id='expired-planner'")
+        .get()
+    ).toMatchObject({ status: "failed" });
+  });
   it("keeps explicit cancellation scoped to the owner and brand and releases it exactly once", async () => {
     const key = analyzerOperationKey("owner", "brand", "request-0123456789");
     sqlite

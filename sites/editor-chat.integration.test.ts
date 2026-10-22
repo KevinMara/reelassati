@@ -85,6 +85,7 @@ const env = {
   SUPABASE_URL: "https://auth.example",
   SUPABASE_PUBLISHABLE_KEY: "test-only",
   OPENROUTER_API_KEY: "test-only-provider",
+  OPENROUTER_TEXT_MODEL: "moonshotai/kimi-k2.5",
   AI_CREDIT_ACCESS_EMAIL: "owner@example.com",
   AI_PROVENANCE_SIGNING_KEY:
     "test-only-provenance-signing-key-at-least-32-characters",
@@ -133,14 +134,14 @@ async function request(
         headers: {
           Authorization: `Bearer ${owner}`,
           "Content-Type": "application/json",
-          ...(path === "/api/ai/analyze"
+          ...(["/api/ai/analyze", "/api/ai/edit-plan"].includes(path)
             ? { Accept: ANALYZER_STREAM_TYPE }
             : {}),
         },
         ...(body
           ? {
               body: JSON.stringify(
-                path === "/api/ai/analyze"
+                ["/api/ai/analyze", "/api/ai/edit-plan"].includes(path)
                   ? { requestId: crypto.randomUUID(), ...(body as object) }
                   : body
               ),
@@ -424,6 +425,124 @@ beforeAll(async () => {
 afterAll(() => {
   sqlite.close();
   vi.unstubAllGlobals();
+});
+
+describe("foreground K3 auto-edit planning", () => {
+  const input = async () => ({
+    project: (
+      (await (await request("/api/workspace")).json()) as {
+        workspace: WorkspaceDocument;
+      }
+    ).workspace.projects[0],
+    command: "Adapt the edit to this footage without generated media",
+    selectedClipIds: [],
+  });
+  it("advertises K3 and rejects legacy planning before charging or contacting a provider", async () => {
+    const caps = await (await request("/api/capabilities")).json();
+    expect(caps.capabilities).toMatchObject({
+      editingModel: "moonshotai/kimi-k3",
+      editPlanTransportVersion: "foreground-v1",
+    });
+    const before = balance(),
+      calls = providerCalls.length;
+    const response = await worker.fetch(
+      new Request("https://studio.example/api/ai/edit-plan", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer owner@example.com",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(await input()),
+      }),
+      env as never
+    );
+    expect(response.status).toBe(409);
+    expect(balance()).toBe(before);
+    expect(providerCalls.length).toBe(calls);
+  });
+  it("uses streamed K3 even with a legacy K2.5 text default, then settles one quoted plan", async () => {
+    const original = nextOutput,
+      before = balance(),
+      calls = providerCalls.length;
+    nextOutput = { summary: "Preserve the measured sequence", changes: [] };
+    try {
+      const response = await request("/api/ai/edit-plan", await input());
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        summary: expect.stringContaining("Preserve"),
+        changes: [],
+      });
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(providerCalls.at(-1)).toMatchObject({
+        model: "moonshotai/kimi-k3",
+        stream: true,
+      });
+      expect(balance()).toBe(before - 5);
+    } finally {
+      nextOutput = original;
+    }
+  });
+  it("releases a failed stream without a second call or a completed plan", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    providerStreamFailure = "truncated";
+    try {
+      const response = await request("/api/ai/edit-plan", await input());
+      expect(response.status).toBe(502);
+      expect(balance()).toBe(before);
+      expect(providerCalls.length).toBe(calls + 1);
+    } finally {
+      providerStreamFailure = undefined;
+    }
+  });
+  it("cancels the exact paid plan and blocks duplicate submissions without releasing someone else's hold", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    const body = {
+      ...(await input()),
+      requestId: "foreground-plan-cancel-20261022",
+    };
+    vi.useFakeTimers();
+    let release!: () => void;
+    providerGate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    try {
+      const raw = await worker.fetch(
+        new Request("https://studio.example/api/ai/edit-plan", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer owner@example.com",
+            "Content-Type": "application/json",
+            Accept: ANALYZER_STREAM_TYPE,
+          },
+          body: JSON.stringify(body),
+        }),
+        env as never
+      );
+      const result = unwrapAnalyzerResponse(raw);
+      await vi.waitFor(() => expect(providerCalls.length).toBe(calls + 1));
+      expect(balance()).toBe(before - 5);
+      expect((await request("/api/ai/edit-plan", body)).status).toBe(409);
+      expect(balance()).toBe(before - 5);
+      await request(
+        "/api/ai/edit-plan/cancel",
+        { requestId: body.requestId },
+        "stranger@example.com"
+      );
+      expect(balance()).toBe(before - 5);
+      await request("/api/ai/edit-plan/cancel", { requestId: body.requestId });
+      // The response owns the provider; its next heartbeat observes the canceled hold.
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect((await result).status).toBeGreaterThanOrEqual(400);
+      expect(balance()).toBe(before);
+      expect(providerCalls.length).toBe(calls + 1);
+    } finally {
+      release();
+      providerGate = undefined;
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("publication copy field selection", () => {

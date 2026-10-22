@@ -23,6 +23,8 @@ import {
   ebmlSize,
 } from "./media-provenance";
 import worker from "./server";
+import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
+import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
 
 type StoredRow = Record<string, unknown>;
 
@@ -52,6 +54,7 @@ function createIntegrityD1() {
             amount: -Number(bindings[1]),
             status: "reserved",
             operation_key: bindings[6],
+            metadata_json: bindings[9],
           });
         } else if (
           normalized.startsWith("update credit_ledger") &&
@@ -237,6 +240,19 @@ function createIntegrityD1() {
         return { success: true, meta: { changes } };
       },
       first: async () => {
+        if (
+          normalized.startsWith("select status") &&
+          normalized.includes("from credit_ledger where id = ?")
+        ) {
+          const row = state.creditLedger.find(item => item.id === bindings[0]);
+          return row
+            ? {
+                status: row.status,
+                attempt: JSON.parse(String(row.metadata_json || "{}"))
+                  .analyzerAttempt,
+              }
+            : null;
+        }
         if (
           normalized.includes("from billing_accounts where owner_email = ?")
         ) {
@@ -1680,8 +1696,8 @@ describe("provenance integrity boundaries", () => {
   it("binds normalized edit-plan provenance to the exact project and operation", async () => {
     const DB = createIntegrityD1();
     const BUCKET = createMemoryBucket();
-    globalThis.fetch = async () =>
-      Response.json({
+    globalThis.fetch = async () => {
+      const payload = {
         choices: [
           {
             message: {
@@ -1702,7 +1718,12 @@ describe("provenance integrity boundaries", () => {
             },
           },
         ],
-      });
+      };
+      return new Response(
+        `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: payload.choices[0].message.content }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+        { headers: { "Content-Type": "text/event-stream" } }
+      );
+    };
     const project = {
       id: "project-a",
       title: "Launch reel",
@@ -1727,13 +1748,19 @@ describe("provenance integrity boundaries", () => {
       proposedChanges: [],
       revisions: [],
     };
-    const generated = await worker.fetch(
-      new Request("https://studio.example/api/ai/edit-plan", {
-        method: "POST",
-        headers: authHeaders,
-        body: JSON.stringify({ project, command: "Tighten the opening" }),
-      }),
-      testEnv(DB, BUCKET) as never
+    const generated = await unwrapAnalyzerResponse(
+      await worker.fetch(
+        new Request("https://studio.example/api/ai/edit-plan", {
+          method: "POST",
+          headers: { ...authHeaders, Accept: ANALYZER_STREAM_TYPE },
+          body: JSON.stringify({
+            project,
+            command: "Tighten the opening",
+            requestId: crypto.randomUUID(),
+          }),
+        }),
+        testEnv(DB, BUCKET) as never
+      )
     );
     expect(generated.status).toBe(200);
     const plan = (await generated.json()) as {

@@ -8,6 +8,7 @@ import {
 
 /** Cleanup callbacks must contain database bookkeeping only, never inference. */
 export interface AnalysisControl {
+  purpose?: "video-analysis" | "edit-planning";
   signal: AbortSignal;
   deadlineAt: number;
   onAbort(cleanup: () => Promise<unknown>): void;
@@ -19,7 +20,12 @@ export interface AnalysisControl {
 export function foregroundAnalysisResponse(
   request: Request,
   run: (request: Request, control: AnalysisControl) => Promise<Response>,
-  keepCleanup?: (cleanup: Promise<unknown>) => void
+  keepCleanup?: (cleanup: Promise<unknown>) => void,
+  failure = {
+    error:
+      "The video review is incomplete. Please refresh before analyzing again.",
+    analysisIncomplete: true,
+  }
 ): Response {
   const abort = new AbortController();
   const cleanups = new Set<() => Promise<unknown>>();
@@ -120,14 +126,7 @@ export function foregroundAnalysisResponse(
         cancel(
           new DOMException("Analysis request deadline exceeded", "TimeoutError")
         );
-        finish(
-          504,
-          JSON.stringify({
-            error:
-              "The video review is incomplete. Please refresh before analyzing again.",
-            analysisIncomplete: true,
-          })
-        );
+        finish(504, JSON.stringify(failure));
       }, ANALYZER_DEADLINE_MS);
       if (request.signal.aborted) disconnect();
       // This promise belongs to the open response body. It is deliberately NOT
@@ -147,14 +146,7 @@ export function foregroundAnalysisResponse(
         } catch {
           if (!abort.signal.aborted)
             cancel(new DOMException("Analysis response failed", "AbortError"));
-          finish(
-            502,
-            JSON.stringify({
-              error:
-                "The video review is incomplete. Please refresh before analyzing again.",
-              analysisIncomplete: true,
-            })
-          );
+          finish(502, JSON.stringify(failure));
         }
       })();
     },

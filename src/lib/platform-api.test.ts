@@ -6,6 +6,13 @@ import {
 } from "./platform-api";
 import { supabase } from "@/lib/supabase/client";
 import { ANALYZER_STREAM_TYPE } from "@contracts/analyzer-transport";
+const planCapabilities = () =>
+  Response.json({
+    capabilities: {
+      editPlanTransportVersion: "foreground-v1",
+      editingModel: "moonshotai/kimi-k3",
+    },
+  });
 
 beforeEach(() => {
   vi.stubGlobal("sessionStorage", { getItem: () => null });
@@ -89,15 +96,18 @@ describe("platform API transport", () => {
     );
   });
   it("retains a bounded support reference and HTTP status for a failed auto-edit step without retrying it", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      Response.json(
-        {
-          error: "The AI service could not complete this request.",
-          reference: "provider-failure-123",
-        },
-        { status: 400 }
-      )
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(planCapabilities())
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            error: "The AI service could not complete this request.",
+            reference: "provider-failure-123",
+          },
+          { status: 400 }
+        )
+      );
     vi.stubGlobal("fetch", fetchMock);
     await expect(
       platformApi.generateEditPlan({
@@ -106,7 +116,90 @@ describe("platform API transport", () => {
         selectedClipIds: [],
       })
     ).rejects.toMatchObject({ status: 400, reference: "provider-failure-123" });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("/api/ai/edit-plan");
+  });
+  it.each([
+    {},
+    {
+      editPlanTransportVersion: "foreground-v1",
+      editingModel: "moonshotai/kimi-k2.5",
+    },
+  ])(
+    "does not submit a paid plan when backend transport or K3 selection is missing",
+    async capabilities => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({ capabilities }));
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(
+        platformApi.generateEditPlan({
+          project: {} as never,
+          command: "Edit",
+          selectedClipIds: [],
+        })
+      ).rejects.toMatchObject({ status: 409 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(String(fetchMock.mock.calls[0][0])).toContain("/api/capabilities");
+    }
+  );
+  it("consumes a streamed plan exactly once", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(planCapabilities())
+      .mockResolvedValueOnce(
+        new Response(
+          '{"type":"pending"}\n' +
+            JSON.stringify({
+              type: "result",
+              status: 200,
+              body: JSON.stringify({ summary: "Complete plan", changes: [] }),
+            }) +
+            "\n",
+          { headers: { "Content-Type": ANALYZER_STREAM_TYPE } }
+        )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      platformApi.generateEditPlan({
+        project: {} as never,
+        command: "Edit",
+        selectedClipIds: [],
+      })
+    ).resolves.toMatchObject({ summary: "Complete plan", changes: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].headers).toMatchObject({
+      Accept: ANALYZER_STREAM_TYPE,
+    });
+  });
+  it("cancels a truncated paid plan using the same request ID, without resubmitting it", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(planCapabilities())
+      .mockResolvedValueOnce(
+        new Response('{"type":"pending"}\n', {
+          headers: { "Content-Type": ANALYZER_STREAM_TYPE },
+        })
+      )
+      .mockResolvedValueOnce(Response.json({ canceled: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      platformApi.generateEditPlan({
+        project: {} as never,
+        command: "Edit",
+        selectedClipIds: [],
+      })
+    ).rejects.toMatchObject({
+      status: 502,
+      reference: expect.stringMatching(/^[a-f0-9-]{36}$/),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2][0])).toContain(
+      "/api/ai/edit-plan/cancel"
+    );
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body).requestId).toBe(
+      JSON.parse(fetchMock.mock.calls[1][1].body).requestId
+    );
   });
   it("pins speech retries to the reviewed request and workspace after a lost response", async () => {
     const scope = await captureUploadRequestScope();

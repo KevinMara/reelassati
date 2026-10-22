@@ -74,3 +74,15 @@ Important unresolved work:
 - Finish exact recovery of remaining original attachments where the viewer or downloads permit it, separating duplicates and unrelated generic filenames.
 
 Passing tests or shipping these corrections does not close the overall editing mission. Creative quality, breadth, speed and reliability must be demonstrated through completed edits rather than a feature count or marketing promise.
+
+## Approved live check and planner repair
+
+Exact `f91e725` was published as Sites version 118 with environment revision 16 unchanged. The separately approved single automatic-style test passed the K3 video review, then stopped on its first failure during planning. The browser reported a lost response; the provider record showed a terminal 499 after roughly 63 seconds with no completed answer. No retry, new media generation, completed edited timeline or finished render followed. This establishes a successful review transaction, not the accuracy of every observation or finished-edit quality.
+
+The live record also exposed a routing defect: video review used K3, while text-only editing inherited the legacy K2.5 default. The follow-up source pins every `edit-planning` call to K3 independently of legacy text settings and owner subscription experiments. Other platform text routes remain outside this editing-only repair.
+
+Auto-edit planning now uses the existing foreground response transport: heartbeats, a five-minute deadline, provider cancellation, and database-only cleanup. Each submission has an owner/brand/request key. Duplicates cannot buy another inference, and cancellation uses the exact same key. New planner reservations carry deadline metadata so an authenticated billing read can reconcile expired holds without a scheduler or provider call. Untagged historical holds are deliberately ineligible for this generic reconciliation and require incident-specific evidence. This repair does not itself restore the failed live test's planner hold.
+
+The client verifies foreground-plan support and the K3 route before a paid plan submission; the auto-edit control also gates preparation during a mixed frontend/backend rollout. Legacy plain-JSON planning requests are rejected before charging. A malformed or interrupted provider stream fails without a model retry or partial timeline application.
+
+Local verification of the repair passed 1,042 tests in 126 files, type checking, changed-file lint, all 28 localization audits, and the client/server production build. Tests include a response kept open beyond 65 seconds, terminal stream failure, duplicate submission, owner-scoped cancellation, a canceled plan's original credit buckets, expired tagged holds, and preservation of legacy holds. Providers are mocked or local. The repair needs its own backend deployment approval; no further paid verification is authorized.

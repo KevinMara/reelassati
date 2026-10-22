@@ -125,6 +125,8 @@ export function AutonomousEditor({
     AI_CREDIT_COSTS.editPlan + analysisCost + transcriptCost + mediaCost;
   const ready =
     capabilities.ai &&
+    capabilities.editPlanTransportVersion === "foreground-v1" &&
+    capabilities.editingModel === "moonshotai/kimi-k3" &&
     (!sources.some(a => a.kind === "video") ||
       (capabilities.analysis &&
         capabilities.analysisTransportVersion === "foreground-v1" &&

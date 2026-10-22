@@ -30,6 +30,8 @@ export interface CapabilityState {
   /** Paid analysis requires a matching complete audiovisual response contract. */
   analysisSchemaVersion?: string;
   analysisTransportVersion?: "foreground-v1";
+  editPlanTransportVersion?: "foreground-v1";
+  editingModel?: "moonshotai/kimi-k3";
   editStyleTemplates?: boolean;
   transcription: boolean;
   speech: boolean;

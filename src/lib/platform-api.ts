@@ -941,7 +941,7 @@ export const platformApi = {
       }
     ),
 
-  generateEditPlan: (
+  generateEditPlan: async (
     input: {
       project: EditProject;
       command: string;
@@ -950,21 +950,81 @@ export const platformApi = {
       localOnly?: boolean;
     },
     options?: UploadRequestOptions
-  ) =>
-    requestJson<{
-      changes: EditOperation[];
-      summary: string;
-      provenance: ContentProvenance;
-    }>(
-      "/api/ai/edit-plan",
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-        signal: options?.signal,
-      },
-      false,
-      options?.scope
-    ),
+  ) => {
+    options?.signal?.throwIfAborted();
+    const scope = options?.scope ?? (await captureUploadRequestScope());
+    // Check the deployed backend before buying a plan during a mixed rollout.
+    const { capabilities } = await requestJson<{
+      capabilities: CapabilityState;
+    }>("/api/capabilities", { signal: options?.signal }, false, scope);
+    if (
+      capabilities.editPlanTransportVersion !== "foreground-v1" ||
+      capabilities.editingModel !== "moonshotai/kimi-k3"
+    )
+      throw new PlatformApiError(
+        "Refresh the Studio before requesting an edit plan.",
+        409
+      );
+    const requestId = crypto.randomUUID();
+    const local = new AbortController();
+    let cancellation: Promise<void> | undefined;
+    const cancelOnce = () =>
+      (cancellation ??= requestJson(
+        "/api/ai/edit-plan/cancel",
+        {
+          method: "POST",
+          body: JSON.stringify({ requestId }),
+          keepalive: true,
+          signal: AbortSignal.timeout(10_000),
+        },
+        false,
+        scope
+      ).then(
+        () => undefined,
+        () => undefined
+      ));
+    const canceled = () => {
+      local.abort();
+      void cancelOnce();
+    };
+    options?.signal?.addEventListener("abort", canceled, { once: true });
+    if (typeof window !== "undefined")
+      window.addEventListener("pagehide", canceled, { once: true });
+    try {
+      options?.signal?.throwIfAborted();
+      return await requestJson<{
+        changes: EditOperation[];
+        summary: string;
+        provenance: ContentProvenance;
+      }>(
+        "/api/ai/edit-plan",
+        {
+          method: "POST",
+          headers: { Accept: ANALYZER_STREAM_TYPE },
+          body: JSON.stringify({ ...input, requestId }),
+          signal: local.signal,
+        },
+        false,
+        scope
+      );
+    } catch (cause) {
+      if (!(cause instanceof PlatformApiError)) {
+        await cancelOnce();
+        if (!local.signal.aborted)
+          throw new PlatformApiError(
+            "The edit plan is incomplete. No edit was applied.",
+            502,
+            undefined,
+            requestId
+          );
+      }
+      throw cause;
+    } finally {
+      options?.signal?.removeEventListener("abort", canceled);
+      if (typeof window !== "undefined")
+        window.removeEventListener("pagehide", canceled);
+    }
+  },
 
   analyzeVideo: async (
     input: {
