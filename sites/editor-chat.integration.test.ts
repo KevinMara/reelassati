@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import worker from "./server";
 import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
 import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
@@ -92,6 +93,31 @@ const env = {
   ASSETS: { fetch: () => new Response("static") },
 };
 const providerCalls: Record<string, unknown>[] = [];
+// A captured public endpoint contract, not a fabricated successful completion.
+// The old forced temperature fails this compatibility check even though our
+// completion mock would otherwise accept it.
+const authorEndpoint = JSON.parse(
+  readFileSync(
+    new URL("./fixtures/k3-author-endpoint-2026-10-22.json", import.meta.url),
+    "utf8"
+  ).replace(/^\uFEFF/, "")
+) as { model: string; supported_parameters: string[] };
+function expectAuthorCompatibleK3(payload: Record<string, unknown>) {
+  expect(payload.model).toBe(authorEndpoint.model);
+  expect(payload.provider).toEqual({
+    order: ["moonshotai"],
+    require_parameters: true,
+    allow_fallbacks: false,
+  });
+  expect(payload).not.toHaveProperty("temperature");
+  const parameters = Object.keys(payload).filter(
+    key => !["model", "messages", "provider", "stream"].includes(key)
+  );
+  expect(
+    parameters.filter(key => !authorEndpoint.supported_parameters.includes(key))
+  ).toEqual([]);
+  expect(authorEndpoint.supported_parameters).toContain("structured_outputs");
+}
 let nextOutput: Record<string, unknown> = {
   message: "Ready to adjust the clip",
   actions: [
@@ -481,6 +507,7 @@ describe("foreground K3 auto-edit planning", () => {
         provider: { require_parameters: true, allow_fallbacks: false },
       });
       expect(providerCalls.at(-1)?.provider).not.toHaveProperty("only");
+      expectAuthorCompatibleK3(providerCalls.at(-1)!);
       expect(balance()).toBe(before - 5);
     } finally {
       nextOutput = original;
@@ -546,6 +573,7 @@ describe("foreground K3 auto-edit planning", () => {
           provider: { require_parameters: true, allow_fallbacks: false },
         });
         expect(providerCalls.at(-1)?.provider).not.toHaveProperty("only");
+        expectAuthorCompatibleK3(providerCalls.at(-1)!);
         expect(failureLog).toHaveBeenCalledWith(
           "REELassati provider operation failed",
           expect.objectContaining({
@@ -1051,6 +1079,7 @@ describe("authenticated paid editing chat route", () => {
     expect((payload as Record<string, unknown>).provider).not.toHaveProperty(
       "only"
     );
+    expectAuthorCompatibleK3(payload as Record<string, unknown>);
     expect(
       sqlite
         .prepare(

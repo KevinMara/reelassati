@@ -3941,6 +3941,8 @@ async function chatJson(
     : useKimiSubscription
       ? env.KIMI_CODE_MODEL || "k3-256k"
       : model || env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5";
+  const foregroundK3 =
+    Boolean(analysisControl) && selectedModel === DEFAULT_ANALYSIS_MODEL;
   analysisControl?.signal.throwIfAborted();
   const invocation = await beginAiInvocation(
     env,
@@ -4004,19 +4006,22 @@ async function chatJson(
             : requireJsonMode
               ? { response_format: { type: "json_object" } }
               : {}),
-          // Select one eligible endpoint for the requested K3 model. A fixed
-          // Fireworks-only route made its rate limit block every review. Keep
-          // fallback disabled for both review and planning: no second provider
-          // attempt or model substitution may spend on the user's behalf.
+          // Use the model author's K3 endpoint rather than price-balanced
+          // reseller capacity. Its published supported_parameters omits
+          // temperature: requiring that optional knob silently excludes it.
+          // No backup attempt or model substitution is permitted.
           ...(analysisControl
             ? {
                 provider: {
                   require_parameters: true,
                   allow_fallbacks: false,
+                  ...(foregroundK3 ? { order: ["moonshotai"] } : {}),
                 },
               }
             : {}),
-          temperature: responseSchema ? 0.1 : 0.45,
+          ...(!foregroundK3
+            ? { temperature: responseSchema ? 0.1 : 0.45 }
+            : {}),
           ...(analysisControl
             ? { stream: true, reasoning: { effort: "low" } }
             : {}),
