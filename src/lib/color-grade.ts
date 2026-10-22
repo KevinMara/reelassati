@@ -66,5 +66,7 @@ export function colorGradeFilter(
     );
     return `${channel}='clip(${terms.join("+")}+${Number((values[4] * 255).toFixed(8))},0,255)'`;
   });
-  return `format=gbrap,geq=${expressions.join(":")}:a='alpha(X,Y)'`;
+  // This is a pointwise color transform, not spatial resampling. Explicit
+  // nearest sampling also preserves the final row/column on older FFmpeg builds.
+  return `format=gbrap,geq=${expressions.join(":")}:a='alpha(X,Y)':interpolation=nearest`;
 }

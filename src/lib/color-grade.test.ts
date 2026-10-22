@@ -50,6 +50,30 @@ describe("color-grade lookup acceleration", () => {
       }
       core.FS.unlink("proof.rgba");
       core.reset();
+      core.exec(
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "nullsrc=s=256x2:d=0.1,format=gbrap,geq=r='X':g='255-X':b='X':a='X'",
+        "-vf",
+        `${colorGradeFilter({ saturation: 1.3 })},format=rgba`,
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "saturation.rgba"
+      );
+      expect(core.ret).toBe(0);
+      const saturationPixels = core.FS.readFile("saturation.rgba");
+      for (let x = 0; x < 256; x++) {
+        expect(saturationPixels[x * 4 + 3]).toBe(x);
+        expect(saturationPixels[1024 + x * 4 + 3]).toBe(x);
+      }
+      expect(saturationPixels[255 * 4]).toBe(255);
+      core.FS.unlink("saturation.rgba");
+      core.reset();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -68,7 +92,7 @@ describe("color-grade lookup acceleration", () => {
     { contrast: 0.6, brightness: 0.1 },
     { contrast: 0.5, brightness: -0.5 },
   ])(
-    "matches the original matrix for every 8-bit channel value, preserving alpha: %j",
+    "matches the pointwise matrix for every 8-bit channel value, preserving alpha: %j",
     grade => {
       const matrix = colorGradeMatrix(grade);
       const channels = ["r", "g", "b"];
@@ -76,7 +100,7 @@ describe("color-grade lookup acceleration", () => {
         (channel, row) =>
           `${channel}='clip(${channels.map((c, col) => `${Number(matrix[row * 5 + col].toFixed(8))}*${c}(X,Y)`).join("+")}+${Number((matrix[row * 5 + 4] * 255).toFixed(8))},0,255)'`
       );
-      const original = `format=gbrap,geq=${expressions.join(":")}:a='alpha(X,Y)'`;
+      const original = `format=gbrap,geq=${expressions.join(":")}:a='alpha(X,Y)':interpolation=nearest`;
       const pixels = (filter: string) =>
         execFileSync(
           "ffmpeg",

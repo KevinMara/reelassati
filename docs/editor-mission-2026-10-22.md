@@ -57,11 +57,16 @@ The bounded full local suite passed 1,029 tests in 126 files before the final te
 
 The six-second synthetic H.264/AAC output in the private render proof fully decodes. It verifies bright/neutral/dark treatment intervals, measured caption clocks and a timed editable callout. A brightness/contrast-only lookup removes an expensive generic per-pixel expression while matching all tested 8-bit channel values and alpha. The installed browser FFmpeg core was exercised too. Saturation changes still use the cross-channel matrix path; this is not a claim that all exports are accelerated.
 
+Linux CI exposed an edge-pixel sampling difference in the generic matrix oracle: default bilinear sampling repeated neighbouring color/alpha values at the final column on that FFmpeg build. The pointwise matrix now explicitly selects nearest sampling, as does the comparison oracle. Browser-core coverage also exercises saturation and both alpha rows. This fixes the spatial sampling discrepancy rather than relaxing pixel equality. Eleven targeted color/render regressions passed after the correction.
+
+A second four-second native MP4 proof selects source seconds 4–6 from a red-then-blue supporting video and places them at timeline seconds 1–3. The encoded output shows the blue excerpt, with the original gray picture before and after; complete decode passed. This independently verifies the source offset through execution and export, rather than checking timeline metadata alone. It uses no model call.
+
 The isolated editor preview uses the actual editor UI and local mocked services. After rebuilding the final code it exercised an empty style, a deliberate plan failure, retained preparation, explicit continuation through full draft preflight and a successful saved editable timeline with Undo. The screenshot is retained locally as `verification-assets/editor-release-2026-10-22.jpg`. This is not production provider verification and does not modify Kevin's live project.
 
 Important unresolved work:
 
 - Evaluate actual K3 observations and finished edits with approved paid calls, then inspect the rendered video and audio. No live comparison is authorized by selecting a reference or benchmark.
+- Verify audio evidence independently of visual capability. The read-only OpenRouter catalog on 22 October lists K3 text/image/video inputs, and [Kimi's vision documentation](https://platform.kimi.ai/docs/guide/use-kimi-vision-model) describes video key frames. These facts do not establish audio-track understanding. Keep K3 as the director while establishing what measured speech/audio evidence reaches it; do not treat a populated report field as proof that the sound was heard.
 - Validate across contrasting content, lengths, aspect ratios and languages, including restrained as well as dense treatments. Coverage examples are not a fixed product style menu.
 - Improve general structural plan composition. The current executor safely rejects some trim/move/retime proposals after source splitting; it is not a complete source-anchored sequence assembly engine.
 - Establish reliable reference ingestion for supported social sources and communicate unavailable features accurately. Do not present a URL or source filename as inspected video.
