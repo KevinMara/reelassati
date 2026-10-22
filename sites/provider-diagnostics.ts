@@ -7,7 +7,8 @@ export type ProviderDiagnostics = {
     | "response-schema"
     | "media-input"
     | "context-limit"
-    | "unsupported-parameter";
+    | "unsupported-parameter"
+    | "rate-limit";
   reportedField?: string;
 };
 
@@ -126,21 +127,24 @@ export function openRouterErrorDiagnostics(
     .join(" ")
     .slice(0, 16384);
   const reportedIssue =
-    /response[_ .-]?(?:schema|format)|json[_ .-]?schema/i.test(message)
-      ? "response-schema"
-      : /(?:context|token).{0,60}(?:limit|exceed|maximum|too (?:large|long))/i.test(
-            message
-          )
-        ? "context-limit"
-        : /(?:invalid|unsupported|decode|failed|unrecognized).{0,80}(?:video|audio|image|mime|inline_data)|(?:video|audio|image|mime|inline_data).{0,80}(?:invalid|unsupported|decode|failed|unrecognized)/i.test(
+    /rate[ _-]?limit|too many requests|RESOURCE_EXHAUSTED/i.test(message) ||
+    Number(error.code) === 429
+      ? "rate-limit"
+      : /response[_ .-]?(?:schema|format)|json[_ .-]?schema/i.test(message)
+        ? "response-schema"
+        : /(?:context|token).{0,60}(?:limit|exceed|maximum|too (?:large|long))/i.test(
               message
             )
-          ? "media-input"
-          : /unsupported.{0,40}parameter|parameter.{0,40}(?:unsupported|not supported)/i.test(
+          ? "context-limit"
+          : /(?:invalid|unsupported|decode|failed|unrecognized).{0,80}(?:video|audio|image|mime|inline_data)|(?:video|audio|image|mime|inline_data).{0,80}(?:invalid|unsupported|decode|failed|unrecognized)/i.test(
                 message
               )
-            ? "unsupported-parameter"
-            : undefined;
+            ? "media-input"
+            : /unsupported.{0,40}parameter|parameter.{0,40}(?:unsupported|not supported)/i.test(
+                  message
+                )
+              ? "unsupported-parameter"
+              : undefined;
   const reportedField =
     violations.map(field => diagnosticField(field.field)).find(Boolean) ??
     diagnosticField(

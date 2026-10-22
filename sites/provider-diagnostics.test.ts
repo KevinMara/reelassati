@@ -47,6 +47,8 @@ describe("bounded provider error diagnostics", () => {
   });
 
   it.each([
+    ["Rate limit exceeded; PRIVATE_KEY", "rate-limit"],
+    ["Too many requests", "rate-limit"],
     ["Unable to decode video inline_data", "media-input"],
     ["Token count exceeds the maximum context limit", "context-limit"],
     ["Unsupported parameter: seed", "unsupported-parameter"],

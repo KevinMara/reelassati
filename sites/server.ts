@@ -3845,7 +3845,12 @@ async function providerError(
       : {}),
     ...(invocation ? { invocation } : {}),
   });
-  const publicFailure = publicProviderFailure(provider, status, reference);
+  const publicFailure = publicProviderFailure(
+    provider,
+    status,
+    reference,
+    response.headers.get("Retry-After")
+  );
   const failure = json(publicFailure.body, publicFailure.status);
   providerFailureMetadata.set(failure, {
     provider,
@@ -3994,14 +3999,23 @@ async function chatJson(
                 },
                 provider: {
                   require_parameters: true,
-                  ...(analysisControl
-                    ? { only: ["fireworks"], allow_fallbacks: false }
-                    : {}),
                 },
               }
             : requireJsonMode
               ? { response_format: { type: "json_object" } }
               : {}),
+          // Select one eligible endpoint for the requested K3 model. A fixed
+          // Fireworks-only route made its rate limit block every review. Keep
+          // fallback disabled for both review and planning: no second provider
+          // attempt or model substitution may spend on the user's behalf.
+          ...(analysisControl
+            ? {
+                provider: {
+                  require_parameters: true,
+                  allow_fallbacks: false,
+                },
+              }
+            : {}),
           temperature: responseSchema ? 0.1 : 0.45,
           ...(analysisControl
             ? { stream: true, reasoning: { effort: "low" } }

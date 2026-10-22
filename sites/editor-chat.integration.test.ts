@@ -116,7 +116,8 @@ let nextOutput: Record<string, unknown> = {
   ],
 };
 let providerGate: Promise<void> | undefined;
-let providerFailure: { status: number; payload: unknown } | undefined;
+let providerFailure:
+  { status: number; payload: unknown; headers?: HeadersInit } | undefined;
 let providerStreamFailure: "truncated" | "error" | "invalid-sse" | undefined;
 let providerContentOverride: string | undefined;
 let searchAnnotations: unknown[] | undefined;
@@ -316,6 +317,7 @@ beforeAll(async () => {
       if (providerFailure)
         return Response.json(providerFailure.payload, {
           status: providerFailure.status,
+          headers: providerFailure.headers,
         });
       if (JSON.parse(String(init?.body || "{}")).stream) {
         if (providerStreamFailure)
@@ -476,7 +478,9 @@ describe("foreground K3 auto-edit planning", () => {
       expect(providerCalls.at(-1)).toMatchObject({
         model: "moonshotai/kimi-k3",
         stream: true,
+        provider: { require_parameters: true, allow_fallbacks: false },
       });
+      expect(providerCalls.at(-1)?.provider).not.toHaveProperty("only");
       expect(balance()).toBe(before - 5);
     } finally {
       nextOutput = original;
@@ -495,6 +499,68 @@ describe("foreground K3 auto-edit planning", () => {
       providerStreamFailure = undefined;
     }
   });
+  it.each(["/api/ai/analyze", "/api/ai/edit-plan"])(
+    "returns a safe rate-limit wait and releases the one SQL hold for %s without retry",
+    async path => {
+      const before = balance(),
+        calls = providerCalls.length;
+      const failureLog = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      providerFailure = {
+        status: 429,
+        headers: { "Retry-After": "90", "X-Private-Provider": "PRIVATE_KEY" },
+        payload: {
+          id: "gen-1792681063-ZCyJBKQOsIweMtgsiya3",
+          error: { code: 429, message: "PRIVATE_KEY rate limit exceeded" },
+        },
+      };
+      try {
+        const response = await request(
+          path,
+          path.endsWith("analyze") ? { assetId: "source" } : await input()
+        );
+        expect(response.status).toBe(429);
+        const body = await response.json();
+        expect(body).toMatchObject({
+          code: "provider_rate_limited",
+          retryAfterSeconds: 90,
+        });
+        expect(body.error).toContain("Wait at least 90 seconds");
+        expect(body.reference).toMatch(/^[a-f0-9-]{36}$/);
+        expect(JSON.stringify(body)).not.toMatch(/PRIVATE|gen-|Retry once/);
+        expect(balance()).toBe(before);
+        expect(
+          sqlite
+            .prepare(
+              "SELECT amount,status FROM credit_ledger WHERE owner_email='owner@example.com' ORDER BY rowid DESC LIMIT 1"
+            )
+            .get()
+        ).toEqual({
+          amount: path.endsWith("analyze") ? -10 : -5,
+          status: "released",
+        });
+        expect(providerCalls.length).toBe(calls + 1);
+        expect(providerCalls.at(-1)).toMatchObject({
+          model: "moonshotai/kimi-k3",
+          provider: { require_parameters: true, allow_fallbacks: false },
+        });
+        expect(providerCalls.at(-1)?.provider).not.toHaveProperty("only");
+        expect(failureLog).toHaveBeenCalledWith(
+          "REELassati provider operation failed",
+          expect.objectContaining({
+            status: 429,
+            diagnostics: expect.objectContaining({
+              reportedIssue: "rate-limit",
+            }),
+          })
+        );
+      } finally {
+        providerFailure = undefined;
+        failureLog.mockRestore();
+      }
+    }
+  );
   it("cancels the exact paid plan and blocks duplicate submissions without releasing someone else's hold", async () => {
     const before = balance(),
       calls = providerCalls.length;
@@ -975,7 +1041,6 @@ describe("authenticated paid editing chat route", () => {
       },
       provider: {
         require_parameters: true,
-        only: ["fireworks"],
         allow_fallbacks: false,
       },
       stream: true,
@@ -983,6 +1048,9 @@ describe("authenticated paid editing chat route", () => {
     });
     expect(providerCalls.length).toBe(calls + 1);
     expect(payload).not.toHaveProperty("models");
+    expect((payload as Record<string, unknown>).provider).not.toHaveProperty(
+      "only"
+    );
     expect(
       sqlite
         .prepare(
