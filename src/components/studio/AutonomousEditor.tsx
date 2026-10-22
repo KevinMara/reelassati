@@ -4,11 +4,13 @@ import { appendEditorRevisions } from "@/lib/editor-history";
 import {
   createAutonomousPreparationCache,
   prepareAutonomousSources,
+  autonomousTranscriptTargets,
 } from "@/lib/autonomous-preparation";
 import {
   EDIT_RECIPES,
   auditAutomatedEdit,
   trimObservedEnding,
+  AUTOMATIC_EDIT_DIRECTION,
 } from "@/lib/editor-production";
 import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { EditStyleTemplates } from "./EditStyleTemplates";
@@ -19,7 +21,6 @@ import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
 import type {
   Asset,
   EditProject,
-  EditOperation,
   WorkspaceDocument,
 } from "@contracts/workspace";
 import {
@@ -36,7 +37,12 @@ import {
 } from "@/lib/platform-api";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { assertAutonomousRunCurrent } from "@/lib/autonomous-run";
-import { applyEditOperation, contentDuration } from "@/lib/edit-timeline";
+import { contentDuration } from "@/lib/edit-timeline";
+import {
+  executeAutonomousPlan,
+  assertAutonomousMediaBudget,
+  preflightAutonomousPlan,
+} from "@/lib/autonomous-execution";
 
 export function AutonomousEditor({
   project,
@@ -50,9 +56,7 @@ export function AutonomousEditor({
     useWorkspace();
   const referenceOwner = workspace.profile.email.toLowerCase();
   const referenceBrand = selectedBrand(referenceOwner);
-  const [style, setStyle] = useState(
-    `Clean editorial. ${EDIT_RECIPES["Clean editorial"]}`
-  );
+  const [style, setStyle] = useState("");
   const [referenceBrief, setReferenceBrief] = useState(
     project.referenceStyleBrief ?? ""
   );
@@ -98,15 +102,16 @@ export function AutonomousEditor({
         timedCreditCost(a.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute),
       0
     );
-  const transcriptCost =
-    captions && !project.transcript.length
-      ? sources.reduce(
+  const transcriptCost = captions
+    ? sources
+        .filter(a => autonomousTranscriptTargets(project, a).length > 0)
+        .reduce(
           (sum, a) =>
             sum +
             timedCreditCost(a.duration, AI_CREDIT_COSTS.transcriptionPerMinute),
           0
         )
-      : 0;
+    : 0;
   const mediaCost =
     images * AI_CREDIT_COSTS.image1K +
     videos *
@@ -255,13 +260,33 @@ export function AutonomousEditor({
       const result = await platformApi.generateEditPlan(
         {
           project: working,
-          command: `AUTONOMOUS COMPLETE EDIT. Style: ${style}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${plannedDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Apply an intentional hook, proof, payoff and ending; remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+          command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${plannedDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
           selectedClipIds: [],
           range: { start: 0, end: working.duration },
         },
         requestOptions
       );
       checkpoint();
+      assertAutonomousMediaBudget(result.changes, { images, videos });
+      const changesToApply = result.changes.filter(
+        op =>
+          op.type !== "caption" ||
+          (captions &&
+            !project.clips.some(
+              c =>
+                c.start < op.end &&
+                c.start + c.duration > op.start &&
+                working.sourceReviews?.some(
+                  r => r.assetId === c.assetId && r.captions === "present"
+                )
+            ))
+      );
+      preflightAutonomousPlan(
+        working,
+        changesToApply,
+        workspace.assets,
+        checkpoint
+      );
       working.proposedChanges = [
         ...working.proposedChanges.filter(c => c.status !== "proposed"),
         ...result.changes,
@@ -357,25 +382,8 @@ export function AutonomousEditor({
       setStatus("Applying the edit to your timeline…");
       setStage(ui("Timeline"));
       const allAssets = [...workspace.assets, ...generatedAssets];
-      const unresolved: EditOperation[] = [];
-      // Work backwards for source-time cuts so earlier operations keep their time coordinates.
-      const ordered = [...result.changes]
-        .filter(
-          op =>
-            op.type !== "caption" ||
-            (captions &&
-              !project.clips.some(
-                c =>
-                  c.start < op.end &&
-                  c.start + c.duration > op.start &&
-                  working.sourceReviews?.some(
-                    r => r.assetId === c.assetId && r.captions === "present"
-                  )
-              ))
-        )
-        .sort((a, b) => b.start - a.start);
-      for (const op of ordered) {
-        const execution = resolvedMedia.has(op.id)
+      const executable = changesToApply.map(op =>
+        resolvedMedia.has(op.id)
           ? {
               ...op,
               parameters: {
@@ -383,23 +391,14 @@ export function AutonomousEditor({
                 assetId: resolvedMedia.get(op.id),
               },
             }
-          : op;
-        const asset = execution.parameters?.assetId
-          ? allAssets.find(a => a.id === execution.parameters?.assetId)
-          : undefined;
-        if (
-          op.type === "broll" &&
-          (!asset || (asset.duration && asset.duration < op.end - op.start))
-        ) {
-          unresolved.push(op);
-          continue;
-        }
-        try {
-          working = applyEditOperation(working, execution);
-        } catch {
-          unresolved.push(op);
-        }
-      }
+          : op
+      );
+      working = executeAutonomousPlan(
+        working,
+        executable,
+        allAssets,
+        checkpoint
+      );
       const problems = auditAutomatedEdit(project, working, allAssets);
       if (problems.length)
         throw new Error(
@@ -487,16 +486,14 @@ export function AutonomousEditor({
               ...(hasChanges
                 ? appendEditorRevisions(p, [before, after], before)
                 : { revisions: p.revisions, revisionIndex: p.revisionIndex }),
-              lastCommand: style,
+              lastCommand: style.trim() || AUTOMATIC_EDIT_DIRECTION,
             };
           }),
         };
       });
       checkpoint();
       setFinished(true);
-      setStatus(
-        `${result.summary}${unresolved.length ? ` ${unresolved.length} suggestions need review in AI assistant.` : ""} Your original edit is available with Undo.`
-      );
+      setStatus(`${result.summary} Your original edit is available with Undo.`);
       onFinished(result.summary);
     } catch (e) {
       if (!mounted.current || runController.current !== controller) return;
@@ -736,12 +733,7 @@ export function AutonomousEditor({
 
           <button
             type="button"
-            disabled={
-              busy ||
-              !ready ||
-              (!style.trim() && !referenceBrief) ||
-              !project.clips.length
-            }
+            disabled={busy || !ready || !project.clips.length}
             onClick={() => void run()}
             className="ai-magic flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium disabled:opacity-40"
           >

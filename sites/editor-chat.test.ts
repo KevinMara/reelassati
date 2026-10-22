@@ -109,6 +109,29 @@ const operation = (patch: Partial<EditOperation> = {}): EditOperation => ({
 });
 
 describe("Reel authorization and actual cost planning", () => {
+  it("keeps valid supporting source offsets and blocks unavailable excerpts", () => {
+    const plan = (sourceIn: number) =>
+      normalizeEditorChatPlan(
+        {
+          actions: [
+            {
+              ...base,
+              kind: "edit",
+              operation: operation({
+                type: "broll",
+                parameters: { assetId: "source", sourceIn },
+              }),
+            },
+          ],
+        },
+        context()
+      );
+    expect(plan(40).actions[0]).toMatchObject({
+      kind: "edit",
+      operation: { parameters: { sourceIn: 40 } },
+    });
+    expect(plan(60).actions).toHaveLength(0);
+  });
   it("rejects missing spending authority and bounded attachment violations before model work", () => {
     expect(() =>
       parseEditorChatRequest({ ...context().request, maxCredits: 4 })

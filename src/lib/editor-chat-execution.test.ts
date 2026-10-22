@@ -100,6 +100,73 @@ describe("chat action scheduling", () => {
 });
 
 describe("chat timeline execution", () => {
+  it("retains only visible measured words when the clip trims both ends of a cue", () => {
+    const source = project();
+    source.clips = [
+      {
+        id: "clip",
+        assetId: "video",
+        track: "video",
+        start: 10,
+        duration: 1,
+        inPoint: 2,
+        outPoint: 4,
+        speed: 2,
+      } as TimelineClip,
+    ];
+    const mapped = mapChatTranscript(source, "video", [
+      {
+        id: "cue",
+        start: 0,
+        end: 6,
+        text: "Outside retained end",
+        words: [
+          { text: "Outside", start: 0, end: 1 },
+          { text: "retained", start: 2.2, end: 3.8 },
+          { text: "end", start: 5, end: 6 },
+        ],
+      },
+    ]);
+    expect(mapped).toHaveLength(1);
+    expect(mapped[0]).toMatchObject({
+      text: "retained",
+      start: 10,
+      end: 11,
+      words: [{ text: "retained", start: 10.1, end: 10.9 }],
+    });
+  });
+  it("revalidates source excerpts at execution if a saved Library asset becomes unavailable", () => {
+    const source = project();
+    const edit = action({
+      kind: "edit",
+      operation: {
+        id: "broll",
+        type: "broll",
+        label: "Detail",
+        start: 0,
+        end: 2,
+        targetClipIds: [],
+        parameters: { assetId: "support", sourceIn: 8 },
+      } as never,
+    });
+    const support = {
+      id: "support",
+      kind: "video",
+      duration: 10,
+      status: "ready",
+      name: "Detail",
+    } as Asset;
+    expect(applyChatAction(source, edit, [support]).clips[0]).toMatchObject({
+      inPoint: 8,
+      outPoint: 10,
+    });
+    expect(() =>
+      applyChatAction(source, edit, [{ ...support, duration: 9 }])
+    ).toThrow(/source interval/);
+    expect(() =>
+      applyChatAction(source, edit, [{ ...support, status: "failed" }])
+    ).toThrow(/unavailable/);
+  });
   it("adds a very short sound once at the requested time, without changing other media", () => {
     const source = project();
     const asset = {

@@ -360,8 +360,20 @@ export function applyEditOperation(
   } else if (op.type === "caption") {
     if (!p.text?.trim())
       throw new Error("This caption needs text before it can be applied.");
-    if (p.sourceClipId && !project.clips.some(c => c.id === p.sourceClipId && targets.has(c.id) && !c.locked && op.start >= c.start && op.end <= c.start + c.duration))
-      throw new Error("The caption's source owner no longer covers this interval.");
+    if (
+      p.sourceClipId &&
+      !project.clips.some(
+        c =>
+          c.id === p.sourceClipId &&
+          targets.has(c.id) &&
+          !c.locked &&
+          op.start >= c.start &&
+          op.end <= c.start + c.duration
+      )
+    )
+      throw new Error(
+        "The caption's source owner no longer covers this interval."
+      );
     next.transcript.push({
       id: op.id,
       start: op.start,
@@ -372,6 +384,14 @@ export function applyEditOperation(
   } else if (op.type === "broll") {
     if (!p.assetId)
       throw new Error("Generate or choose the supporting media first.");
+    const sourceIn = p.sourceIn ?? 0;
+    if (
+      !Number.isFinite(sourceIn) ||
+      sourceIn < 0 ||
+      !Number.isFinite(op.end - op.start) ||
+      op.end <= op.start
+    )
+      throw new Error("Choose a valid supporting-media source interval.");
     next.clips.push({
       id: op.id,
       assetId: p.assetId,
@@ -386,8 +406,8 @@ export function applyEditOperation(
       ),
       start: op.start,
       duration: op.end - op.start,
-      inPoint: 0,
-      outPoint: op.end - op.start,
+      inPoint: sourceIn,
+      outPoint: sourceIn + op.end - op.start,
       locked: false,
       color: "#B98B4B",
       fit: "cover",

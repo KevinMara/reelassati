@@ -1,11 +1,50 @@
 import type { Asset, EditProject } from "@contracts/workspace";
 import { normalizeReview } from "@contracts/source-review";
 import { mapChatTranscript } from "./editor-chat-execution";
+import { captionOwner } from "@contracts/caption-ownership";
+
+/** Captions on another source are not evidence that this source was transcribed.
+ * Linked picture/sound share a speech clock; do not buy it twice. */
+export function autonomousTranscriptTargets(
+  project: EditProject,
+  asset: Asset
+) {
+  const review = project.sourceReviews?.find(r => r.assetId === asset.id);
+  if (review?.captions === "present" || review?.audio === "absent") return [];
+  return project.clips.filter(
+    clip =>
+      clip.assetId === asset.id &&
+      !clip.muted &&
+      !clip.graphic &&
+      !clip.transitionHandle &&
+      !project.clips.some(
+        peer =>
+          peer.linkId &&
+          peer.linkId === clip.linkId &&
+          project.sourceReviews?.some(
+            r => r.assetId === peer.assetId && r.captions === "present"
+          )
+      ) &&
+      !project.transcript.some(segment => {
+        const owner = captionOwner(project, segment);
+        return (
+          owner?.id === clip.id ||
+          Boolean(owner?.linkId && owner.linkId === clip.linkId)
+        );
+      })
+  );
+}
 
 type Review = Pick<
   Awaited<ReturnType<typeof import("./analyze-media").analyzeMedia>>,
   "summary" | "review" | "retention"
->;
+> &
+  Partial<
+    Pick<
+      Awaited<ReturnType<typeof import("./analyze-media").analyzeMedia>>,
+      "insights"
+    >
+  >;
 type Transcript = Awaited<
   ReturnType<typeof import("./transcribe-media").transcribeMedia>
 >;
@@ -34,7 +73,9 @@ export async function prepareAutonomousSources(input: {
     assetId: string;
     summary: string;
     intervals: Review["retention"];
+    observations: NonNullable<Review["insights"]>;
   }> = [];
+  const keys = new Map<string, string>();
   for (const asset of input.sources) {
     input.checkpoint();
     const key = JSON.stringify([
@@ -45,6 +86,7 @@ export async function prepareAutonomousSources(input: {
       asset.contentType,
       input.project.platform,
     ]);
+    keys.set(asset.id, key);
     if (asset.kind === "video") {
       const result =
         input.cache.reviews.get(key) ?? (await input.review(asset));
@@ -57,19 +99,40 @@ export async function prepareAutonomousSources(input: {
           reviewedAt: new Date().toISOString(),
           summary: result.summary,
           ...normalizeReview(result.review),
-          moments: result.retention,
+          moments: result.insights?.length
+            ? result.insights.map(interval => ({
+                start: interval.start,
+                end: interval.end,
+                note: [
+                  interval.visualEvidence &&
+                    `Observed picture: ${interval.visualEvidence}`,
+                  interval.audioEvidence &&
+                    `Observed audio: ${interval.audioEvidence}`,
+                  `Editorial interpretation (${interval.role}): ${interval.rationale}`,
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
+              }))
+            : result.retention,
         },
       ];
       analysis.push({
         assetId: asset.id,
         summary: result.summary,
         intervals: result.retention,
+        observations: result.insights ?? [],
       });
     }
+  }
+  // Review every picture source before deciding which speech clocks are needed.
+  // Library order must not make linked sound buy duplicate burned-in captions.
+  for (const asset of input.sources) {
+    input.checkpoint();
+    const key = keys.get(asset.id)!;
     const review = working.sourceReviews?.find(r => r.assetId === asset.id);
     if (
       input.captions &&
-      !input.project.transcript.length &&
+      autonomousTranscriptTargets(working, asset).length > 0 &&
       review?.captions !== "present" &&
       review?.audio !== "absent"
     ) {
@@ -79,7 +142,11 @@ export async function prepareAutonomousSources(input: {
       input.cache.transcripts.set(key, result);
       if (result.provenance) working.transcriptProvenance = result.provenance;
       working.transcript.push(
-        ...mapChatTranscript(input.project, asset.id, result.segments)
+        ...mapChatTranscript(
+          { ...working, clips: autonomousTranscriptTargets(working, asset) },
+          asset.id,
+          result.segments
+        )
       );
     }
   }

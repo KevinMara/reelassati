@@ -1,7 +1,11 @@
 import type { EditProject } from "./workspace";
 import { getCaptionPreset, type CaptionAppearance } from "./editor-presets";
 import { isPrimaryFootage } from "./timeline-layers";
-import { GRAPHIC_KINDS, type GraphicKind } from "./motion-graphics";
+import {
+  GRAPHIC_KINDS,
+  type GraphicKind,
+  type MotionGraphic,
+} from "./motion-graphics";
 
 export const EDIT_STYLE_TEMPLATE_LIMIT = 50;
 const choices = {
@@ -30,6 +34,7 @@ export interface EditStyleProfile {
     palette: string[];
     animations: string[];
     typicalSize: number;
+    compositions?: Array<NonNullable<MotionGraphic["composition"]>>;
   };
 }
 export interface EditStyleTemplate {
@@ -157,6 +162,25 @@ export function normalizeEditStyleProfile(
           ].slice(0, 4)
         : [],
       typicalSize,
+      ...(Array.isArray(graphic.compositions)
+        ? {
+            compositions: [
+              ...new Set(
+                graphic.compositions.filter(
+                  (value): value is NonNullable<MotionGraphic["composition"]> =>
+                    [
+                      "plain",
+                      "lower-third",
+                      "chapter",
+                      "quote",
+                      "statistic",
+                      "progress",
+                    ].includes(String(value))
+                )
+              ),
+            ],
+          }
+        : {}),
     };
   return result;
 }
@@ -226,13 +250,15 @@ export function captureEditStyle(project: EditProject): EditStyleProfile {
     .filter(d => d >= 0.1 && d <= 180)
     .sort((a, b) => a - b);
   const typical = median(durations, 4),
-    graphics = project.clips.filter(c => c.graphic);
+    graphics = project.clips.filter(c => c.graphic && !c.hidden);
   const moving = picture.filter(
     c =>
       c.visual?.keyframes?.length ||
       (c.visual?.entrance && c.visual.entrance.kind !== "none")
   ).length;
-  const hasCaptions = project.clips.some(c => c.track === "captions");
+  const hasCaptions =
+    Boolean(project.transcript?.some(segment => segment.text?.trim())) ||
+    project.clips.some(c => c.track === "captions" && !c.hidden);
   const p = getCaptionPreset(project.captionStyle, project.captionAppearance);
   return normalizeEditStyleProfile({
     version: 1,
@@ -302,8 +328,10 @@ export function captureEditStyle(project: EditProject): EditStyleProfile {
             palette: graphics.flatMap(c => [
               c.graphic!.color,
               c.graphic!.background,
+              c.graphic!.accent,
             ]),
             animations: graphics.map(c => c.graphic!.animation),
+            compositions: graphics.map(c => c.graphic!.composition ?? "plain"),
             typicalSize: median(
               graphics.map(c => c.graphic!.size),
               5

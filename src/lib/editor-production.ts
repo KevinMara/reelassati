@@ -64,6 +64,9 @@ export const EDIT_RECIPES = {
     "Keep the speaker's meaning and authentic delivery. Trim only evidenced dead time, false starts and repetition. Preserve breaths and complete words at boundaries. Keep playback speed natural and use supporting visuals sparingly. Captions must follow timestamped speech and finish before the next phrase.",
 } as const;
 
+export const AUTOMATIC_EDIT_DIRECTION =
+  "Choose the treatment from the actual footage, speech, audience and selected reference or template. Infer whether this is a tutorial, product demonstration, talking head, documentary, cinematic story, comedy, music-led montage or another form. Build a coherent finished edit with an immediately understandable opening and a satisfying ending suited to that form. Use purposeful visual and audio emphasis; preserve the subject's meaning, complete actions, joke timing and necessary context. Use a consistent visual language and varied, content-specific composition. A quiet cinematic hold and a fast rhythmic sequence can both be engaging: never force every source into an advertising template, maximum cut frequency, a graphic on every sentence or a sales CTA. A supplied style or reference takes precedence over this automatic choice.";
+
 /** Deterministic checks before an automated edit may replace the user's timeline. */
 export function auditAutomatedEdit(
   before: EditProject,

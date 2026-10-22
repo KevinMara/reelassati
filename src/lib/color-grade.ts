@@ -42,6 +42,22 @@ export function colorGradeFilter(
   )
     return "null";
   const matrix = colorGradeMatrix(clip);
+  // Brightness/contrast do not mix channels. A 256-entry lookup per channel
+  // performs the identical transform without interpreting an expression for
+  // every full-resolution pixel. Keep the cross-channel path for saturation.
+  if (
+    matrix[1] === 0 &&
+    matrix[2] === 0 &&
+    matrix[5] === 0 &&
+    matrix[7] === 0 &&
+    matrix[10] === 0 &&
+    matrix[11] === 0
+  ) {
+    const scale = Number(matrix[0].toFixed(8));
+    const offset = Number((matrix[4] * 255).toFixed(8));
+    const expression = `'clip(${scale}*val+${offset},0,255)'`;
+    return `format=gbrap,lutrgb=r=${expression}:g=${expression}:b=${expression}`;
+  }
   const channels = ["r", "g", "b"];
   const expressions = channels.map((channel, row) => {
     const values = matrix.slice(row * 5, row * 5 + 5);

@@ -187,6 +187,7 @@ export interface EditOperation {
     visual?: Partial<import("./clip-visual").ClipVisual>;
     graphicMode?: "create" | "update";
     graphic?: import("./motion-graphics").MotionGraphic;
+    /** Source-media seconds for a trim or existing supporting-video excerpt. */
     sourceIn?: number;
     /** Exact caption owner, used when projecting analyzed source clocks onto a timeline occurrence. */
     sourceClipId?: string;

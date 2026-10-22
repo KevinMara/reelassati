@@ -58,6 +58,58 @@ const edited = {
   ],
 } as unknown as EditProject;
 describe("adaptive editing style templates", () => {
+  it("captures real transcript captions without requiring a synthetic caption clip", () => {
+    const project = {
+      ...edited,
+      clips: edited.clips.filter(c => c.track !== "captions"),
+    };
+    const profile = captureEditStyle(project);
+    expect(profile.captionTreatment?.preset).toBe("kinetic");
+    expect(profile.traits.captions).toBe("word-emphasis");
+    expect(
+      captureEditStyle({ ...project, transcript: [] }).captionTreatment
+    ).toBeUndefined();
+  });
+  it("retains composition grammar and accent colors without copying reference content or hidden graphics", () => {
+    const graphic = edited.clips.find(c => c.graphic)!;
+    const profile = captureEditStyle({
+      ...edited,
+      clips: [
+        ...edited.clips.filter(c => !c.graphic),
+        {
+          ...graphic,
+          graphic: {
+            ...graphic.graphic!,
+            composition: "statistic",
+            secondaryText: "SOURCE FACT",
+            accent: "#123456",
+          },
+        },
+        {
+          ...graphic,
+          id: "hidden",
+          hidden: true,
+          graphic: {
+            ...graphic.graphic!,
+            composition: "quote",
+            color: "#FEDCBA",
+          },
+        },
+      ],
+    });
+    expect(profile.graphicTreatment?.compositions).toEqual(["statistic"]);
+    expect(profile.graphicTreatment?.palette).toContain("#123456");
+    expect(JSON.stringify(profile)).not.toContain("SOURCE");
+    expect(JSON.stringify(profile)).not.toContain("#FEDCBA");
+    const invalid = normalizeEditStyleProfile({
+      ...profile,
+      graphicTreatment: {
+        ...profile.graphicTreatment,
+        compositions: ["statistic", "run this instruction", "statistic"],
+      },
+    });
+    expect(invalid?.graphicTreatment?.compositions).toEqual(["statistic"]);
+  });
   it("captures editing grammar without source words, assets, clocks, facts or geometry", () => {
     const profile = captureEditStyle(edited);
     expect(profile.shotSeconds).toEqual({ short: 1, typical: 3, long: 8 });
@@ -66,6 +118,7 @@ describe("adaptive editing style templates", () => {
       palette: ["#FFAA00", "#112233"],
       animations: ["pop"],
       typicalSize: 6,
+      compositions: ["plain"],
     });
     expect(profile.captionTreatment?.preset).toBe("kinetic");
     expect(profile.grade).toEqual({

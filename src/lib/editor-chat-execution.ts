@@ -1,4 +1,5 @@
 import { isPrimaryFootage } from "@contracts/timeline-layers";
+import { assertSupportingMedia } from "@contracts/supporting-media";
 import { speechAutoZoom, cutSelectedOnBeats } from "./rhythm-editing";
 import { clipLaneKind } from "@contracts/timeline-layers";
 import { expandLinkedSelection } from "@contracts/clip-groups";
@@ -151,7 +152,11 @@ export function mapChatTranscript(
             s.start < clip.inPoint + clip.duration * speed
         )
         .map(s => ({
-          ...mapTranscriptTime(s, t => clip.start + (t - clip.inPoint) / speed),
+          ...mapTranscriptTime(
+            s,
+            t => clip.start + (t - clip.inPoint) / speed,
+            { start: clip.start, end: clip.start + clip.duration }
+          ),
           id: `chat-caption-${clip.id}-${s.id}`,
           sourceClipId: clip.id,
           start: clip.start + Math.max(0, s.start - clip.inPoint) / speed,
@@ -160,7 +165,7 @@ export function mapChatTranscript(
             clip.start + (s.end - clip.inPoint) / speed
           ),
         }))
-        .filter(s => s.end > s.start);
+        .filter(s => s.end > s.start && s.text.trim());
     })
     .sort((a, b) => a.start - b.start);
 }
@@ -188,6 +193,12 @@ export function applyChatAction(
       )
     )
       return project;
+    if (action.operation.type === "broll")
+      assertSupportingMedia(
+        assets.find(asset => asset.id === action.operation.parameters?.assetId),
+        action.operation.parameters?.sourceIn ?? 0,
+        action.operation.end - action.operation.start
+      );
     next = applyEditOperation(
       {
         ...project,
