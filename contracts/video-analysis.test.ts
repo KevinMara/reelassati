@@ -4,6 +4,7 @@ import {
   normalizeVideoInsights,
   normalizeVideoRecommendations,
   normalizeVideoStructure,
+  resolveVideoStructureFromEvidence,
   scoreVideoInsights,
 } from "./video-analysis";
 const interval = {
@@ -78,6 +79,40 @@ const completeInterval = {
   rationale: "A concrete promise removes ambiguity",
 };
 describe("complete multimodal editorial review", () => {
+  it.each([28.351, 28.350708 + Number.EPSILON * 32])(
+    "keeps an evidenced final interval rounded to %s without inventing a tail",
+    end => {
+      const duration = 28.350708;
+      const rows = normalizeVideoInsights(
+        [
+          { ...completeInterval, end: 25 },
+          { ...completeInterval, start: 25, end },
+        ],
+        duration
+      );
+      expect(rows).toHaveLength(2);
+      expect(rows[1].end).toBe(duration);
+      expect(scoreVideoInsights(rows, duration)).toMatchObject({
+        status: "complete",
+        coveragePercent: 100,
+      });
+    }
+  );
+  it("still rejects a substantive overrun and never fills an unobserved tail", () => {
+    const duration = 28.350708;
+    expect(
+      normalizeVideoInsights(
+        [{ ...completeInterval, end: duration + 0.01 }],
+        duration
+      )
+    ).toEqual([]);
+    const rows = normalizeVideoInsights(
+      [{ ...completeInterval, end: 27 }],
+      duration
+    );
+    expect(rows[0].end).toBe(27);
+    expect(scoreVideoInsights(rows, duration).status).toBe("incomplete");
+  });
   it("does not score attention-only reports, missing evidence or source gaps", () => {
     const rows = normalizeVideoInsights([{ ...completeInterval, end: 10 }], 10);
     expect(
@@ -179,6 +214,50 @@ describe("complete multimodal editorial review", () => {
     expect(normalizeVideoStructure([...structure, structure[0]], rows)).toEqual(
       []
     );
+  });
+  it("preserves an uncertain section rather than rejecting the complete source review", () => {
+    const rows = normalizeVideoInsights([{ ...completeInterval, end: 10 }], 10);
+    const structure = ["hook", "core", "proof", "payoff", "cta"].map(role => ({
+      role,
+      status: "uncertain",
+      note: "The function remains uncertain",
+    }));
+    expect(normalizeVideoStructure(structure, rows)).toHaveLength(5);
+    expect(resolveVideoStructureFromEvidence(structure, rows)).toEqual(
+      structure
+    );
+  });
+  it("reconciles a contradictory summary without inventing missing functions or scores", () => {
+    const rows = normalizeVideoInsights([{ ...completeInterval, end: 10 }], 10);
+    const structure = ["hook", "core", "proof", "payoff", "cta"].map(role => ({
+      role,
+      status: role === "cta" ? "present" : "absent",
+      note: "A conflicting summary claim",
+    }));
+    const resolved = resolveVideoStructureFromEvidence(structure, rows);
+    expect(resolved).toHaveLength(5);
+    expect(resolved[0]).toMatchObject({
+      role: "hook",
+      status: "uncertain",
+      note: completeInterval.roleReason,
+    });
+    expect(resolved.at(-1)).toMatchObject({ role: "cta", status: "uncertain" });
+    expect(rows[0]).toMatchObject({ role: "hook", attention: 78 });
+  });
+  it("derives an omitted section index only from observed source functions", () => {
+    const rows = normalizeVideoInsights(
+      [{ ...completeInterval, role: "demonstration", end: 10 }],
+      10
+    );
+    const resolved = resolveVideoStructureFromEvidence([], rows);
+    expect(resolved.find(row => row.role === "core")).toMatchObject({
+      status: "present",
+      note: completeInterval.roleReason,
+    });
+    for (const role of ["hook", "proof", "payoff", "cta"])
+      expect(resolved.find(row => row.role === role)).toMatchObject({
+        status: "uncertain",
+      });
   });
   it("keeps reshoot recommendations distinct and rejects out-of-source or evidence-free suggestions", () => {
     const recommendation = {

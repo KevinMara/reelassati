@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Asset, EditProject } from "@contracts/workspace";
+import type { SavedAnalyzerReport } from "@contracts/analyzer-report";
 import {
   createAutonomousPreparationCache,
   prepareAutonomousSources,
+  findSavedAutonomousReview,
 } from "./autonomous-preparation";
 
 const source = {
@@ -52,6 +54,130 @@ function fixture() {
     ),
   };
 }
+
+function savedReport(): SavedAnalyzerReport {
+  const insight = {
+    start: 0,
+    end: 4,
+    role: "hook" as const,
+    roleReason: "The opening poses a concrete question",
+    label: "Opening question",
+    attention: 70,
+    stimulation: 40,
+    processingLoad: 30,
+    clarity: 80,
+    confidence: 0.8,
+    visualEvidence: "A readable question appears",
+    audioEvidence: "Audio was not verified",
+    strength: "The question is specific",
+    improvement: "Preserve its readable hold",
+    rationale: "The topic is clear immediately",
+  };
+  return {
+    assetId: source.id,
+    duration: 4,
+    platform: "instagram",
+    createdAt: "2026-10-23T16:00:00Z",
+    result: {
+      schemaVersion: "video-analysis-v2",
+      summary: "An observed opening question",
+      hook: { score: 70, note: "Question visible" },
+      pacing: { score: 70, note: "Readable hold" },
+      insights: [insight],
+      structure: ["hook", "core", "proof", "payoff", "cta"].map(role => ({
+        role,
+        status: role === "hook" ? "present" : "absent",
+        note: "Observed source function",
+      })) as SavedAnalyzerReport["result"]["structure"],
+      review: {
+        captions: "present",
+        captionNote: "Words burned into the frames",
+        audio: "unknown",
+        audioNote: "Audio was not verified",
+        ending: null,
+      },
+      retention: [],
+      changes: [],
+      provenance: { origin: "ai-assisted" } as never,
+    },
+  };
+}
+
+describe("saved paid review reuse", () => {
+  it("prepares the exact source from its complete saved review without another provider call", async () => {
+    const input = fixture();
+    const report = savedReport();
+    input.review.mockRejectedValue(
+      new Error("A duplicate purchase must not occur")
+    );
+    const result = await prepareAutonomousSources({
+      ...input,
+      savedReports: [report],
+    });
+    expect(input.review).not.toHaveBeenCalled();
+    expect(input.transcribe).not.toHaveBeenCalled();
+    expect(result.analysis[0].observations).toEqual(report.result.insights);
+    expect(result.analysis[0].intervals).toEqual([
+      {
+        start: 0,
+        end: 4,
+        score: 70,
+        note: report.result.insights[0].rationale,
+      },
+    ]);
+    expect(result.working.sourceReviews?.[0]).toMatchObject({
+      assetId: source.id,
+      captions: "present",
+      audio: "unknown",
+    });
+    result.analysis[0].observations[0].label = "Edited local note";
+    expect(report.result.insights[0].label).toBe("Opening question");
+  });
+  it.each([
+    "source",
+    "duration",
+    "platform",
+    "schema",
+    "coverage",
+    "story",
+    "review",
+  ])(
+    "does not bypass preparation for mismatched or incomplete saved %s",
+    async mismatch => {
+      const input = fixture();
+      const report = savedReport();
+      if (mismatch === "source") report.assetId = "another-source";
+      if (mismatch === "duration") report.duration = 5;
+      if (mismatch === "platform") report.platform = "youtube";
+      if (mismatch === "schema")
+        report.result.schemaVersion = "legacy" as never;
+      if (mismatch === "coverage") report.result.insights[0].end = 3;
+      if (mismatch === "story") report.result.structure = [];
+      if (mismatch === "review") report.result.review = undefined;
+      await prepareAutonomousSources({ ...input, savedReports: [report] });
+      expect(input.review).toHaveBeenCalledTimes(1);
+    }
+  );
+  it("accepts native metadata precision and still buys missing speech preparation only", async () => {
+    const input = fixture();
+    const report = savedReport();
+    report.result.review = {
+      ...report.result.review!,
+      captions: "absent",
+      audio: "present",
+    };
+    expect(
+      findSavedAutonomousReview(
+        { ...source, duration: 4.000000001 },
+        project.platform,
+        [report]
+      )
+    ).toBeDefined();
+    await prepareAutonomousSources({ ...input, savedReports: [report] });
+    expect(input.review).not.toHaveBeenCalled();
+    expect(input.transcribe).toHaveBeenCalledTimes(1);
+  });
+});
 describe("auto-edit source preparation recovery", () => {
   it("retains actual picture/audio observations instead of only editorial rationale", async () => {
     const input = fixture();

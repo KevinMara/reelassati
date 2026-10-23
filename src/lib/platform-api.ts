@@ -1,5 +1,6 @@
 import { speechCreditCost, speechCharacterCount } from "@contracts/billing";
 import { ANALYZER_STREAM_TYPE } from "@contracts/analyzer-transport";
+import { videoReviewFailureMessage } from "@contracts/video-analysis-errors";
 import { unwrapAnalyzerResponse } from "./analyzer-response";
 import type {
   Asset,
@@ -36,24 +37,29 @@ interface ApiErrorBody {
   message?: string;
   missing?: string[];
   reference?: string;
+  reason?: unknown;
+  analysisIncomplete?: boolean;
 }
 
 export class PlatformApiError extends Error {
   status: number;
   missing: string[];
   reference?: string;
+  reason?: string;
 
   constructor(
     message: string,
     status: number,
     missing: string[] = [],
-    reference?: string
+    reference?: string,
+    reason?: string
   ) {
     super(message);
     this.name = "PlatformApiError";
     this.status = status;
     this.missing = missing;
     this.reference = reference;
+    this.reason = reason;
   }
 }
 
@@ -207,6 +213,13 @@ async function requestJson<T>(
       typeof body.reference === "string" &&
         /^[\w-]{1,100}$/.test(body.reference)
         ? body.reference
+        : undefined,
+      path === "/api/ai/analyze" &&
+        response.status === 422 &&
+        body.analysisIncomplete === true &&
+        typeof body.reason === "string" &&
+        videoReviewFailureMessage(body.reason)
+        ? body.reason
         : undefined
     );
   }

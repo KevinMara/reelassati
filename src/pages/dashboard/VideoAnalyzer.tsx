@@ -1,5 +1,6 @@
 import { useUiText } from "@/lib/i18n/ui";
 import { AnalyzerWorkspace } from "@/components/studio/AnalyzerWorkspace";
+import { videoReviewFailureMessage } from "@contracts/video-analysis-errors";
 import {
   normalizeSavedAnalyzerReports,
   attachReportAudience,
@@ -879,6 +880,12 @@ export default function VideoAnalyzer() {
         {error ? (
           <p className="mt-3 text-sm text-red-500" role="alert">
             {typeof error === "string" ? error : ui(error.message)}
+            {error instanceof PlatformApiError &&
+            videoReviewFailureMessage(error.reason) ? (
+              <span className="mt-1 block">
+                {ui(videoReviewFailureMessage(error.reason)!)}
+              </span>
+            ) : null}
             {error instanceof PlatformApiError ? (
               <span className="mt-1 block break-words text-xs">
                 {`HTTP ${error.status}`}

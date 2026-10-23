@@ -1428,6 +1428,48 @@ describe("authenticated paid editing chat route", () => {
     }
   });
 
+  it.each(["omitted", "contradictory", "uncertain"])(
+    "retains a complete evidenced review with a %s story summary, without a retry",
+    async summaryKind => {
+      const complete = videoAnalysisOutput();
+      nextOutput = {
+        ...complete,
+        structure:
+          summaryKind === "omitted"
+            ? []
+            : complete.structure.map(row => ({
+                ...row,
+                status:
+                  summaryKind === "uncertain"
+                    ? "uncertain"
+                    : row.status === "present"
+                      ? "absent"
+                      : "present",
+              })),
+      };
+      const before = balance(),
+        calls = providerCalls.length;
+      const response = await request("/api/ai/analyze", {
+        assetId: "source",
+        schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+      });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        structure: Array<{ role: string; status: string }>;
+        overall: { status: string };
+      };
+      expect(body.overall.status).toBe("complete");
+      expect(body.structure).toHaveLength(5);
+      expect(body.structure.find(row => row.role === "proof")?.status).toBe(
+        "uncertain"
+      );
+      expect(body.structure.find(row => row.role === "payoff")?.status).toBe(
+        "uncertain"
+      );
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before - 10);
+    }
+  );
   it("refunds incomplete, legacy, unsupported or empty analyzer reports instead of settling misleading scores", async () => {
     const complete = videoAnalysisOutput();
     const failures = [
@@ -1453,10 +1495,6 @@ describe("authenticated paid editing chat route", () => {
       {
         output: { ...complete, insights: complete.insights.slice(1) },
         reason: "incomplete-coverage",
-      },
-      {
-        output: { ...complete, structure: [] },
-        reason: "missing-story-assessment",
       },
       {
         output: { ...complete, recommendations: [], changes: [] },

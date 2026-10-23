@@ -5,6 +5,7 @@ import {
   createAutonomousPreparationCache,
   prepareAutonomousSources,
   autonomousTranscriptTargets,
+  findSavedAutonomousReview,
 } from "@/lib/autonomous-preparation";
 import {
   EDIT_RECIPES,
@@ -16,6 +17,7 @@ import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { EditStyleTemplates } from "./EditStyleTemplates";
 import { editStyleDirection } from "@contracts/edit-style-template";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
+import { videoReviewFailureMessage } from "@contracts/video-analysis-errors";
 import { eligibleAnalyzerOptimization } from "@contracts/analyzer-report";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
@@ -39,6 +41,10 @@ import {
 import { selectedBrand } from "@/lib/workspace-scope";
 import { assertAutonomousRunCurrent } from "@/lib/autonomous-run";
 import { contentDuration } from "@/lib/edit-timeline";
+import {
+  editDurationDirection,
+  resolveEditDurationTarget,
+} from "@/lib/edit-duration-target";
 import {
   executeAutonomousPlan,
   assertAutonomousMediaBudget,
@@ -69,11 +75,21 @@ export function AutonomousEditor({
   const [referenceBrief, setReferenceBrief] = useState(
     project.referenceStyleBrief ?? ""
   );
-  const [target, setTarget] = useState(project.duration);
+  const [durationMode, setDurationMode] = useState<"none" | "range">("none");
+  const [minimumDuration, setMinimumDuration] = useState(() =>
+    String(
+      project.duration > 0 ? Number((project.duration / 2).toPrecision(3)) : 15
+    )
+  );
+  const [maximumDuration, setMaximumDuration] = useState(() =>
+    String(project.duration > 0 ? Number(project.duration.toPrecision(3)) : 60)
+  );
   const [automaticDuration, setAutomaticDuration] = useState(true);
-  const targetDuration = automaticDuration
-    ? contentDuration(project.clips)
-    : target;
+  const durationTarget = resolveEditDurationTarget(
+    durationMode,
+    minimumDuration,
+    maximumDuration
+  );
   const [images, setImages] = useState(0);
   const [videos, setVideos] = useState(0);
   const [captions, setCaptions] = useState(true);
@@ -104,7 +120,15 @@ export function AutonomousEditor({
       (a.kind === "video" || a.kind === "audio")
   );
   const analysisCost = sources
-    .filter(a => a.kind === "video")
+    .filter(
+      a =>
+        a.kind === "video" &&
+        !findSavedAutonomousReview(
+          a,
+          project.platform,
+          workspace.analyzerReports
+        )
+    )
     .reduce(
       (sum, a) =>
         sum +
@@ -147,6 +171,15 @@ export function AutonomousEditor({
 
   async function run() {
     if (runController.current && !runController.current.signal.aborted) return;
+    // Validate before scope capture, paid preparation, or any provider request.
+    if (!durationTarget) {
+      setFailure(
+        ui(
+          "Enter a minimum and maximum greater than zero, with the maximum above the minimum."
+        )
+      );
+      return;
+    }
     stopped.current = false;
     const controller = new AbortController();
     runController.current = controller;
@@ -213,6 +246,7 @@ export function AutonomousEditor({
           getUiLocale(),
         ]),
         cache: preparationCache.current,
+        savedReports: workspace.analyzerReports,
         checkpoint,
         review: async asset => {
           setStage(ui("Review"));
@@ -263,15 +297,16 @@ export function AutonomousEditor({
       checkpoint();
       if (automaticDuration)
         working = trimObservedEnding(working, workspace.assets);
-      const plannedDuration = automaticDuration
-        ? contentDuration(working.clips)
-        : targetDuration;
+      const durationDirection = editDurationDirection(
+        durationTarget,
+        automaticDuration
+      );
       setStatus("Building the cut, pacing, captions, and visual treatment…");
       setStage(ui("Edit plan"));
       const result = await platformApi.generateEditPlan(
         {
           project: working,
-          command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. Target ${plannedDuration.toFixed(1)}s. ${automaticDuration ? "Automatically end on the last meaningful content; do not pad to the target or cut off a word." : "Respect the requested target without truncating a word."} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+          command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
           selectedClipIds: [],
           range: { start: 0, end: working.duration },
         },
@@ -508,11 +543,15 @@ export function AutonomousEditor({
       onFinished(result.summary);
     } catch (e) {
       if (!mounted.current || runController.current !== controller) return;
+      const reviewDetail =
+        e instanceof PlatformApiError
+          ? videoReviewFailureMessage(e.reason)
+          : undefined;
       setFailure(
         signal.aborted
           ? `Stopped. Provider work already submitted may still finish in your Library; no further steps will start. ${timelineSaveStarted ? "The timeline save had already started; review your project and use Undo if needed." : "Your original timeline is intact."}`
           : e instanceof PlatformApiError
-            ? `${e.message} (${e.status})${e.reference ? ` · ${ui("Reference")}: ${e.reference}` : ""}`
+            ? `${ui(e.message)}${reviewDetail ? ` ${ui(reviewDetail)}` : ""} (${e.status})${e.reference ? ` · ${ui("Reference")}: ${e.reference}` : ""}`
             : e instanceof Error
               ? e.message
               : "The edit could not complete. Your original timeline is preserved."
@@ -657,20 +696,80 @@ export function AutonomousEditor({
             />
             {ui("Detect ending from content automatically")}
           </label>
-          <label className="mt-4 block text-sm">
-            {ui("Target duration ·")} {targetDuration.toFixed(1)}s
-            <input
-              disabled={busy || automaticDuration}
-              aria-label={ui("AI target duration")}
-              type="range"
-              min={1}
-              max={Math.max(180, project.duration)}
-              step={1}
-              value={target}
-              onChange={e => setTarget(Number(e.target.value))}
-              className="mt-2 w-full accent-primary"
-            />
-          </label>
+          <fieldset disabled={busy} className="mt-4 space-y-3 text-sm">
+            <legend className="font-medium">{ui("Edit duration")}</legend>
+            <select
+              aria-label={ui("Edit duration")}
+              value={durationMode}
+              onChange={event =>
+                setDurationMode(event.target.value as "none" | "range")
+              }
+              className="w-full rounded-lg border border-border bg-background p-2"
+            >
+              <option value="none">{ui("No target duration")}</option>
+              <option value="range">{ui("Preferred duration range")}</option>
+            </select>
+            {durationMode === "range" ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label>
+                    {ui("Minimum duration (seconds)")}
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      inputMode="decimal"
+                      value={minimumDuration}
+                      onChange={event => setMinimumDuration(event.target.value)}
+                      aria-invalid={!durationTarget}
+                      aria-describedby={
+                        durationTarget ? undefined : "edit-duration-error"
+                      }
+                      className="mt-1 w-full rounded-lg border border-border bg-background p-2"
+                    />
+                  </label>
+                  <label>
+                    {ui("Maximum duration (seconds)")}
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      inputMode="decimal"
+                      value={maximumDuration}
+                      onChange={event => setMaximumDuration(event.target.value)}
+                      aria-invalid={!durationTarget}
+                      aria-describedby={
+                        durationTarget ? undefined : "edit-duration-error"
+                      }
+                      className="mt-1 w-full rounded-lg border border-border bg-background p-2"
+                    />
+                  </label>
+                </div>
+                <p className="text-xs text-foreground/60">
+                  {ui(
+                    "A preference, not a cutoff. Preserve complete speech and meaning; never pad or repeat footage to fill the range."
+                  )}
+                </p>
+                {!durationTarget && (
+                  <p
+                    id="edit-duration-error"
+                    role="alert"
+                    className="text-xs text-destructive"
+                  >
+                    {ui(
+                      "Enter a minimum and maximum greater than zero, with the maximum above the minimum."
+                    )}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-foreground/60">
+                {ui(
+                  "The edit follows the footage and story without a requested duration limit."
+                )}
+              </p>
+            )}
+          </fieldset>
         </div>
         <div className="space-y-3 rounded-xl border border-primary/20 bg-background/60 p-4">
           <label className="flex items-center gap-2 text-sm">
@@ -744,7 +843,9 @@ export function AutonomousEditor({
 
           <button
             type="button"
-            disabled={busy || !ready || !project.clips.length}
+            disabled={
+              busy || !ready || !project.clips.length || !durationTarget
+            }
             onClick={() => void run()}
             className="ai-magic flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium disabled:opacity-40"
           >

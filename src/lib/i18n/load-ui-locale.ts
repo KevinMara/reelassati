@@ -2,6 +2,7 @@ import { automaticResearchDisabled } from "./locales/ui-manual-only";
 import { editingTemplateUi } from "./locales/ui-edit-templates";
 import { editingTraitUi } from "./locales/ui-edit-template-traits";
 import { analyzerUi } from "./locales/ui-analyzer";
+import { editDurationUi } from "./locales/ui-edit-duration";
 import type { InterfaceLanguage } from "@contracts/interface-language";
 
 type InterfaceCatalog = Record<string, string>;
@@ -124,6 +125,7 @@ export function loadUiLocale(
   }
   if (code !== "en")
     pending = pending.then(catalog => ({
+      ...editDurationUi[code],
       ...editingTraitUi[code],
       ...catalog,
       "Automatic research is disabled.": automaticResearchDisabled[code],

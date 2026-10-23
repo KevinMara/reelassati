@@ -46,6 +46,15 @@ const number = (value: unknown, max = 100) =>
     ? value
     : null;
 
+/** Millisecond timestamp rounding must not discard an otherwise observed tail.
+ * This only clamps an overrun at the known source boundary; it never fills gaps. */
+const SOURCE_CLOCK_ROUNDING_SECONDS = 0.001;
+export function clampVideoSourceEnd(end: number, duration: number): number {
+  return end > duration && end <= duration + SOURCE_CLOCK_ROUNDING_SECONDS
+    ? duration
+    : end;
+}
+
 /** Reject invented/out-of-source ranges and unsupported scores. Never fill gaps
  * or manufacture a hook/CTA when the model did not observe one. */
 export function normalizeVideoInsights(
@@ -64,8 +73,9 @@ export function normalizeVideoInsights(
       !Number.isFinite(row.start) ||
       !Number.isFinite(row.end) ||
       row.start < 0 ||
+      row.start >= duration ||
       row.start >= row.end ||
-      row.end > duration
+      row.end > duration + SOURCE_CLOCK_ROUNDING_SECONDS
     )
       continue;
     const visualEvidence = text(row.visualEvidence),
@@ -73,7 +83,7 @@ export function normalizeVideoInsights(
     if (!visualEvidence && !audioEvidence) continue;
     candidates.push({
       start: row.start,
-      end: row.end,
+      end: clampVideoSourceEnd(row.end, duration),
       role: VIDEO_ROLES.includes(row.role as VideoRole)
         ? (row.role as VideoRole)
         : "unclassified",
@@ -243,6 +253,17 @@ export type VideoStoryAssessment = {
   status: "present" | "absent" | "uncertain";
   note: string;
 };
+export function videoStoryFunctionMatches(
+  role: VideoStoryAssessment["role"],
+  observedRole: VideoRole
+): boolean {
+  return (
+    observedRole === role ||
+    (role === "core" &&
+      ["development", "demonstration"].includes(observedRole)) ||
+    (role === "payoff" && observedRole === "resolution")
+  );
+}
 export function normalizeVideoStructure(
   value: unknown,
   insights: VideoInsight[]
@@ -255,17 +276,13 @@ export function normalizeVideoStructure(
     );
     if (candidates.length !== 1) return [];
     const row = candidates[0] as Record<string, unknown>;
-    const seen = insights.some(
-      interval =>
-        interval.role === role ||
-        (role === "core" &&
-          ["development", "demonstration"].includes(interval.role)) ||
-        (role === "payoff" && interval.role === "resolution")
+    const seen = insights.some(interval =>
+      videoStoryFunctionMatches(role, interval.role)
     );
     if (
       !["present", "absent", "uncertain"].includes(String(row.status)) ||
       !text(row.note) ||
-      (seen && row.status !== "present") ||
+      (seen && row.status === "absent") ||
       (!seen && row.status === "present")
     )
       return [];
@@ -276,6 +293,56 @@ export function normalizeVideoStructure(
     });
   }
   return result;
+}
+
+/** The section summary is an index over the source-time observations, not a
+ * second source of facts. Preserve uncertainty and never turn a missing index
+ * entry into an invented absence, function, timestamp or numeric score. */
+export function resolveVideoStructureFromEvidence(
+  value: unknown,
+  insights: VideoInsight[]
+): VideoStoryAssessment[] {
+  const strict = normalizeVideoStructure(value, insights);
+  if (strict.length === VIDEO_STORY_ROLES.length) return strict;
+  return VIDEO_STORY_ROLES.map(role => {
+    const observed = insights.filter(interval =>
+      videoStoryFunctionMatches(role, interval.role)
+    );
+    const candidates = Array.isArray(value)
+      ? value.filter(row => row && typeof row === "object" && row.role === role)
+      : [];
+    const assessment =
+      candidates.length === 1
+        ? (candidates[0] as Record<string, unknown>)
+        : undefined;
+    const valid =
+      assessment &&
+      text(assessment.note) &&
+      ["present", "absent", "uncertain"].includes(String(assessment.status));
+    if (valid && assessment.status === "uncertain")
+      return { role, status: "uncertain", note: text(assessment.note) };
+    if (
+      valid &&
+      ((observed.length && assessment.status === "present") ||
+        (!observed.length && assessment.status === "absent"))
+    )
+      return {
+        role,
+        status: assessment.status as VideoStoryAssessment["status"],
+        note: text(assessment.note),
+      };
+    const roleEvidence = observed
+      .map(interval => text(interval.roleReason))
+      .filter(Boolean)
+      .join(" ");
+    return {
+      role,
+      status: observed.length && !valid ? "present" : "uncertain",
+      note:
+        roleEvidence ||
+        "This function was not established by the source-time observations.",
+    };
+  });
 }
 
 export type VideoEditorialRecommendation = {
@@ -301,10 +368,11 @@ export function normalizeVideoRecommendations(
       typeof row.start !== "number" ||
       !Number.isFinite(row.start) ||
       row.start < 0 ||
+      row.start >= duration ||
       typeof row.end !== "number" ||
       !Number.isFinite(row.end) ||
       row.end <= row.start ||
-      row.end > duration ||
+      clampVideoSourceEnd(row.end, duration) > duration ||
       !text(row.label) ||
       !text(row.observation) ||
       !text(row.action) ||
@@ -317,7 +385,7 @@ export function normalizeVideoRecommendations(
       {
         id: `recommendation-${index + 1}`,
         start: row.start,
-        end: row.end,
+        end: clampVideoSourceEnd(row.end, duration),
         label: text(row.label, 160),
         observation: text(row.observation),
         action: text(row.action),
@@ -487,7 +555,7 @@ Return insights as chronological non-overlapping source-time intervals covering 
 Each insight: {start,end,role:${VIDEO_ROLES.join("|")},roleReason,label,attention:0..100|null,stimulation:0..100|null,processingLoad:0..100|null,clarity:0..100|null,confidence:0..1|null,visualEvidence,audioEvidence,strength,improvement,rationale}. All text fields are required and specific to the interval. For genuinely silent/no-audio content, audioEvidence states the observed absence; it is not an empty string. If no change is justified, improvement explains what to preserve and why.
 Observe the actual temporal video and available audio together: framing, movement, edits, visible text, intelligible speech, sound changes, context and payoff. This is never a transcript-only or isolated-screenshot review.
 Automatically identify hook, core, proof, payoff, CTA and other sections from observed content; a CTA can be absent. Hook is an observed opening promise, question, outcome or pattern interruption; core advances the topic/story; proof substantiates a claim; payoff resolves a promise; CTA explicitly requests a viewer action. Other is observed content that serves none of those functions (for example credits); unclassified is a genuinely ambiguous role with a specific explanation. Never use Other as a default when role detection is missing. Never force standard hook lengths or invent a CTA. Preserve intentional pauses and meaningful action.
-Return structure with exactly one {role:hook|core|proof|payoff|cta,status:present|absent|uncertain,note} assessment for each of those five roles. Present must correspond to at least one insight with that role; explain genuine absence or uncertainty.
+Return structure with exactly one {role:hook|core|proof|payoff|cta,status:present|absent|uncertain,note} assessment for each of those five roles. Present must correspond to an observed insight with that function: core includes core/development/demonstration; payoff includes payoff/resolution; the other assessments require their exact role. Explain genuine absence or uncertainty.
 Attention means an editorial estimate of how clearly this interval gives a target short-form viewer a reason to keep watching, using orientation, specificity, promised payoff and relevant visible evidence. Stimulation means content intensity from observed movement, edits and sound, not physiological arousal. ProcessingLoad estimates competing concepts, text, speech and visual tasks; high is not automatically bad. Clarity estimates how easily the interval's message and connection to the story can be followed.
 Use consistent anchored editorial scales: Attention 0-20=no discernible reason to continue, 40-60=understandable but generic/deferred value, 80-100=specific immediate reason with visible/verbal support. Stimulation 0-20=mostly static/quiet, 40-60=moderate relevant audiovisual changes, 80-100=dense/rapid/loud changes; intensity alone is never quality. ProcessingLoad 0-20=one simple aligned cue, 40-60=multiple aligned cues/concepts, 80-100=competing speech/text/visual tasks that demand simultaneous processing. Clarity 0-20=meaning or relation to story cannot be followed, 40-60=understandable with ambiguity/readability costs, 80-100=precise readable coherent progression. Intermediate values require concrete reasons; these ordinal rubric values are not measured viewer percentages.
 For every estimate, give specific visual/audio evidence, explain what works, what should improve and why. Cite the exact source interval; prioritize the first meaningful promise, time to visible proof, coherent progression, readable text, audible delivery and earned payoff. More cuts, louder sound or stronger visual intensity are not automatically better. Confidence is evidential confidence, not a calibrated probability.

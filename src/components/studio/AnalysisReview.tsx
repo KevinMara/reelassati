@@ -28,6 +28,7 @@ import {
   VIDEO_ANALYSIS_SCHEMA_VERSION,
   normalizeVideoInsights,
   scoreVideoInsights,
+  videoStoryFunctionMatches,
   type VideoInsight,
   type VideoRole,
 } from "@contracts/video-analysis";
@@ -998,14 +999,16 @@ export function AnalysisReview({
           <span className="ar-small-label">{ui("Story structure")}</span>
           <div>
             {structure.map(section => {
-              const first = intervals.find(row => row.role === section.role);
+              const first = intervals.find(row =>
+                videoStoryFunctionMatches(section.role, row.role)
+              );
               return (
                 <button
                   type="button"
                   key={section.role}
                   disabled={!first}
                   onClick={() => first && seek(first.start)}
-                  title={section.note}
+                  title={ui(section.note)}
                   style={channelStyle(roleColors[section.role])}
                   className={`is-${section.status}`}
                 >

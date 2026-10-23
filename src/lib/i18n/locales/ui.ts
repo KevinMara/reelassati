@@ -21,6 +21,7 @@ import { czechUi } from "./ui-cs";
 import { indonesianUi } from "./ui-id";
 import { swedishUi } from "./ui-sv";
 import { analyzerUi } from "./ui-analyzer";
+import { editDurationUi } from "./ui-edit-duration";
 import { hungarianUi } from "./ui-hu";
 import { norwegianUi } from "./ui-no";
 import { vietnameseUi } from "./ui-vi";
@@ -83,6 +84,10 @@ for (const [language, translation] of Object.entries(editingTemplateUi)) {
 }
 for (const [language, translation] of Object.entries(analyzerUi)) {
   Object.assign(uiLocales[language], translation);
+}
+for (const [language, translation] of Object.entries(editDurationUi)) {
+  for (const [key, value] of Object.entries(translation))
+    uiLocales[language][key] ??= value;
 }
 for (const [language, translation] of Object.entries(editingTraitUi)) {
   for (const [key, value] of Object.entries(translation))

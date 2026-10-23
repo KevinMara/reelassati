@@ -2,6 +2,11 @@ import type { Asset, EditProject } from "@contracts/workspace";
 import { normalizeReview } from "@contracts/source-review";
 import { mapChatTranscript } from "./editor-chat-execution";
 import { captionOwner } from "@contracts/caption-ownership";
+import {
+  normalizeSavedAnalyzerReports,
+  type SavedAnalyzerReport,
+} from "@contracts/analyzer-report";
+import { normalizeVideoStructure } from "@contracts/video-analysis";
 
 /** Captions on another source are not evidence that this source was transcribed.
  * Linked picture/sound share a speech clock; do not buy it twice. */
@@ -56,6 +61,45 @@ export function createAutonomousPreparationCache(): AutonomousPreparationCache {
   return { reviews: new Map(), transcripts: new Map() };
 }
 
+/** Reuse only a complete review of this immutable owned source and platform.
+ * A saved note never authorizes inference, creates evidence, or changes billing. */
+export function findSavedAutonomousReview(
+  asset: Asset,
+  platform: EditProject["platform"],
+  reports: SavedAnalyzerReport[] | undefined
+): Review | undefined {
+  if (asset.kind !== "video" || !asset.duration) return;
+  const candidates = reports
+    ?.slice(0, 6)
+    .filter(
+      candidate =>
+        candidate?.assetId === asset.id &&
+        candidate.platform === platform &&
+        Math.abs(candidate.duration - asset.duration!) <= 0.001
+    );
+  const report = normalizeSavedAnalyzerReports(candidates).find(
+    candidate =>
+      candidate.result.review &&
+      normalizeVideoStructure(
+        candidate.result.structure,
+        candidate.result.insights
+      ).length === 5
+  );
+  if (!report) return;
+  const review = normalizeReview(report.result.review, asset.duration);
+  return {
+    summary: report.result.summary,
+    review,
+    insights: structuredClone(report.result.insights),
+    retention: report.result.insights.map(interval => ({
+      start: interval.start,
+      end: interval.end,
+      score: interval.attention!,
+      note: interval.rationale,
+    })),
+  };
+}
+
 /** A failed later step must not repurchase completed source preparation.
  * This cache lives only in the open editor, and is scoped to its exact inputs. */
 export async function prepareAutonomousSources(input: {
@@ -63,6 +107,7 @@ export async function prepareAutonomousSources(input: {
   sources: Asset[];
   captions: boolean;
   context: string;
+  savedReports?: SavedAnalyzerReport[];
   cache: AutonomousPreparationCache;
   checkpoint: () => void;
   review: (asset: Asset) => Promise<Review>;
@@ -89,7 +134,13 @@ export async function prepareAutonomousSources(input: {
     keys.set(asset.id, key);
     if (asset.kind === "video") {
       const result =
-        input.cache.reviews.get(key) ?? (await input.review(asset));
+        input.cache.reviews.get(key) ??
+        findSavedAutonomousReview(
+          asset,
+          input.project.platform,
+          input.savedReports
+        ) ??
+        (await input.review(asset));
       input.checkpoint();
       input.cache.reviews.set(key, result);
       working.sourceReviews = [

@@ -34,6 +34,38 @@ afterEach(() => {
 });
 
 describe("platform API transport", () => {
+  it.each([
+    ["missing-story-assessment", true, "missing-story-assessment"],
+    ["PRIVATE_UNTRUSTED_PROVIDER_DETAIL", true, undefined],
+    ["constructor", true, undefined],
+    ["missing-channels", false, undefined],
+  ])(
+    "keeps only a known analyzer validation code (%s)",
+    async (reason, analysisIncomplete, expected) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            {
+              error: "Incomplete report",
+              reason,
+              analysisIncomplete,
+              reference: "safe-review-123",
+            },
+            { status: 422 }
+          )
+        );
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(
+        platformApi.analyzeVideo({ assetId: "owned", platform: "tiktok" })
+      ).rejects.toMatchObject({
+        status: 422,
+        reason: expected,
+        reference: "safe-review-123",
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
   it.each([200, 400, 504])(
     "uses the streamed analyzer's terminal HTTP %s without repeating its paid request",
     async status => {

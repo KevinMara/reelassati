@@ -17,9 +17,10 @@ import {
 import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
 import {
   normalizeVideoInsights,
+  clampVideoSourceEnd,
   VIDEO_ANALYSIS_DIRECTION,
   normalizeVideoRecommendations,
-  normalizeVideoStructure,
+  resolveVideoStructureFromEvidence,
   scoreVideoInsights,
   VIDEO_ANALYSIS_SCHEMA_VERSION,
   VIDEO_ROLES,
@@ -2101,8 +2102,15 @@ async function getWorkspace(
     };
   });
   const availableAssetIds = new Set(workspace.assets.map(asset => asset.id));
-  workspace.analyzerReports = normalizeSavedAnalyzerReports(workspace.analyzerReports).filter(report =>
-    workspace!.assets.some(asset => asset.id === report.assetId && asset.duration && Math.abs(asset.duration - report.duration) <= 0.25)
+  workspace.analyzerReports = normalizeSavedAnalyzerReports(
+    workspace.analyzerReports
+  ).filter(report =>
+    workspace!.assets.some(
+      asset =>
+        asset.id === report.assetId &&
+        asset.duration &&
+        Math.abs(asset.duration - report.duration) <= 0.25
+    )
   );
   workspace.projects = workspace.projects.map(project => ({
     ...project,
@@ -6720,7 +6728,10 @@ async function handleAi(
           analysisDuration || 0
         );
         const overall = scoreVideoInsights(insights, analysisDuration || 0);
-        const structure = normalizeVideoStructure(output.structure, insights);
+        const structure = resolveVideoStructureFromEvidence(
+          output.structure,
+          insights
+        );
         const recommendations = normalizeVideoRecommendations(
           output.recommendations,
           analysisDuration || 0
@@ -6732,7 +6743,15 @@ async function handleAi(
         const sourceReview = recordValue(output.review);
         const pacingAssessment = recordValue(output.pacing);
         const rawChanges = Array.isArray(output.changes)
-          ? output.changes
+          ? output.changes.map(item => {
+              const row = recordValue(item);
+              return row && typeof row.end === "number"
+                ? {
+                    ...row,
+                    end: clampVideoSourceEnd(row.end, analysisDuration || 0),
+                  }
+                : item;
+            })
           : null;
         // The analyzer is source-clock based and has no timeline clip/word map.
         // Accept only directly representable, evidence-bound operations. Rewrites,
@@ -6880,6 +6899,19 @@ async function handleAi(
                               ? "unexplained-empty-plan"
                               : "";
         if (invalidReason) {
+          console.error(
+            "REELassati video review rejected",
+            JSON.stringify({
+              reason: invalidReason,
+              requestId: input.requestId,
+              invocationId: invocation.id,
+              rawIntervalCount: Array.isArray(output.insights)
+                ? output.insights.length
+                : 0,
+              acceptedIntervalCount: insights.length,
+              coveragePercent: overall.coveragePercent,
+            })
+          );
           await failAiInvocation(env, invocation, `analysis_${invalidReason}`);
           return json(
             {
@@ -6888,6 +6920,7 @@ async function handleAi(
               analysisIncomplete: true,
               creditsRefunded: true,
               reason: invalidReason,
+              reference: input.requestId,
             },
             422
           );
@@ -6895,6 +6928,7 @@ async function handleAi(
         output.insights = insights;
         output.structure = structure;
         output.recommendations = recommendations;
+        output.changes = rawChanges;
         output.overall = overall;
         if (analysisUsesProxy) {
           const review = recordValue(output.review) || {};
