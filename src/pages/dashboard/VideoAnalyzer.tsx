@@ -3,6 +3,7 @@ import { AnalyzerWorkspace } from "@/components/studio/AnalyzerWorkspace";
 import {
   normalizeSavedAnalyzerReports,
   attachReportAudience,
+  requiresAnalysisQuoteReview,
   type AudienceResponse,
   type AnalyzerOptimization,
   type SavedAnalyzerReport,
@@ -263,7 +264,7 @@ export default function VideoAnalyzer() {
       if (id !== generation.current || abort.signal.aborted) return;
       setSourceAsset(readyAsset);
       // Import/measurement never starts a paid analysis. A second click accepts the actual duration quote.
-      if (!sourceAsset?.duration || sourceAsset.id !== readyAsset.id) {
+      if (requiresAnalysisQuoteReview(sourceAsset, readyAsset)) {
         setNotice(
           ui(
             "Source ready · {{seconds}} seconds. Review the measured credit quote, then press Analyze video.",

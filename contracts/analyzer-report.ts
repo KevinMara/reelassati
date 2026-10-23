@@ -12,6 +12,25 @@ import {
 import type { EditOperation } from "./workspace";
 import type { ContentProvenance } from "./compliance";
 import type { normalizeReview } from "./source-review";
+import { AI_CREDIT_COSTS, timedCreditCost } from "./billing";
+
+export function requiresAnalysisQuoteReview(
+  previous: { id: string; duration?: number } | null,
+  measured: { id: string; duration?: number }
+) {
+  return (
+    !previous ||
+    previous.id !== measured.id ||
+    !Number.isFinite(previous.duration) ||
+    !previous.duration ||
+    previous.duration < 0 ||
+    timedCreditCost(
+      previous.duration,
+      AI_CREDIT_COSTS.videoAnalysisPerMinute
+    ) !==
+      timedCreditCost(measured.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute)
+  );
+}
 
 export type SavedAnalyzerReport = {
   assetId: string;

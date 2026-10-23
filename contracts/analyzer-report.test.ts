@@ -8,6 +8,7 @@ import {
   normalizeAudienceResponse,
   normalizeSavedAnalyzerReports,
   attachReportAudience,
+  requiresAnalysisQuoteReview,
   type SavedAnalyzerReport,
 } from "./analyzer-report";
 import { normalizeVideoStructure, type VideoInsight } from "./video-analysis";
@@ -37,6 +38,40 @@ const metadata = {
   sampleSize: 1000,
 };
 const csv = "time_seconds,retention_percent\n0,100\n2,110\n4,70\n6,60";
+describe("measured analysis credit quote", () => {
+  it.each([
+    [59.9, 60.1],
+    [60.1, 59.9],
+    [119.9, 120.1],
+  ])(
+    "requires a new quote when measurement crosses a billing boundary (%s → %s)",
+    (before, after) => {
+      expect(
+        requiresAnalysisQuoteReview(
+          { id: "source", duration: before },
+          { id: "source", duration: after }
+        )
+      ).toBe(true);
+    }
+  );
+  it("does not reprompt for precision changes within an accepted price", () => {
+    expect(
+      requiresAnalysisQuoteReview(
+        { id: "source", duration: 28.35 },
+        { id: "source", duration: 28.350708 }
+      )
+    ).toBe(false);
+    expect(
+      requiresAnalysisQuoteReview(null, { id: "source", duration: 28 })
+    ).toBe(true);
+    expect(
+      requiresAnalysisQuoteReview(
+        { id: "other", duration: 28 },
+        { id: "source", duration: 28 }
+      )
+    ).toBe(true);
+  });
+});
 describe("audience measurements", () => {
   it("rejects oversized saved CSV expansions before replacing the existing review", () => {
     const values = Array.from(
