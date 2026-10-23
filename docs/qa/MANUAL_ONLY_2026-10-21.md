@@ -1,5 +1,9 @@
 # Manual-only AI operations — 21 October 2026
 
+## Kevin's clarification — 23 October 2026
+
+Kevin explicitly authorized agents/subagents and similar help during visible, active work, including recovery of unfinished editor work: “just nothing that drains my codex usage after we end this session-visible work.” Bounded subagent work within the active chat is therefore permitted. Explain its model allowance use, duration and stop condition; finish or stop every owned agent before the visible turn ends. No scheduled, detached or queued continuation is authorized. Paid provider tests still require separate explicit approval. The original shutdown requirements below remain in force for unattended work.
+
 Kevin explicitly ordered permanent shutdown of scheduled AI trend research and similar unattended credit-consuming work. New work must occur only in the visible, active chat turn for the current request. Do not enable schedules, heartbeats, model watchdogs, queued continuations or old stopped work. A separate chat or model worker requires Kevin's specific current authorization after explaining model use, cost risk, duration and stop condition. These operating instructions are not a server-side billing cap or a guarantee against third-party faults.
 
 ## Permanent source changes

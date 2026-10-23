@@ -19,6 +19,12 @@ import {
 } from "lucide-react";
 import type { Asset } from "@contracts/workspace";
 import {
+  buildStorySections,
+  STORY_ROLE_LABELS,
+  responseForInterval,
+  type AudienceResponse,
+} from "@contracts/analyzer-report";
+import {
   VIDEO_ANALYSIS_SCHEMA_VERSION,
   normalizeVideoInsights,
   scoreVideoInsights,
@@ -55,15 +61,7 @@ const channels = [
     description: "Message and story coherence",
   },
 ] as const;
-const roleLabels: Record<VideoRole, string> = {
-  hook: "Hook",
-  core: "Core",
-  proof: "Proof",
-  payoff: "Payoff",
-  cta: "CTA",
-  other: "Other",
-  unclassified: "Unclassified",
-};
+const roleLabels = STORY_ROLE_LABELS;
 const roleColors: Record<VideoRole, string> = {
   hook: "#b09aff",
   core: "#59c7ff",
@@ -72,9 +70,18 @@ const roleColors: Record<VideoRole, string> = {
   cta: "#ff8db2",
   other: "#93a2b8",
   unclassified: "#93a2b8",
+  setup: "#86c5da",
+  tension: "#ff8db2",
+  development: "#59c7ff",
+  demonstration: "#38dfb6",
+  transition: "#93a2b8",
+  resolution: "#f4c56a",
+  loop: "#b09aff",
 };
 type Channel = (typeof channels)[number]["id"];
 type Result = {
+  hook?: { score: number | null; note: string };
+  pacing?: { score: number | null; note: string };
   schemaVersion?: string;
   insights?: VideoInsight[];
   retention?: { start: number; end: number; score: number; note: string }[];
@@ -120,13 +127,18 @@ function signalPath(
 export function AnalysisReview({
   asset,
   result,
+  audience,
 }: {
   asset: Asset;
   result: Result;
+  audience?: AudienceResponse;
 }) {
   const { t: ui } = useTranslation("ui");
+  const roleName = (role: VideoRole) =>
+    ui(roleLabels[role], { context: "story" });
   const chartId = useId().replace(/:/g, "");
   const video = useRef<HTMLVideoElement>(null);
+  const pendingSeek = useRef<number | null>(null);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -153,6 +165,19 @@ export function AnalysisReview({
     [intervals, duration]
   );
   const complete = versioned && aggregate.status === "complete";
+  const sections = useMemo(
+    () => buildStorySections(intervals, duration),
+    [intervals, duration]
+  );
+  const response =
+    audience?.assetId === asset.id &&
+    Math.abs(audience.duration - duration) <= 0.25
+      ? audience
+      : undefined;
+  const responseMaximum = Math.max(
+    100,
+    ...(response?.points.map(point => point.retention) || [])
+  );
   const selectedIndex = intervals.findIndex(
     row => row.start <= time && time < row.end
   );
@@ -174,7 +199,9 @@ export function AnalysisReview({
   const confidence = current?.confidence;
   const seek = (next: number) => {
     const position = clamp(next, duration);
-    if (video.current) video.current.currentTime = position;
+    pendingSeek.current = position;
+    if (video.current && video.current.readyState >= 1)
+      video.current.currentTime = position;
     setTime(position);
   };
   const toggle = () => {
@@ -227,7 +254,29 @@ export function AnalysisReview({
               playsInline
               preload="metadata"
               aria-label={asset.name}
-              onTimeUpdate={event => setTime(event.currentTarget.currentTime)}
+              onTimeUpdate={event => {
+                const position = event.currentTarget.currentTime;
+                // A pre-metadata seek can receive the initial 0s event before
+                // the requested frame. Do not move the selected report back.
+                if (
+                  pendingSeek.current !== null &&
+                  Math.abs(position - pendingSeek.current) > 0.1
+                )
+                  return;
+                pendingSeek.current = null;
+                setTime(position);
+              }}
+              onSeeked={event => {
+                if (
+                  pendingSeek.current !== null &&
+                  Math.abs(
+                    event.currentTarget.currentTime - pendingSeek.current
+                  ) <= 0.1
+                ) {
+                  pendingSeek.current = null;
+                  setTime(event.currentTarget.currentTime);
+                }
+              }}
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}
               onEnded={() => setPlaying(false)}
@@ -241,6 +290,11 @@ export function AnalysisReview({
                     ? event.currentTarget.duration
                     : asset.duration || 0
                 );
+                if (pendingSeek.current !== null)
+                  event.currentTarget.currentTime = clamp(
+                    pendingSeek.current,
+                    event.currentTarget.duration || asset.duration || 0
+                  );
               }}
               onError={() =>
                 setPlaybackError(
@@ -263,7 +317,7 @@ export function AnalysisReview({
               >
                 <span className="ar-role-dot" />
                 <span>
-                  <strong>{ui(roleLabels[current.role])}</strong>
+                  <strong>{roleName(current.role)}</strong>
                   <span>{current.label}</span>
                 </span>
                 <span className="ar-overlay-time">
@@ -369,7 +423,7 @@ export function AnalysisReview({
           </div>
           <div className="ar-response-heading">
             <p className="ar-eyebrow">
-              {ui("Response at {{time}}", { time: mediaTime(time) })}
+              {ui("Editorial signals at {{time}}", { time: mediaTime(time) })}
             </p>
             <div className="ar-moment-navigation">
               <button
@@ -460,6 +514,64 @@ export function AnalysisReview({
             </p>
           ) : null}
         </aside>
+      </div>
+      <div className="ar-scorecard-panel">
+        <div className="ar-section-heading">
+          <div>
+            <p className="ar-eyebrow">{ui("Editorial estimates")}</p>
+            <h3>{ui("The whole picture")}</h3>
+          </div>
+          <span className="ar-small-label">
+            {ui("No measured audience response implied")}
+          </span>
+        </div>
+        <div className="ar-scorecards">
+          {[
+            {
+              label: "Hook",
+              score: result.hook?.score,
+              note: result.hook?.note,
+            },
+            {
+              label: "Pacing",
+              score: result.pacing?.score,
+              note: result.pacing?.note,
+            },
+            {
+              label: "Attention",
+              score: aggregate.attention,
+              note: "Reason to keep watching",
+            },
+            {
+              label: "Clarity",
+              score: aggregate.clarity,
+              note: "Message and story coherence",
+            },
+            {
+              label: "Processing load",
+              score: aggregate.processingLoad,
+              note: "Competing information",
+            },
+            {
+              label: "Stimulation",
+              score: aggregate.stimulation,
+              note: "Movement, edits and sound",
+            },
+          ].map(metric => (
+            <article key={metric.label}>
+              <span>{ui(metric.label)}</span>
+              <strong>
+                {scoreText(metric.score)}
+                <small>/100</small>
+              </strong>
+              <p>
+                {metric.label === "Hook" || metric.label === "Pacing"
+                  ? metric.note || ui("Unavailable")
+                  : ui(metric.note!)}
+              </p>
+            </article>
+          ))}
+        </div>
       </div>
       <div className="ar-timeline-panel">
         <div className="ar-section-heading">
@@ -667,7 +779,7 @@ export function AnalysisReview({
                   }}
                 >
                   <span>
-                    {mediaTime(hoverTime)} · {ui(roleLabels[hovered.role])}
+                    {mediaTime(hoverTime)} · {roleName(hovered.role)}
                   </span>
                   {channels.map(channel => (
                     <div key={channel.id} style={channelStyle(channel.color)}>
@@ -698,9 +810,9 @@ export function AnalysisReview({
                   key={`${row.start}-${row.end}`}
                   type="button"
                   aria-label={ui("Select {{section}} section", {
-                    section: `${ui(roleLabels[row.role])} ${mediaTime(row.start)}`,
+                    section: `${roleName(row.role)} ${mediaTime(row.start)}`,
                   })}
-                  title={`${ui(roleLabels[row.role])} · ${mediaTime(row.start)}–${mediaTime(row.end)} · ${row.label}`}
+                  title={`${roleName(row.role)} · ${mediaTime(row.start)}–${mediaTime(row.end)} · ${row.label}`}
                   onClick={() => seek(row.start)}
                   className={current === row ? "is-current" : ""}
                   style={{
@@ -709,7 +821,7 @@ export function AnalysisReview({
                     width: `${((row.end - row.start) / duration) * 100}%`,
                   }}
                 >
-                  <span>{ui(roleLabels[row.role])}</span>
+                  <span>{roleName(row.role)}</span>
                 </button>
               ))}
             </div>
@@ -752,7 +864,135 @@ export function AnalysisReview({
             <small>{ui("No low-attention intervals at this threshold.")}</small>
           ) : null}
         </div>
+        {response ? (
+          <div className="ar-audience-chart">
+            <svg
+              viewBox="0 0 1000 120"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={ui("Imported audience retention")}
+              onClick={event => {
+                const bounds = event.currentTarget.getBoundingClientRect();
+                seek(((event.clientX - bounds.left) / bounds.width) * duration);
+              }}
+            >
+              {[0, responseMaximum / 2, responseMaximum].map(value => (
+                <g key={value}>
+                  <line
+                    x1={0}
+                    x2={1000}
+                    y1={100 - (value / responseMaximum) * 80}
+                    y2={100 - (value / responseMaximum) * 80}
+                    stroke="currentColor"
+                    opacity={0.1}
+                  />
+                  <text
+                    x={4}
+                    y={96 - (value / responseMaximum) * 80}
+                    className="ar-chart-scale"
+                  >{`${Math.round(value)}%`}</text>
+                </g>
+              ))}
+              {response
+                ? response.points.map((point, index, all) => {
+                    const next = all[index + 1];
+                    // Separate from editorial curves; actual samples only, and
+                    // a dynamic scale preserves replay values above 100%.
+                    const maximum = responseMaximum;
+                    return (
+                      <g key={point.time}>
+                        <circle
+                          cx={(point.time / duration) * 1000}
+                          cy={100 - (point.retention / maximum) * 80}
+                          r={3}
+                          fill="#f4c56a"
+                        >
+                          <title>{`${mediaTime(point.time)}: ${point.retention}%`}</title>
+                        </circle>
+                        {next ? (
+                          <line
+                            x1={(point.time / duration) * 1000}
+                            x2={(next.time / duration) * 1000}
+                            y1={100 - (point.retention / maximum) * 80}
+                            y2={100 - (next.retention / maximum) * 80}
+                            stroke="#f4c56a"
+                            strokeDasharray="3 5"
+                            opacity={0.55}
+                          />
+                        ) : null}
+                      </g>
+                    );
+                  })
+                : null}
+
+              <line
+                x1={percent * 10}
+                x2={percent * 10}
+                y1={10}
+                y2={110}
+                stroke="#fff"
+                opacity={0.6}
+              />
+            </svg>
+          </div>
+        ) : null}
+        {response ? (
+          <p className="ar-measurement-note">
+            {ui("Imported audience retention")} · {response.source} ·{" "}
+            {response.period} · {response.sampleSize.toLocaleString()}{" "}
+            {ui("views")} ·{" "}
+            {ui(
+              "Gold: imported retention, 0–{{maximum}}%. Connectors are visual guides.",
+              { maximum: responseMaximum }
+            )}
+          </p>
+        ) : null}
       </div>
+      {sections.length ? (
+        <div className="ar-section-panel">
+          <div className="ar-section-heading">
+            <div>
+              <p className="ar-eyebrow">{ui("Story structure")}</p>
+              <h3>{ui("Every section has a job")}</h3>
+            </div>
+            <span className="ar-small-label">
+              {ui("Sections follow observed purpose")}
+            </span>
+          </div>
+          <div className="ar-section-cards">
+            {sections.map(section => (
+              <button
+                key={section.start}
+                type="button"
+                onClick={() => seek(section.start)}
+                className={
+                  time >= section.start && time < section.end
+                    ? "is-selected"
+                    : ""
+                }
+                style={channelStyle(roleColors[section.role])}
+              >
+                <span className="ar-role-dot" />
+                <strong>{roleName(section.role)}</strong>
+                <span>
+                  {mediaTime(section.start)}–{mediaTime(section.end)}
+                </span>
+                <b>
+                  {scoreText(section.rating.score)}
+                  <small>/100</small>
+                </b>
+                <p>
+                  {section.moments[0].roleReason || section.moments[0].label}
+                </p>
+                <span className="ar-small-label">
+                  {ui("Attention")} {scoreText(section.rating.attention)} ·{" "}
+                  {ui("Clarity")} {scoreText(section.rating.clarity)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {structure.length ? (
         <div className="ar-structure-summary">
           <span className="ar-small-label">{ui("Story structure")}</span>
@@ -770,7 +1010,7 @@ export function AnalysisReview({
                   className={`is-${section.status}`}
                 >
                   <span className="ar-role-dot" />
-                  <strong>{ui(roleLabels[section.role])}</strong>
+                  <strong>{roleName(section.role)}</strong>
                   <span>
                     {ui(
                       section.status === "present"
@@ -837,7 +1077,7 @@ export function AnalysisReview({
                     style={channelStyle(roleColors[row.role])}
                   >
                     <span className="ar-role-dot" />
-                    <strong>{ui(roleLabels[row.role])}</strong>
+                    <strong>{roleName(row.role)}</strong>
                     <span>
                       {mediaTime(row.start)}–{mediaTime(row.end)}
                     </span>
@@ -851,6 +1091,33 @@ export function AnalysisReview({
                   </span>
                 </div>
                 <div className="ar-evidence-grid">
+                  {(() => {
+                    const measurement = responseForInterval(
+                      response,
+                      asset.id,
+                      row.start,
+                      row.end
+                    );
+                    return measurement ? (
+                      <div className="ar-measured-moment">
+                        <strong>{ui("Imported audience retention")}</strong>
+                        <p>
+                          {measurement.first.toFixed(1)}%
+                          {measurement.points.length > 1
+                            ? ` → ${measurement.last.toFixed(1)}%`
+                            : ""}
+                          {measurement.delta !== null
+                            ? ` (${measurement.delta >= 0 ? "+" : ""}${measurement.delta.toFixed(1)} pp)`
+                            : ""}
+                        </p>
+                        <small>
+                          {ui(
+                            "Observed association; the explanation is a hypothesis."
+                          )}
+                        </small>
+                      </div>
+                    ) : null;
+                  })()}
                   {mode === "evidence" ? (
                     <>
                       <Evidence

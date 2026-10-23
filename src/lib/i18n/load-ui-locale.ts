@@ -1,6 +1,7 @@
 import { automaticResearchDisabled } from "./locales/ui-manual-only";
 import { editingTemplateUi } from "./locales/ui-edit-templates";
 import { editingTraitUi } from "./locales/ui-edit-template-traits";
+import { analyzerUi } from "./locales/ui-analyzer";
 import type { InterfaceLanguage } from "@contracts/interface-language";
 
 type InterfaceCatalog = Record<string, string>;
@@ -127,6 +128,7 @@ export function loadUiLocale(
       ...catalog,
       "Automatic research is disabled.": automaticResearchDisabled[code],
       ...editingTemplateUi[code],
+      ...analyzerUi[code],
     }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {

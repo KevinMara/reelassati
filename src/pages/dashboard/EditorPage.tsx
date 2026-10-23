@@ -297,6 +297,22 @@ export default function EditorPage() {
     oy: number;
   } | null>(null);
   const [autoEditOpen, setAutoEditOpen] = useState(false);
+  const optimizationOpenedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      searchParams.get("optimize") !== "1" ||
+      !requestedProject?.analyzerOptimization ||
+      optimizationOpenedFor.current === requestedProject.id
+    )
+      return;
+    optimizationOpenedFor.current = requestedProject.id;
+    setSelectedProjectId(requestedProject.id);
+    setAutoEditOpen(true);
+  }, [
+    requestedProject?.id,
+    requestedProject?.analyzerOptimization,
+    searchParams,
+  ]);
   const [autoEditSummary, setAutoEditSummary] = useState("");
   const autoEditFinished = useRef(false);
   const libraryInsertLock = useRef(false);

@@ -13,6 +13,7 @@ import worker, {
   trendSearchCitations,
   trendTextCitations,
   verifyTrendCitation,
+  withCors,
 } from "./server";
 import {
   AI_COMPLIANCE_POLICY_VERSION,
@@ -874,6 +875,53 @@ describe("Sites worker", () => {
       });
     } finally {
       globalThis.fetch = originalFetch;
+    }
+  });
+
+  it.each([
+    { origin: undefined, allowed: false },
+    { origin: "https://untrusted.example", allowed: false },
+    { origin: "https://reelassati.app", allowed: true },
+  ])("varies cacheable media responses by Origin for $origin", async ({
+    origin,
+    allowed,
+  }) => {
+    const headers = new Headers();
+    if (origin) headers.set("Origin", origin);
+    const response = withCors(
+      new Response(new Uint8Array([1, 2, 3, 4]), {
+        status: 206,
+        headers: {
+          "Content-Type": "video/mp4",
+          "Content-Range": "bytes 0-3/100",
+          "Cache-Control": "private, max-age=3600",
+          Vary: "Accept-Encoding",
+        },
+      }),
+      new Request("https://studio.example/api/media/owned-test?token=test", {
+        headers,
+      })
+    );
+    expect(response.headers.get("Vary")).toBe("Accept-Encoding, Origin");
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+      allowed ? origin : null
+    );
+    expect(response.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+    expect(response.headers.get("Cache-Control")).toBe("private, max-age=3600");
+    expect(response.headers.get("Content-Range")).toBe("bytes 0-3/100");
+    expect(response.status).toBe(206);
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+      new Uint8Array([1, 2, 3, 4])
+    );
+  });
+
+  it("preserves existing case-insensitive Origin variation and wildcard variation", () => {
+    for (const vary of ["Accept-Encoding, origin", "*"]) {
+      const response = withCors(
+        new Response(null, { headers: { Vary: vary } }),
+        new Request("https://studio.example/api/media/owned-test")
+      );
+      expect(response.headers.get("Vary")).toBe(vary);
     }
   });
 

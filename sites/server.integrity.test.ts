@@ -17,6 +17,11 @@ import { normalizeEditorSavedStyles } from "../contracts/editor-style-library";
 import { captureEditStyle } from "../contracts/edit-style-template";
 import { normalizeVisual } from "../contracts/clip-visual";
 import {
+  buildAnalyzerOptimization,
+  parseAudienceResponse,
+} from "../contracts/analyzer-report";
+import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "../contracts/video-analysis";
+import {
   embedMediaProvenanceMarker,
   inspectMediaProvenanceMarker,
   readWebmSegmentHeader,
@@ -1119,6 +1124,65 @@ describe("provenance integrity boundaries", () => {
       };
       workspace.assets = [source, footage];
       workspace.projects = [project];
+      // The upload response has no browser-probed duration yet. This fixture's
+      // native media lasts 0.3s; mirror the measured source metadata save.
+      footage.duration = 0.3;
+      const analyzedDuration = footage.duration;
+      const observedMoment = {
+        start: 0,
+        end: analyzedDuration,
+        role: "demonstration" as const,
+        roleReason: "Fixture demonstration",
+        label: "Fixture",
+        attention: 70,
+        clarity: 80,
+        processingLoad: 30,
+        stimulation: 20,
+        confidence: 0.8,
+        visualEvidence: "Fixture picture",
+        audioEvidence: "Audio not verified",
+        strength: "Preserve picture",
+        improvement: "Preserve timing",
+        rationale: "Fixture rationale",
+      };
+      workspace.analyzerReports = [
+        {
+          assetId: footage.id,
+          duration: analyzedDuration,
+          platform: "instagram",
+          createdAt: now,
+          audience: parseAudienceResponse(
+            `time_seconds,retention_percent\n0,100\n${analyzedDuration},80`,
+            {
+              assetId: footage.id,
+              duration: analyzedDuration,
+              source: "QA fixture",
+              period: "Synthetic",
+              sampleSize: 100,
+            }
+          ),
+          result: {
+            schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+            summary: "Saved fixture review",
+            hook: { score: null, note: "No hook" },
+            pacing: { score: 70, note: "Fixture timing" },
+            insights: [observedMoment],
+            retention: [],
+            recommendations: [],
+            changes: [],
+            provenance: source.provenance!,
+          },
+        },
+      ];
+      project.analyzerOptimization = buildAnalyzerOptimization({
+        assetId: footage.id,
+        sourceName: footage.name,
+        duration: analyzedDuration,
+        platform: "instagram",
+        summary: "Fixture",
+        insights: [observedMoment],
+        recommendations: [],
+      });
       workspace.editorStyles = normalizeEditorSavedStyles([
         {
           id: "style-caption",
@@ -1220,6 +1284,22 @@ describe("provenance integrity boundaries", () => {
         }
       ).workspace;
       for (const actual of [savedWorkspace, persisted, reloaded]) {
+        expect(actual.analyzerReports).toHaveLength(1);
+        expect(actual.analyzerReports![0]).toMatchObject({
+          assetId: footage.id,
+          duration: analyzedDuration,
+          result: { summary: "Saved fixture review", overall: { score: 74 } },
+          audience: {
+            sampleSize: 100,
+            points: [
+              { time: 0, retention: 100 },
+              { time: analyzedDuration, retention: 80 },
+            ],
+          },
+        });
+        expect(actual.projects[0].analyzerOptimization).toEqual(
+          project.analyzerOptimization
+        );
         expect(actual.editorStyles).toEqual(workspace.editorStyles);
         expect(actual.editStyleTemplates).toEqual(workspace.editStyleTemplates);
         expect(actual.projects[0].editStyleTemplate).toEqual(

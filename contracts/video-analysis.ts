@@ -7,6 +7,13 @@ export const VIDEO_ROLES = [
   "proof",
   "payoff",
   "cta",
+  "setup",
+  "tension",
+  "development",
+  "demonstration",
+  "transition",
+  "resolution",
+  "loop",
   "other",
   "unclassified",
 ] as const;
@@ -248,7 +255,13 @@ export function normalizeVideoStructure(
     );
     if (candidates.length !== 1) return [];
     const row = candidates[0] as Record<string, unknown>;
-    const seen = insights.some(interval => interval.role === role);
+    const seen = insights.some(
+      interval =>
+        interval.role === role ||
+        (role === "core" &&
+          ["development", "demonstration"].includes(interval.role)) ||
+        (role === "payoff" && interval.role === "resolution")
+    );
     if (
       !["present", "absent", "uncertain"].includes(String(row.status)) ||
       !text(row.note) ||
@@ -471,7 +484,7 @@ export function videoAnalysisResponseSchema(
 export const VIDEO_ANALYSIS_RUBRIC = `
 Required response schemaVersion: "${VIDEO_ANALYSIS_SCHEMA_VERSION}". A response lacking this exact schema, all four channels, full source-clock interval coverage and evidenced editorial recommendations is incomplete; never substitute a legacy attention-only report.
 Return insights as chronological non-overlapping source-time intervals covering the video where evidence is available. For short-form sources, use intervals around 1-3 seconds or meaningful cuts; use up to 180 intervals and never fabricate unobserved content to fill coverage gaps.
-Each insight: {start,end,role:hook|core|proof|payoff|cta|other|unclassified,roleReason,label,attention:0..100|null,stimulation:0..100|null,processingLoad:0..100|null,clarity:0..100|null,confidence:0..1|null,visualEvidence,audioEvidence,strength,improvement,rationale}. All text fields are required and specific to the interval. For genuinely silent/no-audio content, audioEvidence states the observed absence; it is not an empty string. If no change is justified, improvement explains what to preserve and why.
+Each insight: {start,end,role:${VIDEO_ROLES.join("|")},roleReason,label,attention:0..100|null,stimulation:0..100|null,processingLoad:0..100|null,clarity:0..100|null,confidence:0..1|null,visualEvidence,audioEvidence,strength,improvement,rationale}. All text fields are required and specific to the interval. For genuinely silent/no-audio content, audioEvidence states the observed absence; it is not an empty string. If no change is justified, improvement explains what to preserve and why.
 Observe the actual temporal video and available audio together: framing, movement, edits, visible text, intelligible speech, sound changes, context and payoff. This is never a transcript-only or isolated-screenshot review.
 Automatically identify hook, core, proof, payoff, CTA and other sections from observed content; a CTA can be absent. Hook is an observed opening promise, question, outcome or pattern interruption; core advances the topic/story; proof substantiates a claim; payoff resolves a promise; CTA explicitly requests a viewer action. Other is observed content that serves none of those functions (for example credits); unclassified is a genuinely ambiguous role with a specific explanation. Never use Other as a default when role detection is missing. Never force standard hook lengths or invent a CTA. Preserve intentional pauses and meaningful action.
 Return structure with exactly one {role:hook|core|proof|payoff|cta,status:present|absent|uncertain,note} assessment for each of those five roles. Present must correspond to at least one insight with that role; explain genuine absence or uncertainty.
@@ -483,4 +496,14 @@ The server computes an overall editorial index only from complete evidenced cove
 Use null for unsupported scores. Do not invent EEG, neural activity, brain-region activation, measured audience attention, dopamine, physiological responses, predicted retention percentages or scientifically validated performance lifts. These require actual viewer studies and a calibrated model. Do not claim training on a research corpus or number of studies. Research principles inform an editorial rubric, not a validated neural predictor.
 Research context only: Lang (2000), https://doi.org/10.1111/j.1460-2466.2000.tb02833.x models mediated-message processing under limited capacity; Sweller (1988), https://doi.org/10.1207/s15516709cog1202_4 studies cognitive load and learning. Neither validates these numerical weights, short-form performance forecasts, or a neural reading from video alone. Cite a principle only when it explains an observed editorial tradeoff; never claim an individual viewer response was measured.
 Assess audiovisual delivery separately from factual accuracy. A clear or compelling health, medical, scientific or numerical claim is not thereby correct. Do not certify source claims, diagnostic tests, advice or evidence from their presentation. Where a consequential claim is not substantiated by supplied material, identify the exact claim and recommend source verification as an editorial action; do not invent a citation, diagnose anyone or call the claim false from uncertainty alone. An editorial score never certifies truth, clinical validity or safety.
+`;
+
+/** Shared by standalone analysis and editor review; additions do not replace
+ * the five presence/absence assessments required by existing clients. */
+export const VIDEO_ANALYSIS_DIRECTION = `
+Adapt the review to the observed form: tutorial, documentary, comedy, narrative, performance, product, interview, montage or another justified genre. Do not assume every video is an advertisement. Assess whether each interval advances its own purpose, not whether it has rapid cuts or a CTA. Intentional stillness, suspense, musical phrasing and emotional resolution can be strengths.
+Pacing is an editorial fit-to-purpose assessment: 0–20 means progression is repeatedly blocked by unjustified delays or premature cuts; 40–60 means useful progression with uneven holds or information timing; 80–100 means intentional timing that preserves comprehension, performance, suspense and payoff. Do not reward speed itself. Explain the rating with observed intervals.
+Additional interval roles: setup establishes context; tension introduces a question/conflict or stakes; development advances an explanation/story; demonstration shows a process/result; transition connects ideas/scenes; resolution closes the story; loop creates a meaningful return to the opening. Use the most specific evidenced role. Proof requires substantiation, not merely an assertion. A rhetorical question alone does not prove a hook worked. Section boundaries follow observable changes in purpose; a section can contain several short observation intervals. The existing structure array still assesses hook/core/proof/payoff/cta; core includes development and demonstration, payoff includes resolution. Never invent a missing function or penalize an absent CTA when it is unnecessary.
+For every 1–3 second short-form interval, describe the specific stimulus (what changes or remains intentionally stable), the editorial interpretation, what to preserve, and an actionable improvement. Tie a fix to exact source times and explain its mechanism and tradeoff. Prefer an exact rewrite, order change, framing/caption adjustment or precise hold/cut instruction over 'make it more engaging'. If speech cannot be heard or is not supplied by the provider, audioEvidence must say audio could not be verified; do not infer spoken words, sound quality, silence, music or beat timing from visuals. Unverified audio must not produce executable audio/silence edits.
+Do not claim that the model has measured response to the stimulus. Observed content, editorial interpretation and external audience measurements are separate evidence classes. There is no universal optimal stimulation or processing-load score. Do not predict an improvement percentage or a perfect result. Identify experiments to validate the editorial hypothesis with actual viewers.
 `;

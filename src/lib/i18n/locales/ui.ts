@@ -20,6 +20,7 @@ import { danishUi } from "./ui-da";
 import { czechUi } from "./ui-cs";
 import { indonesianUi } from "./ui-id";
 import { swedishUi } from "./ui-sv";
+import { analyzerUi } from "./ui-analyzer";
 import { hungarianUi } from "./ui-hu";
 import { norwegianUi } from "./ui-no";
 import { vietnameseUi } from "./ui-vi";
@@ -78,6 +79,9 @@ for (const [language, translation] of Object.entries(
   uiLocales[language]["Automatic research is disabled."] = translation;
 }
 for (const [language, translation] of Object.entries(editingTemplateUi)) {
+  Object.assign(uiLocales[language], translation);
+}
+for (const [language, translation] of Object.entries(analyzerUi)) {
   Object.assign(uiLocales[language], translation);
 }
 for (const [language, translation] of Object.entries(editingTraitUi)) {

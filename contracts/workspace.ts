@@ -236,6 +236,8 @@ export interface EditRevision {
 }
 
 export interface EditProject {
+  /** Reviewed source-clock brief; opening it never starts inference. */
+  analyzerOptimization?: import("./analyzer-report").AnalyzerOptimization;
   frameRate?: import("./export-settings").ExportFrameRate;
   trackSettings?: import("./timeline-mixer").TimelineTrackSettings[];
   storyBeats?: import("./story-beats").StoryBeat[];
@@ -383,6 +385,7 @@ export interface GenerationJob {
 }
 
 export interface WorkspaceDocument {
+  analyzerReports?: import("./analyzer-report").SavedAnalyzerReport[];
   editorStyles?: import("./editor-style-library").EditorSavedStyle[];
   editStyleTemplates?: import("./edit-style-template").EditStyleTemplate[];
   version: 1;

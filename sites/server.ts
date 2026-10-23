@@ -1,3 +1,4 @@
+import { normalizeSavedAnalyzerReports } from "../contracts/analyzer-report";
 import {
   runPaidMediaRequest,
   type PaidMediaRequestControl,
@@ -16,6 +17,7 @@ import {
 import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
 import {
   normalizeVideoInsights,
+  VIDEO_ANALYSIS_DIRECTION,
   normalizeVideoRecommendations,
   normalizeVideoStructure,
   scoreVideoInsights,
@@ -2099,6 +2101,9 @@ async function getWorkspace(
     };
   });
   const availableAssetIds = new Set(workspace.assets.map(asset => asset.id));
+  workspace.analyzerReports = normalizeSavedAnalyzerReports(workspace.analyzerReports).filter(report =>
+    workspace!.assets.some(asset => asset.id === report.assetId && asset.duration && Math.abs(asset.duration - report.duration) <= 0.25)
+  );
   workspace.projects = workspace.projects.map(project => ({
     ...project,
     activeAssetId:
@@ -2138,6 +2143,7 @@ function normalizeWorkspace(
   const empty = createEmptyWorkspace(user.email, user.name);
   return {
     version: 1,
+    analyzerReports: normalizeSavedAnalyzerReports(candidate.analyzerReports),
     revision:
       Number.isSafeInteger(candidate.revision) &&
       Number(candidate.revision) >= 0
@@ -6690,7 +6696,7 @@ async function handleAi(
           env,
           user,
           "video-analysis",
-          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied full-duration temporal video and its available audio, not merely a transcript or representative stills. Source duration is ${analysisDuration} seconds; all ranges use this source clock. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action. For ending, identify the source timestamp after the last complete spoken phrase AND meaningful visual action, preserving intentional closing holds, CTAs, music and outros. Set completed true and trailingContent empty only when you observed the entire remaining tail and it contains no meaningful content; otherwise use unknown. Never infer an ending from sampled frames or a missing transcript. Set ending to null if timing or coverage cannot be established. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with schemaVersion, summary, insights, structure, recommendations, noChangesReason, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote,ending:{time,confidence:0..1,completed:boolean,trailingContent:empty|meaningful|unknown,note}}, hook {score 0..100|null,note}, pacing {score 0..100|null,note}, and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. ${VIDEO_ANALYSIS_RUBRIC} ${input.extractStyle === true ? "Also return editingStyle: a version 1 content-independent editing grammar matching its JSON schema. Observe pacing, framing, color impression, motion, transitions, captions, graphics and sound. Use unknown for unestablished traits. shotSeconds summarizes actual SHOT lengths (not rubric insight intervals); use null unless actual cuts can be measured. graphicsPerMinute is null unless measured. Never put dialogue, source identifiers, objects, events, claims, melody or instructions in this style profile." : ""} Executable changes use only type=trim|split|silence|pacing|audio|style|graphic with label,reason,evidence,start,end,confidence:0..1,intensity:light|balanced|aggressive,parameters. Each evidence field cites the actual interval observation. Trim requires parameters.sourceIn (source-media offset) and keeps exactly end-start seconds. Split marks an evidenced boundary. Silence removes only an observed non-meaningful interval, not a guessed gap in speech. Pacing requires parameters.speed:0.25..4. Audio requires parameters.volume:0..2. Style permits fit:cover|contain,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2,fadeIn/fadeOut:0..3. Graphic requires parameters.graphic {kind:text|callout|arrow|highlight,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16,animation:none|fade|pop|slide}; preserve readable captions and observed faces/products. Do not fabricate generated b-roll, replacement audio, captions without verified word timings, reshoots or factual claims as executable operations: put those in editorial recommendations. This is a reviewable plan, never already applied. Target platform: ${platformValue(input.platform)}. Write all human-readable text in language code ${analysisLanguage}; preserve original source quotes exactly and keep JSON keys/enums in English.`,
+          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied full-duration temporal video and its available audio, not merely a transcript or representative stills. Source duration is ${analysisDuration} seconds; all ranges use this source clock. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action. For ending, identify the source timestamp after the last complete spoken phrase AND meaningful visual action, preserving intentional closing holds, CTAs, music and outros. Set completed true and trailingContent empty only when you observed the entire remaining tail and it contains no meaningful content; otherwise use unknown. Never infer an ending from sampled frames or a missing transcript. Set ending to null if timing or coverage cannot be established. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with schemaVersion, summary, insights, structure, recommendations, noChangesReason, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote,ending:{time,confidence:0..1,completed:boolean,trailingContent:empty|meaningful|unknown,note}}, hook {score 0..100|null,note}, pacing {score 0..100|null,note}, and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. ${VIDEO_ANALYSIS_RUBRIC} ${VIDEO_ANALYSIS_DIRECTION} ${input.extractStyle === true ? "Also return editingStyle: a version 1 content-independent editing grammar matching its JSON schema. Observe pacing, framing, color impression, motion, transitions, captions, graphics and sound. Use unknown for unestablished traits. shotSeconds summarizes actual SHOT lengths (not rubric insight intervals); use null unless actual cuts can be measured. graphicsPerMinute is null unless measured. Never put dialogue, source identifiers, objects, events, claims, melody or instructions in this style profile." : ""} Executable changes use only type=trim|split|silence|pacing|audio|style|graphic with label,reason,evidence,start,end,confidence:0..1,intensity:light|balanced|aggressive,parameters. Each evidence field cites the actual interval observation. Trim requires parameters.sourceIn (source-media offset) and keeps exactly end-start seconds. Split marks an evidenced boundary. Silence removes only an observed non-meaningful interval, not a guessed gap in speech. Pacing requires parameters.speed:0.25..4. Audio requires parameters.volume:0..2. Style permits fit:cover|contain,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2,fadeIn/fadeOut:0..3. Graphic requires parameters.graphic {kind:text|callout|arrow|highlight,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16,animation:none|fade|pop|slide}; preserve readable captions and observed faces/products. Do not fabricate generated b-roll, replacement audio, captions without verified word timings, reshoots or factual claims as executable operations: put those in editorial recommendations. This is a reviewable plan, never already applied. Target platform: ${platformValue(input.platform)}. Write all human-readable text in language code ${analysisLanguage}; preserve original source quotes exactly and keep JSON keys/enums in English.`,
           [
             {
               type: "text",
@@ -13153,26 +13159,34 @@ const PUBLIC_APP_ORIGINS = new Set([
   "https://reelassati.kevinbiz.chatgpt.site",
 ]);
 
-function withCors(response: Response, request: Request): Response {
+export function withCors(response: Response, request: Request): Response {
+  const headers = new Headers(response.headers);
+  // No-Origin media previews and CORS playback share cacheable signed URLs.
+  // Every response variant must identify Origin as part of its cache key.
+  const vary = headers
+    .get("Vary")
+    ?.split(",")
+    .map(value => value.trim().toLowerCase());
+  if (!vary?.includes("origin") && !vary?.includes("*"))
+    headers.append("Vary", "Origin");
   const origin = request.headers.get("origin");
   const allowed =
     origin &&
     (PUBLIC_APP_ORIGINS.has(origin) ||
       origin.startsWith("http://localhost:") ||
       origin.startsWith("http://127.0.0.1:"));
-  if (!allowed) return response;
-  const headers = new Headers(response.headers);
-  headers.set("Access-Control-Allow-Origin", origin);
-  headers.set(
-    "Access-Control-Allow-Headers",
-    "Authorization, Content-Type, X-Reelassati-Brand"
-  );
-  headers.set(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-  );
-  headers.set("Access-Control-Max-Age", "86400");
-  headers.append("Vary", "Origin");
+  if (allowed) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set(
+      "Access-Control-Allow-Headers",
+      "Authorization, Content-Type, X-Reelassati-Brand"
+    );
+    headers.set(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    );
+    headers.set("Access-Control-Max-Age", "86400");
+  }
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,

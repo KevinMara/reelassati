@@ -16,6 +16,7 @@ import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { EditStyleTemplates } from "./EditStyleTemplates";
 import { editStyleDirection } from "@contracts/edit-style-template";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
+import { eligibleAnalyzerOptimization } from "@contracts/analyzer-report";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
 import type {
@@ -56,7 +57,15 @@ export function AutonomousEditor({
     useWorkspace();
   const referenceOwner = workspace.profile.email.toLowerCase();
   const referenceBrand = selectedBrand(referenceOwner);
-  const [style, setStyle] = useState("");
+  const [style, setStyle] = useState(
+    () =>
+      eligibleAnalyzerOptimization(
+        project.analyzerOptimization,
+        workspace.assets.filter(asset =>
+          project.clips.some(clip => clip.assetId === asset.id)
+        )
+      )?.brief ?? ""
+  );
   const [referenceBrief, setReferenceBrief] = useState(
     project.referenceStyleBrief ?? ""
   );

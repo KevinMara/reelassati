@@ -1,12 +1,19 @@
 import { useUiText } from "@/lib/i18n/ui";
-import { AnalysisReview } from "@/components/studio/AnalysisReview";
+import { AnalyzerWorkspace } from "@/components/studio/AnalyzerWorkspace";
+import {
+  normalizeSavedAnalyzerReports,
+  attachReportAudience,
+  type AudienceResponse,
+  type AnalyzerOptimization,
+  type SavedAnalyzerReport,
+} from "@contracts/analyzer-report";
 import {
   VIDEO_ANALYSIS_SCHEMA_VERSION,
   scoreVideoInsights,
 } from "@contracts/video-analysis";
 import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
-import { resolveMediaDuration } from "@/lib/media-metadata";
+import { resolveVideoMetadata } from "@/lib/media-metadata";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -70,7 +77,8 @@ function retentionToQualitySignals(
 ): QualitySignal[] {
   return retention.map((segment, index) => ({
     id: `analysis-signal-${crypto.randomUUID()}-${index}`,
-    label: segment.score >= 75 ? "Retention strength" : "Retention risk",
+    label:
+      segment.score >= 75 ? "Editorial strength" : "Editorial review point",
     detail: segment.note,
     start: segment.start,
     end: segment.end,
@@ -103,6 +111,7 @@ export default function VideoAnalyzer() {
   const [sourceAsset, setSourceAsset] = useState<Asset | null>(null);
   const [publicUrl, setPublicUrl] = useState("");
   const [platform, setPlatform] = useState<Platform>("tiktok");
+  const [focus, setFocus] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -245,8 +254,7 @@ export default function VideoAnalyzer() {
         if (!asset)
           throw new Error(ui("Select a video before running analysis."));
       }
-      if (!asset.duration || !Number.isFinite(asset.duration))
-        asset = { ...asset, duration: await resolveMediaDuration(asset) };
+      asset = await resolveVideoMetadata(asset, abort.signal);
       abort.signal.throwIfAborted();
       await verifyUploadRequestScope(scope);
       if (id !== generation.current) return;
@@ -269,7 +277,7 @@ export default function VideoAnalyzer() {
       ).analyzeMedia(
         readyAsset,
         platform,
-        undefined,
+        focus.trim() || undefined,
         stage => {
           if (id === generation.current) setAnalysisStage(stage);
         },
@@ -309,6 +317,22 @@ export default function VideoAnalyzer() {
           );
         return {
           ...current,
+          analyzerReports: normalizeSavedAnalyzerReports([
+            {
+              assetId: readyAsset.id,
+              duration: readyAsset.duration!,
+              platform,
+              createdAt: new Date().toISOString(),
+              result: {
+                ...analysis,
+                schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+              },
+            },
+            ...(current.analyzerReports || []).filter(
+              report =>
+                report.assetId !== readyAsset.id || report.platform !== platform
+            ),
+          ]),
           activity: [
             createEvent(
               "generation",
@@ -329,6 +353,34 @@ export default function VideoAnalyzer() {
         setAnalyzing(false);
         controller.current = null;
       }
+    }
+  };
+
+  const restoreReview = async (report: SavedAnalyzerReport) => {
+    setError(null);
+    const id = generation.current;
+    try {
+      const scope = await captureUploadRequestScope();
+      await verifyUploadRequestScope(scope);
+      const asset = workspace.assets.find(
+        item =>
+          item.id === report.assetId &&
+          item.duration &&
+          Math.abs(item.duration - report.duration) <= 0.25
+      );
+      if (id !== generation.current || !asset) return;
+      analyzedScope.current = scope;
+      setAnalyzedAsset(asset);
+      setSourceAsset(asset);
+      setPlatform(report.platform as Platform);
+      setResult(report.result);
+      setNotice(ui("Saved analysis"));
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The saved analysis could not be opened."
+      );
     }
   };
 
@@ -412,7 +464,33 @@ export default function VideoAnalyzer() {
     }
   };
 
-  const createAnalyzedProject = async () => {
+  const saveAudienceResponse = async (
+    audience: AudienceResponse | undefined
+  ) => {
+    const scope = analyzedScope.current;
+    if (!scope || !analyzedAsset) return;
+    const id = generation.current;
+    await verifyUploadRequestScope(scope);
+    await updateWorkspace(current => {
+      if (
+        id !== generation.current ||
+        current.profile.email.toLowerCase() !== scope.ownerEmail ||
+        selectedBrand(scope.ownerEmail) !== scope.brandId
+      )
+        throw new Error(
+          "The analysis workspace changed before saving its activity."
+        );
+      const reports = attachReportAudience(
+        current.analyzerReports,
+        analyzedAsset.id,
+        platform,
+        audience
+      );
+      return { ...current, analyzerReports: reports };
+    });
+  };
+
+  const createAnalyzedProject = async (optimization?: AnalyzerOptimization) => {
     if (!analyzedAsset?.duration || !analyzedScope.current || creatingProject)
       return;
     const source = analyzedAsset;
@@ -440,11 +518,17 @@ export default function VideoAnalyzer() {
           projects: [
             {
               id: projectId,
+              ...(optimization ? { analyzerOptimization: optimization } : {}),
               title: source.name.replace(/\.[^.]+$/, "") + " · edit",
               template: "blank",
               status: "editing",
               platform,
-              aspectRatio: "9:16",
+              aspectRatio:
+                source.width && source.height && source.width > source.height
+                  ? "16:9"
+                  : source.width === source.height && source.width
+                    ? "1:1"
+                    : "9:16",
               duration,
               playhead: 0,
               createdAt: now,
@@ -464,6 +548,7 @@ export default function VideoAnalyzer() {
                   muted: false,
                   speed: 1,
                   volume: 1,
+                  fit: "contain",
                   color: "#8b7cf4",
                 },
               ],
@@ -480,6 +565,7 @@ export default function VideoAnalyzer() {
       if (generationId === generation.current) {
         setSelectedProjectId(projectId);
         setQueued(false);
+        return projectId;
       }
     } catch (cause) {
       if (generationId === generation.current)
@@ -721,6 +807,27 @@ export default function VideoAnalyzer() {
           </div>
         )}
 
+        <label
+          className="mt-5 block text-xs font-medium"
+          htmlFor="analysis-direction"
+        >
+          {ui("Optional goal, audience or style")}
+        </label>
+        <textarea
+          id="analysis-direction"
+          value={focus}
+          maxLength={2000}
+          disabled={analyzing}
+          onChange={event => {
+            setFocus(event.target.value);
+            invalidateSourceAuthorization();
+          }}
+          rows={2}
+          placeholder={ui(
+            "Leave blank to assess the form and purpose of the footage."
+          )}
+          className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm"
+        />
         <button
           type="button"
           onClick={() => void handleAnalyze()}
@@ -786,6 +893,34 @@ export default function VideoAnalyzer() {
         ) : null}
       </section>
 
+      {!analyzing && !result && workspace.analyzerReports?.length ? (
+        <section className="mb-6 rounded-xl border border-border bg-surface p-5">
+          <h2 className="mb-3 text-sm font-medium">{ui("Saved analysis")}</h2>
+          <div className="flex flex-wrap gap-2">
+            {workspace.analyzerReports.map(report => {
+              const asset = workspace.assets.find(
+                item => item.id === report.assetId
+              );
+              return asset ? (
+                <button
+                  type="button"
+                  key={`${report.assetId}-${report.platform}`}
+                  onClick={() => void restoreReview(report)}
+                  className="rounded-lg border border-border px-3 py-2 text-left text-xs hover:border-primary"
+                >
+                  <strong className="block">{asset.name}</strong>
+                  <span className="text-foreground/60">
+                    {report.platform} ·{" "}
+                    {new Date(report.createdAt).toLocaleDateString()} ·{" "}
+                    {ui("No AI credits")}
+                  </span>
+                </button>
+              ) : null;
+            })}
+          </div>
+        </section>
+      ) : null}
+
       <AnimatePresence mode="wait">
         {result ? (
           <motion.div
@@ -795,10 +930,20 @@ export default function VideoAnalyzer() {
             className="space-y-6"
           >
             {analyzedAsset && (
-              <AnalysisReview
+              <AnalyzerWorkspace
                 key={analyzedAsset.id}
                 asset={analyzedAsset}
                 result={result}
+                platform={platform}
+                onCreateProject={createAnalyzedProject}
+                initialAudience={
+                  workspace.analyzerReports?.find(
+                    report =>
+                      report.assetId === analyzedAsset.id &&
+                      report.platform === platform
+                  )?.audience
+                }
+                onAudienceChange={saveAudienceResponse}
               />
             )}
             <section className="rounded-xl border border-border bg-surface p-6">
