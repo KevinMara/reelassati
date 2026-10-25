@@ -1,3 +1,8 @@
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import { useUiText } from "@/lib/i18n/ui";
 import {
   useEffect,
@@ -8,10 +13,11 @@ import {
 } from "react";
 import {
   ArrowUp,
+  AtSign,
+  Brain,
   ClipboardList,
   Check,
   CheckCheck,
-  ChevronDown,
   Circle,
   CircleAlert,
   Clock3,
@@ -24,7 +30,6 @@ import {
   Paperclip,
   Plus,
   Scissors,
-  Settings2,
   SkipForward,
   Sparkles,
   Square,
@@ -47,11 +52,16 @@ import {
 import type { EditProject } from "@contracts/workspace";
 import { useEditorChat } from "./useEditorChat";
 import { canChooseChatAction } from "@/lib/editor-chat-safety";
+import {
+  editorChatTargetContext,
+  type EditorChatTimeTarget,
+} from "@/lib/editor-chat-target";
 import { useWorkspace } from "@/providers/workspace";
 import { cn } from "@/lib/utils";
 import { CompactSelect } from "@/components/ui/compact-select";
 import {
   Popover,
+  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
@@ -59,7 +69,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -69,9 +78,16 @@ type Props = {
   project: EditProject;
   playhead: number;
   selectedClipId?: string | null;
-  seed?: { text: string; id: number; range?: TimeRange };
+  seed?: {
+    text: string;
+    id: number;
+    range?: TimeRange;
+    section?: { id: string; label: string };
+  };
   onSeek: (time: number) => void;
   onAutoEdit: () => void;
+  onFindSections?: () => void;
+  findingSections?: boolean;
 };
 
 const STARTERS = [
@@ -110,7 +126,10 @@ function referenceKey(ref: EditorChatReference) {
       ? `url:${ref.url}`
       : `text:${ref.name}:${ref.text}`;
 }
-function actionStateLabel(action: EditorChatAction, ui: ReturnType<typeof useUiText>) {
+function actionStateLabel(
+  action: EditorChatAction,
+  ui: ReturnType<typeof useUiText>
+) {
   const labels = {
     pending: ui("Queued"),
     "awaiting-approval": ui("Your choice"),
@@ -137,6 +156,8 @@ export function EditorChat({
   seed,
   onSeek,
   onAutoEdit,
+  onFindSections,
+  findingSections,
 }: Props) {
   const ui = useUiText();
   const chat = useEditorChat(project, { onSeek });
@@ -147,18 +168,29 @@ export function EditorChat({
     "execute"
   );
   const [excludedClip, setExcludedClip] = useState<string>();
+  const [timeTarget, setTimeTarget] = useState<EditorChatTimeTarget>();
   const contextClip =
-    selectedClipId !== excludedClip
+    !timeTarget && selectedClipId !== excludedClip
       ? project.clips.find(c => c.id === selectedClipId)
       : undefined;
   const [references, setReferences] = useState<EditorChatReference[]>([]);
-  const [range, setRange] = useState<TimeRange>();
+  const targetContext = editorChatTargetContext(timeTarget, contextClip?.id);
+  const range = targetContext.range;
+  const referenceItems = targetContext.sectionReference
+    ? [...references, targetContext.sectionReference]
+    : references;
   const [attachBusy, setAttachBusy] = useState(false);
   const [localError, setLocalError] = useState("");
   const [dragging, setDragging] = useState(false);
   const [referenceUrl, setReferenceUrl] = useState("");
   const [urlOpen, setUrlOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [effort, setEffort] = useState<"balanced" | "max">("max");
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [rangeDraft, setRangeDraft] = useState({
+    start: 0,
+    end: project.duration,
+  });
   const [budgetDraft, setBudgetInput] = useState<string | null>(null);
   const budgetInput = budgetDraft ?? String(chat.state.maxCredits);
   const [workingChoice, setWorkingChoice] = useState<string>();
@@ -166,32 +198,35 @@ export function EditorChat({
     new Set()
   );
   const input = useRef<HTMLTextAreaElement>(null);
+  const referenceTrigger = useRef<HTMLButtonElement>(null);
+  const pendingReferencePopover = useRef<"range" | "url" | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
-  const lastSeed = useRef<number | undefined>(undefined);
+  const [lastSeed, setLastSeed] = useState<number>();
   const dragDepth = useRef(0);
-  const previousProjectId = useRef(project.id);
+  const [previousProjectId, setPreviousProjectId] = useState(project.id);
 
-  useEffect(() => {
-    if (previousProjectId.current === project.id) return;
-    previousProjectId.current = project.id;
+  if (previousProjectId !== project.id) {
+    setPreviousProjectId(project.id);
     setPrompt("");
     setTaskPreset(undefined);
     setExcludedClip(undefined);
     setReferences([]);
-    setRange(undefined);
+    setTimeTarget(undefined);
     setLocalError("");
-    lastSeed.current = undefined;
+    setLastSeed(undefined);
     setSelectedActions(new Set());
     setBudgetInput(null);
-  }, [project.id]);
+  } else if (seed && seed.id !== lastSeed) {
+    setLastSeed(seed.id);
+    if (seed.text) setPrompt(seed.text);
+    setTimeTarget(
+      seed.range ? { range: seed.range, section: seed.section } : undefined
+    );
+  }
   useEffect(() => {
-    if (!seed || seed.id === lastSeed.current) return;
-    lastSeed.current = seed.id;
-    setPrompt(seed.text);
-    setRange(seed.range);
-    input.current?.focus();
+    if (seed) input.current?.focus();
   }, [seed]);
 
   useEffect(() => {
@@ -284,6 +319,12 @@ export function EditorChat({
       setLocalError(ui("Enter a complete public https:// reference link."));
     }
   }
+  function restoreReferenceTriggerFocus(event: Event) {
+    event.preventDefault();
+    // Keep focus on the composer after applying, or on an outside control.
+    if (document.activeElement === document.body)
+      referenceTrigger.current?.focus();
+  }
   async function runChoice(id: string, callback: () => Promise<void>) {
     setLocalError("");
     setWorkingChoice(id);
@@ -325,25 +366,26 @@ export function EditorChat({
     }
     setLocalError("");
     followLatest.current = true;
-    const sentRefs = references;
-    const sentRange = range;
+    const sentRefs = referenceItems;
+    const sentAttachments = references;
+    const sentTarget = timeTarget;
     const sentPreset = taskPreset;
     setPrompt("");
     setReferences([]);
-    setRange(undefined);
+    setTimeTarget(undefined);
     setTaskPreset(undefined);
     try {
       await chat.send(
         text,
         sentRefs,
-        sentRange,
-        contextClip ? [contextClip.id] : undefined,
-        { taskPreset: sentPreset, executionMode }
+        targetContext.range,
+        targetContext.selectedClipIds,
+        { taskPreset: sentPreset, executionMode, effort }
       );
     } catch (error) {
       setPrompt(current => current || text);
-      addReferences(sentRefs);
-      setRange(sentRange);
+      addReferences(sentAttachments);
+      setTimeTarget(sentTarget);
       setTaskPreset(sentPreset);
       setLocalError(
         error instanceof Error
@@ -394,97 +436,6 @@ export function EditorChat({
             {ui("Your editing partner")}
           </p>
         </div>
-        <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label={ui("Chat preferences")}
-              title={ui("Chat preferences")}
-              className="rounded-lg p-2 text-foreground/55 hover:bg-foreground/5 hover:text-foreground"
-            >
-              <Settings2 className="size-4" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="end"
-            className="w-72 rounded-xl border-border bg-surface text-foreground"
-          >
-            <h3 className="mb-3 text-sm font-semibold">
-              {ui("How Reel works")}
-            </h3>
-            <p className="mb-1.5 block text-xs text-foreground/60">
-              {ui("Optional improvements")}
-            </p>
-            <CompactSelect
-              aria-label={ui("Approval mode")}
-              value={chat.state.mode}
-              disabled={busyChoice}
-              onValueChange={value =>
-                void runChoice("preferences", () =>
-                  chat.setPreferences({
-                    mode: value === "auto" ? "auto" : "ask",
-                  })
-                )
-              }
-              options={[
-                { value: "ask", label: "Ask before extras" },
-                { value: "auto", label: "Approve extras automatically" },
-              ]}
-            />
-            <p className="mt-2 text-xs leading-relaxed text-foreground/55">
-              {ui("Requested edits and their necessary steps run directly.")}{" "}
-              {chat.state.mode === "ask"
-                ? ui("You choose whether to include additional suggestions.")
-                : ui(
-                    "Reel can include extra improvements within your credit limit."
-                  )}
-            </p>
-            <label
-              className="mb-1.5 mt-4 block text-xs text-foreground/60"
-              htmlFor="reel-credit-limit"
-            >
-              {ui("Credit limit per request")}
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="reel-credit-limit"
-                type="number"
-                min={5}
-                max={10000}
-                step={1}
-                value={budgetInput}
-                disabled={busyChoice}
-                onChange={event => setBudgetInput(event.target.value)}
-                className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-sm"
-              />
-              <button
-                type="button"
-                disabled={
-                  busyChoice ||
-                  !Number.isInteger(Number(budgetInput)) ||
-                  Number(budgetInput) < 5 ||
-                  Number(budgetInput) > 10000
-                }
-                onClick={() =>
-                  void runChoice("preferences", async () => {
-                    await chat.setPreferences({
-                      maxCredits: Number(budgetInput),
-                    });
-                    setSettingsOpen(false);
-                  })
-                }
-                className="rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-40"
-              >
-                {ui("Save")}
-              </button>
-            </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
-              {ui(
-                "Includes the 5-credit planning step and any paid actions. Approval mode never raises this limit."
-              )}
-            </p>
-          </PopoverContent>
-        </Popover>
       </header>
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
         <button
@@ -900,7 +851,7 @@ export function EditorChat({
                   <button
                     type="button"
                     aria-label={ui("Remove time range")}
-                    onClick={() => setRange(undefined)}
+                    onClick={() => setTimeTarget(undefined)}
                     className="rounded p-0.5 hover:bg-primary/10"
                   >
                     <X className="size-3" />
@@ -949,9 +900,9 @@ export function EditorChat({
               )}
             </div>
           )}
-          {!!references.length && (
+          {!!referenceItems.length && (
             <div className="mb-2 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
-              {references.map((ref, index) => (
+              {referenceItems.map((ref, index) => (
                 <span
                   key={referenceKey(ref)}
                   className="inline-flex max-w-full items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1 text-[10px] text-foreground/70"
@@ -963,11 +914,13 @@ export function EditorChat({
                   <button
                     type="button"
                     aria-label={ui("Remove {{name}}", { name: refLabel(ref) })}
-                    onClick={() =>
-                      setReferences(current =>
-                        current.filter((_, i) => i !== index)
-                      )
-                    }
+                    onClick={() => {
+                      if (index === references.length) setTimeTarget(undefined);
+                      else
+                        setReferences(current =>
+                          current.filter((_, i) => i !== index)
+                        );
+                    }}
                     className="rounded p-0.5 hover:bg-foreground/10"
                   >
                     <X className="size-3" />
@@ -1007,8 +960,9 @@ export function EditorChat({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
+                  ref={referenceTrigger}
                   type="button"
-                  aria-label={ui("Attach or choose an editing task")}
+                  aria-label={ui("Add a reference or time range")}
                   disabled={attachBusy}
                   className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border text-foreground/60 hover:bg-foreground/5 disabled:opacity-40"
                 >
@@ -1022,20 +976,73 @@ export function EditorChat({
               <DropdownMenuContent
                 align="start"
                 side="top"
+                onCloseAutoFocus={event => {
+                  const nextPopover = pendingReferencePopover.current;
+                  if (!nextPopover) return;
+                  pendingReferencePopover.current = null;
+                  // Finish closing the menu before the popover takes focus.
+                  event.preventDefault();
+                  if (nextPopover === "range") setRangeOpen(true);
+                  else setUrlOpen(true);
+                }}
                 className="w-60 rounded-xl border-border bg-surface p-1.5 text-foreground"
               >
                 <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
                   <Paperclip />
                   {ui("Attach reference files")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setUrlOpen(true)}>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    pendingReferencePopover.current = "url";
+                  }}
+                >
                   <Link2 />
                   {ui("Attach a reference link")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-[10px] font-normal text-foreground/45">
-                  {ui("Start with a task")}
-                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  disabled={project.duration <= 0}
+                  onSelect={() => {
+                    const start = Math.max(
+                      0,
+                      Math.min(playhead, project.duration - 0.1)
+                    );
+                    setRangeDraft({
+                      start,
+                      end: Math.min(project.duration, start + 5),
+                    });
+                    pendingReferencePopover.current = "range";
+                  }}
+                >
+                  <Clock3 />
+                  {ui("Edit around the playhead")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={findingSections || !onFindSections}
+                  onSelect={onFindSections}
+                >
+                  <Scissors />
+                  {ui(findingSections ? "Finding sections…" : "Find sections")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={ui("Reel modes")}
+                  className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary"
+                >
+                  <AtSign size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="top"
+                align="start"
+                className="w-60 rounded-xl border-border bg-surface p-1.5"
+              >
+                {" "}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onSelect={() => {
                     setExecutionMode("plan");
@@ -1047,58 +1054,112 @@ export function EditorChat({
                 {EDITOR_TASK_PRESETS.filter(
                   preset => preset.id !== "range"
                 ).map(preset => (
-                  <DropdownMenuItem
-                    key={preset.id}
-                    onSelect={() => starter(preset.id)}
-                  >
-                    {preset.id === "captions" ? (
-                      <Subtitles />
-                    ) : preset.id === "image" ? (
-                      <Image />
-                    ) : preset.id === "audio" ? (
-                      <Music2 />
-                    ) : preset.id === "reference" ? (
-                      <Film />
-                    ) : preset.id === "story" ? (
-                      <Scissors />
-                    ) : (
-                      <WandSparkles />
-                    )}
-                    {ui(preset.label)}
-                  </DropdownMenuItem>
+                  <Tooltip key={preset.id} delayDuration={1000}>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuItem onSelect={() => starter(preset.id)}>
+                        {preset.id === "captions" ? (
+                          <Subtitles />
+                        ) : preset.id === "image" ? (
+                          <Image />
+                        ) : preset.id === "audio" ? (
+                          <Music2 />
+                        ) : preset.id === "reference" ? (
+                          <Film />
+                        ) : preset.id === "story" ? (
+                          <Scissors />
+                        ) : (
+                          <WandSparkles />
+                        )}
+                        {ui(preset.label)}
+                      </DropdownMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="left"
+                      sideOffset={8}
+                      className="max-w-64 text-xs leading-relaxed"
+                    >
+                      {ui(preset.hint)}
+                    </TooltipContent>
+                  </Tooltip>
                 ))}
-                <DropdownMenuItem
-                  disabled={project.duration <= 0}
-                  onSelect={() => {
-                    const start = Math.max(
-                      0,
-                      Math.min(playhead, project.duration - 0.1)
-                    );
-                    setTaskPreset("range");
-                    setRange({
-                      start,
-                      end: Math.min(project.duration, start + 5),
-                    });
-                    input.current?.focus();
-                  }}
-                >
-                  <Clock3 />
-                  {ui("Edit around the playhead")}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={onAutoEdit}>
-                  <Sparkles />
-                  {ui("Advanced AI auto-edit")}
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Popover open={urlOpen} onOpenChange={setUrlOpen}>
-              <PopoverTrigger asChild>
+            <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
+              <PopoverAnchor asChild>
                 <span className="w-0" aria-hidden="true" />
-              </PopoverTrigger>
+              </PopoverAnchor>
               <PopoverContent
                 side="top"
                 align="start"
+                onCloseAutoFocus={restoreReferenceTriggerFocus}
+                className="w-72 space-y-3 rounded-xl bg-surface"
+              >
+                <h3 className="text-sm font-semibold">{ui("Time range")}</h3>
+                {(["start", "end"] as const).map(edge => (
+                  <label key={edge} className="block text-xs">
+                    {ui(edge === "start" ? "Start" : "End")}
+                    <input
+                      type="range"
+                      min={0}
+                      max={project.duration}
+                      step={0.1}
+                      value={rangeDraft[edge]}
+                      onChange={e =>
+                        setRangeDraft(current => ({
+                          ...current,
+                          [edge]: Number(e.target.value),
+                        }))
+                      }
+                      className="mt-2 w-full accent-primary"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={project.duration}
+                      step={0.1}
+                      aria-label={ui(
+                        edge === "start" ? "Range start" : "Range end"
+                      )}
+                      value={rangeDraft[edge]}
+                      onChange={e =>
+                        setRangeDraft(current => ({
+                          ...current,
+                          [edge]: Number(e.target.value),
+                        }))
+                      }
+                      className="w-full rounded-lg border border-border bg-background px-2 py-1"
+                    />
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  disabled={
+                    !Number.isFinite(rangeDraft.start) ||
+                    !Number.isFinite(rangeDraft.end) ||
+                    rangeDraft.start < 0 ||
+                    rangeDraft.end > project.duration ||
+                    rangeDraft.start >= rangeDraft.end
+                  }
+                  onClick={() => {
+                    setTimeTarget({ range: rangeDraft });
+                    setRangeOpen(false);
+                    input.current?.focus();
+                  }}
+                  className="w-full rounded-lg bg-primary py-2 text-xs text-primary-foreground"
+                >
+                  {ui("Use range")}
+                </button>
+              </PopoverContent>
+            </Popover>
+
+            <Popover open={urlOpen} onOpenChange={setUrlOpen}>
+              <PopoverAnchor asChild>
+                <span className="w-0" aria-hidden="true" />
+              </PopoverAnchor>
+              <PopoverContent
+                side="top"
+                align="start"
+                onCloseAutoFocus={restoreReferenceTriggerFocus}
                 className="w-72 rounded-xl border-border bg-surface text-foreground"
               >
                 <label
@@ -1135,28 +1196,117 @@ export function EditorChat({
                 </button>
               </PopoverContent>
             </Popover>
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              className="flex min-w-0 items-center gap-1 rounded-lg px-1.5 py-1 text-[10px] text-foreground/50 hover:text-foreground"
-              title={ui(
-                "Optional improvements: {{approval}}. Limit: {{credits}} credits.",
-                {
-                  approval:
-                    chat.state.mode === "ask"
-                      ? ui("ask first")
-                      : ui("automatically approved"),
-                  credits: chat.state.maxCredits,
-                }
-              )}
-            >
-              <span className="truncate">
-                {chat.state.mode === "ask"
-                  ? ui("Ask before extras")
-                  : ui("Auto extras")}
-              </span>
-              <ChevronDown className="size-3 shrink-0" />
-            </button>
+            <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={ui("Reel effort and extras")}
+                  title={ui("Reel effort and extras")}
+                  className="rounded-lg p-2 text-foreground/55 hover:bg-foreground/5 hover:text-foreground"
+                >
+                  <Brain className="size-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                className="w-72 rounded-xl border-border bg-surface text-foreground"
+              >
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {ui(
+                    "Maximum spends more time checking the edit. Extras follow your approval setting and credit limit."
+                  )}
+                </p>
+                <CompactSelect
+                  aria-label={ui("Reel effort")}
+                  value={effort}
+                  onValueChange={value =>
+                    setEffort(value === "balanced" ? "balanced" : "max")
+                  }
+                  options={[
+                    { value: "balanced", label: ui("Balanced") },
+                    { value: "max", label: ui("Maximum") },
+                  ]}
+                />
+                <h3 className="mb-3 mt-4 text-sm font-semibold">
+                  {ui("How Reel works")}
+                </h3>
+                <p className="mb-1.5 block text-xs text-foreground/60">
+                  {ui("Optional improvements")}
+                </p>
+                <CompactSelect
+                  aria-label={ui("Approval mode")}
+                  value={chat.state.mode}
+                  disabled={busyChoice}
+                  onValueChange={value =>
+                    void runChoice("preferences", () =>
+                      chat.setPreferences({
+                        mode: value === "auto" ? "auto" : "ask",
+                      })
+                    )
+                  }
+                  options={[
+                    { value: "ask", label: "Ask before extras" },
+                    { value: "auto", label: "Approve extras automatically" },
+                  ]}
+                />
+                <p className="mt-2 text-xs leading-relaxed text-foreground/55">
+                  {ui(
+                    "Requested edits and their necessary steps run directly."
+                  )}{" "}
+                  {chat.state.mode === "ask"
+                    ? ui(
+                        "You choose whether to include additional suggestions."
+                      )
+                    : ui(
+                        "Reel can include extra improvements within your credit limit."
+                      )}
+                </p>
+                <label
+                  className="mb-1.5 mt-4 block text-xs text-foreground/60"
+                  htmlFor="reel-credit-limit"
+                >
+                  {ui("Credit limit per request")}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="reel-credit-limit"
+                    type="number"
+                    min={5}
+                    max={10000}
+                    step={1}
+                    value={budgetInput}
+                    disabled={busyChoice}
+                    onChange={event => setBudgetInput(event.target.value)}
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={
+                      busyChoice ||
+                      !Number.isInteger(Number(budgetInput)) ||
+                      Number(budgetInput) < 5 ||
+                      Number(budgetInput) > 10000
+                    }
+                    onClick={() =>
+                      void runChoice("preferences", async () => {
+                        await chat.setPreferences({
+                          maxCredits: Number(budgetInput),
+                        });
+                        setSettingsOpen(false);
+                      })
+                    }
+                    className="rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-40"
+                  >
+                    {ui("Save")}
+                  </button>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
+                  {ui(
+                    "Includes the 5-credit planning step and any paid actions. Approval mode never raises this limit."
+                  )}
+                </p>
+              </PopoverContent>
+            </Popover>
             <span className="ml-auto whitespace-nowrap text-[10px] text-foreground/35">
               ≤ {chat.state.maxCredits} cr
             </span>

@@ -40,6 +40,23 @@ export function trimObservedEnding(
   }
   // Complete the entire last transcribed phrase, even if visual analysis ended earlier.
   ending = Math.max(ending, ...project.transcript.map(s => s.end + 0.2));
+  for (const clip of project.clips.filter(c => !c.muted && !c.graphic)) {
+    const speech = project.sourceSpeech?.find(s => s.assetId === clip.assetId);
+    for (const segment of speech?.segments ?? []) {
+      if (segment.end <= clip.inPoint || segment.start >= clip.outPoint)
+        continue;
+      ending = Math.max(
+        ending,
+        Math.min(
+          clip.start + clip.duration,
+          clip.start +
+            (Math.min(segment.end, clip.outPoint) - clip.inPoint) /
+              (clip.speed ?? 1) +
+            0.15
+        )
+      );
+    }
+  }
   ending = Math.min(originalEnd, ending);
   if (!Number.isFinite(ending) || ending < 0.2 || originalEnd - ending < 0.25)
     return project;
@@ -107,6 +124,36 @@ export function auditAutomatedEdit(
         clip.inPoint + clip.duration * speed > asset.duration + 0.05)
     )
       problems.push(`Clip extends beyond its source: ${clip.label}`);
+    const originalSource = before.clips.filter(c => c.assetId === clip.assetId);
+    const words =
+      after.sourceSpeech
+        ?.find(s => s.assetId === clip.assetId)
+        ?.segments.flatMap(s => s.words ?? []) ?? [];
+    if (!clip.muted && !clip.graphic && originalSource.length && words.length) {
+      for (const side of ["inPoint", "outPoint"] as const) {
+        const boundary = clip[side];
+        if (originalSource.some(c => Math.abs(c[side] - boundary) < 0.001))
+          continue;
+        const continuous = after.clips.some(
+          peer =>
+            peer.id !== clip.id &&
+            peer.assetId === clip.assetId &&
+            !peer.muted &&
+            (side === "inPoint"
+              ? Math.abs(peer.start + peer.duration - clip.start) < 0.001 &&
+                Math.abs(peer.outPoint - boundary) < 0.001
+              : Math.abs(clip.start + clip.duration - peer.start) < 0.001 &&
+                Math.abs(peer.inPoint - boundary) < 0.001)
+        );
+        if (
+          !continuous &&
+          words.some(
+            word => boundary > word.start + 0.035 && boundary < word.end - 0.035
+          )
+        )
+          problems.push(`Cut crosses a spoken word: ${clip.label}`);
+      }
+    }
   }
   return problems;
 }

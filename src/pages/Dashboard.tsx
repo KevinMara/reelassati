@@ -37,7 +37,9 @@ import {
   X,
   ChevronRight,
   ChevronDown,
-  Flame,
+  Palette,
+  Lock,
+  Unlock,
   Film,
   Images,
   Mic,
@@ -62,6 +64,7 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace";
 import { platformApi } from "@/lib/platform-api";
 import { StudioMediaTray } from "@/components/studio/StudioMediaTray";
+import { FirstVisitTour } from "@/components/help/FirstVisitTour";
 import { PageGuideButton } from "@/components/help/PageGuide";
 
 function formatActivityTime(timestamp: string, now: number): string {
@@ -93,7 +96,7 @@ const ClientsPage = lazy(() => import("./dashboard/ClientsPage"));
 const CalendarPage = lazy(() => import("./dashboard/CalendarPage"));
 const SocialHub = lazy(() => import("./dashboard/SocialHub"));
 const SettingsPage = lazy(() => import("./dashboard/SettingsPage"));
-const TrendsPage = lazy(() => import("./dashboard/TrendsPage"));
+const StylesPage = lazy(() => import("./dashboard/StylesPage"));
 const VideoGenerator = lazy(() => import("./dashboard/VideoGenerator"));
 const ImageGenerator = lazy(() => import("./dashboard/ImageGenerator"));
 const VoiceNotes = lazy(() => import("./dashboard/VoiceNotes"));
@@ -591,10 +594,10 @@ function DashboardHome() {
           </div>
           <div className="mt-6 pt-4 border-t border-border">
             <Link
-              to="/dashboard/trends"
+              to="/dashboard/styles"
               className="flex items-center gap-2 text-sm text-primary hover:text-primary-hover"
             >
-              <Flame className="h-4 w-4" /> {ui("Explore trending content")}
+              <Palette className="h-4 w-4" /> {ui("Styles")}
             </Link>
           </div>
         </div>
@@ -707,7 +710,12 @@ export default function Dashboard() {
   const { loading: workspaceLoading } = useWorkspace();
   const navigate = useNavigate();
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
+  const [pinned, setPinned] = useState(
+    () => localStorage.getItem("reelassati:sidebar-pinned") === "true"
+  );
+  const [expandedPath,setExpandedPath]=useState("");
+  const collapsed=!pinned && location.pathname!=="/dashboard" && expandedPath!==location.pathname;
+  const setCollapsed=(value:boolean)=>setExpandedPath(value?"":location.pathname);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(() =>
     ["/dashboard/video", "/dashboard/image", "/dashboard/voice"].some(route =>
@@ -735,7 +743,7 @@ export default function Dashboard() {
   > = [
     { icon: LayoutDashboard, label: t("nav.dashboard"), to: "/dashboard" },
     { separator: true, label: "", compact: true },
-    { icon: Flame, label: ui("Trends"), to: "/dashboard/trends" },
+    { icon: Palette, label: ui("Styles"), to: "/dashboard/styles" },
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
     { group: "create" },
     { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
@@ -743,6 +751,7 @@ export default function Dashboard() {
     { icon: Send, label: t("nav.publish"), to: "/dashboard/publish" },
     { icon: BarChart3, label: t("nav.analytics"), to: "/dashboard/analytics" },
     { separator: true, label: ui("Workspace") },
+    { icon: Library, label: t("nav.library"), to: "/dashboard/library" },
     { icon: Users, label: t("nav.clients"), to: "/dashboard/clients" },
     { icon: Calendar, label: t("nav.calendar"), to: "/dashboard/calendar" },
     {
@@ -751,7 +760,6 @@ export default function Dashboard() {
       to: "/dashboard/coaching",
     },
     { separator: true, label: ui("Account") },
-    { icon: Library, label: t("nav.library"), to: "/dashboard/library" },
     { icon: AtSign, label: t("nav.social"), to: "/dashboard/social" },
     {
       icon: Gift,
@@ -794,6 +802,19 @@ export default function Dashboard() {
 
       {/* Sidebar */}
       <aside
+        onMouseEnter={() => setCollapsed(false)}
+        onMouseLeave={() => {
+          if (!pinned && path !== "/dashboard") setCollapsed(true);
+        }}
+        onFocusCapture={() => setCollapsed(false)}
+        onBlurCapture={event => {
+          if (
+            !event.currentTarget.contains(event.relatedTarget as Node) &&
+            !pinned &&
+            path !== "/dashboard"
+          )
+            setCollapsed(true);
+        }}
         className={cn(
           "fixed lg:sticky top-0 left-0 z-50 h-screen bg-surface border-r border-border flex flex-col transition-all duration-300",
           collapsed ? "w-[68px]" : "w-56",
@@ -806,17 +827,27 @@ export default function Dashboard() {
           </Link>
           <button
             type="button"
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() => {
+              const next = !pinned;
+              setPinned(next);
+              localStorage.setItem("reelassati:sidebar-pinned", String(next));
+            }}
             aria-label={
-              collapsed ? ui("Expand navigation") : ui("Collapse navigation")
+              pinned ? ui("Unpin navigation") : ui("Keep navigation open")
             }
-            aria-expanded={!collapsed}
-            className="hidden lg:flex p-1.5 rounded-md text-foreground/70 hover:text-foreground"
+            aria-pressed={pinned}
+            title={ui(
+              "Pin to keep the sidebar open. Unpin to expand it on hover."
+            )}
+            className="studio-help-anchor hidden lg:flex p-1.5 rounded-md text-foreground/70 hover:text-primary"
+            data-help={ui(
+              "Pin to keep the sidebar open. Unpin to expand it on hover."
+            )}
           >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
+            {pinned ? (
+              <Lock className="h-4 w-4 text-primary" />
             ) : (
-              <X className="h-4 w-4" />
+              <Unlock className="h-4 w-4" />
             )}
           </button>
           <button
@@ -954,9 +985,14 @@ export default function Dashboard() {
             <Menu className="h-5 w-5" />
           </button>
           <span className="mono-eyebrow text-foreground/70 hidden sm:block">
-            {ui("Dashboard")}
+            {ui(
+              path === "/dashboard"
+                ? "Dashboard"
+                : path.split("/")[2]?.replaceAll("-", " ") || "Studio"
+            )}
           </span>
           <div className="flex-1" />
+          <FirstVisitTour />
           <PageGuideButton compact />
           <CreditBalanceChip refreshKey={path} />
           <StudioMediaTray key={path} />
@@ -1004,7 +1040,11 @@ export default function Dashboard() {
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="/social" element={<SocialHub />} />
                   <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/trends" element={<TrendsPage />} />
+                  <Route path="/styles" element={<StylesPage />} />
+                  <Route
+                    path="/trends"
+                    element={<Navigate to="/dashboard/styles" replace />}
+                  />
                   <Route path="/voice" element={<VoiceNotes />} />
                   <Route
                     path="/interview"

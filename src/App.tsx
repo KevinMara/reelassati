@@ -149,7 +149,6 @@ export default function App() {
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/update-password" element={<UpdatePassword />} />
           <Route path="/auth/oauth-success" element={<OAuthSuccess />} />
-          <Route path="/dashboard" element={<StudioRoute />} />
           <Route path="/dashboard/*" element={<StudioRoute />} />
           <Route path="/entry" element={<EntryDemo />} />
           <Route path="*" element={<Navigate to="/" replace />} />

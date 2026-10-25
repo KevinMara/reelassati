@@ -364,7 +364,7 @@ function ReferenceStyleSession({
   }
 
   return (
-    <details className="my-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+    <details className="my-3 border-t border-border pt-3">
       <summary className="cursor-pointer text-sm font-medium">
         {purpose === "script"
           ? ui("Learn from a reference hook or script")
@@ -432,7 +432,7 @@ function ReferenceStyleSession({
           <input
             type="file"
             accept="video/*"
-            className="mt-1 block w-full text-xs"
+            className="mt-2 block w-full text-xs file:mr-3 file:rounded-xl file:border file:border-primary/25 file:bg-primary/10 file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary"
             onChange={e => {
               const file = e.target.files?.[0];
               e.target.value = "";

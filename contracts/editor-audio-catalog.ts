@@ -1,3 +1,4 @@
+import { zenAudioCatalog } from "./editor-audio-zen";
 /** Bundled CC0 audio. Sources, changes and checksums are included with every file. */
 export interface EditorAudioCatalogEntry {
   id: string;
@@ -20,6 +21,7 @@ export interface EditorAudioCatalogEntry {
 }
 
 export const editorAudioCatalog: readonly EditorAudioCatalogEntry[] = [
+  ...zenAudioCatalog,
   {
     id: "swish-01",
     name: "Swish 01",

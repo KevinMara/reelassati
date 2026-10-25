@@ -1,9 +1,9 @@
 import { useUiText } from "@/lib/i18n/ui";
-import { colorGradeMatrix } from "@/lib/color-grade";
-import { visualFrame } from "@contracts/clip-visual";
+import { colorGradeMatrix, colorToneTable } from "@/lib/color-grade";
+import { normalizeVisual, patchVisual, visualFrame } from "@contracts/clip-visual";
 import { CaptionLayer } from "./CaptionLayer";
 import { compareTimelineLayers } from "@/lib/timeline-lanes";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
 import { audioMixAt, audioMixAutomation } from "@contracts/audio-mix";
@@ -158,6 +158,20 @@ function MediaLayer({
             type="matrix"
             values={colorGradeMatrix(clip).join(" ")}
           />
+          <feComponentTransfer>
+            <feFuncR
+              type="table"
+              tableValues={colorToneTable(clip).join(" ")}
+            />
+            <feFuncG
+              type="table"
+              tableValues={colorToneTable(clip).join(" ")}
+            />
+            <feFuncB
+              type="table"
+              tableValues={colorToneTable(clip).join(" ")}
+            />
+          </feComponentTransfer>
         </filter>
       </defs>
     </svg>
@@ -217,6 +231,9 @@ export function TimelinePreview({
   playing,
   zoom = 1,
   pan = { x: 0, y: 0 },
+  selectedClipId,
+  onSelectClip,
+  onTransform,
 }: {
   project: EditProject;
   assets: Asset[];
@@ -224,8 +241,17 @@ export function TimelinePreview({
   playing: boolean;
   zoom?: number;
   pan?: { x: number; y: number };
+  selectedClipId?: string | null;
+  onSelectClip?(id: string): void;
+  onTransform?(id: string, dx: number, dy: number): Promise<void>;
 }) {
   const ui = useUiText();
+  const [moving, setMoving] = useState<{
+    id: string;
+    dx: number;
+    dy: number;
+  }>();
+  const [dragError, setDragError] = useState("");
   const active = effectiveTimelineClips(project)
     .filter(
       c =>
@@ -238,22 +264,84 @@ export function TimelinePreview({
   return (
     <div
       className="relative mx-auto w-full overflow-hidden bg-black"
+      onPointerDown={event => {
+        if (!onSelectClip || !onTransform) return;
+        event.stopPropagation();
+        const chosen =
+          active.find(c => c.id === selectedClipId && c.track !== "audio") ??
+          [...active].reverse().find(c => c.track !== "audio");
+        if (!chosen) return;
+        onSelectClip(chosen.id);
+        if (chosen.locked) return;
+        const element = event.currentTarget;
+        const rect = element.getBoundingClientRect();
+        const origin = { x: event.clientX, y: event.clientY };
+        element.setPointerCapture(event.pointerId);
+        let delta = { dx: 0, dy: 0 };
+        const move = (e: globalThis.PointerEvent) => {
+          delta = {
+            dx: ((e.clientX - origin.x) / rect.width) * 100,
+            dy: ((e.clientY - origin.y) / rect.height) * 100,
+          };
+          setMoving({ id: chosen.id, ...delta });
+        };
+        const stop = () => {
+          element.removeEventListener("pointermove", move);
+          element.removeEventListener("pointerup", stop);
+          element.removeEventListener("pointercancel", cancel);
+          if (Math.abs(delta.dx) + Math.abs(delta.dy) > 0.1)
+            void onTransform(chosen.id, delta.dx, delta.dy)
+              .catch(() => setDragError(ui("Could not save the position.")))
+              .finally(() => setMoving(undefined));
+          else setMoving(undefined);
+        };
+        const cancel = () => {
+          delta = { dx: 0, dy: 0 };
+          stop();
+        };
+        element.addEventListener("pointermove", move);
+        element.addEventListener("pointerup", stop, { once: true });
+        element.addEventListener("pointercancel", cancel, { once: true });
+      }}
       style={{
         transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-        pointerEvents: "none",
+        pointerEvents: onSelectClip ? "auto" : "none",
         aspectRatio: project.aspectRatio.replace(":", "/"),
+        ...{
+          "--preview-aspect":
+            Number(project.aspectRatio.split(":")[0]) /
+            Number(project.aspectRatio.split(":")[1]),
+        },
         containerType: "inline-size",
         isolation: "isolate",
         maxHeight: "100%",
         maxWidth:
           project.aspectRatio === "9:16"
-            ? "min(360px, calc(434px * 9 / 16))"
+            ? "min(100%, calc((var(--editor-upper, 540px) - 110px) * 9 / 16))"
             : project.aspectRatio === "1:1"
               ? "434px"
               : "100%",
       }}
     >
-      {active.map(c => {
+      {active.map(original => {
+        let c = original;
+        if (moving?.id === c.id)
+          c = c.graphic
+            ? {
+                ...c,
+                graphic: {
+                  ...c.graphic,
+                  x: c.graphic.x + moving.dx,
+                  y: c.graphic.y + moving.dy,
+                },
+              }
+            : {
+                ...c,
+                visual: patchVisual(c, {
+                  x: normalizeVisual(c.visual).x + moving.dx,
+                  y: normalizeVisual(c.visual).y + moving.dy,
+                }),
+              };
         if (c.graphic)
           return <MotionGraphicLayer key={c.id} clip={c} time={time} />;
         const asset = assets.find(a => a.id === c.assetId);
@@ -268,6 +356,23 @@ export function TimelinePreview({
           />
         ) : null;
       })}
+      {onSelectClip && active.some(c => c.id === selectedClipId) && (
+        <span
+          className="pointer-events-none absolute inset-0 z-30 rounded-sm border-2 border-primary/80"
+          aria-hidden="true"
+        >
+          <i className="absolute -left-1 -top-1 size-2 bg-primary" />
+          <i className="absolute -right-1 -bottom-1 size-2 bg-primary" />
+        </span>
+      )}
+      {dragError && (
+        <p
+          role="alert"
+          className="absolute bottom-2 z-40 rounded bg-black/80 p-2 text-xs text-white"
+        >
+          {dragError}
+        </p>
+      )}
       {!active.length && (
         <p className="absolute inset-0 flex items-center justify-center p-8 text-center text-sm text-white/50">
           {project.clips.length

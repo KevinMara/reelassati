@@ -1,3 +1,6 @@
+import { CompactSelect } from "@/components/ui/compact-select";
+import { assetOrigin } from "@/lib/library-organization";
+import { StockLibrary } from "./StockLibrary";
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { v4 as createUuid } from "uuid";
@@ -50,6 +53,9 @@ export function EditorMediaLibrary({
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [sort, setSort] = useState("newest");
+  const [origin,setOrigin]=useState("all");
+  const [date,setDate]=useState("all");
+  const [now]=useState(()=>Date.now());
   const [folderName, setFolderName] = useState("");
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -111,6 +117,8 @@ export function EditorMediaLibrary({
         .filter(
           a =>
             ["video", "image", "audio"].includes(a.kind) &&
+            (origin==="all"||assetOrigin(a)===origin) &&
+            (date==="all"||Date.parse(a.createdAt)>=now-Number(date)*86400000) &&
             (query.trim() || (a.folderId ?? "") === folderId) &&
             (kind === "all" || a.kind === kind) &&
             [a.name, ...(reviewedContent.get(a.id) ?? [])]
@@ -129,7 +137,7 @@ export function EditorMediaLibrary({
                   ? a.createdAt.localeCompare(b.createdAt)
                   : b.createdAt.localeCompare(a.createdAt)
         ),
-    [workspace.assets, folderId, kind, query, sort, reviewedContent]
+    [workspace.assets, folderId, kind, query, sort, reviewedContent,origin,date,now]
   );
   async function action(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -291,6 +299,8 @@ export function EditorMediaLibrary({
           e.target.value = "";
         }}
       />
+      <div className="grid grid-cols-2 gap-2"><CompactSelect aria-label={ui("Media source")} value={origin} onValueChange={setOrigin} options={[{value:"all",label:ui("All sources")},{value:"uploaded",label:ui("Uploaded")},{value:"generated",label:ui("Generated")},{value:"stock",label:ui("Reel stock")}]} /><CompactSelect aria-label={ui("Date added")} value={date} onValueChange={setDate} options={[{value:"all",label:ui("Any time")},{value:"1",label:ui("Last 24 hours")},{value:"7",label:ui("Last 7 days")},{value:"30",label:ui("Last 30 days")}]} /></div>
+      {origin==="stock"&&<StockLibrary/>}
       <DirectVideoImport
         key={`${owner}:${brand}:${folderId}`}
         disabled={busy || !capabilities.uploads}
@@ -430,13 +440,13 @@ export function EditorMediaLibrary({
             className="border-border bg-surface text-foreground"
           >
             {[
-              ["all", "All types"],
-              ["video", "Video"],
-              ["image", "Image"],
-              ["audio", "Audio"],
+              ["all", ui("All types")],
+              ["video", ui("Video")],
+              ["image", ui("Image")],
+              ["audio", ui("Audio")],
             ].map(([value, label]) => (
               <SelectItem key={value} value={value}>
-                {ui(label)}
+                {label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -454,14 +464,14 @@ export function EditorMediaLibrary({
             className="border-border bg-surface text-foreground"
           >
             {[
-              ["newest", "Newest first"],
-              ["oldest", "Oldest first"],
-              ["name", "Name"],
-              ["duration", "Duration"],
-              ["size", "File size"],
+              ["newest", ui("Newest first")],
+              ["oldest", ui("Oldest first")],
+              ["name", ui("Name")],
+              ["duration", ui("Duration")],
+              ["size", ui("File size")],
             ].map(([value, label]) => (
               <SelectItem key={value} value={value}>
-                {ui(label)}
+                {label}
               </SelectItem>
             ))}
           </SelectContent>

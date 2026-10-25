@@ -1,3 +1,10 @@
+import { LibraryOrganization } from "@/components/studio/LibraryOrganization";
+import {
+  DEFAULT_LIBRARY_ORGANIZATION,
+  libraryOrganizationMatches,
+} from "@/lib/library-organization";
+import { CompactSelect } from "@/components/ui/compact-select";
+import { StockLibrary } from "@/components/studio/StockLibrary";
 import { useUiText } from "@/lib/i18n/ui";
 import { useTranslation } from "react-i18next";
 import { StudioSelect } from "@/components/ui/studio-select";
@@ -136,6 +143,10 @@ export default function ContentLibrary() {
   const [search, setSearch] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [projectFilter, setProjectFilter] = useState("");
+  const [organization, setOrganization] = useState(
+    DEFAULT_LIBRARY_ORGANIZATION
+  );
+  const [now] = useState(() => Date.now());
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -180,28 +191,52 @@ export default function ContentLibrary() {
 
   const filteredItems = useMemo(
     () =>
-      items.filter(item => {
-        if (favoritesOnly && (item.source !== "asset" || !item.asset.favorite))
-          return false;
-        if (
-          projectFilter &&
-          (item.source !== "asset" ||
-            !(
-              item.asset.projectId === projectFilter ||
-              workspace.projects
-                .find(project => project.id === projectFilter)
-                ?.clips.some(clip => clip.assetId === item.asset.id)
-            ))
-        )
-          return false;
-        if (filter !== "all" && item.kind !== filter) return false;
-        return (
-          !deferredSearch ||
-          item.title.toLowerCase().includes(deferredSearch) ||
-          item.kind.includes(deferredSearch)
-        );
-      }),
+      items
+        .filter(item => {
+          if (
+            item.source === "asset" &&
+            !libraryOrganizationMatches(item.asset, organization, now)
+          )
+            return false;
+          if (
+            item.source === "script" &&
+            (organization.folder ||
+              !["all", "generated"].includes(organization.origin))
+          )
+            return false;
+          if (
+            favoritesOnly &&
+            (item.source !== "asset" || !item.asset.favorite)
+          )
+            return false;
+          if (
+            projectFilter &&
+            (item.source !== "asset" ||
+              !(
+                item.asset.projectId === projectFilter ||
+                workspace.projects
+                  .find(project => project.id === projectFilter)
+                  ?.clips.some(clip => clip.assetId === item.asset.id)
+              ))
+          )
+            return false;
+          if (filter !== "all" && item.kind !== filter) return false;
+          return (
+            !deferredSearch ||
+            item.title.toLowerCase().includes(deferredSearch) ||
+            item.kind.includes(deferredSearch)
+          );
+        })
+        .sort((a, b) =>
+          organization.sort === "name"
+            ? a.title.localeCompare(b.title)
+            : organization.sort === "oldest"
+              ? a.createdAt.localeCompare(b.createdAt)
+              : b.createdAt.localeCompare(a.createdAt)
+        ),
     [
+      organization,
+      now,
       deferredSearch,
       filter,
       items,
@@ -564,6 +599,8 @@ export default function ContentLibrary() {
           ))}
         </StudioSelect>
       </div>
+      <LibraryOrganization value={organization} onChange={setOrganization} />
+      {organization.origin === "stock" && <StockLibrary />}
       {filteredItems.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-14 text-center">
           <FileText className="mx-auto h-7 w-7 text-primary" />
@@ -680,6 +717,38 @@ export default function ContentLibrary() {
                           ? ` · ${formatBytes(item.asset.size)}`
                           : ""}
                       </p>
+                      {item.source === "asset" && (
+                        <div className="mt-2 max-w-48">
+                          <CompactSelect
+                            aria-label={ui("Move {{name}} to folder", {
+                              name: item.title,
+                            })}
+                            value={item.asset.folderId ?? ""}
+                            options={[
+                              { value: "", label: ui("No folder") },
+                              ...(workspace.mediaFolders ?? []).map(f => ({
+                                value: f.id,
+                                label: f.name,
+                              })),
+                            ]}
+                            onValueChange={folderId =>
+                              void updateWorkspace(w => ({
+                                ...w,
+                                assets: w.assets.map(a =>
+                                  a.id === item.asset.id
+                                    ? { ...a, folderId: folderId || undefined }
+                                    : a
+                                ),
+                              })).catch(() =>
+                                setNotice({
+                                  tone: "error",
+                                  message: "Save failed",
+                                })
+                              )
+                            }
+                          />
+                        </div>
+                      )}
                       <div className="mt-2">
                         <AiProvenanceBadge
                           provenance={

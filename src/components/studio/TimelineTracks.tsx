@@ -1,3 +1,5 @@
+import type { StoryBeat } from "@contracts/story-beats";
+import { sectionColors } from "./TimelineSections";
 import { useUiText } from "@/lib/i18n/ui";
 import {
   useEffect,
@@ -5,6 +7,7 @@ import {
   useRef,
   useState,
   type DragEvent,
+  type ReactNode,
   type PointerEvent,
 } from "react";
 import {
@@ -14,7 +17,6 @@ import {
   Music2,
   Lock,
   VolumeX,
-  Magnet,
   Unlock,
   Volume2,
   Eye,
@@ -52,6 +54,9 @@ const icons = {
 const fmt = (value: number) => `${value.toFixed(1)}s`;
 
 type Props = {
+  sections?: ReactNode;
+  highlightedSections?: StoryBeat[];
+  onTrackGain?(lane: TimelineLane, gain: number): Promise<void>;
   project: EditProject;
   assets: Asset[];
   time: number;
@@ -83,7 +88,9 @@ export function TimelineTracks({
   selectedClipIds = selectedClipId ? [selectedClipId] : [],
   disabled,
   snapping,
-  onSnappingChange,
+  sections,
+  highlightedSections = [],
+  onTrackGain,
   onSeek,
   onSelect,
   onAssetDrop,
@@ -94,7 +101,30 @@ export function TimelineTracks({
   onTrackToggle,
 }: Props) {
   const ui = useUiText();
-  const names = { video: ui("Video"), audio: ui("Audio"), text: ui("Text"), graphics: ui("Graphics"), captions: ui("Captions") };
+  const [gainDraft, setGainDraft] = useState<Record<string, number>>({});
+  const [gainError, setGainError] = useState("");
+  const saveGain = async (lane: TimelineLane, key: string, value: number) => {
+    setGainError("");
+    try {
+      await onTrackGain?.(lane, value);
+    } catch {
+      setGainError(ui("Save failed"));
+    } finally {
+      setGainDraft(current => {
+        if (current[key] !== value) return current;
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+  const names = {
+    video: ui("Video"),
+    audio: ui("Audio"),
+    text: ui("Text"),
+    graphics: ui("Graphics"),
+    captions: ui("Captions"),
+  };
   const snapLabels: Record<string, string> = {
     "Timeline start": ui("Timeline start"),
     "Timeline end": ui("Timeline end"),
@@ -320,38 +350,31 @@ export function TimelineTracks({
   };
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-3 py-1.5">
-        <button
-          type="button"
-          aria-pressed={snapping}
-          onClick={() => {
-            onSnappingChange(!snapping);
-            setSnapGuide(null);
-          }}
-          title={ui(
-            "Align moved clips and trimmed edges with the playhead and other clips."
-          )}
-          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${snapping ? "bg-primary/15 text-primary" : "text-foreground/50 hover:bg-foreground/5"}`}
-        >
-          <Magnet className="h-3.5 w-3.5" />
-          {ui("Clip snapping")} {snapping ? ui("on") : ui("off")}
-        </button>
-        <span
-          role="status"
-          aria-live="polite"
-          className="ml-auto text-[10px] text-cyan-400"
-        >
-          {snapGuide
-            ? ui("Aligned to {{target}} · {{time}}", { target: snapLabels[snapGuide.label] ?? snapGuide.label, time: fmt(snapGuide.time) })
-            : ""}
-        </span>
-      </div>
+      {gainError && (
+        <p role="alert" className="px-3 py-1 text-xs text-destructive">
+          {gainError}
+        </p>
+      )}
+      <span role="status" className="sr-only">
+        {snapGuide
+          ? ui("Aligned to {{target}} · {{time}}", {
+              target: snapLabels[snapGuide.label] ?? snapGuide.label,
+              time: fmt(snapGuide.time),
+            })
+          : ""}
+      </span>
       <div
         ref={scrollRef}
         className="editor-timeline-scroll overflow-x-auto"
         aria-label={ui("Editing timeline")}
       >
         <div style={{ width: canvasWidth }}>
+          {sections && (
+            <div className="grid grid-cols-[92px_minmax(0,1fr)] border-b border-border">
+              <div />
+              <div className="mx-1.5 min-w-0">{sections}</div>
+            </div>
+          )}
           <div className="grid grid-cols-[92px_minmax(0,1fr)] border-b border-border bg-background/45">
             <div className="border-r border-border px-3 py-2 font-mono text-xs uppercase tracking-wider text-foreground/60">
               {ui("Time")}
@@ -394,6 +417,24 @@ export function TimelineTracks({
             </div>
           </div>
           <div className="relative">
+            <div
+              className="pointer-events-none absolute bottom-0 left-[98px] right-1.5 top-0"
+              aria-hidden="true"
+            >
+              {highlightedSections.map(beat => (
+                <span
+                  key={beat.id}
+                  className="absolute inset-y-0 border-x transition-all"
+                  style={{
+                    left: `${(beat.start / project.duration) * 100}%`,
+                    width: `${((beat.end - beat.start) / project.duration) * 100}%`,
+                    background: `${sectionColors[beat.kind]}15`,
+                    borderColor: `${sectionColors[beat.kind]}90`,
+                    boxShadow: `inset 0 0 24px ${sectionColors[beat.kind]}18`,
+                  }}
+                />
+              ))}
+            </div>
             <div className="pointer-events-none absolute bottom-0 left-[98px] right-1.5 top-0 z-20">
               <div
                 className="absolute inset-y-0 w-px bg-primary"
@@ -474,7 +515,25 @@ export function TimelineTracks({
                                 : active
                                   ? EyeOff
                                   : Eye;
-                          const label = ui("{{action}} clips in {{kind}} {{number}}", { action: property === "locked" ? (active ? ui("Unlock") : ui("Lock")) : property === "muted" ? (active ? ui("Unmute") : ui("Mute")) : active ? ui("Show") : ui("Hide"), kind: names[lane.kind], number: lane.number });
+                          const label = ui(
+                            "{{action}} clips in {{kind}} {{number}}",
+                            {
+                              action:
+                                property === "locked"
+                                  ? active
+                                    ? ui("Unlock")
+                                    : ui("Lock")
+                                  : property === "muted"
+                                    ? active
+                                      ? ui("Unmute")
+                                      : ui("Mute")
+                                    : active
+                                      ? ui("Show")
+                                      : ui("Hide"),
+                              kind: names[lane.kind],
+                              number: lane.number,
+                            }
+                          );
                           return (
                             <button
                               key={property}
@@ -497,6 +556,63 @@ export function TimelineTracks({
                         })}
                       </div>
                     )}
+                    {onTrackGain &&
+                      (lane.kind === "video" || lane.kind === "audio") &&
+                      clips.length > 0 && (
+                        <input
+                          type="range"
+                          min={0}
+                          max={2}
+                          step={0.01}
+                          aria-label={ui("Volume for {{kind}} {{number}}", {
+                            kind: names[lane.kind],
+                            number: lane.number,
+                          })}
+                          title={
+                            String(
+                              Math.round(
+                                (gainDraft[key] ??
+                                  timelineTrackSettings(project, lane)?.gain ??
+                                  1) * 100
+                              )
+                            ) + "%"
+                          }
+                          disabled={disabled || clips.some(c => c.locked)}
+                          value={
+                            gainDraft[key] ??
+                            timelineTrackSettings(project, lane)?.gain ??
+                            1
+                          }
+                          onChange={e =>
+                            setGainDraft(current => ({
+                              ...current,
+                              [key]: Number(e.target.value),
+                            }))
+                          }
+                          onPointerUp={e =>
+                            void saveGain(
+                              lane,
+                              key,
+                              Number(e.currentTarget.value)
+                            )
+                          }
+                          onKeyUp={e => {
+                            if (
+                              e.key.startsWith("Arrow") ||
+                              e.key === "Home" ||
+                              e.key === "End" ||
+                              e.key === "PageUp" ||
+                              e.key === "PageDown"
+                            )
+                              void saveGain(
+                                lane,
+                                key,
+                                Number(e.currentTarget.value)
+                              );
+                          }}
+                          className="h-1 w-full cursor-ew-resize accent-primary"
+                        />
+                      )}
                   </div>
                   <div
                     data-timeline-lane={key}
@@ -555,7 +671,10 @@ export function TimelineTracks({
                   >
                     <button
                       type="button"
-                      aria-label={ui("Seek in {{kind}} {{number}}", { kind: names[lane.kind], number: lane.number })}
+                      aria-label={ui("Seek in {{kind}} {{number}}", {
+                        kind: names[lane.kind],
+                        number: lane.number,
+                      })}
                       className="absolute inset-0 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                       onClick={e => onSeek(pointerTime(e))}
                       onKeyDown={e => {
@@ -587,8 +706,15 @@ export function TimelineTracks({
                     {emptyDestination && (
                       <span className="pointer-events-none absolute inset-0 flex items-center px-3 text-[10px] text-foreground/30">
                         {lane.number > 1
-                          ? ui("Drop to layer {{number}}", { number: lane.number })
-                          : ui("Drop {{kind}} here", { kind: lane.kind === "audio" ? ui("audio") : ui("video or images") })}
+                          ? ui("Drop to layer {{number}}", {
+                              number: lane.number,
+                            })
+                          : ui("Drop {{kind}} here", {
+                              kind:
+                                lane.kind === "audio"
+                                  ? ui("audio")
+                                  : ui("video or images"),
+                            })}
                       </span>
                     )}
                     {lane.kind === "captions" &&
@@ -628,7 +754,16 @@ export function TimelineTracks({
                           key={clip.id}
                           type="button"
                           draggable={!clip.locked && !disabled}
-                          aria-label={ui("{{name}}, {{kind}} {{number}}, {{start}} to {{end}}", { name: clip.label, kind: names[lane.kind], number: lane.number, start: fmt(clip.start), end: fmt(clip.start + clip.duration) })}
+                          aria-label={ui(
+                            "{{name}}, {{kind}} {{number}}, {{start}} to {{end}}",
+                            {
+                              name: clip.label,
+                              kind: names[lane.kind],
+                              number: lane.number,
+                              start: fmt(clip.start),
+                              end: fmt(clip.start + clip.duration),
+                            }
+                          )}
                           aria-pressed={selectedClipIds.includes(clip.id)}
                           onDragStart={e => {
                             if (clip.locked) {
@@ -685,7 +820,10 @@ export function TimelineTracks({
                             backgroundColor: timelineClipColor(clip, assets),
                             opacity: clip.muted ? 0.55 : 1,
                           }}
-                          title={ui("{{name}} · Drag to move; drag edges to trim", { name: clip.label })}
+                          title={ui(
+                            "{{name}} · Drag to move; drag edges to trim",
+                            { name: clip.label }
+                          )}
                         >
                           {(clip.track === "video" ||
                             clip.track === "audio") && (
@@ -721,7 +859,12 @@ export function TimelineTracks({
                                     ? clip.start
                                     : clip.start + clip.duration
                                 }
-                                aria-label={ui(side === "start" ? "Trim start of {{name}}" : "Trim end of {{name}}", { name: clip.label })}
+                                aria-label={ui(
+                                  side === "start"
+                                    ? "Trim start of {{name}}"
+                                    : "Trim end of {{name}}",
+                                  { name: clip.label }
+                                )}
                                 aria-orientation="vertical"
                                 draggable={false}
                                 onDragStart={e => {

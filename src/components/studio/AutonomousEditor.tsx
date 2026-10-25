@@ -1,10 +1,19 @@
+import { editorAudioCatalog } from "@contracts/editor-audio-catalog";
+import { resolveChatCatalogAudio } from "@/lib/editor-chat-catalog-audio";
+import { StudioSelect } from "@/components/ui/studio-select";
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { v4 as createUuid } from "uuid";
-import { appendEditorRevisions } from "@/lib/editor-history";
+import { publishAutonomousSteps } from "@/lib/autonomous-live-publish";
+import { createPortal } from "react-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   createAutonomousPreparationCache,
   prepareAutonomousSources,
-  autonomousTranscriptTargets,
   findSavedAutonomousReview,
 } from "@/lib/autonomous-preparation";
 import {
@@ -54,7 +63,11 @@ import {
 export function AutonomousEditor({
   project,
   onFinished,
+  open,
+  onOpenChange,
 }: {
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
   project: EditProject;
   onFinished: (summary: string) => void;
 }) {
@@ -63,6 +76,10 @@ export function AutonomousEditor({
     useWorkspace();
   const referenceOwner = workspace.profile.email.toLowerCase();
   const referenceBrand = selectedBrand(referenceOwner);
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [model, setModel] = useState<
+    "moonshotai/kimi-k3" | "moonshotai/kimi-k3.1-pro"
+  >("moonshotai/kimi-k3");
   const [style, setStyle] = useState(
     () =>
       eligibleAnalyzerOptimization(
@@ -70,7 +87,9 @@ export function AutonomousEditor({
         workspace.assets.filter(asset =>
           project.clips.some(clip => clip.assetId === asset.id)
         )
-      )?.brief ?? ""
+      )?.brief ??
+      new URLSearchParams(window.location.search).get("style") ??
+      ""
   );
   const [referenceBrief, setReferenceBrief] = useState(
     project.referenceStyleBrief ?? ""
@@ -90,8 +109,8 @@ export function AutonomousEditor({
     minimumDuration,
     maximumDuration
   );
-  const [images, setImages] = useState(0);
-  const [videos, setVideos] = useState(0);
+  const [images, setImages] = useState(2);
+  const [videos, setVideos] = useState(1);
   const [captions, setCaptions] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -135,16 +154,7 @@ export function AutonomousEditor({
         timedCreditCost(a.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute),
       0
     );
-  const transcriptCost = captions
-    ? sources
-        .filter(a => autonomousTranscriptTargets(project, a).length > 0)
-        .reduce(
-          (sum, a) =>
-            sum +
-            timedCreditCost(a.duration, AI_CREDIT_COSTS.transcriptionPerMinute),
-          0
-        )
-    : 0;
+  const transcriptCost = 0;
   const mediaCost =
     images * AI_CREDIT_COSTS.image1K +
     videos *
@@ -190,6 +200,8 @@ export function AutonomousEditor({
       projectId: project.id,
     };
     setBusy(true);
+    setCompletedSteps([]);
+    onOpenChange(false);
     setFinished(false);
     setFailure("");
     setStage(ui("Review"));
@@ -212,7 +224,6 @@ export function AutonomousEditor({
       if (!signal.aborted && mounted.current) setStatus(stage);
     };
     let working: EditProject = structuredClone(project);
-    const originalClips = JSON.stringify(project.clips);
     const generatedAssets: Asset[] = [];
     const resolvedMedia = new Map<string, string>();
     let timelineSaveStarted = false;
@@ -240,6 +251,7 @@ export function AutonomousEditor({
         project,
         sources,
         captions,
+        speechTiming: true,
         context: JSON.stringify([
           destination,
           workspace.profile.contentLanguage,
@@ -266,11 +278,12 @@ export function AutonomousEditor({
         transcribe: async asset => {
           setStage(ui("Captions"));
           setStatus(`Transcribing ${asset.name}…`);
-          const { transcribeMedia } = await import("@/lib/transcribe-media");
+          const { transcribeMediaLocally } =
+            await import("@/lib/local-transcription");
           checkpoint();
-          return transcribeMedia(
+          return transcribeMediaLocally(
             asset,
-            workspace.profile.contentLanguage,
+            undefined,
             project.id,
             progress,
             signal,
@@ -307,6 +320,9 @@ export function AutonomousEditor({
         {
           project: working,
           command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+          model,
+          stock:true,
+          effort: "max",
           selectedClipIds: [],
           range: { start: 0, end: working.duration },
         },
@@ -330,13 +346,70 @@ export function AutonomousEditor({
       preflightAutonomousPlan(
         working,
         changesToApply,
-        workspace.assets,
+        [
+          ...workspace.assets,
+          ...(result.stockMedia??[]).map(item=>({id:`stock:${item.provider}:${item.id}`,name:item.title,kind:item.kind,status:"ready" as const,duration:item.duration,url:"",size:0,createdAt:"",contentType:`${item.kind}/${item.kind==="video"?"webm":"jpeg"}`})),
+          ...editorAudioCatalog.map(a => ({
+            id: `catalog:${a.id}`,
+            kind: "audio" as const,
+            name: a.name,
+            status: "ready" as const,
+            duration: a.duration,
+            url: "",
+            size: 0,
+            createdAt: "",
+            contentType: "audio/wav",
+          })),
+        ],
         checkpoint
       );
       working.proposedChanges = [
         ...working.proposedChanges.filter(c => c.status !== "proposed"),
         ...result.changes,
       ];
+      for(const item of result.stockMedia??[]) {
+        checkpoint();setStage(ui("Supporting shots"));setStatus(`Importing licensed stock · ${item.title}`);
+        let asset=await platformApi.importStock(item,signal,scope);
+        if(asset.kind==="video") {const {resolveVideoMetadata}=await import("@/lib/media-metadata");asset=await resolveVideoMetadata({...asset,duration:undefined,width:undefined,height:undefined},signal);}
+        checkpoint();generatedAssets.push(asset);
+        for(const op of changesToApply)if(op.parameters?.assetId===`stock:${item.provider}:${item.id}`)resolvedMedia.set(op.id,asset.id);
+        await updateWorkspace(w=>{checkpoint(w);return {...w,assets:[asset,...w.assets.filter(a=>a.id!==asset.id)]};});
+      }
+      for (const op of changesToApply.filter(op => op.type === "sound")) {
+        const id = op.parameters?.assetId;
+        if (!id?.startsWith("catalog:")) continue;
+        setStage(ui("Sound"));
+        setStatus(`Adding free sound · ${op.label}`);
+        const asset = await resolveChatCatalogAudio(
+          id.slice(8),
+          [...workspace.assets, ...generatedAssets],
+          file =>
+            platformApi.uploadAsset(
+              file,
+              "audio",
+              undefined,
+              undefined,
+              requestOptions
+            ),
+          (url, init) =>
+            fetch(url, {
+              ...init,
+              signal: init?.signal
+                ? AbortSignal.any([signal, init.signal])
+                : signal,
+            })
+        );
+        checkpoint();
+        generatedAssets.push(asset);
+        resolvedMedia.set(op.id, asset.id);
+        await updateWorkspace(w => {
+          checkpoint(w);
+          return {
+            ...w,
+            assets: [asset, ...w.assets.filter(a => a.id !== asset.id)],
+          };
+        });
+      }
       let imagesUsed = 0;
       let videosUsed = 0;
       for (const op of result.changes) {
@@ -439,11 +512,14 @@ export function AutonomousEditor({
             }
           : op
       );
+      const steps: Array<{ label: string; project: EditProject }> = [];
       working = executeAutonomousPlan(
         working,
         executable,
         allAssets,
-        checkpoint
+        checkpoint,
+        (snapshot, operation) =>
+          steps.push({ label: operation.label, project: snapshot })
       );
       const problems = auditAutomatedEdit(project, working, allAssets);
       if (problems.length)
@@ -456,86 +532,17 @@ export function AutonomousEditor({
       await verifyUploadRequestScope(scope);
       checkpoint();
       timelineSaveStarted = true;
-      await updateWorkspace(w => {
-        checkpoint(w);
-        return {
-          ...w,
-          projects: w.projects.map(p => {
-            if (p.id !== project.id) return p;
-            if (
-              JSON.stringify(p.clips) !== originalClips ||
-              JSON.stringify(p.transcript) !==
-                JSON.stringify(project.transcript) ||
-              JSON.stringify([
-                p.captionStyle,
-                p.captionAppearance,
-                p.editStyleTemplate,
-              ]) !==
-                JSON.stringify([
-                  project.captionStyle,
-                  project.captionAppearance,
-                  project.editStyleTemplate,
-                ])
-            )
-              throw new Error(
-                ui(
-                  "Your timeline changed during the edit. AI media is saved; run again on the current version."
-                )
-              );
-            const before = {
-              id: createUuid(),
-              label: "Before autonomous edit",
-              createdAt: new Date().toISOString(),
-              clips: p.clips,
-              transcript: p.transcript,
-              duration: p.duration,
-              captionStyle: p.captionStyle,
-              captionAppearance: p.captionAppearance,
-              aspectRatio: p.aspectRatio,
-              frameRate: p.frameRate,
-              trackSettings: structuredClone(p.trackSettings),
-              transcriptProvenance: p.transcriptProvenance,
-            };
-            const after = {
-              id: createUuid(),
-              label: "Autonomous edit",
-              createdAt: new Date().toISOString(),
-              clips: working.clips,
-              transcript: working.transcript,
-              duration: contentDuration(working.clips),
-              captionStyle: working.captionStyle,
-              captionAppearance: working.captionAppearance,
-              aspectRatio: p.aspectRatio,
-              frameRate: p.frameRate,
-              trackSettings: structuredClone(p.trackSettings),
-            };
-            const hasChanges =
-              JSON.stringify([
-                before.clips,
-                before.transcript,
-                before.duration,
-                before.captionStyle,
-                before.captionAppearance,
-              ]) !==
-              JSON.stringify([
-                after.clips,
-                after.transcript,
-                after.duration,
-                after.captionStyle,
-                after.captionAppearance,
-              ]);
-            return {
-              ...working,
-              updatedAt: new Date().toISOString(),
-              captionStyle: working.captionStyle,
-              captionAppearance: working.captionAppearance,
-              ...(hasChanges
-                ? appendEditorRevisions(p, [before, after], before)
-                : { revisions: p.revisions, revisionIndex: p.revisionIndex }),
-              lastCommand: style.trim() || AUTOMATIC_EDIT_DIRECTION,
-            };
-          }),
-        };
+      working.lastCommand = style.trim() || AUTOMATIC_EDIT_DIRECTION;
+      steps.push({ label: "Saved the finished edit", project: working });
+      await publishAutonomousSteps({
+        original: project,
+        steps,
+        update: updateWorkspace,
+        checkpoint,
+        onStep: label => {
+          setCompletedSteps(previous => [...previous, label]);
+          setStatus(label);
+        },
       });
       checkpoint();
       setFinished(true);
@@ -564,346 +571,413 @@ export function AutonomousEditor({
       }
     }
   }
-  return (
-    <section className="mb-4 rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 to-surface p-6">
-      <div className="mb-4 flex items-center gap-3">
-        <Sparkles className="h-6 w-6 text-primary" />
-        <div>
-          <h2 className="text-xl font-semibold">
-            {ui("Let AI build your edit")}
-          </h2>
-          <p className="text-sm text-foreground/70">
-            {ui(
-              "Footage review → captions → cut and pacing → supporting shots → editable timeline."
-            )}
-          </p>
-        </div>
-      </div>
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div>
-          {referenceBrief && (
-            <details className="mb-2 text-xs">
-              <summary>{ui("Saved reference direction")}</summary>
-              <p className="mt-2 whitespace-pre-wrap">{referenceBrief}</p>
-            </details>
-          )}
-          <div className="mb-4">
-            <EditStyleTemplates project={project} disabled={busy} />
-          </div>
-          <label className="block text-sm font-medium">
-            {ui("Describe the style and outcome")}
-            <textarea
-              disabled={busy}
-              aria-label={ui("Autonomous editing style")}
-              rows={4}
-              value={style}
-              onChange={e => setStyle(e.target.value)}
-              placeholder={ui(
-                "Premium skincare demo. Clean editorial captions, a fast before/after opening, subtle fades, warm colour, and a quiet product close-up at the end."
-              )}
-              className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm"
-            />
-          </label>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {(
-              Object.keys(EDIT_RECIPES) as Array<keyof typeof EDIT_RECIPES>
-            ).map(s => (
-              <button
-                disabled={busy}
-                key={s}
-                type="button"
-                onClick={() => setStyle(`${s}. ${EDIT_RECIPES[s]}`)}
-                className="rounded-lg border border-border px-3 py-2 text-sm"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-          <details className="mt-4 rounded-xl border border-border bg-surface p-3">
-            <summary className="cursor-pointer text-sm font-medium">
-              {ui("Match a reference style or video · optional")}
-            </summary>
-            <div className="mt-3">
-              {" "}
-              <ReferenceStylePanel
-                key={project.id}
-                projectId={project.id}
-                onChange={brief => {
-                  const current = getWorkspaceSnapshot();
-                  if (
-                    !mounted.current ||
-                    current.profile.email.toLowerCase() !== referenceOwner ||
-                    selectedBrand(referenceOwner) !== referenceBrand ||
-                    !current.projects.some(p => p.id === project.id)
-                  )
-                    return;
-                  setReferenceBrief(brief);
-                  void (async () => {
-                    const scope = await captureUploadRequestScope();
-                    if (
-                      scope.ownerEmail !== referenceOwner ||
-                      scope.brandId !== referenceBrand
-                    )
-                      throw new Error(
-                        ui(
-                          "The reference workspace changed. Reopen the intended project."
-                        )
-                      );
-                    await verifyUploadRequestScope(scope);
-                    await updateWorkspace(w => {
-                      if (
-                        !mounted.current ||
-                        w.profile.email.toLowerCase() !== referenceOwner ||
-                        selectedBrand(referenceOwner) !== referenceBrand ||
-                        !w.projects.some(p => p.id === project.id)
-                      )
-                        throw new Error(
-                          ui("The reference project changed before saving.")
-                        );
-                      return {
-                        ...w,
-                        projects: w.projects.map(p =>
-                          p.id === project.id
-                            ? { ...p, referenceStyleBrief: brief }
-                            : p
-                        ),
-                      };
-                    });
-                  })().catch(e => {
-                    const latest = getWorkspaceSnapshot();
-                    if (
-                      mounted.current &&
-                      latest.profile.email.toLowerCase() === referenceOwner &&
-                      selectedBrand(referenceOwner) === referenceBrand
-                    )
-                      setStatus(
-                        e instanceof Error
-                          ? e.message
-                          : "Reference direction could not be saved."
-                      );
-                  });
-                }}
-                disabled={busy}
-              />
-            </div>
-          </details>
-          <label className="mt-4 flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              disabled={busy}
-              checked={automaticDuration}
-              onChange={e => setAutomaticDuration(e.target.checked)}
-            />
-            {ui("Detect ending from content automatically")}
-          </label>
-          <fieldset disabled={busy} className="mt-4 space-y-3 text-sm">
-            <legend className="font-medium">{ui("Edit duration")}</legend>
-            <select
-              aria-label={ui("Edit duration")}
-              value={durationMode}
-              onChange={event =>
-                setDurationMode(event.target.value as "none" | "range")
-              }
-              className="w-full rounded-lg border border-border bg-background p-2"
-            >
-              <option value="none">{ui("No target duration")}</option>
-              <option value="range">{ui("Preferred duration range")}</option>
-            </select>
-            {durationMode === "range" ? (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label>
-                    {ui("Minimum duration (seconds)")}
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      inputMode="decimal"
-                      value={minimumDuration}
-                      onChange={event => setMinimumDuration(event.target.value)}
-                      aria-invalid={!durationTarget}
-                      aria-describedby={
-                        durationTarget ? undefined : "edit-duration-error"
-                      }
-                      className="mt-1 w-full rounded-lg border border-border bg-background p-2"
-                    />
-                  </label>
-                  <label>
-                    {ui("Maximum duration (seconds)")}
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      inputMode="decimal"
-                      value={maximumDuration}
-                      onChange={event => setMaximumDuration(event.target.value)}
-                      aria-invalid={!durationTarget}
-                      aria-describedby={
-                        durationTarget ? undefined : "edit-duration-error"
-                      }
-                      className="mt-1 w-full rounded-lg border border-border bg-background p-2"
-                    />
-                  </label>
-                </div>
-                <p className="text-xs text-foreground/60">
-                  {ui(
-                    "A preference, not a cutoff. Preserve complete speech and meaning; never pad or repeat footage to fill the range."
-                  )}
-                </p>
-                {!durationTarget && (
-                  <p
-                    id="edit-duration-error"
-                    role="alert"
-                    className="text-xs text-destructive"
-                  >
-                    {ui(
-                      "Enter a minimum and maximum greater than zero, with the maximum above the minimum."
-                    )}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="text-xs text-foreground/60">
-                {ui(
-                  "The edit follows the footage and story without a requested duration limit."
-                )}
-              </p>
-            )}
-          </fieldset>
-        </div>
-        <div className="space-y-3 rounded-xl border border-primary/20 bg-background/60 p-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              disabled={busy}
-              type="checkbox"
-              checked={captions}
-              onChange={e => setCaptions(e.target.checked)}
-            />
-            {ui("Transcribe and caption footage")}
-          </label>
-          <details className="rounded-xl border border-border p-3">
-            <summary className="cursor-pointer text-sm">
-              {ui("Create extra images or videos · optional")}
-            </summary>
-            <p className="my-3 text-xs leading-relaxed text-foreground/60">
-              {ui(
-                "Your own footage is used by default. Allow paid new assets only when you want supporting shots."
-              )}
-            </p>
-            <div className="space-y-3">
-              {" "}
-              <label className="flex items-center justify-between gap-2 text-sm">
-                {ui("New images, up to")}
-                <input
-                  disabled={busy}
-                  aria-label={ui("Maximum generated images")}
-                  type="number"
-                  min={0}
-                  value={images}
-                  onChange={e =>
-                    setImages(
-                      Math.max(0, Math.floor(Number(e.target.value) || 0))
-                    )
-                  }
-                  className="w-16 rounded border border-border bg-background p-2"
-                />
-              </label>
-              <label className="flex items-center justify-between gap-2 text-sm">
-                {ui("New 5s videos, up to")}
-                <input
-                  disabled={busy}
-                  aria-label={ui("Maximum generated videos")}
-                  type="number"
-                  min={0}
-                  value={videos}
-                  onChange={e =>
-                    setVideos(
-                      Math.max(0, Math.floor(Number(e.target.value) || 0))
-                    )
-                  }
-                  className="w-16 rounded border border-border bg-background p-2"
-                />
-              </label>
-            </div>
-          </details>
-          <div className="border-t border-border pt-3">
-            <p className="text-2xl font-semibold">
-              {ui("Up to")} {estimate.toLocaleString(getUiLocale())}{" "}
-              {ui("credits")}
-            </p>
-            <p className="mt-1 text-xs text-foreground/70">
-              {ui("Review")} {analysisCost} {ui("· speech timing")}{" "}
-              {transcriptCost} {ui("· plan")} {AI_CREDIT_COSTS.editPlan}{" "}
-              {ui("· optional media")} {mediaCost}
-              {ui(
-                ". Only requested generations run. Manual editing and local export use no AI credits."
-              )}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            disabled={
-              busy || !ready || !project.clips.length || !durationTarget
-            }
-            onClick={() => void run()}
-            className="ai-magic flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium disabled:opacity-40"
-          >
-            {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            {failure ? ui("Continue edit") : ui("Build my edit · ≤")}{" "}
-            {failure ? "" : `${estimate} ${ui("credits")}`}
-          </button>
-          {busy && (
-            <button
-              type="button"
-              onClick={() => {
-                stopped.current = true;
-                runController.current?.abort();
-              }}
-              className="flex items-center gap-2 text-sm"
-            >
-              <Square className="h-3 w-3" />
-              {ui("Stop remaining steps")}
-            </button>
-          )}
-        </div>
-      </div>
-      {failure && (
-        <div
-          role="alert"
-          className="mt-4 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm"
-        >
-          <p className="mb-1 flex items-center gap-2 font-medium">
-            <AlertCircle size={16} />
-            {ui("Edit paused")} · {stage}
-          </p>
-          <p className="break-words text-foreground/80">{failure}</p>
-          <p className="mt-2 text-xs text-foreground/60">
-            {ui("Completed preparation is reused.")}
-          </p>
-        </div>
+  const activity = (busy || failure || finished) && (
+    <section
+      aria-label={ui("Auto-edit activity")}
+      className="m-3 space-y-3 rounded-xl border border-primary/25 bg-primary/5 p-3"
+    >
+      <p className="flex items-center gap-2 text-sm font-medium">
+        {busy && <Loader2 size={14} className="animate-spin" />}
+        {ui(busy ? "Building your edit" : finished ? "Edit ready" : "Edit paused")}
+      </p>
+      <p role="status" className="text-xs leading-relaxed">
+        {failure || status}
+      </p>
+      {!!completedSteps.length && (
+        <ol className="space-y-1 text-xs text-muted-foreground">
+          {completedSteps.map((label, index) => (
+            <li key={index}>✓ {label}</li>
+          ))}
+        </ol>
       )}
-      {status && (
-        <p
-          role="status"
-          className={`mt-4 text-sm leading-6 ${busy ? "ai-status-text" : ""}`}
-        >
-          {status}
-        </p>
-      )}
-      {finished && (
+      {busy ? (
         <button
           type="button"
-          onClick={() => onFinished(status)}
-          className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground"
+          onClick={() => {
+            stopped.current = true;
+            runController.current?.abort();
+          }}
+          className="flex items-center gap-2 text-xs"
         >
-          {ui("Review and export my edit")}
+          <Square size={12} />
+          {ui("Stop remaining steps")}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => finished ? setFinished(false) : onOpenChange(true)}
+          className="text-xs text-primary"
+        >
+          {ui(finished ? "Close" : "Review options")}
         </button>
       )}
     </section>
+  );
+  const host = document.getElementById("editor-autoedit-activity");
+  return (
+    <>
+      {host && activity && createPortal(activity, host)}
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogTitle>{ui("Auto-edit")}</DialogTitle>
+          <DialogDescription>
+            {ui("Choose a direction, or let the footage guide the edit.")}
+          </DialogDescription>
+          <section className="space-y-4">
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_250px]">
+              <div>
+                {referenceBrief && (
+                  <details className="mb-2 text-xs">
+                    <summary>{ui("Saved reference direction")}</summary>
+                    <p className="mt-2 whitespace-pre-wrap">{referenceBrief}</p>
+                  </details>
+                )}
+                <div className="mb-4">
+                  <EditStyleTemplates project={project} disabled={busy} />
+                </div>
+                <label className="block text-sm font-medium">
+                  {ui("Describe the style and outcome")}
+                  <textarea
+                    disabled={busy}
+                    aria-label={ui("Autonomous editing style")}
+                    rows={4}
+                    value={style}
+                    onChange={e => setStyle(e.target.value)}
+                    placeholder={ui(
+                      "Premium skincare demo. Clean editorial captions, a fast before/after opening, subtle fades, warm colour, and a quiet product close-up at the end."
+                    )}
+                    className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm"
+                  />
+                </label>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(
+                    Object.keys(EDIT_RECIPES) as Array<
+                      keyof typeof EDIT_RECIPES
+                    >
+                  ).map(s => (
+                    <button
+                      disabled={busy}
+                      key={s}
+                      type="button"
+                      onClick={() => setStyle(`${s}. ${EDIT_RECIPES[s]}`)}
+                      className="rounded-lg border border-border px-3 py-2 text-sm"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4">
+                  <div>
+                    {" "}
+                    <ReferenceStylePanel
+                      key={project.id}
+                      projectId={project.id}
+                      onChange={brief => {
+                        const current = getWorkspaceSnapshot();
+                        if (
+                          !mounted.current ||
+                          current.profile.email.toLowerCase() !==
+                            referenceOwner ||
+                          selectedBrand(referenceOwner) !== referenceBrand ||
+                          !current.projects.some(p => p.id === project.id)
+                        )
+                          return;
+                        setReferenceBrief(brief);
+                        void (async () => {
+                          const scope = await captureUploadRequestScope();
+                          if (
+                            scope.ownerEmail !== referenceOwner ||
+                            scope.brandId !== referenceBrand
+                          )
+                            throw new Error(
+                              ui(
+                                "The reference workspace changed. Reopen the intended project."
+                              )
+                            );
+                          await verifyUploadRequestScope(scope);
+                          await updateWorkspace(w => {
+                            if (
+                              !mounted.current ||
+                              w.profile.email.toLowerCase() !==
+                                referenceOwner ||
+                              selectedBrand(referenceOwner) !==
+                                referenceBrand ||
+                              !w.projects.some(p => p.id === project.id)
+                            )
+                              throw new Error(
+                                ui(
+                                  "The reference project changed before saving."
+                                )
+                              );
+                            return {
+                              ...w,
+                              projects: w.projects.map(p =>
+                                p.id === project.id
+                                  ? { ...p, referenceStyleBrief: brief }
+                                  : p
+                              ),
+                            };
+                          });
+                        })().catch(e => {
+                          const latest = getWorkspaceSnapshot();
+                          if (
+                            mounted.current &&
+                            latest.profile.email.toLowerCase() ===
+                              referenceOwner &&
+                            selectedBrand(referenceOwner) === referenceBrand
+                          )
+                            setStatus(
+                              e instanceof Error
+                                ? e.message
+                                : "Reference direction could not be saved."
+                            );
+                        });
+                      }}
+                      disabled={busy}
+                    />
+                  </div>
+                </div>
+                <label className="mt-4 flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    disabled={busy}
+                    checked={automaticDuration}
+                    onChange={e => setAutomaticDuration(e.target.checked)}
+                  />
+                  {ui("Detect ending from content automatically")}
+                </label>
+                <fieldset disabled={busy} className="mt-4 space-y-3 text-sm">
+                  <legend className="font-medium">{ui("Edit duration")}</legend>
+                  <StudioSelect
+                    aria-label={ui("Edit duration")}
+                    value={durationMode}
+                    onChange={event =>
+                      setDurationMode(event.target.value as "none" | "range")
+                    }
+                    className="w-full rounded-lg border border-border bg-background p-2"
+                  >
+                    <option value="none">{ui("No target duration")}</option>
+                    <option value="range">
+                      {ui("Preferred duration range")}
+                    </option>
+                  </StudioSelect>
+                  {durationMode === "range" ? (
+                    <>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label>
+                          {ui("Minimum duration (seconds)")}
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            inputMode="decimal"
+                            value={minimumDuration}
+                            onChange={event =>
+                              setMinimumDuration(event.target.value)
+                            }
+                            aria-invalid={!durationTarget}
+                            aria-describedby={
+                              durationTarget ? undefined : "edit-duration-error"
+                            }
+                            className="mt-1 w-full rounded-lg border border-border bg-background p-2"
+                          />
+                        </label>
+                        <label>
+                          {ui("Maximum duration (seconds)")}
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            inputMode="decimal"
+                            value={maximumDuration}
+                            onChange={event =>
+                              setMaximumDuration(event.target.value)
+                            }
+                            aria-invalid={!durationTarget}
+                            aria-describedby={
+                              durationTarget ? undefined : "edit-duration-error"
+                            }
+                            className="mt-1 w-full rounded-lg border border-border bg-background p-2"
+                          />
+                        </label>
+                      </div>
+                      <p className="text-xs text-foreground/60">
+                        {ui(
+                          "A preference, not a cutoff. Preserve complete speech and meaning; never pad or repeat footage to fill the range."
+                        )}
+                      </p>
+                      {!durationTarget && (
+                        <p
+                          id="edit-duration-error"
+                          role="alert"
+                          className="text-xs text-destructive"
+                        >
+                          {ui(
+                            "Enter a minimum and maximum greater than zero, with the maximum above the minimum."
+                          )}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-foreground/60">
+                      {ui(
+                        "The edit follows the footage and story without a requested duration limit."
+                      )}
+                    </p>
+                  )}
+                </fieldset>
+              </div>
+              <div className="space-y-4 lg:border-l lg:border-border lg:pl-5">
+                <label className="block space-y-2 text-sm">
+                  {ui("Editing model")}
+                  <StudioSelect
+                    value={model}
+                    onChange={e => setModel(e.target.value as typeof model)}
+                    disabled={busy}
+                    aria-label={ui("Editing model")}
+                  >
+                    <option value="moonshotai/kimi-k3">K3</option>
+                    <option value="moonshotai/kimi-k3.1-pro">{ui("K3.1 Pro")}</option>
+                  </StudioSelect>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  {ui("Maximum effort · extras within the approved allowance")}
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    disabled={busy}
+                    type="checkbox"
+                    checked={captions}
+                    onChange={e => setCaptions(e.target.checked)}
+                  />
+                  {ui("Transcribe and caption footage")}
+                </label>
+                <details className="rounded-xl border border-border p-3">
+                  <summary className="cursor-pointer text-sm">
+                    {ui("Create extra images or videos · optional")}
+                  </summary>
+                  <p className="my-3 text-xs leading-relaxed text-foreground/60">
+                    {ui(
+                      "Your own footage is used by default. Allow paid new assets only when you want supporting shots."
+                    )}
+                  </p>
+                  <div className="space-y-3">
+                    {" "}
+                    <label className="flex items-center justify-between gap-2 text-sm">
+                      {ui("New images, up to")}
+                      <input
+                        disabled={busy}
+                        aria-label={ui("Maximum generated images")}
+                        type="number"
+                        min={0}
+                        value={images}
+                        onChange={e =>
+                          setImages(
+                            Math.max(0, Math.floor(Number(e.target.value) || 0))
+                          )
+                        }
+                        className="w-16 rounded border border-border bg-background p-2"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between gap-2 text-sm">
+                      {ui("New 5s videos, up to")}
+                      <input
+                        disabled={busy}
+                        aria-label={ui("Maximum generated videos")}
+                        type="number"
+                        min={0}
+                        value={videos}
+                        onChange={e =>
+                          setVideos(
+                            Math.max(0, Math.floor(Number(e.target.value) || 0))
+                          )
+                        }
+                        className="w-16 rounded border border-border bg-background p-2"
+                      />
+                    </label>
+                  </div>
+                </details>
+                <div className="border-t border-border pt-3">
+                  <p className="text-2xl font-semibold">
+                    {ui("Up to")} {estimate.toLocaleString(getUiLocale())}{" "}
+                    {ui("credits")}
+                  </p>
+                  <p className="mt-1 text-xs text-foreground/70">
+                    {ui("Review")} {analysisCost} {ui("· speech timing")}{" "}
+                    {transcriptCost} {ui("· plan")} {AI_CREDIT_COSTS.editPlan}{" "}
+                    {ui("· optional media")} {mediaCost}
+                    {ui(
+                      ". Only requested generations run. Manual editing and local export use no AI credits."
+                    )}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={
+                    busy || !ready || !project.clips.length || !durationTarget
+                  }
+                  onClick={() => void run()}
+                  className="ai-magic flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium disabled:opacity-40"
+                >
+                  {busy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {failure ? ui("Continue edit") : ui("Build my edit · ≤")}{" "}
+                  {failure ? "" : `${estimate} ${ui("credits")}`}
+                </button>
+                {busy && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopped.current = true;
+                      runController.current?.abort();
+                    }}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <Square className="h-3 w-3" />
+                    {ui("Stop remaining steps")}
+                  </button>
+                )}
+              </div>
+            </div>
+            {failure && (
+              <div
+                role="alert"
+                className="mt-4 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm"
+              >
+                <p className="mb-1 flex items-center gap-2 font-medium">
+                  <AlertCircle size={16} />
+                  {ui("Edit paused")} · {stage}
+                </p>
+                <p className="break-words text-foreground/80">{failure}</p>
+                <p className="mt-2 text-xs text-foreground/60">
+                  {ui("Completed preparation is reused.")}
+                </p>
+              </div>
+            )}
+            {status && (
+              <p
+                role="status"
+                className={`mt-4 text-sm leading-6 ${busy ? "ai-status-text" : ""}`}
+              >
+                {status}
+              </p>
+            )}
+            {finished && (
+              <button
+                type="button"
+                onClick={() => onFinished(status)}
+                className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground"
+              >
+                {ui("Review and export my edit")}
+              </button>
+            )}
+          </section>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -852,3 +852,38 @@
     0 24px 70px hsl(0 0% 0% / 0.65),
     0 0 0 1px hsl(0 0% 100% / 0.07);
 }
+
+/* Studio controls share one visual language, including menus rendered in portals. */
+.studio-shell [data-slot="select-trigger"] { border-radius: .8rem; transition: border-color 160ms, box-shadow 160ms, background 160ms; }
+.studio-shell [data-slot="select-trigger"]:hover { border-color: hsl(var(--primary) / .45); background: hsl(var(--primary) / .045); }
+[data-slot="select-item"][data-highlighted] { background: hsl(var(--primary) / .14); color: hsl(var(--foreground)); }
+.studio-help-anchor { position: relative; }
+.studio-help-anchor::after { content: attr(data-help); pointer-events: none; opacity: 0; position: absolute; left: calc(100% + 10px); top: 0; z-index: 80; width: 220px; border: 1px solid hsl(var(--border)); border-radius: .8rem; background: hsl(var(--popover)); color: hsl(var(--foreground)); padding: .75rem; font-size: 12px; line-height: 1.5; text-align: left; box-shadow: 0 12px 32px #0005; transition: opacity 120ms; transition-delay: 0ms; }
+.studio-help-anchor:hover::after,.studio-help-anchor:focus-visible::after { opacity: 1; transition-delay: 1050ms; }
+.editor-workspace { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; min-width: 0; }
+.editor-resizer { display: none; }
+#editor-preview-panel:fullscreen { --editor-upper: 100dvh; display: flex; flex-direction: column; height: 100dvh !important; width: 100vw; border: none; border-radius: 0; background: #08090b; }
+#editor-preview-panel:fullscreen .editor-preview-stage { flex: 1; height: calc(100dvh - 110px) !important; }
+#editor-preview-panel:fullscreen .editor-preview-stage > div { max-width: calc((100dvh - 120px)*9/16) !important; }
+@media(min-width:1100px) {
+  .editor-workspace { grid-template-columns: minmax(180px,min(var(--editor-media),30%)) 8px minmax(240px,1fr) 8px minmax(220px,min(var(--editor-chat),35%)); grid-template-rows: var(--editor-upper) 8px minmax(220px,auto); gap: 0; align-items: stretch; }
+  .editor-workspace > #editor-media-panel { grid-column:1; grid-row:1; height:100%; max-height:none; }
+  .editor-workspace #editor-preview-panel { grid-column:3; grid-row:1; height:100%; }
+  .editor-workspace > #editor-chat-panel { grid-column:5; grid-row:1; height:100%; }
+  .editor-workspace #editor-timeline-panel { grid-column:1 / -1; grid-row:3; max-height:70dvh; overflow-y:auto; }
+  .editor-workspace .editor-preview-stage { height:calc(var(--editor-upper) - 110px); }
+  .editor-workspace[data-media-hidden="true"] { grid-template-columns:0 0 minmax(240px,1fr) 8px minmax(240px,var(--editor-chat)); }
+  .editor-workspace[data-media-hidden="true"] > #editor-media-panel,.editor-workspace[data-media-hidden="true"] > .editor-resizer-media { display:none; }
+  .editor-resizer { display:flex; align-items:center; justify-content:center; touch-action:none; background:transparent; border-radius:10px; outline-offset:-1px; }
+  .editor-resizer span { border-radius:6px; background:hsl(var(--foreground)/.12); transition: background 150ms,box-shadow 150ms; }
+  .editor-resizer:hover span,.editor-resizer:focus-visible span,.editor-resizer:active span { background:hsl(var(--primary)/.8); box-shadow:0 0 10px hsl(var(--primary)/.35); }
+  .editor-resizer-media { grid-column:2;grid-row:1;cursor:col-resize; }
+  .editor-resizer-chat { grid-column:4;grid-row:1;cursor:col-resize; }
+  .editor-resizer-media span,.editor-resizer-chat span { width:3px;height:44px; }
+  .editor-resizer-height { grid-column:1 / -1;grid-row:2;cursor:row-resize; }
+  .editor-resizer-height span { width:54px;height:3px; }
+}
+
+.editor-workspace[data-media-hidden="true"] > #editor-media-panel { display:none; }
+@media(max-width:1099px) { .editor-workspace > #editor-media-panel,.editor-workspace #editor-preview-panel,.editor-workspace > #editor-chat-panel,.editor-workspace #editor-timeline-panel { grid-column:1; grid-row:auto; } }
+#editor-preview-panel:fullscreen .editor-preview-stage > div { max-width:min(100%,calc((100dvh - 120px)*var(--preview-aspect,0.5625))) !important; }

@@ -25,6 +25,7 @@ export interface EditorChatRequest {
   prompt: string;
   mode: EditorChatMode;
   executionMode?: "plan" | "execute";
+  effort?: import("./edit-model").EditEffort;
   taskPreset?: EditorTaskPresetId;
   /** Marker-only workflow; never executes timeline edits. */
   task?: "story-sections";

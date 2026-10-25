@@ -9,6 +9,9 @@ import { defineConfig, globalIgnores } from "eslint/config";
 export default defineConfig([
   globalIgnores([
     "dist",
+    "verification-assets/**",
+    ".local-editor-recovery/**",
+    ".wrangler/**",
     "legacy-api/**",
     "db/migrations/**",
     "db/schema.ts",

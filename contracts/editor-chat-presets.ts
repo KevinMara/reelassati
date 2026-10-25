@@ -2,7 +2,7 @@
 export const EDITOR_TASK_PRESETS = [
   {
     id: "motion",
-    label: "Motion graphics",
+    label: "Graphics",
     intent: "Create or refine editable motion graphics.",
     hint: "What should the graphic say or explain?",
     workflow:
@@ -18,7 +18,7 @@ export const EDITOR_TASK_PRESETS = [
   },
   {
     id: "image",
-    label: "Generate an image",
+    label: "Image",
     intent: "Generate an image matching the editing brief.",
     hint: "Describe the image and how it will be used…",
     workflow:
@@ -26,7 +26,7 @@ export const EDITOR_TASK_PRESETS = [
   },
   {
     id: "audio",
-    label: "Voice & audio",
+    label: "Audio",
     intent: "Create or refine voiceover, music or sound for this edit.",
     hint: "Voiceover words, soundtrack mood, or sound cue…",
     workflow:
@@ -34,7 +34,7 @@ export const EDITOR_TASK_PRESETS = [
   },
   {
     id: "reference",
-    label: "Match a reference",
+    label: "Reference",
     intent: "Match a reference style or video using selected aspects.",
     hint: "Attach the reference and describe what to match…",
     workflow:
@@ -42,7 +42,7 @@ export const EDITOR_TASK_PRESETS = [
   },
   {
     id: "story",
-    label: "Shape the story",
+    label: "Story",
     intent: "Organize the edit into a clear hook, body and appropriate ending.",
     hint: "Audience, goal, and what must stay…",
     workflow:

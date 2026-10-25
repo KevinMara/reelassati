@@ -50,9 +50,11 @@ type Review = Pick<
       "insights"
     >
   >;
-type Transcript = Awaited<
-  ReturnType<typeof import("./transcribe-media").transcribeMedia>
->;
+type Transcript = {
+  transcript: string;
+  segments: EditProject["transcript"];
+  provenance?: import("@contracts/compliance").ContentProvenance;
+};
 export type AutonomousPreparationCache = {
   reviews: Map<string, Review>;
   transcripts: Map<string, Transcript>;
@@ -106,6 +108,7 @@ export async function prepareAutonomousSources(input: {
   project: EditProject;
   sources: Asset[];
   captions: boolean;
+  speechTiming?: boolean;
   context: string;
   savedReports?: SavedAnalyzerReport[];
   cache: AutonomousPreparationCache;
@@ -182,15 +185,32 @@ export async function prepareAutonomousSources(input: {
     const key = keys.get(asset.id)!;
     const review = working.sourceReviews?.find(r => r.assetId === asset.id);
     if (
-      input.captions &&
-      autonomousTranscriptTargets(working, asset).length > 0 &&
-      review?.captions !== "present" &&
+      (input.speechTiming || input.captions) &&
+      (input.speechTiming
+        ? working.clips.some(
+            c => c.assetId === asset.id && !c.muted && !c.graphic
+          )
+        : autonomousTranscriptTargets(working, asset).length > 0) &&
       review?.audio !== "absent"
     ) {
       const result =
-        input.cache.transcripts.get(key) ?? (await input.transcribe(asset));
+        input.cache.transcripts.get(key) ??
+        (working.sourceSpeech?.find(s => s.assetId === asset.id)?.segments
+          .length
+          ? {
+              segments: working.sourceSpeech.find(s => s.assetId === asset.id)!
+                .segments,
+              transcript: "",
+              provenance: working.sourceSpeech.find(s=>s.assetId===asset.id)?.provenance,
+            }
+          : await input.transcribe(asset));
       input.checkpoint();
       input.cache.transcripts.set(key, result);
+      working.sourceSpeech = [
+        ...(working.sourceSpeech ?? []).filter(s => s.assetId !== asset.id),
+        { assetId: asset.id, segments: result.segments, provenance: result.provenance },
+      ];
+      if (!input.captions || review?.captions === "present") continue;
       if (result.provenance) working.transcriptProvenance = result.provenance;
       working.transcript.push(
         ...mapChatTranscript(

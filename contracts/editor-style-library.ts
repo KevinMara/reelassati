@@ -23,6 +23,13 @@ export type EditorSavedStyleDraft =
       name: string;
       type: "look";
       settings: {
+        exposure?: number;
+        temperature?: number;
+        tint?: number;
+        highlights?: number;
+        shadows?: number;
+        whites?: number;
+        blacks?: number;
         brightness: number;
         contrast: number;
         saturation: number;
@@ -137,6 +144,27 @@ function normalizeDraft(value: unknown): EditorSavedStyleDraft | undefined {
       name,
       type: "look",
       settings: {
+        ...(settings.exposure !== undefined
+          ? { exposure: bound(settings.exposure, 0, -2, 2) }
+          : {}),
+        ...(settings.temperature !== undefined
+          ? { temperature: bound(settings.temperature, 0, -1, 1) }
+          : {}),
+        ...(settings.tint !== undefined
+          ? { tint: bound(settings.tint, 0, -1, 1) }
+          : {}),
+        ...(settings.highlights !== undefined
+          ? { highlights: bound(settings.highlights, 0, -1, 1) }
+          : {}),
+        ...(settings.shadows !== undefined
+          ? { shadows: bound(settings.shadows, 0, -1, 1) }
+          : {}),
+        ...(settings.whites !== undefined
+          ? { whites: bound(settings.whites, 0, -1, 1) }
+          : {}),
+        ...(settings.blacks !== undefined
+          ? { blacks: bound(settings.blacks, 0, -1, 1) }
+          : {}),
         brightness: bound(settings.brightness, 0, -0.5, 0.5),
         contrast: bound(settings.contrast, 1, 0.5, 2),
         saturation: bound(settings.saturation, 1, 0, 3),
@@ -251,6 +279,13 @@ export function captureEditorStyle(
       name,
       type,
       settings: {
+        exposure: selectedClip.exposure,
+        temperature: selectedClip.temperature,
+        tint: selectedClip.tint,
+        highlights: selectedClip.highlights,
+        shadows: selectedClip.shadows,
+        whites: selectedClip.whites,
+        blacks: selectedClip.blacks,
         brightness: selectedClip.brightness,
         contrast: selectedClip.contrast,
         saturation: selectedClip.saturation,

@@ -7,6 +7,10 @@ import {
   type GlbPoseRenderer,
 } from "@/lib/glb-renderer";
 import { GLB_LIMITS } from "@/lib/glb-validation";
+import {
+  editor3dModels,
+  type Editor3dModel,
+} from "@contracts/editor-3d-catalog";
 
 export function GlbModelComposer({
   onSave,
@@ -19,10 +23,15 @@ export function GlbModelComposer({
   disabled?: boolean;
 }) {
   const ui = useUiText();
+  const catalogNames: Record<string, string> = {
+    "khronos-avocado": ui("Avocado"),
+    "khronos-water-bottle": ui("Water bottle"),
+  };
   const id = useId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<GlbPoseRenderer | null>(null);
   const operationRef = useRef(0);
+  const loadControllerRef = useRef<AbortController | null>(null);
   const [pose, setPose] = useState<GlbPose>(DEFAULT_GLB_POSE);
   const [model, setModel] = useState<{
     name: string;
@@ -36,12 +45,16 @@ export function GlbModelComposer({
   useEffect(
     () => () => {
       operationRef.current++;
+      loadControllerRef.current?.abort();
       rendererRef.current?.dispose();
     },
     []
   );
-  const load = async (file: File) => {
+  const load = async (source: File | Editor3dModel) => {
     const operation = ++operationRef.current;
+    loadControllerRef.current?.abort();
+    const controller = new AbortController();
+    loadControllerRef.current = controller;
     rendererRef.current?.dispose();
     rendererRef.current = null;
     setModel(null);
@@ -49,11 +62,41 @@ export function GlbModelComposer({
     setSaved(false);
     setLoading(true);
     try {
-      if (!/\.glb$/i.test(file.name) || file.size > GLB_LIMITS.bytes)
-        throw new Error(
-          ui("Choose a self-contained .glb file no larger than 25 MB.")
-        );
-      const bytes = await file.arrayBuffer();
+      const catalog = "path" in source ? source : undefined;
+      let bytes: ArrayBuffer;
+      if (catalog) {
+        const response = await fetch(catalog.path, {
+          signal: AbortSignal.any([
+            controller.signal,
+            AbortSignal.timeout(20_000),
+          ]),
+          credentials: "omit",
+        });
+        if (
+          !response.ok ||
+          Number(response.headers.get("content-length")) > GLB_LIMITS.bytes
+        ) {
+          await response.body?.cancel();
+          throw new Error(ui("Could not load this model. Try again."));
+        }
+        bytes = await response.arrayBuffer();
+        controller.signal.throwIfAborted();
+        if (bytes.byteLength !== catalog.bytes)
+          throw new Error(ui("Could not load this model. Try again."));
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        const hash = Array.from(new Uint8Array(digest), byte =>
+          byte.toString(16).padStart(2, "0")
+        ).join("");
+        if (hash !== catalog.sha256)
+          throw new Error(ui("Could not load this model. Try again."));
+      } else {
+        const file = source as File;
+        if (!/\.glb$/i.test(file.name) || file.size > GLB_LIMITS.bytes)
+          throw new Error(
+            ui("Choose a self-contained .glb file no larger than 25 MB.")
+          );
+        bytes = await file.arrayBuffer();
+      }
       if (operation !== operationRef.current || !canvasRef.current) return;
       const renderer = await createGlbPoseRenderer(bytes, canvasRef.current);
       if (operation !== operationRef.current) {
@@ -63,7 +106,9 @@ export function GlbModelComposer({
       rendererRef.current = renderer;
       setPose(DEFAULT_GLB_POSE);
       setModel({
-        name: file.name.replace(/\.glb$/i, ""),
+        name: catalog
+          ? (catalogNames[catalog.id] ?? catalog.name)
+          : source.name.replace(/\.glb$/i, ""),
         triangles: renderer.triangles,
         images: renderer.images,
       });
@@ -111,6 +156,49 @@ export function GlbModelComposer({
           "Import a static GLB, compose a pose, and save a transparent image for your timeline."
         )}
       </p>
+      <div className="space-y-2">
+        <p className="text-sm font-medium">{ui("Free 3D models")}</p>
+        <p className="text-xs text-foreground/60">
+          {ui("Choose a bundled model or import your own GLB.")}
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {editor3dModels.map(item => (
+            <div
+              key={item.id}
+              className="overflow-hidden rounded-lg border border-border"
+            >
+              <button
+                type="button"
+                disabled={disabled || loading || saving}
+                onClick={() => void load(item)}
+                aria-label={`${ui("Load model")} · ${catalogNames[item.id] ?? item.name}`}
+                className="block w-full p-2 text-left text-sm hover:bg-muted/40 disabled:opacity-50"
+              >
+                <img
+                  src={item.preview}
+                  alt=""
+                  loading="lazy"
+                  width={128}
+                  height={128}
+                  className="mb-2 aspect-square w-full rounded bg-white object-contain"
+                />
+                <span className="font-medium">
+                  {catalogNames[item.id] ?? item.name}
+                </span>
+              </button>
+              <a
+                href={item.source}
+                target="_blank"
+                rel="noreferrer"
+                className="block px-2 pb-2 text-xs text-foreground/60 underline"
+                aria-label={`${ui("Source and license")} · ${catalogNames[item.id] ?? item.name}`}
+              >
+                {ui("Microsoft · CC0")}
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
       <label className="block text-sm" htmlFor={`${id}-file`}>
         {ui("Model · .glb, up to 25 MB")}
       </label>

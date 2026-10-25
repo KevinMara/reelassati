@@ -29,16 +29,16 @@ describe("protected product and compliance invariants", () => {
     );
     expect(destinations).toEqual([
       "/dashboard",
-      "/dashboard/trends",
+      "/dashboard/styles",
       "/dashboard/script",
       "/dashboard/edit",
       "/dashboard/analyze",
       "/dashboard/publish",
       "/dashboard/analytics",
+      "/dashboard/library",
       "/dashboard/clients",
       "/dashboard/calendar",
       "/dashboard/coaching",
-      "/dashboard/library",
       "/dashboard/social",
       "/dashboard/referral",
       "/dashboard/billing",

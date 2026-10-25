@@ -3,6 +3,7 @@ import { editingTemplateUi } from "./locales/ui-edit-templates";
 import { editingTraitUi } from "./locales/ui-edit-template-traits";
 import { analyzerUi } from "./locales/ui-analyzer";
 import { editDurationUi } from "./locales/ui-edit-duration";
+import { editorRedesignUi } from "./locales/ui-editor-redesign";
 import type { InterfaceLanguage } from "@contracts/interface-language";
 
 type InterfaceCatalog = Record<string, string>;
@@ -131,6 +132,7 @@ export function loadUiLocale(
       "Automatic research is disabled.": automaticResearchDisabled[code],
       ...editingTemplateUi[code],
       ...analyzerUi[code],
+      ...editorRedesignUi[code],
     }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {

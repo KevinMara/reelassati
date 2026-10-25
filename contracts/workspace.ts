@@ -77,6 +77,7 @@ export interface BrandKit {
 }
 
 export interface Asset {
+  stock?: import("./stock-media").StockMedia;
   id: string;
   name: string;
   kind: AssetKind;
@@ -140,6 +141,13 @@ export interface TimelineClip {
   fit?: "contain" | "cover";
   fadeIn?: number;
   fadeOut?: number;
+  exposure?: number;
+  temperature?: number;
+  tint?: number;
+  highlights?: number;
+  shadows?: number;
+  whites?: number;
+  blacks?: number;
   brightness?: number;
   contrast?: number;
   saturation?: number;
@@ -171,6 +179,7 @@ export interface EditOperation {
     | "caption"
     | "silence"
     | "pacing"
+    | "sound"
     | "broll"
     | "audio"
     | "style"
@@ -203,6 +212,13 @@ export interface EditOperation {
     fit?: "contain" | "cover";
     fadeIn?: number;
     fadeOut?: number;
+    exposure?: number;
+    temperature?: number;
+    tint?: number;
+    highlights?: number;
+    shadows?: number;
+    whites?: number;
+    blacks?: number;
     brightness?: number;
     contrast?: number;
     saturation?: number;
@@ -236,6 +252,8 @@ export interface EditRevision {
 }
 
 export interface EditProject {
+  sourceSpeech?: Array<{ assetId: string; segments: TranscriptSegment[]; provenance?: import("./compliance").ContentProvenance }>;
+  folderId?: string;
   /** Reviewed source-clock brief; opening it never starts inference. */
   analyzerOptimization?: import("./analyzer-report").AnalyzerOptimization;
   frameRate?: import("./export-settings").ExportFrameRate;
@@ -394,6 +412,7 @@ export interface WorkspaceDocument {
   brandKit: BrandKit;
   projects: EditProject[];
   assets: Asset[];
+  projectFolders?: Array<{ id: string; name: string; parentId?: string }>;
   mediaFolders?: Array<{ id: string; name: string; parentId?: string }>;
   scripts: ScriptDraft[];
   accounts: PublishingAccount[];

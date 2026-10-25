@@ -17,6 +17,8 @@ import {
   SlidersHorizontal,
   Loader2,
   WandSparkles,
+  Palette,
+  MousePointer2,
 } from "lucide-react";
 import type { MotionGraphic } from "@contracts/motion-graphics";
 import type { GraphicPreset } from "@contracts/editor-presets";
@@ -53,7 +55,7 @@ const GlbModelComposer = lazy(async () => ({
 }));
 
 export type DockKind =
-  "library" | "image" | "video" | "audio" | "captions" | "graphics" | "effects";
+  "library" | "image" | "video" | "audio" | "captions" | "graphics" | "effects" | "color" | "adjust";
 
 export function EditorCreationDock({
   project,
@@ -64,6 +66,8 @@ export function EditorCreationDock({
   onToolChange,
   captions,
   effects,
+  color,
+  adjustment,
   onGraphic,
   onMotionKit,
 }: {
@@ -72,6 +76,8 @@ export function EditorCreationDock({
   onToolChange: (kind: DockKind) => void;
   captions: ReactNode;
   effects: ReactNode;
+  color?: ReactNode;
+  adjustment?: ReactNode;
   onGraphic: (graphic: MotionGraphic, seconds: number) => Promise<void>;
   onMotionKit: (draft: MotionKitDraft) => Promise<void>;
   project: EditProject;
@@ -144,7 +150,7 @@ export function EditorCreationDock({
           file,
           "image",
           undefined,
-          targetId,
+          undefined,
           { scope, signal: controller.signal }
         );
         await verifyUploadRequestScope(scope);
@@ -153,7 +159,7 @@ export function EditorCreationDock({
           assertTarget();
           return {
             ...current,
-            assets: [...current.assets.filter(a => a.id !== asset.id), asset],
+            assets: [...current.assets.filter(a => a.id !== asset.id), {...asset,projectId:targetId}],
           };
         });
       } finally {
@@ -274,13 +280,15 @@ export function EditorCreationDock({
       >
         {(
           [
-            ["library", "Library", Files],
-            ["video", "Video", Film],
-            ["image", "Image", Image],
-            ["audio", "Audio", Music2],
-            ["captions", "Captions", Captions],
-            ["graphics", "Graphics", Shapes],
-            ["effects", "Looks & transitions", SlidersHorizontal],
+            ["library", ui("Library"), Files],
+            ["video", ui("Video"), Film],
+            ["image", ui("Image"), Image],
+            ["audio", ui("Audio"), Music2],
+            ["captions", ui("Captions"), Captions],
+            ["graphics", ui("Graphics"), Shapes],
+            ["effects", ui("Transitions"), SlidersHorizontal],
+            ["color", ui("Color"), Palette],
+            ["adjust", ui("Adjust"), MousePointer2],
           ] as const
         ).map(([id, label, Icon]) => (
           <button
@@ -294,7 +302,7 @@ export function EditorCreationDock({
               onToolChange(id);
               setMessage("");
             }}
-            className={`${id === "effects" ? "col-span-3" : ""} flex min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-sm transition-colors ${activeTool === id ? "border-primary/60 bg-primary/10 text-primary" : "border-transparent text-foreground/65 hover:bg-foreground/5 hover:text-foreground"}`}
+            className={`${""} flex min-w-0 items-center justify-center gap-1.5 rounded-lg border px-1.5 py-2 text-sm transition-colors ${activeTool === id ? "border-primary/60 bg-primary/10 text-primary" : "border-transparent text-foreground/65 hover:bg-foreground/5 hover:text-foreground"}`}
           >
             <Icon className="h-4 w-4 shrink-0" />
             {label}
@@ -468,7 +476,7 @@ export function EditorCreationDock({
               />
             </div>
           </div>
-        ) : kind === "image" && imageMode === "cutout" ? (
+        ) : kind === "color" ? color : kind === "adjust" ? adjustment : kind === "image" && imageMode === "cutout" ? (
           <PersonCutoutPanel key={project.id} projectId={project.id} />
         ) : kind === "image" && imageMode === "depth" ? (
           <ImageDepthPanel key={project.id} projectId={project.id} />

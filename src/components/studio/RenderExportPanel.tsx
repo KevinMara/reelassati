@@ -1,3 +1,4 @@
+import { editAttribution } from "@contracts/media-attribution";
 import { useUiText } from "@/lib/i18n/ui";
 import posthog from "@/lib/posthog";
 import { useEffect, useId, useRef, useState } from "react";
@@ -42,6 +43,7 @@ export function RenderExportPanel({
 }) {
   const ui = useUiText();
   const { workspace, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
+  const attribution=editAttribution(project,workspace.assets);
   const requiresMarking = Boolean(
     project.transcriptProvenance ||
     workspace.assets.some(
@@ -337,6 +339,7 @@ export function RenderExportPanel({
             />
           </div>
         )}
+        {attribution && <details className="rounded-xl border border-border p-3 text-xs"><summary className="cursor-pointer font-medium">{ui("Media credits")}</summary><pre className="mt-3 whitespace-pre-wrap break-words font-sans leading-relaxed">{attribution}</pre><button type="button" onClick={()=>{const url=URL.createObjectURL(new Blob([attribution],{type:"text/plain;charset=utf-8"}));const anchor=document.createElement("a");anchor.href=url;anchor.download="media-credits.txt";anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}} className="mt-3 text-primary">{ui("Download credits")}</button></details>}
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}

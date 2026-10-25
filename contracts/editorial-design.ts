@@ -18,6 +18,10 @@ sentence or rapid cuts on footage whose meaning depends on a longer hold.
 
 Use the actual transcript word clocks for emphasis, not the start of a sentence
 when the relevant word occurs later. Keep original dialogue and measured timing;
+Write added on-screen copy in the actual speech language unless the brief
+explicitly asks for translation. A profile or interface language is not a request
+to translate the video. Avoid generic chapter labels that merely summarize the
+speaker; use a graphic only to clarify a specific claim, comparison or detail.
 prepared captions already exist, so do not add them again. Caption styling and
 graphic emphasis are distinct layers. Use a small consistent palette, readable
 hierarchy, aligned spacing and deliberate entrances/holds/exits. Adapt the layout

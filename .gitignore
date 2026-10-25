@@ -27,6 +27,8 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.dev.vars
+.dev.vars.*
 
 # Database
 *.db

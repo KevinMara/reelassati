@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
-import { auditAutomatedEdit } from "./editor-production";
+import { auditAutomatedEdit, trimObservedEnding } from "./editor-production";
 import { audioGenerationQuote } from "@contracts/audio-generation";
 
 const clip = {
@@ -46,6 +46,87 @@ describe("automated edit delivery checks", () => {
         []
       )
     ).toHaveLength(2);
+  });
+  it("rejects a new cut through a word while allowing continuous splits", () => {
+    const source = { ...clip, start: 0, duration: 4, inPoint: 0, outPoint: 4 };
+    const before = {
+      ...project,
+      clips: [source],
+      sourceSpeech: [
+        {
+          assetId: "media",
+          segments: [
+            {
+              id: "speech",
+              start: 1,
+              end: 2,
+              text: "parola",
+              words: [{ text: "parola", start: 1, end: 2 }],
+            },
+          ],
+        },
+      ],
+    };
+    expect(
+      auditAutomatedEdit(
+        before,
+        { ...before, clips: [{ ...source, inPoint: 1.5, duration: 2.5 }] },
+        assets
+      )
+    ).toContain("Cut crosses a spoken word: Source");
+    const split = {
+      ...before,
+      clips: [
+        { ...source, id: "left", duration: 1.5, outPoint: 1.5 },
+        { ...source, id: "right", start: 1.5, inPoint: 1.5, duration: 2.5 },
+      ],
+    };
+    expect(auditAutomatedEdit(before, split, assets)).toEqual([]);
+  });
+  it("protects measured speech when an observed visual ending is earlier", () => {
+    const source = {
+      ...clip,
+      start: 0,
+      duration: 10,
+      inPoint: 0,
+      outPoint: 10,
+    };
+    const base = {
+      ...project,
+      clips: [source],
+      duration: 10,
+      transcript: [],
+      sourceReviews: [
+        {
+          assetId: "media",
+          reviewedAt: "2026-10-25T00:00:00Z",
+          summary: "Observed",
+          captions: "present",
+          captionNote: "Burned in",
+          audio: "present",
+          audioNote: "Speech",
+          moments: [],
+          ending: {
+            time: 5,
+            confidence: 0.99,
+            completed: true,
+            trailingContent: "empty",
+            note: "Empty visual tail",
+          },
+        },
+      ],
+    } as EditProject;
+    const spoken = {
+      ...base,
+      sourceSpeech: [
+        {
+          assetId: "media",
+          segments: [{ id: "last", start: 8, end: 9.5, text: "fine." }],
+        },
+      ],
+    };
+    expect(trimObservedEnding(base, assets).duration).toBeCloseTo(5.2);
+    expect(trimObservedEnding(spoken, assets).duration).toBeCloseTo(9.65);
   });
 });
 describe("AI audio credit quotes", () => {

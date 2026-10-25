@@ -97,7 +97,8 @@ export function executeAutonomousPlan(
   project: EditProject,
   operations: EditOperation[],
   assets: Asset[],
-  checkpoint: () => void = () => undefined
+  checkpoint: () => void = () => undefined,
+  onStep?: (project: EditProject, operation: EditOperation) => void
 ): EditProject {
   let working = structuredClone(project);
   const roots = new Map(project.clips.map(clip => [clip.id, clip.id]));
@@ -166,6 +167,10 @@ export function executeAutonomousPlan(
           `${operation.label}: this would overlap existing captions.`
         );
     }
+    if (operation.type === "sound") {
+      const asset=assets.find(a=>a.id===operation.parameters?.assetId),sourceIn=operation.parameters?.sourceIn??0;
+      if (!asset || asset.kind!=="audio" || !asset.duration || sourceIn<0 || sourceIn+operation.end-operation.start>asset.duration+.001) throw new Error(`${operation.label}: the sound placement exceeds its source.`);
+    }
     if (operation.type === "broll") {
       const asset = assets.find(a => a.id === operation.parameters?.assetId);
       try {
@@ -211,6 +216,7 @@ export function executeAutonomousPlan(
       throw new Error(
         `${operation.label}: split source pieces need explicit structural targets.`
       );
+    onStep?.(structuredClone(working), operation);
   }
   checkpoint();
   return working;

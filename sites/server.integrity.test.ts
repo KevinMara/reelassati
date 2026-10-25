@@ -38,6 +38,8 @@ function createIntegrityD1() {
     provenance: [] as StoredRow[],
     invocations: [] as StoredRow[],
     assets: [] as StoredRow[],
+    stockMetadata: [] as StoredRow[],
+    failStockMetadataWrites: false,
     events: [] as StoredRow[],
     workspaces: [] as StoredRow[],
     creditLedger: [] as StoredRow[],
@@ -196,6 +198,7 @@ function createIntegrityD1() {
             bytes,
             r2Key,
             createdAt,
+            brandId,
           ] = bindings;
           state.assets.push({
             id,
@@ -206,6 +209,14 @@ function createIntegrityD1() {
             bytes,
             r2_key: r2Key,
             created_at: createdAt,
+            brand_id: brandId || "default",
+          });
+        } else if (normalized.includes("insert into asset_stock_metadata")) {
+          if (state.failStockMetadataWrites)
+            throw new Error("Stock metadata storage unavailable");
+          state.stockMetadata.push({
+            asset_id: bindings[0],
+            stock_json: bindings[1],
           });
         } else if (normalized.startsWith("delete from assets")) {
           const index = state.assets.findIndex(
@@ -337,13 +348,21 @@ function createIntegrityD1() {
           normalized.includes("from assets") &&
           normalized.includes("where id = ?")
         ) {
-          return (
-            state.assets.find(
-              row =>
-                row.id === bindings[0] &&
-                (bindings.length === 1 || row.owner_email === bindings[1])
-            ) || null
+          const asset = state.assets.find(
+            row =>
+              row.id === bindings[0] &&
+              (bindings.length === 1 || row.owner_email === bindings[1]) &&
+              (bindings.length < 3 ||
+                (row.brand_id || "default") === bindings[2])
           );
+          return asset
+            ? {
+                ...asset,
+                stock_json: state.stockMetadata.find(
+                  row => row.asset_id === asset.id
+                )?.stock_json,
+              }
+            : null;
         }
         if (
           normalized.includes("from workspace_state") &&
@@ -368,9 +387,19 @@ function createIntegrityD1() {
         if (normalized.includes("from assets")) {
           return {
             success: true,
-            results: state.assets.filter(
-              row => !bindings.length || row.owner_email === bindings[0]
-            ),
+            results: state.assets
+              .filter(
+                row =>
+                  (!bindings.length || row.owner_email === bindings[0]) &&
+                  (bindings.length < 2 ||
+                    (row.brand_id || "default") === bindings[1])
+              )
+              .map(asset => ({
+                ...asset,
+                stock_json: state.stockMetadata.find(
+                  row => row.asset_id === asset.id
+                )?.stock_json,
+              })),
           };
         }
         return { success: true, results: [] };
@@ -383,8 +412,17 @@ function createIntegrityD1() {
   return {
     state,
     prepare,
-    batch: async (statements: Array<{ run(): Promise<unknown> }>) =>
-      Promise.all(statements.map(statement => statement.run())),
+    batch: async (statements: Array<{ run(): Promise<unknown> }>) => {
+      const before = structuredClone(state);
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        return results;
+      } catch (error) {
+        Object.assign(state, before);
+        throw error;
+      }
+    },
   };
 }
 
@@ -518,6 +556,202 @@ const authHeaders = {
 };
 const signingKey = "test-only-provenance-signing-key-32-characters";
 const rawMp3 = new Uint8Array([0xff, 0xfb, 0x90, 0x64, 1, 2, 3, 4]);
+
+describe("stock persistence and strict local speech", () => {
+  const mockStock = () => {
+    globalThis.fetch = async input => {
+      const url = String(input);
+      if (url.startsWith("https://commons.wikimedia.org/w/api.php"))
+        return Response.json({
+          query: {
+            pages: {
+              1: {
+                pageid: 1,
+                title: "File:Licensed image.jpg",
+                imageinfo: [
+                  {
+                    url: "https://upload.wikimedia.org/wikipedia/commons/a/ab/Licensed_image.jpg",
+                    mime: "image/jpeg",
+                    size: 3,
+                    width: 1920,
+                    height: 1080,
+                    extmetadata: {
+                      LicenseShortName: { value: "CC BY 4.0" },
+                      LicenseUrl: {
+                        value: "https://creativecommons.org/licenses/by/4.0/",
+                      },
+                      Artist: { value: "Alice" },
+                      Attribution: { value: "Courtesy of Alice" },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        });
+      if (url.startsWith("https://upload.wikimedia.org/wikipedia/commons/"))
+        return new Response(new Uint8Array([1, 2, 3]), {
+          headers: { "content-type": "image/jpeg" },
+        });
+      throw new Error(`Unexpected request: ${url}`);
+    };
+  };
+  const importRequest = () =>
+    new Request("https://studio.example/api/stock/import", {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ provider: "commons", id: "1", kind: "image" }),
+    });
+
+  it("recovers stock attribution without a client save and preserves the server source", async () => {
+    const DB = createIntegrityD1(),
+      BUCKET = createMemoryBucket(),
+      env = testEnv(DB, BUCKET);
+    mockStock();
+    const response = await worker.fetch(importRequest(), env as never);
+    expect(response.status).toBe(200);
+    const imported = (await response.json()) as Asset;
+    expect(imported.stock).toMatchObject({
+      creator: "Alice",
+      attribution: "Courtesy of Alice",
+      license: "CC BY 4.0",
+    });
+    expect(DB.state.stockMetadata).toHaveLength(1);
+    expect(DB.state.invocations).toHaveLength(0);
+    expect(DB.state.creditLedger).toHaveLength(0);
+    // No client workspace save has taken place.
+    const request = () =>
+      new Request("https://studio.example/api/workspace", {
+        headers: authHeaders,
+      });
+    const reloaded = await worker.fetch(request(), env as never);
+    expect(reloaded.status).toBe(200);
+    const { workspace } = (await reloaded.json()) as {
+      workspace: ReturnType<typeof createEmptyWorkspace>;
+    };
+    expect(workspace.assets[0]).toMatchObject({
+      id: imported.id,
+      stock: imported.stock,
+      width: 1920,
+      height: 1080,
+      variantGroupId: "stock:commons:1",
+    });
+    workspace.assets[0].stock = {
+      ...imported.stock!,
+      creator: "Forged creator",
+      license: "CC0",
+    };
+    DB.state.workspaces[0].document = JSON.stringify(workspace);
+    DB.state.assets.push({
+      ...DB.state.assets[0],
+      id: "different-brand",
+      brand_id: "other",
+    });
+    const again = await worker.fetch(request(), env as never);
+    const recovered = (
+      (await again.json()) as {
+        workspace: ReturnType<typeof createEmptyWorkspace>;
+      }
+    ).workspace;
+    expect(recovered.assets).toHaveLength(1);
+    expect(recovered.assets[0].stock).toEqual(imported.stock);
+  });
+
+  it("rolls back the asset and uploaded object when its attribution cannot be stored", async () => {
+    const DB = createIntegrityD1(),
+      BUCKET = createMemoryBucket();
+    DB.state.failStockMetadataWrites = true;
+    mockStock();
+    const response = await worker.fetch(
+      importRequest(),
+      testEnv(DB, BUCKET) as never
+    );
+    expect(response.status).toBe(500);
+    expect(DB.state.assets).toHaveLength(0);
+    expect(DB.state.stockMetadata).toHaveLength(0);
+    expect(BUCKET.objects.size).toBe(0);
+  });
+
+  it("preserves actual short local word intervals and rejects malformed timing before signing", async () => {
+    const DB = createIntegrityD1(),
+      BUCKET = createMemoryBucket(),
+      env = testEnv(DB, BUCKET);
+    const source: Asset = {
+      id: "local-source",
+      name: "Speech.wav",
+      kind: "audio",
+      contentType: "audio/wav",
+      size: 3,
+      url: "",
+      status: "ready",
+      duration: 5,
+      createdAt: new Date().toISOString(),
+    };
+    DB.state.assets.push({
+      id: source.id,
+      owner_email: "creator@example.com",
+      name: source.name,
+      kind: "audio",
+      content_type: "audio/wav",
+      bytes: 3,
+      r2_key: "source.wav",
+      created_at: source.createdAt,
+    });
+    persistRenderProject(DB, source);
+    globalThis.fetch = async () => {
+      throw new Error("Local transcription must not call a provider");
+    };
+    const segments = [
+      {
+        id: "segment-1",
+        text: "Hi",
+        start: 0,
+        end: 0.06,
+        words: [{ text: "Hi", start: 0, end: 0.06 }],
+      },
+    ];
+    const request = (value: unknown) =>
+      new Request("https://studio.example/api/transcripts/local", {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          assetId: source.id,
+          projectId: "webm-project",
+          segments: value,
+        }),
+      });
+    const response = await worker.fetch(request(segments), env as never);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      segments: unknown;
+      provenance: ContentProvenance;
+    };
+    expect(body.segments).toEqual(segments);
+    expect(DB.state.provenance).toHaveLength(1);
+    expect(
+      JSON.parse(String(DB.state.provenance[0].metadata_json))
+    ).toMatchObject({ execution: "client-reported-local", providerCost: 0 });
+    for (const invalid of [
+      null,
+      [{ ...segments[0], words: undefined }],
+      [{ ...segments[0], start: -1 }],
+      [
+        {
+          ...segments[0],
+          end: 5.01,
+          words: [{ text: "Hi", start: 0, end: 5.01 }],
+        },
+      ],
+      Array.from({ length: 5001 }, () => segments[0]),
+    ]) {
+      const rejected = await worker.fetch(request(invalid), env as never);
+      expect(rejected.status).toBe(422);
+    }
+    expect(DB.state.provenance).toHaveLength(1);
+    expect(DB.state.invocations).toHaveLength(0);
+    expect(DB.state.creditLedger).toHaveLength(0);
+  });
+});
 
 function testEnv(
   DB: ReturnType<typeof createIntegrityD1>,
@@ -1771,6 +2005,112 @@ describe("provenance integrity boundaries", () => {
     expect(
       tamperedBody.workspace.projects[1].transcriptProvenance
     ).toBeUndefined();
+  });
+
+  it("keeps ranged sound and supporting-media source clocks intact on the explicit Pro route", async () => {
+    const DB = createIntegrityD1(),
+      BUCKET = createMemoryBucket();
+    persistRenderProject(DB);
+    const workspace = JSON.parse(
+      String(DB.state.workspaces[0].document)
+    ) as ReturnType<typeof createEmptyWorkspace>;
+    const project = { ...workspace.projects[0], duration: 10 };
+    let providerBody: Record<string, unknown> | undefined;
+    globalThis.fetch = async (_url, init) => {
+      providerBody = JSON.parse(String(init?.body));
+      const changes = [
+        {
+          type: "sound",
+          label: "Contained cue",
+          start: 2.5,
+          end: 3,
+          parameters: { assetId: "catalog:cue", sourceIn: 0.3 },
+        },
+        {
+          type: "broll",
+          label: "Contained visual",
+          start: 2.2,
+          end: 4,
+          parameters: { assetId: "owned-image", sourceIn: 0 },
+        },
+        {
+          type: "sound",
+          label: "Crossing cue",
+          start: 4.5,
+          end: 5.5,
+          parameters: { assetId: "catalog:cue", sourceIn: 0.3 },
+        },
+        {
+          type: "broll",
+          label: "Crossing visual",
+          start: 1,
+          end: 3,
+          parameters: { assetId: "owned-video", sourceIn: 0 },
+        },
+        {
+          type: "style",
+          label: "Local style",
+          start: 1,
+          end: 3,
+          parameters: { brightness: 0.1 },
+        },
+      ];
+      return new Response(
+        `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: JSON.stringify({ summary: "Local polish", changes }) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+        { headers: { "content-type": "text/event-stream" } }
+      );
+    };
+    const response = await unwrapAnalyzerResponse(
+      await worker.fetch(
+        new Request("https://studio.example/api/ai/edit-plan", {
+          method: "POST",
+          headers: { ...authHeaders, Accept: ANALYZER_STREAM_TYPE },
+          body: JSON.stringify({
+            project,
+            command: "Polish this range",
+            requestId: crypto.randomUUID(),
+            localOnly: true,
+            range: { start: 2, end: 5 },
+            model: "moonshotai/kimi-k3.1-pro",
+            effort: "max",
+          }),
+        }),
+        testEnv(DB, BUCKET) as never
+      )
+    );
+    expect(response.status).toBe(200);
+    const plan = (await response.json()) as { changes: EditOperation[] };
+    expect(plan.changes.map(change => change.label)).toEqual([
+      "Contained cue",
+      "Contained visual",
+      "Local style",
+    ]);
+    expect(plan.changes[0]).toMatchObject({
+      start: 2.5,
+      end: 3,
+      parameters: { sourceIn: 0.3 },
+    });
+    expect(plan.changes[1]).toMatchObject({
+      start: 2.2,
+      end: 4,
+      parameters: { sourceIn: 0 },
+    });
+    expect(plan.changes[2]).toMatchObject({ start: 2, end: 3 });
+    expect(providerBody).toMatchObject({
+      model: "moonshotai/kimi-k3.1-pro",
+      reasoning: { effort: "high" },
+      provider: {
+        order: ["moonshotai"],
+        allow_fallbacks: false,
+        require_parameters: true,
+      },
+    });
+    expect(DB.state.invocations).toHaveLength(1);
+    expect(DB.state.creditLedger).toHaveLength(1);
+    expect(DB.state.creditLedger[0]).toMatchObject({
+      amount: -5,
+      status: "settled",
+    });
   });
 
   it("binds normalized edit-plan provenance to the exact project and operation", async () => {

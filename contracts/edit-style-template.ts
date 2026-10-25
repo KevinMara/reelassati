@@ -28,7 +28,18 @@ export interface EditStyleProfile {
   shotSeconds: { short: number; typical: number; long: number } | null;
   graphicsPerMinute: number | null;
   captionTreatment?: { preset: string; appearance: CaptionAppearance };
-  grade?: { brightness: number; contrast: number; saturation: number };
+  grade?: {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    exposure?: number;
+    temperature?: number;
+    tint?: number;
+    highlights?: number;
+    shadows?: number;
+    whites?: number;
+    blacks?: number;
+  };
   graphicTreatment?: {
     kinds: GraphicKind[];
     palette: string[];
@@ -128,7 +139,32 @@ export function normalizeEditStyleProfile(
     contrast = number(grade.contrast, 0.5, 2),
     saturation = number(grade.saturation, 0, 3);
   if (brightness !== null && contrast !== null && saturation !== null)
-    result.grade = { brightness, contrast, saturation };
+    result.grade = {
+      brightness,
+      contrast,
+      saturation,
+      ...(grade.exposure !== undefined
+        ? { exposure: number(grade.exposure, -2, 2) ?? 0 }
+        : {}),
+      ...(grade.temperature !== undefined
+        ? { temperature: number(grade.temperature, -1, 1) ?? 0 }
+        : {}),
+      ...(grade.tint !== undefined
+        ? { tint: number(grade.tint, -1, 1) ?? 0 }
+        : {}),
+      ...(grade.highlights !== undefined
+        ? { highlights: number(grade.highlights, -1, 1) ?? 0 }
+        : {}),
+      ...(grade.shadows !== undefined
+        ? { shadows: number(grade.shadows, -1, 1) ?? 0 }
+        : {}),
+      ...(grade.whites !== undefined
+        ? { whites: number(grade.whites, -1, 1) ?? 0 }
+        : {}),
+      ...(grade.blacks !== undefined
+        ? { blacks: number(grade.blacks, -1, 1) ?? 0 }
+        : {}),
+    };
   const graphic = object(row.graphicTreatment),
     typicalSize = number(graphic.typicalSize, 2, 16);
   if (typicalSize !== null)
@@ -308,6 +344,62 @@ export function captureEditStyle(project: EditProject): EditStyleProfile {
         }
       : {}),
     grade: {
+      ...(picture.some(c => c.exposure !== undefined)
+        ? {
+            exposure: median(
+              picture.map(c => c.exposure ?? 0),
+              0
+            ),
+          }
+        : {}),
+      ...(picture.some(c => c.temperature !== undefined)
+        ? {
+            temperature: median(
+              picture.map(c => c.temperature ?? 0),
+              0
+            ),
+          }
+        : {}),
+      ...(picture.some(c => c.tint !== undefined)
+        ? {
+            tint: median(
+              picture.map(c => c.tint ?? 0),
+              0
+            ),
+          }
+        : {}),
+      ...(picture.some(c => c.highlights !== undefined)
+        ? {
+            highlights: median(
+              picture.map(c => c.highlights ?? 0),
+              0
+            ),
+          }
+        : {}),
+      ...(picture.some(c => c.shadows !== undefined)
+        ? {
+            shadows: median(
+              picture.map(c => c.shadows ?? 0),
+              0
+            ),
+          }
+        : {}),
+      ...(picture.some(c => c.whites !== undefined)
+        ? {
+            whites: median(
+              picture.map(c => c.whites ?? 0),
+              0
+            ),
+          }
+        : {}),
+      ...(picture.some(c => c.blacks !== undefined)
+        ? {
+            blacks: median(
+              picture.map(c => c.blacks ?? 0),
+              0
+            ),
+          }
+        : {}),
       brightness: median(
         picture.map(c => c.brightness ?? 0),
         0

@@ -8,7 +8,7 @@ import {
 } from "./editor-chat-catalog-audio";
 import { restoreEditorRevision } from "./editor-history";
 
-const entry = editorAudioCatalog.find(item => item.type === "sfx")!;
+const entry = editorAudioCatalog.find(item => item.id === "swish-01")!;
 const uploaded: Asset = {
   id: "saved-sound",
   kind: "audio",
@@ -57,6 +57,23 @@ const action: CatalogAudioAction = {
 };
 
 describe("free catalog file execution", () => {
+  it("uploads a bundled MP3 cue with its real extension and media type", async () => {
+    const cue = editorAudioCatalog.find(item => item.id === "zen-check")!;
+    const upload = vi.fn(async (file: File) => {
+      expect(file.name).toBe(`${cue.name}.mp3`);
+      expect(file.type).toBe("audio/mpeg");
+      return { ...uploaded, contentType: file.type };
+    });
+    const fetcher = vi.fn(
+      async () =>
+        new Response(new Uint8Array([73, 68, 51]), {
+          headers: { "Content-Type": "audio/mpeg" },
+        })
+    );
+    const result = await resolveChatCatalogAudio(cue.id, [], upload, fetcher);
+    expect(result.duration).toBe(cue.duration);
+    expect(result.variantGroupId).toBe("builtin-audio:zen-check");
+  });
   it("reuses an existing renamed Library file without fetching, uploading, or generating it again", async () => {
     const fetcher = vi.fn();
     const upload = vi.fn();

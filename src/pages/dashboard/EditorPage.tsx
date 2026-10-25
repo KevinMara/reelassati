@@ -1,3 +1,8 @@
+import { normalizeVisual, patchVisual } from "@contracts/clip-visual";
+import { ResizableWorkspace } from "@/components/studio/ResizableWorkspace";
+import { ProjectBrowser } from "@/components/studio/ProjectBrowser";
+import { TimelineSections } from "@/components/studio/TimelineSections";
+import { ColorPanel } from "@/components/studio/ColorPanel";
 import { useUiText } from "@/lib/i18n/ui";
 import { isPrimaryFootage } from "@contracts/timeline-layers";
 import { insertMotionKit } from "@/lib/motion-kits";
@@ -93,7 +98,7 @@ import {
   buildStoryBeatEvidence,
   storyBeatsAreCurrent,
 } from "@contracts/story-beats";
-import { StoryBeatStrip } from "@/components/studio/StoryBeatStrip";
+
 import { TimelineTracks } from "@/components/studio/TimelineTracks";
 import {
   clipLaneKind,
@@ -123,6 +128,10 @@ import {
   Library,
   Loader2,
   Maximize2,
+  FileOutput,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Magnet,
   Mic2,
   Music2,
   Pause,
@@ -156,7 +165,7 @@ import {
   EditorCreationDock,
   type DockKind,
 } from "@/components/studio/EditorCreationDock";
-import { TimelinePrompt } from "@/components/studio/TimelinePrompt";
+
 import { AutonomousEditor } from "@/components/studio/AutonomousEditor";
 import { RenderExportPanel } from "@/components/studio/RenderExportPanel";
 import { useSearchParams } from "react-router-dom";
@@ -173,7 +182,6 @@ import { useFileDropZone } from "@/hooks/useFileDropZone";
 import type { ContentProvenance } from "@contracts/compliance";
 import { AiProvenanceBadge } from "@/components/compliance/AiProvenanceBadge";
 import { validateFileSelection } from "@/lib/file-validation";
-import { AI_CREDIT_COSTS } from "@contracts/billing";
 
 const PROJECT_TEMPLATES = [
   {
@@ -265,7 +273,6 @@ export default function EditorPage() {
 
   const {
     workspace,
-    capabilities,
     loading,
     saving,
     error: workspaceError,
@@ -288,6 +295,15 @@ export default function EditorPage() {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [snapping, setSnapping] = useState(true);
+  const [localSpeechStatus, setLocalSpeechStatus] = useState("");
+  const localSpeechController = useRef<AbortController | null>(null);
+  useEffect(() => () => localSpeechController.current?.abort(), []);
+  const [colorPreview, setColorPreview] = useState<{
+    id: string;
+    patch: Partial<TimelineClip>;
+  }>();
+  const [mediaHidden, setMediaHidden] = useState(false);
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [previewZoom, setPreviewZoom] = useState(100);
   const [previewPan, setPreviewPan] = useState({ x: 0, y: 0 });
   const previewDrag = useRef<{
@@ -314,12 +330,12 @@ export default function EditorPage() {
     searchParams,
   ]);
   const [autoEditSummary, setAutoEditSummary] = useState("");
-  const autoEditFinished = useRef(false);
   const libraryInsertLock = useRef(false);
   const [chatSeed, setChatSeed] = useState<{
     text: string;
     id: number;
     range?: { start: number; end: number };
+    section?: { id: string; label: string };
   }>();
   const [clipDraft, setClipDraft] = useState<TimelineClip | null>(null);
   const [transcriptDraft, setTranscriptDraft] = useState<TranscriptSegment[]>(
@@ -429,6 +445,7 @@ export default function EditorPage() {
   );
 
   const openProject = (item: EditProject) => {
+    localSpeechController.current?.abort();
     const firstClip = item.clips[0] ?? null;
     transcriptBase.current = {
       projectId: item.id,
@@ -541,15 +558,26 @@ export default function EditorPage() {
     patch: Partial<EditProject> | ((currentProject: EditProject) => EditProject)
   ) => {
     if (!project) return;
-    return updateWorkspace(current => ({
-      ...current,
-      projects: current.projects.map(item => {
-        if (item.id !== project.id) return item;
-        const next =
-          typeof patch === "function" ? patch(item) : { ...item, ...patch };
-        return { ...next, updatedAt: new Date().toISOString() };
-      }),
-    }));
+    const owner = workspace.profile.email.toLowerCase();
+    const brand = selectedBrand(owner);
+    return updateWorkspace(current => {
+      if (
+        current.profile.email.toLowerCase() !== owner ||
+        selectedBrand(owner) !== brand
+      )
+        throw new Error(
+          ui("Your account or brand changed. Reopen the intended workspace.")
+        );
+      return {
+        ...current,
+        projects: current.projects.map(item => {
+          if (item.id !== project.id) return item;
+          const next =
+            typeof patch === "function" ? patch(item) : { ...item, ...patch };
+          return { ...next, updatedAt: new Date().toISOString() };
+        }),
+      };
+    });
   };
 
   const commitProject = async (
@@ -557,80 +585,95 @@ export default function EditorPage() {
     transform: (currentProject: EditProject) => EditProject
   ) => {
     if (!project) return;
-    return updateWorkspace(current => ({
-      ...current,
-      projects: current.projects.map(item => {
-        if (item.id !== project.id) return item;
-        const transformed = transform({
-          ...item,
-          clips: item.clips.map(clip => ({ ...clip })),
-          transcript: item.transcript.map(segment => ({ ...segment })),
-        });
-        const next = {
-          ...transformed,
-          duration:
-            transformed.duration !== item.duration
-              ? transformed.duration
-              : transformed.clips.filter(c => !c.transitionHandle).length !==
-                    item.clips.filter(c => !c.transitionHandle).length ||
-                  transformed.clips
-                    .filter(c => !c.transitionHandle)
-                    .some(
-                      (clip, index) =>
-                        clip.id !==
-                          item.clips.filter(c => !c.transitionHandle)[index]
-                            ?.id ||
-                        clip.start !==
-                          item.clips.filter(c => !c.transitionHandle)[index]
-                            ?.start ||
-                        clip.duration !==
-                          item.clips.filter(c => !c.transitionHandle)[index]
-                            ?.duration
-                    )
-                ? transformed.clips.length > item.clips.length &&
-                  item.clips.length > 0
-                  ? Math.max(
-                      item.duration,
-                      getProjectDuration(transformed.clips)
-                    )
-                  : getProjectDuration(transformed.clips)
-                : item.duration,
-          updatedAt: new Date().toISOString(),
-        };
-        const unchanged =
-          JSON.stringify({
-            clips: item.clips,
-            transcript: item.transcript,
-            duration: item.duration,
-            captionStyle: item.captionStyle,
-            captionAppearance: item.captionAppearance,
-            aspectRatio: item.aspectRatio,
-            frameRate: item.frameRate,
-            trackSettings: item.trackSettings,
-            storyBeats: item.storyBeats,
-          }) ===
-          JSON.stringify({
-            clips: next.clips,
-            transcript: next.transcript,
-            duration: next.duration,
-            captionStyle: next.captionStyle,
-            captionAppearance: next.captionAppearance,
-            aspectRatio: next.aspectRatio,
-            frameRate: next.frameRate,
-            trackSettings: next.trackSettings,
-            storyBeats: next.storyBeats,
+    const owner = workspace.profile.email.toLowerCase();
+    const brand = selectedBrand(owner);
+    return updateWorkspace(current => {
+      if (
+        current.profile.email.toLowerCase() !== owner ||
+        selectedBrand(owner) !== brand
+      )
+        throw new Error(
+          ui("Your account or brand changed. Reopen the intended workspace.")
+        );
+      return {
+        ...current,
+        projects: current.projects.map(item => {
+          if (item.id !== project.id) return item;
+          const transformed = transform({
+            ...item,
+            clips: item.clips.map(clip => ({ ...clip })),
+            transcript: item.transcript.map(segment => ({ ...segment })),
           });
-        if (unchanged) return item;
-        return {
-          ...next,
-          ...appendEditorRevisions(
-            item,
-            [snapshotProject(next, label)],
-            snapshotProject(item, "Project opened")
-          ),
-        };
-      }),
-    }));
+          const next = {
+            ...transformed,
+            duration:
+              transformed.duration !== item.duration
+                ? transformed.duration
+                : transformed.clips.filter(c => !c.transitionHandle).length !==
+                      item.clips.filter(c => !c.transitionHandle).length ||
+                    transformed.clips
+                      .filter(c => !c.transitionHandle)
+                      .some(
+                        (clip, index) =>
+                          clip.id !==
+                            item.clips.filter(c => !c.transitionHandle)[index]
+                              ?.id ||
+                          clip.start !==
+                            item.clips.filter(c => !c.transitionHandle)[index]
+                              ?.start ||
+                          clip.duration !==
+                            item.clips.filter(c => !c.transitionHandle)[index]
+                              ?.duration
+                      )
+                  ? transformed.clips.length > item.clips.length &&
+                    item.clips.length > 0
+                    ? Math.max(
+                        item.duration,
+                        getProjectDuration(transformed.clips)
+                      )
+                    : getProjectDuration(transformed.clips)
+                  : item.duration,
+            updatedAt: new Date().toISOString(),
+          };
+          const unchanged =
+            JSON.stringify({
+              clips: item.clips,
+              transcript: item.transcript,
+              duration: item.duration,
+              captionStyle: item.captionStyle,
+              captionAppearance: item.captionAppearance,
+              aspectRatio: item.aspectRatio,
+              frameRate: item.frameRate,
+              trackSettings: item.trackSettings,
+              storyBeats: item.storyBeats,
+              sourceSpeech: item.sourceSpeech,
+              transcriptProvenance: item.transcriptProvenance,
+            }) ===
+            JSON.stringify({
+              clips: next.clips,
+              transcript: next.transcript,
+              duration: next.duration,
+              captionStyle: next.captionStyle,
+              captionAppearance: next.captionAppearance,
+              aspectRatio: next.aspectRatio,
+              frameRate: next.frameRate,
+              trackSettings: next.trackSettings,
+              storyBeats: next.storyBeats,
+              sourceSpeech: next.sourceSpeech,
+              transcriptProvenance: next.transcriptProvenance,
+            });
+          if (unchanged) return item;
+          return {
+            ...next,
+            ...appendEditorRevisions(
+              item,
+              [snapshotProject(next, label)],
+              snapshotProject(item, "Project opened")
+            ),
+          };
+        }),
+      };
+    });
   };
 
   const findStorySections = async () => {
@@ -996,6 +1039,76 @@ export default function EditorPage() {
           insertAt,
           destination
         );
+        if (
+          ["video", "audio"].includes(asset.kind) &&
+          detectedDuration !== undefined &&
+          detectedDuration > 0 &&
+          detectedDuration <= 600
+        ) {
+          const controller = new AbortController();
+          localSpeechController.current = controller;
+          setBusyAction("local-speech");
+          try {
+            const { transcribeMediaLocally } =
+              await import("@/lib/local-transcription");
+            const { captureUploadRequestScope, verifyUploadRequestScope } =
+              await import("@/lib/platform-api");
+            const scope = await captureUploadRequestScope();
+            const result = await transcribeMediaLocally(
+              asset,
+              undefined,
+              projectId,
+              setLocalSpeechStatus,
+              controller.signal,
+              scope
+            );
+            await verifyUploadRequestScope(scope);
+            controller.signal.throwIfAborted();
+            await updateWorkspace(w => {
+              controller.signal.throwIfAborted();
+              if (
+                w.profile.email.toLowerCase() !== scope.ownerEmail ||
+                selectedBrand(scope.ownerEmail) !== scope.brandId
+              )
+                throw new Error(
+                  ui(
+                    "The destination workspace changed. Start the import again."
+                  )
+                );
+              return {
+                ...w,
+                projects: w.projects.map(p =>
+                  p.id === projectId
+                    ? {
+                        ...p,
+                        sourceSpeech: [
+                          ...(p.sourceSpeech ?? []).filter(
+                            s => s.assetId !== asset.id
+                          ),
+                          {
+                            assetId: asset.id,
+                            segments: result.segments,
+                            provenance: result.provenance,
+                          },
+                        ],
+                      }
+                    : p
+                ),
+              };
+            });
+          } catch (error) {
+            if (!controller.signal.aborted)
+              setLocalError(
+                error instanceof Error
+                  ? error.message
+                  : "Local transcription failed. Your media is saved."
+              );
+          } finally {
+            localSpeechController.current = null;
+            setLocalSpeechStatus("");
+            setBusyAction("upload");
+          }
+        }
       }
     } catch (cause) {
       setLocalError(
@@ -1567,15 +1680,32 @@ export default function EditorPage() {
 
   const transcribeActiveAsset = async () => {
     if (!previewAsset || !project) return;
+    const controller = new AbortController();
+    localSpeechController.current = controller;
     setBusyAction("transcribe");
     setLocalError(null);
     try {
-      const { transcribeMedia } = await import("@/lib/transcribe-media");
-      const result = await transcribeMedia(
-        previewAsset,
-        workspace.profile.contentLanguage,
-        project.id
+      const { transcribeMediaLocally } =
+        await import("@/lib/local-transcription");
+      const { captureUploadRequestScope, verifyUploadRequestScope } =
+        await import("@/lib/platform-api");
+      const scope = await captureUploadRequestScope();
+      controller.signal.throwIfAborted();
+      const cached = project.sourceSpeech?.find(
+        s => s.assetId === previewAsset.id
       );
+      const result =
+        cached ??
+        (await transcribeMediaLocally(
+          previewAsset,
+          undefined,
+          project.id,
+          setLocalSpeechStatus,
+          controller.signal,
+          scope
+        ));
+      await verifyUploadRequestScope(scope);
+      controller.signal.throwIfAborted();
       const mapped = mapChatTranscript(
         project,
         previewAsset.id,
@@ -1587,6 +1717,16 @@ export default function EditorPage() {
         ...current,
         transcript: mapped,
         transcriptProvenance: result.provenance,
+        sourceSpeech: [
+          ...(current.sourceSpeech ?? []).filter(
+            s => s.assetId !== previewAsset.id
+          ),
+          {
+            assetId: previewAsset.id,
+            segments: result.segments,
+            provenance: result.provenance,
+          },
+        ],
       }));
       const canonical = saved?.projects.find(
         candidate => candidate.id === project.id
@@ -1604,6 +1744,8 @@ export default function EditorPage() {
           : "The media could not be transcribed."
       );
     } finally {
+      localSpeechController.current = null;
+      setLocalSpeechStatus("");
       setBusyAction(null);
     }
   };
@@ -1771,10 +1913,10 @@ export default function EditorPage() {
           <span className="text-base font-medium">
             {newEditDrop.isDragging
               ? ui("Drop files to start the edit")
-              : ui("Upload footage to a new edit")}
+              : ui("Upload to create a project")}
           </span>
           <span className="mt-1 text-sm text-foreground/70">
-            {ui("Drop video, image, or audio here, or click to choose.")}
+            {ui("Drop files here to create a new project, or choose files.")}
           </span>
           {uploadProgress !== null && (
             <span className="mt-4 font-mono text-xs text-primary">
@@ -1791,80 +1933,15 @@ export default function EditorPage() {
           className="hidden"
         />
 
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-medium">
-            {ui("Start from a structure")}
-          </h2>
-          <span className="text-xs text-foreground/70">
-            {ui("No irreversible auto-edit")}
-          </span>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {PROJECT_TEMPLATES.map(item => (
-            <button
-              key={item.template}
-              type="button"
-              disabled={busyAction === "create"}
-              onClick={() =>
-                void (pendingAsset
-                  ? createProjectWithPendingAsset(item.template)
-                  : createProject(item.template))
-              }
-              className="group rounded-2xl border border-border bg-surface p-5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-card-hover disabled:opacity-50"
-            >
-              <span className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <item.icon className="h-4 w-4" />
-              </span>
-              <span className="block font-medium">{ui(item.name)}</span>
-              <span className="mt-2 block text-sm leading-5 text-foreground/70">
-                {ui(item.description)}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {workspace.projects.length > 0 && (
-          <div className="mt-10">
-            <h2 className="mb-4 text-base font-medium">
-              {ui("Saved projects")}
-            </h2>
-            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {workspace.projects.map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() =>
-                    void (pendingAsset
-                      ? addPendingAssetToProject(item)
-                      : openProject(item))
-                  }
-                  className="min-w-0 rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary/30"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate font-medium">
-                      {item.title}
-                    </span>
-                    <span className="mono-eyebrow shrink-0 text-foreground/70">
-                      {item.aspectRatio}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex items-center gap-3 text-xs text-foreground/70">
-                    <span>
-                      {item.clips.length} {ui("clips")}
-                    </span>
-                    <span>{formatTime(item.duration)}</span>
-                    <span className="capitalize">{item.status}</span>
-                    {pendingAsset ? (
-                      <span className="ml-auto font-medium text-primary">
-                        {ui("Add here")}
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <ProjectBrowser
+          busy={Boolean(busyAction)}
+          onCreate={() => void createProject("blank")}
+          onOpen={item =>
+            void (pendingAsset
+              ? addPendingAssetToProject(item)
+              : openProject(item))
+          }
+        />
       </div>
     );
   }
@@ -2279,7 +2356,7 @@ export default function EditorPage() {
             />
           </div>
 
-          {capabilities.transcription && previewAsset && (
+          {previewAsset && (
             <button
               type="button"
               disabled={busyAction === "transcribe"}
@@ -2291,7 +2368,7 @@ export default function EditorPage() {
               ) : (
                 <AudioLines className="h-3.5 w-3.5" />
               )}
-              {ui("Transcribe active media")}
+              {ui("Transcribe locally · free")}
             </button>
           )}
 
@@ -2480,7 +2557,7 @@ export default function EditorPage() {
           {transcriptDraft.length === 0 && (
             <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm leading-5 text-foreground/70">
               {ui(
-                "Add lines manually or transcribe the selected media when the speech service is connected."
+                "Add lines manually or transcribe the selected media locally."
               )}
             </div>
           )}
@@ -2532,7 +2609,7 @@ export default function EditorPage() {
                   "The project title could not be saved."
                 );
             }}
-            className="w-full border-0 bg-transparent p-0 text-xl font-semibold outline-none placeholder:text-foreground/70"
+            className="w-full border-0 bg-transparent p-0 text-2xl font-semibold outline-none placeholder:text-foreground/70"
             aria-label={ui("Project title")}
           />
           <div className="mt-1 flex items-center gap-2 text-xs text-foreground/70">
@@ -2544,6 +2621,20 @@ export default function EditorPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMediaHidden(!mediaHidden)}
+            aria-label={ui(
+              mediaHidden ? "Show media panel" : "Hide media panel"
+            )}
+            className="rounded-lg border border-border p-2 text-muted-foreground"
+          >
+            {mediaHidden ? (
+              <PanelLeftOpen size={17} />
+            ) : (
+              <PanelLeftClose size={17} />
+            )}
+          </button>
           <span
             className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs sm:flex ${
               workspaceError
@@ -2569,7 +2660,7 @@ export default function EditorPage() {
             onClick={() => setExportOpen(true)}
             className="flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
           >
-            <Maximize2 className="h-3.5 w-3.5" />
+            <FileOutput className="h-3.5 w-3.5" />
             {ui("Export video")}
           </button>
         </div>
@@ -2587,6 +2678,24 @@ export default function EditorPage() {
             aria-label={ui("Dismiss error")}
           >
             <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      {localSpeechStatus && (
+        <div
+          role="status"
+          className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 p-3 text-xs"
+        >
+          <span className="flex items-center gap-2">
+            <Loader2 size={14} className="animate-spin" />
+            {localSpeechStatus}
+          </span>
+          <button
+            type="button"
+            onClick={() => localSpeechController.current?.abort()}
+            className="text-primary"
+          >
+            {ui("Stop")}
           </button>
         </div>
       )}
@@ -2620,7 +2729,7 @@ export default function EditorPage() {
         </div>
       )}
 
-      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.2fr)] md:items-start xl:grid-cols-[minmax(240px,0.85fr)_minmax(300px,1.35fr)_minmax(310px,1fr)]">
+      <ResizableWorkspace mediaHidden={mediaHidden}>
         <section
           id="editor-media-panel"
           className="min-w-0 max-h-[560px] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface md:col-start-1 md:row-start-1 md:h-[540px] xl:h-[620px] xl:max-h-none"
@@ -2631,6 +2740,41 @@ export default function EditorPage() {
             activeTool={leftTool}
             onToolChange={setLeftTool}
             captions={captionsContent}
+            adjustment={inspectorContent}
+            color={
+              <ColorPanel
+                key={selectedClip?.id}
+                clip={selectedClip ?? null}
+                disabled={Boolean(busyAction)}
+                onPreview={patch =>
+                  selectedClip &&
+                  setColorPreview(current => ({
+                    id: selectedClip.id,
+                    patch: {
+                      ...(current?.id === selectedClip.id ? current.patch : {}),
+                      ...patch,
+                    },
+                  }))
+                }
+                onChange={async patch => {
+                  if (!selectedClip) return;
+                  await commitProject("Color adjusted", p =>
+                    replaceTimelineClip(p, selectedClip.id, {
+                      ...(p.clips.find(c => c.id === selectedClip.id) ??
+                        selectedClip),
+                      ...patch,
+                    })
+                  );
+                  setColorPreview(undefined);
+                }}
+                onAssist={() =>
+                  setChatSeed({
+                    text: "Inspect the selected footage and optimize its exposure, white balance, tonal separation and color naturally. Preserve skin tones and intentional lighting.",
+                    id: Date.now(),
+                  })
+                }
+              />
+            }
             effects={looksContent}
             project={project}
             playhead={playhead}
@@ -2716,6 +2860,7 @@ export default function EditorPage() {
         </section>
         <main className="contents">
           <section
+            id="editor-preview-panel"
             {...previewDrop.dropZoneProps}
             className={`relative min-w-0 overflow-hidden rounded-xl border md:col-start-2 md:row-start-1 md:h-[540px] xl:h-[620px] bg-[#0D0C0E] shadow-card transition-all ${
               previewDrop.isDragging
@@ -2723,12 +2868,21 @@ export default function EditorPage() {
                 : "border-white/5"
             }`}
           >
-            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/45 px-2.5 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-white/60 backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#A894FF]" />
-              {ui("Timeline preview")}
-            </div>
+            <button
+              type="button"
+              aria-label={ui("Fullscreen preview")}
+              title={ui("Fullscreen preview")}
+              onClick={() => {
+                const panel = document.getElementById("editor-preview-panel");
+                if (document.fullscreenElement) void document.exitFullscreen();
+                else void panel?.requestFullscreen();
+              }}
+              className="absolute right-3 top-3 z-20 rounded-lg border border-white/15 bg-black/40 p-2 text-white/70 hover:text-white"
+            >
+              <Maximize2 size={16} />
+            </button>
             <div
-              className={`relative flex h-[400px] touch-none items-center justify-center overflow-hidden p-5 md:h-[410px] xl:h-[490px] ${previewZoom > 100 ? "cursor-grab active:cursor-grabbing" : ""}`}
+              className={`editor-preview-stage relative flex h-[400px] touch-none items-center justify-center overflow-hidden p-5 md:h-[410px] xl:h-[490px] ${previewZoom > 100 ? "cursor-grab active:cursor-grabbing" : ""}`}
               onPointerDown={e => {
                 if (previewZoom <= 100) return;
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -2760,12 +2914,61 @@ export default function EditorPage() {
                 </div>
               ) : null}
               <TimelinePreview
-                project={project}
+                project={
+                  colorPreview?.id === selectedClipId
+                    ? {
+                        ...project,
+                        clips: project.clips.map(c =>
+                          c.id === colorPreview.id
+                            ? { ...c, ...colorPreview.patch }
+                            : c
+                        ),
+                      }
+                    : project
+                }
                 assets={workspace.assets}
                 time={playhead}
                 playing={playing}
                 zoom={previewZoom / 100}
                 pan={previewPan}
+                selectedClipId={selectedClipId}
+                onSelectClip={id => {
+                  setSelectedClipId(id);
+                  setLeftTool("adjust");
+                  setMediaHidden(false);
+                }}
+                onTransform={async (id, dx, dy) => {
+                  await commitProject("Moved in preview", p => {
+                    const clip = p.clips.find(c => c.id === id);
+                    if (!clip || clip.locked) return p;
+                    return replaceTimelineClip(
+                      p,
+                      id,
+                      clip.graphic
+                        ? {
+                            ...clip,
+                            graphic: {
+                              ...clip.graphic,
+                              x: Math.max(
+                                0,
+                                Math.min(100, clip.graphic.x + dx)
+                              ),
+                              y: Math.max(
+                                0,
+                                Math.min(100, clip.graphic.y + dy)
+                              ),
+                            },
+                          }
+                        : {
+                            ...clip,
+                            visual: patchVisual(clip, {
+                              x: normalizeVisual(clip.visual).x + dx,
+                              y: normalizeVisual(clip.visual).y + dy,
+                            }),
+                          }
+                    );
+                  });
+                }}
               />
             </div>
             <div className="flex items-center justify-center gap-3 border-t border-white/10 bg-black/30 px-4 py-2.5 text-white">
@@ -2893,19 +3096,32 @@ export default function EditorPage() {
             }`}
           >
             <div className="flex flex-wrap items-center gap-1 border-b border-border p-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={Boolean(busyAction)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {busyAction === "upload" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Upload className="h-3.5 w-3.5" />
-                )}
-                {ui("Upload")}
-              </button>
+              <div className="flex flex-col items-start">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={Boolean(busyAction)}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-background disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {busyAction === "upload" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5" />
+                  )}
+                  {ui("Upload")}
+                </button>
+                <button
+                  type="button"
+                  aria-label={ui("Clip snapping")}
+                  aria-pressed={snapping}
+                  onClick={() => setSnapping(!snapping)}
+                  title={ui("Snap clips to nearby edges")}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-primary"
+                >
+                  <Magnet size={14} />
+                  {ui("Snap")}
+                </button>
+              </div>
               <span className="mx-3 text-xs text-foreground/45">
                 {ui("or")}
               </span>
@@ -3086,41 +3302,45 @@ export default function EditorPage() {
               </div>
             </div>
 
-            <StoryBeatStrip
-              beats={project.storyBeats ?? []}
-              duration={project.duration}
-              time={playhead}
-              hasEvidence={buildStoryBeatEvidence(project).length > 0}
-              stale={
-                Boolean(project.storyBeats?.length) &&
-                !storyBeatsAreCurrent(
-                  project.storyBeats ?? [],
-                  buildStoryBeatEvidence(project)
-                )
-              }
-              onSeek={seekTimeline}
-              onChange={async storyBeats => {
-                await commitProject("Story sections updated", p => ({
-                  ...p,
-                  storyBeats,
-                }));
-              }}
-              busy={findingSections}
-              onGenerate={() => void findStorySections()}
-            />
-            <TimelinePrompt
-              key={project.id}
-              duration={project.duration}
-              busy={Boolean(busyAction)}
-              credits={AI_CREDIT_COSTS.editPlan}
-              onSend={async (text, range) => {
-                setChatSeed({ text, range, id: Date.now() });
-                document
-                  .getElementById("editor-chat-panel")
-                  ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-              }}
-            />
             <TimelineTracks
+              sections={
+                <TimelineSections
+                  key={project.id}
+                  beats={project.storyBeats ?? []}
+                  duration={project.duration}
+                  selectedIds={selectedSections}
+                  onToggle={id =>
+                    setSelectedSections(current =>
+                      current.includes(id)
+                        ? current.filter(x => x !== id)
+                        : [...current, id]
+                    )
+                  }
+                  onChange={async storyBeats => {
+                    await commitProject("Sections updated", p => ({
+                      ...p,
+                      storyBeats,
+                    }));
+                  }}
+                  onSend={beat =>
+                    setChatSeed({
+                      text: "",
+                      range: { start: beat.start, end: beat.end },
+                      section: { id: beat.id, label: beat.label },
+                      id: Date.now(),
+                    })
+                  }
+                  disabled={Boolean(busyAction)}
+                />
+              }
+              highlightedSections={(project.storyBeats ?? []).filter(beat =>
+                selectedSections.includes(beat.id)
+              )}
+              onTrackGain={async (lane, gain) => {
+                await commitProject("Track volume", p =>
+                  updateTimelineTrack(p, lane, { gain })
+                );
+              }}
               project={project}
               assets={workspace.assets}
               time={playhead}
@@ -3162,6 +3382,8 @@ export default function EditorPage() {
                       : related.filter(id => id !== clip.id)
                   );
                   setClipDraft({ ...clip });
+                  setLeftTool("adjust");
+                  setMediaHidden(false);
                 }
                 seekTimeline(time);
               }}
@@ -3206,19 +3428,27 @@ export default function EditorPage() {
 
         <aside
           id="editor-chat-panel"
-          className="min-w-0 overflow-hidden rounded-xl border border-primary/20 bg-surface md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:h-[620px]"
+          className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-primary/20 bg-surface md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:h-[620px]"
         >
-          <EditorChat
-            key={project.id}
-            project={project}
-            playhead={playhead}
-            selectedClipId={selectedClipId}
-            seed={chatSeed}
-            onSeek={seekTimeline}
-            onAutoEdit={() => setAutoEditOpen(true)}
+          <div
+            id="editor-autoedit-activity"
+            className="max-h-[45%] shrink-0 overflow-y-auto"
           />
+          <div className="min-h-0 flex-1">
+            <EditorChat
+              key={project.id}
+              project={project}
+              playhead={playhead}
+              selectedClipId={selectedClipId}
+              seed={chatSeed}
+              onSeek={seekTimeline}
+              onFindSections={() => void findStorySections()}
+              findingSections={findingSections}
+              onAutoEdit={() => setAutoEditOpen(true)}
+            />
+          </div>
         </aside>
-      </div>
+      </ResizableWorkspace>
 
       <EditorShortcuts
         open={shortcutsOpen}
@@ -3326,35 +3556,16 @@ export default function EditorPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={autoEditOpen} onOpenChange={setAutoEditOpen}>
-        <DialogContent
-          className="max-h-[85vh] overflow-y-auto sm:max-w-4xl"
-          onCloseAutoFocus={event => {
-            if (!autoEditFinished.current) return;
-            event.preventDefault();
-            autoEditFinished.current = false;
-            const timeline = document.getElementById("editor-timeline-panel");
-            timeline?.focus({ preventScroll: true });
-            timeline?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
-        >
-          <DialogTitle>{ui("AI auto-edit")}</DialogTitle>
-          <DialogDescription>
-            {ui(
-              "Build a complete edit from your footage and a reference style."
-            )}
-          </DialogDescription>
-          <AutonomousEditor
-            key={project.id}
-            project={project}
-            onFinished={summary => {
-              setAutoEditSummary(summary);
-              autoEditFinished.current = true;
-              setAutoEditOpen(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      <AutonomousEditor
+        key={project.id}
+        project={project}
+        open={autoEditOpen}
+        onOpenChange={setAutoEditOpen}
+        onFinished={summary => {
+          setAutoEditSummary(summary);
+          setAutoEditOpen(false);
+        }}
+      />
       {exportOpen && (
         <RenderExportPanel
           project={project}

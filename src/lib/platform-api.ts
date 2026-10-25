@@ -659,6 +659,9 @@ export const platformApi = {
       body: JSON.stringify({}),
     }),
 
+  searchStock: (kind: import("@contracts/stock-media").StockKind, query: string, signal?: AbortSignal) => requestJson<{items: import("@contracts/stock-media").StockMedia[]}>(`/api/stock/search?kind=${kind}&q=${encodeURIComponent(query)}`, {signal}),
+  importStock: (item: import("@contracts/stock-media").StockMedia, signal?: AbortSignal, scope?: UploadRequestScope) => requestJson<Asset>("/api/stock/import", {method:"POST",body:JSON.stringify({provider:item.provider,id:item.id,kind:item.kind}),signal},false,scope),
+
   uploadAsset: async (
     file: File,
     kind?: Asset["kind"],
@@ -961,6 +964,9 @@ export const platformApi = {
       selectedClipIds: string[];
       range?: { start: number; end: number };
       localOnly?: boolean;
+      model?: import("@contracts/edit-model").EditModel;
+      effort?: import("@contracts/edit-model").EditEffort;
+      stock?: boolean;
     },
     options?: UploadRequestOptions
   ) => {
@@ -1007,6 +1013,7 @@ export const platformApi = {
       options?.signal?.throwIfAborted();
       return await requestJson<{
         changes: EditOperation[];
+        stockMedia?: import("@contracts/stock-media").StockMedia[];
         summary: string;
         provenance: ContentProvenance;
       }>(
@@ -1141,6 +1148,7 @@ export const platformApi = {
     }
   },
 
+  registerLocalTranscript: (input:{assetId:string;projectId?:string;segments:EditProject["transcript"]}, options:UploadRequestOptions) => requestJson<{transcript:string;segments:EditProject["transcript"];provenance:ContentProvenance}>("/api/transcripts/local",{method:"POST",body:JSON.stringify(input),signal:options.signal},false,options.scope),
   transcribe: (
     assetId: string,
     language?: string,

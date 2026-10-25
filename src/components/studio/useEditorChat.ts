@@ -828,7 +828,7 @@ export function useEditorChat(
     references: EditorChatReference[] = [],
     range?: { start: number; end: number },
     selectedClipIds: string[] = [],
-    options: Pick<EditorChatRequest, "executionMode" | "taskPreset"> = {}
+    options: Pick<EditorChatRequest, "executionMode" | "taskPreset" | "effort"> = {}
   ) {
     if (!prompt.trim() || activeProjects.has(project.id)) return;
     activeProjects.add(project.id);

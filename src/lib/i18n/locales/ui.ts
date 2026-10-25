@@ -22,6 +22,7 @@ import { indonesianUi } from "./ui-id";
 import { swedishUi } from "./ui-sv";
 import { analyzerUi } from "./ui-analyzer";
 import { editDurationUi } from "./ui-edit-duration";
+import { editorRedesignUi } from "./ui-editor-redesign";
 import { hungarianUi } from "./ui-hu";
 import { norwegianUi } from "./ui-no";
 import { vietnameseUi } from "./ui-vi";
@@ -73,6 +74,10 @@ export const uiLocales: Record<string, Record<string, string>> = {
   hi: { ...hindiUi, ...asianUi.hi },
   he: { ...hebrewUi, ...asianUi.he },
 };
+
+for (const [language, translation] of Object.entries(editorRedesignUi)) {
+  Object.assign(uiLocales[language], translation);
+}
 
 for (const [language, translation] of Object.entries(
   automaticResearchDisabled
