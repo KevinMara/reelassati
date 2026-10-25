@@ -1,9 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
-import { Tensor } from "@huggingface/transformers";
 import {
   detectLocalSpeechLanguage,
   selectWhisperLanguage,
 } from "./local-speech-language";
+
+// This unit exercises the injected Tensor boundary, not an ONNX inference session.
+// Importing Transformers' Node entry point loads a native addon that cannot be
+// re-registered across CI worker threads; the application uses its browser build.
+class TensorFixture {
+  dispose = vi.fn();
+  readonly type: string;
+  readonly data: ArrayLike<number | bigint>;
+  readonly dims: number[];
+  constructor(
+    type: string,
+    data: ArrayLike<number | bigint>,
+    dims: number[]
+  ) {
+    this.type = type;
+    this.data = data;
+    this.dims = dims;
+  }
+}
+const Tensor = TensorFixture as unknown as Parameters<
+  typeof detectLocalSpeechLanguage
+>[1];
 
 describe("source language detection", () => {
   it("selects the strongest language token, ignoring higher non-language logits", () => {
@@ -22,14 +43,12 @@ describe("source language detection", () => {
     expect(() => selectWhisperLanguage([4, 3], {})).toThrow("could not detect");
   });
   it("uses one start-of-transcript token and at most 30 seconds, then releases tensors", async () => {
-    const features = new Tensor("float32", [0], [1, 1, 1]);
-    const logits = new Tensor("float32", [100, 1, 4, 2], [1, 1, 4]);
-    const featureDispose = vi.spyOn(features, "dispose");
-    const logitDispose = vi.spyOn(logits, "dispose");
-    let prompt: unknown;
-    const processor = vi.fn<(audio: Float32Array) => Promise<{ input_features: Tensor }>>().mockResolvedValue({ input_features: features });
+    const features = new TensorFixture("float32", [0], [1, 1, 1]);
+    const logits = new TensorFixture("float32", [100, 1, 4, 2], [1, 1, 4]);
+    let prompt: TensorFixture | undefined;
+    const processor = vi.fn<(audio: Float32Array) => Promise<{ input_features: TensorFixture }>>().mockResolvedValue({ input_features: features });
     const forward = vi.fn(async (input: Record<string, unknown>) => {
-      prompt = (input.decoder_input_ids as Tensor).tolist();
+      prompt = input.decoder_input_ids as TensorFixture;
       return { logits };
     });
     const model = {
@@ -47,9 +66,13 @@ describe("source language detection", () => {
       )
     ).toBe("it");
     expect(processor.mock.calls[0][0]).toHaveLength(16_000 * 30);
-    expect(prompt).toEqual([[50258n]]);
+    expect(prompt).toBeInstanceOf(TensorFixture);
+    expect(prompt?.type).toBe("int64");
+    expect(prompt?.dims).toEqual([1, 1]);
+    expect(Array.from(prompt?.data ?? [])).toEqual([50258n]);
     expect(forward).toHaveBeenCalledOnce();
-    expect(featureDispose).toHaveBeenCalledOnce();
-    expect(logitDispose).toHaveBeenCalledOnce();
+    expect(prompt?.dispose).toHaveBeenCalledOnce();
+    expect(features.dispose).toHaveBeenCalledOnce();
+    expect(logits.dispose).toHaveBeenCalledOnce();
   });
 });
