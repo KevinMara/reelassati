@@ -168,8 +168,35 @@ export function executeAutonomousPlan(
         );
     }
     if (operation.type === "sound") {
-      const asset=assets.find(a=>a.id===operation.parameters?.assetId),sourceIn=operation.parameters?.sourceIn??0;
-      if (!asset || asset.kind!=="audio" || !asset.duration || sourceIn<0 || sourceIn+operation.end-operation.start>asset.duration+.001) throw new Error(`${operation.label}: the sound placement exceeds its source.`);
+      const asset = assets.find(a => a.id === operation.parameters?.assetId);
+      const sourceIn = operation.parameters?.sourceIn ?? 0;
+      if (
+        !asset ||
+        asset.kind !== "audio" ||
+        !Number.isFinite(asset.duration) ||
+        !asset.duration ||
+        asset.duration <= 0 ||
+        !Number.isFinite(sourceIn) ||
+        sourceIn < 0 ||
+        sourceIn >= asset.duration ||
+        !Number.isFinite(operation.start) ||
+        !Number.isFinite(operation.end) ||
+        operation.start < 0 ||
+        operation.end <= operation.start ||
+        operation.end > project.duration
+      )
+        throw new Error(`${operation.label}: the sound placement exceeds its source.`);
+      // A cue may finish before its visual beat. Shorten only its execution copy:
+      // never stretch/loop audio, move its start/source offset, or rewrite the
+      // signed recommendation retained in proposedChanges. The resulting range
+      // is a subset of the already-approved placement, including local ranges.
+      const end = Math.min(
+        operation.end,
+        operation.start + (asset.duration - sourceIn)
+      );
+      if (end <= operation.start)
+        throw new Error(`${operation.label}: the sound placement exceeds its source.`);
+      execution = end < operation.end ? { ...operation, end } : operation;
     }
     if (operation.type === "broll") {
       const asset = assets.find(a => a.id === operation.parameters?.assetId);

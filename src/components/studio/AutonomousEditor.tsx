@@ -4,6 +4,11 @@ import { StudioSelect } from "@/components/ui/studio-select";
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { v4 as createUuid } from "uuid";
 import { publishAutonomousSteps } from "@/lib/autonomous-live-publish";
+import {
+  autonomousPlanCacheKey,
+  createAutonomousPlanCache,
+  type AutonomousPlanResult,
+} from "@/lib/autonomous-plan-cache";
 import { createPortal } from "react-dom";
 import {
   Dialog,
@@ -118,21 +123,27 @@ export function AutonomousEditor({
   const [failure, setFailure] = useState("");
   const [stage, setStage] = useState("");
   const preparationCache = useRef(createAutonomousPreparationCache());
+  const planCache = useRef(createAutonomousPlanCache());
   const stopped = useRef(false);
   const runController = useRef<AbortController | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
+    const cache = planCache.current;
     mounted.current = true;
     return () => {
       mounted.current = false;
       stopped.current = true;
       runController.current?.abort();
+      cache.clear();
     };
   }, []);
-  useEffect(
-    () => () => runController.current?.abort(),
-    [referenceOwner, referenceBrand, project.id]
-  );
+  useEffect(() => {
+    const cache = planCache.current;
+    return () => {
+      runController.current?.abort();
+      cache.clear();
+    };
+  }, [referenceOwner, referenceBrand, project.id]);
   const sources = workspace.assets.filter(
     a =>
       project.clips.some(c => c.assetId === a.id) &&
@@ -247,87 +258,129 @@ export function AutonomousEditor({
           )
         );
       const requestOptions = { scope, signal };
-      const prepared = await prepareAutonomousSources({
-        project,
-        sources,
+      const cacheOptions = {
+        model,
+        effort: "max",
+        stock: true,
+        style,
+        referenceBrief,
+        durationMode,
+        minimumDuration,
+        maximumDuration,
+        automaticDuration,
         captions,
-        speechTiming: true,
-        context: JSON.stringify([
-          destination,
-          workspace.profile.contentLanguage,
-          getUiLocale(),
-        ]),
-        cache: preparationCache.current,
-        savedReports: workspace.analyzerReports,
-        checkpoint,
-        review: async asset => {
-          setStage(ui("Review"));
-          setStatus(`Reviewing ${asset.name}…`);
-          const { analyzeMedia } = await import("@/lib/analyze-media");
-          checkpoint();
-          return analyzeMedia(
-            asset,
-            project.platform,
-            undefined,
-            progress,
-            signal,
-            scope,
-            getUiLocale()
+        images,
+        videos,
+      };
+      const keyFor = (current: WorkspaceDocument, base: EditProject) =>
+        autonomousPlanCacheKey({
+          scope,
+          project: base,
+          assets: current.assets,
+          brandKit: current.brandKit,
+          savedReports: current.analyzerReports,
+          contentLanguage: current.profile.contentLanguage,
+          uiLocale: getUiLocale(),
+          options: cacheOptions,
+        });
+      const cacheKey = keyFor(workspace, project);
+      const inputsStillCurrent = () => {
+        const current = getWorkspaceSnapshot();
+        const base = current.projects.find(p => p.id === project.id);
+        return Boolean(base && keyFor(current, base) === cacheKey);
+      };
+      const cached = planCache.current.read(cacheKey);
+      let result: AutonomousPlanResult;
+      if (cached && inputsStillCurrent()) {
+        working = cached.working;
+        result = cached.result;
+      } else {
+        planCache.current.clear();
+        const prepared = await prepareAutonomousSources({
+          project,
+          sources,
+          captions,
+          speechTiming: true,
+          context: JSON.stringify([
+            destination,
+            workspace.profile.contentLanguage,
+            getUiLocale(),
+          ]),
+          cache: preparationCache.current,
+          savedReports: workspace.analyzerReports,
+          checkpoint,
+          review: async asset => {
+            setStage(ui("Review"));
+            setStatus(`Reviewing ${asset.name}…`);
+            const { analyzeMedia } = await import("@/lib/analyze-media");
+            checkpoint();
+            return analyzeMedia(
+              asset,
+              project.platform,
+              undefined,
+              progress,
+              signal,
+              scope,
+              getUiLocale()
+            );
+          },
+          transcribe: async asset => {
+            setStage(ui("Captions"));
+            setStatus(`Transcribing ${asset.name}…`);
+            const { transcribeMediaLocally } =
+              await import("@/lib/local-transcription");
+            checkpoint();
+            return transcribeMediaLocally(
+              asset,
+              undefined,
+              project.id,
+              progress,
+              signal,
+              scope
+            );
+          },
+        });
+        working = prepared.working;
+        const templateDirection = working.editStyleTemplate
+          ? editStyleDirection(working.editStyleTemplate.profile)
+          : "";
+        const captionTreatment =
+          working.editStyleTemplate?.profile.captionTreatment;
+        if (
+          captionTreatment &&
+          !working.sourceReviews?.some(r => r.captions === "present")
+        ) {
+          working.captionStyle = captionTreatment.preset;
+          working.captionAppearance = structuredClone(
+            captionTreatment.appearance
           );
-        },
-        transcribe: async asset => {
-          setStage(ui("Captions"));
-          setStatus(`Transcribing ${asset.name}…`);
-          const { transcribeMediaLocally } =
-            await import("@/lib/local-transcription");
-          checkpoint();
-          return transcribeMediaLocally(
-            asset,
-            undefined,
-            project.id,
-            progress,
-            signal,
-            scope
-          );
-        },
-      });
-      working = prepared.working;
-      const templateDirection = working.editStyleTemplate
-        ? editStyleDirection(working.editStyleTemplate.profile)
-        : "";
-      const captionTreatment =
-        working.editStyleTemplate?.profile.captionTreatment;
-      if (
-        captionTreatment &&
-        !working.sourceReviews?.some(r => r.captions === "present")
-      ) {
-        working.captionStyle = captionTreatment.preset;
-        working.captionAppearance = structuredClone(
-          captionTreatment.appearance
+        }
+        const analysis = prepared.analysis;
+        checkpoint();
+        if (automaticDuration)
+          working = trimObservedEnding(working, workspace.assets);
+        const durationDirection = editDurationDirection(
+          durationTarget,
+          automaticDuration
         );
+        setStatus("Building the cut, pacing, captions, and visual treatment…");
+        setStage(ui("Edit plan"));
+        result = await platformApi.generateEditPlan(
+          {
+            project: working,
+            command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+            model,
+            stock: true,
+            effort: "max",
+            selectedClipIds: [],
+            range: { start: 0, end: working.duration },
+          },
+          requestOptions
+        );
+        checkpoint();
+        if (inputsStillCurrent())
+          planCache.current.write(cacheKey, working, result);
       }
-      const analysis = prepared.analysis;
-      checkpoint();
-      if (automaticDuration)
-        working = trimObservedEnding(working, workspace.assets);
-      const durationDirection = editDurationDirection(
-        durationTarget,
-        automaticDuration
-      );
-      setStatus("Building the cut, pacing, captions, and visual treatment…");
-      setStage(ui("Edit plan"));
-      const result = await platformApi.generateEditPlan(
-        {
-          project: working,
-          command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
-          model,
-          stock:true,
-          effort: "max",
-          selectedClipIds: [],
-          range: { start: 0, end: working.duration },
-        },
-        requestOptions
-      );
       checkpoint();
       assertAutonomousMediaBudget(result.changes, { images, videos });
       const changesToApply = result.changes.filter(
@@ -348,7 +401,17 @@ export function AutonomousEditor({
         changesToApply,
         [
           ...workspace.assets,
-          ...(result.stockMedia??[]).map(item=>({id:`stock:${item.provider}:${item.id}`,name:item.title,kind:item.kind,status:"ready" as const,duration:item.duration,url:"",size:0,createdAt:"",contentType:`${item.kind}/${item.kind==="video"?"webm":"jpeg"}`})),
+          ...(result.stockMedia ?? []).map(item => ({
+            id: `stock:${item.provider}:${item.id}`,
+            name: item.title,
+            kind: item.kind,
+            status: "ready" as const,
+            duration: item.duration,
+            url: "",
+            size: 0,
+            createdAt: "",
+            contentType: `${item.kind}/${item.kind === "video" ? "webm" : "jpeg"}`,
+          })),
           ...editorAudioCatalog.map(a => ({
             id: `catalog:${a.id}`,
             kind: "audio" as const,
@@ -363,17 +426,42 @@ export function AutonomousEditor({
         ],
         checkpoint
       );
+      // Recovery covers local validation only, not already-started media jobs
+      // or partially published timelines that need their own execution ledger.
+      planCache.current.clear();
       working.proposedChanges = [
         ...working.proposedChanges.filter(c => c.status !== "proposed"),
         ...result.changes,
       ];
-      for(const item of result.stockMedia??[]) {
-        checkpoint();setStage(ui("Supporting shots"));setStatus(`Importing licensed stock · ${item.title}`);
-        let asset=await platformApi.importStock(item,signal,scope);
-        if(asset.kind==="video") {const {resolveVideoMetadata}=await import("@/lib/media-metadata");asset=await resolveVideoMetadata({...asset,duration:undefined,width:undefined,height:undefined},signal);}
-        checkpoint();generatedAssets.push(asset);
-        for(const op of changesToApply)if(op.parameters?.assetId===`stock:${item.provider}:${item.id}`)resolvedMedia.set(op.id,asset.id);
-        await updateWorkspace(w=>{checkpoint(w);return {...w,assets:[asset,...w.assets.filter(a=>a.id!==asset.id)]};});
+      for (const item of result.stockMedia ?? []) {
+        checkpoint();
+        setStage(ui("Supporting shots"));
+        setStatus(`Importing licensed stock · ${item.title}`);
+        let asset = await platformApi.importStock(item, signal, scope);
+        if (asset.kind === "video") {
+          const { resolveVideoMetadata } = await import("@/lib/media-metadata");
+          asset = await resolveVideoMetadata(
+            {
+              ...asset,
+              duration: undefined,
+              width: undefined,
+              height: undefined,
+            },
+            signal
+          );
+        }
+        checkpoint();
+        generatedAssets.push(asset);
+        for (const op of changesToApply)
+          if (op.parameters?.assetId === `stock:${item.provider}:${item.id}`)
+            resolvedMedia.set(op.id, asset.id);
+        await updateWorkspace(w => {
+          checkpoint(w);
+          return {
+            ...w,
+            assets: [asset, ...w.assets.filter(a => a.id !== asset.id)],
+          };
+        });
       }
       for (const op of changesToApply.filter(op => op.type === "sound")) {
         const id = op.parameters?.assetId;
@@ -545,10 +633,12 @@ export function AutonomousEditor({
         },
       });
       checkpoint();
+      planCache.current.clear();
       setFinished(true);
       setStatus(`${result.summary} Your original edit is available with Undo.`);
       onFinished(result.summary);
     } catch (e) {
+      if (signal.aborted) planCache.current.clear();
       if (!mounted.current || runController.current !== controller) return;
       const reviewDetail =
         e instanceof PlatformApiError
@@ -578,7 +668,9 @@ export function AutonomousEditor({
     >
       <p className="flex items-center gap-2 text-sm font-medium">
         {busy && <Loader2 size={14} className="animate-spin" />}
-        {ui(busy ? "Building your edit" : finished ? "Edit ready" : "Edit paused")}
+        {ui(
+          busy ? "Building your edit" : finished ? "Edit ready" : "Edit paused"
+        )}
       </p>
       <p role="status" className="text-xs leading-relaxed">
         {failure || status}
@@ -605,7 +697,7 @@ export function AutonomousEditor({
       ) : (
         <button
           type="button"
-          onClick={() => finished ? setFinished(false) : onOpenChange(true)}
+          onClick={() => (finished ? setFinished(false) : onOpenChange(true))}
           className="text-xs text-primary"
         >
           {ui(finished ? "Close" : "Review options")}
@@ -837,7 +929,9 @@ export function AutonomousEditor({
                     aria-label={ui("Editing model")}
                   >
                     <option value="moonshotai/kimi-k3">K3</option>
-                    <option value="moonshotai/kimi-k3.1-pro">{ui("K3.1 Pro")}</option>
+                    <option value="moonshotai/kimi-k3.1-pro">
+                      {ui("K3.1 Pro")}
+                    </option>
                   </StudioSelect>
                 </label>
                 <p className="text-xs text-muted-foreground">

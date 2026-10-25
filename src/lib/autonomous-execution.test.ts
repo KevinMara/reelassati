@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Asset, EditOperation, EditProject } from "@contracts/workspace";
+import { editorAudioCatalog } from "@contracts/editor-audio-catalog";
+import { auditAutomatedEdit } from "./editor-production";
 import {
   assertAutonomousMediaBudget,
   executeAutonomousPlan,
@@ -55,6 +57,68 @@ function op(
   };
 }
 describe("complete auto-edit draft execution", () => {
+  it("ends a catalog cue at its real source boundary in preflight and execution without rewriting the signed proposal", () => {
+    const entry = editorAudioCatalog.find(item => item.id === "zen-complete")!;
+    const sound = {
+      id: `catalog:${entry.id}`,
+      kind: "audio",
+      duration: entry.duration,
+      status: "ready",
+    } as Asset;
+    const action = {
+      ...op("completion", "sound", 8, 10, {
+        assetId: sound.id,
+        sourceIn: 0.1,
+        volume: 0.15,
+        fadeOut: 0.04,
+      }),
+      provenance: { id: "signed-plan" } as NonNullable<EditOperation["provenance"]>,
+    };
+    const original = structuredClone(action);
+    const before = { ...project, proposedChanges: [action] };
+    expect(() => preflightAutonomousPlan(before, [action], [asset, sound])).not.toThrow();
+    // The final pass resolves the catalog placeholder to the user's uploaded asset.
+    const uploaded = { ...sound, id: "saved-audio", variantGroupId: `builtin-audio:${entry.id}` };
+    const executable = { ...action, parameters: { ...action.parameters, assetId: uploaded.id } };
+    const after = executeAutonomousPlan(before, [executable], [asset, uploaded]);
+    const cue = after.clips.find(c => c.id === action.id)!;
+    expect(cue).toMatchObject({ start: 8, inPoint: 0.1, assetId: uploaded.id, volume: 0.15 });
+    expect(cue.duration).toBeCloseTo(entry.duration - 0.1, 12);
+    expect(cue.outPoint).toBeCloseTo(entry.duration, 12);
+    expect(cue.start + cue.duration).toBeLessThan(original.end);
+    expect(cue.speed).toBeUndefined();
+    expect(after.duration).toBe(project.duration);
+    expect(after.proposedChanges[0]).toEqual({ ...original, status: "accepted", reviewedAt: expect.any(String) });
+    expect(action).toEqual(original);
+    expect(executable.end).toBe(10);
+    expect(before.proposedChanges[0]).toEqual(original);
+    expect(auditAutomatedEdit(before, after, [asset, uploaded])).toEqual([]);
+  });
+  it("preserves a shorter requested sound interval and never extends a sound beyond its approved range", () => {
+    const sound = { id: "sound", kind: "audio", duration: 1, status: "ready" } as Asset;
+    const action = op("short-cue", "sound", 2.5, 2.7, { assetId: sound.id, sourceIn: 0.25 });
+    const after = executeAutonomousPlan(project, [action], [asset, sound]);
+    const cue = after.clips.find(c => c.id === action.id)!;
+    expect(cue.start).toBe(action.start);
+    expect(cue.duration).toBeCloseTo(0.2);
+    expect(cue.inPoint).toBe(0.25);
+    expect(cue.outPoint).toBeCloseTo(0.45);
+    expect(cue.start + cue.duration).toBeLessThanOrEqual(action.end);
+  });
+  it("still rejects missing or invalid audio, empty source offsets and invalid timeline intervals", () => {
+    const sound = { id: "sound", kind: "audio", duration: 0.6, status: "ready" } as Asset;
+    const action = op("cue", "sound", 8, 10, { assetId: sound.id });
+    for (const sourceIn of [-1, NaN, Infinity, 0.6, 1])
+      expect(() => executeAutonomousPlan(project, [{ ...action, parameters: { ...action.parameters, sourceIn } }], [asset, sound])).toThrow(/sound placement/);
+    for (const duration of [undefined, 0, -1, NaN, Infinity])
+      expect(() => executeAutonomousPlan(project, [action], [asset, { ...sound, duration }])).toThrow(/sound placement/);
+    for (const [start, end] of [[-1, 1], [NaN, 10], [8, Infinity], [8, 8], [8, 10.1]])
+      expect(() => executeAutonomousPlan(project, [{ ...action, start, end }], [asset, sound])).toThrow(/sound placement/);
+    expect(() => executeAutonomousPlan(project, [action], [asset])).toThrow(/sound placement/);
+    expect(() => executeAutonomousPlan(project, [action], [asset, { ...sound, kind: "video" }])).toThrow(/sound placement/);
+    expect(() => executeAutonomousPlan({ ...project, clips: project.clips.map(c => ({ ...c, locked: true })) }, [action], [asset, sound])).toThrow(/locked/);
+    expect(project.clips).toHaveLength(1);
+  });
   it("inserts the observed excerpt inside a supporting video and rejects overruns", () => {
     const excerpt = op("detail", "broll", 1, 3, {
       assetId: "source",
