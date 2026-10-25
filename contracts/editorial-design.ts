@@ -52,6 +52,11 @@ animation:none|fade|pop|slide,rotation:-720..720. Compositions:
 composition:plain|lower-third|chapter|quote|statistic|progress,
 secondaryText (up to120 characters),accent:#RRGGBB,padding/cornerRadius:0..6,
 width:1..90,height:0.2..60 (both percent of canvas width),strokeWidth:0..4.
+For a filled text card choose kind=callout: only callout draws background behind
+text. kind=text stays transparent, even when background or a statistic/quote
+composition is supplied. Choose readable foreground and secondary-text contrast
+against the actual footage; when a stable dark or light surface is needed, use a
+callout with that explicit background. A composition does not add a card by itself.
 Use original, content-specific combinations rather than repeating one card.
 Counters/countdowns accept from,to,prefix,suffix; values must come from the brief
 or source evidence. Motion paths use motion:[{at:0..1,x/y:0..100,scale:0.1..4,

@@ -15,6 +15,10 @@ import {
   type ExportSettings,
 } from "@contracts/export-settings";
 import { effectiveTimelineClips } from "@contracts/timeline-mixer";
+import {
+  terminalVideoPadding,
+  type RenderSourceMetadata,
+} from "./render-source-probe";
 
 const number = (n: number) => Number(n.toFixed(4));
 /** Pure, deterministic FFmpeg plan, also exercised against native FFmpeg. */
@@ -22,7 +26,8 @@ export function buildRenderPlan(
   project: EditProject,
   assets: Asset[],
   audioIds: Set<string>,
-  options: ExportResolution | Partial<ExportSettings> = 720
+  options: ExportResolution | Partial<ExportSettings> = 720,
+  sourceMetadata: ReadonlyMap<string, RenderSourceMetadata> = new Map()
 ) {
   const { resolution, frameRate, format } = resolveExportSettings(
     options,
@@ -113,6 +118,10 @@ export function buildRenderPlan(
           ? Math.min(max, Math.max(min, value!))
           : fallback;
       const grade = colorGradeFilter(clip);
+      const terminalPadding =
+        asset.kind === "image"
+          ? ""
+          : terminalVideoPadding(clip, sourceMetadata.get(asset.id), frameRate);
       const transform = visualRenderFilter(clip, { width, height });
       const fades = [
         clip.fadeIn
@@ -125,7 +134,7 @@ export function buildRenderPlan(
         .filter(Boolean)
         .join(",");
       filters.push(
-        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=${frameRate},${grade}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
+        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=${frameRate},${terminalPadding}${grade}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
       );
       filters.push(
         ...visualCompositeFilters(clip, visual, `v${index}`, `layer${index}`)

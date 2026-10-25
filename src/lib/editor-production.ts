@@ -1,6 +1,8 @@
 import type { Asset, EditProject } from "@contracts/workspace";
 import { contentDuration, resizeTimeline } from "./edit-timeline";
 import { normalizeReview } from "@contracts/source-review";
+import { effectiveTimelineClips } from "@contracts/timeline-mixer";
+import { normalizeGraphic } from "@contracts/motion-graphics";
 
 /** Trim only an observed empty tail; all unassessed or intentional layers hold the end. */
 export function trimObservedEnding(
@@ -93,6 +95,29 @@ export function auditAutomatedEdit(
   const problems: string[] = [];
   if (before.clips.length && !after.clips.length)
     problems.push("The edit removed every clip");
+  const sourceKinds = new Map(assets.map(asset => [asset.id, asset.kind]));
+  // Match renderer eligibility, including hidden/solo tracks. Audio must not
+  // disguise complete picture loss; replacement media or graphics still count.
+  const hasPicture = (project: EditProject) =>
+    effectiveTimelineClips(project).some(clip => {
+      if (
+        clip.hidden ||
+        clip.duration <= 0 ||
+        clip.start + clip.duration <= 0 ||
+        clip.start >= (project.duration ?? Infinity)
+      )
+        return false;
+      if (normalizeGraphic(clip.graphic)) return true;
+      return (
+        clip.track !== "audio" &&
+        clip.track !== "captions" &&
+        ["video", "image", "export"].includes(
+          sourceKinds.get(clip.assetId ?? "") ?? ""
+        )
+      );
+    });
+  if (hasPicture(before) && !hasPicture(after))
+    problems.push("The edit removed all visible picture content");
   for (const locked of before.clips.filter(c => c.locked)) {
     if (
       JSON.stringify(after.clips.find(c => c.id === locked.id)) !==

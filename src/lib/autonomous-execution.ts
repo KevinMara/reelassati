@@ -103,7 +103,15 @@ export function executeAutonomousPlan(
   let working = structuredClone(project);
   const roots = new Map(project.clips.map(clip => [clip.id, clip.id]));
   const seen = new Set<string>();
-  for (const operation of [...operations].sort((a, b) => b.start - a.start)) {
+  // Sounds are specified on the original clock. Materialize them before cuts
+  // so rippleRemove keeps their surviving samples in sync, including a bed
+  // spanning a cut, equal-start cues and cues removed entirely by that cut.
+  const ordered = [...operations].sort(
+    (a, b) =>
+      Number(b.type === "sound") - Number(a.type === "sound") ||
+      b.start - a.start
+  );
+  for (const operation of ordered) {
     checkpoint();
     if (seen.has(operation.id))
       throw new Error("The edit plan repeats an operation.");
@@ -185,7 +193,9 @@ export function executeAutonomousPlan(
         operation.end <= operation.start ||
         operation.end > project.duration
       )
-        throw new Error(`${operation.label}: the sound placement exceeds its source.`);
+        throw new Error(
+          `${operation.label}: the sound placement exceeds its source.`
+        );
       // A cue may finish before its visual beat. Shorten only its execution copy:
       // never stretch/loop audio, move its start/source offset, or rewrite the
       // signed recommendation retained in proposedChanges. The resulting range
@@ -195,7 +205,9 @@ export function executeAutonomousPlan(
         operation.start + (asset.duration - sourceIn)
       );
       if (end <= operation.start)
-        throw new Error(`${operation.label}: the sound placement exceeds its source.`);
+        throw new Error(
+          `${operation.label}: the sound placement exceeds its source.`
+        );
       execution = end < operation.end ? { ...operation, end } : operation;
     }
     if (operation.type === "broll") {
@@ -213,6 +225,10 @@ export function executeAutonomousPlan(
     const before = working;
     try {
       working = applyEditOperation(working, execution);
+      // Staging sound must not shrink the original clock before a later cut
+      // addresses an intentional gap or outro within that clock.
+      if (operation.type === "sound")
+        working.duration = Math.max(before.duration, working.duration);
     } catch (error) {
       throw new Error(
         `${operation.label}: ${error instanceof Error ? error.message : "the operation could not be applied."}`

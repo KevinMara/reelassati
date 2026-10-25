@@ -3,6 +3,10 @@ import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "./platform-api";
 import { buildRenderPlan } from "./render-plan";
 import { probeExportMetadata } from "./export-probe";
+import {
+  probeRenderSource,
+  type RenderSourceMetadata,
+} from "./render-source-probe";
 import type {
   ExportResolution,
   ExportFrameRate,
@@ -77,6 +81,7 @@ export async function renderVideo(
     );
     const sourceBlobs: Array<{ name: string; data: Blob }> = [];
     const audioIds = new Set<string>();
+    const sourceMetadata = new Map<string, RenderSourceMetadata>();
     for (const [i, asset] of firstPlan.inputs.entries()) {
       options.signal.throwIfAborted();
       options.onProgress(
@@ -96,20 +101,23 @@ export async function renderVideo(
       await ffmpeg.mount(FFFSType.WORKERFS, { blobs: sourceBlobs }, "/sources");
     }
     for (const [i, asset] of firstPlan.inputs.entries()) {
-      let hasAudio = false;
-      const probe = ({ message }: { message: string }) => {
-        if (/Stream #.*Audio:/.test(message)) hasAudio = true;
-      };
-      ffmpeg.on("log", probe);
-      await ffmpeg.exec(["-i", `/sources/input-${i}`]); // Probe only; FFmpeg returns 1 without an output.
-      ffmpeg.off("log", probe);
-      if (hasAudio) audioIds.add(asset.id);
+      options.signal.throwIfAborted();
+      const metadata = await probeRenderSource(ffmpeg, `/sources/input-${i}`);
+      options.signal.throwIfAborted();
+      sourceMetadata.set(asset.id, metadata);
+      if (metadata.hasAudio) audioIds.add(asset.id);
     }
-    const plan = buildRenderPlan(project, assets, audioIds, {
-      resolution: options.resolution,
-      frameRate: options.frameRate,
-      format: options.format,
-    });
+    const plan = buildRenderPlan(
+      project,
+      assets,
+      audioIds,
+      {
+        resolution: options.resolution,
+        frameRate: options.frameRate,
+        format: options.format,
+      },
+      sourceMetadata
+    );
     await ffmpeg.writeFile("captions.ass", plan.ass);
     const renderProgress = ({ time }: { time: number }) =>
       options.onProgress(

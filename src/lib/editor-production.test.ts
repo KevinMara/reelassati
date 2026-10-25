@@ -20,6 +20,31 @@ describe("automated edit delivery checks", () => {
   it("retains precise source endpoints without forcing display rounding onto media", () => {
     expect(auditAutomatedEdit(project, project, assets)).toEqual([]);
   });
+  it("does not count footage hidden by picture solo or outside the output clock as surviving picture", () => {
+    const visible = { ...clip, track: "video" as const, lane: 1 };
+    const hidden = { ...visible, id: "hidden", hidden: true };
+    const before = {
+      ...project,
+      duration: 10,
+      clips: [visible, hidden],
+      trackSettings: [{ kind: "video" as const, number: 1, soloPicture: true }],
+    };
+    const replacement = { ...visible, id: "replacement", lane: 2 };
+    const soloResult = { ...before, clips: [hidden, replacement] };
+    expect(auditAutomatedEdit(before, soloResult, assets)).toContain(
+      "The edit removed all visible picture content"
+    );
+    expect(
+      auditAutomatedEdit(before, { ...soloResult, trackSettings: [] }, assets)
+    ).toEqual([]);
+    expect(
+      auditAutomatedEdit(
+        before,
+        { ...before, clips: [{ ...visible, start: 10 }] },
+        assets
+      )
+    ).toContain("The edit removed all visible picture content");
+  });
   it("rejects source overruns at changed playback speeds", () => {
     expect(
       auditAutomatedEdit(
