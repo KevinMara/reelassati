@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Asset, EditOperation, EditProject } from "@contracts/workspace";
 import { editorAudioCatalog } from "@contracts/editor-audio-catalog";
+import { AI_COMPLIANCE_POLICY_VERSION, AI_PROVENANCE_SCHEME } from "@contracts/compliance";
 import { auditAutomatedEdit } from "./editor-production";
 import {
   assertAutonomousMediaBudget,
@@ -72,7 +73,20 @@ describe("complete auto-edit draft execution", () => {
         volume: 0.15,
         fadeOut: 0.04,
       }),
-      provenance: { id: "signed-plan" } as NonNullable<EditOperation["provenance"]>,
+      provenance: {
+        recordId: "signed-plan",
+        origin: "ai-assisted",
+        operation: "edit-planning",
+        provider: "fixture",
+        model: "fixture",
+        generatedAt: "2026-10-25T18:00:00Z",
+        policyVersion: AI_COMPLIANCE_POLICY_VERSION,
+        marking: {
+          scheme: AI_PROVENANCE_SCHEME,
+          method: "signed-record+sha256-fingerprint",
+          status: "verified",
+        },
+      } satisfies NonNullable<EditOperation["provenance"]>,
     };
     const original = structuredClone(action);
     const before = { ...project, proposedChanges: [action] };
