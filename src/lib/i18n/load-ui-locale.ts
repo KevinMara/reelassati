@@ -4,6 +4,10 @@ import { editingTraitUi } from "./locales/ui-edit-template-traits";
 import { analyzerUi } from "./locales/ui-analyzer";
 import { editDurationUi } from "./locales/ui-edit-duration";
 import { editorRedesignUi } from "./locales/ui-editor-redesign";
+import { stylesWorkspaceUi } from "./locales/ui-styles-workspace";
+import { editorReceiptUi } from "./locales/ui-editor-receipts";
+import { guidedTourUi } from "./locales/ui-guided-tour";
+import { librarySourceUi } from "./locales/ui-library-sources";
 import type { InterfaceLanguage } from "@contracts/interface-language";
 
 type InterfaceCatalog = Record<string, string>;
@@ -129,10 +133,14 @@ export function loadUiLocale(
       ...editDurationUi[code],
       ...editingTraitUi[code],
       ...catalog,
+      ...editorReceiptUi[code],
+      ...guidedTourUi[code],
+      ...librarySourceUi[code],
+      ...editorRedesignUi[code],
       "Automatic research is disabled.": automaticResearchDisabled[code],
       ...editingTemplateUi[code],
       ...analyzerUi[code],
-      ...editorRedesignUi[code],
+      ...stylesWorkspaceUi[code],
     }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {

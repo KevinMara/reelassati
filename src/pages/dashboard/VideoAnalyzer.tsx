@@ -615,7 +615,7 @@ export default function VideoAnalyzer() {
       ) : null}
 
       <section className="mb-6 rounded-xl border border-border bg-surface p-6">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div data-tour="analysis-source" className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex rounded-lg border border-border bg-background p-1">
             <button
               type="button"
@@ -832,6 +832,7 @@ export default function VideoAnalyzer() {
         />
         <button
           type="button"
+          data-tour="analysis-run"
           onClick={() => void handleAnalyze()}
           disabled={!sourceReady || analyzing || !analysisReady}
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"

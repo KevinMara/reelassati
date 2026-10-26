@@ -4,6 +4,7 @@ import { useWorkspace } from "@/providers/workspace";
 import { useUiText } from "@/lib/i18n/ui";
 import { CompactSelect } from "@/components/ui/compact-select";
 import type { LibraryOrganizationState } from "@/lib/library-organization";
+import { isStockCollection } from "@/lib/library-organization";
 
 export function LibraryOrganization({
   value,
@@ -42,7 +43,7 @@ export function LibraryOrganization({
           <Folder size={14} />
           {ui("Reel stock")}
         </button>
-        {(workspace.mediaFolders ?? []).map(folder => (
+        {(workspace.mediaFolders ?? []).filter(folder => !isStockCollection(folder)).map(folder => (
           <button
             type="button"
             key={folder.id}

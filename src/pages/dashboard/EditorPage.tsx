@@ -92,6 +92,8 @@ import {
 import { resolveMediaDuration } from "@/lib/media-metadata";
 import { placeLibraryAsset } from "@/lib/library-insertion";
 import { selectedBrand } from "@/lib/workspace-scope";
+import { activeEditorProjects, editorRunKey } from "@/lib/editor-run-lock";
+import { assertAutonomousRunCurrent } from "@/lib/autonomous-run";
 
 import { EditorPresetLibrary } from "@/components/studio/EditorPresetLibrary";
 import {
@@ -176,7 +178,7 @@ import type {
   TimelineClip,
   TranscriptSegment,
 } from "@contracts/workspace";
-import { platformApi } from "@/lib/platform-api";
+import { captureUploadRequestScope, platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { useFileDropZone } from "@/hooks/useFileDropZone";
 import type { ContentProvenance } from "@contracts/compliance";
@@ -330,6 +332,13 @@ export default function EditorPage() {
     searchParams,
   ]);
   const [autoEditSummary, setAutoEditSummary] = useState("");
+  const [autoEditing, setAutoEditing] = useState(false);
+  const [reelBusy, setReelBusy] = useState(false);
+  const [stylesOpen, setStylesOpen] = useState(
+    searchParams.get("panel") === "styles"
+  );
+  const styleDestination = searchParams.get("savedStyle") ?? undefined;
+  const styleRoute = useRef("");
   const libraryInsertLock = useRef(false);
   const [chatSeed, setChatSeed] = useState<{
     text: string;
@@ -357,6 +366,7 @@ export default function EditorPage() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [findingSections, setFindingSections] = useState(false);
   const sectionsLock = useRef(false);
+  const sectionsController = useRef<AbortController | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -376,6 +386,26 @@ export default function EditorPage() {
     () => workspace.projects.find(item => item.id === selectedProjectId),
     [selectedProjectId, workspace.projects]
   );
+  const sectionsOwner = workspace.profile.email.toLowerCase();
+  const sectionsBrand = selectedBrand(sectionsOwner);
+  const sectionsRunKey = project
+    ? editorRunKey(sectionsOwner, sectionsBrand, project.id)
+    : "";
+  const [editorStateScope, setEditorStateScope] = useState(sectionsRunKey);
+  if (editorStateScope !== sectionsRunKey) {
+    setEditorStateScope(sectionsRunKey);
+    setFindingSections(false);
+    setAutoEditing(false);
+    setReelBusy(false);
+    setAutoEditSummary("");
+  }
+  useEffect(() => {
+    return () => {
+      sectionsController.current?.abort();
+      sectionsController.current = null;
+      sectionsLock.current = false;
+    };
+  }, [sectionsRunKey]);
   useEffect(() => {
     if (!project) return;
     const next = JSON.stringify(project.transcript);
@@ -462,6 +492,29 @@ export default function EditorPage() {
     setExtraSelection([]);
     setClipDraft(firstClip ? { ...firstClip } : null);
   };
+
+  useEffect(() => {
+    const target = searchParams.get("project");
+    if (
+      searchParams.get("panel") !== "styles" ||
+      !target ||
+      !requestedProject ||
+      styleRoute.current === searchParams.toString()
+    )
+      return;
+    styleRoute.current = searchParams.toString();
+    openProject(requestedProject);
+    setMediaHidden(false);
+    setStylesOpen(true);
+    const frame = requestAnimationFrame(() =>
+      document
+        .getElementById("saved-editor-styles")
+        ?.scrollIntoView({ block: "nearest" })
+    );
+    return () => cancelAnimationFrame(frame);
+    // Navigation chooses the saved snapshot once; subsequent editor changes must not reset drafts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedProject?.id, searchParams]);
 
   useEffect(() => {
     if (!recentlyAddedAssetId) return;
@@ -677,16 +730,54 @@ export default function EditorPage() {
   };
 
   const findStorySections = async () => {
-    if (!project || sectionsLock.current) return;
+    if (
+      !project ||
+      sectionsLock.current ||
+      autoEditing ||
+      reelBusy ||
+      activeEditorProjects.has(sectionsRunKey)
+    )
+      return;
     const projectId = project.id;
-    const latest = () =>
-      getWorkspaceSnapshot().projects.find(p => p.id === projectId);
+    const controller = new AbortController();
+    const signal = controller.signal;
+    const destination = {
+      ownerEmail: sectionsOwner,
+      brandId: sectionsBrand,
+      projectId,
+    };
+    const checkpoint = (current = getWorkspaceSnapshot()) => {
+      assertAutonomousRunCurrent(
+        destination,
+        {
+          ownerEmail: current.profile.email.toLowerCase(),
+          brandId: selectedBrand(current.profile.email.toLowerCase()),
+          projectId,
+          projectExists: current.projects.some(p => p.id === projectId),
+        },
+        signal
+      );
+    };
+    const latest = () => {
+      const current = getWorkspaceSnapshot();
+      checkpoint(current);
+      return current.projects.find(p => p.id === projectId)!;
+    };
+    sectionsController.current = controller;
     sectionsLock.current = true;
+    activeEditorProjects.add(sectionsRunKey);
     setFindingSections(true);
     setLocalError(null);
     try {
-      if (!buildStoryBeatEvidence(latest()!).length) {
-        const mainClips = latest()!.clips.filter(isPrimaryFootage);
+      const scope = await captureUploadRequestScope();
+      checkpoint();
+      assertAutonomousRunCurrent(
+        destination,
+        { ...scope, projectId, projectExists: true },
+        signal
+      );
+      if (!buildStoryBeatEvidence(latest()).length) {
+        const mainClips = latest().clips.filter(isPrimaryFootage);
         const ids = [...new Set(mainClips.map(c => c.assetId).filter(Boolean))];
         const assets = getWorkspaceSnapshot().assets.filter(
           a => ids.includes(a.id) && a.kind === "video"
@@ -703,45 +794,57 @@ export default function EditorPage() {
           );
         const { analyzeMedia } = await import("@/lib/analyze-media");
         for (const asset of assets) {
+          checkpoint();
           const result = await analyzeMedia(
             asset,
             project.platform,
-            "Identify the actual hook, main explanation, proof and payoff with measured source timestamps. Describe speech and visual content accurately; these observations will locate reference markers, not change the edit."
+            "Identify the actual hook, main explanation, proof and payoff with measured source timestamps. Describe speech and visual content accurately; these observations will locate reference markers, not change the edit.",
+            undefined,
+            signal,
+            scope
           );
-          await updateWorkspace(w => ({
-            ...w,
-            projects: w.projects.map(p =>
-              p.id !== projectId
-                ? p
-                : {
-                    ...p,
-                    sourceReviews: [
-                      ...(p.sourceReviews ?? []).filter(
-                        r => r.assetId !== asset.id
-                      ),
-                      {
-                        assetId: asset.id,
-                        reviewedAt: new Date().toISOString(),
-                        summary: result.summary,
-                        ...normalizeReview(result.review),
-                        moments: result.retention,
-                      },
-                    ],
-                  }
-            ),
-          }));
+          checkpoint();
+          await updateWorkspace(w => {
+            checkpoint(w);
+            return {
+              ...w,
+              projects: w.projects.map(p =>
+                p.id !== projectId
+                  ? p
+                  : {
+                      ...p,
+                      sourceReviews: [
+                        ...(p.sourceReviews ?? []).filter(
+                          r => r.assetId !== asset.id
+                        ),
+                        {
+                          assetId: asset.id,
+                          reviewedAt: new Date().toISOString(),
+                          summary: result.summary,
+                          ...normalizeReview(result.review),
+                          moments: result.retention,
+                        },
+                      ],
+                    }
+              ),
+            };
+          });
         }
       }
+      checkpoint();
       const response = await platformApi.findStorySections(
         projectId,
-        crypto.randomUUID()
+        crypto.randomUUID(),
+        { scope, signal }
       );
+      checkpoint();
       const markerAction = response.actions.find(a => a.kind === "story-beats");
       if (!markerAction || markerAction.kind !== "story-beats")
         throw new Error(
           ui("No reliable story sections were found in this footage.")
         );
       await commitProject("Story sections found", p => {
+        checkpoint();
         if (
           !storyBeatsAreCurrent(markerAction.beats, buildStoryBeatEvidence(p))
         )
@@ -753,14 +856,19 @@ export default function EditorPage() {
         return { ...p, storyBeats: markerAction.beats };
       });
     } catch (cause) {
-      setLocalError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not find sections. Try again."
-      );
+      if (!signal.aborted && sectionsController.current === controller)
+        setLocalError(
+          cause instanceof Error
+            ? cause.message
+            : "Could not find sections. Try again."
+        );
     } finally {
-      sectionsLock.current = false;
-      setFindingSections(false);
+      activeEditorProjects.delete(sectionsRunKey);
+      if (sectionsController.current === controller) {
+        sectionsController.current = null;
+        sectionsLock.current = false;
+        setFindingSections(false);
+      }
     }
   };
 
@@ -2699,35 +2807,6 @@ export default function EditorPage() {
           </button>
         </div>
       )}
-      {autoEditSummary && (
-        <div>
-          <div
-            role="status"
-            className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm"
-          >
-            <span className="flex items-start gap-2">
-              <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-              {autoEditSummary}
-            </span>
-            <button
-              type="button"
-              aria-label={ui("Close")}
-              onClick={() => setAutoEditSummary("")}
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-          {canCaptureEditStyle(project) && (
-            <div className="mb-4">
-              <SaveEditStyleTemplate
-                profile={captureEditStyle(project)}
-                source="edit"
-                disabled={Boolean(busyAction)}
-              />
-            </div>
-          )}
-        </div>
-      )}
 
       <ResizableWorkspace mediaHidden={mediaHidden}>
         <section
@@ -2821,7 +2900,12 @@ export default function EditorPage() {
               />
             </div>
           </details>
-          <details className="border-t border-border p-4">
+          <details
+            id="saved-editor-styles"
+            open={stylesOpen}
+            onToggle={event => setStylesOpen(event.currentTarget.open)}
+            className="border-t border-border p-4"
+          >
             <summary className="cursor-pointer text-sm font-medium">
               {ui("Saved graphics and styles")}
             </summary>
@@ -2833,6 +2917,7 @@ export default function EditorPage() {
                 />
               </div>
               <SavedEditorStyles
+                focusedStyleId={styleDestination}
                 styles={workspace.editorStyles ?? []}
                 selectedClip={selectedClip}
                 project={project}
@@ -3095,7 +3180,7 @@ export default function EditorPage() {
                 : "border-border"
             }`}
           >
-            <div className="flex flex-wrap items-center gap-1 border-b border-border p-2">
+            <div className="timeline-toolbar flex flex-wrap items-start gap-1 border-b border-border p-2">
               <div className="flex flex-col items-start">
                 <button
                   type="button"
@@ -3119,10 +3204,10 @@ export default function EditorPage() {
                   className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-primary"
                 >
                   <Magnet size={14} />
-                  {ui("Snap")}
+                  {ui("Clip snapping")} · {snapping ? ui("On") : ui("Off")}
                 </button>
               </div>
-              <span className="mx-3 text-xs text-foreground/45">
+              <span className="mx-1 pt-2 text-xs text-foreground/45">
                 {ui("or")}
               </span>
               <button
@@ -3134,7 +3219,7 @@ export default function EditorPage() {
                 <Library className="h-3.5 w-3.5" />
                 {ui("Add from library")}
               </button>
-              <span className="mx-1 h-5 w-px bg-border" />
+              <span className="mx-1 mt-1.5 h-5 w-px bg-border" />
               <Popover>
                 <PopoverTrigger asChild>
                   <button
@@ -3430,10 +3515,6 @@ export default function EditorPage() {
           id="editor-chat-panel"
           className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-primary/20 bg-surface md:col-span-2 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:h-[620px]"
         >
-          <div
-            id="editor-autoedit-activity"
-            className="max-h-[45%] shrink-0 overflow-y-auto"
-          />
           <div className="min-h-0 flex-1">
             <EditorChat
               key={project.id}
@@ -3444,7 +3525,29 @@ export default function EditorPage() {
               onSeek={seekTimeline}
               onFindSections={() => void findStorySections()}
               findingSections={findingSections}
-              onAutoEdit={() => setAutoEditOpen(true)}
+              onAutoEdit={() => {
+                if (!reelBusy && !autoEditing && !findingSections)
+                  setAutoEditOpen(true);
+              }}
+              onBusyChange={setReelBusy}
+              externalBusy={autoEditing || findingSections}
+              hasAutoActivity={autoEditing || Boolean(autoEditSummary)}
+              resultTools={
+                autoEditSummary && canCaptureEditStyle(project) ? (
+                  <details className="mt-3 text-xs">
+                    <summary className="cursor-pointer text-muted-foreground">
+                      {ui("Save style")}
+                    </summary>
+                    <div className="mt-2">
+                      <SaveEditStyleTemplate
+                        profile={captureEditStyle(project)}
+                        source="edit"
+                        disabled={Boolean(busyAction)}
+                      />
+                    </div>
+                  </details>
+                ) : null
+              }
             />
           </div>
         </aside>
@@ -3560,6 +3663,7 @@ export default function EditorPage() {
         key={project.id}
         project={project}
         open={autoEditOpen}
+        onBusyChange={setAutoEditing}
         onOpenChange={setAutoEditOpen}
         onFinished={summary => {
           setAutoEditSummary(summary);

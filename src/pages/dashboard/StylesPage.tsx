@@ -1,241 +1,584 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Palette, ArrowUpRight, BookmarkPlus, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  ArrowUpRight,
+  Check,
+  Film,
+  Palette,
+  Plus,
+  Save,
+  Search,
+  Shapes,
+  SlidersHorizontal,
+  Trash2,
+  Type,
+} from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
 import { useUiText } from "@/lib/i18n/ui";
-import { EDIT_RECIPES } from "@/lib/editor-production";
-import { CAPTION_PRESETS } from "@contracts/editor-presets";
+import { selectedBrand } from "@/lib/workspace-scope";
 import {
-  addEditorSavedStyle,
-  removeEditorSavedStyle,
-} from "@contracts/editor-style-library";
-import { CaptionStylePreview } from "@/components/studio/CaptionStylePreview";
+  captureUploadRequestScope,
+  verifyUploadRequestScope,
+} from "@/lib/platform-api";
+import type { WorkspaceDocument } from "@contracts/workspace";
+import { CaptionStyleFields } from "@/components/styles/CaptionStyleFields";
+import { EditingLanguageFields } from "@/components/styles/EditingLanguageFields";
+import { GraphicStyleFields } from "@/components/styles/GraphicStyleFields";
+import { LookStyleFields } from "@/components/styles/LookStyleFields";
+import { StyleSelect } from "@/components/styles/StyleFields";
+import {
+  newWorkspaceStyle,
+  removeWorkspaceStyle,
+  saveWorkspaceStyle,
+  selectProjectEditingStyle,
+  styleKind,
+  workspaceStyles,
+  type StyleKind,
+  type WorkspaceStyle,
+} from "@/components/styles/style-workspace";
+
+const kindLabels = {
+  editing: "Editing language",
+  captions: "Captions",
+  graphic: "Graphics",
+  look: "Color / look",
+};
+const kindIcons = {
+  editing: Film,
+  captions: Type,
+  graphic: Shapes,
+  look: SlidersHorizontal,
+};
+const styleKey = (style: WorkspaceStyle) => `${style.kind}:${style.value.id}`;
 
 export default function StylesPage() {
+  const { workspace } = useWorkspace();
+  const owner = workspace.profile.email.toLowerCase();
+  const brand = selectedBrand(owner);
+  return (
+    <StylesWorkspace key={`${owner}:${brand}`} owner={owner} brand={brand} />
+  );
+}
+
+function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
   const ui = useUiText();
-  const { workspace, updateWorkspace, saving } = useWorkspace();
-  const [tab, setTab] = useState<"editing" | "captions" | "saved">("editing");
-  const [notice, setNotice] = useState("");
-  const editingCards = [
-    {
-      recipe: "Fast product demo",
-      name: ui("Fast product demo"),
-      description: ui("Result first. Clear proof and purposeful pace."),
-    },
-    {
-      recipe: "Clean editorial",
-      name: ui("Clean editorial"),
-      description: ui("Confident typography and precise, understated cuts."),
-    },
-    {
-      recipe: "Cinematic story",
-      name: ui("Cinematic story"),
-      description: ui("Atmosphere, motivated motion and a complete story."),
-    },
-    {
-      recipe: "Natural talking head",
-      name: ui("Natural talking head"),
-      description: ui("Speech-led rhythm with space for personality."),
-    },
-  ] as const;
+  const navigate = useNavigate();
+  const {
+    workspace,
+    getWorkspaceSnapshot,
+    updateWorkspace,
+    saving,
+    capabilities,
+  } = useWorkspace();
+  const [draft, setDraft] = useState<WorkspaceStyle | null>(null);
+  const [baseline, setBaseline] = useState("");
+  const [mode, setMode] = useState<"create" | "update">("create");
+  const [query, setQuery] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const library = workspaceStyles(workspace);
+  const filtered = library.filter(style =>
+    `${style.value.name} ${ui(kindLabels[styleKind(style)])}`
+      .toLocaleLowerCase()
+      .includes(query.toLocaleLowerCase())
+  );
+  const dirty = draft !== null && JSON.stringify(draft) !== baseline;
+  const blocked = busy || saving;
+  const canPersist =
+    capabilities.persistence &&
+    (draft?.kind !== "editing" || capabilities.editStyleTemplates);
+  const chosenProject = workspace.projects.find(
+    project => project.id === projectId
+  );
+
+  function open(style?: WorkspaceStyle) {
+    if (blocked || (dirty && !window.confirm(ui("Discard unsaved changes?"))))
+      return;
+    const next = style
+      ? structuredClone(style)
+      : newWorkspaceStyle("editing", crypto.randomUUID());
+    setDraft(next);
+    setBaseline(JSON.stringify(next));
+    setMode(style ? "update" : "create");
+    setMessage("");
+    setConfirmDelete(false);
+  }
+
+  async function persist(
+    change: (current: WorkspaceDocument) => WorkspaceDocument
+  ) {
+    const scope = await captureUploadRequestScope();
+    if (scope.ownerEmail !== owner || scope.brandId !== brand)
+      throw new Error(
+        ui("The destination workspace changed. Start the import again.")
+      );
+    await verifyUploadRequestScope(scope);
+    return updateWorkspace(current => {
+      if (
+        current.profile.email.toLowerCase() !== owner ||
+        selectedBrand(owner) !== brand ||
+        getWorkspaceSnapshot().profile.email.toLowerCase() !== owner
+      )
+        throw new Error(
+          ui("The destination workspace changed. Start the import again.")
+        );
+      return change(current);
+    });
+  }
+
+  async function run(task: () => Promise<void>) {
+    if (busyRef.current || saving) return;
+    busyRef.current = true;
+    setBusy(true);
+    setMessage("");
+    setFailed(false);
+    try {
+      await task();
+    } catch (cause) {
+      setFailed(true);
+      setMessage(ui(cause instanceof Error ? cause.message : "Save failed"));
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function save() {
+    if (!draft || !canPersist) return;
+    const captured = structuredClone(draft);
+    await run(async () => {
+      let expected: WorkspaceStyle | undefined;
+      const result = await persist(current => {
+        const next = saveWorkspaceStyle(current, captured, mode);
+        expected = workspaceStyles(next).find(
+          style => styleKey(style) === styleKey(captured)
+        );
+        return next;
+      });
+      const saved = workspaceStyles(result).find(
+        style => styleKey(style) === styleKey(captured)
+      );
+      if (!saved || JSON.stringify(saved) !== JSON.stringify(expected))
+        throw new Error(ui("Save failed"));
+      setDraft(saved);
+      setBaseline(JSON.stringify(saved));
+      setMode("update");
+      setMessage(ui("Style saved"));
+    });
+  }
+
+  async function remove() {
+    if (!draft) return;
+    const captured = structuredClone(draft);
+    await run(async () => {
+      const result = await persist(current =>
+        removeWorkspaceStyle(current, captured)
+      );
+      if (
+        workspaceStyles(result).some(
+          style => styleKey(style) === styleKey(captured)
+        )
+      )
+        throw new Error(ui("Save failed"));
+      setDraft(null);
+      setBaseline("");
+      setConfirmDelete(false);
+      setMessage(ui("Style deleted"));
+    });
+  }
+
+  async function openInEditor() {
+    if (!draft || dirty || mode !== "update" || !chosenProject) return;
+    const captured = draft;
+    const target = chosenProject.id;
+    if (captured.kind === "editing") {
+      await run(async () => {
+        const result = await persist(current =>
+          selectProjectEditingStyle(current, captured.value.id, target)
+        );
+        if (
+          result.projects.find(project => project.id === target)
+            ?.editStyleTemplate?.id !== captured.value.id
+        )
+          throw new Error(ui("Save failed"));
+        navigate(
+          `/dashboard/edit?project=${encodeURIComponent(target)}&panel=styles`
+        );
+      });
+    } else
+      navigate(
+        `/dashboard/edit?project=${encodeURIComponent(target)}&panel=styles&savedStyle=${encodeURIComponent(captured.value.id)}`
+      );
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <header>
-        <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight">
-          <Palette className="text-primary" />
-          {ui("Styles")}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {ui("One visual language. Adapted to every video.")}
-        </p>
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {ui("Styles")}
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {ui("Create your visual language. Reuse it in every edit.")}
+          </p>
+        </div>
+        <button
+          type="button"
+          data-tour="styles-create"
+          disabled={blocked}
+          onClick={() => open()}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          <Plus size={16} />
+          {ui("New style")}
+        </button>
       </header>
-      <div
-        className="inline-flex flex-wrap gap-1 rounded-xl border border-border bg-surface p-1"
-        role="tablist"
-        tabIndex={-1}
-        aria-label={ui("Style library")}
-        onKeyDown={event => {
-          const tabs = Array.from(
-            event.currentTarget.querySelectorAll<HTMLButtonElement>(
-              '[role="tab"]'
-            )
-          );
-          const index = tabs.indexOf(event.target as HTMLButtonElement);
-          if (index < 0) return;
-          const next =
-            event.key === "Home"
-              ? 0
-              : event.key === "End"
-                ? tabs.length - 1
-                : event.key === "ArrowRight"
-                  ? (index + 1) % tabs.length
-                  : event.key === "ArrowLeft"
-                    ? (index - 1 + tabs.length) % tabs.length
-                    : -1;
-          if (next < 0) return;
-          event.preventDefault();
-          event.stopPropagation();
-          tabs[next].focus();
-          tabs[next].click();
-        }}
-      >
-        {(
-          [
-            ["editing", ui("Editing")],
-            ["captions", ui("Captions")],
-            ["saved", ui("My templates")],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            type="button"
-            role="tab"
-            id={`styles-tab-${value}`}
-            tabIndex={tab === value ? 0 : -1}
-            aria-selected={tab === value}
-            aria-controls="styles-panel"
-            key={value}
-            onClick={() => setTab(value)}
-            className={`rounded-lg px-4 py-2 text-sm transition-all ${tab === value ? "bg-primary/15 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {notice && (
-        <p role="status" className="text-sm text-primary">
-          {notice}
+      {message && (
+        <p
+          role={failed ? "alert" : "status"}
+          className={`flex items-center gap-2 text-sm ${failed ? "text-destructive" : "text-primary"}`}
+        >
+          {!failed && <Check size={15} />}
+          {message}
         </p>
       )}
-      <div
-        role="tabpanel"
-        id="styles-panel"
-        aria-labelledby={`styles-tab-${tab}`}
-        tabIndex={0}
-      >
-        {tab === "editing" && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {editingCards.map(({ recipe, name, description }, index) => (
-              <Link
-                key={recipe}
-                to={`/dashboard/edit?style=${encodeURIComponent(EDIT_RECIPES[recipe])}`}
-                className="group relative overflow-hidden rounded-2xl border border-border bg-surface p-6 transition-all hover:-translate-y-0.5 hover:border-primary/40"
-              >
-                <div
-                  className="mb-6 h-16 rounded-xl bg-gradient-to-br from-primary/25 via-primary/5 to-transparent"
-                  style={{ filter: `hue-rotate(${index * 28}deg)` }}
-                />
-                <h2 className="text-lg font-semibold">{name}</h2>
-                <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                  {description}
-                </p>
-                <ArrowUpRight className="absolute right-5 top-5 size-4 text-primary" />
-              </Link>
-            ))}
+      <div className="style-workspace">
+        <aside
+          data-tour="styles-library"
+          aria-label={ui("Saved styles")}
+          className="space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">{ui("Saved styles")}</h2>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {library.length}
+            </span>
           </div>
-        )}
-        {tab === "captions" && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {CAPTION_PRESETS.map(preset => (
-              <section
-                key={preset.id}
-                className="rounded-2xl border border-border bg-surface p-4"
-              >
-                <CaptionStylePreview presetId={preset.id} />
-                <div className="mt-3 flex items-center justify-between">
-                  <h2 className="text-sm font-medium">{ui(preset.name)}</h2>
-                  <button
-                    type="button"
-                    aria-label={ui("Save {{name}}", { name: preset.name })}
-                    disabled={saving}
-                    onClick={() =>
-                      void updateWorkspace(w => ({
-                        ...w,
-                        editorStyles: addEditorSavedStyle(w.editorStyles, {
-                          id: crypto.randomUUID(),
-                          name: preset.name,
-                          type: "captions",
-                          captionStyle: preset.id,
-                          captionAppearance: {},
-                        }),
-                      }))
-                        .then(() => setNotice(ui("Template saved")))
-                        .catch(() => setNotice(ui("Save failed")))
-                    }
-                    className="rounded-lg p-2 text-primary hover:bg-primary/10 disabled:opacity-50"
-                  >
-                    <BookmarkPlus size={17} />
-                  </button>
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
-        {tab === "saved" && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              ...(workspace.editStyleTemplates ?? []).map(t => ({
-                id: t.id,
-                name: t.name,
-                kind: "Editing style",
-                editing: true,
-              })),
-              ...(workspace.editorStyles ?? []).map(t => ({
-                id: t.id,
-                name: t.name,
-                kind: t.type,
-                editing: false,
-              })),
-            ].map(template => (
-              <article
-                key={template.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4"
-              >
-                <div>
-                  <h2 className="text-sm font-semibold">{template.name}</h2>
-                  <p className="mt-1 text-xs capitalize text-muted-foreground">
-                    {ui(template.kind)}
-                  </p>
-                </div>
+          {library.length > 0 && (
+            <label className="relative block">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-3 top-3 text-muted-foreground"
+              />
+              <input
+                type="search"
+                aria-label={ui("Search styles")}
+                placeholder={ui("Search styles")}
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+                className="h-9 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-xs"
+              />
+            </label>
+          )}
+          <div className="space-y-2">
+            {filtered.map(style => {
+              const Icon = kindIcons[styleKind(style)];
+              return (
                 <button
                   type="button"
-                  disabled={saving}
-                  aria-label={ui("Delete {{name}}", { name: template.name })}
-                  onClick={() =>
-                    void updateWorkspace(w =>
-                      template.editing
-                        ? {
-                            ...w,
-                            editStyleTemplates: w.editStyleTemplates?.filter(
-                              t => t.id !== template.id
-                            ),
-                          }
-                        : {
-                            ...w,
-                            editorStyles: removeEditorSavedStyle(
-                              w.editorStyles,
-                              template.id
-                            ),
-                          }
-                    ).catch(() => setNotice(ui("Save failed")))
+                  key={styleKey(style)}
+                  disabled={blocked}
+                  aria-pressed={
+                    mode === "update" &&
+                    draft !== null &&
+                    styleKey(style) === styleKey(draft)
                   }
-                  className="rounded-lg p-2 text-muted-foreground hover:text-destructive"
+                  onClick={() => open(style)}
+                  className="style-list-item disabled:opacity-50"
                 >
-                  <Trash2 size={15} />
+                  <span className="rounded-md bg-muted p-2 text-muted-foreground">
+                    <Icon size={16} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {style.value.name}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {ui(kindLabels[styleKind(style)])}
+                    </span>
+                  </span>
                 </button>
-              </article>
-            ))}
-            {!(
-              workspace.editStyleTemplates?.length ||
-              workspace.editorStyles?.length
-            ) && (
-              <p className="col-span-full rounded-xl border border-dashed border-border p-8 text-sm text-muted-foreground">
+              );
+            })}
+          </div>
+          {!library.length && (
+            <p className="rounded-lg border border-dashed border-border p-4 text-xs leading-relaxed text-muted-foreground">
+              {ui("Your saved styles appear here.")}
+            </p>
+          )}
+          {library.length > 0 && !filtered.length && (
+            <p className="py-4 text-xs text-muted-foreground">
+              {ui("No matching styles")}
+            </p>
+          )}
+        </aside>
+        <section
+          className="style-editor min-w-0"
+          data-tour="styles-editor"
+          aria-label={ui("Style editor")}
+        >
+          {!draft ? (
+            <div className="flex min-h-80 flex-col items-center justify-center text-center">
+              <Palette size={28} className="mb-4 text-primary" />
+              <h2 className="text-lg font-semibold">
+                {ui("Make it your style")}
+              </h2>
+              <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
                 {ui(
-                  "Save a finished edit, caption treatment, graphic or look from the editor. Your templates appear here."
+                  "Create an editing language, caption treatment, graphic or color look."
                 )}
               </p>
-            )}
-          </div>
-        )}
+              <button
+                type="button"
+                onClick={() => open()}
+                disabled={blocked}
+                className="mt-5 inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm"
+              >
+                <Plus size={15} />
+                {ui("New style")}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    {mode === "create"
+                      ? ui("New style")
+                      : draft.value.name || ui("Edit style")}
+                  </h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {dirty
+                      ? ui("Unsaved changes")
+                      : ui(kindLabels[styleKind(draft)])}
+                  </p>
+                </div>
+                {mode === "update" && (
+                  <button
+                    type="button"
+                    disabled={blocked || !canPersist}
+                    aria-label={ui("Delete style")}
+                    onClick={() => setConfirmDelete(value => !value)}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+              {confirmDelete && (
+                <div className="mb-4 rounded-lg border border-destructive/30 p-3">
+                  <p className="text-sm">{ui("Delete this saved style?")}</p>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={blocked}
+                      onClick={() => void remove()}
+                      className="rounded-md bg-destructive px-3 py-2 text-xs text-destructive-foreground"
+                    >
+                      {ui("Delete")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      className="rounded-md border border-border px-3 py-2 text-xs"
+                    >
+                      {ui("Cancel")}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <form
+                onSubmit={event => {
+                  event.preventDefault();
+                  void save();
+                }}
+              >
+                <fieldset
+                  disabled={blocked}
+                  className="space-y-5 disabled:opacity-70"
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label>
+                      {ui("Style name")}
+                      <input
+                        required
+                        maxLength={60}
+                        value={draft.value.name}
+                        placeholder={ui("Name this style")}
+                        onChange={event =>
+                          setDraft({
+                            ...draft,
+                            value: { ...draft.value, name: event.target.value },
+                          } as WorkspaceStyle)
+                        }
+                      />
+                    </label>
+                    {mode === "create" ? (
+                      <StyleSelect
+                        label={ui("Style type")}
+                        value={styleKind(draft)}
+                        options={(Object.keys(kindLabels) as StyleKind[]).map(
+                          kind => ({ value: kind, label: kindLabels[kind] })
+                        )}
+                        onChange={kind => {
+                          const next = newWorkspaceStyle(
+                            kind as StyleKind,
+                            draft.value.id
+                          );
+                          next.value.name = draft.value.name;
+                          setDraft(next);
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-end pb-2 text-xs text-muted-foreground">
+                        {ui(kindLabels[styleKind(draft)])}
+                      </div>
+                    )}
+                  </div>
+                  {draft.kind === "editing" ? (
+                    <EditingLanguageFields
+                      value={draft.value.profile}
+                      onChange={profile =>
+                        setDraft({
+                          ...draft,
+                          value: { ...draft.value, profile },
+                        })
+                      }
+                    />
+                  ) : draft.value.type === "captions" ? (
+                    <CaptionStyleFields
+                      preset={draft.value.captionStyle}
+                      appearance={draft.value.captionAppearance}
+                      onChange={(captionStyle, captionAppearance) =>
+                        setDraft({
+                          kind: "element",
+                          value: {
+                            id: draft.value.id,
+                            name: draft.value.name,
+                            type: "captions",
+                            captionStyle,
+                            captionAppearance,
+                          },
+                        })
+                      }
+                    />
+                  ) : draft.value.type === "graphic" ? (
+                    <GraphicStyleFields
+                      value={draft.value}
+                      onChange={value => setDraft({ kind: "element", value })}
+                    />
+                  ) : (
+                    <LookStyleFields
+                      value={draft.value.settings}
+                      onChange={settings =>
+                        setDraft({
+                          kind: "element",
+                          value: {
+                            id: draft.value.id,
+                            name: draft.value.name,
+                            type: "look",
+                            settings,
+                          },
+                        })
+                      }
+                    />
+                  )}
+                  <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraft(JSON.parse(baseline) as WorkspaceStyle);
+                        setMessage("");
+                      }}
+                      disabled={!dirty}
+                      className="rounded-lg border border-border px-4 py-2.5 text-sm disabled:opacity-40"
+                    >
+                      {ui("Reset")}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={
+                        !draft.value.name.trim() ||
+                        !canPersist ||
+                        (mode === "update" && !dirty)
+                      }
+                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
+                    >
+                      <Save size={15} />
+                      {busy ? ui("Saving…") : ui("Save style")}
+                    </button>
+                  </div>
+                </fieldset>
+              </form>
+              {!canPersist && (
+                <p role="status" className="mt-3 text-xs text-muted-foreground">
+                  {ui("Saving is unavailable in this workspace.")}
+                </p>
+              )}
+              {mode === "update" && (
+                <div className="mt-6 space-y-3 border-t border-border pt-5">
+                  <h3 className="text-sm font-semibold">
+                    {ui("Use in editor")}
+                  </h3>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {draft.kind === "editing"
+                      ? ui(
+                          "Choose a project to use this language for its next edit."
+                        )
+                      : ui(
+                          "Open a project, then apply this style from Saved styles."
+                        )}
+                  </p>
+                  {workspace.projects.length ? (
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="min-w-0 flex-1">
+                        <StyleSelect
+                          label={ui("Projects")}
+                          value={projectId}
+                          options={[
+                            { value: "", label: "Choose a project" },
+                            ...workspace.projects.map(project => ({
+                              value: project.id,
+                              label: project.title,
+                              translate: false,
+                            })),
+                          ]}
+                          onChange={setProjectId}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={
+                          blocked ||
+                          dirty ||
+                          !chosenProject ||
+                          (draft.kind === "editing" && !canPersist)
+                        }
+                        onClick={() => void openInEditor()}
+                        className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-xs disabled:opacity-40"
+                      >
+                        {ui("Use in editor")}
+                        <ArrowUpRight size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <Link
+                      to="/dashboard/edit?panel=styles"
+                      className="inline-flex items-center gap-2 text-sm text-primary"
+                    >
+                      {ui("Open editing studio")}
+                      <ArrowUpRight size={14} />
+                    </Link>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </section>
       </div>
     </div>
   );

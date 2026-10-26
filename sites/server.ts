@@ -75,6 +75,8 @@ import {
   readSoundEffectAudio,
 } from "./music-generation";
 import { normalizeGraphic } from "../contracts/motion-graphics";
+import { buildEditorialSpeechEvidence } from "../contracts/editorial-evidence";
+import { autonomousCaptionDirection, normalizeAutonomousCaptionTreatment } from "../contracts/editorial-captions";
 import { normalizeVisual } from "../contracts/clip-visual";
 import {
   normalizeTranscriptWords,
@@ -5480,6 +5482,40 @@ async function requireCreditReservation(
   );
 }
 
+async function responseWithCreditReceipt(
+  env: SitesEnvironment,
+  user: AuthenticatedUser,
+  response: Response,
+  reservation: Pick<CreditReservation, "id"> | null
+) {
+  if (!reservation || !response.headers.get("content-type")?.includes("json"))
+    return response;
+  try {
+    const row = await env.DB.prepare(
+      "SELECT id, amount, status FROM credit_ledger WHERE id = ? AND owner_email = ? AND applied = 1"
+    )
+      .bind(reservation.id, user.email)
+      .first<{ id: string; amount: number; status: string }>();
+    if (!row || !["reserved", "settled", "released"].includes(row.status))
+      return response;
+    const body = (await response.clone().json()) as Record<string, unknown>;
+    return new Response(
+      JSON.stringify({
+        ...body,
+        creditReceipt: {
+          id: row.id,
+          status: row.status,
+          credits: row.status === "settled" ? Math.max(0, -row.amount) : 0,
+        },
+      }),
+      { status: response.status, headers: response.headers }
+    );
+  } catch {
+    // Keep the delivered result even when receipt lookup is temporarily unavailable.
+    return response;
+  }
+}
+
 async function runPaidAiAction(
   env: SitesEnvironment,
   user: AuthenticatedUser,
@@ -5552,9 +5588,10 @@ async function runPaidAiAction(
     } else {
       await releaseCreditReservation(env, reservation);
     }
-    return response;
+    return await responseWithCreditReceipt(env, user, response, reservation);
   } catch (cause) {
     await releaseCreditReservation(env, reservation).catch(() => undefined);
+    if (cause instanceof Response) throw await responseWithCreditReceipt(env, user, cause, reservation);
     throw cause;
   }
 }
@@ -6408,6 +6445,7 @@ async function handleAi(
       model?: string;
       effort?: string;
       stock?: boolean;
+      captionStyling?: boolean;
     }>(request);
     if (
       !analysisControl ||
@@ -6444,7 +6482,9 @@ async function handleAi(
       aspectRatio: input.project.aspectRatio,
       clips: input.project.clips,
       transcript: input.project.transcript,
-      sourceSpeech: input.project.sourceSpeech,
+      speechEvidence: buildEditorialSpeechEvidence(input.project),
+      captionStyle: input.project.captionStyle,
+      captionAppearance: input.project.captionAppearance,
       sourceReviews: input.project.sourceReviews,
       storyEvidence: buildStoryBeatEvidence(input.project),
       qualitySignals: input.project.qualitySignals.slice(0, 30),
@@ -6457,6 +6497,9 @@ async function handleAi(
       editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
         ?.profile,
     };
+    const captionStyling = input.captionStyling === true && input.localOnly !== true &&
+      !input.selectedClipIds?.length && (!input.range || (input.range.start <= 0 && input.range.end >= duration));
+    const captionDirection = autonomousCaptionDirection(project, captionStyling);
     return runPaidAiAction(
       env,
       user,
@@ -6485,7 +6528,7 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "You may request up to two stock searches only when a specific supporting image would explain an actual spoken point. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
+          `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "You may request up to two stock searches only when a specific supporting image would explain an actual spoken point. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
           JSON.stringify({
             command: input.command,
             project: projectContext,
@@ -6507,7 +6550,7 @@ async function handleAi(
           const found=await Promise.allSettled(searches.map(s=>searchStock(s.kind as "video"|"image",s.query,AbortSignal.any([analysisControl.signal,AbortSignal.timeout(20_000)]))));
           stockMedia=[...new Map(found.flatMap(result=>result.status==="fulfilled"?result.value.slice(0,4):[]).map(item=>[`stock:${item.provider}:${item.id}`,item])).values()].slice(0,6);
           if(stockMedia.length) {
-            const refined=await chatJson(env,user,"edit-planning",`${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Use at most three stock shots as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Maintain the approved generation limits from the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,[
+            const refined=await chatJson(env,user,"edit-planning",`${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Use at most three stock shots as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Maintain the approved generation limits from the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,[
               {type:"text",text:JSON.stringify({command:input.command,project:projectContext,draft:output,stock:stockMedia.map(item=>({...item,assetId:`stock:${item.provider}:${item.id}`}))})},
               ...stockMedia.filter(item=>item.thumbnail).slice(0,4).map(item=>({type:"image_url",image_url:{url:item.thumbnail}}))
             ],requestedModel,true,24000,false,undefined,analysisControl,editReasoningEffort(input.effort));
@@ -6518,6 +6561,9 @@ async function handleAi(
           output.summary,
           "Edit plan ready for review"
         );
+        const captionTreatment = captionStyling
+          ? normalizeAutonomousCaptionTreatment(project, output.captionTreatment)
+          : undefined;
         let changes = mapEditOperations(
           output.changes,
           duration,
@@ -6547,6 +6593,7 @@ async function handleAi(
         }
         const normalizedProjection = {
           summary,
+          ...(captionTreatment ? { captionTreatment } : {}),
           changes: changes.map(editOperationProvenanceProjection),
         };
         const normalizedProjectionJson = JSON.stringify(normalizedProjection);
@@ -6575,6 +6622,7 @@ async function handleAi(
         });
         return json({
           summary,
+          ...(captionTreatment ? { captionTreatment } : {}),
           stockMedia:stockMedia.filter(item=>changes.some(change=>change.type==="broll"&&change.parameters?.assetId===`stock:${item.provider}:${item.id}`)),
           changes: changes.map(change => ({ ...change, provenance })),
           provenance,
@@ -7978,7 +8026,7 @@ async function handleVideoJobs(
       return errorResponse("That video request id is already in use", 409);
     }
     if (existing) {
-      return json({ job: jobFromRow(existing) }, 202);
+      return responseWithCreditReceipt(env, user, json({ job: jobFromRow(existing) }, 202), reservationFromJobPayload(JSON.parse(existing.payload)));
     }
 
     const videoCost = videoCreditCost({
@@ -8051,7 +8099,7 @@ async function handleVideoJobs(
       return errorResponse("The video request could not be registered", 500);
     }
     if ((registration.meta?.changes || 0) !== 1 || registered.provider_job_id) {
-      return json({ job: jobFromRow(registered) }, 202);
+      return responseWithCreditReceipt(env, user, json({ job: jobFromRow(registered) }, 202), creditReservation);
     }
 
     let providerAccepted = false;
@@ -8188,7 +8236,7 @@ async function handleVideoJobs(
       )
         .bind(requestId, user.email)
         .first<JobRow>();
-      return json({ job: jobFromRow(row as JobRow) }, 202);
+      return responseWithCreditReceipt(env, user, json({ job: jobFromRow(row as JobRow) }, 202), creditReservation);
     } catch (cause) {
       if (!providerAccepted) {
         await releaseCreditReservation(env, creditReservation).catch(
@@ -8743,7 +8791,7 @@ async function handleVideoJobs(
   const assetProvenance = asset
     ? await provenanceByEntity(env, user, "asset", asset.id)
     : null;
-  return json({
+  return responseWithCreditReceipt(env, user, json({
     job: {
       ...jobFromRow(row as JobRow),
       canRecover: Boolean(row && (await videoRecoveryEvidence(env, user, row))),
@@ -8756,7 +8804,7 @@ async function handleVideoJobs(
           },
         }
       : {}),
-  });
+  }), row ? reservationFromJobPayload(JSON.parse(row.payload)) : null);
 }
 
 async function handleVideoReference(

@@ -1,4 +1,9 @@
 import type { Asset } from "@contracts/workspace";
+type Folder = { id: string; name: string };
+/** Earlier sound imports used this collection name; it is stock, not a separate library. */
+export function isStockCollection(folder: Folder): boolean {
+  return /^(?:futuristic\s+sfxs?|reel\s+stock|stock)$/i.test(folder.name.trim());
+}
 export type LibraryOrganizationState = {
   folder: string;
   origin: string;
@@ -12,11 +17,13 @@ export const DEFAULT_LIBRARY_ORGANIZATION: LibraryOrganizationState = {
   sort: "recent",
 };
 export function assetOrigin(
-  asset: Asset
+  asset: Asset,
+  folders: readonly Folder[] = []
 ): "stock" | "generated" | "uploaded" | "export" {
   if (
     asset.variantGroupId?.startsWith("builtin-audio:") ||
-    asset.variantGroupId?.startsWith("stock:")
+    asset.variantGroupId?.startsWith("stock:") ||
+    folders.some(folder => folder.id === asset.folderId && isStockCollection(folder))
   )
     return "stock";
   if (asset.kind === "export") return "export";
@@ -25,10 +32,11 @@ export function assetOrigin(
 export function libraryOrganizationMatches(
   asset: Asset,
   state: LibraryOrganizationState,
-  now: number
+  now: number,
+  folders: readonly Folder[] = []
 ): boolean {
   if (state.folder && asset.folderId !== state.folder) return false;
-  if (state.origin !== "all" && state.origin !== assetOrigin(asset))
+  if (state.origin !== "all" && state.origin !== assetOrigin(asset, folders))
     return false;
   const days = Number(state.date);
   if (

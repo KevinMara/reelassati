@@ -29,7 +29,8 @@ export async function analyzeMedia(
   signal?: AbortSignal,
   requestScope?: UploadRequestScope,
   language = "en",
-  extractStyle = false
+  extractStyle = false,
+  onCreditReceipt?: import("./platform-api").UploadRequestOptions["onCreditReceipt"]
 ) {
   const scope = requestScope ?? (await captureUploadRequestScope());
   const input = {
@@ -47,12 +48,25 @@ export async function analyzeMedia(
   signal?.throwIfAborted();
   if (asset.size <= ANALYSIS_DIRECT_BYTES) {
     onProgress?.(`Analyzing ${asset.name}…`);
+    let directReceipt:
+      import("@contracts/credit-receipt").CreditReceipt | undefined;
     try {
-      return await platformApi.analyzeVideo(input, signal, scope);
+      const result = await platformApi.analyzeVideo(
+        input,
+        signal,
+        scope,
+        receipt => {
+          directReceipt = receipt;
+        }
+      );
+      onCreditReceipt?.(directReceipt);
+      return result;
     } catch (error) {
       // A rejected-size request has not purchased an analysis. Never repeat other paid failures.
-      if (!(error instanceof PlatformApiError) || error.status !== 413)
+      if (!(error instanceof PlatformApiError) || error.status !== 413) {
+        onCreditReceipt?.(directReceipt);
         throw error;
+      }
     }
   }
 
@@ -205,7 +219,8 @@ export async function analyzeMedia(
         analysisFramesPerSecond: ANALYSIS_PROXY_FPS,
       },
       signal,
-      scope
+      scope,
+      onCreditReceipt
     );
   } finally {
     signal?.removeEventListener("abort", cancel);

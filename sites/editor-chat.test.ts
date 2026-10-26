@@ -109,6 +109,49 @@ const operation = (patch: Partial<EditOperation> = {}): EditOperation => ({
 });
 
 describe("Reel authorization and actual cost planning", () => {
+  it("provides measured speech to Reel even when burned captions leave the editable caption track empty", () => {
+    const prepared = {
+      ...project,
+      clips: [
+        {
+          ...project.clips[0],
+          start: 2,
+          inPoint: 10,
+          outPoint: 20,
+          duration: 5,
+          speed: 2,
+        },
+      ],
+      transcript: [],
+      sourceSpeech: [
+        {
+          assetId: "source",
+          segments: [
+            {
+              id: "spoken",
+              start: 12,
+              end: 14,
+              text: "Trenta domande",
+              words: [
+                { text: "Trenta", start: 12, end: 13 },
+                { text: "domande", start: 13, end: 14 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const input = editorChatModelContext(context({ project: prepared }));
+    expect(input.project.transcript).toEqual([]);
+    expect(input.project.speechEvidence[0]).toMatchObject({
+      start: 3,
+      end: 4,
+      words: [
+        { text: "Trenta", start: 3, end: 3.5 },
+        { text: "domande", start: 3.5, end: 4 },
+      ],
+    });
+  });
   it("keeps valid supporting source offsets and blocks unavailable excerpts", () => {
     const plan = (sourceIn: number) =>
       normalizeEditorChatPlan(

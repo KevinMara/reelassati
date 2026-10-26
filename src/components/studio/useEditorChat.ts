@@ -1,3 +1,9 @@
+import { mergeCreditReceipt } from "@contracts/credit-receipt";
+import { translateUi } from "@/lib/i18n/ui";
+import {
+  activeEditorProjects as activeProjects,
+  editorRunKey,
+} from "@/lib/editor-run-lock";
 import {
   applyChatCatalogAudio,
   resolveChatCatalogAudio,
@@ -26,7 +32,11 @@ import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 import { normalizeReview } from "@contracts/source-review";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { useWorkspace } from "@/providers/workspace";
-import { platformApi, captureUploadRequestScope, verifyUploadRequestScope } from "@/lib/platform-api";
+import {
+  platformApi,
+  captureUploadRequestScope,
+  verifyUploadRequestScope,
+} from "@/lib/platform-api";
 import {
   applyChatAction,
   applyMeasuredBeatAction,
@@ -61,7 +71,6 @@ const DEFAULT_CHAT: EditorChatState = {
   preferencesVersion: 2,
   messages: [],
 };
-const activeProjects = new Set<string>();
 
 export function useEditorChat(
   project: EditProject,
@@ -70,9 +79,11 @@ export function useEditorChat(
   const { workspace, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
   const owner = workspace.profile.email.toLowerCase();
   const brand = selectedBrand(owner);
+  const runKey = editorRunKey(owner, brand, project.id);
   const stopRequested = useRef(false);
+  const mountedScope = useRef(0);
   const mediaController = useRef<AbortController | null>(null);
-  const resultChecks = useRef(new Set<string>());
+  const attachmentController = useRef<AbortController | null>(null);
   const queuedMessages = useRef(new Set<string>());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -96,8 +107,14 @@ export function useEditorChat(
     // The provider owns the only optimistic snapshot and mutation counter.
     // A returned durable response may be older than a concurrent manual edit.
     return updateWorkspace(current => {
-      if (current.profile.email.toLowerCase() !== owner || selectedBrand(owner) !== brand || !current.projects.some(p => p.id === project.id))
-        throw new Error("The chat workspace changed. Reopen the intended project before continuing.");
+      if (
+        current.profile.email.toLowerCase() !== owner ||
+        selectedBrand(owner) !== brand ||
+        !current.projects.some(p => p.id === project.id)
+      )
+        throw new Error(
+          "The chat workspace changed. Reopen the intended project before continuing."
+        );
       return transform(current);
     });
   }
@@ -152,49 +169,20 @@ export function useEditorChat(
 
   useEffect(() => {
     stopRequested.current = false;
+    mountedScope.current += 1;
     const queue = queuedMessages.current;
     return () => {
       stopRequested.current = true;
+      mountedScope.current += 1;
       mediaController.current?.abort();
+      attachmentController.current?.abort();
       queue.clear();
     };
   }, [project.id, owner, brand]);
 
-  useEffect(() => {
-    if (busy || activeProjects.has(project.id)) return;
-    const message = state.messages.find(m =>
-      m.plan?.actions.some(
-        a =>
-          a.kind === "generate" &&
-          a.status === "interrupted" &&
-          getWorkspaceSnapshot().editorGenerations?.some(
-            g => g.id === a.runtime?.generationId && g.status === "completed"
-          )
-      )
-    );
-    const action = message?.plan?.actions.find(
-      a =>
-        a.kind === "generate" &&
-        a.status === "interrupted" &&
-        getWorkspaceSnapshot().editorGenerations?.some(
-          g => g.id === a.runtime?.generationId && g.status === "completed"
-        )
-    );
-    if (!message || !action || resultChecks.current.has(action.id)) return;
-    resultChecks.current.add(action.id);
-    void recover(message.id, action.id)
-      .then(async () => {
-        if (message.status !== "stopped" && !stopRequested.current)
-          await run(message.id);
-      })
-      .finally(() => resultChecks.current.delete(action.id));
-    // A generation completion is a read-only recovery signal, never a new paid generation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspace.editorGenerations, state.messages, busy, project.id]);
-
   // A re-opened tab reads saved results; it never silently repeats a paid request.
   useEffect(() => {
-    if (activeProjects.has(project.id)) return;
+    if (activeProjects.has(runKey)) return;
     const interrupted = state.messages.some(
       m =>
         m.status === "planning" ||
@@ -206,13 +194,20 @@ export function useEditorChat(
       ...s,
       messages: s.messages.map(m => ({
         ...m,
+        creditReceiptsComplete:
+          ["planning", "running"].includes(m.status ?? "") ||
+          m.plan?.actions.some(action => action.status === "running")
+            ? false
+            : m.creditReceiptsComplete,
         status: ["planning", "running"].includes(m.status ?? "")
           ? "stopped"
           : m.status,
         text:
-          m.status === "planning"
-            ? "Planning was interrupted. Resume to check the same saved request; it will not start a second paid plan."
-            : m.text,
+          m.activity && m.status === "running"
+            ? translateUi("Edit paused")
+            : m.status === "planning"
+              ? "Planning was interrupted. Resume to check the same saved request; it will not start a second paid plan."
+              : m.text,
         plan: m.plan
           ? {
               ...m.plan,
@@ -257,7 +252,32 @@ export function useEditorChat(
     }));
   }
 
-  async function execute(messageId: string, action: EditorChatAction) {
+  const receiptOptions = (
+    messageId: string,
+    signal = mediaController.current?.signal
+  ) => ({
+    signal,
+    onCreditReceipt: (
+      receipt: import("@contracts/credit-receipt").CreditReceipt | undefined
+    ) => {
+      void changeMessage(messageId, message => ({
+        ...message,
+        creditReceipts: receipt
+          ? mergeCreditReceipt(message.creditReceipts, receipt)
+          : message.creditReceipts,
+        creditReceiptsComplete: receipt
+          ? message.creditReceiptsComplete !== false
+          : false,
+      })).catch(cause => setError(String(cause)));
+    },
+  });
+
+  async function execute(
+    messageId: string,
+    action: EditorChatAction,
+    signal: AbortSignal
+  ) {
+    signal.throwIfAborted();
     if (
       [
         "edit",
@@ -291,10 +311,7 @@ export function useEditorChat(
       const { measuredAudioBeats, timelineBeatCuts, rhythmProjectIdentity } =
         await import("@/lib/rhythm-editing");
       const identity = rhythmProjectIdentity(current);
-      const waveform = await timelineWaveform(
-        asset,
-        new AbortController().signal
-      );
+      const waveform = await timelineWaveform(asset, signal);
       const times = timelineBeatCuts(
         measuredAudioBeats(waveform, action.sensitivity),
         source,
@@ -325,14 +342,28 @@ export function useEditorChat(
         : undefined;
       if (assetId && !asset)
         throw new Error("The source video is no longer available.");
-      if (!asset) throw new Error("Import the final direct video link into private Library first, then ask Reel to analyze that saved video with its measured credit quote. Social pages need an authorized original upload.");
-      mediaController.current?.abort();
-      const controller = new AbortController(); mediaController.current = controller;
+      if (!asset)
+        throw new Error(
+          "Import the final direct video link into private Library first, then ask Reel to analyze that saved video with its measured credit quote. Social pages need an authorized original upload."
+        );
       const scope = await captureUploadRequestScope();
-      const result = await (await import("@/lib/analyze-media")).analyzeMedia(asset, getProject().platform, action.focus, detail => {
-        void progress(messageId, action.id, detail).catch(() => undefined);
-      }, controller.signal, scope);
-      controller.signal.throwIfAborted();
+      signal.throwIfAborted();
+      const result = await (
+        await import("@/lib/analyze-media")
+      ).analyzeMedia(
+        asset,
+        getProject().platform,
+        action.focus,
+        detail => {
+          void progress(messageId, action.id, detail).catch(() => undefined);
+        },
+        signal,
+        scope,
+        undefined,
+        false,
+        receiptOptions(messageId, signal).onCreditReceipt
+      );
+      signal.throwIfAborted();
       await verifyUploadRequestScope(scope);
       await changeAction(messageId, action.id, a => ({
         ...a,
@@ -377,7 +408,10 @@ export function useEditorChat(
           project.id,
           detail => {
             void progress(messageId, action.id, detail).catch(() => undefined);
-          }
+          },
+          signal,
+          undefined,
+          receiptOptions(messageId, signal).onCreditReceipt
         );
         results.push({ assetId, ...result });
         await changeAction(messageId, action.id, a => ({
@@ -517,19 +551,22 @@ export function useEditorChat(
       let asset: Asset;
       try {
         if (action.media === "video") {
-          const created = await platformApi.createVideo({
-            requestId: id,
-            assetName: record.outputName,
-            prompt: action.prompt,
-            duration: action.seconds ?? 5,
-            resolution: "720p",
-            generateAudio: false,
-            aspectRatio: getProject().aspectRatio,
-            projectId: project.id,
-            rightsConfirmed: true,
-            referenceContainsRealPerson: false,
-            realPersonConsentConfirmed: false,
-          });
+          const created = await platformApi.createVideo(
+            {
+              requestId: id,
+              assetName: record.outputName,
+              prompt: action.prompt,
+              duration: action.seconds ?? 5,
+              resolution: "720p",
+              generateAudio: false,
+              aspectRatio: getProject().aspectRatio,
+              projectId: project.id,
+              rightsConfirmed: true,
+              referenceContainsRealPerson: false,
+              realPersonConsentConfirmed: false,
+            },
+            receiptOptions(messageId, signal)
+          );
           await save(w => applyVideoGenerationResult(w, id, created));
           await changeAction(messageId, action.id, a => ({
             ...a,
@@ -547,26 +584,32 @@ export function useEditorChat(
           }));
           return;
         } else if (action.media === "image") {
-          asset = await platformApi.generateImage({
-            requestId: id,
-            prompt: action.prompt,
-            assetName: record.outputName,
-            aspectRatio: getProject().aspectRatio,
-            resolution: "1K",
-            rightsConfirmed: true,
-            referenceContainsRealPerson: false,
-            realPersonConsentConfirmed: false,
-          });
+          asset = await platformApi.generateImage(
+            {
+              requestId: id,
+              prompt: action.prompt,
+              assetName: record.outputName,
+              aspectRatio: getProject().aspectRatio,
+              resolution: "1K",
+              rightsConfirmed: true,
+              referenceContainsRealPerson: false,
+              realPersonConsentConfirmed: false,
+            },
+            receiptOptions(messageId, signal)
+          );
         } else if (action.media === "speech") {
-          asset = await platformApi.synthesizeSpeech({
-            requestId: id,
-            acceptedCredits: action.credits,
-            text: action.prompt,
-            voice: action.voice ?? "sarah",
-            assetName: record.outputName,
-            projectId: project.id,
-            rightsConfirmed: true,
-          });
+          asset = await platformApi.synthesizeSpeech(
+            {
+              requestId: id,
+              acceptedCredits: action.credits,
+              text: action.prompt,
+              voice: action.voice ?? "sarah",
+              assetName: record.outputName,
+              projectId: project.id,
+              rightsConfirmed: true,
+            },
+            receiptOptions(messageId, signal)
+          );
         } else {
           const quote = await platformApi.quoteAudio(
             action.media,
@@ -576,16 +619,19 @@ export function useEditorChat(
             throw new Error(
               "The audio price changed. Request a fresh quote before generating."
             );
-          asset = await platformApi.generateAudio({
-            kind: action.media,
-            text: action.prompt,
-            seconds: action.seconds ?? 15,
-            acceptedCredits: quote.credits,
-            requestId: id,
-            assetName: record.outputName,
-            projectId: project.id,
-            rightsConfirmed: true,
-          });
+          asset = await platformApi.generateAudio(
+            {
+              kind: action.media,
+              text: action.prompt,
+              seconds: action.seconds ?? 15,
+              acceptedCredits: quote.credits,
+              requestId: id,
+              assetName: record.outputName,
+              projectId: project.id,
+              rightsConfirmed: true,
+            },
+            receiptOptions(messageId, signal)
+          );
         }
         if (asset.kind !== "image" && !asset.duration)
           asset = { ...asset, duration: await resolveMediaDuration(asset) };
@@ -644,7 +690,10 @@ export function useEditorChat(
           runtime: { ...step.runtime, request: savedRequest },
         }));
       }
-      const response = await platformApi.editorChat(savedRequest);
+      const response = await platformApi.editorChat(
+        savedRequest,
+        receiptOptions(messageId, signal)
+      );
       await changeMessage(messageId, message =>
         mergeChatReplan(message, action.id, response)
       );
@@ -654,20 +703,24 @@ export function useEditorChat(
   }
 
   async function run(messageId: string) {
-    if (activeProjects.has(project.id)) {
+    if (activeProjects.has(runKey)) {
       queuedMessages.current.add(messageId);
       return;
     }
     const pendingPlan = getMessage(messageId);
     if (!editorChatCanExecute(pendingPlan)) return;
-    activeProjects.add(project.id);
+    activeProjects.add(runKey);
+    const scopeVersion = mountedScope.current;
     stopRequested.current = false;
+    const controller = new AbortController();
+    mediaController.current = controller;
     setBusy(true);
     setError("");
     try {
       await changeMessage(messageId, m => ({ ...m, status: "running" }));
       for (let pass = 0; pass < 100; pass++) {
-        if (stopRequested.current) break;
+        if (stopRequested.current || mountedScope.current !== scopeVersion)
+          break;
         const m = getMessage(messageId);
         const actions = m.plan?.actions ?? [];
         const remaining = (m.maxCredits ?? 200) - (m.usedCredits ?? 5);
@@ -736,8 +789,29 @@ export function useEditorChat(
           };
         });
         if (!claimed) continue;
+        if (
+          stopRequested.current ||
+          mountedScope.current !== scopeVersion ||
+          controller.signal.aborted
+        ) {
+          // Claim persistence can outlast Stop/navigation. No work was submitted,
+          // so restore the pending action and its budget reservation before pausing.
+          await changeMessage(messageId, m => ({
+            ...m,
+            usedCredits: Math.max(0, (m.usedCredits ?? 5) - action.credits),
+            plan: m.plan
+              ? {
+                  ...m.plan,
+                  actions: m.plan.actions.map(a =>
+                    a.id === action.id ? action : a
+                  ),
+                }
+              : undefined,
+          }));
+          break;
+        }
         try {
-          await execute(messageId, action);
+          await execute(messageId, action, controller.signal);
         } catch (cause) {
           await changeAction(messageId, action.id, a => ({
             ...a,
@@ -777,7 +851,9 @@ export function useEditorChat(
           status: editorChatRunStatus(
             actions,
             m.plan?.blockedReasons ?? [],
-            stopRequested.current
+            stopRequested.current ||
+              mountedScope.current !== scopeVersion ||
+              controller.signal.aborted
           ),
           plan: m.plan ? { ...m.plan, actions } : undefined,
         };
@@ -789,14 +865,16 @@ export function useEditorChat(
           : "Reel could not save this action."
       );
     } finally {
-      activeProjects.delete(project.id);
-      setBusy(false);
-      queueMicrotask(drainDecisions);
+      activeProjects.delete(runKey);
+      if (mountedScope.current === scopeVersion) {
+        setBusy(false);
+        queueMicrotask(drainDecisions);
+      }
     }
   }
 
   function drainDecisions() {
-    if (activeProjects.has(project.id) || stopRequested.current) return;
+    if (activeProjects.has(runKey) || stopRequested.current) return;
     while (queuedMessages.current.size) {
       const id = queuedMessages.current.values().next().value!;
       queuedMessages.current.delete(id);
@@ -813,12 +891,15 @@ export function useEditorChat(
     messageId: string,
     decisions: Record<string, "approve" | "skip">
   ) {
+    const scopeVersion = mountedScope.current;
+    if (!activeProjects.has(runKey)) stopRequested.current = false;
     await changeMessage(messageId, m => ({
       ...m,
       plan: m.plan
         ? { ...m.plan, actions: chooseChatActions(m.plan.actions, decisions) }
         : undefined,
     }));
+    if (mountedScope.current !== scopeVersion || stopRequested.current) return;
     queuedMessages.current.add(messageId);
     drainDecisions();
   }
@@ -828,12 +909,17 @@ export function useEditorChat(
     references: EditorChatReference[] = [],
     range?: { start: number; end: number },
     selectedClipIds: string[] = [],
-    options: Pick<EditorChatRequest, "executionMode" | "taskPreset" | "effort"> = {}
+    options: Pick<
+      EditorChatRequest,
+      "executionMode" | "taskPreset" | "effort"
+    > = {}
   ) {
-    if (!prompt.trim() || activeProjects.has(project.id)) return;
-    activeProjects.add(project.id);
+    if (!prompt.trim() || activeProjects.has(runKey)) return false;
+    activeProjects.add(runKey);
+    const scopeVersion = mountedScope.current;
     setBusy(true);
     setError("");
+    mediaController.current = new AbortController();
     stopRequested.current = false;
     const id = uuid();
     const assistantId = `${id}-reel`;
@@ -879,6 +965,8 @@ export function useEditorChat(
             mode: settings.mode,
             maxCredits: settings.maxCredits,
             usedCredits: AI_CREDIT_COSTS.editPlan,
+            creditReceipts: [],
+            creditReceiptsComplete: true,
             range,
             selectedClipIds,
             references,
@@ -886,7 +974,10 @@ export function useEditorChat(
           },
         ].slice(-60) as EditorChatMessage[],
       }));
-      const response = await platformApi.editorChat(request);
+      const response = await platformApi.editorChat(
+        request,
+        receiptOptions(assistantId)
+      );
       await changeMessage(assistantId, m => ({
         ...m,
         text: response.message,
@@ -903,22 +994,28 @@ export function useEditorChat(
         status: "failed",
       })).catch(() => undefined);
     } finally {
-      activeProjects.delete(project.id);
-      setBusy(false);
-      queueMicrotask(drainDecisions);
+      activeProjects.delete(runKey);
+      if (mountedScope.current === scopeVersion) {
+        setBusy(false);
+        queueMicrotask(drainDecisions);
+      }
     }
     if (
       getWorkspaceSnapshot()
         .projects.find(p => p.id === project.id)
         ?.editorChat?.messages.find(m => m.id === assistantId)?.plan &&
       !stopRequested.current &&
+      mountedScope.current === scopeVersion &&
       options.executionMode !== "plan"
     )
       await run(assistantId);
+    return true;
   }
 
   async function recover(messageId: string, actionId: string) {
-    if (busy || activeProjects.has(project.id)) return;
+    if (busy || activeProjects.has(runKey)) return;
+    const scopeVersion = mountedScope.current;
+    stopRequested.current = false;
     const freeSound = getMessage(messageId).plan?.actions.find(
       action => action.id === actionId
     );
@@ -926,7 +1023,7 @@ export function useEditorChat(
       freeSound?.kind === "catalog-audio" &&
       ["failed", "interrupted"].includes(freeSound.status)
     ) {
-      activeProjects.add(project.id);
+      activeProjects.add(runKey);
       setBusy(true);
       setError("");
       try {
@@ -935,7 +1032,8 @@ export function useEditorChat(
           status: "pending",
           error: undefined,
         }));
-        queuedMessages.current.add(messageId);
+        if (mountedScope.current === scopeVersion && !stopRequested.current)
+          queuedMessages.current.add(messageId);
       } catch (cause) {
         setError(
           cause instanceof Error
@@ -943,13 +1041,16 @@ export function useEditorChat(
             : "Could not retry this free sound."
         );
       } finally {
-        activeProjects.delete(project.id);
-        setBusy(false);
-        queueMicrotask(drainDecisions);
+        activeProjects.delete(runKey);
+        if (mountedScope.current === scopeVersion) {
+          setBusy(false);
+          queueMicrotask(drainDecisions);
+        }
       }
       return;
     }
-    activeProjects.add(project.id);
+    activeProjects.add(runKey);
+    mediaController.current = new AbortController();
     setBusy(true);
     setError("");
     try {
@@ -961,7 +1062,10 @@ export function useEditorChat(
           throw new Error(
             "The follow-up request was not saved. Send a new instruction; no paid plan was repeated."
           );
-        const response = await platformApi.editorChat(action.runtime.request);
+        const response = await platformApi.editorChat(
+          action.runtime.request,
+          receiptOptions(messageId)
+        );
         await changeMessage(messageId, message => ({
           ...mergeChatReplan(message, action.id, response),
           status: "stopped",
@@ -991,14 +1095,18 @@ export function useEditorChat(
       const alreadyReady = getWorkspaceSnapshot().editorGenerations?.some(
         g => g.id === id && g.status === "completed"
       );
-      if (alreadyReady) {
-        /* The generation tray already reconciled this output. */
-      } else if (action.runtime.jobId) {
-        let result = await platformApi.videoJob(action.runtime.jobId);
+      if (action.runtime.jobId) {
+        let result = await platformApi.videoJob(
+          action.runtime.jobId,
+          receiptOptions(messageId)
+        );
         if (result.job.status === "failed" && result.job.canRecover)
-          result = await platformApi.recoverVideoJob(action.runtime.jobId);
+          result = await platformApi.recoverVideoJob(
+            action.runtime.jobId,
+            receiptOptions(messageId)
+          );
         await save(w => applyVideoGenerationResult(w, id, result));
-      } else {
+      } else if (!alreadyReady) {
         const result = await platformApi.workspace();
         await save(w => recoverSavedEditorResults(w, result.workspace, id));
       }
@@ -1053,19 +1161,29 @@ export function useEditorChat(
           : "Could not check the saved result."
       );
     } finally {
-      activeProjects.delete(project.id);
-      setBusy(false);
-      queueMicrotask(drainDecisions);
+      activeProjects.delete(runKey);
+      if (mountedScope.current === scopeVersion) {
+        setBusy(false);
+        queueMicrotask(drainDecisions);
+      }
     }
   }
 
   async function resume(messageId: string, newCap?: number, applyPlan = false) {
-    if (busy || activeProjects.has(project.id)) return;
+    if (busy || activeProjects.has(runKey)) return;
+    const scopeVersion = mountedScope.current;
+    stopRequested.current = false;
     if (newCap !== undefined)
       await changeMessage(messageId, m => ({
         ...m,
         maxCredits: Math.max(5, Math.min(100000, Math.floor(newCap))),
       }));
+    if (
+      mountedScope.current !== scopeVersion ||
+      stopRequested.current ||
+      activeProjects.has(runKey)
+    )
+      return;
     let m = getMessage(messageId);
     if (!m.plan) {
       if (!m.request) {
@@ -1074,10 +1192,14 @@ export function useEditorChat(
         );
         return;
       }
-      activeProjects.add(project.id);
+      activeProjects.add(runKey);
+      mediaController.current = new AbortController();
       setBusy(true);
       try {
-        const response = await platformApi.editorChat(m.request);
+        const response = await platformApi.editorChat(
+          m.request,
+          receiptOptions(messageId)
+        );
         await changeMessage(messageId, item => ({
           ...item,
           plan: response,
@@ -1092,16 +1214,20 @@ export function useEditorChat(
         );
         return;
       } finally {
-        activeProjects.delete(project.id);
-        setBusy(false);
-        queueMicrotask(drainDecisions);
+        activeProjects.delete(runKey);
+        if (mountedScope.current === scopeVersion) {
+          setBusy(false);
+          queueMicrotask(drainDecisions);
+        }
       }
     }
+    if (mountedScope.current !== scopeVersion || stopRequested.current) return;
     m = getMessage(messageId);
     if (m.request?.executionMode === "plan" && !m.planApproved) {
       if (!applyPlan || !m.plan) return;
       await changeMessage(messageId, item => ({ ...item, planApproved: true }));
     }
+    if (mountedScope.current !== scopeVersion || stopRequested.current) return;
     await run(messageId);
   }
   async function approve(messageId: string, actionId: string) {
@@ -1111,7 +1237,7 @@ export function useEditorChat(
     await decide(messageId, { [actionId]: "skip" });
   }
   async function reviewSavedSuggestion(operationId: string, accept: boolean) {
-    if (busy || activeProjects.has(project.id)) return;
+    if (busy || activeProjects.has(runKey)) return;
     await save(w => ({
       ...w,
       projects: w.projects.map(p => {
@@ -1154,8 +1280,9 @@ export function useEditorChat(
   }
 
   async function attachFiles(files: File[]): Promise<EditorChatReference[]> {
-    mediaController.current?.abort();
-    const controller = new AbortController(); mediaController.current = controller;
+    attachmentController.current?.abort();
+    const controller = new AbortController();
+    attachmentController.current = controller;
     const scope = await captureUploadRequestScope();
     const references: EditorChatReference[] = [];
     if (files.length > 8) throw new Error("Attach up to 8 files at a time.");
@@ -1188,7 +1315,13 @@ export function useEditorChat(
         : file.type.startsWith("image/")
           ? "image"
           : "video";
-      let asset = await platformApi.uploadAsset(file, kind, undefined, undefined, { scope, signal: controller.signal });
+      let asset = await platformApi.uploadAsset(
+        file,
+        kind,
+        undefined,
+        undefined,
+        { scope, signal: controller.signal }
+      );
       if (kind !== "image")
         asset = { ...asset, duration: await resolveMediaDuration(asset) };
       controller.signal.throwIfAborted();
@@ -1202,8 +1335,14 @@ export function useEditorChat(
     controller.signal.throwIfAborted();
     await verifyUploadRequestScope(scope);
     const current = getWorkspaceSnapshot();
-    if (current.profile.email.toLowerCase() !== owner || selectedBrand(owner) !== brand || !current.projects.some(p => p.id === project.id))
-      throw new Error("The attachment project changed before the references were ready.");
+    if (
+      current.profile.email.toLowerCase() !== owner ||
+      selectedBrand(owner) !== brand ||
+      !current.projects.some(p => p.id === project.id)
+    )
+      throw new Error(
+        "The attachment project changed before the references were ready."
+      );
     return references;
   }
   return {
@@ -1221,6 +1360,7 @@ export function useEditorChat(
     stop: () => {
       stopRequested.current = true;
       mediaController.current?.abort();
+      queuedMessages.current.clear();
     },
     setPreferences: async (
       patch: Partial<Pick<EditorChatState, "mode" | "maxCredits">>

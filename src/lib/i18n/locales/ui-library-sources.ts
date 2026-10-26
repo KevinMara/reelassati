@@ -1,0 +1,36 @@
+const stock: Record<string, string> = {
+  en: "Stock",
+  it: "Stock",
+  es: "Stock",
+  fr: "Banque de médias",
+  de: "Stockmedien",
+  pt: "Stock",
+  nl: "Stock",
+  pl: "Materiały stockowe",
+  ro: "Stoc media",
+  tr: "Stok",
+  uk: "Сток",
+  ru: "Сток",
+  ar: "وسائط جاهزة",
+  hi: "स्टॉक",
+  ja: "ストック",
+  ko: "스톡",
+  zh: "素材库",
+  vi: "Kho tư liệu",
+  da: "Stock",
+  sv: "Stockmaterial",
+  no: "Arkivmedier",
+  fi: "Kuvapankki",
+  cs: "Fotobanka",
+  hu: "Stockanyag",
+  el: "Υλικό αρχείου",
+  he: "מאגר מדיה",
+  id: "Stok",
+  th: "สต็อก",
+};
+export const librarySourceUi = Object.fromEntries(
+  Object.entries(stock).map(([language, label]) => [
+    language,
+    { Stock: label, "3D": "3D" },
+  ])
+);

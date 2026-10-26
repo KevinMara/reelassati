@@ -3,6 +3,7 @@ import { contentDuration, resizeTimeline } from "./edit-timeline";
 import { normalizeReview } from "@contracts/source-review";
 import { effectiveTimelineClips } from "@contracts/timeline-mixer";
 import { normalizeGraphic } from "@contracts/motion-graphics";
+import { graphicReadabilityProblems } from "@contracts/graphic-readability";
 
 /** Trim only an observed empty tail; all unassessed or intentional layers hold the end. */
 export function trimObservedEnding(
@@ -149,6 +150,15 @@ export function auditAutomatedEdit(
         clip.inPoint + clip.duration * speed > asset.duration + 0.05)
     )
       problems.push(`Clip extends beyond its source: ${clip.label}`);
+    const originalGraphic = before.clips.find(c => c.id === clip.id);
+    if (
+      clip.graphic &&
+      (!originalGraphic ||
+        originalGraphic.duration !== clip.duration ||
+        JSON.stringify(originalGraphic.graphic) !==
+          JSON.stringify(clip.graphic))
+    )
+      problems.push(...graphicReadabilityProblems(clip, after.aspectRatio));
     const originalSource = before.clips.filter(c => c.assetId === clip.assetId);
     const words =
       after.sourceSpeech

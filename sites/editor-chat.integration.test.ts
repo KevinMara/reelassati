@@ -727,7 +727,7 @@ describe("authenticated paid editing chat route", () => {
         /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
       );
       expect(firstBody.error).toContain(firstBody.reference);
-      expect(JSON.stringify(firstBody)).not.toMatch(
+      expect(JSON.stringify({ ...firstBody, creditReceipt: undefined })).not.toMatch(
         /private diagnostic|depleted|OpenRouter|Kimi|api.?key|credits|charged|refunded/i
       );
       expect(failureLog).toHaveBeenCalledWith(
@@ -735,6 +735,7 @@ describe("authenticated paid editing chat route", () => {
         expect.objectContaining({ status: 402, reference: firstBody.reference })
       );
       expect(balance()).toBe(before);
+      expect(firstBody.creditReceipt).toMatchObject({ credits: 0, status: "released" });
       const ledger = sqlite
         .prepare(
           "SELECT amount,included_amount,topup_amount,status FROM credit_ledger WHERE owner_email='owner@example.com' AND json_extract(metadata_json,'$.requestId')=?"
@@ -831,6 +832,7 @@ describe("authenticated paid editing chat route", () => {
       assistant: "Reel",
       planCredits: 5,
       totalCredits: 5,
+      creditReceipt: { credits: 5, status: "settled" },
     });
     const payload = providerCalls.at(-1)! as {
       messages: Array<{ content: string }>;
@@ -973,7 +975,8 @@ describe("authenticated paid editing chat route", () => {
         reference: string;
       };
       expect(body.reference).toMatch(/^[a-f0-9-]{36}$/);
-      expect(Object.keys(body).sort()).toEqual(["error", "reference"]);
+      expect(Object.keys(body).sort()).toEqual(["creditReceipt", "error", "reference"]);
+      expect((body as typeof body & { creditReceipt: unknown }).creditReceipt).toMatchObject({ credits: 0, status: "released" });
       expect(JSON.stringify(body)).not.toMatch(
         /PRIVATE|gen-|schema|Gemini|OpenRouter/
       );

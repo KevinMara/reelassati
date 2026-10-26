@@ -2,6 +2,7 @@ import { LibraryOrganization } from "@/components/studio/LibraryOrganization";
 import {
   DEFAULT_LIBRARY_ORGANIZATION,
   libraryOrganizationMatches,
+  isStockCollection,
 } from "@/lib/library-organization";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { StockLibrary } from "@/components/studio/StockLibrary";
@@ -195,7 +196,7 @@ export default function ContentLibrary() {
         .filter(item => {
           if (
             item.source === "asset" &&
-            !libraryOrganizationMatches(item.asset, organization, now)
+            !libraryOrganizationMatches(item.asset, organization, now, workspace.mediaFolders)
           )
             return false;
           if (
@@ -243,6 +244,7 @@ export default function ContentLibrary() {
       favoritesOnly,
       projectFilter,
       workspace.projects,
+      workspace.mediaFolders,
     ]
   );
 
@@ -477,6 +479,7 @@ export default function ContentLibrary() {
           />
           <button
             type="button"
+            data-tour="library-upload"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading || !capabilities.uploads}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
@@ -515,7 +518,7 @@ export default function ContentLibrary() {
         </div>
       ) : null}
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      <div data-tour="library-find" className="mb-6 flex flex-wrap items-center gap-3">
         <label className="relative min-w-64 flex-1 sm:max-w-md">
           <span className="sr-only">{ui("Search library")}</span>
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/65" />
@@ -728,7 +731,7 @@ export default function ContentLibrary() {
                               { value: "", label: ui("No folder") },
                               ...(workspace.mediaFolders ?? []).map(f => ({
                                 value: f.id,
-                                label: f.name,
+                                label: isStockCollection(f) ? ui("Stock") : f.name,
                               })),
                             ]}
                             onValueChange={folderId =>

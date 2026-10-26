@@ -9,8 +9,15 @@ import {
 import { useUiText } from "@/lib/i18n/ui";
 
 type Sizes = { media: number; chat: number; height: number };
-const defaults: Sizes = { media: 290, chat: 350, height: 540 };
-const storageKey = "reelassati:editor-panels";
+const defaultSizes = (): Sizes => ({
+  media: 276,
+  chat: 340,
+  height:
+    typeof window === "undefined"
+      ? 440
+      : Math.max(300, Math.min(440, window.innerHeight - 285)),
+});
+const storageKey = "reelassati:editor-panels:v3";
 function persistSizes(sizes: Sizes | null) {
   try {
     if (sizes) localStorage.setItem(storageKey, JSON.stringify(sizes));
@@ -28,6 +35,7 @@ export function ResizableWorkspace({
 }) {
   const ui = useUiText();
   const [sizes, setSizes] = useState<Sizes>(() => {
+    const defaults = defaultSizes();
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
       return Object.fromEntries(
@@ -137,7 +145,7 @@ export function ResizableWorkspace({
           onPointerDown={event => drag(event, key)}
           onDoubleClick={() => {
             stopDragging.current?.();
-            setSizes(defaults);
+            setSizes(defaultSizes());
             persistSizes(null);
           }}
           onKeyDown={event => {

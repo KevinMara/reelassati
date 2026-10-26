@@ -1,3 +1,5 @@
+import { creditReceiptTotal } from "@contracts/credit-receipt";
+import { ConciseResponse } from "./ConciseResponse";
 import {
   Tooltip,
   TooltipTrigger,
@@ -8,6 +10,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ReactNode,
   type DragEvent,
   type FormEvent,
 } from "react";
@@ -17,7 +20,6 @@ import {
   Brain,
   ClipboardList,
   Check,
-  CheckCheck,
   Circle,
   CircleAlert,
   Clock3,
@@ -25,7 +27,6 @@ import {
   Image,
   Link2,
   Loader2,
-  MessageCircle,
   Music2,
   Paperclip,
   Plus,
@@ -86,6 +87,10 @@ type Props = {
   };
   onSeek: (time: number) => void;
   onAutoEdit: () => void;
+  onBusyChange?: (busy: boolean) => void;
+  externalBusy?: boolean;
+  hasAutoActivity?: boolean;
+  resultTools?: ReactNode;
   onFindSections?: () => void;
   findingSections?: boolean;
 };
@@ -156,11 +161,18 @@ export function EditorChat({
   seed,
   onSeek,
   onAutoEdit,
+  onBusyChange,
+  externalBusy = false,
+  hasAutoActivity = false,
+  resultTools,
   onFindSections,
   findingSections,
 }: Props) {
   const ui = useUiText();
   const chat = useEditorChat(project, { onSeek });
+  useEffect(() => {
+    onBusyChange?.(chat.busy);
+  }, [chat.busy, onBusyChange]);
   const { workspace } = useWorkspace();
   const [prompt, setPrompt] = useState("");
   const [taskPreset, setTaskPreset] = useState<EditorTaskPresetId>();
@@ -326,6 +338,7 @@ export function EditorChat({
       referenceTrigger.current?.focus();
   }
   async function runChoice(id: string, callback: () => Promise<void>) {
+    if (externalBusy || chat.busy || workingChoice) return;
     setLocalError("");
     setWorkingChoice(id);
     try {
@@ -343,7 +356,8 @@ export function EditorChat({
   async function send(event?: FormEvent) {
     event?.preventDefault();
     const text = prompt.trim();
-    if (!text || chat.busy || attachBusy || workingChoice) return;
+    if (!text || externalBusy || chat.busy || attachBusy || workingChoice)
+      return;
     if (references.length > 8) {
       setLocalError(
         ui("Attach up to 8 references per message. Remove one to make room.")
@@ -375,13 +389,19 @@ export function EditorChat({
     setTimeTarget(undefined);
     setTaskPreset(undefined);
     try {
-      await chat.send(
+      const submitted = await chat.send(
         text,
         sentRefs,
         targetContext.range,
         targetContext.selectedClipIds,
         { taskPreset: sentPreset, executionMode, effort }
       );
+      if (!submitted) {
+        setPrompt(current => current || text);
+        addReferences(sentAttachments);
+        setTimeTarget(sentTarget);
+        setTaskPreset(sentPreset);
+      }
     } catch (error) {
       setPrompt(current => current || text);
       addReferences(sentAttachments);
@@ -398,13 +418,13 @@ export function EditorChat({
     setTaskPreset(id);
     input.current?.focus();
   }
-  const busyChoice = chat.busy || !!workingChoice;
+  const busyChoice = externalBusy || chat.busy || !!workingChoice;
   const error = localError || chat.error;
 
   return (
     <section
       aria-label={ui("{{name}} editing chat", { name: EDITOR_ASSISTANT_NAME })}
-      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface"
+      className="reel-chat relative flex h-full min-h-0 flex-col overflow-hidden bg-surface"
       onDragEnter={event => {
         if (supportedDrop(event)) {
           event.preventDefault();
@@ -437,36 +457,39 @@ export function EditorChat({
           </p>
         </div>
       </header>
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
-        <button
-          type="button"
-          onClick={onAutoEdit}
-          className="ai-magic flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold"
-        >
-          <Sparkles className="size-4" /> {ui("AI auto-edit")}
-        </button>
-        <button
-          type="button"
-          aria-pressed={executionMode === "plan"}
-          onClick={() => {
-            setExecutionMode(current =>
-              current === "plan" ? "execute" : "plan"
-            );
-            input.current?.focus();
-          }}
-          className={cn(
-            "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm",
-            executionMode === "plan"
-              ? "border-primary/50 bg-primary/15 text-primary"
-              : "border-border text-foreground/70 hover:bg-foreground/5"
-          )}
-        >
-          <ClipboardList className="size-4" /> {ui("Plan")}
-        </button>
-      </div>
+      {!busyChoice && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+          <button
+            type="button"
+            onClick={onAutoEdit}
+            className="ai-magic flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold"
+          >
+            <Sparkles className="size-4" /> {ui("AI auto-edit")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={executionMode === "plan"}
+            onClick={() => {
+              setExecutionMode(current =>
+                current === "plan" ? "execute" : "plan"
+              );
+              input.current?.focus();
+            }}
+            className={cn(
+              "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm",
+              executionMode === "plan"
+                ? "border-primary/50 bg-primary/15 text-primary"
+                : "border-border text-foreground/70 hover:bg-foreground/5"
+            )}
+          >
+            <ClipboardList className="size-4" /> {ui("Plan")}
+          </button>
+        </div>
+      )}
 
       <div
         ref={scroller}
+        data-chat-conversation
         onScroll={() => {
           const node = scroller.current;
           if (node)
@@ -541,291 +564,352 @@ export function EditorChat({
               ))}
           </details>
         )}
-        {!chat.state.messages.length ? (
-          <div className="flex min-h-full flex-col justify-center px-1 py-5">
-            <div className="mb-4 flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <MessageCircle className="size-5" />
-            </div>
-            <h3 className="text-lg font-semibold tracking-tight">
+        {!chat.state.messages.length && !hasAutoActivity ? (
+          <div className="reel-empty flex min-h-full flex-col justify-center py-1">
+            <h3 className="text-xs font-medium text-muted-foreground">
               {ui("What are we making?")}
             </h3>
-            <p className="mt-2 text-xs leading-relaxed text-foreground/55">
-              {ui(
-                "Tell Reel what you want to change. Attach a reference, point to a moment, or start with an idea."
-              )}
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2">
               {STARTERS.map(item => (
                 <button
                   key={item.preset}
                   type="button"
                   onClick={() => starter(item.preset)}
-                  className="flex min-h-16 flex-col items-start gap-2 rounded-xl border border-border bg-background/40 p-3 text-left text-xs text-foreground/75 transition-colors hover:border-primary/50 hover:bg-primary/5"
+                  className="flex min-h-9 items-center gap-2 rounded-lg border border-border bg-background/40 px-2.5 py-2 text-left text-[11px] text-foreground/75 transition-colors hover:border-primary/50 hover:bg-primary/5"
                 >
-                  <item.icon className="size-4 text-primary" />
+                  <item.icon className="size-3.5 shrink-0 text-muted-foreground" />
                   {ui(item.label)}
                 </button>
               ))}
             </div>
-            <p className="mt-5 text-[11px] leading-relaxed text-foreground/40">
-              {ui(
-                "Changes appear on your timeline as they finish. You can keep editing them by hand."
-              )}
-            </p>
           </div>
         ) : (
           <div className="space-y-5">
-            {chat.state.messages.map(message => (
-              <div
-                key={message.id}
-                className={cn("min-w-0", message.role === "user" && "ml-5")}
-              >
-                {message.role === "user" ? (
-                  <div className="rounded-2xl rounded-tr-sm bg-primary/12 px-3 py-2.5">
-                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                      {message.text}
-                    </p>
-                    {!!message.references?.length && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {message.references.map((ref, index) => (
-                          <span
-                            key={index}
-                            title={refLabel(ref)}
-                            className="inline-flex max-w-full items-center gap-1 rounded-md bg-background/60 px-2 py-1 text-[10px] text-foreground/60"
-                          >
-                            <Paperclip className="size-3 shrink-0" />
-                            <span className="truncate">{refLabel(ref)}</span>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {message.request?.taskPreset && (
-                      <p className="mt-2 text-xs text-primary">
-                        {ui(
-                          editorTaskPreset(message.request.taskPreset)?.label ??
-                            ""
-                        )}
-                        {message.request.executionMode === "plan"
-                          ? ui(" · Plan first")
-                          : ""}
-                      </p>
-                    )}
-                    {message.range && (
-                      <button
-                        type="button"
-                        onClick={() => onSeek(message.range!.start)}
-                        className="mt-2 inline-flex items-center gap-1 text-[10px] text-primary"
-                      >
-                        <Clock3 className="size-3" />
-                        {seconds(message.range.start)}–
-                        {seconds(message.range.end)}
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-foreground/55">
-                      <Sparkles className="size-3 text-primary" />
-                      {EDITOR_ASSISTANT_NAME}
-                    </div>
-                    {message.text && (
-                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/85">
+            {chat.state.messages
+              .filter(
+                message =>
+                  !(
+                    externalBusy &&
+                    message.activity?.kind === "auto-edit" &&
+                    message.status === "running"
+                  )
+              )
+              .map(message => (
+                <div
+                  key={message.id}
+                  className={cn("min-w-0", message.role === "user" && "ml-5")}
+                >
+                  {message.role === "user" ? (
+                    <div className="rounded-2xl rounded-tr-sm bg-primary/12 px-3 py-2.5">
+                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                         {message.text}
                       </p>
-                    )}
-                    {message.status === "planning" && (
-                      <div
-                        role="status"
-                        className="ai-status-text mt-3 flex items-center gap-2 text-xs"
-                      >
-                        <Loader2 className="size-3.5 animate-spin" />
-                        {ui("Reading your request and project…")}
+                      {!!message.references?.length && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {message.references.map((ref, index) => (
+                            <span
+                              key={index}
+                              title={refLabel(ref)}
+                              className="inline-flex max-w-full items-center gap-1 rounded-md bg-background/60 px-2 py-1 text-[10px] text-foreground/60"
+                            >
+                              <Paperclip className="size-3 shrink-0" />
+                              <span className="truncate">{refLabel(ref)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {message.request?.taskPreset && (
+                        <p className="mt-2 text-xs text-primary">
+                          {ui(
+                            editorTaskPreset(message.request.taskPreset)
+                              ?.label ?? ""
+                          )}
+                          {message.request.executionMode === "plan"
+                            ? ui(" · Plan first")
+                            : ""}
+                        </p>
+                      )}
+                      {message.range && (
+                        <button
+                          type="button"
+                          onClick={() => onSeek(message.range!.start)}
+                          className="mt-2 inline-flex items-center gap-1 text-[10px] text-primary"
+                        >
+                          <Clock3 className="size-3" />
+                          {seconds(message.range.start)}–
+                          {seconds(message.range.end)}
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-foreground/55">
+                        <Sparkles className="size-3 text-primary" />
+                        {EDITOR_ASSISTANT_NAME}
                       </div>
-                    )}
-                    {!!message.plan?.actions.length && (
-                      <div className="mt-3 space-y-2">
-                        {message.plan.actions.filter(canChooseChatAction)
-                          .length > 1 && (
-                          <div className="space-y-2 rounded-xl border border-border bg-background/60 p-3">
-                            <div className="flex items-center justify-between text-sm">
-                              <span>
-                                {
-                                  message.plan.actions.filter(
-                                    a =>
-                                      canChooseChatAction(a) &&
-                                      selectedActions.has(a.id)
-                                  ).length
-                                }{" "}
-                                {ui("selected")}
-                              </span>
-                              <button
-                                type="button"
-                                className="text-primary"
-                                onClick={() =>
-                                  setSelectedActions(current => {
-                                    const next = new Set(current);
-                                    const eligible =
-                                      message.plan!.actions.filter(
-                                        canChooseChatAction
-                                      );
-                                    const all = eligible.every(a =>
-                                      next.has(a.id)
-                                    );
-                                    eligible.forEach(a =>
-                                      all ? next.delete(a.id) : next.add(a.id)
-                                    );
-                                    return next;
-                                  })
-                                }
-                              >
-                                {ui("Select all / clear")}
-                              </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {(["approve", "skip"] as const).map(decision => (
-                                <button
-                                  key={decision}
-                                  type="button"
-                                  disabled={
-                                    !!workingChoice ||
-                                    !message.plan!.actions.some(
+                      {message.text && <ConciseResponse text={message.text} />}
+                      {message.status === "planning" && (
+                        <div
+                          role="status"
+                          className="ai-status-text mt-3 flex items-center gap-2 text-xs"
+                        >
+                          <Loader2 className="size-3.5 animate-spin" />
+                          {ui("Reading your request and project…")}
+                        </div>
+                      )}
+                      {!!message.plan?.actions.length && (
+                        <div className="mt-3 space-y-2">
+                          {message.plan.actions.filter(canChooseChatAction)
+                            .length > 1 && (
+                            <div className="space-y-2 rounded-xl border border-border bg-background/60 p-3">
+                              <div className="flex items-center justify-between text-sm">
+                                <span>
+                                  {
+                                    message.plan.actions.filter(
                                       a =>
                                         canChooseChatAction(a) &&
                                         selectedActions.has(a.id)
-                                    )
-                                  }
-                                  className="rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-2 text-xs text-primary disabled:opacity-40"
+                                    ).length
+                                  }{" "}
+                                  {ui("selected")}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="text-primary"
                                   onClick={() =>
-                                    void runChoice(
-                                      `batch:${message.id}`,
-                                      async () => {
-                                        const decisions = Object.fromEntries(
-                                          message
-                                            .plan!.actions.filter(
-                                              canChooseChatAction
-                                            )
-                                            .map(a => [
-                                              a.id,
-                                              selectedActions.has(a.id)
-                                                ? decision
-                                                : decision === "approve"
-                                                  ? "skip"
-                                                  : "approve",
-                                            ])
+                                    setSelectedActions(current => {
+                                      const next = new Set(current);
+                                      const eligible =
+                                        message.plan!.actions.filter(
+                                          canChooseChatAction
                                         );
-                                        await chat.decide(
-                                          message.id,
-                                          decisions
-                                        );
-                                        setSelectedActions(new Set());
-                                      }
-                                    )
+                                      const all = eligible.every(a =>
+                                        next.has(a.id)
+                                      );
+                                      eligible.forEach(a =>
+                                        all ? next.delete(a.id) : next.add(a.id)
+                                      );
+                                      return next;
+                                    })
                                   }
                                 >
-                                  {decision === "approve"
-                                    ? ui("Include selected · skip rest")
-                                    : ui("Skip selected · include rest")}
+                                  {ui("Select all / clear")}
                                 </button>
-                              ))}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {(["approve", "skip"] as const).map(
+                                  decision => (
+                                    <button
+                                      key={decision}
+                                      type="button"
+                                      disabled={
+                                        busyChoice ||
+                                        !message.plan!.actions.some(
+                                          a =>
+                                            canChooseChatAction(a) &&
+                                            selectedActions.has(a.id)
+                                        )
+                                      }
+                                      className="rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-2 text-xs text-primary disabled:opacity-40"
+                                      onClick={() =>
+                                        void runChoice(
+                                          `batch:${message.id}`,
+                                          async () => {
+                                            const decisions =
+                                              Object.fromEntries(
+                                                message
+                                                  .plan!.actions.filter(
+                                                    canChooseChatAction
+                                                  )
+                                                  .map(a => [
+                                                    a.id,
+                                                    selectedActions.has(a.id)
+                                                      ? decision
+                                                      : decision === "approve"
+                                                        ? "skip"
+                                                        : "approve",
+                                                  ])
+                                              );
+                                            await chat.decide(
+                                              message.id,
+                                              decisions
+                                            );
+                                            setSelectedActions(new Set());
+                                          }
+                                        )
+                                      }
+                                    >
+                                      {decision === "approve"
+                                        ? ui("Include selected · skip rest")
+                                        : ui("Skip selected · include rest")}
+                                    </button>
+                                  )
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                        {message.plan.actions.map(action => (
-                          <ActionCard
-                            key={action.id}
-                            action={action}
-                            busy={busyChoice}
-                            choiceBusy={!!workingChoice}
-                            selected={selectedActions.has(action.id)}
-                            onSelect={() =>
-                              setSelectedActions(current => {
-                                const next = new Set(current);
-                                if (next.has(action.id)) next.delete(action.id);
-                                else next.add(action.id);
-                                return next;
-                              })
-                            }
-                            working={workingChoice === action.id}
-                            onApprove={() =>
-                              void runChoice(action.id, () =>
-                                chat.approve(message.id, action.id)
-                              )
-                            }
-                            onSkip={() =>
-                              void runChoice(action.id, () =>
-                                chat.skip(message.id, action.id)
-                              )
-                            }
-                            onRecover={() =>
-                              void runChoice(action.id, () =>
-                                chat.recover(message.id, action.id)
-                              )
-                            }
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {!!message.plan?.blockedReasons.length && (
-                      <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-relaxed text-foreground/70">
-                        {message.plan.blockedReasons.map(reason => (
-                          <p key={reason} className="not-first:mt-2">
-                            {reason}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    <RunControls
-                      message={message}
-                      busy={busyChoice}
-                      onResume={(newCap, applyPlan) =>
-                        void runChoice(`resume:${message.id}`, () =>
-                          chat.resume(message.id, newCap, applyPlan)
-                        )
-                      }
-                    />
-                    {message.status !== "planning" &&
-                      message.status !== "running" &&
-                      message.plan &&
-                      editorChatRunStatus(
-                        message.plan.actions,
-                        message.plan.blockedReasons
-                      ) === "failed" && (
-                        <p
-                          role="status"
-                          className="mt-3 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-300"
-                        >
-                          <CircleAlert className="size-3.5" />
-                          {message.plan.actions.some(
-                            a => a.status === "completed"
-                          )
-                            ? ui("Partly completed · review the steps above")
-                            : ui("Needs attention · review the steps above")}
-                        </p>
-                      )}
-                    {message.status === "completed" &&
-                      message.plan &&
-                      editorChatRunStatus(
-                        message.plan.actions,
-                        message.plan.blockedReasons
-                      ) === "completed" && (
-                        <div className="mt-2 flex items-center gap-1 text-[10px] text-foreground/45">
-                          <CheckCheck className="size-3" />
-                          {message.plan.actions.length
-                            ? ui("Finished")
-                            : ui("No changes made")}
-                          {typeof message.usedCredits === "number"
-                            ? ui(" · up to {{credits}} credits", {
-                                credits: message.usedCredits,
-                              })
-                            : ""}
+                          )}
+                          {message.plan.actions
+                            .filter(
+                              action =>
+                                !["completed", "skipped"].includes(
+                                  action.status
+                                )
+                            )
+                            .map(action => (
+                              <ActionCard
+                                key={action.id}
+                                action={action}
+                                busy={busyChoice}
+                                choiceBusy={busyChoice}
+                                selected={selectedActions.has(action.id)}
+                                onSelect={() =>
+                                  setSelectedActions(current => {
+                                    const next = new Set(current);
+                                    if (next.has(action.id))
+                                      next.delete(action.id);
+                                    else next.add(action.id);
+                                    return next;
+                                  })
+                                }
+                                working={workingChoice === action.id}
+                                onApprove={() =>
+                                  void runChoice(action.id, () =>
+                                    chat.approve(message.id, action.id)
+                                  )
+                                }
+                                onSkip={() =>
+                                  void runChoice(action.id, () =>
+                                    chat.skip(message.id, action.id)
+                                  )
+                                }
+                                onRecover={() =>
+                                  void runChoice(action.id, () =>
+                                    chat.recover(message.id, action.id)
+                                  )
+                                }
+                              />
+                            ))}
                         </div>
                       )}
-                  </div>
-                )}
-              </div>
-            ))}
+                      {!!message.plan?.actions.some(action =>
+                        ["completed", "skipped"].includes(action.status)
+                      ) && (
+                        <details className="mt-3 text-xs text-muted-foreground">
+                          <summary className="cursor-pointer">
+                            {
+                              message.plan.actions.filter(action =>
+                                ["completed", "skipped"].includes(action.status)
+                              ).length
+                            }{" "}
+                            {ui("steps")}
+                          </summary>
+                          <ol className="mt-2 space-y-2 border-l border-border pl-3">
+                            {message.plan.actions
+                              .filter(action =>
+                                ["completed", "skipped"].includes(action.status)
+                              )
+                              .map(action => (
+                                <li
+                                  key={action.id}
+                                  className="flex items-center gap-2"
+                                >
+                                  {action.status === "skipped" ? (
+                                    <SkipForward size={12} />
+                                  ) : (
+                                    <Check size={12} />
+                                  )}
+                                  {action.label}
+                                  {action.status === "skipped" && (
+                                    <span className="text-foreground/40">
+                                      · {ui("Skipped")}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                          </ol>
+                        </details>
+                      )}
+                      {!!message.plan?.blockedReasons.length && (
+                        <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-relaxed text-foreground/70">
+                          {message.plan.blockedReasons.map(reason => (
+                            <p key={reason} className="not-first:mt-2">
+                              {reason}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      <RunControls
+                        message={message}
+                        busy={busyChoice}
+                        onResume={(newCap, applyPlan) =>
+                          void runChoice(`resume:${message.id}`, () =>
+                            chat.resume(message.id, newCap, applyPlan)
+                          )
+                        }
+                      />
+                      {message.status !== "planning" &&
+                        message.status !== "running" &&
+                        message.plan &&
+                        editorChatRunStatus(
+                          message.plan.actions,
+                          message.plan.blockedReasons
+                        ) === "failed" && (
+                          <p
+                            role="status"
+                            className="mt-3 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-300"
+                          >
+                            <CircleAlert className="size-3.5" />
+                            {message.plan.actions.some(
+                              a => a.status === "completed"
+                            )
+                              ? ui("Partly completed · review the steps above")
+                              : ui("Needs attention · review the steps above")}
+                          </p>
+                        )}
+                      {!!message.activity?.steps.length && (
+                        <details className="mt-3 text-xs text-muted-foreground">
+                          <summary className="cursor-pointer">
+                            {message.activity.steps.length} {ui("steps")}
+                          </summary>
+                          <ol className="mt-2 space-y-2 border-l border-border pl-3">
+                            {message.activity.steps.map((step, index) => (
+                              <li
+                                key={index}
+                                className="flex items-start gap-2"
+                              >
+                                <Check className="mt-0.5 size-3 shrink-0" />
+                                {step}
+                              </li>
+                            ))}
+                          </ol>
+                        </details>
+                      )}
+                      <div
+                        className="mt-2 flex items-center gap-1 text-[10px] leading-none text-foreground/40"
+                        title={ui("Credits used")}
+                      >
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {message.creditReceiptsComplete === true &&
+                          !["planning", "running"].includes(
+                            message.status ?? ""
+                          ) &&
+                          !message.creditReceipts?.some(
+                            receipt => receipt.status === "reserved"
+                          )
+                            ? creditReceiptTotal(message.creditReceipts)
+                            : "…"}{" "}
+                          cr
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
           </div>
         )}
+        <div id="editor-autoedit-activity" />
+        {resultTools}
       </div>
 
       <div className="shrink-0 border-t border-border p-3">
@@ -956,20 +1040,20 @@ export function EditorChat({
             }}
             className="max-h-40 min-h-16 w-full resize-none border-0 bg-transparent font-sans text-[14px] font-normal leading-6 tracking-normal outline-none placeholder:font-normal placeholder:text-foreground/40"
           />
-          <div className="mt-1 flex items-center gap-1.5">
+          <div className="relative mt-1 flex items-center gap-1 sm:gap-1.5">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   ref={referenceTrigger}
                   type="button"
                   aria-label={ui("Add a reference or time range")}
-                  disabled={attachBusy}
-                  className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border text-foreground/60 hover:bg-foreground/5 disabled:opacity-40"
+                  disabled={attachBusy || externalBusy}
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 disabled:opacity-40 sm:size-[30px]"
                 >
                   {attachBusy ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    <Plus className="size-4" />
+                    <Plus className="size-[15px] sm:size-4" />
                   )}
                 </button>
               </DropdownMenuTrigger>
@@ -1018,7 +1102,7 @@ export function EditorChat({
                   {ui("Edit around the playhead")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  disabled={findingSections || !onFindSections}
+                  disabled={busyChoice || findingSections || !onFindSections}
                   onSelect={onFindSections}
                 >
                   <Scissors />
@@ -1031,9 +1115,9 @@ export function EditorChat({
                 <button
                   type="button"
                   aria-label={ui("Reel modes")}
-                  className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 hover:text-foreground sm:size-[30px]"
                 >
-                  <AtSign size={16} />
+                  <AtSign className="size-[15px] sm:size-4" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -1086,7 +1170,10 @@ export function EditorChat({
             </DropdownMenu>
             <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
               <PopoverAnchor asChild>
-                <span className="w-0" aria-hidden="true" />
+                <span
+                  className="pointer-events-none absolute bottom-0 left-0 size-0"
+                  aria-hidden="true"
+                />
               </PopoverAnchor>
               <PopoverContent
                 side="top"
@@ -1154,7 +1241,10 @@ export function EditorChat({
 
             <Popover open={urlOpen} onOpenChange={setUrlOpen}>
               <PopoverAnchor asChild>
-                <span className="w-0" aria-hidden="true" />
+                <span
+                  className="pointer-events-none absolute bottom-0 left-0 size-0"
+                  aria-hidden="true"
+                />
               </PopoverAnchor>
               <PopoverContent
                 side="top"
@@ -1202,9 +1292,9 @@ export function EditorChat({
                   type="button"
                   aria-label={ui("Reel effort and extras")}
                   title={ui("Reel effort and extras")}
-                  className="rounded-lg p-2 text-foreground/55 hover:bg-foreground/5 hover:text-foreground"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 hover:text-foreground sm:size-[30px]"
                 >
-                  <Brain className="size-4" />
+                  <Brain className="size-[15px] sm:size-4" />
                 </button>
               </PopoverTrigger>
               <PopoverContent
@@ -1307,9 +1397,7 @@ export function EditorChat({
                 </p>
               </PopoverContent>
             </Popover>
-            <span className="ml-auto whitespace-nowrap text-[10px] text-foreground/35">
-              ≤ {chat.state.maxCredits} cr
-            </span>
+            <span className="ml-auto" />
             {chat.busy ? (
               <button
                 type="button"
@@ -1323,9 +1411,9 @@ export function EditorChat({
             ) : (
               <button
                 type="submit"
-                disabled={!prompt.trim() || attachBusy || !!workingChoice}
-                aria-label={ui("Send to Reel, 5 credits for planning")}
-                title={ui("Send · 5 credits for planning")}
+                disabled={!prompt.trim() || attachBusy || busyChoice}
+                aria-label={ui("Send to Reel")}
+                title={ui("Send to Reel")}
                 className="ai-magic flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:cursor-not-allowed disabled:opacity-35"
               >
                 <ArrowUp className="size-4" />
@@ -1333,10 +1421,6 @@ export function EditorChat({
             )}
           </div>
         </form>
-        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-foreground/40">
-          <span>{ui("Planning: 5 credits · manual edits: free")}</span>
-          <span title={ui("Shift + Enter for a new line")}>{ui("↵ Send")}</span>
-        </div>
         <input
           ref={fileInput}
           type="file"

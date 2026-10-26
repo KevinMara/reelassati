@@ -151,6 +151,10 @@ export interface EditorChatMessage {
   mode?: EditorChatMode;
   maxCredits?: number;
   usedCredits?: number;
+  /** Budget reservations above are distinct from actual ledger receipts. */
+  creditReceipts?: import("./credit-receipt").CreditReceipt[];
+  creditReceiptsComplete?: boolean;
+  activity?: { kind: "auto-edit"; steps: string[] };
   range?: { start: number; end: number };
   selectedClipIds?: string[];
   request?: EditorChatRequest;

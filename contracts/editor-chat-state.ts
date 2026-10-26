@@ -3,6 +3,7 @@ import {
   findCatalogAudio,
 } from "./editor-catalog-audio";
 import { visualTransitions } from "./clip-visual";
+import { readCreditReceipt } from "./credit-receipt";
 import { exportFrameRates, type ExportFrameRate } from "./export-settings";
 import type {
   EditorChatAction,
@@ -354,11 +355,41 @@ export function normalizeEditorChatState(
       !Number.isFinite(Date.parse(row.createdAt))
     )
       continue;
+    const receiptRows = Array.isArray(row.creditReceipts)
+      ? row.creditReceipts
+      : [];
     const message: EditorChatMessage = {
       id: string(row.id),
       role: row.role,
       text: string(row.text, 6000),
       createdAt: row.createdAt,
+      ...(Array.isArray(row.creditReceipts)
+        ? {
+            creditReceipts: receiptRows
+              .slice(-100)
+              .map(readCreditReceipt)
+              .filter((receipt): receipt is NonNullable<typeof receipt> =>
+                Boolean(receipt)
+              ),
+          }
+        : {}),
+      ...(typeof row.creditReceiptsComplete === "boolean"
+        ? { creditReceiptsComplete: row.creditReceiptsComplete }
+        : {}),
+      ...(record(row.activity)?.kind === "auto-edit"
+        ? {
+            activity: {
+              kind: "auto-edit" as const,
+              steps: (Array.isArray(record(row.activity)?.steps)
+                ? (record(row.activity)!.steps as unknown[])
+                : []
+              )
+                .filter((step): step is string => typeof step === "string")
+                .slice(-100)
+                .map(step => step.slice(0, 500)),
+            },
+          }
+        : {}),
       ...(row.planApproved === true ? { planApproved: true } : {}),
       ...(string(row.requestId) ? { requestId: string(row.requestId) } : {}),
       ...(Array.isArray(row.references)

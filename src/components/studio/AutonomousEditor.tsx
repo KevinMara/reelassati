@@ -1,3 +1,11 @@
+import {
+  mergeCreditReceipt,
+  type CreditReceipt,
+} from "@contracts/credit-receipt";
+import { normalizeEditorChatState } from "@contracts/editor-chat-state";
+import { applyAutonomousCaptionTreatment } from "@contracts/editorial-captions";
+import { activeEditorProjects, editorRunKey } from "@/lib/editor-run-lock";
+import { ConciseResponse } from "./ConciseResponse";
 import { editorAudioCatalog } from "@contracts/editor-audio-catalog";
 import { resolveChatCatalogAudio } from "@/lib/editor-chat-catalog-audio";
 import { StudioSelect } from "@/components/ui/studio-select";
@@ -70,7 +78,9 @@ export function AutonomousEditor({
   onFinished,
   open,
   onOpenChange,
+  onBusyChange,
 }: {
+  onBusyChange: (busy: boolean) => void;
   open: boolean;
   onOpenChange: (value: boolean) => void;
   project: EditProject;
@@ -82,6 +92,7 @@ export function AutonomousEditor({
   const referenceOwner = workspace.profile.email.toLowerCase();
   const referenceBrand = selectedBrand(referenceOwner);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const runKey = editorRunKey(referenceOwner, referenceBrand, project.id);
   const [model, setModel] = useState<
     "moonshotai/kimi-k3" | "moonshotai/kimi-k3.1-pro"
   >("moonshotai/kimi-k3");
@@ -191,7 +202,7 @@ export function AutonomousEditor({
     (!videos || capabilities.videoGeneration);
 
   async function run() {
-    if (runController.current && !runController.current.signal.aborted) return;
+    if (activeEditorProjects.has(runKey) || runController.current) return;
     // Validate before scope capture, paid preparation, or any provider request.
     if (!durationTarget) {
       setFailure(
@@ -201,6 +212,7 @@ export function AutonomousEditor({
       );
       return;
     }
+    activeEditorProjects.add(runKey);
     stopped.current = false;
     const controller = new AbortController();
     runController.current = controller;
@@ -211,6 +223,7 @@ export function AutonomousEditor({
       projectId: project.id,
     };
     setBusy(true);
+    onBusyChange(true);
     setCompletedSteps([]);
     onOpenChange(false);
     setFinished(false);
@@ -238,7 +251,66 @@ export function AutonomousEditor({
     const generatedAssets: Asset[] = [];
     const resolvedMedia = new Map<string, string>();
     let timelineSaveStarted = false;
+    const messageId = createUuid();
+    let receipts: CreditReceipt[] = [];
+    let receiptsComplete = true;
+    const savedSteps: string[] = [];
+    const saveActivity = async (
+      text: string,
+      state: "running" | "completed" | "failed" | "stopped"
+    ) => {
+      await updateWorkspace(current => {
+        // Stop may abort the provider request, while its final visible status still needs saving.
+        if (
+          current.profile.email.toLowerCase() !== destination.ownerEmail ||
+          selectedBrand(destination.ownerEmail) !== destination.brandId
+        )
+          return current;
+        return {
+          ...current,
+          projects: current.projects.map(p => {
+            if (p.id !== project.id) return p;
+            const chat = normalizeEditorChatState(p.editorChat) ?? {
+              mode: "ask" as const,
+              maxCredits: 200,
+              preferencesVersion: 2,
+              messages: [],
+            };
+            const previous = chat.messages.find(
+              message => message.id === messageId
+            );
+            const message = {
+              ...previous,
+              id: messageId,
+              role: "assistant" as const,
+              text,
+              status: state,
+              createdAt: previous?.createdAt ?? new Date().toISOString(),
+              activity: { kind: "auto-edit" as const, steps: [...savedSteps] },
+              creditReceipts: receipts,
+              creditReceiptsComplete:
+                state === "running" ? false : receiptsComplete,
+            };
+            return {
+              ...p,
+              editorChat: {
+                ...chat,
+                messages: [
+                  ...chat.messages.filter(item => item.id !== messageId),
+                  message,
+                ].slice(-60),
+              },
+            };
+          }),
+        };
+      });
+    };
+    const onCreditReceipt = (receipt: CreditReceipt | undefined) => {
+      if (receipt) receipts = mergeCreditReceipt(receipts, receipt);
+      else receiptsComplete = false;
+    };
     try {
+      await saveActivity(ui("Building your edit"), "running");
       checkpoint();
       if (!ready)
         throw new Error(
@@ -257,7 +329,7 @@ export function AutonomousEditor({
             "Your account or brand changed before the edit started. Reopen the intended workspace."
           )
         );
-      const requestOptions = { scope, signal };
+      const requestOptions = { scope, signal, onCreditReceipt };
       const cacheOptions = {
         model,
         effort: "max",
@@ -321,7 +393,9 @@ export function AutonomousEditor({
               progress,
               signal,
               scope,
-              getUiLocale()
+              getUiLocale(),
+              false,
+              onCreditReceipt
             );
           },
           transcribe: async asset => {
@@ -371,6 +445,7 @@ export function AutonomousEditor({
             command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. You may request up to ${images} new 1K images and ${videos} new 5-second video shots using broll operations with parameters.prompt and parameters.mediaKind. Never exceed those counts. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
             model,
             stock: true,
+            captionStyling: captions,
             effort: "max",
             selectedClipIds: [],
             range: { start: 0, end: working.duration },
@@ -382,6 +457,11 @@ export function AutonomousEditor({
           planCache.current.write(cacheKey, working, result);
       }
       checkpoint();
+      if (captions)
+        working = applyAutonomousCaptionTreatment(
+          working,
+          result.captionTreatment
+        );
       assertAutonomousMediaBudget(result.changes, { images, videos });
       const changesToApply = result.changes.filter(
         op =>
@@ -557,6 +637,7 @@ export function AutonomousEditor({
           setStatus(`Generating supporting image ${imagesUsed}/${images}…`);
           asset = await platformApi.generateImage(
             {
+              requestId: createUuid(),
               prompt: op.parameters.prompt,
               assetName: op.label,
               aspectRatio: project.aspectRatio,
@@ -628,14 +709,16 @@ export function AutonomousEditor({
         update: updateWorkspace,
         checkpoint,
         onStep: label => {
-          setCompletedSteps(previous => [...previous, label]);
+          savedSteps.push(label);
+          setCompletedSteps([...savedSteps]);
           setStatus(label);
         },
       });
       checkpoint();
       planCache.current.clear();
+      await saveActivity(result.summary, "completed");
       setFinished(true);
-      setStatus(`${result.summary} Your original edit is available with Undo.`);
+      setStatus(result.summary);
       onFinished(result.summary);
     } catch (e) {
       if (signal.aborted) planCache.current.clear();
@@ -644,27 +727,34 @@ export function AutonomousEditor({
         e instanceof PlatformApiError
           ? videoReviewFailureMessage(e.reason)
           : undefined;
-      setFailure(
-        signal.aborted
-          ? `Stopped. Provider work already submitted may still finish in your Library; no further steps will start. ${timelineSaveStarted ? "The timeline save had already started; review your project and use Undo if needed." : "Your original timeline is intact."}`
-          : e instanceof PlatformApiError
-            ? `${ui(e.message)}${reviewDetail ? ` ${ui(reviewDetail)}` : ""} (${e.status})${e.reference ? ` · ${ui("Reference")}: ${e.reference}` : ""}`
-            : e instanceof Error
-              ? e.message
-              : "The edit could not complete. Your original timeline is preserved."
-      );
+      const failureText = signal.aborted
+        ? `Stopped. Provider work already submitted may still finish in your Library; no further steps will start. ${timelineSaveStarted ? "The timeline save had already started; review your project and use Undo if needed." : "Your original timeline is intact."}`
+        : e instanceof PlatformApiError
+          ? `${ui(e.message)}${reviewDetail ? ` ${ui(reviewDetail)}` : ""} (${e.status})${e.reference ? ` · ${ui("Reference")}: ${e.reference}` : ""}`
+          : e instanceof Error
+            ? e.message
+            : "The edit could not complete. Your original timeline is preserved.";
+      setFailure(failureText);
+      await saveActivity(
+        failureText,
+        signal.aborted ? "stopped" : "failed"
+      ).catch(() => undefined);
       setStatus("");
     } finally {
+      activeEditorProjects.delete(runKey);
       if (runController.current === controller) {
         runController.current = null;
-        if (mounted.current) setBusy(false);
+        if (mounted.current) {
+          setBusy(false);
+          onBusyChange(false);
+        }
       }
     }
   }
-  const activity = (busy || failure || finished) && (
+  const activity = busy && !finished && !failure && (
     <section
       aria-label={ui("Auto-edit activity")}
-      className="m-3 space-y-3 rounded-xl border border-primary/25 bg-primary/5 p-3"
+      className="reel-activity space-y-3 py-3"
     >
       <p className="flex items-center gap-2 text-sm font-medium">
         {busy && <Loader2 size={14} className="animate-spin" />}
@@ -672,15 +762,20 @@ export function AutonomousEditor({
           busy ? "Building your edit" : finished ? "Edit ready" : "Edit paused"
         )}
       </p>
-      <p role="status" className="text-xs leading-relaxed">
-        {failure || status}
-      </p>
+      <div role="status" aria-live="polite">
+        <ConciseResponse text={failure || ui(status)} />
+      </div>
       {!!completedSteps.length && (
-        <ol className="space-y-1 text-xs text-muted-foreground">
-          {completedSteps.map((label, index) => (
-            <li key={index}>✓ {label}</li>
-          ))}
-        </ol>
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer">
+            {completedSteps.length} {ui("steps")}
+          </summary>
+          <ol className="mt-2 space-y-2 border-l border-border pl-3">
+            {completedSteps.map((label, index) => (
+              <li key={index}>✓ {label}</li>
+            ))}
+          </ol>
+        </details>
       )}
       {busy ? (
         <button
@@ -725,39 +820,44 @@ export function AutonomousEditor({
                   </details>
                 )}
                 <div className="mb-4">
-                  <EditStyleTemplates project={project} disabled={busy} />
+                  <EditStyleTemplates project={project} disabled={busy} compact />
                 </div>
                 <label className="block text-sm font-medium">
                   {ui("Describe the style and outcome")}
                   <textarea
                     disabled={busy}
                     aria-label={ui("Autonomous editing style")}
-                    rows={4}
+                    rows={3}
                     value={style}
                     onChange={e => setStyle(e.target.value)}
                     placeholder={ui(
                       "Premium skincare demo. Clean editorial captions, a fast before/after opening, subtle fades, warm colour, and a quiet product close-up at the end."
                     )}
-                    className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm"
+                    className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"
                   />
                 </label>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {(
-                    Object.keys(EDIT_RECIPES) as Array<
-                      keyof typeof EDIT_RECIPES
-                    >
-                  ).map(s => (
-                    <button
-                      disabled={busy}
-                      key={s}
-                      type="button"
-                      onClick={() => setStyle(`${s}. ${EDIT_RECIPES[s]}`)}
-                      className="rounded-lg border border-border px-3 py-2 text-sm"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs text-muted-foreground">
+                    {ui("Presets")}
+                  </summary>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(
+                      Object.keys(EDIT_RECIPES) as Array<
+                        keyof typeof EDIT_RECIPES
+                      >
+                    ).map(s => (
+                      <button
+                        disabled={busy}
+                        key={s}
+                        type="button"
+                        onClick={() => setStyle(`${s}. ${EDIT_RECIPES[s]}`)}
+                        className="rounded-lg border border-border px-3 py-1.5 text-xs"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </details>
                 <div className="mt-4">
                   <div>
                     {" "}
@@ -992,18 +1092,23 @@ export function AutonomousEditor({
                   </div>
                 </details>
                 <div className="border-t border-border pt-3">
-                  <p className="text-2xl font-semibold">
+                  <p className="text-sm font-semibold">
                     {ui("Up to")} {estimate.toLocaleString(getUiLocale())}{" "}
                     {ui("credits")}
                   </p>
-                  <p className="mt-1 text-xs text-foreground/70">
-                    {ui("Review")} {analysisCost} {ui("· speech timing")}{" "}
-                    {transcriptCost} {ui("· plan")} {AI_CREDIT_COSTS.editPlan}{" "}
-                    {ui("· optional media")} {mediaCost}
-                    {ui(
-                      ". Only requested generations run. Manual editing and local export use no AI credits."
-                    )}
-                  </p>
+                  <details className="mt-2 text-xs text-foreground/70">
+                    <summary className="cursor-pointer">
+                      {ui("Show details")}
+                    </summary>
+                    <p className="mt-2 leading-relaxed">
+                      {ui("Review")} {analysisCost} {ui("· speech timing")}{" "}
+                      {transcriptCost} {ui("· plan")} {AI_CREDIT_COSTS.editPlan}{" "}
+                      {ui("· optional media")} {mediaCost}
+                      {ui(
+                        ". Only requested generations run. Manual editing and local export use no AI credits."
+                      )}
+                    </p>
+                  </details>
                 </div>
 
                 <button
@@ -1012,7 +1117,7 @@ export function AutonomousEditor({
                     busy || !ready || !project.clips.length || !durationTarget
                   }
                   onClick={() => void run()}
-                  className="ai-magic flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium disabled:opacity-40"
+                  className="ai-magic flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium disabled:opacity-40"
                 >
                   {busy ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

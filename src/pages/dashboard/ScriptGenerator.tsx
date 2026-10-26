@@ -686,7 +686,7 @@ function DirectScriptSession() {
           </section>
         </div>
 
-        <div className="space-y-5">
+        <div data-tour="script-result" className="space-y-5">
           <AnimatePresence mode="wait">
             {generatedScript ? (
               <motion.section
@@ -932,6 +932,7 @@ export default function ScriptGenerator() {
         className="mx-auto mb-8 flex max-w-6xl rounded-xl border border-border bg-surface p-1.5"
         role="tablist"
         aria-label={ui("Script creation mode")}
+        data-tour="script-modes"
       >
         <button
           type="button"

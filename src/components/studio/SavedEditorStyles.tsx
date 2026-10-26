@@ -1,6 +1,6 @@
 import { useUiText } from "@/lib/i18n/ui";
 import { StudioSelect } from "@/components/ui/studio-select";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BookmarkPlus, SlidersHorizontal, Trash2 } from "lucide-react";
 import type { EditProject, TimelineClip } from "@contracts/workspace";
 import {
@@ -23,6 +23,7 @@ export interface SavedEditorStylesProps {
   onApply(style: EditorSavedStyle): void | Promise<void>;
   onDelete(id: string): void | Promise<void>;
   disabled?: boolean;
+  focusedStyleId?: string;
 }
 
 const typeNames = {
@@ -41,6 +42,7 @@ export function SavedEditorStyles({
   onApply,
   onDelete,
   disabled = false,
+  focusedStyleId,
 }: SavedEditorStylesProps) {
   const ui = useUiText();
   const [name, setName] = useState("");
@@ -50,6 +52,20 @@ export function SavedEditorStyles({
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const styleList = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusedStyleId) return;
+    const frame = requestAnimationFrame(() => {
+      const element = Array.from(
+        styleList.current?.querySelectorAll<HTMLElement>(
+          "[data-saved-style]"
+        ) ?? []
+      ).find(item => item.dataset.savedStyle === focusedStyleId);
+      element?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      element?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusedStyleId]);
   const saved = useMemo(() => normalizeEditorSavedStyles(styles), [styles]);
   const inClip =
     selectedClip &&
@@ -194,7 +210,7 @@ export function SavedEditorStyles({
           />
         </label>
       )}
-      <div className="grid grid-cols-2 gap-2">
+      <div ref={styleList} className="grid grid-cols-2 gap-2">
         {saved
           .filter(style =>
             `${style.name} ${typeNames[style.type]}`
@@ -213,7 +229,9 @@ export function SavedEditorStyles({
             return (
               <article
                 key={style.id}
-                className="min-w-0 rounded-xl border border-border p-2"
+                data-saved-style={style.id}
+                tabIndex={-1}
+                className={`min-w-0 rounded-xl border p-2 ${focusedStyleId === style.id ? "border-primary/50" : "border-border"}`}
               >
                 <SavedStylePreview style={style} />
                 <p
@@ -250,7 +268,9 @@ export function SavedEditorStyles({
                   <button
                     type="button"
                     disabled={blocked}
-                    aria-label={ui("Delete saved style {{name}}", { name: style.name })}
+                    aria-label={ui("Delete saved style {{name}}", {
+                      name: style.name,
+                    })}
                     onClick={() =>
                       void run(`delete:${style.id}`, () => onDelete(style.id))
                     }

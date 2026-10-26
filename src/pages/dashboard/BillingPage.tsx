@@ -257,15 +257,12 @@ export default function BillingPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">
+          <h1 className="text-2xl font-semibold tracking-tight">
             {ui("Plan & credits")}
-          </p>
-          <h1 className="text-3xl font-semibold">
-            {ui("Your creative fuel.")}
           </h1>
-          <p className="mt-2 max-w-2xl text-foreground/60">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             {ui(
               "One transparent REELassati balance for every AI tool. Plan credits refresh monthly; purchased top-ups roll over."
             )}
@@ -275,7 +272,7 @@ export default function BillingPage() {
           type="button"
           onClick={() => void load()}
           disabled={loading}
-          className="inline-flex items-center justify-center gap-2 rounded-pill border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/40 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:border-primary/40 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           {ui("Refresh")}
@@ -330,9 +327,9 @@ export default function BillingPage() {
         </p>
       )}
 
-      <section className="mt-5 rounded-2xl border border-border bg-surface p-6 sm:p-8">
+      <section className="mt-5 rounded-lg border border-border bg-surface p-4 sm:p-5">
         <div className="flex items-center gap-3">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <Sparkles className="h-4 w-4 shrink-0 text-primary" />
           <div>
             <h2 className="font-medium">{ui("Credit top-ups")}</h2>
             <p className="text-sm text-foreground/70">
@@ -342,7 +339,7 @@ export default function BillingPage() {
             </p>
           </div>
         </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
           {(Object.keys(CREDIT_TOP_UPS) as CreditTopUpId[]).map((id, index) => {
             const pack =
               summary?.topUps.find(item => item.id === id) ||
@@ -353,11 +350,11 @@ export default function BillingPage() {
             return (
               <article
                 key={id}
-                className="group rounded-xl border border-border bg-background p-5 text-left transition-all motion-safe:hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-card"
+                className="group rounded-lg border border-border bg-background p-4 text-left transition-colors hover:border-primary/40"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-2xl font-semibold">
+                    <p className="text-xl font-semibold tabular-nums">
                       {pack.credits.toLocaleString(getUiLocale())}
                     </p>
                     <p className="text-xs text-foreground/70">
@@ -370,7 +367,7 @@ export default function BillingPage() {
                     </span>
                   ) : null}
                 </div>
-                <div className="mt-5 flex items-center justify-between">
+                <div className="mt-3 flex items-center justify-between">
                   <span className="font-medium">
                     {pack.price.toFixed(2)} USD
                   </span>
@@ -380,11 +377,11 @@ export default function BillingPage() {
                     <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" />
                   )}
                 </div>
-                <p className="mt-3 text-sm text-foreground/70">
+                <p className="mt-2 text-xs text-muted-foreground">
                   {((pack.price / pack.credits) * 1000).toFixed(2)}{" "}
                   {ui("USD per 1,000 credits")}
                 </p>
-                <p className="mt-2 text-sm text-foreground/80">
+                <p className="mt-2 text-xs leading-relaxed text-foreground/80">
                   {id === "boost"
                     ? ui(
                         "Covers one 15-second 720p video with audio, plus 100 credits."
@@ -406,7 +403,7 @@ export default function BillingPage() {
                     !available ||
                     busy !== null
                   }
-                  className="mt-4 w-full rounded-pill bg-primary/15 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-3 w-full rounded-lg bg-primary/15 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {busy === `topup:${id}`
                     ? ui("Opening…")
@@ -430,14 +427,13 @@ export default function BillingPage() {
       </section>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
-        <section className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.12] via-surface to-fuchsia-500/[0.06] p-6 shadow-card sm:p-8">
-          <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
+        <section className="relative overflow-hidden rounded-lg border border-border bg-surface p-5">
           <div className="relative flex items-start justify-between gap-4">
             <div>
               <p className="mono-eyebrow text-primary">{ui("Available now")}</p>
               <div className="mt-3 flex items-center gap-3">
-                <Coins className="h-7 w-7 text-primary" />
-                <span className="text-5xl font-semibold tracking-tight">
+                <Coins className="h-5 w-5 text-primary" />
+                <span className="text-3xl font-semibold tracking-tight tabular-nums">
                   {loading
                     ? "—"
                     : (summary?.availableCredits || 0).toLocaleString(
@@ -463,7 +459,7 @@ export default function BillingPage() {
               )}
             </p>
           )}
-          <div className="relative mt-7 grid gap-3 sm:grid-cols-2">
+          <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-border/70 bg-background/55 p-4 backdrop-blur">
               <p className="text-xs text-foreground/70">{ui("Plan credits")}</p>
               <p className="mt-1 text-xl font-semibold">
@@ -671,17 +667,17 @@ function PlanChooser({
   );
   return (
     <section aria-labelledby="plans-title">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 id="plans-title" className="text-2xl font-semibold">
+          <h2 id="plans-title" className="sr-only">
             {ui("Find your creative pace.")}
           </h2>
-          <p className="mt-2 text-foreground/70">
+          <p className="text-sm text-muted-foreground">
             {ui("One plan. Every creation tool. Room to keep going.")}
           </p>
         </div>
         <div
-          className="inline-flex rounded-pill border border-border bg-surface p-1 text-sm"
+          className="inline-flex rounded-lg border border-border bg-surface p-1 text-xs"
           role="group"
           aria-label={ui("Billing cycle")}
         >
@@ -691,7 +687,7 @@ function PlanChooser({
               type="button"
               aria-pressed={billingCycle === cycle}
               onClick={() => setBillingCycle(cycle)}
-              className={`rounded-pill px-4 py-2 capitalize transition-colors ${billingCycle === cycle ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground/75 hover:bg-primary/10"}`}
+              className={`rounded-md px-3 py-1.5 transition-colors ${billingCycle === cycle ? "bg-primary text-primary-foreground" : "text-foreground/75 hover:bg-primary/10"}`}
             >
               {ui(cycle === "annual" ? "Annual" : "Monthly")}
               {cycle === "annual" ? ui(" · 2 months free") : ""}
@@ -699,7 +695,7 @@ function PlanChooser({
           ))}
         </div>
       </div>
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         {PLAN_IDS.map(planId => {
           const name = PLAN_NAME_BY_ID[planId];
           const plan = PUBLIC_PLAN_PRICING[name];
@@ -710,32 +706,25 @@ function PlanChooser({
           return (
             <article
               key={planId}
-              className={`relative flex flex-col rounded-2xl border p-6 transition-all motion-safe:hover:-translate-y-1 ${featured ? "border-primary/60 bg-gradient-to-br from-primary/15 via-surface to-surface shadow-[0_8px_40px_-16px_hsl(var(--primary)/0.45)]" : "border-border bg-surface hover:border-primary/40"} ${selectedPlan === planId ? "ring-2 ring-primary/30" : ""}`}
+              className={`relative flex min-w-0 flex-col rounded-lg border p-4 transition-colors sm:p-5 ${featured ? "border-primary/50 bg-primary/[0.04]" : "border-border bg-surface hover:border-primary/40"} ${selectedPlan === planId ? "ring-2 ring-primary/30" : ""}`}
             >
-              <div className="mb-5 flex min-h-10 items-start justify-between gap-2">
-                <span className="font-mono text-xs uppercase tracking-widest text-primary">
-                  {planId === "creator"
-                    ? ui("Your first momentum")
-                    : featured
-                      ? ui("More room to create")
-                      : ui("Your biggest ideas")}
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold">{name}</h3>
                 {(current || featured) && (
-                  <span className="rounded-pill bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
+                  <span className="rounded-md bg-primary/15 px-2 py-1 text-[11px] font-medium text-primary">
                     {current ? ui("Current plan") : ui("Recommended")}
                   </span>
                 )}
               </div>
-              <h3 className="text-2xl font-semibold">{name}</h3>
-              <p className="mt-2 min-h-16 text-sm text-foreground/75">
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                 {planId === "creator"
                   ? ui("For one creator finding a consistent rhythm.")
                   : featured
                     ? ui("For frequent creators running several channels.")
                     : ui("For a larger content output across your channels.")}
               </p>
-              <p className="mt-5">
-                <span className="text-4xl font-semibold tracking-tight">
+              <p className="mt-4">
+                <span className="text-3xl font-semibold tracking-tight tabular-nums">
                   {price.toLocaleString(locale, {
                     maximumFractionDigits: 2,
                   })}
@@ -745,7 +734,7 @@ function PlanChooser({
                   {ui("USD / month")}
                 </span>
               </p>
-              <p className="mt-2 text-sm text-foreground/70">
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 {annual
                   ? ui("{{total}} USD billed yearly · save {{saving}} USD", {
                       total: plan.annualTotal.toLocaleString(locale),
@@ -753,31 +742,28 @@ function PlanChooser({
                     })
                   : ui("Billed monthly · cancel renewal anytime")}
               </p>
-              <div className="my-6 rounded-xl border border-primary/20 bg-primary/10 p-4">
-                <p className="text-3xl font-semibold text-primary">
+              <div className="my-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-y border-border py-3">
+                <p className="text-xl font-semibold tabular-nums text-primary">
                   {plan.monthlyCredits.toLocaleString(locale)}
                 </p>
-                <p className="mt-1 text-sm">{ui("credits every month")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {ui("credits every month")}
+                </p>
               </div>
-              <ul className="space-y-3 text-sm text-foreground/85">
+              <ul className="space-y-2 text-xs text-foreground/85">
                 {[
                   ui("Brand workspaces: {{count}}", { count: plan.workspaces }),
                   ui("Connected social accounts: {{count}}", {
                     count: plan.socialAccounts,
                   }),
-                  ui("AI scripts, images, video and voice"),
-                  ui("Video analysis and custom trend research"),
-                  ui("Weekly organic short-form trends"),
-                  ui("Library, MP4 export and content calendar"),
-                  ui("Optional credit top-ups that roll over"),
                 ].map(detail => (
                   <li key={detail} className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
                     {detail}
                   </li>
                 ))}
               </ul>
-              <p className="my-5 border-t border-border pt-4 text-sm text-foreground/70">
+              <p className="mb-4 mt-3 text-xs leading-relaxed text-muted-foreground">
                 {ui("For example: up to")}{" "}
                 {Math.floor(
                   plan.monthlyCredits / AI_CREDIT_COSTS.image1K
@@ -793,7 +779,7 @@ function PlanChooser({
                 onClick={() =>
                   void (manageExisting ? onManage() : onChoose(planId))
                 }
-                className={`mt-auto flex w-full items-center justify-center gap-2 rounded-pill px-5 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${featured ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "border border-primary/35 bg-primary/10 text-foreground hover:bg-primary/20"}`}
+                className={`mt-auto flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${featured ? "bg-primary text-primary-foreground hover:bg-primary-hover" : "border border-border bg-background text-foreground hover:border-primary/40"}`}
               >
                 {busy === `plan:${planId}` || busy === "portal" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -812,7 +798,24 @@ function PlanChooser({
           );
         })}
       </div>
-      <p className="mt-4 text-sm text-foreground/70">
+      <ul
+        aria-label={ui("One plan. Every creation tool. Room to keep going.")}
+        className="mt-4 grid gap-x-5 gap-y-2 rounded-lg border border-border px-4 py-3 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-3"
+      >
+        {[
+          ui("AI scripts, images, video and voice"),
+          ui("Video analysis and custom trend research"),
+          ui("Weekly organic short-form trends"),
+          ui("Library, MP4 export and content calendar"),
+          ui("Optional credit top-ups that roll over"),
+        ].map(detail => (
+          <li key={detail} className="flex items-start gap-2">
+            <Check className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
+            {detail}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
         {ui(
           "Prices exclude tax; applicable taxes are added at checkout. Annual plans receive credits monthly. Plan credits reset; purchased credits roll over."
         )}

@@ -126,28 +126,23 @@ export default function ClientsPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <BrandSwitcher manage />
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">
-            {ui("Reusable creative memory")}
-          </p>
-          <h1 className="text-3xl font-semibold">{ui("Brand DNA")}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {ui("Brand DNA")}
+          </h1>
           <p className="mt-2 max-w-2xl text-sm text-foreground/70">
-            {ui(
-              "One truthful source of creative constraints for this workspace. Switch brands above to keep each client’s content separate."
-            )}
+            {ui("Save your voice, audience, colors, and caption style.")}
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-surface px-4 py-3 text-right">
-          <p className="mono-eyebrow text-xs text-foreground/70">
-            {ui("Definition depth")}
-          </p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
+        <div className="flex items-center gap-2 text-xs">
+          <p className="text-muted-foreground">{ui("Definition depth")}</p>
+          <p className="font-semibold tabular-nums text-primary">
             {readiness}%
           </p>
         </div>
       </div>
+      <BrandSwitcher manage compact />
 
       {notice ? (
         <div
@@ -165,10 +160,10 @@ export default function ClientsPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <form
           onSubmit={saveBrandKit}
-          className="space-y-7 rounded-xl border border-border bg-surface p-6"
+          className="space-y-5 rounded-lg border border-border bg-surface p-4 sm:p-5"
         >
           <section>
             <div className="mb-4 flex items-center gap-2">
@@ -195,7 +190,7 @@ export default function ClientsPage() {
                 <textarea
                   value={draft.voice}
                   onChange={event => updateDraft("voice", event.target.value)}
-                  rows={4}
+                  rows={3}
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder={ui(
                     "How the brand speaks, phrases it avoids, energy level, point of view, and proof style"
@@ -216,7 +211,7 @@ export default function ClientsPage() {
                   onChange={event =>
                     updateDraft("audience", event.target.value)
                   }
-                  rows={4}
+                  rows={3}
                   className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder={ui(
                     "Who this is for, what they already believe, and what problem creates urgency"
@@ -226,7 +221,7 @@ export default function ClientsPage() {
             </div>
           </section>
 
-          <section className="border-t border-border pt-7">
+          <section className="border-t border-border pt-5">
             <div className="mb-4 flex items-center gap-2">
               <Palette className="h-4 w-4 text-primary" />
               <h2 className="font-medium">{ui("Visual system")}</h2>
@@ -308,7 +303,7 @@ export default function ClientsPage() {
             </div>
           </section>
 
-          <section className="border-t border-border pt-7">
+          <section className="border-t border-border pt-5">
             <div className="mb-4 flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4 text-primary" />
               <h2 className="font-medium">{ui("Editing defaults")}</h2>
@@ -320,14 +315,14 @@ export default function ClientsPage() {
                   type="button"
                   onClick={() => updateDraft("captionPreset", preset.value)}
                   aria-pressed={draft.captionPreset === preset.value}
-                  className={`rounded-xl border p-4 text-left transition-colors ${
+                  className={`rounded-lg border p-3 text-left transition-colors ${
                     draft.captionPreset === preset.value
                       ? "border-primary bg-primary/5"
                       : "border-border bg-background hover:border-primary/35"
                   }`}
                 >
                   <Captions className="h-4 w-4 text-primary" />
-                  <span className="mt-3 block text-sm font-medium">
+                  <span className="mt-2 block text-sm font-medium">
                     {ui(preset.label)}
                   </span>
                   <span className="mt-1 block text-xs leading-relaxed text-foreground/70">
@@ -410,9 +405,9 @@ export default function ClientsPage() {
         </form>
 
         <aside className="space-y-5">
-          <div className="sticky top-6 overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="overflow-hidden rounded-lg border border-border bg-surface lg:sticky lg:top-5">
             <div
-              className="relative aspect-[9/12] p-6"
+              className="relative aspect-[4/3] p-5"
               style={{
                 background: `linear-gradient(145deg, ${draft.primaryColor} 0%, #15131c 68%)`,
               }}
@@ -428,10 +423,10 @@ export default function ClientsPage() {
                 <p
                   className={`mt-3 max-w-[15rem] text-white ${
                     draft.captionPreset === "kinetic"
-                      ? "text-3xl font-black uppercase leading-[0.92]"
+                      ? "text-2xl font-bold uppercase leading-tight"
                       : draft.captionPreset === "editorial"
-                        ? "text-3xl font-medium leading-tight"
-                        : "text-2xl font-medium leading-snug"
+                        ? "text-2xl font-medium leading-tight"
+                        : "text-xl font-medium leading-snug"
                   }`}
                   style={{ fontFamily: draft.font || "Geist" }}
                 >
@@ -446,31 +441,31 @@ export default function ClientsPage() {
                 />
               </div>
             </div>
-            <div className="p-5">
+            <div className="p-4">
               <h2 className="font-medium">{draft.name || "Unnamed brand"}</h2>
               <p className="mt-1 text-xs leading-relaxed text-foreground/70">
                 {draft.audience ||
                   "Define the audience tension to make creative decisions more specific."}
               </p>
-              <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg bg-background p-3">
-                  <dt className="text-xs uppercase tracking-wide text-foreground/70">
+              <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center">
+                <div>
+                  <dt className="text-xs text-muted-foreground">
                     {ui("Projects")}
                   </dt>
                   <dd className="mt-1 font-semibold">
                     {workspace.projects.length}
                   </dd>
                 </div>
-                <div className="rounded-lg bg-background p-3">
-                  <dt className="text-xs uppercase tracking-wide text-foreground/70">
+                <div>
+                  <dt className="text-xs text-muted-foreground">
                     {ui("Assets")}
                   </dt>
                   <dd className="mt-1 font-semibold">
                     {workspace.assets.length}
                   </dd>
                 </div>
-                <div className="rounded-lg bg-background p-3">
-                  <dt className="text-xs uppercase tracking-wide text-foreground/70">
+                <div>
+                  <dt className="text-xs text-muted-foreground">
                     {ui("Scripts")}
                   </dt>
                   <dd className="mt-1 font-semibold">

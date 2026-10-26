@@ -7,7 +7,13 @@ import { platformApi } from "@/lib/platform-api";
 import { selectBrand } from "@/lib/workspace-scope";
 import { useWorkspace } from "@/providers/workspace";
 
-export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
+export function BrandSwitcher({
+  manage = false,
+  compact = false,
+}: {
+  manage?: boolean;
+  compact?: boolean;
+}) {
   const ui = useUiText();
   const { workspace, saving, error: workspaceError } = useWorkspace();
   const [data, setData] = useState<Awaited<
@@ -47,20 +53,22 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
     <div
       className={
         manage
-          ? "mb-6 rounded-xl border border-border bg-surface p-5"
-          : "relative min-w-0 overflow-hidden rounded-2xl border border-primary/45 bg-gradient-to-br from-primary/20 via-primary/10 to-surface p-3.5 shadow-[0_16px_36px_-22px_hsl(var(--primary))] before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary"
+          ? compact
+            ? "mb-5 grid items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 sm:grid-cols-[minmax(200px,300px)_minmax(0,1fr)]"
+            : "mb-6 rounded-xl border border-border bg-surface p-5"
+          : "min-w-0 border-b border-border px-1 pb-3"
       }
     >
       <label className="text-sm font-medium">
         <span
           className={
             manage
-              ? "block"
-              : "relative mb-2.5 flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.14em] text-primary"
+              ? "block text-xs text-muted-foreground"
+              : "mb-2 flex items-center gap-2 text-[11px] font-medium text-muted-foreground"
           }
         >
           {!manage ? (
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+            <span className="flex h-4 w-4 items-center justify-center">
               <Building2 className="h-3.5 w-3.5" aria-hidden />
             </span>
           ) : null}
@@ -71,7 +79,7 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
           disabled={!data || saving || !!workspaceError || busy}
           value={data?.activeId || "default"}
           onChange={e => selectBrand(workspace.profile.email, e.target.value)}
-          className={`${manage ? "mt-2 border-border bg-background p-2" : "relative border-primary/40 bg-background px-3 py-3 font-semibold shadow-sm"} w-full rounded-xl border text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/15`}
+          className={`${manage ? "mt-2 border-border bg-background p-2" : "border-border bg-background px-2 py-2 font-medium"} w-full rounded-lg border text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/15`}
         >
           {(
             data?.brands || [
@@ -85,22 +93,43 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
         </StudioSelect>
       </label>
       {manage && data && (
-        <>
-          <p className="mt-3 text-sm text-foreground/70">
+        <details
+          open={!compact}
+          className={compact ? "min-w-0 sm:justify-self-end" : undefined}
+        >
+          <summary
+            className={
+              compact
+                ? "cursor-pointer text-xs text-muted-foreground"
+                : "hidden"
+            }
+          >
+            {data.brands.length}/{data.limit} ·{" "}
+            {data.brands.length < data.limit
+              ? ui("Add brand")
+              : ui("Compare brand allowances")}
+          </summary>
+          <p
+            className={
+              compact
+                ? "mt-3 max-w-lg text-xs leading-relaxed text-muted-foreground"
+                : "mt-3 text-sm text-foreground/70"
+            }
+          >
             {data.brands.length} {ui("of")} {data.limit}{" "}
             {ui(
               "brands. Each has its own voice, Library, projects, calendar, and social connections. Plan credits are shared."
             )}
           </p>
           {data.brands.length < data.limit ? (
-            <div className="mt-4 flex gap-2">
+            <div className={compact ? "mt-3 flex gap-2" : "mt-4 flex gap-2"}>
               <input
                 aria-label={ui("New brand name")}
                 value={name}
                 onChange={e => setName(e.target.value)}
                 maxLength={100}
                 placeholder={ui("Brand name")}
-                className="min-w-0 flex-1 rounded-lg border border-border bg-background p-3 text-sm"
+                className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
               />
               <button
                 type="button"
@@ -119,10 +148,13 @@ export function BrandSwitcher({ manage = false }: { manage?: boolean }) {
               {ui("Compare brand allowances")}
             </Link>
           )}
-        </>
+        </details>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-sm text-destructive">
+        <p
+          role="alert"
+          className={`mt-2 text-sm text-destructive ${manage && compact ? "sm:col-span-2" : ""}`}
+        >
           {ui(error)}
         </p>
       )}

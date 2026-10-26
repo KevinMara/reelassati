@@ -19,6 +19,7 @@ import {
 } from "react-router-dom";
 import {
   LayoutDashboard,
+  Building2,
   Bell,
   Sun,
   Moon,
@@ -336,9 +337,7 @@ function DashboardHome() {
 
   return (
     <div>
-      <CreationStart />
-      <div className="dashboard-hero mb-6 rounded-2xl border border-border px-5 py-5 md:px-6">
-        <p className="mono-eyebrow text-primary mb-2">{ui("Dashboard")}</p>
+      <div className="mb-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold">
@@ -349,7 +348,7 @@ function DashboardHome() {
               {ui("What will you make impossible to scroll past today?")}
             </p>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs text-foreground/70 shadow-sm backdrop-blur-sm">
+          <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <span
               aria-hidden="true"
               className={cn(
@@ -369,9 +368,10 @@ function DashboardHome() {
           </span>
         </div>
       </div>
+      <CreationStart />
 
       <section
-        className="momentum-strip mb-6 rounded-xl border border-border bg-surface px-4 py-4 shadow-card sm:px-5"
+        className="mb-6 border-y border-border py-4"
         aria-label={ui("Weekly momentum")}
       >
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
@@ -713,10 +713,20 @@ export default function Dashboard() {
   const [pinned, setPinned] = useState(
     () => localStorage.getItem("reelassati:sidebar-pinned") === "true"
   );
-  const [expandedPath,setExpandedPath]=useState("");
-  const collapsed=!pinned && location.pathname!=="/dashboard" && expandedPath!==location.pathname;
-  const setCollapsed=(value:boolean)=>setExpandedPath(value?"":location.pathname);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobilePath, setMobilePath] = useState(location.pathname);
+  if (mobilePath !== location.pathname) {
+    setMobilePath(location.pathname);
+    setMobileOpen(false);
+  }
+  const [expandedPath, setExpandedPath] = useState("");
+  const collapsed =
+    !mobileOpen &&
+    !pinned &&
+    location.pathname !== "/dashboard" &&
+    expandedPath !== location.pathname;
+  const setCollapsed = (value: boolean) =>
+    setExpandedPath(value ? "" : location.pathname);
   const [createOpen, setCreateOpen] = useState(() =>
     ["/dashboard/video", "/dashboard/image", "/dashboard/voice"].some(route =>
       location.pathname.startsWith(route)
@@ -789,7 +799,10 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="studio-shell min-h-screen bg-background text-foreground flex">
+    <div
+      className="studio-shell min-h-screen bg-background text-foreground flex"
+      data-page={path.split("/")[2] || "dashboard"}
+    >
       {/* Mobile overlay */}
       {mobileOpen && (
         <button
@@ -804,7 +817,10 @@ export default function Dashboard() {
       <aside
         onMouseEnter={() => setCollapsed(false)}
         onMouseLeave={() => {
-          if (!pinned && path !== "/dashboard") setCollapsed(true);
+          if (!pinned && path !== "/dashboard") {
+            setCollapsed(true);
+            setCreateOpen(false);
+          }
         }}
         onFocusCapture={() => setCollapsed(false)}
         onBlurCapture={event => {
@@ -817,8 +833,10 @@ export default function Dashboard() {
         }}
         className={cn(
           "fixed lg:sticky top-0 left-0 z-50 h-screen bg-surface border-r border-border flex flex-col transition-all duration-300",
-          collapsed ? "w-[68px]" : "w-56",
-          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          collapsed ? "w-[56px]" : "w-56",
+          mobileOpen
+            ? "visible translate-x-0"
+            : "invisible -translate-x-full lg:visible lg:translate-x-0"
         )}
       >
         <div className="h-14 flex items-center px-3 border-b border-border shrink-0">
@@ -839,7 +857,10 @@ export default function Dashboard() {
             title={ui(
               "Pin to keep the sidebar open. Unpin to expand it on hover."
             )}
-            className="studio-help-anchor hidden lg:flex p-1.5 rounded-md text-foreground/70 hover:text-primary"
+            className={cn(
+              "studio-help-anchor p-1.5 rounded-md text-foreground/70 hover:text-primary",
+              collapsed ? "hidden" : "hidden lg:flex"
+            )}
             data-help={ui(
               "Pin to keep the sidebar open. Unpin to expand it on hover."
             )}
@@ -860,11 +881,6 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {!collapsed && (
-          <div className="px-4 py-3">
-            <BrandSwitcher />
-          </div>
-        )}
         <div className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
           {navItems.map((item, i) =>
             item.separator ? (
@@ -875,7 +891,7 @@ export default function Dashboard() {
                   "border-t border-border",
                   item.compact
                     ? "mx-1 my-1"
-                    : "mt-4 px-3 pt-3 text-xs font-medium text-foreground/70"
+                    : "mt-2 h-7 px-3 pt-2 text-[11px] font-medium text-foreground/70"
                 )}
               >
                 {!collapsed && item.label}
@@ -961,6 +977,17 @@ export default function Dashboard() {
           )}
         </div>
 
+        <div className="relative h-[78px] shrink-0 border-t border-border px-3 py-2">
+          <div className={collapsed ? "invisible" : "visible"}>
+            <BrandSwitcher />
+          </div>
+          {collapsed && (
+            <Building2
+              aria-hidden
+              className="absolute left-5 top-7 size-4 text-muted-foreground"
+            />
+          )}
+        </div>
         <div className="shrink-0 border-t border-border p-3">
           <button
             type="button"
@@ -1006,6 +1033,7 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={toggleTheme}
+            data-theme-control
             aria-label={
               theme === "light" ? ui("Use dark theme") : ui("Use light theme")
             }
@@ -1020,7 +1048,7 @@ export default function Dashboard() {
           <LanguagePicker compact />
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 xl:p-8 w-full">
+        <main className="studio-main flex-1 min-w-0 w-full">
           <Suspense fallback={<StudioPageFallback />}>
             {workspaceLoading ? (
               <StudioPageFallback />

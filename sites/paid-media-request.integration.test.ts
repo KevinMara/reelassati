@@ -577,6 +577,7 @@ describe("OpenRouter custom sound effects on the actual worker", () => {
     expect(result).toMatchObject({
       creditsCharged: expected,
       reservedCredits: 150,
+      creditReceipt: { status: "settled", credits: expected },
       asset: {
         kind: "audio",
         contentType: "audio/mpeg",

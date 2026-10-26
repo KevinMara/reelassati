@@ -1,4 +1,8 @@
 import { speechCreditCost, speechCharacterCount } from "@contracts/billing";
+import {
+  readCreditReceipt,
+  type CreditReceipt,
+} from "@contracts/credit-receipt";
 import { ANALYZER_STREAM_TYPE } from "@contracts/analyzer-transport";
 import { videoReviewFailureMessage } from "@contracts/video-analysis-errors";
 import { unwrapAnalyzerResponse } from "./analyzer-response";
@@ -117,6 +121,7 @@ export interface UploadRequestScope {
 export interface UploadRequestOptions {
   scope?: UploadRequestScope;
   signal?: AbortSignal;
+  onCreditReceipt?: (receipt: CreditReceipt | undefined) => void;
 }
 function sessionScope(session: Session | null): UploadRequestScope {
   if (!session?.user.email || !session.access_token)
@@ -154,105 +159,120 @@ async function requestJson<T>(
   path: string,
   init?: RequestInit,
   direct = false,
-  scope?: UploadRequestScope
+  scope?: UploadRequestScope,
+  onCreditReceipt?: UploadRequestOptions["onCreditReceipt"]
 ): Promise<T> {
-  let session = await requestSession();
-  const send = (activeSession: Session | null) => {
-    init?.signal?.throwIfAborted();
-    assertRequestScope(activeSession, scope);
-    return fetch(direct ? path : platformApiUrl(path), {
-      ...init,
-      headers: {
-        ...(init?.body instanceof FormData
-          ? {}
-          : { "Content-Type": "application/json" }),
-        ...(activeSession?.access_token
-          ? { Authorization: `Bearer ${activeSession.access_token}` }
-          : {}),
-        "X-Reelassati-Brand":
-          scope?.brandId ?? selectedBrand(activeSession?.user.email),
-        ...init?.headers,
-      },
-    });
-  };
+  let receiptReported = false;
+  try {
+    let session = await requestSession();
+    const send = (activeSession: Session | null) => {
+      init?.signal?.throwIfAborted();
+      assertRequestScope(activeSession, scope);
+      return fetch(direct ? path : platformApiUrl(path), {
+        ...init,
+        headers: {
+          ...(init?.body instanceof FormData
+            ? {}
+            : { "Content-Type": "application/json" }),
+          ...(activeSession?.access_token
+            ? { Authorization: `Bearer ${activeSession.access_token}` }
+            : {}),
+          "X-Reelassati-Brand":
+            scope?.brandId ?? selectedBrand(activeSession?.user.email),
+          ...init?.headers,
+        },
+      });
+    };
 
-  let response = await unwrapAnalyzerResponse(
-    await send(session),
-    init?.signal ?? undefined
-  );
-  if (response.status === 401 && session?.access_token) {
-    session = await recoverRejectedSession(session.access_token);
-    response = await unwrapAnalyzerResponse(
+    let response = await unwrapAnalyzerResponse(
       await send(session),
       init?.signal ?? undefined
     );
-  }
-  init?.signal?.throwIfAborted();
-  if (scope) await verifyUploadRequestScope(scope);
-
-  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-  const responseText = await response.text();
-  init?.signal?.throwIfAborted();
-  if (scope) await verifyUploadRequestScope(scope);
-  const isJson = contentType.includes("json");
-  let parsed: unknown;
-  if (isJson && responseText) {
-    try {
-      parsed = JSON.parse(responseText);
-    } catch {
-      parsed = undefined;
+    if (response.status === 401 && session?.access_token) {
+      session = await recoverRejectedSession(session.access_token);
+      response = await unwrapAnalyzerResponse(
+        await send(session),
+        init?.signal ?? undefined
+      );
     }
-  }
+    init?.signal?.throwIfAborted();
+    if (scope) await verifyUploadRequestScope(scope);
 
-  if (!response.ok) {
-    const body = (parsed ?? {}) as ApiErrorBody;
-    throw new PlatformApiError(
-      body.error || body.message || `Request failed (${response.status})`,
-      response.status,
-      body.missing,
-      typeof body.reference === "string" &&
-        /^[\w-]{1,100}$/.test(body.reference)
-        ? body.reference
-        : undefined,
-      path === "/api/ai/analyze" &&
-        response.status === 422 &&
-        body.analysisIncomplete === true &&
-        typeof body.reason === "string" &&
-        videoReviewFailureMessage(body.reason)
-        ? body.reason
-        : undefined
-    );
-  }
+    const contentType =
+      response.headers.get("content-type")?.toLowerCase() ?? "";
+    const responseText = await response.text();
+    init?.signal?.throwIfAborted();
+    if (scope) await verifyUploadRequestScope(scope);
+    const isJson = contentType.includes("json");
+    let parsed: unknown;
+    if (isJson && responseText) {
+      try {
+        parsed = JSON.parse(responseText);
+      } catch {
+        parsed = undefined;
+      }
+    }
 
-  if (!isJson || parsed === undefined) {
-    throw new PlatformApiError(
-      "The server returned an unexpected response. Reload the page and try again.",
-      response.status
-    );
-  }
+    if (onCreditReceipt) {
+      receiptReported = true;
+      onCreditReceipt(
+        readCreditReceipt(
+          (parsed as { creditReceipt?: unknown } | undefined)?.creditReceipt
+        )
+      );
+    }
+    if (!response.ok) {
+      const body = (parsed ?? {}) as ApiErrorBody;
+      throw new PlatformApiError(
+        body.error || body.message || `Request failed (${response.status})`,
+        response.status,
+        body.missing,
+        typeof body.reference === "string" &&
+          /^[\w-]{1,100}$/.test(body.reference)
+          ? body.reference
+          : undefined,
+        path === "/api/ai/analyze" &&
+          response.status === 422 &&
+          body.analysisIncomplete === true &&
+          typeof body.reason === "string" &&
+          videoReviewFailureMessage(body.reason)
+          ? body.reason
+          : undefined
+      );
+    }
 
-  // Media URLs use the API host even when the frontend is on a custom domain.
-  const resolveMedia = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(resolveMedia);
-    if (!value || typeof value !== "object") return value;
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        key === "url" &&
-        typeof item === "string" &&
-        item.startsWith("/api/media/")
-          ? platformApiUrl(item)
-          : resolveMedia(item),
-      ])
-    );
-  };
-  if (
-    typeof window !== "undefined" &&
-    ((init?.method === "POST" && /^\/api\/(ai|trends|video)/.test(path)) ||
-      (parsed as { job?: { status?: string } }).job?.status === "completed")
-  )
-    window.dispatchEvent(new Event("reelassati:credits-changed"));
-  return resolveMedia(parsed) as T;
+    if (!isJson || parsed === undefined) {
+      throw new PlatformApiError(
+        "The server returned an unexpected response. Reload the page and try again.",
+        response.status
+      );
+    }
+
+    // Media URLs use the API host even when the frontend is on a custom domain.
+    const resolveMedia = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(resolveMedia);
+      if (!value || typeof value !== "object") return value;
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [
+          key,
+          key === "url" &&
+          typeof item === "string" &&
+          item.startsWith("/api/media/")
+            ? platformApiUrl(item)
+            : resolveMedia(item),
+        ])
+      );
+    };
+    if (
+      typeof window !== "undefined" &&
+      ((init?.method === "POST" && /^\/api\/(ai|trends|video)/.test(path)) ||
+        (parsed as { job?: { status?: string } }).job?.status === "completed")
+    )
+      window.dispatchEvent(new Event("reelassati:credits-changed"));
+    return resolveMedia(parsed) as T;
+  } finally {
+    if (onCreditReceipt && !receiptReported) onCreditReceipt(undefined);
+  }
 }
 
 async function uploadForm<T>(
@@ -659,8 +679,34 @@ export const platformApi = {
       body: JSON.stringify({}),
     }),
 
-  searchStock: (kind: import("@contracts/stock-media").StockKind, query: string, signal?: AbortSignal) => requestJson<{items: import("@contracts/stock-media").StockMedia[]}>(`/api/stock/search?kind=${kind}&q=${encodeURIComponent(query)}`, {signal}),
-  importStock: (item: import("@contracts/stock-media").StockMedia, signal?: AbortSignal, scope?: UploadRequestScope) => requestJson<Asset>("/api/stock/import", {method:"POST",body:JSON.stringify({provider:item.provider,id:item.id,kind:item.kind}),signal},false,scope),
+  searchStock: (
+    kind: import("@contracts/stock-media").StockKind,
+    query: string,
+    signal?: AbortSignal
+  ) =>
+    requestJson<{ items: import("@contracts/stock-media").StockMedia[] }>(
+      `/api/stock/search?kind=${kind}&q=${encodeURIComponent(query)}`,
+      { signal }
+    ),
+  importStock: (
+    item: import("@contracts/stock-media").StockMedia,
+    signal?: AbortSignal,
+    scope?: UploadRequestScope
+  ) =>
+    requestJson<Asset>(
+      "/api/stock/import",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          provider: item.provider,
+          id: item.id,
+          kind: item.kind,
+        }),
+        signal,
+      },
+      false,
+      scope
+    ),
 
   uploadAsset: async (
     file: File,
@@ -934,17 +980,28 @@ export const platformApi = {
       options?.scope
     ),
 
-  editorChat: (input: import("@contracts/editor-chat").EditorChatRequest) =>
+  editorChat: (
+    input: import("@contracts/editor-chat").EditorChatRequest,
+    options?: UploadRequestOptions
+  ) =>
     requestJson<import("@contracts/editor-chat").EditorChatResponse>(
       "/api/ai/editor-chat",
-      { method: "POST", body: JSON.stringify(input) }
+      { method: "POST", body: JSON.stringify(input), signal: options?.signal },
+      false,
+      options?.scope,
+      options?.onCreditReceipt
     ),
 
-  findStorySections: (projectId: string, requestId: string) =>
+  findStorySections: (
+    projectId: string,
+    requestId: string,
+    options?: UploadRequestOptions
+  ) =>
     requestJson<import("@contracts/editor-chat").EditorChatResponse>(
       "/api/ai/editor-chat",
       {
         method: "POST",
+        signal: options?.signal,
         body: JSON.stringify({
           projectId,
           requestId,
@@ -954,7 +1011,10 @@ export const platformApi = {
           maxCredits: 5,
           task: "story-sections",
         }),
-      }
+      },
+      false,
+      options?.scope,
+      options?.onCreditReceipt
     ),
 
   generateEditPlan: async (
@@ -967,6 +1027,7 @@ export const platformApi = {
       model?: import("@contracts/edit-model").EditModel;
       effort?: import("@contracts/edit-model").EditEffort;
       stock?: boolean;
+      captionStyling?: boolean;
     },
     options?: UploadRequestOptions
   ) => {
@@ -1014,6 +1075,7 @@ export const platformApi = {
       return await requestJson<{
         changes: EditOperation[];
         stockMedia?: import("@contracts/stock-media").StockMedia[];
+        captionTreatment?: import("@contracts/editorial-captions").AutonomousCaptionTreatment;
         summary: string;
         provenance: ContentProvenance;
       }>(
@@ -1025,7 +1087,8 @@ export const platformApi = {
           signal: local.signal,
         },
         false,
-        scope
+        scope,
+        options?.onCreditReceipt
       );
     } catch (cause) {
       if (!(cause instanceof PlatformApiError)) {
@@ -1060,7 +1123,8 @@ export const platformApi = {
       focus?: string;
     },
     signal?: AbortSignal,
-    scope?: UploadRequestScope
+    scope?: UploadRequestScope,
+    onCreditReceipt?: UploadRequestOptions["onCreditReceipt"]
   ) => {
     signal?.throwIfAborted();
     const requestId = crypto.randomUUID();
@@ -1127,7 +1191,8 @@ export const platformApi = {
           body: JSON.stringify({ ...input, requestId }),
         },
         false,
-        scope
+        scope,
+        onCreditReceipt
       );
     } catch (cause) {
       if (!(cause instanceof PlatformApiError)) {
@@ -1148,7 +1213,24 @@ export const platformApi = {
     }
   },
 
-  registerLocalTranscript: (input:{assetId:string;projectId?:string;segments:EditProject["transcript"]}, options:UploadRequestOptions) => requestJson<{transcript:string;segments:EditProject["transcript"];provenance:ContentProvenance}>("/api/transcripts/local",{method:"POST",body:JSON.stringify(input),signal:options.signal},false,options.scope),
+  registerLocalTranscript: (
+    input: {
+      assetId: string;
+      projectId?: string;
+      segments: EditProject["transcript"];
+    },
+    options: UploadRequestOptions
+  ) =>
+    requestJson<{
+      transcript: string;
+      segments: EditProject["transcript"];
+      provenance: ContentProvenance;
+    }>(
+      "/api/transcripts/local",
+      { method: "POST", body: JSON.stringify(input), signal: options.signal },
+      false,
+      options.scope
+    ),
   transcribe: (
     assetId: string,
     language?: string,
@@ -1168,7 +1250,8 @@ export const platformApi = {
         signal: options?.signal,
       },
       false,
-      options?.scope
+      options?.scope,
+      options?.onCreditReceipt
     ),
 
   quoteAudio: (kind: "music" | "sfx", seconds: number) =>
@@ -1176,20 +1259,30 @@ export const platformApi = {
       method: "POST",
       body: JSON.stringify({ kind, seconds }),
     }),
-  generateAudio: async (input: {
-    kind: "music" | "sfx";
-    seconds: number;
-    text: string;
-    acceptedCredits: number;
-    requestId: string;
-    rightsConfirmed: true;
-    projectId: string;
-    assetName?: string;
-  }): Promise<Asset> => {
-    const result = await requestJson<{ asset: Asset }>("/api/ai/audio", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
+  generateAudio: async (
+    input: {
+      kind: "music" | "sfx";
+      seconds: number;
+      text: string;
+      acceptedCredits: number;
+      requestId: string;
+      rightsConfirmed: true;
+      projectId: string;
+      assetName?: string;
+    },
+    options?: UploadRequestOptions
+  ): Promise<Asset> => {
+    const result = await requestJson<{ asset: Asset }>(
+      "/api/ai/audio",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+        signal: options?.signal,
+      },
+      false,
+      options?.scope,
+      options?.onCreditReceipt
+    );
     return result.asset;
   },
   synthesizeSpeech: async (
@@ -1217,7 +1310,8 @@ export const platformApi = {
         signal: options?.signal,
       },
       false,
-      options?.scope
+      options?.scope,
+      options?.onCreditReceipt
     );
     return result.asset;
   },
@@ -1243,7 +1337,8 @@ export const platformApi = {
         signal: options?.signal,
       },
       false,
-      options?.scope
+      options?.scope,
+      options?.onCreditReceipt
     );
     return result.asset;
   },
@@ -1275,7 +1370,8 @@ export const platformApi = {
         signal: options?.signal,
       },
       false,
-      options?.scope
+      options?.scope,
+      options?.onCreditReceipt
     ),
 
   videoJob: (id: string, options?: UploadRequestOptions) =>
@@ -1283,14 +1379,18 @@ export const platformApi = {
       `/api/video/jobs/${encodeURIComponent(id)}`,
       { signal: options?.signal },
       false,
-      options?.scope
+      options?.scope,
+      options?.onCreditReceipt
     ),
 
   /** Retrieve an existing provider output; this endpoint never starts a new generation. */
-  recoverVideoJob: (id: string) =>
+  recoverVideoJob: (id: string, options?: UploadRequestOptions) =>
     requestJson<{ job: GenerationJob; asset?: Asset }>(
       `/api/video/jobs/${encodeURIComponent(id)}/recover`,
-      { method: "POST" }
+      { method: "POST", signal: options?.signal },
+      false,
+      options?.scope,
+      options?.onCreditReceipt
     ),
 
   publishingAccounts: () =>

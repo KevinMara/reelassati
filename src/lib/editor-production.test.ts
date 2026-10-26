@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
 import { auditAutomatedEdit, trimObservedEnding } from "./editor-production";
 import { audioGenerationQuote } from "@contracts/audio-generation";
+import { normalizeGraphic } from "@contracts/motion-graphics";
 
 const clip = {
   id: "clip",
@@ -17,6 +18,28 @@ const clip = {
 const project = { clips: [clip] } as EditProject;
 const assets = [{ id: "media", kind: "video", duration: 28.3507 }] as Asset[];
 describe("automated edit delivery checks", () => {
+  it("rejects newly generated unreadable cards without imposing a redesign on existing user graphics", () => {
+    const bad = {
+      ...clip,
+      id: "bad-card",
+      assetId: undefined,
+      label: "Card",
+      inPoint: 0,
+      outPoint: 3,
+      duration: 3,
+      graphic: normalizeGraphic({
+        kind: "callout",
+        text: "A useful detail",
+        color: "#EEEEEE",
+        background: "#FFFFFF",
+      }),
+    };
+    const after = { ...project, clips: [...project.clips, bad] };
+    expect(auditAutomatedEdit(project, after, assets)).toContain(
+      "Graphic text lacks contrast against its card: Card"
+    );
+    expect(auditAutomatedEdit(after, after, assets)).toEqual([]);
+  });
   it("retains precise source endpoints without forcing display rounding onto media", () => {
     expect(auditAutomatedEdit(project, project, assets)).toEqual([]);
   });

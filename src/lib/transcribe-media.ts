@@ -13,7 +13,8 @@ export async function transcribeMedia(
   projectId: string | undefined,
   onProgress?: (stage: string) => void,
   signal?: AbortSignal,
-  requestScope?: UploadRequestScope
+  requestScope?: UploadRequestScope,
+  onCreditReceipt?: import("./platform-api").UploadRequestOptions["onCreditReceipt"]
 ) {
   const scope = requestScope ?? (await captureUploadRequestScope());
   const ffmpeg = new FFmpeg();
@@ -114,7 +115,7 @@ export async function transcribeMedia(
       language,
       projectId,
       temporary,
-      { scope, signal }
+      { scope, signal, onCreditReceipt }
     );
   } finally {
     signal?.removeEventListener("abort", cancel);

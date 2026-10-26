@@ -1,4 +1,8 @@
 import { automaticResearchDisabled } from "./ui-manual-only";
+import { stylesWorkspaceUi } from "./ui-styles-workspace";
+import { editorReceiptUi } from "./ui-editor-receipts";
+import { guidedTourUi } from "./ui-guided-tour";
+import { librarySourceUi } from "./ui-library-sources";
 import { editingTemplateUi } from "./ui-edit-templates";
 import { editingTraitUi } from "./ui-edit-template-traits";
 import { italianUi } from "./ui-it";
@@ -75,6 +79,16 @@ export const uiLocales: Record<string, Record<string, string>> = {
   he: { ...hebrewUi, ...asianUi.he },
 };
 
+for (const [language, translation] of Object.entries(editorReceiptUi)) {
+  if (language !== "en") Object.assign(uiLocales[language], translation);
+}
+for (const [language, translation] of Object.entries(guidedTourUi)) {
+  if (language !== "en") Object.assign(uiLocales[language], translation);
+}
+for (const [language, translation] of Object.entries(librarySourceUi)) {
+  if (language !== "en") Object.assign(uiLocales[language], translation);
+}
+
 for (const [language, translation] of Object.entries(editorRedesignUi)) {
   Object.assign(uiLocales[language], translation);
 }
@@ -97,4 +111,7 @@ for (const [language, translation] of Object.entries(editDurationUi)) {
 for (const [language, translation] of Object.entries(editingTraitUi)) {
   for (const [key, value] of Object.entries(translation))
     uiLocales[language][key] ??= value;
+}
+for (const [language, translation] of Object.entries(stylesWorkspaceUi)) {
+  Object.assign(uiLocales[language], translation);
 }

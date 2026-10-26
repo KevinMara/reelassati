@@ -69,7 +69,13 @@ function contextBlock() {
   ].join("\n");
 }
 
-export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
+export function FeedbackCenter({
+  showInbox = false,
+  compact = false,
+}: {
+  showInbox?: boolean;
+  compact?: boolean;
+}) {
   const ui = useUiText();
 
   const { user } = useAuth();
@@ -236,34 +242,65 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
 
       <section
         id="send-feedback"
-        className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"
+        className={
+          compact
+            ? "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_240px]"
+            : "grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"
+        }
       >
         <form
           onSubmit={submit}
-          className="rounded-2xl border border-border bg-surface p-5 shadow-card sm:p-7"
+          className={
+            compact
+              ? "rounded-lg border border-border bg-surface p-4 sm:p-5"
+              : "rounded-2xl border border-border bg-surface p-5 shadow-card sm:p-7"
+          }
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="mono-eyebrow text-primary">
-                {ui("Help us improve")}
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold">
+              {!compact && (
+                <p className="mono-eyebrow text-primary">
+                  {ui("Help us improve")}
+                </p>
+              )}
+              <h2
+                className={
+                  compact
+                    ? "text-sm font-semibold"
+                    : "mt-2 text-2xl font-semibold"
+                }
+              >
                 {ui("Send a report")}
               </h2>
-              <p className="mt-2 max-w-2xl text-sm text-foreground/55">
-                {ui(
-                  "Report a problem or suggest an improvement. Technical context is attached automatically."
-                )}
-              </p>
+              {!compact && (
+                <p className="mt-2 max-w-2xl text-sm text-foreground/55">
+                  {ui(
+                    "Report a problem or suggest an improvement. Technical context is attached automatically."
+                  )}
+                </p>
+              )}
             </div>
-            <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-600">
+            <span
+              className={
+                compact
+                  ? "flex items-center gap-1.5 text-xs text-muted-foreground"
+                  : "flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-600"
+              }
+            >
               <ShieldCheck className="h-3.5 w-3.5" />
               {ui("No sensitive data")}
             </span>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div
+            className={
+              compact
+                ? "mt-4 grid gap-2 sm:grid-cols-2"
+                : "mt-6 grid gap-3 sm:grid-cols-2"
+            }
+          >
             <TypeButton
+              compact={compact}
               active={type === "bug"}
               icon={AlertTriangle}
               title={ui("Report a bug")}
@@ -271,6 +308,7 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
               onClick={() => setType("bug")}
             />
             <TypeButton
+              compact={compact}
               active={type === "feedback"}
               icon={Lightbulb}
               title={ui("Suggest an improvement")}
@@ -279,7 +317,7 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
             />
           </div>
 
-          <div className="mt-6 grid gap-5">
+          <div className={compact ? "mt-4 grid gap-4" : "mt-6 grid gap-5"}>
             {!user ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label={ui("Name")}>
@@ -337,7 +375,7 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
                 }
                 required
                 minLength={10}
-                rows={5}
+                rows={compact ? 4 : 5}
                 className={`${FIELD_INPUT} resize-y`}
                 placeholder={ui(
                   "Describe the problem or idea with as much useful detail as possible."
@@ -428,7 +466,12 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
             disabled={
               busy || title.trim().length < 4 || details.trim().length < 10
             }
-            className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-[0_14px_34px_-18px_hsl(var(--primary))] transition hover:-translate-y-0.5 hover:bg-primary-hover disabled:translate-y-0 disabled:opacity-45 sm:w-auto"
+            className={cn(
+              "inline-flex w-full items-center justify-center gap-2 bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary-hover disabled:opacity-45 sm:w-auto",
+              compact
+                ? "mt-5 rounded-lg px-4 py-2.5"
+                : "mt-6 min-h-11 rounded-xl px-5 py-3 shadow-[0_14px_34px_-18px_hsl(var(--primary))] hover:-translate-y-0.5 disabled:translate-y-0"
+            )}
           >
             {busy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -448,8 +491,9 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
           </p>
         </form>
 
-        <aside className="space-y-4">
+        <aside className={compact ? "space-y-2" : "space-y-4"}>
           <InfoCard
+            compact={compact}
             icon={Sparkles}
             title={ui("What happens next")}
             items={[
@@ -459,6 +503,7 @@ export function FeedbackCenter({ showInbox = false }: { showInbox?: boolean }) {
             ]}
           />
           <InfoCard
+            compact={compact}
             icon={ShieldCheck}
             title={ui("Send safely")}
             items={[
@@ -714,12 +759,14 @@ function TypeButton({
   title,
   description,
   onClick,
+  compact = false,
 }: {
   active: boolean;
   icon: typeof AlertTriangle;
   title: string;
   description: string;
   onClick: () => void;
+  compact?: boolean;
 }) {
   return (
     <button
@@ -727,15 +774,19 @@ function TypeButton({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "rounded-xl border p-4 text-left transition",
+        compact
+          ? "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors"
+          : "rounded-xl border p-4 text-left transition",
         active
-          ? "border-primary/35 bg-primary/[0.07] shadow-[0_12px_28px_-22px_hsl(var(--primary))]"
+          ? "border-primary/35 bg-primary/[0.07]"
           : "border-border bg-background hover:border-primary/20"
       )}
     >
       <span
         className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-lg",
+          compact
+            ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
+            : "flex h-9 w-9 items-center justify-center rounded-lg",
           active
             ? "bg-primary/15 text-primary"
             : "bg-foreground/[0.05] text-foreground/50"
@@ -743,9 +794,19 @@ function TypeButton({
       >
         <Icon className="h-4 w-4" />
       </span>
-      <span className="mt-3 block text-sm font-semibold">{title}</span>
-      <span className="mt-1 block text-xs leading-relaxed text-foreground/45">
-        {description}
+      <span className="min-w-0">
+        <span
+          className={
+            compact
+              ? "block text-sm font-medium"
+              : "mt-3 block text-sm font-semibold"
+          }
+        >
+          {title}
+        </span>
+        <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+          {description}
+        </span>
       </span>
     </button>
   );
@@ -770,11 +831,30 @@ function InfoCard({
   icon: Icon,
   title,
   items,
+  compact = false,
 }: {
   icon: typeof Sparkles;
   title: string;
   items: string[];
+  compact?: boolean;
 }) {
+  if (compact)
+    return (
+      <details className="rounded-lg border border-border bg-surface">
+        <summary className="cursor-pointer px-3 py-3 text-xs font-medium">
+          <Icon className="mr-2 inline h-3.5 w-3.5 text-muted-foreground" />
+          {title}
+        </summary>
+        <ul className="space-y-2 border-t border-border px-3 py-3 text-xs leading-relaxed text-muted-foreground">
+          {items.map(item => (
+            <li key={item} className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      </details>
+    );
   return (
     <div className="rounded-2xl border border-border bg-background/80 p-5">
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">

@@ -1,5 +1,6 @@
 import type { ContentProvenance } from "@contracts/compliance";
 import type { StockMedia } from "@contracts/stock-media";
+import type { AutonomousCaptionTreatment } from "@contracts/editorial-captions";
 import type {
   EditOperation,
   EditProject,
@@ -9,6 +10,7 @@ import type {
 export interface AutonomousPlanResult {
   changes: EditOperation[];
   stockMedia?: StockMedia[];
+  captionTreatment?: AutonomousCaptionTreatment;
   summary: string;
   provenance: ContentProvenance;
 }
@@ -35,6 +37,7 @@ export function autonomousPlanCacheKey(input: AutonomousPlanCacheInput) {
       playhead: undefined,
       activeAssetId: undefined,
       updatedAt: undefined,
+      editorChat: undefined,
     },
   });
 }

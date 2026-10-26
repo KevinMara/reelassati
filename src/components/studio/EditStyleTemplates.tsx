@@ -171,10 +171,12 @@ export function SaveEditStyleTemplate({
 export function EditStyleTemplates({
   project,
   disabled = false,
+  compact = false,
   onSelect,
 }: {
   project: EditProject;
   disabled?: boolean;
+  compact?: boolean;
   onSelect?: (template?: EditStyleTemplate) => void;
 }) {
   const ui = useUiText();
@@ -232,14 +234,18 @@ export function EditStyleTemplates({
   return (
     <section
       aria-label={ui("Editing templates")}
-      className="space-y-3 rounded-xl border border-border p-3"
+      className={
+        compact ? "space-y-2" : "space-y-3 rounded-xl border border-border p-3"
+      }
     >
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{ui("Editing templates")}</h3>
-        <span className="text-xs text-muted-foreground">
-          {templates.length}/{EDIT_STYLE_TEMPLATE_LIMIT}
-        </span>
-      </div>
+      {!compact && (
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">{ui("Editing templates")}</h3>
+          <span className="text-xs text-muted-foreground">
+            {templates.length}/{EDIT_STYLE_TEMPLATE_LIMIT}
+          </span>
+        </div>
+      )}
       <label className="block text-xs">
         {ui("Style for the next edit")}
         <StudioSelect
@@ -262,9 +268,11 @@ export function EditStyleTemplates({
           ))}
         </StudioSelect>
       </label>
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        {ui("Selecting a template does not start an edit or spend credits.")}
-      </p>
+      {!compact && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {ui("Selecting a template does not start an edit or spend credits.")}
+        </p>
+      )}
       {active && (
         <details className="text-xs">
           <summary className="cursor-pointer">
@@ -273,7 +281,7 @@ export function EditStyleTemplates({
           <EditStyleProfilePreview profile={active.profile} />
         </details>
       )}
-      {profile && (
+      {!compact && profile && (
         <details>
           <summary className="cursor-pointer text-xs font-medium">
             {ui("Save this edit as a template")}
@@ -287,7 +295,7 @@ export function EditStyleTemplates({
           </div>
         </details>
       )}
-      {templates.length > 0 && (
+      {!compact && templates.length > 0 && (
         <details>
           <summary className="cursor-pointer text-xs text-muted-foreground">
             {ui("Manage templates")}

@@ -1,6 +1,11 @@
 import { useUiText } from "@/lib/i18n/ui";
 import { colorGradeMatrix, colorToneTable } from "@/lib/color-grade";
-import { normalizeVisual, patchVisual, visualFrame } from "@contracts/clip-visual";
+import {
+  normalizeVisual,
+  patchVisual,
+  visualFrame,
+} from "@contracts/clip-visual";
+import { graphicSelectionBounds } from "@contracts/graphic-selection";
 import { CaptionLayer } from "./CaptionLayer";
 import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import { useEffect, useId, useRef, useState } from "react";
@@ -261,6 +266,25 @@ export function TimelinePreview({
         !(c.graphic && c.hidden)
     )
     .sort(compareTimelineLayers);
+  const selected = active.find(c => c.id === selectedClipId && c.graphic);
+  const selectedGraphic =
+    selected?.graphic && moving?.id === selected.id
+      ? {
+          ...selected,
+          graphic: {
+            ...selected.graphic,
+            x: selected.graphic.x + moving.dx,
+            y: selected.graphic.y + moving.dy,
+          },
+        }
+      : selected;
+  const [aspectWidth, aspectHeight] = project.aspectRatio
+    .split(":")
+    .map(Number);
+  const selectionHeight = (1000 * aspectHeight) / aspectWidth;
+  const selection =
+    selectedGraphic &&
+    graphicSelectionBounds(selectedGraphic, time, 1000, selectionHeight);
   return (
     <div
       className="relative mx-auto w-full overflow-hidden bg-black"
@@ -317,7 +341,7 @@ export function TimelinePreview({
         maxHeight: "100%",
         maxWidth:
           project.aspectRatio === "9:16"
-            ? "min(100%, calc((var(--editor-upper, 540px) - 110px) * 9 / 16))"
+            ? "min(100%, calc((var(--editor-visible-upper, var(--editor-upper, 540px)) - 88px) * 9 / 16))"
             : project.aspectRatio === "1:1"
               ? "434px"
               : "100%",
@@ -356,15 +380,6 @@ export function TimelinePreview({
           />
         ) : null;
       })}
-      {onSelectClip && active.some(c => c.id === selectedClipId) && (
-        <span
-          className="pointer-events-none absolute inset-0 z-30 rounded-sm border-2 border-primary/80"
-          aria-hidden="true"
-        >
-          <i className="absolute -left-1 -top-1 size-2 bg-primary" />
-          <i className="absolute -right-1 -bottom-1 size-2 bg-primary" />
-        </span>
-      )}
       {dragError && (
         <p
           role="alert"
@@ -387,6 +402,22 @@ export function TimelinePreview({
         frameRate={project.frameRate}
         time={time}
       />
+      {selection && (
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-30 h-full w-full"
+          viewBox={`0 0 1000 ${selectionHeight}`}
+        >
+          <rect
+            {...selection}
+            fill="none"
+            stroke="#d4d4d8"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      )}
     </div>
   );
 }

@@ -618,7 +618,7 @@ function PublisherComposer() {
       )}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <section className="rounded-xl border border-border bg-surface p-6">
+        <section data-tour="publish-compose" className="rounded-xl border border-border bg-surface p-6">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-medium">
               <Send className="h-4 w-4 text-primary" />

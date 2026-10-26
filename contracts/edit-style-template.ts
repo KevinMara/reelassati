@@ -8,7 +8,7 @@ import {
 } from "./motion-graphics";
 
 export const EDIT_STYLE_TEMPLATE_LIMIT = 50;
-const choices = {
+export const EDIT_STYLE_TRAIT_CHOICES = {
   pacing: ["measured", "balanced", "brisk", "variable", "unknown"],
   framing: ["wide", "close", "mixed", "unknown"],
   color: ["natural", "warm", "cool", "monochrome", "vivid", "muted", "unknown"],
@@ -18,6 +18,7 @@ const choices = {
   graphics: ["none", "minimal", "explanatory", "kinetic", "unknown"],
   sound: ["speech-led", "music-led", "ambient", "unknown"],
 } as const;
+const choices = EDIT_STYLE_TRAIT_CHOICES;
 export type EditStyleTraits = {
   -readonly [K in keyof typeof choices]: (typeof choices)[K][number];
 };

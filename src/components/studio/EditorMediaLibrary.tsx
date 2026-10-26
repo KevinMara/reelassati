@@ -1,5 +1,5 @@
 import { CompactSelect } from "@/components/ui/compact-select";
-import { assetOrigin } from "@/lib/library-organization";
+import { assetOrigin, isStockCollection } from "@/lib/library-organization";
 import { StockLibrary } from "./StockLibrary";
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -53,9 +53,9 @@ export function EditorMediaLibrary({
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
   const [sort, setSort] = useState("newest");
-  const [origin,setOrigin]=useState("all");
-  const [date,setDate]=useState("all");
-  const [now]=useState(()=>Date.now());
+  const [origin, setOrigin] = useState("all");
+  const [date, setDate] = useState("all");
+  const [now] = useState(() => Date.now());
   const [folderName, setFolderName] = useState("");
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -73,7 +73,9 @@ export function EditorMediaLibrary({
     },
     [owner, brand]
   );
-  const folders = workspace.mediaFolders ?? [];
+  const folders = (workspace.mediaFolders ?? []).filter(
+    folder => !isStockCollection(folder)
+  );
   const currentFolder = folders.find(f => f.id === folderId);
   async function insert(asset: Asset) {
     if (insertLock.current || asset.status !== "ready") return;
@@ -117,9 +119,13 @@ export function EditorMediaLibrary({
         .filter(
           a =>
             ["video", "image", "audio"].includes(a.kind) &&
-            (origin==="all"||assetOrigin(a)===origin) &&
-            (date==="all"||Date.parse(a.createdAt)>=now-Number(date)*86400000) &&
-            (query.trim() || (a.folderId ?? "") === folderId) &&
+            (origin === "all" ||
+              assetOrigin(a, workspace.mediaFolders) === origin) &&
+            (date === "all" ||
+              Date.parse(a.createdAt) >= now - Number(date) * 86400000) &&
+            (query.trim() ||
+              origin === "stock" ||
+              (a.folderId ?? "") === folderId) &&
             (kind === "all" || a.kind === kind) &&
             [a.name, ...(reviewedContent.get(a.id) ?? [])]
               .join(" ")
@@ -137,7 +143,18 @@ export function EditorMediaLibrary({
                   ? a.createdAt.localeCompare(b.createdAt)
                   : b.createdAt.localeCompare(a.createdAt)
         ),
-    [workspace.assets, folderId, kind, query, sort, reviewedContent,origin,date,now]
+    [
+      workspace.assets,
+      workspace.mediaFolders,
+      folderId,
+      kind,
+      query,
+      sort,
+      reviewedContent,
+      origin,
+      date,
+      now,
+    ]
   );
   async function action(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -299,8 +316,31 @@ export function EditorMediaLibrary({
           e.target.value = "";
         }}
       />
-      <div className="grid grid-cols-2 gap-2"><CompactSelect aria-label={ui("Media source")} value={origin} onValueChange={setOrigin} options={[{value:"all",label:ui("All sources")},{value:"uploaded",label:ui("Uploaded")},{value:"generated",label:ui("Generated")},{value:"stock",label:ui("Reel stock")}]} /><CompactSelect aria-label={ui("Date added")} value={date} onValueChange={setDate} options={[{value:"all",label:ui("Any time")},{value:"1",label:ui("Last 24 hours")},{value:"7",label:ui("Last 7 days")},{value:"30",label:ui("Last 30 days")}]} /></div>
-      {origin==="stock"&&<StockLibrary/>}
+      <div className="grid grid-cols-2 gap-2">
+        <CompactSelect
+          aria-label={ui("Media source")}
+          value={origin}
+          onValueChange={setOrigin}
+          options={[
+            { value: "all", label: ui("All sources") },
+            { value: "uploaded", label: ui("Uploaded") },
+            { value: "generated", label: ui("Generated") },
+            { value: "stock", label: ui("Reel stock") },
+          ]}
+        />
+        <CompactSelect
+          aria-label={ui("Date added")}
+          value={date}
+          onValueChange={setDate}
+          options={[
+            { value: "all", label: ui("Any time") },
+            { value: "1", label: ui("Last 24 hours") },
+            { value: "7", label: ui("Last 7 days") },
+            { value: "30", label: ui("Last 30 days") },
+          ]}
+        />
+      </div>
+      {origin === "stock" && <StockLibrary />}
       <DirectVideoImport
         key={`${owner}:${brand}:${folderId}`}
         disabled={busy || !capabilities.uploads}
