@@ -154,7 +154,14 @@ export interface EditorChatMessage {
   /** Budget reservations above are distinct from actual ledger receipts. */
   creditReceipts?: import("./credit-receipt").CreditReceipt[];
   creditReceiptsComplete?: boolean;
-  activity?: { kind: "auto-edit"; steps: string[] };
+  activity?: {
+    kind: "auto-edit";
+    steps: string[];
+    /** Completed execution categories, including saved preparation; never proposals. */
+    appliedTypes?: EditOperation["type"][];
+    /** Original planning rationale, shown only in expandable details. */
+    planSummary?: string;
+  };
   range?: { start: number; end: number };
   selectedClipIds?: string[];
   request?: EditorChatRequest;

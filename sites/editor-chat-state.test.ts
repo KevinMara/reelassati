@@ -38,6 +38,43 @@ const message = {
 };
 
 describe("saved editing chat continuity", () => {
+  it("retains only supported completed-operation categories without inventing legacy evidence", () => {
+    const state = normalizeEditorChatState({
+      messages: [
+        {
+          ...message,
+          id: "new",
+          status: "completed",
+          activity: {
+            kind: "auto-edit",
+            steps: ["Saved the finished edit"],
+            appliedTypes: ["caption", "caption", "trim", "provider-call", null],
+            planSummary: "Long original rationale. ".repeat(100),
+          },
+        },
+        {
+          ...message,
+          id: "old",
+          status: "completed",
+          activity: {
+            kind: "auto-edit",
+            steps: ["Saved the finished edit"],
+          },
+        },
+      ],
+    })!;
+    expect(state.messages[0].activity?.appliedTypes).toEqual([
+      "caption",
+      "trim",
+    ]);
+    expect(state.messages[1].activity).not.toHaveProperty("appliedTypes");
+    expect(state.messages[0].activity?.planSummary).toBe(
+      "Long original rationale. ".repeat(100)
+    );
+    expect(normalizeEditorChatState(JSON.parse(JSON.stringify(state)))).toEqual(
+      state
+    );
+  });
   it("retains supported FPS and legacy settings while dropping malformed FPS actions", () => {
     const settings = (frameRate?: unknown) => ({
       ...action,

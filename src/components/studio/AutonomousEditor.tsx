@@ -46,6 +46,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
 import type {
   Asset,
+  EditOperation,
   EditProject,
   WorkspaceDocument,
 } from "@contracts/workspace";
@@ -258,7 +259,9 @@ export function AutonomousEditor({
     const savedSteps: string[] = [];
     const saveActivity = async (
       text: string,
-      state: "running" | "completed" | "failed" | "stopped"
+      state: "running" | "completed" | "failed" | "stopped",
+      appliedTypes?: EditOperation["type"][],
+      planSummary?: string
     ) => {
       await updateWorkspace(current => {
         // Stop may abort the provider request, while its final visible status still needs saving.
@@ -287,7 +290,13 @@ export function AutonomousEditor({
               text,
               status: state,
               createdAt: previous?.createdAt ?? new Date().toISOString(),
-              activity: { kind: "auto-edit" as const, steps: [...savedSteps] },
+              activity: {
+                kind: "auto-edit" as const,
+                steps: [...savedSteps],
+                ...(state === "completed" && appliedTypes
+                  ? { appliedTypes: [...new Set(appliedTypes)], planSummary }
+                  : {}),
+              },
               creditReceipts: receipts,
               creditReceiptsComplete:
                 state === "running" ? false : receiptsComplete,
@@ -524,7 +533,9 @@ export function AutonomousEditor({
         checkpoint,
         // Analyzer optimization contains generated recommendations, not a
         // verbatim human instruction to add or cover source text.
-        { request: style.startsWith("ANALYZER OPTIMIZATION BRIEF") ? "" : style }
+        {
+          request: style.startsWith("ANALYZER OPTIMIZATION BRIEF") ? "" : style,
+        }
       );
       changesToApply = graphicReview.changes;
       // Recovery covers local validation only, not already-started media jobs
@@ -703,13 +714,16 @@ export function AutonomousEditor({
           : op
       );
       const steps: Array<{ label: string; project: EditProject }> = [];
+      const appliedOperations: Array<Pick<EditOperation, "type">> = [];
       working = executeAutonomousPlan(
         working,
         executable,
         allAssets,
         checkpoint,
-        (snapshot, operation) =>
-          steps.push({ label: operation.label, project: snapshot })
+        (snapshot, operation) => {
+          steps.push({ label: operation.label, project: snapshot });
+          appliedOperations.push({ type: operation.type });
+        }
       );
       const problems = auditAutomatedEdit(project, working, allAssets);
       if (problems.length)
@@ -739,13 +753,20 @@ export function AutonomousEditor({
       planCache.current.clear();
       const receipt = autonomousResultReceipt(
         result.summary,
-        [...executable, ...preparationCategories],
+        [...appliedOperations, ...preparationCategories],
         graphicReview,
         ui
       );
       savedSteps.push(...receipt.details);
       setCompletedSteps([...savedSteps]);
-      await saveActivity(receipt.summary, "completed");
+      await saveActivity(
+        receipt.summary,
+        "completed",
+        [...appliedOperations, ...preparationCategories].map(
+          operation => operation.type
+        ),
+        receipt.planSummary
+      );
       setFinished(true);
       setStatus(receipt.summary);
       onFinished(receipt.summary);

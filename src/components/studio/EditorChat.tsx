@@ -1,5 +1,6 @@
 import { creditReceiptTotal } from "@contracts/credit-receipt";
 import { ConciseResponse } from "./ConciseResponse";
+import { persistedAutonomousReceipt } from "@/lib/autonomous-result-receipt";
 import {
   Tooltip,
   TooltipTrigger,
@@ -8,6 +9,7 @@ import {
 import { useUiText } from "@/lib/i18n/ui";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -120,6 +122,11 @@ const STARTERS = [
 const ACCEPT_FILES =
   "image/*,video/*,audio/*,text/plain,application/pdf,.pdf,.md,.json,.csv,.srt,.vtt";
 const LIBRARY_DRAG_TYPE = "application/x-reelassati-asset-id";
+
+function fitComposer(node: HTMLTextAreaElement) {
+  node.style.height = "auto";
+  if (node.value) node.style.height = `${Math.min(node.scrollHeight, 160)}px`;
+}
 
 function seconds(value: number) {
   return `${value.toFixed(1)}s`;
@@ -240,6 +247,22 @@ export function EditorChat({
   useEffect(() => {
     if (seed) input.current?.focus();
   }, [seed]);
+
+  useLayoutEffect(() => {
+    if (input.current) fitComposer(input.current);
+  }, [prompt, project.id]);
+  useEffect(() => {
+    const node = input.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    let width = node.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (node.clientWidth === width) return;
+      width = node.clientWidth;
+      fitComposer(node);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (followLatest.current && scroller.current)
@@ -418,7 +441,12 @@ export function EditorChat({
     setTaskPreset(id);
     input.current?.focus();
   }
-  const busyChoice = externalBusy || chat.busy || !!workingChoice;
+  const busyChoice =
+    externalBusy ||
+    chat.busy ||
+    attachBusy ||
+    findingSections ||
+    !!workingChoice;
   const error = localError || chat.error;
 
   return (
@@ -446,46 +474,45 @@ export function EditorChat({
       }}
       onDrop={drop}
     >
-      <header className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3">
-        <span className="flex size-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
-          <Sparkles className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
+      <header className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1">
+        <div className="min-w-0 shrink-0">
           <h2 className="text-sm font-semibold">{EDITOR_ASSISTANT_NAME}</h2>
           <p className="text-[11px] text-foreground/50">
             {ui("Your editing partner")}
           </p>
         </div>
+        {!busyChoice && (
+          <div className="ml-auto flex min-w-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onAutoEdit}
+              title={ui("AI auto-edit")}
+              className="ai-magic flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-semibold"
+            >
+              <Sparkles className="size-4 shrink-0" />{" "}
+              <span className="truncate">{ui("AI auto-edit")}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={executionMode === "plan"}
+              onClick={() => {
+                setExecutionMode(current =>
+                  current === "plan" ? "execute" : "plan"
+                );
+                input.current?.focus();
+              }}
+              className={cn(
+                "flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-sm",
+                executionMode === "plan"
+                  ? "border-primary/50 bg-primary/15 text-primary"
+                  : "border-border text-foreground/70 hover:bg-foreground/5"
+              )}
+            >
+              <ClipboardList className="size-4" /> {ui("Plan")}
+            </button>
+          </div>
+        )}
       </header>
-      {!busyChoice && (
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-          <button
-            type="button"
-            onClick={onAutoEdit}
-            className="ai-magic flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold"
-          >
-            <Sparkles className="size-4" /> {ui("AI auto-edit")}
-          </button>
-          <button
-            type="button"
-            aria-pressed={executionMode === "plan"}
-            onClick={() => {
-              setExecutionMode(current =>
-                current === "plan" ? "execute" : "plan"
-              );
-              input.current?.focus();
-            }}
-            className={cn(
-              "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm",
-              executionMode === "plan"
-                ? "border-primary/50 bg-primary/15 text-primary"
-                : "border-border text-foreground/70 hover:bg-foreground/5"
-            )}
-          >
-            <ClipboardList className="size-4" /> {ui("Plan")}
-          </button>
-        </div>
-      )}
 
       <div
         ref={scroller}
@@ -647,7 +674,24 @@ export function EditorChat({
                         <Sparkles className="size-3 text-primary" />
                         {EDITOR_ASSISTANT_NAME}
                       </div>
-                      {message.text && <ConciseResponse text={message.text} />}
+                      {message.text && (
+                        <ConciseResponse
+                          text={
+                            persistedAutonomousReceipt(message, project, ui) ??
+                            message.text
+                          }
+                          detailsText={
+                            message.activity?.kind === "auto-edit" &&
+                            message.status === "completed"
+                              ? message.activity.planSummary
+                                ? `${ui("Plan")}: ${message.activity.planSummary}`
+                                : message.activity.appliedTypes === undefined
+                                  ? `${ui("Plan")}: ${message.text}`
+                                  : undefined
+                              : undefined
+                          }
+                        />
+                      )}
                       {message.status === "planning" && (
                         <div
                           role="status"
@@ -912,7 +956,7 @@ export function EditorChat({
         {resultTools}
       </div>
 
-      <div className="shrink-0 border-t border-border p-3">
+      <div data-chat-composer className="shrink-0 border-t border-border p-2">
         {error && (
           <p
             role="alert"
@@ -924,10 +968,10 @@ export function EditorChat({
         )}
         <form
           onSubmit={event => void send(event)}
-          className="rounded-xl border border-border bg-background/65 p-2.5 focus-within:border-primary/55 focus-within:ring-1 focus-within:ring-primary/15"
+          className="rounded-xl border border-border bg-background/65 p-2 focus-within:border-primary/55 focus-within:ring-1 focus-within:ring-primary/15"
         >
           {(range || contextClip || taskPreset || executionMode === "plan") && (
-            <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[10px] text-primary">
+            <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] text-primary">
               {range && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 py-1 pl-1.5 pr-1">
                   <Clock3 className="size-3" />
@@ -1027,7 +1071,7 @@ export function EditorChat({
             }
             value={prompt}
             onChange={event => setPrompt(event.target.value)}
-            rows={3}
+            rows={2}
             onKeyDown={event => {
               if (
                 event.key === "Enter" &&
@@ -1038,9 +1082,9 @@ export function EditorChat({
                 void send();
               }
             }}
-            className="max-h-40 min-h-16 w-full resize-none border-0 bg-transparent font-sans text-[14px] font-normal leading-6 tracking-normal outline-none placeholder:font-normal placeholder:text-foreground/40"
+            className="block max-h-40 min-h-12 w-full resize-none border-0 bg-transparent font-sans text-[14px] font-normal leading-6 tracking-normal outline-none placeholder:font-normal placeholder:text-foreground/40"
           />
-          <div className="relative mt-1 flex items-center gap-1 sm:gap-1.5">
+          <div className="relative flex items-center gap-1 sm:gap-1.5">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button

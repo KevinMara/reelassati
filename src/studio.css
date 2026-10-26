@@ -196,7 +196,7 @@
 }
 .studio-shell[data-page="edit"] .reel-chat header {
   min-height: 44px;
-  padding: 8px 12px;
+  padding: 4px 8px;
 }
 .reel-chat header > span {
   width: 26px;
@@ -212,11 +212,11 @@
 .reel-chat [data-chat-conversation] {
   padding: 12px 14px;
 }
-.reel-chat > .shrink-0:last-child {
-  padding: 10px;
+.reel-chat [data-chat-composer] {
+  padding: 8px;
 }
 .reel-chat textarea {
-  min-height: 60px;
+  min-height: 48px;
 }
 .studio-shell #editor-media-panel [role="tablist"] {
   gap: 2px;

@@ -7,6 +7,7 @@ import {
   AI_PROVENANCE_SCHEME,
 } from "@contracts/compliance";
 import { auditAutomatedEdit } from "./editor-production";
+import { autonomousResultReceipt } from "./autonomous-result-receipt";
 import {
   assertAutonomousMediaBudget,
   executeAutonomousPlan,
@@ -739,12 +740,27 @@ describe("complete auto-edit draft execution", () => {
       text: "These are the real words",
       sourceClipId: "picture",
     };
+    const applied: EditOperation[] = [];
     const result = executeAutonomousPlan(
       { ...project, transcript: [caption] },
-      [op("repeat", "caption", 1, 3, { text: caption.text })],
-      [asset]
+      [
+        op("repeat", "caption", 1, 3, { text: caption.text }),
+        op("look", "style", 0, 10, { brightness: 0.1 }),
+      ],
+      [asset],
+      undefined,
+      (_snapshot, operation) => applied.push(operation)
     );
     expect(result.transcript).toEqual([caption]);
+    expect(applied.map(operation => operation.id)).toEqual(["look"]);
+    expect(
+      autonomousResultReceipt(
+        "Added captions and updated the look.",
+        applied,
+        { changes: [], omitted: [], warnings: [] },
+        text => text
+      ).summary
+    ).toBe("Updated the visual treatment.");
     expect(() =>
       executeAutonomousPlan(
         { ...project, transcript: [caption] },

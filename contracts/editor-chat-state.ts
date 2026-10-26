@@ -13,6 +13,22 @@ import type {
   EditorChatResponse,
   EditorChatReference,
 } from "./editor-chat";
+import type { EditOperation } from "./workspace";
+
+const operationTypes = new Set<EditOperation["type"]>([
+  "trim",
+  "split",
+  "move",
+  "delete",
+  "silence",
+  "pacing",
+  "style",
+  "audio",
+  "sound",
+  "caption",
+  "graphic",
+  "broll",
+]);
 
 const record = (value: unknown): Record<string, unknown> | undefined =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -380,6 +396,14 @@ export function normalizeEditorChatState(
         ? {
             activity: {
               kind: "auto-edit" as const,
+              ...(typeof record(row.activity)?.planSummary === "string"
+                ? {
+                    planSummary: string(
+                      record(row.activity)!.planSummary,
+                      6000
+                    ),
+                  }
+                : {}),
               steps: (Array.isArray(record(row.activity)?.steps)
                 ? (record(row.activity)!.steps as unknown[])
                 : []
@@ -387,6 +411,21 @@ export function normalizeEditorChatState(
                 .filter((step): step is string => typeof step === "string")
                 .slice(-100)
                 .map(step => step.slice(0, 500)),
+              ...(Array.isArray(record(row.activity)?.appliedTypes)
+                ? {
+                    appliedTypes: [
+                      ...new Set(
+                        (
+                          record(row.activity)!.appliedTypes as unknown[]
+                        ).filter(
+                          (type): type is EditOperation["type"] =>
+                            typeof type === "string" &&
+                            operationTypes.has(type as EditOperation["type"])
+                        )
+                      ),
+                    ],
+                  }
+                : {}),
             },
           }
         : {}),
