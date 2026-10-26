@@ -11,7 +11,7 @@ import {
 } from "./video-analysis";
 import type { EditOperation } from "./workspace";
 import type { ContentProvenance } from "./compliance";
-import type { normalizeReview } from "./source-review";
+import { normalizeReview } from "./source-review";
 import { AI_CREDIT_COSTS, timedCreditCost } from "./billing";
 
 export function requiresAnalysisQuoteReview(
@@ -101,6 +101,7 @@ export function normalizeSavedAnalyzerReports(
         ),
         result: {
           ...candidate.result,
+          ...(candidate.result.review ? { review: normalizeReview(candidate.result.review, candidate.duration) } : {}),
           insights,
           recommendations: normalizeVideoRecommendations(
             candidate.result.recommendations,

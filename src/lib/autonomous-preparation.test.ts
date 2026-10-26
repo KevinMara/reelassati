@@ -104,6 +104,32 @@ function savedReport(): SavedAnalyzerReport {
 }
 
 describe("saved paid review reuse", () => {
+  it("upgrades an open editor's legacy cache from a new saved spatial review without inference", async () => {
+    const input = fixture(),
+      old = savedReport();
+    const legacy = await prepareAutonomousSources({
+      ...input,
+      savedReports: [old],
+    });
+    expect(legacy.analysis[0].visualProtection?.coverage).toBe("unknown");
+    const fresh = structuredClone(old);
+    fresh.createdAt = "2026-10-26T10:00:00Z";
+    fresh.result.review!.visualProtection = {
+      version: 1,
+      sourceDuration: 4,
+      coverage: "complete",
+      reviewedRanges: [{ start: 0, end: 4 }],
+      regions: [],
+      observedText: [],
+    };
+    const updated = await prepareAutonomousSources({
+      ...input,
+      savedReports: [old, fresh],
+    });
+    expect(updated.analysis[0].visualProtection?.coverage).toBe("complete");
+    expect(input.review).not.toHaveBeenCalled();
+    expect(input.transcribe).not.toHaveBeenCalled();
+  });
   it("prepares the exact source from its complete saved review without another provider call", async () => {
     const input = fixture();
     const report = savedReport();
@@ -116,21 +142,28 @@ describe("saved paid review reuse", () => {
     });
     expect(input.review).not.toHaveBeenCalled();
     expect(input.transcribe).not.toHaveBeenCalled();
-    expect(result.analysis[0].observations).toEqual(report.result.insights);
-    expect(result.analysis[0].intervals).toEqual([
+    expect(result.analysis[0].observations).toEqual([
       {
         start: 0,
         end: 4,
-        score: 70,
-        note: report.result.insights[0].rationale,
+        confidence: 0.8,
+        visualEvidence: report.result.insights[0].visualEvidence,
+        audioEvidence: report.result.insights[0].audioEvidence,
       },
     ]);
+    expect(result.analysis[0].visualProtection?.coverage).toBe("unknown");
+    expect(JSON.stringify(result.analysis)).not.toContain(
+      report.result.insights[0].improvement
+    );
+    expect(JSON.stringify(result.analysis)).not.toContain(
+      report.result.insights[0].rationale
+    );
     expect(result.working.sourceReviews?.[0]).toMatchObject({
       assetId: source.id,
       captions: "present",
       audio: "unknown",
     });
-    result.analysis[0].observations[0].label = "Edited local note";
+    result.analysis[0].observations[0].visualEvidence = "Edited local note";
     expect(report.result.insights[0].label).toBe("Opening question");
   });
   it.each([
@@ -196,15 +229,23 @@ describe("auto-edit source preparation recovery", () => {
       insights: [observed],
     } as never);
     const result = await prepareAutonomousSources(input);
-    expect(result.analysis[0].observations).toEqual([observed]);
+    expect(result.analysis[0].observations).toEqual([
+      {
+        start: 0,
+        end: 4,
+        confidence: null,
+        visualEvidence: observed.visualEvidence,
+        audioEvidence: observed.audioEvidence,
+      },
+    ]);
     expect(result.working.sourceReviews?.[0].moments[0].note).toContain(
       observed.visualEvidence
     );
     expect(result.working.sourceReviews?.[0].moments[0].note).toContain(
       observed.audioEvidence
     );
-    expect(result.working.sourceReviews?.[0].moments[0].note).toContain(
-      "Editorial interpretation (proof)"
+    expect(result.working.sourceReviews?.[0].moments[0].note).not.toContain(
+      observed.rationale
     );
   });
   it("prepares missing speech from another source without replacing existing captions", async () => {

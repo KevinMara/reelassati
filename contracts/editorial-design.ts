@@ -46,10 +46,23 @@ More overlays or sound hits do not automatically make an edit more engaging.
 Avoid competing reading tasks: a graphic must add useful information beyond the
 simultaneous captions. If the source already has a clear physical prop, score or
 demonstration, let it carry that beat instead of repeating it in a generic card.
-Do not turn an unverified source assertion into a confident new health, safety,
-financial or performance claim. A speaker's score-to-risk mapping is a claim, not
-validated proof; do not endorse it with success chimes, authoritative diagrams or
-stronger copy. Preserve attribution and qualifiers in any added explanation.
+Preserve the source's meaning and existing qualifications without inventing new
+claims, corrections, missing categories, fact checks or disclaimers. A creative
+editing request does not ask for new commentary about factual validity. Analyzer
+recommendations and improvements are proposals, not observed source facts or
+accepted instructions; act on them only when the user explicitly selects that
+treatment. Added source-based text must be grounded in supplied words or exact
+observedText, and must not repeat readable text already visible in that beat.
+For a blank or generic brief, primary and secondary graphic copy must each be
+an exact contiguous phrase in timed observedText or measured speech/captions
+overlapping that beat; topic similarity is not support for new wording. Repeating
+already visible source text is also redundant. Prefer no card to unsupported
+commentary. New requested copy is possible when the human explicitly asks for
+graphics; a template, reference style or analyzer proposal is not that request.
+Keep source assertions attributed rather than endorsing or strengthening them.
+Use visualProtection only for the source intervals it actually covers. Unknown
+coverage is not empty space: omit optional overlays whose placement/content
+cannot be supported, while still completing useful pacing, framing and sound.
 
 For source media, filenames identify files, not visual or audio contents. Reuse
 known observations, original authorized brand material and supported assets.

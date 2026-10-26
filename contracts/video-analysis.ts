@@ -1,4 +1,5 @@
 import { referenceStyleSchema } from "./edit-style-template";
+import { sourceVisualEvidenceSchema } from "./source-visual-evidence";
 /** Versioned source-clock evidence returned by the multimodal video reviewer. */
 export const VIDEO_ANALYSIS_SCHEMA_VERSION = "video-analysis-v2" as const;
 export const VIDEO_ROLES = [
@@ -497,6 +498,7 @@ export function videoAnalysisResponseSchema(
     },
     noChangesReason: string,
     review: object({
+      visualProtection: sourceVisualEvidenceSchema(duration),
       captions: { type: "string", enum: ["present", "absent", "unknown"] },
       captionNote: string,
       audio: { type: "string", enum: ["present", "absent", "unknown"] },

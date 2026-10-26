@@ -1,4 +1,5 @@
 import type { EditProject } from "./workspace";
+import { sourceReviewFacts } from "./source-review";
 
 export const STORY_BEAT_KINDS = [
   "hook",
@@ -58,6 +59,7 @@ export function buildStoryBeatEvidence(
 ): StoryBeatEvidence[] {
   if (!finite(project.duration) || project.duration <= 0) return [];
   const evidence: StoryBeatEvidence[] = [];
+  const reviews = project.sourceReviews?.map(sourceReviewFacts);
   for (const segment of project.transcript) {
     const text = segment.text.trim();
     if (!text || !finite(segment.start) || !finite(segment.end)) continue;
@@ -89,7 +91,7 @@ export function buildStoryBeatEvidence(
       continue;
     const speed = clip.speed ?? 1;
     if (!finite(speed) || speed <= 0) continue;
-    const review = project.sourceReviews
+    const review = reviews
       ?.filter(item => item.assetId === clip.assetId)
       .sort((a, b) => b.reviewedAt.localeCompare(a.reviewedAt))[0];
     if (!review) continue;

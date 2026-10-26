@@ -4,6 +4,7 @@ import {
 } from "@contracts/credit-receipt";
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 import { applyAutonomousCaptionTreatment } from "@contracts/editorial-captions";
+import { autonomousResultReceipt } from "@/lib/autonomous-result-receipt";
 import { activeEditorProjects, editorRunKey } from "@/lib/editor-run-lock";
 import { ConciseResponse } from "./ConciseResponse";
 import { editorAudioCatalog } from "@contracts/editor-audio-catalog";
@@ -462,8 +463,24 @@ export function AutonomousEditor({
           working,
           result.captionTreatment
         );
+      const preparationCategories: Array<{ type: "trim" | "caption" }> = [];
+      if (JSON.stringify(working.clips) !== JSON.stringify(project.clips))
+        preparationCategories.push({ type: "trim" });
+      if (
+        JSON.stringify([
+          working.transcript,
+          working.captionStyle,
+          working.captionAppearance,
+        ]) !==
+        JSON.stringify([
+          project.transcript,
+          project.captionStyle,
+          project.captionAppearance,
+        ])
+      )
+        preparationCategories.push({ type: "caption" });
       assertAutonomousMediaBudget(result.changes, { images, videos });
-      const changesToApply = result.changes.filter(
+      let changesToApply = result.changes.filter(
         op =>
           op.type !== "caption" ||
           (captions &&
@@ -476,7 +493,7 @@ export function AutonomousEditor({
                 )
             ))
       );
-      preflightAutonomousPlan(
+      const graphicReview = preflightAutonomousPlan(
         working,
         changesToApply,
         [
@@ -504,8 +521,12 @@ export function AutonomousEditor({
             contentType: "audio/wav",
           })),
         ],
-        checkpoint
+        checkpoint,
+        // Analyzer optimization contains generated recommendations, not a
+        // verbatim human instruction to add or cover source text.
+        { request: style.startsWith("ANALYZER OPTIMIZATION BRIEF") ? "" : style }
       );
+      changesToApply = graphicReview.changes;
       // Recovery covers local validation only, not already-started media jobs
       // or partially published timelines that need their own execution ledger.
       planCache.current.clear();
@@ -716,10 +737,18 @@ export function AutonomousEditor({
       });
       checkpoint();
       planCache.current.clear();
-      await saveActivity(result.summary, "completed");
+      const receipt = autonomousResultReceipt(
+        result.summary,
+        [...executable, ...preparationCategories],
+        graphicReview,
+        ui
+      );
+      savedSteps.push(...receipt.details);
+      setCompletedSteps([...savedSteps]);
+      await saveActivity(receipt.summary, "completed");
       setFinished(true);
-      setStatus(result.summary);
-      onFinished(result.summary);
+      setStatus(receipt.summary);
+      onFinished(receipt.summary);
     } catch (e) {
       if (signal.aborted) planCache.current.clear();
       if (!mounted.current || runController.current !== controller) return;
@@ -820,7 +849,11 @@ export function AutonomousEditor({
                   </details>
                 )}
                 <div className="mb-4">
-                  <EditStyleTemplates project={project} disabled={busy} compact />
+                  <EditStyleTemplates
+                    project={project}
+                    disabled={busy}
+                    compact
+                  />
                 </div>
                 <label className="block text-sm font-medium">
                   {ui("Describe the style and outcome")}

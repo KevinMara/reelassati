@@ -7,6 +7,12 @@ import type {
 import { applyEditOperation } from "./edit-timeline";
 import { assertSupportingMedia } from "@contracts/supporting-media";
 import { auditAutomatedEdit } from "./editor-production";
+import {
+  automaticGraphicProblems,
+  graphicRequestScope,
+  type AutomaticGraphicPolicy,
+  type GraphicProtectionIssue,
+} from "./automatic-graphic-protection";
 const captionKey = (text: string) =>
   (
     text
@@ -41,7 +47,7 @@ export function assertAutonomousMediaBudget(
 
 /** Exercise the complete draft before buying optional media. Placeholders model
  * the exact five-second video allowance; they are never saved or rendered. */
-export function preflightAutonomousPlan(
+function draftAutonomousPlan(
   project: EditProject,
   operations: EditOperation[],
   assets: Asset[],
@@ -81,12 +87,176 @@ export function preflightAutonomousPlan(
     };
   });
   const allAssets = [...assets, ...placeholders];
-  const draft = executeAutonomousPlan(project, resolved, allAssets, checkpoint);
+  let previous = project;
+  const graphicOwners = new Map<string, string>();
+  const draft = executeAutonomousPlan(
+    project,
+    resolved,
+    allAssets,
+    checkpoint,
+    (next, operation) => {
+      const parents = [...previous.clips].sort(
+        (a, b) => b.id.length - a.id.length
+      );
+      for (const clip of next.clips) {
+        if (!clip.graphic) continue;
+        const old = previous.clips.find(candidate => candidate.id === clip.id);
+        if (
+          operation.type === "graphic" &&
+          (!old || JSON.stringify(old.graphic) !== JSON.stringify(clip.graphic))
+        )
+          graphicOwners.set(clip.id, operation.id);
+        else if (!old) {
+          const parent = parents.find(
+            candidate =>
+              clip.id.startsWith(`${candidate.id}-`) &&
+              graphicOwners.has(candidate.id)
+          );
+          if (parent) graphicOwners.set(clip.id, graphicOwners.get(parent.id)!);
+        }
+      }
+      previous = next;
+    }
+  );
+  return { draft, allAssets, graphicOwners };
+}
+
+export interface AutonomousGraphicDecision {
+  operationId: string;
+  label: string;
+  issues: GraphicProtectionIssue[];
+}
+export interface AutonomousGraphicReview {
+  changes: EditOperation[];
+  omitted: AutonomousGraphicDecision[];
+  warnings: AutonomousGraphicDecision[];
+}
+
+/** Validate the final composed draft, not the proposal's pre-cut clock. Omit
+ * unsafe unsolicited graphics without discarding other useful paid planning.
+ * Signed proposals stay unchanged; omissions are a separate execution receipt. */
+export function filterAutonomousGraphics(
+  project: EditProject,
+  operations: EditOperation[],
+  assets: Asset[],
+  policy: AutomaticGraphicPolicy = "automatic",
+  checkpoint: () => void = () => undefined
+): AutonomousGraphicReview {
+  if (!operations.some(operation => operation.type === "graphic"))
+    return { changes: operations, omitted: [], warnings: [] };
+  let changes = operations;
+  const omitted: AutonomousGraphicDecision[] = [];
+  // Each nonfinal pass removes at least one operation, so this is bounded by
+  // the submitted graphic count. Rebuild because omitting an update restores
+  // its original graphic, which can obstruct another previously clear title.
+  for (
+    let pass = 0;
+    pass <= operations.filter(op => op.type === "graphic").length;
+    pass++
+  ) {
+    const { draft, allAssets, graphicOwners } = draftAutonomousPlan(
+      project,
+      changes,
+      assets,
+      checkpoint
+    );
+    const decisions = new Map<
+      string,
+      { issues: GraphicProtectionIssue[]; requested: boolean }
+    >();
+    for (const clip of draft.clips) {
+      const operationId = graphicOwners.get(clip.id);
+      if (!operationId || !clip.graphic) continue;
+      checkpoint();
+      const { intent, replacementRegions } = graphicRequestScope(
+        draft,
+        clip.graphic,
+        policy
+      );
+      const issues = automaticGraphicProblems(
+        draft,
+        clip,
+        allAssets,
+        intent,
+        checkpoint,
+        replacementRegions
+      );
+      if (issues.length)
+        decisions.set(operationId, {
+          issues: [...(decisions.get(operationId)?.issues ?? []), ...issues],
+          requested: intent !== "automatic",
+        });
+    }
+    const rejected: AutonomousGraphicDecision[] = [],
+      warnings: AutonomousGraphicDecision[] = [];
+    for (const operation of changes) {
+      const result = decisions.get(operation.id);
+      if (!result?.issues.length) continue;
+      const decision = {
+        operationId: operation.id,
+        label: operation.label,
+        issues: [
+          ...new Map(
+            result.issues.map(issue => [issue.reason, issue])
+          ).values(),
+        ],
+      };
+      if (result.requested && result.issues.every(issue => issue.uncertain))
+        warnings.push(decision);
+      else rejected.push(decision);
+    }
+    if (!rejected.length) return { changes, omitted, warnings };
+    omitted.push(...rejected);
+    const excluded = new Set(rejected.map(decision => decision.operationId));
+    changes = changes.filter(operation => !excluded.has(operation.id));
+  }
+  throw new Error("The graphic placement check did not reach a stable draft.");
+}
+
+export function autonomousGraphicReceipt(review: AutonomousGraphicReview) {
+  const parts: string[] = [];
+  if (review.omitted.length)
+    parts.push(
+      `Skipped ${review.omitted.length} graphic${review.omitted.length === 1 ? "" : "s"}: ${[...new Set(review.omitted.flatMap(item => item.issues.map(issue => issue.detail)))].slice(0, 2).join(" ")}`
+    );
+  if (review.warnings.length)
+    parts.push(
+      `Placement of ${review.warnings.length} requested graphic${review.warnings.length === 1 ? "" : "s"} could not be verified from the saved source analysis.`
+    );
+  return parts.join(" ");
+}
+
+/** Exercise the complete filtered draft before buying optional media. Existing
+ * callers keep their explicit-edit behavior unless an auto-edit intent is set. */
+export function preflightAutonomousPlan(
+  project: EditProject,
+  operations: EditOperation[],
+  assets: Asset[],
+  checkpoint: () => void = () => undefined,
+  graphicIntent?: AutomaticGraphicPolicy
+): AutonomousGraphicReview {
+  const review =
+    graphicIntent === undefined
+      ? { changes: operations, omitted: [], warnings: [] }
+      : filterAutonomousGraphics(
+          project,
+          operations,
+          assets,
+          graphicIntent,
+          checkpoint
+        );
+  const { draft, allAssets } = draftAutonomousPlan(
+    project,
+    review.changes,
+    assets,
+    checkpoint
+  );
   const problems = auditAutomatedEdit(project, draft, allAssets);
   if (problems.length)
     throw new Error(
       `The edit plan needs correction: ${problems.slice(0, 3).join("; ")}. No supporting media was generated.`
     );
+  return review;
 }
 
 /** Execute one proposal against its original timeline clock. Local operations

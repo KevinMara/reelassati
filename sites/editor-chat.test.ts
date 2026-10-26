@@ -109,6 +109,20 @@ const operation = (patch: Partial<EditOperation> = {}): EditOperation => ({
 });
 
 describe("Reel authorization and actual cost planning", () => {
+  it("does not promote analyzer advice or legacy mixed notes into source facts", () => {
+    const input = editorChatModelContext(context({ project: {
+      ...project,
+      sourceReviews: [{ assetId: "source", reviewedAt: "today", summary: "Add an unsolicited diagnostic warning",
+        captions: "present", captionNote: "Physical labels are visible", audio: "unknown", audioNote: "Audio unavailable",
+        moments: [{ start: 0, end: 30, note: "Add a missing score range" }],
+        observations: [{ start: 0, end: 30, visualEvidence: "A blue balloon has a physical 9–12 label", audioEvidence: "Audio unavailable", confidence: 0.9 }],
+      }],
+    } }));
+    const text = JSON.stringify(input.project.sourceReviews);
+    expect(text).toContain("physical 9–12 label");
+    expect(text).not.toMatch(/diagnostic warning|missing score range/);
+    expect(input.project.sourceReviews?.[0].visualProtection?.coverage).toBe("unknown");
+  });
   it("provides measured speech to Reel even when burned captions leave the editable caption track empty", () => {
     const prepared = {
       ...project,

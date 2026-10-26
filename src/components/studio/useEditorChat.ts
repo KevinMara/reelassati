@@ -29,7 +29,11 @@ import {
   type EditorChatRequest,
 } from "@contracts/editor-chat";
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
-import { normalizeReview } from "@contracts/source-review";
+import {
+  normalizeReview,
+  normalizeSourceObservations,
+  sourceReviewFacts,
+} from "@contracts/source-review";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { useWorkspace } from "@/providers/workspace";
 import {
@@ -377,13 +381,17 @@ export function useEditorChat(
               ...p,
               sourceReviews: [
                 ...(p.sourceReviews ?? []).filter(r => r.assetId !== assetId),
-                {
+                sourceReviewFacts({
                   assetId,
                   reviewedAt: new Date().toISOString(),
                   summary: result.summary,
-                  ...normalizeReview(result.review),
-                  moments: result.retention,
-                },
+                  ...normalizeReview(result.review, asset.duration),
+                  observations: normalizeSourceObservations(
+                    result.insights,
+                    asset.duration
+                  ),
+                  moments: [],
+                }),
               ],
             })
           : undefined,

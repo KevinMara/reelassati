@@ -94,7 +94,7 @@ describe("evidence-backed story sections", () => {
   });
 
   it("maps trimmed and accelerated source observations to the current timeline", () => {
-    const result = buildStoryBeatEvidence({
+    const project: Parameters<typeof buildStoryBeatEvidence>[0] = {
       duration: 20,
       transcript: [],
       clips: [
@@ -121,18 +121,34 @@ describe("evidence-backed story sections", () => {
           captionNote: "",
           audio: "unknown",
           audioNote: "",
-          moments: [
+          moments: [],
+          observations: [
             {
               start: 7,
               end: 11,
-              note: "The opening reaches into the visible trim.",
+              visualEvidence: "The opening reaches into the visible trim.",
+              audioEvidence: "",
+              confidence: 1,
             },
-            { start: 12, end: 16, note: "The actual demonstration." },
-            { start: 19, end: 20, note: "Not in this timeline." },
+            {
+              start: 12,
+              end: 16,
+              visualEvidence: "The actual demonstration.",
+              audioEvidence: "",
+              confidence: 1,
+            },
+            {
+              start: 19,
+              end: 20,
+              visualEvidence: "Not in this timeline.",
+              audioEvidence: "",
+              confidence: 1,
+            },
           ],
         },
       ],
-    });
+    };
+    const result = buildStoryBeatEvidence(project);
     expect(result.map(item => [item.start, item.end])).toEqual([
       [8, 8.5],
       [9, 11],
@@ -140,6 +156,17 @@ describe("evidence-backed story sections", () => {
     expect(
       result.every(item => item.assetId === "asset" && item.clipId === "clip")
     ).toBe(true);
+    // Legacy recommendations cannot alter factual evidence keys on either side.
+    project.sourceReviews![0].moments = [
+      {
+        start: 12,
+        end: 16,
+        note: "Add a missing score category and a disclaimer.",
+      },
+    ];
+    expect(buildStoryBeatEvidence(project)).toEqual(result);
+    project.sourceReviews![0].observations = [];
+    expect(buildStoryBeatEvidence(project)).toEqual([]);
   });
 
   it("marks sections stale when their text, timing or referenced evidence changes", () => {

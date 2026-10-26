@@ -6,7 +6,12 @@ import { ColorPanel } from "@/components/studio/ColorPanel";
 import { useUiText } from "@/lib/i18n/ui";
 import { isPrimaryFootage } from "@contracts/timeline-layers";
 import { insertMotionKit } from "@/lib/motion-kits";
-import { normalizeReview } from "@contracts/source-review";
+import { findSavedAutonomousReview } from "@/lib/autonomous-preparation";
+import {
+  normalizeReview,
+  normalizeSourceObservations,
+  sourceReviewFacts,
+} from "@contracts/source-review";
 import {
   EditStyleTemplates,
   SaveEditStyleTemplate,
@@ -795,14 +800,35 @@ export default function EditorPage() {
         const { analyzeMedia } = await import("@/lib/analyze-media");
         for (const asset of assets) {
           checkpoint();
-          const result = await analyzeMedia(
+          const saved = findSavedAutonomousReview(
             asset,
             project.platform,
-            "Identify the actual hook, main explanation, proof and payoff with measured source timestamps. Describe speech and visual content accurately; these observations will locate reference markers, not change the edit.",
-            undefined,
-            signal,
-            scope
+            getWorkspaceSnapshot().analyzerReports
           );
+          if (
+            (!saved ||
+              !normalizeSourceObservations(saved.insights, asset.duration)
+                .length) &&
+            (saved ||
+              latest().sourceReviews?.some(
+                review => review.assetId === asset.id
+              ))
+          )
+            throw new Error(
+              ui(
+                "Analyze the source video again to refresh its observations before finding sections."
+              )
+            );
+          const result =
+            saved ??
+            (await analyzeMedia(
+              asset,
+              project.platform,
+              "Identify the actual hook, main explanation, proof and payoff with measured source timestamps. Describe speech and visual content accurately; these observations will locate reference markers, not change the edit.",
+              undefined,
+              signal,
+              scope
+            ));
           checkpoint();
           await updateWorkspace(w => {
             checkpoint(w);
@@ -817,13 +843,18 @@ export default function EditorPage() {
                         ...(p.sourceReviews ?? []).filter(
                           r => r.assetId !== asset.id
                         ),
-                        {
+                        sourceReviewFacts({
                           assetId: asset.id,
-                          reviewedAt: new Date().toISOString(),
+                          reviewedAt:
+                            saved?.savedAt ?? new Date().toISOString(),
                           summary: result.summary,
-                          ...normalizeReview(result.review),
-                          moments: result.retention,
-                        },
+                          ...normalizeReview(result.review, asset.duration),
+                          observations: normalizeSourceObservations(
+                            result.insights,
+                            asset.duration
+                          ),
+                          moments: [],
+                        }),
                       ],
                     }
               ),

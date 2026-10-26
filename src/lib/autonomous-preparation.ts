@@ -1,5 +1,10 @@
 import type { Asset, EditProject } from "@contracts/workspace";
-import { normalizeReview } from "@contracts/source-review";
+import {
+  normalizeReview,
+  normalizeSourceObservations,
+  sourceReviewFacts,
+  type SourceObservation,
+} from "@contracts/source-review";
 import { mapChatTranscript } from "./editor-chat-execution";
 import { captionOwner } from "@contracts/caption-ownership";
 import {
@@ -49,7 +54,7 @@ type Review = Pick<
       Awaited<ReturnType<typeof import("./analyze-media").analyzeMedia>>,
       "insights"
     >
-  >;
+  > & { savedAt?: string };
 type Transcript = {
   transcript: string;
   segments: EditProject["transcript"];
@@ -78,7 +83,8 @@ export function findSavedAutonomousReview(
         candidate?.assetId === asset.id &&
         candidate.platform === platform &&
         Math.abs(candidate.duration - asset.duration!) <= 0.001
-    );
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const report = normalizeSavedAnalyzerReports(candidates).find(
     candidate =>
       candidate.result.review &&
@@ -90,6 +96,7 @@ export function findSavedAutonomousReview(
   if (!report) return;
   const review = normalizeReview(report.result.review, asset.duration);
   return {
+    savedAt: report.createdAt,
     summary: report.result.summary,
     review,
     insights: structuredClone(report.result.insights),
@@ -119,9 +126,8 @@ export async function prepareAutonomousSources(input: {
   const working = structuredClone(input.project);
   const analysis: Array<{
     assetId: string;
-    summary: string;
-    intervals: Review["retention"];
-    observations: NonNullable<Review["insights"]>;
+    observations: SourceObservation[];
+    visualProtection: ReturnType<typeof normalizeReview>["visualProtection"];
   }> = [];
   const keys = new Map<string, string>();
   for (const asset of input.sources) {
@@ -136,45 +142,49 @@ export async function prepareAutonomousSources(input: {
     ]);
     keys.set(asset.id, key);
     if (asset.kind === "video") {
+      const cached = input.cache.reviews.get(key);
+      const saved = findSavedAutonomousReview(
+        asset,
+        input.project.platform,
+        input.savedReports
+      );
+      // A newly saved review can upgrade evidence while this editor stays open.
+      // Legacy/spatially-unknown reviews still reuse normally: never buy an
+      // analysis merely to satisfy the optional graphic-placement guard.
+      const preferSaved =
+        saved &&
+        (!cached ||
+          (saved.savedAt &&
+            (!cached.savedAt || saved.savedAt > cached.savedAt)));
       const result =
-        input.cache.reviews.get(key) ??
-        findSavedAutonomousReview(
-          asset,
-          input.project.platform,
-          input.savedReports
-        ) ??
+        (preferSaved ? saved : (cached ?? saved)) ??
         (await input.review(asset));
       input.checkpoint();
-      input.cache.reviews.set(key, result);
+      input.cache.reviews.set(key, {
+        ...result,
+        savedAt: result.savedAt ?? new Date().toISOString(),
+      });
+      const observed = normalizeSourceObservations(
+        result.insights,
+        asset.duration
+      );
+      const review = sourceReviewFacts({
+        assetId: asset.id,
+        reviewedAt: new Date().toISOString(),
+        summary: "",
+        ...normalizeReview(result.review, asset.duration),
+        observations: observed,
+        moments: [],
+      });
       working.sourceReviews = [
         ...(working.sourceReviews ?? []).filter(r => r.assetId !== asset.id),
-        {
-          assetId: asset.id,
-          reviewedAt: new Date().toISOString(),
-          summary: result.summary,
-          ...normalizeReview(result.review),
-          moments: result.insights?.length
-            ? result.insights.map(interval => ({
-                start: interval.start,
-                end: interval.end,
-                note: [
-                  interval.visualEvidence &&
-                    `Observed picture: ${interval.visualEvidence}`,
-                  interval.audioEvidence &&
-                    `Observed audio: ${interval.audioEvidence}`,
-                  `Editorial interpretation (${interval.role}): ${interval.rationale}`,
-                ]
-                  .filter(Boolean)
-                  .join("\n"),
-              }))
-            : result.retention,
-        },
+        review,
       ];
       analysis.push({
         assetId: asset.id,
-        summary: result.summary,
-        intervals: result.retention,
-        observations: result.insights ?? [],
+        observations: observed,
+        visualProtection: normalizeReview(review, asset.duration)
+          .visualProtection,
       });
     }
   }
@@ -201,14 +211,19 @@ export async function prepareAutonomousSources(input: {
               segments: working.sourceSpeech.find(s => s.assetId === asset.id)!
                 .segments,
               transcript: "",
-              provenance: working.sourceSpeech.find(s=>s.assetId===asset.id)?.provenance,
+              provenance: working.sourceSpeech.find(s => s.assetId === asset.id)
+                ?.provenance,
             }
           : await input.transcribe(asset));
       input.checkpoint();
       input.cache.transcripts.set(key, result);
       working.sourceSpeech = [
         ...(working.sourceSpeech ?? []).filter(s => s.assetId !== asset.id),
-        { assetId: asset.id, segments: result.segments, provenance: result.provenance },
+        {
+          assetId: asset.id,
+          segments: result.segments,
+          provenance: result.provenance,
+        },
       ];
       if (!input.captions || review?.captions === "present") continue;
       if (result.provenance) working.transcriptProvenance = result.provenance;

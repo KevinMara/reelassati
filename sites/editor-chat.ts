@@ -13,6 +13,7 @@ import {
   EDITOR_GRAPHIC_GUIDANCE,
 } from "../contracts/editorial-design";
 import { buildEditorialSpeechEvidence } from "../contracts/editorial-evidence";
+import { sourceReviewFacts } from "../contracts/source-review";
 import { assertSupportingMedia } from "../contracts/supporting-media";
 import { editorTaskPreset } from "../contracts/editor-chat-presets";
 import {
@@ -335,7 +336,7 @@ export function editorChatModelContext(context: EditorChatContext) {
       clips: project.clips,
       transcript: project.transcript,
       speechEvidence: buildEditorialSpeechEvidence(project),
-      sourceReviews: project.sourceReviews,
+      sourceReviews: project.sourceReviews?.map(sourceReviewFacts),
       referenceStyleBrief: project.referenceStyleBrief,
       editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
         ?.profile,
