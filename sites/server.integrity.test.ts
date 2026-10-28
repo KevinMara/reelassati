@@ -2097,7 +2097,7 @@ describe("provenance integrity boundaries", () => {
     });
     expect(plan.changes[2]).toMatchObject({ start: 2, end: 3 });
     expect(providerBody).toMatchObject({
-      model: "moonshotai/kimi-k3.1-pro",
+      model: "moonshotai/kimi-k3",
       reasoning: { effort: "high" },
       provider: {
         order: ["moonshotai"],

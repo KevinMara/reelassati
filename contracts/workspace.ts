@@ -209,6 +209,8 @@ export interface EditOperation {
     assetId?: string;
     prompt?: string;
     mediaKind?: "image" | "video";
+    /** An alternative enhancement, rather than coverage required by the story. Used for cost forecasts. */
+    optional?: boolean;
     fit?: "contain" | "cover";
     fadeIn?: number;
     fadeOut?: number;
@@ -252,7 +254,11 @@ export interface EditRevision {
 }
 
 export interface EditProject {
-  sourceSpeech?: Array<{ assetId: string; segments: TranscriptSegment[]; provenance?: import("./compliance").ContentProvenance }>;
+  sourceSpeech?: Array<{
+    assetId: string;
+    segments: TranscriptSegment[];
+    provenance?: import("./compliance").ContentProvenance;
+  }>;
   folderId?: string;
   /** Reviewed source-clock brief; opening it never starts inference. */
   analyzerOptimization?: import("./analyzer-report").AnalyzerOptimization;

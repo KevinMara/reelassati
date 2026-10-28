@@ -10,14 +10,20 @@ import { useUiText } from "@/lib/i18n/ui";
 
 type Sizes = { media: number; chat: number; height: number };
 const defaultSizes = (): Sizes => ({
-  media: 276,
-  chat: 340,
+  media:
+    typeof window === "undefined"
+      ? 360
+      : Math.max(260, Math.min(440, window.innerWidth * 0.25)),
+  chat:
+    typeof window === "undefined"
+      ? 380
+      : Math.max(320, Math.min(480, window.innerWidth * 0.27)),
   height:
     typeof window === "undefined"
-      ? 440
-      : Math.max(300, Math.min(440, window.innerHeight - 285)),
+      ? 600
+      : Math.max(340, window.innerHeight - 240),
 });
-const storageKey = "reelassati:editor-panels:v3";
+const storageKey = "reelassati:editor-panels:v4";
 function persistSizes(sizes: Sizes | null) {
   try {
     if (sizes) localStorage.setItem(storageKey, JSON.stringify(sizes));

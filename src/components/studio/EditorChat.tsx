@@ -1,5 +1,6 @@
 import { creditReceiptTotal } from "@contracts/credit-receipt";
 import { ConciseResponse } from "./ConciseResponse";
+import { editorChatReceipt } from "@/lib/editor-chat-receipt";
 import { persistedAutonomousReceipt } from "@/lib/autonomous-result-receipt";
 import {
   Tooltip,
@@ -678,6 +679,7 @@ export function EditorChat({
                         <ConciseResponse
                           text={
                             persistedAutonomousReceipt(message, project, ui) ??
+                            editorChatReceipt(message, ui) ??
                             message.text
                           }
                           detailsText={
@@ -688,7 +690,9 @@ export function EditorChat({
                                 : message.activity.appliedTypes === undefined
                                   ? `${ui("Plan")}: ${message.text}`
                                   : undefined
-                              : undefined
+                              : editorChatReceipt(message, ui)
+                                ? `${ui("Plan")}: ${message.text}`
+                                : undefined
                           }
                         />
                       )}

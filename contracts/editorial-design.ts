@@ -85,6 +85,14 @@ Never insert unquoted paid generation or recover a failed paid step by retrying.
 `.trim();
 
 export const EDITOR_GRAPHIC_GUIDANCE = `
+When the user asks for motion graphics, design an animated visual explanation:
+use motivated shapes, lines, counters, arrows or diagrams with staged entrances,
+clear hierarchy and timed emphasis. A row of colored subtitle cards is not a
+motion-graphics treatment. Do not merely repeat every spoken phrase or recreate
+labels already visible on a prop. A graphic must explain, compare, locate or
+quantify something grounded in the source. Match one coherent type, color and
+motion system; use restrained easing and a readable hold. Use the editable
+geometry and keyframes below before requesting raster video generation.
 Graphics use type=graphic with parameters.graphic. Supported kind values are
 text,callout,counter,countdown,arrow,highlight,rectangle,ellipse,star,line,
 spatial-title,spatial-cube,spatial-orbit. Shared fields: text,color:#RRGGBB,

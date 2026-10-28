@@ -169,7 +169,9 @@ function AudioMixControls({
                   className={field}
                   value={key.at}
                   disabled={clip.locked}
-                  aria-label={ui("Audio gain key {{number}} source second", { number: index + 1 })}
+                  aria-label={ui("Audio gain key {{number}} source second", {
+                    number: index + 1,
+                  })}
                   title={
                     inClip
                       ? ui("Key inside this clip")
@@ -203,7 +205,9 @@ function AudioMixControls({
                   className={field}
                   value={Number(key.gain.toFixed(3))}
                   disabled={clip.locked}
-                  aria-label={ui("Audio gain key {{number}} gain multiplier", { number: index + 1 })}
+                  aria-label={ui("Audio gain key {{number}} gain multiplier", {
+                    number: index + 1,
+                  })}
                   onChange={event =>
                     update(current => ({
                       ...current,
@@ -218,7 +222,9 @@ function AudioMixControls({
                 <button
                   type="button"
                   disabled={!inClip}
-                  aria-label={ui("Go to audio gain key {{number}}", { number: index + 1 })}
+                  aria-label={ui("Go to audio gain key {{number}}", {
+                    number: index + 1,
+                  })}
                   onClick={() =>
                     onSeek(
                       clip.start + (key.at - clip.inPoint) / (clip.speed ?? 1)
@@ -231,7 +237,9 @@ function AudioMixControls({
                 <button
                   type="button"
                   disabled={clip.locked}
-                  aria-label={ui("Remove audio gain key {{number}}", { number: index + 1 })}
+                  aria-label={ui("Remove audio gain key {{number}}", {
+                    number: index + 1,
+                  })}
                   onClick={() =>
                     update(current => ({
                       ...current,
@@ -362,7 +370,7 @@ export function ClipInspector({
   ) => (
     <label key={key} className="block text-sm">
       <span className="mb-2 flex justify-between">
-        <span>{label}</span>
+        <span>{ui(label)}</span>
         <span className="font-mono text-foreground/65">
           {(key === "volume" && draft
             ? audioBaseVolume(draft)
@@ -373,7 +381,7 @@ export function ClipInspector({
       </span>
       <input
         type="range"
-        aria-label={label}
+        aria-label={ui(label)}
         min={min}
         max={max}
         step={step}
@@ -413,7 +421,7 @@ export function ClipInspector({
             onClick={() => setTab(id)}
             className={`rounded-lg px-3 py-2 text-sm disabled:opacity-35 ${tab === id ? "bg-surface font-medium text-primary shadow-sm" : "text-foreground/65 hover:text-foreground"}`}
           >
-            {label}
+            {ui(label)}
           </button>
         ))}
       </div>
@@ -473,7 +481,7 @@ export function ClipInspector({
                 ).map(([key, label, min, max]) => (
                   <label key={key} className="text-sm">
                     <span className="mb-1 flex items-center">
-                      {label}
+                      {ui(label)}
                       {key === "inPoint" && (
                         <EditorInfo label={ui("Source in and out")}>
                           {ui(

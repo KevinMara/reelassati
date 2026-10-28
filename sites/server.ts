@@ -76,7 +76,10 @@ import {
 } from "./music-generation";
 import { normalizeGraphic } from "../contracts/motion-graphics";
 import { buildEditorialSpeechEvidence } from "../contracts/editorial-evidence";
-import { autonomousCaptionDirection, normalizeAutonomousCaptionTreatment } from "../contracts/editorial-captions";
+import {
+  autonomousCaptionDirection,
+  normalizeAutonomousCaptionTreatment,
+} from "../contracts/editorial-captions";
 import { normalizeVisual } from "../contracts/clip-visual";
 import {
   normalizeTranscriptWords,
@@ -84,7 +87,10 @@ import {
   type ProviderTranscript,
 } from "../contracts/transcript-timing";
 import { normalizeReview, sourceReviewFacts } from "../contracts/source-review";
-import { SOURCE_VISUAL_EVIDENCE_GUIDANCE, normalizeSourceVisualEvidence } from "../contracts/source-visual-evidence";
+import {
+  SOURCE_VISUAL_EVIDENCE_GUIDANCE,
+  normalizeSourceVisualEvidence,
+} from "../contracts/source-visual-evidence";
 import {
   SOUND_EFFECT_MODEL,
   soundEffectQuote,
@@ -2105,7 +2111,7 @@ async function getWorkspace(
         ? { height: Math.max(1, Math.round(saved.height)) }
         : {}),
       ...(saved.variantGroupId ? { variantGroupId: saved.variantGroupId } : {}),
-      ...(!asset.stock && saved.stock ? {stock:saved.stock} : {}),
+      ...(!asset.stock && saved.stock ? { stock: saved.stock } : {}),
       ...(saved.parentAssetId ? { parentAssetId: saved.parentAssetId } : {}),
       favorite: saved.favorite === true,
       ...(saved.folderId &&
@@ -3391,23 +3397,31 @@ function inferAssetKind(
 }
 
 function stockAssetMetadata(stock: StockMedia | undefined): Partial<Asset> {
-  return stock ? {
-    stock,
-    variantGroupId: `stock:${stock.provider}:${stock.id}`,
-    ...(stock.duration ? {duration: stock.duration} : {}),
-    ...(stock.width ? {width: stock.width} : {}),
-    ...(stock.height ? {height: stock.height} : {}),
-  } : {};
+  return stock
+    ? {
+        stock,
+        variantGroupId: `stock:${stock.provider}:${stock.id}`,
+        ...(stock.duration ? { duration: stock.duration } : {}),
+        ...(stock.width ? { width: stock.width } : {}),
+        ...(stock.height ? { height: stock.height } : {}),
+      }
+    : {};
 }
 
 function rowToAsset(row: AssetRow, provenance?: ProvenanceRow | null): Asset {
   let stock: StockMedia | undefined;
   if (row.stock_json) {
     const saved = recordValue(JSON.parse(row.stock_json));
-    if (!saved || !["commons", "openverse"].includes(String(saved.provider)) ||
-        saved.kind !== row.kind || typeof saved.id !== "string" ||
-        typeof saved.creator !== "string" || typeof saved.source !== "string" ||
-        typeof saved.license !== "string" || typeof saved.licenseUrl !== "string")
+    if (
+      !saved ||
+      !["commons", "openverse"].includes(String(saved.provider)) ||
+      saved.kind !== row.kind ||
+      typeof saved.id !== "string" ||
+      typeof saved.creator !== "string" ||
+      typeof saved.source !== "string" ||
+      typeof saved.license !== "string" ||
+      typeof saved.licenseUrl !== "string"
+    )
       throw new Error("Stored stock attribution could not be read.");
     stock = saved as unknown as StockMedia;
   }
@@ -3446,25 +3460,25 @@ async function insertAssetRecord(
       (id, owner_email, name, kind, content_type, bytes, r2_key, created_at, brand_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `
-  )
-    .bind(
-      id,
-      user.email,
-      input.name,
-      input.kind,
-      input.contentType,
-      input.size,
-      input.r2Key,
-      createdAt,
-      user.brandId || "default"
-    );
+  ).bind(
+    id,
+    user.email,
+    input.name,
+    input.kind,
+    input.contentType,
+    input.size,
+    input.r2Key,
+    createdAt,
+    user.brandId || "default"
+  );
   // The media record and its license must become visible together. A workspace
   // save or client reconnect is not required to recover the attribution.
   if (input.stock) {
     await env.DB.batch([
       insert,
-      env.DB.prepare("INSERT INTO asset_stock_metadata (asset_id, stock_json) VALUES (?, ?)")
-        .bind(id, JSON.stringify(input.stock)),
+      env.DB.prepare(
+        "INSERT INTO asset_stock_metadata (asset_id, stock_json) VALUES (?, ?)"
+      ).bind(id, JSON.stringify(input.stock)),
     ]);
   } else await insert.run();
 
@@ -4003,12 +4017,13 @@ async function chatJson(
 
   const providerName = useKimiSubscription ? "Kimi Code" : "OpenRouter";
   const selectedModel = editing
-    ? model === "moonshotai/kimi-k3.1-pro" ? model : DEFAULT_ANALYSIS_MODEL
+    ? DEFAULT_ANALYSIS_MODEL
     : useKimiSubscription
       ? env.KIMI_CODE_MODEL || "k3-256k"
       : model || env.OPENROUTER_TEXT_MODEL || "moonshotai/kimi-k2.5";
   const foregroundK3 =
-    selectedModel === DEFAULT_ANALYSIS_MODEL || selectedModel === "moonshotai/kimi-k3.1-pro";
+    selectedModel === DEFAULT_ANALYSIS_MODEL ||
+    selectedModel === "moonshotai/kimi-k3.1-pro";
   analysisControl?.signal.throwIfAborted();
   const invocation = await beginAiInvocation(
     env,
@@ -4089,7 +4104,7 @@ async function chatJson(
             ? { temperature: responseSchema ? 0.1 : 0.45 }
             : {}),
           ...(analysisControl ? { stream: true } : {}),
-          ...((analysisControl || editing) ? {reasoning: {effort}} : {}),
+          ...(analysisControl || editing ? { reasoning: { effort } } : {}),
           ...(maxOutputTokens ? { max_tokens: maxOutputTokens } : {}),
         }),
       }
@@ -4454,6 +4469,8 @@ function mapEditOperations(
         parameters.assetId = params.assetId.slice(0, 160);
       if (params.mediaKind === "image" || params.mediaKind === "video")
         parameters.mediaKind = params.mediaKind;
+      if (typeof params.optional === "boolean")
+        parameters.optional = params.optional;
       if (params.fit === "cover" || params.fit === "contain")
         parameters.fit = params.fit;
       if (type === "style" && recordValue(params.visual)) {
@@ -5592,7 +5609,8 @@ async function runPaidAiAction(
     return await responseWithCreditReceipt(env, user, response, reservation);
   } catch (cause) {
     await releaseCreditReservation(env, reservation).catch(() => undefined);
-    if (cause instanceof Response) throw await responseWithCreditReceipt(env, user, cause, reservation);
+    if (cause instanceof Response)
+      throw await responseWithCreditReceipt(env, user, cause, reservation);
     throw cause;
   }
 }
@@ -5673,7 +5691,10 @@ async function handleAi(
     const currentCapabilities = capabilities(env, user);
     if (!currentCapabilities.ai)
       return errorResponse("Reel is temporarily unavailable", 503);
-    const storyEvidence = buildStoryBeatEvidence({ ...project, sourceReviews: project.sourceReviews?.map(sourceReviewFacts) });
+    const storyEvidence = buildStoryBeatEvidence({
+      ...project,
+      sourceReviews: project.sourceReviews?.map(sourceReviewFacts),
+    });
     if (input.task === "story-sections" && !storyEvidence.length)
       return errorResponse(
         "Analyze the source footage before finding story sections.",
@@ -5880,7 +5901,12 @@ async function handleAi(
               mediaParts.length
                 ? env.OPENROUTER_ANALYSIS_MODEL || DEFAULT_ANALYSIS_MODEL
                 : undefined,
-              true, 16000, false, undefined, undefined, editReasoningEffort(input.effort)
+              true,
+              16000,
+              false,
+              undefined,
+              undefined,
+              editReasoningEffort(input.effort)
             );
             let plan = normalizeEditorChatPlan(output, context);
             const malformed = (p: typeof plan) =>
@@ -5927,7 +5953,12 @@ async function handleAi(
                 mediaParts.length
                   ? env.OPENROUTER_ANALYSIS_MODEL || DEFAULT_ANALYSIS_MODEL
                   : undefined,
-                true, 16000, false, undefined, undefined, editReasoningEffort(input.effort)
+                true,
+                16000,
+                false,
+                undefined,
+                undefined,
+                editReasoningEffort(input.effort)
               );
               output = repaired.output;
               invocation = repaired.invocation;
@@ -6460,7 +6491,11 @@ async function handleAi(
       return errorResponse("Choose a project and describe the edit");
     }
     let requestedModel: ReturnType<typeof editModel>;
-    try { requestedModel = editModel(input.model); } catch { return errorResponse("Choose a supported editing model.",422); }
+    try {
+      requestedModel = editModel(input.model);
+    } catch {
+      return errorResponse("Choose a supported editing model.", 422);
+    }
     const project = input.project;
     const projectId = stringValue(project.id);
     if (!projectId) {
@@ -6476,7 +6511,8 @@ async function handleAi(
       projectId
     );
     const duration = boundedNumber(input.project.duration, 30, 0.2, 86400);
-    const factualSourceReviews = input.project.sourceReviews?.map(sourceReviewFacts);
+    const factualSourceReviews =
+      input.project.sourceReviews?.map(sourceReviewFacts);
     const projectContext = {
       title: input.project.title,
       duration,
@@ -6488,20 +6524,35 @@ async function handleAi(
       captionStyle: input.project.captionStyle,
       captionAppearance: input.project.captionAppearance,
       sourceReviews: factualSourceReviews,
-      storyEvidence: buildStoryBeatEvidence({ ...input.project, sourceReviews: factualSourceReviews }),
+      storyEvidence: buildStoryBeatEvidence({
+        ...input.project,
+        sourceReviews: factualSourceReviews,
+      }),
       qualitySignals: input.project.qualitySignals.slice(0, 30),
       selectedClipIds: Array.isArray(input.selectedClipIds)
         ? input.selectedClipIds.slice(0, 20)
         : [],
       selectedRange: input.range,
-      freeSounds:editorAudioCatalog.map(a=>({assetId:`catalog:${a.id}`,name:a.name,duration:a.duration,tags:a.tags,type:a.type})),
+      freeSounds: editorAudioCatalog.map(a => ({
+        assetId: `catalog:${a.id}`,
+        name: a.name,
+        duration: a.duration,
+        tags: a.tags,
+        type: a.type,
+      })),
       localOnly: input.localOnly === true,
       editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
         ?.profile,
     };
-    const captionStyling = input.captionStyling === true && input.localOnly !== true &&
-      !input.selectedClipIds?.length && (!input.range || (input.range.start <= 0 && input.range.end >= duration));
-    const captionDirection = autonomousCaptionDirection(project, captionStyling);
+    const captionStyling =
+      input.captionStyling === true &&
+      input.localOnly !== true &&
+      !input.selectedClipIds?.length &&
+      (!input.range || (input.range.start <= 0 && input.range.end >= duration));
+    const captionDirection = autonomousCaptionDirection(
+      project,
+      captionStyling
+    );
     return runPaidAiAction(
       env,
       user,
@@ -6530,7 +6581,7 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "You may request up to two stock searches only when a specific supporting image would explain an actual spoken point. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
+          `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
           JSON.stringify({
             command: input.command,
             project: projectContext,
@@ -6546,17 +6597,99 @@ async function handleAi(
           analysisControl,
           editReasoningEffort(input.effort)
         );
-        let stockMedia:StockMedia[]=[];
-        if(input.stock === true && Array.isArray(output.stockSearches) && output.stockSearches.length) {
-          const searches=output.stockSearches.slice(0,2).flatMap(value=>{const row=recordValue(value);const kind=row?.kind,query=stringValue(row?.query).trim().slice(0,120);return query&&(kind==="video"||kind==="image")?[{kind,query}]:[];});
-          const found=await Promise.allSettled(searches.map(s=>searchStock(s.kind as "video"|"image",s.query,AbortSignal.any([analysisControl.signal,AbortSignal.timeout(20_000)]))));
-          stockMedia=[...new Map(found.flatMap(result=>result.status==="fulfilled"?result.value.slice(0,4):[]).map(item=>[`stock:${item.provider}:${item.id}`,item])).values()].slice(0,6);
-          if(stockMedia.length) {
-            const refined=await chatJson(env,user,"edit-planning",`${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Use at most three stock shots as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Maintain the approved generation limits from the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,[
-              {type:"text",text:JSON.stringify({command:input.command,project:projectContext,draft:output,stock:stockMedia.map(item=>({...item,assetId:`stock:${item.provider}:${item.id}`}))})},
-              ...stockMedia.filter(item=>item.thumbnail).slice(0,4).map(item=>({type:"image_url",image_url:{url:item.thumbnail}}))
-            ],requestedModel,true,24000,false,undefined,analysisControl,editReasoningEffort(input.effort));
-            output=refined.output;invocation=refined.invocation;
+        let stockMedia: StockMedia[] = [];
+        if (
+          input.stock === true &&
+          Array.isArray(output.stockSearches) &&
+          output.stockSearches.length
+        ) {
+          const searches = [
+            ...new Map(
+              output.stockSearches.flatMap(value => {
+                const row = recordValue(value);
+                const kind = row?.kind,
+                  query = stringValue(row?.query).trim().slice(0, 120);
+                return query && (kind === "video" || kind === "image")
+                  ? [
+                      [
+                        `${kind}:${query.toLowerCase()}`,
+                        { kind, query },
+                      ] as const,
+                    ]
+                  : [];
+              })
+            ).values(),
+          ];
+          // Bound concurrency, not the number of story beats that may use stock.
+          for (let offset = 0; offset < searches.length; offset += 4) {
+            analysisControl.signal.throwIfAborted();
+            const found = await Promise.allSettled(
+              searches
+                .slice(offset, offset + 4)
+                .map(s =>
+                  searchStock(
+                    s.kind as "video" | "image",
+                    s.query,
+                    AbortSignal.any([
+                      analysisControl.signal,
+                      AbortSignal.timeout(20_000),
+                    ])
+                  )
+                )
+            );
+            stockMedia.push(
+              ...found.flatMap(result =>
+                result.status === "fulfilled" ? result.value.slice(0, 4) : []
+              )
+            );
+          }
+          stockMedia = [
+            ...new Map(
+              stockMedia.map(item => [
+                `stock:${item.provider}:${item.id}`,
+                item,
+              ])
+            ).values(),
+          ];
+          if (stockMedia.length) {
+            const refined = await chatJson(
+              env,
+              user,
+              "edit-planning",
+              `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Choose the number of useful stock shots from the source and story; insert them as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Follow the generation authorization in the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,
+              [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    command: input.command,
+                    project: projectContext,
+                    draft: output,
+                    stock: stockMedia.map(item => ({
+                      ...item,
+                      assetId: `stock:${item.provider}:${item.id}`,
+                    })),
+                  }),
+                },
+                ...stockMedia
+                  .filter(item => item.thumbnail)
+                  .flatMap(item => [
+                    {
+                      type: "text",
+                      text: `Stock preview: stock:${item.provider}:${item.id}`,
+                    },
+                    { type: "image_url", image_url: { url: item.thumbnail } },
+                  ]),
+              ],
+              requestedModel,
+              true,
+              24000,
+              false,
+              undefined,
+              analysisControl,
+              editReasoningEffort(input.effort)
+            );
+            output = refined.output;
+            invocation = refined.invocation;
           }
         }
         const summary = stringValue(
@@ -6564,7 +6697,10 @@ async function handleAi(
           "Edit plan ready for review"
         );
         const captionTreatment = captionStyling
-          ? normalizeAutonomousCaptionTreatment(project, output.captionTreatment)
+          ? normalizeAutonomousCaptionTreatment(
+              project,
+              output.captionTreatment
+            )
           : undefined;
         let changes = mapEditOperations(
           output.changes,
@@ -6578,9 +6714,14 @@ async function handleAi(
           changes = changes
             .filter(
               change =>
-                ["style", "audio", "sound", "caption", "broll", "graphic"].includes(
-                  change.type
-                ) &&
+                [
+                  "style",
+                  "audio",
+                  "sound",
+                  "caption",
+                  "broll",
+                  "graphic",
+                ].includes(change.type) &&
                 change.end > start &&
                 change.start < end &&
                 (!["broll", "sound"].includes(change.type) ||
@@ -6625,7 +6766,14 @@ async function handleAi(
         return json({
           summary,
           ...(captionTreatment ? { captionTreatment } : {}),
-          stockMedia:stockMedia.filter(item=>changes.some(change=>change.type==="broll"&&change.parameters?.assetId===`stock:${item.provider}:${item.id}`)),
+          stockMedia: stockMedia.filter(item =>
+            changes.some(
+              change =>
+                change.type === "broll" &&
+                change.parameters?.assetId ===
+                  `stock:${item.provider}:${item.id}`
+            )
+          ),
           changes: changes.map(change => ({ ...change, provenance })),
           provenance,
         });
@@ -6837,8 +6985,9 @@ async function handleAi(
           env,
           user,
           "video-analysis",
-          SOURCE_VISUAL_EVIDENCE_GUIDANCE + "\n" +
-          `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied full-duration temporal video and its available audio, not merely a transcript or representative stills. Source duration is ${analysisDuration} seconds; all ranges use this source clock. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action. For ending, identify the source timestamp after the last complete spoken phrase AND meaningful visual action, preserving intentional closing holds, CTAs, music and outros. Set completed true and trailingContent empty only when you observed the entire remaining tail and it contains no meaningful content; otherwise use unknown. Never infer an ending from sampled frames or a missing transcript. Set ending to null if timing or coverage cannot be established. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with schemaVersion, summary, insights, structure, recommendations, noChangesReason, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote,ending:{time,confidence:0..1,completed:boolean,trailingContent:empty|meaningful|unknown,note}}, hook {score 0..100|null,note}, pacing {score 0..100|null,note}, and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. ${VIDEO_ANALYSIS_RUBRIC} ${VIDEO_ANALYSIS_DIRECTION} ${input.extractStyle === true ? "Also return editingStyle: a version 1 content-independent editing grammar matching its JSON schema. Observe pacing, framing, color impression, motion, transitions, captions, graphics and sound. Use unknown for unestablished traits. shotSeconds summarizes actual SHOT lengths (not rubric insight intervals); use null unless actual cuts can be measured. graphicsPerMinute is null unless measured. Never put dialogue, source identifiers, objects, events, claims, melody or instructions in this style profile." : ""} Executable changes use only type=trim|split|silence|pacing|audio|style|graphic with label,reason,evidence,start,end,confidence:0..1,intensity:light|balanced|aggressive,parameters. Each evidence field cites the actual interval observation. Trim requires parameters.sourceIn (source-media offset) and keeps exactly end-start seconds. Split marks an evidenced boundary. Silence removes only an observed non-meaningful interval, not a guessed gap in speech. Pacing requires parameters.speed:0.25..4. Audio requires parameters.volume:0..2. Style permits fit:cover|contain,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2,fadeIn/fadeOut:0..3. Graphic requires parameters.graphic {kind:text|callout|arrow|highlight,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16,animation:none|fade|pop|slide}; preserve readable captions and observed faces/products. Do not fabricate generated b-roll, replacement audio, captions without verified word timings, reshoots or factual claims as executable operations: put those in editorial recommendations. This is a reviewable plan, never already applied. Target platform: ${platformValue(input.platform)}. Write all human-readable text in language code ${analysisLanguage}; preserve original source quotes exactly and keep JSON keys/enums in English.`,
+          SOURCE_VISUAL_EVIDENCE_GUIDANCE +
+            "\n" +
+            `You are REELassati's evidence-focused short-form video reviewer. Inspect the supplied full-duration temporal video and its available audio, not merely a transcript or representative stills. Source duration is ${analysisDuration} seconds; all ranges use this source clock. Include timestamped observations of shot/action changes, pauses, visible proof and the final meaningful action. For ending, identify the source timestamp after the last complete spoken phrase AND meaningful visual action, preserving intentional closing holds, CTAs, music and outros. Set completed true and trailingContent empty only when you observed the entire remaining tail and it contains no meaningful content; otherwise use unknown. Never infer an ending from sampled frames or a missing transcript. Set ending to null if timing or coverage cannot be established. Keep observed facts separate from editorial suggestions. Do not label a gap in speech as silence unless audio actually supports it. Return JSON only with schemaVersion, summary, insights, structure, recommendations, noChangesReason, review {captions:present|absent|unknown,captionNote,audio:present|absent|unknown,audioNote,ending:{time,confidence:0..1,completed:boolean,trailingContent:empty|meaningful|unknown,note}}, hook {score 0..100|null,note}, pacing {score 0..100|null,note}, and changes. Scores are editorial rubric estimates, never presented as predicted views. Never infer emotions, sensitive traits, health, identity, biometric categories or a person's suitability. ${VIDEO_ANALYSIS_RUBRIC} ${VIDEO_ANALYSIS_DIRECTION} ${input.extractStyle === true ? "Also return editingStyle: a version 1 content-independent editing grammar matching its JSON schema. Observe pacing, framing, color impression, motion, transitions, captions, graphics and sound. Use unknown for unestablished traits. shotSeconds summarizes actual SHOT lengths (not rubric insight intervals); use null unless actual cuts can be measured. graphicsPerMinute is null unless measured. Never put dialogue, source identifiers, objects, events, claims, melody or instructions in this style profile." : ""} Executable changes use only type=trim|split|silence|pacing|audio|style|graphic with label,reason,evidence,start,end,confidence:0..1,intensity:light|balanced|aggressive,parameters. Each evidence field cites the actual interval observation. Trim requires parameters.sourceIn (source-media offset) and keeps exactly end-start seconds. Split marks an evidenced boundary. Silence removes only an observed non-meaningful interval, not a guessed gap in speech. Pacing requires parameters.speed:0.25..4. Audio requires parameters.volume:0..2. Style permits fit:cover|contain,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2,fadeIn/fadeOut:0..3. Graphic requires parameters.graphic {kind:text|callout|arrow|highlight,text,color:#RRGGBB,background:#RRGGBB,x:10..90,y:10..90,size:2..16,animation:none|fade|pop|slide}; preserve readable captions and observed faces/products. Do not fabricate generated b-roll, replacement audio, captions without verified word timings, reshoots or factual claims as executable operations: put those in editorial recommendations. This is a reviewable plan, never already applied. Target platform: ${platformValue(input.platform)}. Write all human-readable text in language code ${analysisLanguage}; preserve original source quotes exactly and keep JSON keys/enums in English.`,
           [
             {
               type: "text",
@@ -7067,7 +7216,10 @@ async function handleAi(
         // Normalize before provenance is recorded: invalid/old spatial metadata
         // never becomes a safe-placement claim merely through cache reuse.
         const sourceReviewWithVisuals = recordValue(output.review) || {};
-        const visualProtection = normalizeSourceVisualEvidence(sourceReviewWithVisuals.visualProtection, analysisDuration);
+        const visualProtection = normalizeSourceVisualEvidence(
+          sourceReviewWithVisuals.visualProtection,
+          analysisDuration
+        );
         output.review = { ...sourceReviewWithVisuals, visualProtection };
         if (analysisUsesProxy) {
           const review = recordValue(output.review) || {};
@@ -7076,7 +7228,11 @@ async function handleAi(
             ending: null,
             // An 8fps proxy can preserve observed text/regions, but cannot
             // certify empty space or object motion between sampled frames.
-            visualProtection: { ...visualProtection, coverage: "unknown", reviewedRanges: [] },
+            visualProtection: {
+              ...visualProtection,
+              coverage: "unknown",
+              reviewedRanges: [],
+            },
             ...(review.captions === "absent"
               ? {
                   captions: "unknown",
@@ -8037,7 +8193,12 @@ async function handleVideoJobs(
       return errorResponse("That video request id is already in use", 409);
     }
     if (existing) {
-      return responseWithCreditReceipt(env, user, json({ job: jobFromRow(existing) }, 202), reservationFromJobPayload(JSON.parse(existing.payload)));
+      return responseWithCreditReceipt(
+        env,
+        user,
+        json({ job: jobFromRow(existing) }, 202),
+        reservationFromJobPayload(JSON.parse(existing.payload))
+      );
     }
 
     const videoCost = videoCreditCost({
@@ -8110,7 +8271,12 @@ async function handleVideoJobs(
       return errorResponse("The video request could not be registered", 500);
     }
     if ((registration.meta?.changes || 0) !== 1 || registered.provider_job_id) {
-      return responseWithCreditReceipt(env, user, json({ job: jobFromRow(registered) }, 202), creditReservation);
+      return responseWithCreditReceipt(
+        env,
+        user,
+        json({ job: jobFromRow(registered) }, 202),
+        creditReservation
+      );
     }
 
     let providerAccepted = false;
@@ -8247,7 +8413,12 @@ async function handleVideoJobs(
       )
         .bind(requestId, user.email)
         .first<JobRow>();
-      return responseWithCreditReceipt(env, user, json({ job: jobFromRow(row as JobRow) }, 202), creditReservation);
+      return responseWithCreditReceipt(
+        env,
+        user,
+        json({ job: jobFromRow(row as JobRow) }, 202),
+        creditReservation
+      );
     } catch (cause) {
       if (!providerAccepted) {
         await releaseCreditReservation(env, creditReservation).catch(
@@ -8802,20 +8973,27 @@ async function handleVideoJobs(
   const assetProvenance = asset
     ? await provenanceByEntity(env, user, "asset", asset.id)
     : null;
-  return responseWithCreditReceipt(env, user, json({
-    job: {
-      ...jobFromRow(row as JobRow),
-      canRecover: Boolean(row && (await videoRecoveryEvidence(env, user, row))),
-    },
-    ...(asset
-      ? {
-          asset: {
-            ...rowToAsset(asset, assetProvenance),
-            url: await signedMediaUrl(env, asset.id),
-          },
-        }
-      : {}),
-  }), row ? reservationFromJobPayload(JSON.parse(row.payload)) : null);
+  return responseWithCreditReceipt(
+    env,
+    user,
+    json({
+      job: {
+        ...jobFromRow(row as JobRow),
+        canRecover: Boolean(
+          row && (await videoRecoveryEvidence(env, user, row))
+        ),
+      },
+      ...(asset
+        ? {
+            asset: {
+              ...rowToAsset(asset, assetProvenance),
+              url: await signedMediaUrl(env, asset.id),
+            },
+          }
+        : {}),
+    }),
+    row ? reservationFromJobPayload(JSON.parse(row.payload)) : null
+  );
 }
 
 async function handleVideoReference(
@@ -13160,39 +13338,122 @@ async function handleApi(
     user.brandId = requestedBrand;
   }
   if (url.pathname === "/api/transcripts/local" && request.method === "POST") {
-    const input = await parseJsonBody<{assetId?:string;projectId?:string;segments?:unknown}>(request);
-    const assetId=stringValue(input.assetId),projectId=stringValue(input.projectId);
-    const workspace=await getWorkspace(env,user),asset=workspace.assets.find(a=>a.id===assetId);
-    if (!asset || !["audio","video"].includes(asset.kind) || (projectId&&!workspace.projects.some(p=>p.id===projectId))) return errorResponse("Choose an owned source and project.",422);
+    const input = await parseJsonBody<{
+      assetId?: string;
+      projectId?: string;
+      segments?: unknown;
+    }>(request);
+    const assetId = stringValue(input.assetId),
+      projectId = stringValue(input.projectId);
+    const workspace = await getWorkspace(env, user),
+      asset = workspace.assets.find(a => a.id === assetId);
+    if (
+      !asset ||
+      !["audio", "video"].includes(asset.kind) ||
+      (projectId && !workspace.projects.some(p => p.id === projectId))
+    )
+      return errorResponse("Choose an owned source and project.", 422);
     let segments: ReturnType<typeof parseLocalTranscriptSegments>;
-    try { segments = parseLocalTranscriptSegments(input.segments,asset.duration); }
-    catch { return errorResponse("Local speech timing is incomplete, unordered, or outside the source.",422); }
-    const transcript=canonicalTranscriptText(segments),invocationId=crypto.randomUUID();
-    const metadata=projectId?await transcriptProvenanceMetadata(projectId,invocationId,assetId,segments):{sourceAssetId:assetId};
-    const provenance=await createProvenanceRecord(env,user,{entityType:"transcript",entityId:projectId?`${projectId}:source:${invocationId}`:invocationId,origin:"ai-assisted",operation:"transcription",provider:"Local browser",model:LOCAL_SPEECH_MODEL.id,content:transcript,textToken:true,metadata:{...metadata,execution:"client-reported-local",modelRevision:LOCAL_SPEECH_MODEL.revision,providerCost:0}});
-    return json({transcript,segments,provenance});
+    try {
+      segments = parseLocalTranscriptSegments(input.segments, asset.duration);
+    } catch {
+      return errorResponse(
+        "Local speech timing is incomplete, unordered, or outside the source.",
+        422
+      );
+    }
+    const transcript = canonicalTranscriptText(segments),
+      invocationId = crypto.randomUUID();
+    const metadata = projectId
+      ? await transcriptProvenanceMetadata(
+          projectId,
+          invocationId,
+          assetId,
+          segments
+        )
+      : { sourceAssetId: assetId };
+    const provenance = await createProvenanceRecord(env, user, {
+      entityType: "transcript",
+      entityId: projectId
+        ? `${projectId}:source:${invocationId}`
+        : invocationId,
+      origin: "ai-assisted",
+      operation: "transcription",
+      provider: "Local browser",
+      model: LOCAL_SPEECH_MODEL.id,
+      content: transcript,
+      textToken: true,
+      metadata: {
+        ...metadata,
+        execution: "client-reported-local",
+        modelRevision: LOCAL_SPEECH_MODEL.revision,
+        providerCost: 0,
+      },
+    });
+    return json({ transcript, segments, provenance });
   }
   if (url.pathname.startsWith("/api/stock/")) {
-    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(45_000)]);
+    const signal = AbortSignal.any([
+      request.signal,
+      AbortSignal.timeout(45_000),
+    ]);
     if (url.pathname === "/api/stock/search" && request.method === "GET") {
-      const kind = url.searchParams.get("kind"), query = stringValue(url.searchParams.get("q")).trim();
-      if (!["audio","video","image"].includes(kind || "") || !query) return errorResponse("Choose a media type and search term.", 422);
-      return json({items: await searchStock(kind as "audio"|"video"|"image", query, signal)});
+      const kind = url.searchParams.get("kind"),
+        query = stringValue(url.searchParams.get("q")).trim();
+      if (!["audio", "video", "image"].includes(kind || "") || !query)
+        return errorResponse("Choose a media type and search term.", 422);
+      return json({
+        items: await searchStock(
+          kind as "audio" | "video" | "image",
+          query,
+          signal
+        ),
+      });
     }
     if (url.pathname === "/api/stock/import" && request.method === "POST") {
-      const input = await parseJsonBody<{provider?:string;id?:string;kind?:string}>(request);
-      if (!["audio","video","image"].includes(input.kind || "")) return errorResponse("Choose a stock media type.",422);
-      const item = await resolveStock(input.provider || "", input.id || "", input.kind as "audio"|"video"|"image", signal);
-      const blob = await downloadStock(item,signal);
+      const input = await parseJsonBody<{
+        provider?: string;
+        id?: string;
+        kind?: string;
+      }>(request);
+      if (!["audio", "video", "image"].includes(input.kind || ""))
+        return errorResponse("Choose a stock media type.", 422);
+      const item = await resolveStock(
+        input.provider || "",
+        input.id || "",
+        input.kind as "audio" | "video" | "image",
+        signal
+      );
+      const blob = await downloadStock(item, signal);
       signal.throwIfAborted();
       const key = `users/${encodeURIComponent(user.email)}/stock/${crypto.randomUUID()}`;
-      await env.BUCKET.put(key,blob.stream(),{httpMetadata:{contentType:blob.type},customMetadata:{stockProvider:item.provider,stockId:item.id,license:item.license,source:item.source}});
+      await env.BUCKET.put(key, blob.stream(), {
+        httpMetadata: { contentType: blob.type },
+        customMetadata: {
+          stockProvider: item.provider,
+          stockId: item.id,
+          license: item.license,
+          source: item.source,
+        },
+      });
       let asset: Asset;
-      try { signal.throwIfAborted(); asset = await insertAssetRecord(env,user,{name:item.title,kind:item.kind,contentType:blob.type,size:blob.size,r2Key:key,stock:item}); }
-      catch(error) { await env.BUCKET.delete(key); throw error; }
+      try {
+        signal.throwIfAborted();
+        asset = await insertAssetRecord(env, user, {
+          name: item.title,
+          kind: item.kind,
+          contentType: blob.type,
+          size: blob.size,
+          r2Key: key,
+          stock: item,
+        });
+      } catch (error) {
+        await env.BUCKET.delete(key);
+        throw error;
+      }
       return json(asset);
     }
-    return errorResponse("Stock operation not found",404);
+    return errorResponse("Stock operation not found", 404);
   }
   if (url.pathname === "/api/brands") return handleBrands(request, env, user);
   if (url.pathname === "/api/operations")

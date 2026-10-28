@@ -1,3 +1,6 @@
+import { transformPreviewClip } from "@/lib/preview-transform";
+import { PageGuideButton } from "@/components/help/PageGuide";
+import { CreditBalanceChip } from "@/components/studio/CreditBalanceChip";
 import { normalizeVisual, patchVisual } from "@contracts/clip-visual";
 import { ResizableWorkspace } from "@/components/studio/ResizableWorkspace";
 import { ProjectBrowser } from "@/components/studio/ProjectBrowser";
@@ -300,6 +303,9 @@ export default function EditorPage() {
   const [durationDraft, setDurationDraft] = useState<string | null>(null);
   const [leftTool, setLeftTool] = useState<DockKind>("library");
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorScope, setInspectorScope] = useState<"clip" | "project">(
+    "clip"
+  );
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [snapping, setSnapping] = useState(true);
   const [localSpeechStatus, setLocalSpeechStatus] = useState("");
@@ -1730,7 +1736,10 @@ export default function EditorPage() {
           setClipDraft(null);
         },
         library: openLibrary,
-        inspector: () => setInspectorOpen(true),
+        inspector: () => {
+          setInspectorScope("clip");
+          setInspectorOpen(true);
+        },
         shortcuts: () => setShortcutsOpen(true),
         group: () => editMembership("group"),
         ungroup: () => editMembership("ungroup"),
@@ -1739,6 +1748,8 @@ export default function EditorPage() {
       };
       const action = actions[actionId];
       event.preventDefault();
+      // Capture before a timeline button can treat Space as a click or scroll.
+      event.stopPropagation();
       if (
         (event.repeat &&
           !EDITOR_KEYBOARD_ACTIONS.find(row => row.id === actionId)?.repeat) ||
@@ -1753,8 +1764,8 @@ export default function EditorPage() {
           keyboardActionPending.current = false;
         });
     };
-    window.addEventListener("keydown", handleKeyboard);
-    return () => window.removeEventListener("keydown", handleKeyboard);
+    window.addEventListener("keydown", handleKeyboard, true);
+    return () => window.removeEventListener("keydown", handleKeyboard, true);
   });
 
   const saveTranscript = async () => {
@@ -2087,6 +2098,32 @@ export default function EditorPage() {
 
   const canvasContent = (
     <div className="grid gap-4">
+      <label className="text-sm" htmlFor="editor-project-aspect-ratio">
+        {ui("Aspect ratio")}
+        <CompactSelect
+          id="editor-project-aspect-ratio"
+          aria-label={ui("Aspect ratio")}
+          value={project.aspectRatio}
+          options={[
+            { value: "9:16", label: "9:16" },
+            { value: "16:9", label: "16:9" },
+            { value: "1:1", label: "1:1" },
+          ]}
+          onValueChange={value => {
+            setPreviewZoom(100);
+            setPreviewPan({ x: 0, y: 0 });
+            void saveProjectChange(
+              () =>
+                commitProject("Aspect ratio changed", p => ({
+                  ...p,
+                  aspectRatio: value as EditProject["aspectRatio"],
+                })),
+              "Could not change format."
+            );
+          }}
+          className="mt-2"
+        />
+      </label>
       <label className="text-sm" htmlFor="editor-project-frame-rate">
         {ui("Project frame rate")}
         <CompactSelect
@@ -2748,7 +2785,7 @@ export default function EditorPage() {
                   "The project title could not be saved."
                 );
             }}
-            className="w-full border-0 bg-transparent p-0 text-2xl font-semibold outline-none placeholder:text-foreground/70"
+            className="editor-project-title w-full border-0 bg-transparent p-0 font-semibold outline-none placeholder:text-foreground/70"
             aria-label={ui("Project title")}
           />
           <div className="mt-1 flex items-center gap-2 text-xs text-foreground/70">
@@ -2760,6 +2797,12 @@ export default function EditorPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <div className="hidden min-[1100px]:block">
+            <PageGuideButton compact />
+          </div>
+          <div className="hidden min-[1100px]:block">
+            <CreditBalanceChip refreshKey={project.id} />
+          </div>
           <button
             type="button"
             onClick={() => setMediaHidden(!mediaHidden)}
@@ -3000,7 +3043,10 @@ export default function EditorPage() {
             <div
               className={`editor-preview-stage relative flex h-[400px] touch-none items-center justify-center overflow-hidden p-5 md:h-[410px] xl:h-[490px] ${previewZoom > 100 ? "cursor-grab active:cursor-grabbing" : ""}`}
               onPointerDown={e => {
-                if (previewZoom <= 100) return;
+                if (previewZoom <= 100 || ![0, 1].includes(e.button)) return;
+                if (e.button === 0 && !e.altKey && e.target !== e.currentTarget)
+                  return;
+                e.preventDefault();
                 e.currentTarget.setPointerCapture(e.pointerId);
                 previewDrag.current = {
                   x: e.clientX,
@@ -3053,41 +3099,61 @@ export default function EditorPage() {
                   setLeftTool("adjust");
                   setMediaHidden(false);
                 }}
-                onTransform={async (id, dx, dy) => {
-                  await commitProject("Moved in preview", p => {
+                onTransform={async (id, change) => {
+                  await commitProject("Transformed in preview", p => {
+                    const clip = p.clips.find(c => c.id === id);
+                    return clip && !clip.locked
+                      ? replaceTimelineClip(
+                          p,
+                          id,
+                          transformPreviewClip(clip, change)
+                        )
+                      : p;
+                  });
+                }}
+                onInspectClip={id => {
+                  setSelectedClipId(id);
+                  setInspectorScope("clip");
+                  setInspectorOpen(true);
+                }}
+                onClipAction={async (id, action) => {
+                  await commitProject("Adjusted selected item", p => {
                     const clip = p.clips.find(c => c.id === id);
                     if (!clip || clip.locked) return p;
-                    return replaceTimelineClip(
-                      p,
-                      id,
-                      clip.graphic
+                    let next = clip;
+                    if (action === "rotate")
+                      next = transformPreviewClip(clip, { rotation: 90 });
+                    if (action === "fit" || action === "fill")
+                      next = {
+                        ...clip,
+                        fit: action === "fit" ? "contain" : "cover",
+                      };
+                    if (action === "flip")
+                      next = {
+                        ...clip,
+                        visual: patchVisual(clip, {
+                          flipX: !normalizeVisual(clip.visual).flipX,
+                        }),
+                      };
+                    if (action === "reset")
+                      next = clip.graphic
                         ? {
                             ...clip,
                             graphic: {
                               ...clip.graphic,
-                              x: Math.max(
-                                0,
-                                Math.min(100, clip.graphic.x + dx)
-                              ),
-                              y: Math.max(
-                                0,
-                                Math.min(100, clip.graphic.y + dy)
-                              ),
+                              x: 50,
+                              y: 50,
+                              rotation: 0,
+                              motion: [],
                             },
                           }
-                        : {
-                            ...clip,
-                            visual: patchVisual(clip, {
-                              x: normalizeVisual(clip.visual).x + dx,
-                              y: normalizeVisual(clip.visual).y + dy,
-                            }),
-                          }
-                    );
+                        : { ...clip, visual: normalizeVisual() };
+                    return replaceTimelineClip(p, id, next);
                   });
                 }}
               />
             </div>
-            <div className="flex items-center justify-center gap-3 border-t border-white/10 bg-black/30 px-4 py-2.5 text-white">
+            <div className="editor-preview-controls flex flex-wrap items-center gap-2 border-t border-white/10 bg-black/30 px-3 py-2 text-white">
               <button
                 type="button"
                 onClick={() => void toggleTimelinePlayback()}
@@ -3102,7 +3168,7 @@ export default function EditorPage() {
                   <Play className="h-3.5 w-3.5 fill-current" />
                 )}
               </button>
-              <span className="w-24 font-mono text-xs text-white/65">
+              <span className="shrink-0 font-mono text-[11px] text-white/65">
                 {formatTime(playhead)}
               </span>
               <input
@@ -3113,19 +3179,18 @@ export default function EditorPage() {
                 value={playhead}
                 onChange={event => seekTimeline(Number(event.target.value))}
                 onPointerUp={persistPlayhead}
-                className="h-1 w-full max-w-md accent-[#8A76EA]"
+                className="h-1 min-w-12 flex-1 accent-[#8A76EA]"
                 aria-label={ui("Playhead")}
               />
-              <span className="w-20 text-right font-mono text-xs text-white/40">
+              <span className="shrink-0 text-right font-mono text-[11px] text-white/40">
                 {formatTime(project.duration)}
               </span>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-surface px-3 py-2 text-sm text-foreground">
               <CompactSelect
                 aria-label={ui("Preview aspect ratio")}
                 value={project.aspectRatio}
                 onValueChange={value => {
                   setPreviewPan({ x: 0, y: 0 });
+                  setPreviewZoom(100);
                   void saveProjectChange(
                     () =>
                       commitProject("Aspect ratio changed", p => ({
@@ -3140,7 +3205,7 @@ export default function EditorPage() {
                   { value: "16:9", label: "16:9 Landscape" },
                   { value: "1:1", label: "1:1 Square" },
                 ]}
-                className="w-36"
+                className="w-28"
               />
               <Popover>
                 <PopoverTrigger asChild>
@@ -3186,14 +3251,17 @@ export default function EditorPage() {
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-foreground/65">
                     {ui(
-                      "Zoom is for inspecting your edit. Drag the enlarged preview to pan. Export framing stays unchanged."
+                      "Hold Alt and drag to pan. Zoom does not change the exported framing."
                     )}
                   </p>
                 </PopoverContent>
               </Popover>
               <button
                 type="button"
-                onClick={() => setInspectorOpen(true)}
+                onClick={() => {
+                  setInspectorScope("project");
+                  setInspectorOpen(true);
+                }}
                 className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-2 text-sm"
               >
                 <SlidersHorizontal className="size-4" /> {ui("Adjust")}
@@ -3649,11 +3717,17 @@ export default function EditorPage() {
       </Dialog>
       <Dialog open={inspectorOpen} onOpenChange={setInspectorOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogTitle>{ui("Adjust")}</DialogTitle>
+          <DialogTitle>
+            {ui(inspectorScope === "project" ? "Canvas & duration" : "Adjust")}
+          </DialogTitle>
           <DialogDescription>
-            {ui("Clip settings, canvas and the end of your edit.")}
+            {ui(
+              inspectorScope === "project"
+                ? "Canvas and duration for the complete edit."
+                : "Clip settings, canvas and the end of your edit."
+            )}
           </DialogDescription>
-          {clipDraft && (
+          {inspectorScope === "clip" && clipDraft && (
             <div className="rounded-xl border border-border bg-black p-3">
               <div className="mx-auto max-w-[280px]">
                 <TimelinePreview
@@ -3686,7 +3760,7 @@ export default function EditorPage() {
               </label>
             </div>
           )}
-          {inspectorContent}
+          {inspectorScope === "project" ? canvasContent : inspectorContent}
         </DialogContent>
       </Dialog>
 

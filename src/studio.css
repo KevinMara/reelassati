@@ -238,6 +238,7 @@
 .studio-shell .timeline-toolbar {
   align-items: flex-start;
   padding: 8px;
+  position: relative;
 }
 .studio-shell .timeline-toolbar > button,
 .studio-shell .timeline-toolbar > div > button:first-child {
@@ -256,19 +257,55 @@
 }
 @media (min-width: 1100px) {
   .editor-workspace {
-    --editor-visible-upper: var(--editor-upper, 440px);
-    grid-template-rows: var(--editor-visible-upper) 8px minmax(190px, auto);
+    --editor-visible-upper: var(--editor-upper, 600px);
+    grid-template-rows: var(--editor-visible-upper) 8px minmax(170px, auto);
     grid-template-columns:
       minmax(220px, min(var(--editor-media), 26%))
       8px minmax(240px, 1fr) 8px minmax(290px, min(var(--editor-chat), 32%));
   }
   .editor-workspace .editor-preview-stage {
-    height: calc(var(--editor-visible-upper) - 88px);
+    flex: 1;
+    min-height: 0;
+    height: auto;
     padding: 10px;
   }
   .editor-workspace #editor-timeline-panel {
-    max-height: max(230px, calc(100dvh - var(--editor-visible-upper) - 135px));
+    max-height: max(170px, calc(100dvh - var(--editor-visible-upper) - 75px));
   }
+  .studio-shell[data-page="edit"]:has(.editor-workspace) > .flex-1 > header {
+    display: none;
+  }
+  .studio-shell .timeline-toolbar {
+    min-height: 64px;
+    padding: 6px;
+    padding-bottom: 30px;
+  }
+  .studio-shell .timeline-toolbar > div:first-child {
+    height: 30px;
+    overflow: visible;
+  }
+  .studio-shell .timeline-toolbar > div:last-child {
+    position: absolute;
+    right: 6px;
+    bottom: 4px;
+  }
+}
+.editor-workspace .editor-preview-controls > button {
+  font-size: 11px;
+}
+#editor-preview-panel:fullscreen .editor-preview-stage > div {
+  max-width: 100% !important;
+}
+.studio-shell .studio-route-enter input.editor-project-title {
+  font-size: 17px;
+  line-height: 1.35;
+}
+.editor-workspace #editor-preview-panel {
+  display: flex;
+  flex-direction: column;
+}
+.editor-workspace #editor-preview-panel > :not(.editor-preview-stage) {
+  flex-shrink: 0;
 }
 @media (min-width: 760px) and (max-width: 1099px) {
   .editor-workspace {
@@ -391,4 +428,16 @@
   .style-editor {
     padding: 16px;
   }
+}
+
+.auto-edit-reference .reference-style-panel {
+  border-top: 0;
+  padding-top: 0;
+}
+.auto-edit-reference summary {
+  font-size: 14px;
+  font-weight: 600;
+}
+.auto-edit-dialog > section {
+  margin-top: 4px;
 }

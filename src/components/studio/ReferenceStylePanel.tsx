@@ -364,7 +364,7 @@ function ReferenceStyleSession({
   }
 
   return (
-    <details className="my-3 border-t border-border pt-3">
+    <details className="reference-style-panel my-3 border-t border-border pt-3">
       <summary className="cursor-pointer text-sm font-medium">
         {purpose === "script"
           ? ui("Learn from a reference hook or script")

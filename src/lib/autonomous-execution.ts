@@ -27,7 +27,7 @@ const overlaps = (clip: TimelineClip, operation: EditOperation) =>
 /** Validate the entire generation allowance before submitting the first asset. */
 export function assertAutonomousMediaBudget(
   operations: EditOperation[],
-  limits: { images: number; videos: number }
+  limits?: { images: number; videos: number }
 ) {
   let images = 0,
     videos = 0;
@@ -39,7 +39,7 @@ export function assertAutonomousMediaBudget(
     else
       throw new Error(`${op.label}: choose an image or video generation type.`);
   }
-  if (images > limits.images || videos > limits.videos)
+  if (limits && (images > limits.images || videos > limits.videos))
     throw new Error(
       "The edit plan exceeds the approved supporting-media allowance. No media generation was started."
     );

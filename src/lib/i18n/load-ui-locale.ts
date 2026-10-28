@@ -4,6 +4,7 @@ import { editingTraitUi } from "./locales/ui-edit-template-traits";
 import { analyzerUi } from "./locales/ui-analyzer";
 import { editDurationUi } from "./locales/ui-edit-duration";
 import { editorRedesignUi } from "./locales/ui-editor-redesign";
+import { editorInteractionUi } from "./locales/ui-editor-interactions";
 import { stylesWorkspaceUi } from "./locales/ui-styles-workspace";
 import { editorReceiptUi } from "./locales/ui-editor-receipts";
 import { guidedTourUi } from "./locales/ui-guided-tour";
@@ -137,6 +138,7 @@ export function loadUiLocale(
       ...guidedTourUi[code],
       ...librarySourceUi[code],
       ...editorRedesignUi[code],
+      ...editorInteractionUi[code],
       "Automatic research is disabled.": automaticResearchDisabled[code],
       ...editingTemplateUi[code],
       ...analyzerUi[code],

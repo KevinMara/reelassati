@@ -11,7 +11,8 @@ const reviewedItalianUi: Record<string, string> = {
   "An insertion is already in progress.": "È già in corso un inserimento.",
   "At end": "Alla fine",
   "At playhead": "Al cursore",
-  "Completed preparation is reused.": "La preparazione completata viene riutilizzata.",
+  "Completed preparation is reused.":
+    "La preparazione completata viene riutilizzata.",
   "Continue edit": "Continua il montaggio",
   "Edit paused": "Montaggio in pausa",
   "Insert position": "Posizione di inserimento",
@@ -19,8 +20,9 @@ const reviewedItalianUi: Record<string, string> = {
   "Ready to add to your timeline.": "Pronto per essere aggiunto alla timeline.",
   "The file could not be added.": "Impossibile aggiungere il file.",
   "The project is no longer available.": "Il progetto non è più disponibile.",
-  "Timeline": "Timeline",
-  "Your account or brand changed. Reopen the intended workspace.": "L’account o il brand è cambiato. Riapri lo spazio di lavoro desiderato.",
+  Timeline: "Timeline",
+  "Your account or brand changed. Reopen the intended workspace.":
+    "L’account o il brand è cambiato. Riapri lo spazio di lavoro desiderato.",
   Attention: "Attenzione",
   Stimulation: "Stimolazione",
   "Processing load": "Carico cognitivo",
@@ -333,7 +335,7 @@ const reviewedItalianUi: Record<string, string> = {
   "Clip settings, canvas and the end of your edit.":
     "Impostazioni della clip, tela e fine del montaggio.",
   "Adjustment preview time": "Tempo di anteprima della regolazione",
-  "AI auto-edit": "Montaggio assistito AI",
+  "AI auto-edit": "Montaggio automatico AI",
   "Build a complete edit from your footage and a reference style.":
     "Crea un montaggio completo dalle tue riprese e da uno stile di riferimento.",
   "Product loop": "Miglioramento del prodotto",
@@ -980,7 +982,7 @@ const reviewedItalianUi: Record<string, string> = {
     "Revisione delle riprese → sottotitoli → tagli e ritmo → scene di supporto → timeline modificabile.",
   "Saved reference direction": "Indicazioni di riferimento salvate",
   "Describe the style and outcome": "Descrivi lo stile e il risultato",
-  "Autonomous editing style": "Stile del montaggio assistito",
+  "Autonomous editing style": "Stile del montaggio automatico",
   "Premium skincare demo. Clean editorial captions, a fast before/after opening, subtle fades, warm colour, and a quiet product close-up at the end.":
     "Demo di un prodotto skincare premium. Sottotitoli editoriali puliti, apertura rapida prima/dopo, dissolvenze delicate, colori caldi e un primo piano finale del prodotto.",
   "Match a reference style or video · optional":
@@ -1155,7 +1157,7 @@ const reviewedItalianUi: Record<string, string> = {
   "Start with a task": "Parti da un'attività",
   "Plan before editing": "Pianifica prima del montaggio",
   "Edit around the playhead": "Modifica intorno al cursore",
-  "Advanced AI auto-edit": "Montaggio AI avanzato",
+  "Advanced AI auto-edit": "Montaggio automatico AI avanzato",
   "Reference link": "Link di riferimento",
   "Use a public link. Upload the file if the source requires sign-in.":
     "Usa un link pubblico. Carica il file se la fonte richiede l'accesso.",
@@ -2143,8 +2145,8 @@ const reviewedItalianUi: Record<string, string> = {
     "Il video è ancora in generazione. Resterà disponibile nella Libreria; la timeline non è cambiata.",
   "Your timeline changed during the edit. AI media is saved; run again on the current version.":
     "La timeline è cambiata durante il montaggio. I file AI sono salvati; riprova sulla versione attuale.",
-  "Before autonomous edit": "Prima del montaggio assistito",
-  "Autonomous edit": "Montaggio assistito",
+  "Before autonomous edit": "Prima del montaggio automatico",
+  "Autonomous edit": "Montaggio automatico",
   "The reference workspace changed. Reopen the intended project.":
     "Lo spazio del riferimento è cambiato. Riapri il progetto desiderato.",
   "The reference project changed before saving.":

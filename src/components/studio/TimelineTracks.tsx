@@ -376,11 +376,11 @@ export function TimelineTracks({
             </div>
           )}
           <div className="grid grid-cols-[92px_minmax(0,1fr)] border-b border-border bg-background/45">
-            <div className="border-r border-border px-3 py-2 font-mono text-xs uppercase tracking-wider text-foreground/60">
+            <div className="border-r border-border px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-foreground/60">
               {ui("Time")}
             </div>
             <div
-              className="relative mx-1.5 h-9 cursor-crosshair"
+              className="relative mx-1.5 h-6 cursor-crosshair"
               onPointerDown={e => onSeek(pointerTime(e))}
             >
               {Array.from(
@@ -468,7 +468,7 @@ export function TimelineTracks({
               return (
                 <div
                   key={key}
-                  className={`grid grid-cols-[92px_minmax(0,1fr)] border-b border-border last:border-b-0 ${emptyDestination && lane.number > 1 ? "min-h-[38px]" : "min-h-[62px]"}`}
+                  className={`grid grid-cols-[92px_minmax(0,1fr)] border-b border-border last:border-b-0 ${emptyDestination && lane.number > 1 ? "min-h-[26px]" : "min-h-[52px]"}`}
                 >
                   <div className="flex flex-col justify-center gap-1 border-r border-border bg-background/35 px-2 text-[11px] text-foreground/65">
                     <div className="flex items-center gap-1">
