@@ -759,15 +759,48 @@ const refreshSourceObservations: Record<string, string> = {
   th: "วิเคราะห์วิดีโอต้นฉบับอีกครั้งเพื่ออัปเดตข้อสังเกตก่อนค้นหาส่วนต่าง ๆ",
 };
 
+const skippedSounds: Record<string, string> = {
+  en: "Skipped sound cues: {count}.",
+  it: "Effetti sonori omessi: {count}.",
+  es: "Efectos sonoros omitidos: {count}.",
+  fr: "Effets sonores omis : {count}.",
+  de: "Übersprungene Soundeffekte: {count}.",
+  pt: "Efeitos sonoros omitidos: {count}.",
+  nl: "Overgeslagen geluidseffecten: {count}.",
+  pl: "Pominięte efekty dźwiękowe: {count}.",
+  ro: "Efecte sonore omise: {count}.",
+  tr: "Atlanan ses efektleri: {count}.",
+  uk: "Пропущено звукових ефектів: {count}.",
+  ru: "Пропущено звуковых эффектов: {count}.",
+  ar: "المؤثرات الصوتية المتخطاة: {count}.",
+  hi: "छोड़े गए ध्वनि प्रभाव: {count}।",
+  ja: "スキップした効果音：{count}。",
+  ko: "건너뛴 효과음: {count}.",
+  zh: "已跳过的音效：{count}。",
+  vi: "Hiệu ứng âm thanh đã bỏ qua: {count}.",
+  da: "Oversprungne lydeffekter: {count}.",
+  sv: "Överhoppade ljudeffekter: {count}.",
+  no: "Lydsignaler hoppet over: {count}.",
+  fi: "Ohitetut äänitehosteet: {count}.",
+  cs: "Přeskočené zvukové efekty: {count}.",
+  hu: "Kihagyott hangeffektusok: {count}.",
+  el: "Ηχητικά εφέ που παραλείφθηκαν: {count}.",
+  he: "אפקטים קוליים שדולגו: {count}.",
+  id: "Efek suara dilewati: {count}.",
+  th: "เอฟเฟกต์เสียงที่ข้าม: {count}",
+};
+
 export const editorReceiptUi = Object.fromEntries(
   Object.entries(usedCredits).map(([language, translation]) => [
     language,
     {
       "Credits used": translation,
+      "Skipped sound cues: {count}.": skippedSounds[language],
       "Show details": detailCopy[language][0],
       "Show less": detailCopy[language][1],
       steps: detailCopy[language][2],
-      "Analyze the source video again to refresh its observations before finding sections.": refreshSourceObservations[language],
+      "Analyze the source video again to refresh its observations before finding sections.":
+        refreshSourceObservations[language],
       ...Object.fromEntries(
         protectionKeys.map((key, index) => [
           key,

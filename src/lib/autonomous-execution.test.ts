@@ -10,6 +10,7 @@ import { auditAutomatedEdit } from "./editor-production";
 import { autonomousResultReceipt } from "./autonomous-result-receipt";
 import {
   assertAutonomousMediaBudget,
+  autonomousGraphicReceipt,
   executeAutonomousPlan,
   preflightAutonomousPlan,
 } from "./autonomous-execution";
@@ -63,6 +64,69 @@ function op(
   };
 }
 describe("complete auto-edit draft execution", () => {
+  it("omits invalid automatic sound cues, retains valid edits, and reports the omission without altering proposals", () => {
+    const sound = {
+      ...asset,
+      id: "cue",
+      kind: "audio",
+      duration: 0.3,
+    } as Asset;
+    const actions = [
+      op("missing", "sound", 1, 2, { assetId: "catalog:invented" }),
+      op("bad-offset", "sound", 2, 3, { assetId: sound.id, sourceIn: 2 }),
+      op("valid-cue", "sound", 4, 5, { assetId: sound.id }),
+      op("grade", "style", 0, 10, { saturation: 0.95 }),
+    ];
+    const original = structuredClone(actions);
+    const review = preflightAutonomousPlan(
+      project,
+      actions,
+      [asset, sound],
+      undefined,
+      "automatic"
+    );
+    expect(review.changes.map(action => action.id)).toEqual([
+      "valid-cue",
+      "grade",
+    ]);
+    expect(review.omittedSounds?.map(item => item.operationId)).toEqual([
+      "missing",
+      "bad-offset",
+    ]);
+    expect(autonomousGraphicReceipt(review)).toBe(
+      "Skipped 2 unavailable sound cues."
+    );
+    const after = executeAutonomousPlan(project, review.changes, [
+      asset,
+      sound,
+    ]);
+    expect(after.clips.find(clip => clip.assetId === sound.id)).toMatchObject({
+      start: 4,
+      inPoint: 0,
+    });
+    expect(
+      after.clips.find(clip => clip.assetId === sound.id)?.duration
+    ).toBeCloseTo(0.3);
+    expect(actions).toEqual(original);
+    expect(() =>
+      preflightAutonomousPlan(project, actions, [asset, sound])
+    ).toThrow(/sound placement/);
+  });
+
+  it("still rejects destructive picture changes after omitting an invalid cue", () => {
+    expect(() =>
+      preflightAutonomousPlan(
+        project,
+        [
+          op("missing", "sound", 1, 2, { assetId: "missing" }),
+          op("remove-picture", "delete", 0, 10),
+        ],
+        [asset],
+        undefined,
+        "automatic"
+      )
+    ).toThrow(/removed all visible picture content/);
+  });
   it.each([false, true])(
     "rejects deleting the last visible picture even with staged sound and hidden footage=%s",
     hiddenFootage => {

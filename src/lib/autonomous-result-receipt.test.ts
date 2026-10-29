@@ -7,6 +7,23 @@ import type { EditOperation, EditProject } from "@contracts/workspace";
 import type { EditorChatMessage } from "@contracts/editor-chat";
 
 describe("auto-edit execution receipt", () => {
+  it("reports unavailable sound omissions without claiming they were applied", () => {
+    const receipt = autonomousResultReceipt(
+      "Added three sound cues",
+      [{ type: "style" }],
+      {
+        changes: [],
+        omitted: [],
+        warnings: [],
+        omittedSounds: [
+          { operationId: "missing", label: "Cue", reason: "Unavailable audio" },
+        ],
+      },
+      text => text
+    );
+    expect(receipt.summary).toBe("Updated the visual treatment.");
+    expect(receipt.details).toEqual(["Skipped sound cues: 1."]);
+  });
   it("cannot repeat a planner's discarded-overlay claim in the saved answer", () => {
     const receipt = autonomousResultReceipt(
       "Added scorecards and the missing score range",

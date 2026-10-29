@@ -23,6 +23,13 @@ export function autonomousResultReceipt(
     String(review.omitted.length)
   );
   const details: string[] = [];
+  if (review.omittedSounds?.length)
+    details.push(
+      ui("Skipped sound cues: {count}.").replace(
+        "{count}",
+        String(review.omittedSounds.length)
+      )
+    );
   if (review.omitted.length)
     details.push(
       `${skipped} ${[...new Set(review.omitted.flatMap(item => item.issues.map(issue => reasonText[issue.reason])))].join(" ")}`

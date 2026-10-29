@@ -130,6 +130,48 @@ export interface AutonomousGraphicReview {
   changes: EditOperation[];
   omitted: AutonomousGraphicDecision[];
   warnings: AutonomousGraphicDecision[];
+  omittedSounds?: Array<{ operationId: string; label: string; reason: string }>;
+}
+
+function soundExecution(
+  project: EditProject,
+  operation: EditOperation,
+  assets: Asset[]
+): EditOperation {
+  const asset = assets.find(a => a.id === operation.parameters?.assetId);
+  const sourceIn = operation.parameters?.sourceIn ?? 0;
+  if (!asset || asset.kind !== "audio")
+    throw new Error(
+      `${operation.label}: sound placement requires an available audio file.`
+    );
+  if (
+    !Number.isFinite(asset.duration) ||
+    !asset.duration ||
+    asset.duration <= 0
+  )
+    throw new Error(
+      `${operation.label}: sound placement requires a measured audio duration.`
+    );
+  if (!Number.isFinite(sourceIn) || sourceIn < 0 || sourceIn >= asset.duration)
+    throw new Error(
+      `${operation.label}: the sound placement starts outside the audio source.`
+    );
+  if (
+    !Number.isFinite(operation.start) ||
+    !Number.isFinite(operation.end) ||
+    operation.start < 0 ||
+    operation.end <= operation.start ||
+    operation.end > project.duration
+  )
+    throw new Error(
+      `${operation.label}: the sound placement is outside the edit.`
+    );
+  // Keep the start and source offset; a short cue ends naturally, without looping.
+  const end = Math.min(
+    operation.end,
+    operation.start + asset.duration - sourceIn
+  );
+  return end < operation.end ? { ...operation, end } : operation;
 }
 
 /** Validate the final composed draft, not the proposal's pre-cut clock. Omit
@@ -215,6 +257,10 @@ export function filterAutonomousGraphics(
 
 export function autonomousGraphicReceipt(review: AutonomousGraphicReview) {
   const parts: string[] = [];
+  if (review.omittedSounds?.length)
+    parts.push(
+      `Skipped ${review.omittedSounds.length} unavailable sound cue${review.omittedSounds.length === 1 ? "" : "s"}.`
+    );
   if (review.omitted.length)
     parts.push(
       `Skipped ${review.omitted.length} graphic${review.omitted.length === 1 ? "" : "s"}: ${[...new Set(review.omitted.flatMap(item => item.issues.map(issue => issue.detail)))].slice(0, 2).join(" ")}`
@@ -235,12 +281,35 @@ export function preflightAutonomousPlan(
   checkpoint: () => void = () => undefined,
   graphicIntent?: AutomaticGraphicPolicy
 ): AutonomousGraphicReview {
+  const omittedSounds: NonNullable<AutonomousGraphicReview["omittedSounds"]> =
+    [];
+  // Unusable decorative cues must not discard an otherwise valid automatic edit.
+  // Never invent a replacement, change the signed proposal, or relax manual edits.
+  const executable =
+    graphicIntent === undefined
+      ? operations
+      : operations.filter(operation => {
+          if (operation.type !== "sound") return true;
+          checkpoint();
+          try {
+            soundExecution(project, operation, assets);
+            return true;
+          } catch (error) {
+            omittedSounds.push({
+              operationId: operation.id,
+              label: operation.label,
+              reason:
+                error instanceof Error ? error.message : "Unavailable audio",
+            });
+            return false;
+          }
+        });
   const review =
     graphicIntent === undefined
       ? { changes: operations, omitted: [], warnings: [] }
       : filterAutonomousGraphics(
           project,
-          operations,
+          executable,
           assets,
           graphicIntent,
           checkpoint
@@ -256,7 +325,7 @@ export function preflightAutonomousPlan(
     throw new Error(
       `The edit plan needs correction: ${problems.slice(0, 3).join("; ")}. No supporting media was generated.`
     );
-  return review;
+  return omittedSounds.length ? { ...review, omittedSounds } : review;
 }
 
 /** Execute one proposal against its original timeline clock. Local operations
@@ -346,39 +415,11 @@ export function executeAutonomousPlan(
         );
     }
     if (operation.type === "sound") {
-      const asset = assets.find(a => a.id === operation.parameters?.assetId);
-      const sourceIn = operation.parameters?.sourceIn ?? 0;
-      if (
-        !asset ||
-        asset.kind !== "audio" ||
-        !Number.isFinite(asset.duration) ||
-        !asset.duration ||
-        asset.duration <= 0 ||
-        !Number.isFinite(sourceIn) ||
-        sourceIn < 0 ||
-        sourceIn >= asset.duration ||
-        !Number.isFinite(operation.start) ||
-        !Number.isFinite(operation.end) ||
-        operation.start < 0 ||
-        operation.end <= operation.start ||
-        operation.end > project.duration
-      )
-        throw new Error(
-          `${operation.label}: the sound placement exceeds its source.`
-        );
       // A cue may finish before its visual beat. Shorten only its execution copy:
       // never stretch/loop audio, move its start/source offset, or rewrite the
       // signed recommendation retained in proposedChanges. The resulting range
       // is a subset of the already-approved placement, including local ranges.
-      const end = Math.min(
-        operation.end,
-        operation.start + (asset.duration - sourceIn)
-      );
-      if (end <= operation.start)
-        throw new Error(
-          `${operation.label}: the sound placement exceeds its source.`
-        );
-      execution = end < operation.end ? { ...operation, end } : operation;
+      execution = soundExecution(project, operation, assets);
     }
     if (operation.type === "broll") {
       const asset = assets.find(a => a.id === operation.parameters?.assetId);
