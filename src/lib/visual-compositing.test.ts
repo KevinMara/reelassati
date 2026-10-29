@@ -107,7 +107,79 @@ function checkLogo(bytes: Uint8Array, trimmed = false) {
   expect(alpha(trimmed ? 2 : 5, 32, 40)).toBe(0);
   expect(alpha(trimmed ? 2 : 5, 1, 1)).toBe(0);
 }
+const enlargedPose = {
+  ...logoPose,
+  visual: normalizeVisual({
+    scale: 1.5,
+    x: 10,
+    y: -10,
+    opacity: 0.6,
+    entrance: { kind: "dissolve", duration: 0.2 },
+  }),
+};
+const enlargedGraph = () =>
+  `color=red:s=64x64:r=10:d=1,format=rgba,drawbox=x=32:y=0:w=32:h=64:color=blue:t=fill,${visualRenderFilter(enlargedPose, { width: 64, height: 64 })},format=rgba[rgba]`;
+function checkEnlarged(bytes: Uint8Array) {
+  const pixel = (frame: number, x: number, y: number) => [
+    ...bytes.slice(
+      (frame * 64 * 64 + y * 64 + x) * 4,
+      (frame * 64 * 64 + y * 64 + x) * 4 + 4
+    ),
+  ];
+  expect(bytes.length).toBe(10 * 64 * 64 * 4);
+  expect(pixel(0, 32, 32)[3]).toBe(0);
+  for (const y of [0, 32, 63]) {
+    expect(pixel(5, 20, y)[0]).toBeGreaterThan(245);
+    expect(pixel(5, 60, y)[2]).toBeGreaterThan(245);
+    expect(pixel(5, 20, y)[3]).toBeGreaterThanOrEqual(152);
+    expect(pixel(5, 60, y)[3]).toBeLessThanOrEqual(154);
+  }
+}
 describe("actual polygon masks and alpha-aware layer blending", () => {
+  it("preserves enlarged framing, translation, alpha and fades without per-pixel sampling", () => {
+    expect(
+      visualRenderFilter(enlargedPose, { width: 64, height: 64 })
+    ).not.toContain("geq");
+    const bytes = execFileSync("ffmpeg", [
+      "-v",
+      "error",
+      "-filter_complex_threads",
+      "1",
+      "-f",
+      "lavfi",
+      "-i",
+      "anullsrc",
+      "-filter_complex",
+      enlargedGraph(),
+      "-map",
+      "[rgba]",
+      "-r",
+      "10",
+      "-t",
+      "1",
+      "-f",
+      "rawvideo",
+      "pipe:1",
+    ]);
+    checkEnlarged(bytes);
+    for (const visual of [
+      { scale: 1.5, x: 80 },
+      { scale: 1.5, rotation: 10 },
+      { scale: 1.5, mask: "ellipse" as const },
+      {
+        keyframes: [
+          { at: 0, scale: 1.5 },
+          { at: 1, scale: 2 },
+        ],
+      },
+    ])
+      expect(
+        visualRenderFilter(
+          { ...logoPose, visual: normalizeVisual(visual) },
+          { width: 64, height: 64 }
+        )
+      ).toContain("geq");
+  });
   it("scales contained logos with transparent padding and preserves a trimmed fade clock in native FFmpeg", () => {
     for (const trimmed of [false, true]) {
       const clip = trimmed
@@ -213,6 +285,33 @@ describe("shipped browser WASM compositor", () => {
     core.setLogger(() => {});
   });
   afterAll(() => vi.unstubAllGlobals());
+  it("renders enlarged footage through the fast path in the shipped browser core", () => {
+    core.exec(
+      "-v",
+      "error",
+      "-filter_complex_threads",
+      "1",
+      "-f",
+      "lavfi",
+      "-i",
+      "anullsrc",
+      "-filter_complex",
+      enlargedGraph(),
+      "-map",
+      "[rgba]",
+      "-r",
+      "10",
+      "-t",
+      "1",
+      "-f",
+      "rawvideo",
+      "enlarged.rgba"
+    );
+    expect(core.ret).toBe(0);
+    checkEnlarged(core.FS.readFile("enlarged.rgba"));
+    core.FS.unlink("enlarged.rgba");
+    core.reset();
+  }, 30000);
   it("runs the contained-logo fast path and trimmed animation in the shipped browser core", () => {
     for (const trimmed of [false, true]) {
       const clip = trimmed

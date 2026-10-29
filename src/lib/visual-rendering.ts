@@ -160,8 +160,24 @@ export function visualRenderFilter(
     topPad >= 0 &&
     leftPad + scaledWidth <= canvas.width &&
     topPad + scaledHeight <= canvas.height;
+  // A static enlarged crop is also affine without per-pixel expressions.
+  // Restrict this path to a source that covers the whole canvas; off-canvas
+  // transparency, rotations, masks and animated poses retain inverse sampling.
+  const coveringPose =
+    canvas &&
+    !v.keyframes.length &&
+    v.scale > 1 &&
+    v.rotation === 0 &&
+    !v.flipX &&
+    !v.flipY &&
+    !Object.values(v.crop).some(Boolean) &&
+    v.mask === "none" &&
+    leftPad <= 0 &&
+    topPad <= 0 &&
+    leftPad + scaledWidth >= canvas.width &&
+    topPad + scaledHeight >= canvas.height;
   if (
-    (plainGeometry || containedPose) &&
+    (plainGeometry || containedPose || coveringPose) &&
     [v.entrance.kind, v.exit.kind].every(
       kind => kind === "none" || kind === "dissolve"
     )
@@ -171,6 +187,11 @@ export function visualRenderFilter(
       filters.push(
         `scale=${scaledWidth}:${scaledHeight}:flags=bilinear`,
         `pad=${canvas!.width}:${canvas!.height}:${leftPad}:${topPad}:color=black@0`
+      );
+    if (coveringPose)
+      filters.push(
+        `scale=${scaledWidth}:${scaledHeight}:flags=bilinear`,
+        `crop=${canvas!.width}:${canvas!.height}:${-leftPad}:${-topPad}`
       );
     if (v.opacity !== 1) filters.push(`colorchannelmixer=aa=${n(v.opacity)}`);
     for (const [type, effect] of [
