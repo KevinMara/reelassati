@@ -126,14 +126,7 @@
 .studio-shell .studio-route-enter button:is(.py-2, .py-2\.5) {
   padding-block: 7px;
 }
-.studio-shell .studio-route-enter .ai-magic {
-  background: hsl(var(--primary) / 0.1);
-  border: 1px solid hsl(var(--primary) / 0.28);
-  color: hsl(var(--primary));
-  box-shadow: none;
-  animation: none;
-  border-radius: 8px;
-}
+
 .studio-shell :is(button, a).bg-primary {
   background-image: none;
   box-shadow: none;
@@ -440,4 +433,61 @@
 }
 .auto-edit-dialog > section {
   margin-top: 4px;
+}
+
+/* Secondary editor actions stay below the primary export action in the hierarchy. */
+.editor-header-tools > button:not(.editor-export),
+.editor-header-tools [data-guide-button] {
+  height: 30px;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+.editor-header-tools > button:not(.editor-export) svg {
+  width: 14px;
+  height: 14px;
+}
+.auto-edit-dialog {
+  gap: 16px;
+}
+.auto-edit-dialog .auto-edit-options label,
+.auto-edit-dialog .auto-edit-options fieldset {
+  font-size: 12px;
+}
+.auto-edit-dialog .auto-edit-options > :first-child {
+  margin-top: 0;
+}
+.auto-edit-dialog .auto-edit-template [data-slot="select-trigger"] {
+  height: 32px;
+  min-height: 32px;
+  font-size: 12px;
+}
+/* Preserve mobile input size and content previews while tightening oversized forms. */
+@media (min-width: 768px) {
+  .studio-shell:not([data-page="edit"])
+    .studio-route-enter
+    :is(label, legend).text-sm {
+    font-size: 12px;
+  }
+  .studio-shell:not([data-page="edit"])
+    .studio-route-enter
+    :is(input, [data-slot="select-trigger"]).h-12 {
+    height: 36px;
+  }
+  .studio-shell:not([data-page="edit"])
+    .studio-route-enter
+    :is(button, a).text-lg {
+    font-size: 13px;
+  }
+}
+
+.editor-header-tools > div :is(button, a) {
+  min-height: 30px;
+  height: 30px;
+  padding: 4px 8px;
+  font-size: 11px;
+  gap: 5px;
+}
+.editor-header-tools > div svg {
+  width: 13px;
+  height: 13px;
 }

@@ -133,6 +133,7 @@ import {
   ChevronLeft,
   Copy,
   Film,
+  BookmarkPlus,
   Image as ImageIcon,
   Layers3,
   Library,
@@ -288,6 +289,7 @@ export default function EditorPage() {
     error: workspaceError,
     updateWorkspace,
     getWorkspaceSnapshot,
+    capabilities,
   } = useWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProject = workspace.projects.find(
@@ -296,9 +298,7 @@ export default function EditorPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     requestedProject?.id ?? null
   );
-  const [selectedClipId, setSelectedClipId] = useState<string | null>(
-    requestedProject?.clips[0]?.id ?? null
-  );
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [extraSelection, setExtraSelection] = useState<string[]>([]);
   const [durationDraft, setDurationDraft] = useState<string | null>(null);
   const [leftTool, setLeftTool] = useState<DockKind>("library");
@@ -343,6 +343,7 @@ export default function EditorPage() {
     searchParams,
   ]);
   const [autoEditSummary, setAutoEditSummary] = useState("");
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [autoEditing, setAutoEditing] = useState(false);
   const [reelBusy, setReelBusy] = useState(false);
   const [stylesOpen, setStylesOpen] = useState(
@@ -490,7 +491,6 @@ export default function EditorPage() {
 
   const openProject = (item: EditProject) => {
     localSpeechController.current?.abort();
-    const firstClip = item.clips[0] ?? null;
     transcriptBase.current = {
       projectId: item.id,
       value: JSON.stringify(item.transcript),
@@ -502,9 +502,9 @@ export default function EditorPage() {
     setPlayhead(item.playhead);
     setTranscriptDraft(item.transcript.map(segment => ({ ...segment })));
     setTranscriptionProvenance(item.transcriptProvenance ?? null);
-    setSelectedClipId(firstClip?.id ?? null);
+    setSelectedClipId(null);
     setExtraSelection([]);
-    setClipDraft(firstClip ? { ...firstClip } : null);
+    setClipDraft(null);
   };
 
   useEffect(() => {
@@ -972,9 +972,9 @@ export default function EditorPage() {
         [snapshotProject(updatedProject, `Added ${asset.name}`)],
         snapshotProject(target, "Project opened")
       );
-      setSelectedClipId(clip.id);
+      setSelectedClipId(null);
       setExtraSelection([]);
-      setClipDraft({ ...clip });
+      setClipDraft(null);
 
       return {
         ...current,
@@ -2822,7 +2822,7 @@ export default function EditorPage() {
             <span>{formatTime(project.duration)}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="editor-header-tools flex items-center gap-2">
           <div className="hidden min-[1100px]:block">
             <PageGuideButton compact />
           </div>
@@ -2865,8 +2865,25 @@ export default function EditorPage() {
           </span>
           <button
             type="button"
+            disabled={
+              !capabilities.editStyleTemplates ||
+              !canCaptureEditStyle(project) ||
+              Boolean(busyAction)
+            }
+            onClick={() => setSaveTemplateOpen(true)}
+            title={ui("Save as template")}
+            aria-label={ui("Save as template")}
+            className="flex items-center gap-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground"
+          >
+            <BookmarkPlus size={14} />
+            <span className="hidden min-[1400px]:inline">
+              {ui("Save as template")}
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => setExportOpen(true)}
-            className="flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
+            className="editor-export flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
           >
             <FileOutput className="h-3.5 w-3.5" />
             {ui("Export video")}
@@ -3708,6 +3725,7 @@ export default function EditorPage() {
                     <div className="mt-2">
                       <SaveEditStyleTemplate
                         profile={captureEditStyle(project)}
+                        project={project}
                         source="edit"
                         disabled={Boolean(busyAction)}
                       />
@@ -3719,6 +3737,22 @@ export default function EditorPage() {
           </div>
         </aside>
       </ResizableWorkspace>
+
+      <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle>{ui("Save as template")}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {ui("Save the reference video and every edit setting.")}
+          </DialogDescription>
+          {saveTemplateOpen && canCaptureEditStyle(project) && (
+            <SaveEditStyleTemplate
+              project={project}
+              profile={captureEditStyle(project)}
+              source="edit"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <EditorShortcuts
         open={shortcutsOpen}

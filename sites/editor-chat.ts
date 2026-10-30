@@ -1,3 +1,4 @@
+import { resolveBlueprintOperations } from "../contracts/edit-template-blueprint";
 import {
   editorPresetCatalog,
   EDITOR_PRESET_GUIDANCE,
@@ -10,7 +11,7 @@ import {
 import { editorAudioCatalog } from "../contracts/editor-audio-catalog";
 import {
   normalizeEditStyleTemplate,
-  editStyleDirection,
+  editTemplateDirection,
 } from "../contracts/edit-style-template";
 import {
   catalogAudioPlacement,
@@ -362,7 +363,7 @@ export function editorChatModelContext(context: EditorChatContext) {
       editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
         ?.profile,
       styleAdaptation: project.editStyleTemplate
-        ? editStyleDirection(project.editStyleTemplate.profile)
+        ? editTemplateDirection(project.editStyleTemplate)
         : undefined,
     },
     assets: candidates.map(
@@ -564,13 +565,18 @@ export function normalizeEditorChatPlan(
           );
         if (raw.start < 0 || raw.end > project.duration || raw.end < raw.start)
           throw new Error("This edit needs a valid timeline range.");
-        const operation = context.normalizeOperations([
-          {
-            ...raw,
-            label: raw.label ?? label,
-            reason: raw.reason ?? row.reason,
-          },
-        ])[0];
+        const operation = context.normalizeOperations(
+          resolveBlueprintOperations(
+            [
+              {
+                ...raw,
+                label: raw.label ?? label,
+                reason: raw.reason ?? row.reason,
+              },
+            ],
+            normalizeEditStyleTemplate(project.editStyleTemplate)?.blueprint
+          )
+        )[0];
         if (!operation)
           throw new Error(
             "Reel returned an invalid edit instruction; no clip was changed."

@@ -39,7 +39,7 @@ import {
 } from "@/lib/editor-production";
 import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { EditStyleTemplates } from "./EditStyleTemplates";
-import { editStyleDirection } from "@contracts/edit-style-template";
+import { editTemplateDirection } from "@contracts/edit-style-template";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
 import { videoReviewFailureMessage } from "@contracts/video-analysis-errors";
 import { eligibleAnalyzerOptimization } from "@contracts/analyzer-report";
@@ -129,6 +129,9 @@ export function AutonomousEditor({
     images: number;
     videos: number;
   }>();
+  const [optionsPanel, setOptionsPanel] = useState<
+    "presets" | "options" | null
+  >(null);
   const [captions, setCaptions] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -431,10 +434,19 @@ export function AutonomousEditor({
         });
         working = prepared.working;
         const templateDirection = working.editStyleTemplate
-          ? editStyleDirection(working.editStyleTemplate.profile)
+          ? editTemplateDirection(working.editStyleTemplate)
           : "";
-        const captionTreatment =
-          working.editStyleTemplate?.profile.captionTreatment;
+        const blueprint = working.editStyleTemplate?.blueprint;
+        if (blueprint) {
+          working.aspectRatio = blueprint.aspectRatio;
+          working.frameRate = blueprint.frameRate;
+        }
+        const captionTreatment = blueprint?.captionStyle
+          ? {
+              preset: blueprint.captionStyle,
+              appearance: blueprint.captionAppearance,
+            }
+          : working.editStyleTemplate?.profile.captionTreatment;
         if (
           captionTreatment &&
           !working.sourceReviews?.some(r => r.captions === "present")
@@ -880,13 +892,25 @@ export function AutonomousEditor({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="auto-edit-dialog max-h-[88dvh] overflow-y-auto sm:max-w-2xl">
           <DialogTitle>{ui("Auto-edit")}</DialogTitle>
-          <DialogDescription>
-            {ui("Choose a direction, or let the footage guide the edit.")}
+          <DialogDescription className="-mt-3 text-xs">
+            {ui(
+              "AI edits your footage using your reference, template or direction."
+            )}
           </DialogDescription>
           <section className="space-y-4">
             <div className="grid gap-5">
               <div>
-                <div className="auto-edit-reference mb-5 rounded-xl border border-primary/25 bg-primary/5 px-4 py-1">
+                <div className="auto-edit-template mb-3 rounded-xl border border-sky-400/25 bg-sky-400/5 p-3">
+                  <h3 className="mb-2 text-xs font-semibold">
+                    {ui("Match a template")}
+                  </h3>
+                  <EditStyleTemplates
+                    project={project}
+                    disabled={busy}
+                    compact
+                  />
+                </div>
+                <div className="auto-edit-reference mb-4 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1">
                   <div>
                     {" "}
                     <ReferenceStylePanel
@@ -963,184 +987,183 @@ export function AutonomousEditor({
                     <p className="mt-2 whitespace-pre-wrap">{referenceBrief}</p>
                   </details>
                 )}
-                <div className="mb-4">
-                  <EditStyleTemplates
-                    project={project}
-                    disabled={busy}
-                    compact
-                  />
-                </div>
-                <label className="block text-sm font-medium">
-                  {ui("Describe the style and outcome")}
-                  <textarea
-                    disabled={busy}
-                    aria-label={ui("Autonomous editing style")}
-                    rows={3}
-                    value={style}
-                    onChange={e => setStyle(e.target.value)}
-                    placeholder={ui(
-                      "Premium skincare demo. Clean editorial captions, a fast before/after opening, subtle fades, warm colour, and a quiet product close-up at the end."
-                    )}
-                    className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"
-                  />
-                </label>
-                <details className="mt-3">
-                  <summary className="cursor-pointer text-xs text-muted-foreground">
-                    {ui("Presets")}
-                  </summary>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {(
-                      Object.keys(EDIT_RECIPES) as Array<
-                        keyof typeof EDIT_RECIPES
-                      >
-                    ).map(s => (
-                      <button
+                <div className="auto-edit-direction border-t border-border pt-4">
+                  <div className="rounded-xl border border-border bg-background/30 p-3">
+                    <label className="block text-xs font-medium">
+                      {ui("Describe the style and outcome")}
+                      <textarea
                         disabled={busy}
-                        key={s}
-                        type="button"
-                        onClick={() => setStyle(`${s}. ${EDIT_RECIPES[s]}`)}
-                        className="rounded-lg border border-border px-3 py-1.5 text-xs"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </details>
-                <details className="auto-edit-options mt-5 border-t border-border pt-3">
-                  <summary className="cursor-pointer text-sm text-muted-foreground">
-                    {ui("More options")}
-                  </summary>
-                  <label className="mt-4 flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      disabled={busy}
-                      checked={automaticDuration}
-                      onChange={e => setAutomaticDuration(e.target.checked)}
-                    />
-                    {ui("Detect ending from content automatically")}
-                  </label>
-                  <fieldset disabled={busy} className="mt-4 space-y-3 text-sm">
-                    <legend className="font-medium">
-                      {ui("Edit duration")}
-                    </legend>
-                    <StudioSelect
-                      aria-label={ui("Edit duration")}
-                      value={durationMode}
-                      onChange={event =>
-                        setDurationMode(event.target.value as "none" | "range")
-                      }
-                      className="w-full rounded-lg border border-border bg-background p-2"
-                    >
-                      <option value="none">{ui("No target duration")}</option>
-                      <option value="range">
-                        {ui("Preferred duration range")}
-                      </option>
-                    </StudioSelect>
-                    {durationMode === "range" ? (
-                      <>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <label>
-                            {ui("Minimum duration (seconds)")}
-                            <input
-                              type="number"
-                              min={0}
-                              step="any"
-                              inputMode="decimal"
-                              value={minimumDuration}
-                              onChange={event =>
-                                setMinimumDuration(event.target.value)
+                        aria-label={ui("Autonomous editing style")}
+                        rows={3}
+                        value={style}
+                        onChange={e => setStyle(e.target.value)}
+                        placeholder={ui(
+                          "Premium skincare demo. Clean editorial captions, a fast before/after opening, subtle fades, warm colour, and a quiet product close-up at the end."
+                        )}
+                        className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"
+                      />
+                    </label>
+                    <div className="mt-2 flex gap-2">
+                      {(["presets", "options"] as const).map(panel => (
+                        <button
+                          key={panel}
+                          type="button"
+                          aria-expanded={optionsPanel === panel}
+                          onClick={() =>
+                            setOptionsPanel(
+                              optionsPanel === panel ? null : panel
+                            )
+                          }
+                          className={`rounded-md border px-2.5 py-1.5 text-xs ${optionsPanel === panel ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+                        >
+                          {ui(panel === "presets" ? "Presets" : "More options")}
+                        </button>
+                      ))}
+                    </div>
+                    {optionsPanel === "presets" && (
+                      <div className="mt-3 rounded-lg border border-border bg-surface p-3">
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {(
+                            Object.keys(EDIT_RECIPES) as Array<
+                              keyof typeof EDIT_RECIPES
+                            >
+                          ).map(s => (
+                            <button
+                              disabled={busy}
+                              key={s}
+                              type="button"
+                              onClick={() =>
+                                setStyle(`${s}. ${EDIT_RECIPES[s]}`)
                               }
-                              aria-invalid={!durationTarget}
-                              aria-describedby={
-                                durationTarget
-                                  ? undefined
-                                  : "edit-duration-error"
-                              }
-                              className="mt-1 w-full rounded-lg border border-border bg-background p-2"
-                            />
-                          </label>
-                          <label>
-                            {ui("Maximum duration (seconds)")}
-                            <input
-                              type="number"
-                              min={0}
-                              step="any"
-                              inputMode="decimal"
-                              value={maximumDuration}
-                              onChange={event =>
-                                setMaximumDuration(event.target.value)
-                              }
-                              aria-invalid={!durationTarget}
-                              aria-describedby={
-                                durationTarget
-                                  ? undefined
-                                  : "edit-duration-error"
-                              }
-                              className="mt-1 w-full rounded-lg border border-border bg-background p-2"
-                            />
-                          </label>
+                              className="rounded-lg border border-border px-3 py-1.5 text-xs"
+                            >
+                              {s}
+                            </button>
+                          ))}
                         </div>
-                        <p className="text-xs text-foreground/60">
-                          {ui(
-                            "A preference, not a cutoff. Preserve complete speech and meaning; never pad or repeat footage to fill the range."
-                          )}
-                        </p>
-                        {!durationTarget && (
-                          <p
-                            id="edit-duration-error"
-                            role="alert"
-                            className="text-xs text-destructive"
+                      </div>
+                    )}
+                    {optionsPanel === "options" && (
+                      <div className="auto-edit-options mt-3 rounded-lg border border-border bg-surface p-3">
+                        <label className="mt-4 flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            disabled={busy}
+                            checked={automaticDuration}
+                            onChange={e =>
+                              setAutomaticDuration(e.target.checked)
+                            }
+                          />
+                          {ui("Detect ending from content automatically")}
+                        </label>
+                        <fieldset
+                          disabled={busy}
+                          className="mt-4 space-y-3 text-sm"
+                        >
+                          <legend className="font-medium">
+                            {ui("Edit duration")}
+                          </legend>
+                          <StudioSelect
+                            aria-label={ui("Edit duration")}
+                            value={durationMode}
+                            onChange={event =>
+                              setDurationMode(
+                                event.target.value as "none" | "range"
+                              )
+                            }
+                            className="w-full rounded-lg border border-border bg-background p-2"
                           >
-                            {ui(
-                              "Enter a minimum and maximum greater than zero, with the maximum above the minimum."
-                            )}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-xs text-foreground/60">
-                        {ui(
-                          "The edit follows the footage and story without a requested duration limit."
-                        )}
-                      </p>
+                            <option value="none">
+                              {ui("No target duration")}
+                            </option>
+                            <option value="range">
+                              {ui("Preferred duration range")}
+                            </option>
+                          </StudioSelect>
+                          {durationMode === "range" ? (
+                            <>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <label>
+                                  {ui("Minimum duration (seconds)")}
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="any"
+                                    inputMode="decimal"
+                                    value={minimumDuration}
+                                    onChange={event =>
+                                      setMinimumDuration(event.target.value)
+                                    }
+                                    aria-invalid={!durationTarget}
+                                    aria-describedby={
+                                      durationTarget
+                                        ? undefined
+                                        : "edit-duration-error"
+                                    }
+                                    className="mt-1 w-full rounded-lg border border-border bg-background p-2"
+                                  />
+                                </label>
+                                <label>
+                                  {ui("Maximum duration (seconds)")}
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="any"
+                                    inputMode="decimal"
+                                    value={maximumDuration}
+                                    onChange={event =>
+                                      setMaximumDuration(event.target.value)
+                                    }
+                                    aria-invalid={!durationTarget}
+                                    aria-describedby={
+                                      durationTarget
+                                        ? undefined
+                                        : "edit-duration-error"
+                                    }
+                                    className="mt-1 w-full rounded-lg border border-border bg-background p-2"
+                                  />
+                                </label>
+                              </div>
+                              <p className="text-xs text-foreground/60">
+                                {ui(
+                                  "A preference, not a cutoff. Preserve complete speech and meaning; never pad or repeat footage to fill the range."
+                                )}
+                              </p>
+                              {!durationTarget && (
+                                <p
+                                  id="edit-duration-error"
+                                  role="alert"
+                                  className="text-xs text-destructive"
+                                >
+                                  {ui(
+                                    "Enter a minimum and maximum greater than zero, with the maximum above the minimum."
+                                  )}
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-xs text-foreground/60">
+                              {ui(
+                                "The edit follows the footage and story without a requested duration limit."
+                              )}
+                            </p>
+                          )}
+                        </fieldset>
+                        <label className="mt-4 flex items-center gap-2 text-sm">
+                          <input
+                            disabled={busy}
+                            type="checkbox"
+                            checked={captions}
+                            onChange={e => setCaptions(e.target.checked)}
+                          />
+                          {ui("Transcribe and caption footage")}
+                        </label>
+                      </div>
                     )}
-                  </fieldset>
-                  <label className="mt-4 flex items-center gap-2 text-sm">
-                    <input
-                      disabled={busy}
-                      type="checkbox"
-                      checked={captions}
-                      onChange={e => setCaptions(e.target.checked)}
-                    />
-                    {ui("Transcribe and caption footage")}
-                  </label>
-                </details>
-              </div>
-              <div className="space-y-3 border-t border-border pt-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {quote
-                        ? `${quote.minimum}–${quote.maximum} ${ui("credits")}`
-                        : ui("Cost follows your edit plan")}
-                    </p>
-                    {quote && quote.minimum !== quote.maximum && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {ui("Range covers required and optional shots.")}
-                      </p>
-                    )}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {quote
-                        ? `${quote.images} ${ui("images")} · ${quote.videos} ${ui("videos")} · ${ui("Only completed work is charged.")}`
-                        : `${ui("Review and plan")}: ${preparationCost} ${ui("credits")}. ${ui("Supporting media is estimated after planning.")}`}
-                    </p>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {ui(
-                    "Maximum effort · automatic extras · no fixed media limit"
-                  )}
-                </p>
+              </div>
+              <div className="space-y-2">
                 <button
                   type="button"
                   disabled={
@@ -1156,7 +1179,15 @@ export function AutonomousEditor({
                   )}
                   {failure ? ui("Continue edit") : ui("Build my edit")}
                 </button>
-                <div className="flex justify-end">
+                <div className="flex items-center justify-end gap-3">
+                  {quote && (
+                    <span
+                      className="text-xs text-muted-foreground"
+                      role="status"
+                    >
+                      {quote.minimum}–{quote.maximum} {ui("credits")}
+                    </span>
+                  )}
                   <button
                     type="button"
                     disabled={

@@ -1,3 +1,4 @@
+import { resolveBlueprintOperations } from "../contracts/edit-template-blueprint";
 import {
   editorPresetCatalog,
   EDITOR_PRESET_GUIDANCE,
@@ -110,7 +111,7 @@ import {
   normalizeEditStyleTemplates,
   normalizeEditStyleTemplate,
   normalizeReferenceEditStyle,
-  editStyleDirection,
+  editTemplateDirection,
 } from "../contracts/edit-style-template";
 import { pcmWaveDuration } from "../contracts/audio-chunks";
 import {
@@ -6610,8 +6611,8 @@ async function handleAi(
           JSON.stringify({
             command: input.command,
             project: projectContext,
-            styleAdaptation: projectContext.editingStyle
-              ? editStyleDirection(projectContext.editingStyle)
+            styleAdaptation: project.editStyleTemplate
+              ? editTemplateDirection(project.editStyleTemplate)
               : undefined,
           }),
           requestedModel,
@@ -6728,7 +6729,10 @@ async function handleAi(
             )
           : undefined;
         let changes = mapEditOperations(
-          output.changes,
+          resolveBlueprintOperations(
+            output.changes,
+            normalizeEditStyleTemplate(project.editStyleTemplate)?.blueprint
+          ),
           duration,
           project.clips,
           Array.isArray(input.selectedClipIds) ? input.selectedClipIds : [],

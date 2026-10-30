@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookmarkPlus, Trash2 } from "lucide-react";
 import { useUiText } from "@/lib/i18n/ui";
 import { useWorkspace } from "@/providers/workspace";
 import {
+  platformApi,
   captureUploadRequestScope,
   verifyUploadRequestScope,
 } from "@/lib/platform-api";
@@ -17,7 +18,8 @@ import {
   type EditStyleProfile,
   type EditStyleTemplate,
 } from "@contracts/edit-style-template";
-import type { EditProject } from "@contracts/workspace";
+import { captureEditBlueprint } from "@contracts/edit-template-blueprint";
+import type { Asset, EditProject } from "@contracts/workspace";
 import { editingTraitLabel } from "@/lib/i18n/locales/ui-edit-template-traits";
 import { CaptionStylePreview } from "./CaptionStylePreview";
 
@@ -68,37 +70,121 @@ export function SaveEditStyleTemplate({
   profile,
   source,
   disabled = false,
+  project,
 }: {
+  project?: EditProject;
   profile: EditStyleProfile;
   source: EditStyleTemplate["source"];
   disabled?: boolean;
 }) {
   const ui = useUiText();
-  const { getWorkspaceSnapshot, updateWorkspace, capabilities } =
+  const { workspace, getWorkspaceSnapshot, updateWorkspace, capabilities } =
     useWorkspace();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const abort = useRef<AbortController | null>(null);
+  const owner = workspace.profile.email.toLowerCase();
+  const brand = selectedBrand(owner);
+  useEffect(() => () => abort.current?.abort(), [owner, brand, project?.id]);
   if (!capabilities.editStyleTemplates) return null;
   async function save() {
     if (busy || disabled || !name.trim()) return;
     setBusy(true);
     setMessage("");
     setFailed(false);
+    abort.current?.abort();
+    const controller = new AbortController();
+    abort.current = controller;
+    setProgress(0);
+    const projectSnapshot = project ? structuredClone(project) : undefined;
     const snapshot = structuredClone(profile),
       templateName = name.trim();
     try {
+      const scope = await captureUploadRequestScope();
+      const assertScope = () => {
+        controller.signal.throwIfAborted();
+        const current = getWorkspaceSnapshot();
+        if (
+          scope.ownerEmail !== owner ||
+          scope.brandId !== brand ||
+          current.profile.email.toLowerCase() !== owner ||
+          selectedBrand(owner) !== brand ||
+          (projectSnapshot &&
+            !current.projects.some(p => p.id === projectSnapshot.id))
+        )
+          throw new Error(
+            ui("The destination workspace changed. Start the import again.")
+          );
+      };
+      assertScope();
+      await verifyUploadRequestScope(scope);
+      if (
+        normalizeEditStyleTemplates(getWorkspaceSnapshot().editStyleTemplates)
+          .length >= EDIT_STYLE_TEMPLATE_LIMIT
+      )
+        throw new Error(ui("Delete a saved style to make room for another."));
+      const blueprint = projectSnapshot
+        ? captureEditBlueprint(projectSnapshot)
+        : undefined;
+      let reference: Asset | undefined;
+      if (projectSnapshot) {
+        const { renderVideo } = await import("@/lib/render-video");
+        const rendered = await renderVideo(
+          projectSnapshot,
+          structuredClone(getWorkspaceSnapshot().assets),
+          {
+            resolution: 1080,
+            frameRate: projectSnapshot.frameRate ?? 30,
+            format: "mp4",
+            signal: controller.signal,
+            onProgress: value => {
+              if (!controller.signal.aborted) setProgress(value);
+            },
+            loadAsset: async (id, signal) =>
+              new Uint8Array(
+                await (
+                  await platformApi.downloadAssetBlob(id, signal, { scope })
+                ).arrayBuffer()
+              ),
+          }
+        );
+        assertScope();
+        await verifyUploadRequestScope(scope);
+        const current = getWorkspaceSnapshot().projects.find(
+          p => p.id === projectSnapshot.id
+        );
+        if (
+          !current ||
+          JSON.stringify(captureEditBlueprint(current)) !==
+            JSON.stringify(blueprint)
+        )
+          throw new Error(ui("The edit changed. Save the template again."));
+        reference = await platformApi.uploadAsset(
+          new File([rendered.file], `${templateName}.mp4`, {
+            type: rendered.file.type,
+          }),
+          "video",
+          undefined,
+          projectSnapshot.id,
+          { scope, signal: controller.signal }
+        );
+        await verifyUploadRequestScope(scope);
+        assertScope();
+      }
       const candidate = normalizeEditStyleTemplate({
         id: crypto.randomUUID(),
         name: templateName,
         source,
         profile: snapshot,
+        blueprint,
+        referenceAssetId: reference?.id,
       });
       if (!candidate) throw new Error(ui("Save failed"));
-      const scope = await captureUploadRequestScope();
-      await verifyUploadRequestScope(scope);
       const saved = await updateWorkspace(w => {
+        assertScope();
         if (
           w.profile.email.toLowerCase() !== scope.ownerEmail ||
           selectedBrand(scope.ownerEmail) !== scope.brandId ||
@@ -114,6 +200,9 @@ export function SaveEditStyleTemplate({
         return {
           ...w,
           editStyleTemplates: [...templates, candidate],
+          assets: reference
+            ? [reference, ...w.assets.filter(a => a.id !== reference!.id)]
+            : w.assets,
         };
       });
       if (!saved.editStyleTemplates?.some(t => t.id === candidate.id))
@@ -131,7 +220,9 @@ export function SaveEditStyleTemplate({
     <div className="space-y-2 rounded-xl border border-primary/25 bg-primary/5 p-3">
       <p className="text-xs leading-relaxed text-muted-foreground">
         {ui(
-          "Save the editing language. Each new edit adapts it to its own footage, words and story."
+          project
+            ? "Save the reference video and every edit setting."
+            : "Save the editing language. Each new edit adapts it to its own footage, words and story."
         )}
       </p>
       <details>
@@ -153,11 +244,18 @@ export function SaveEditStyleTemplate({
       <button
         type="button"
         onClick={() => void save()}
-        disabled={disabled || busy || !name.trim()}
+        disabled={
+          disabled ||
+          busy ||
+          !name.trim() ||
+          Boolean(project && !capabilities.uploads)
+        }
         className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-xs text-primary disabled:opacity-40"
       >
         <BookmarkPlus size={14} />
-        {busy ? ui("Saving…") : ui("Save editing template · no AI credits")}
+        {busy
+          ? `${ui("Saving…")} ${project ? `${progress}%` : ""}`
+          : ui("Save editing template · no AI credits")}
       </button>
       {message && (
         <p role={failed ? "alert" : "status"} className="text-xs">
@@ -278,6 +376,22 @@ export function EditStyleTemplates({
           <summary className="cursor-pointer">
             {ui("Style profile")}: {active.name}
           </summary>
+          {active.referenceAssetId &&
+            workspace.assets.find(a => a.id === active.referenceAssetId)
+              ?.url && (
+              <video
+                className="mt-2 max-h-48 w-full rounded-lg bg-black"
+                src={
+                  workspace.assets.find(a => a.id === active.referenceAssetId)!
+                    .url
+                }
+                controls
+                playsInline
+                preload="metadata"
+              >
+                <track kind="captions" />
+              </video>
+            )}
           <EditStyleProfilePreview profile={active.profile} />
         </details>
       )}
@@ -289,6 +403,7 @@ export function EditStyleTemplates({
           <div className="mt-2">
             <SaveEditStyleTemplate
               profile={profile}
+              project={project}
               source="edit"
               disabled={disabled || busy}
             />

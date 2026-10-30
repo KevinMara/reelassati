@@ -43,7 +43,7 @@ export function RenderExportPanel({
 }) {
   const ui = useUiText();
   const { workspace, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
-  const attribution=editAttribution(project,workspace.assets);
+  const attribution = editAttribution(project, workspace.assets);
   const requiresMarking = Boolean(
     project.transcriptProvenance ||
     workspace.assets.some(
@@ -232,9 +232,7 @@ export function RenderExportPanel({
       >
         <DialogTitle>{ui("Export your video")}</DialogTitle>
         <DialogDescription>
-          {ui(
-            "Your device renders your cuts, images, motion graphics, captions and audio. Download the result or save it to your Library."
-          )}
+          {ui("Download your edit or save it to Library.")}
         </DialogDescription>
         <p className="font-medium">{project.title}</p>
         <label className="text-sm" htmlFor={`${settingsId}-destination`}>
@@ -246,8 +244,8 @@ export function RenderExportPanel({
             value={actualDestination}
             onValueChange={value => setDestination(value as ExportDestination)}
             options={[
-              { value: "download", label: "Download only · no Library upload" },
-              { value: "library", label: "Library · save and publish later" },
+              { value: "download", label: ui("Download") },
+              { value: "library", label: ui("Library") },
             ]}
           />
         </label>
@@ -271,9 +269,9 @@ export function RenderExportPanel({
             }
             className="mt-2"
             options={[
-              { value: "720", label: "720p · faster export" },
-              { value: "1080", label: "1080p · more detail" },
-              { value: "2160", label: "4K · maximum detail" },
+              { value: "720", label: "720p" },
+              { value: "1080", label: "1080p" },
+              { value: "2160", label: "4K" },
             ]}
           />
         </label>
@@ -291,7 +289,7 @@ export function RenderExportPanel({
               }
               options={exportFrameRates.map(value => ({
                 value: String(value),
-                label: `${value} fps${value === (project.frameRate ?? 30) ? " · project" : ""}`,
+                label: `${value} fps`,
               }))}
             />
           </label>
@@ -315,10 +313,7 @@ export function RenderExportPanel({
           {project.aspectRatio} {ui("canvas ·")}{" "}
           {exportDimensions(project.aspectRatio, resolution).width} ×{" "}
           {exportDimensions(project.aspectRatio, resolution).height} ·{" "}
-          {frameRate}{" "}
-          {ui(
-            "fps. Rendering uses this device’s processor and memory. Keep this page open while exporting. Templates and rendering use no AI credits; Library storage and AI generation have their own allowances."
-          )}
+          {frameRate} {ui("fps · Keep this page open while exporting.")}
         </p>
         {resolution === 2160 && (
           <p className="text-sm text-foreground/70">
@@ -339,7 +334,32 @@ export function RenderExportPanel({
             />
           </div>
         )}
-        {attribution && <details className="rounded-xl border border-border p-3 text-xs"><summary className="cursor-pointer font-medium">{ui("Media credits")}</summary><pre className="mt-3 whitespace-pre-wrap break-words font-sans leading-relaxed">{attribution}</pre><button type="button" onClick={()=>{const url=URL.createObjectURL(new Blob([attribution],{type:"text/plain;charset=utf-8"}));const anchor=document.createElement("a");anchor.href=url;anchor.download="media-credits.txt";anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}} className="mt-3 text-primary">{ui("Download credits")}</button></details>}
+        {attribution && (
+          <details className="rounded-xl border border-border p-3 text-xs">
+            <summary className="cursor-pointer font-medium">
+              {ui("Media credits")}
+            </summary>
+            <pre className="mt-3 whitespace-pre-wrap break-words font-sans leading-relaxed">
+              {attribution}
+            </pre>
+            <button
+              type="button"
+              onClick={() => {
+                const url = URL.createObjectURL(
+                  new Blob([attribution], { type: "text/plain;charset=utf-8" })
+                );
+                const anchor = document.createElement("a");
+                anchor.href = url;
+                anchor.download = "media-credits.txt";
+                anchor.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              }}
+              className="mt-3 text-primary"
+            >
+              {ui("Download credits")}
+            </button>
+          </details>
+        )}
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -370,7 +390,7 @@ export function RenderExportPanel({
               to={`/dashboard/publish?asset=${encodeURIComponent(saved.id)}`}
               className="mt-4 block rounded-lg bg-primary p-3 text-center font-medium text-primary-foreground"
             >
-              {ui("Prepare publication")}
+              {ui("Open publisher")}
             </Link>
           </div>
         ) : (

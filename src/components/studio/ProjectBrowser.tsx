@@ -1,9 +1,54 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Folder, FolderPlus, Film, Plus, Search } from "lucide-react";
-import type { EditProject } from "@contracts/workspace";
+import type { Asset, EditProject } from "@contracts/workspace";
 import { useWorkspace } from "@/providers/workspace";
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
+import { TimelinePreview } from "./TimelinePreview";
 import { CompactSelect } from "@/components/ui/compact-select";
+
+function ProjectPreview({
+  project,
+  assets,
+}: {
+  project: EditProject;
+  assets: Asset[];
+}) {
+  const host = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { rootMargin: "120px" }
+    );
+    if (host.current) observer.observe(host.current);
+    return () => observer.disconnect();
+  }, []);
+  const first = project.clips
+    .filter(c => !c.hidden && c.track !== "audio")
+    .sort((a, b) => a.start - b.start)[0];
+  const time = Math.min(
+    Math.max(0, project.duration - 0.01),
+    (first?.start ?? 0) + 0.5
+  );
+  return (
+    <div
+      ref={host}
+      className="mb-3 flex h-36 items-center justify-center overflow-hidden rounded-lg bg-black"
+      aria-hidden="true"
+    >
+      {visible && first ? (
+        <TimelinePreview
+          project={project}
+          assets={assets}
+          time={time}
+          playing={false}
+        />
+      ) : (
+        <Film className="size-6 text-muted-foreground" />
+      )}
+    </div>
+  );
+}
 
 export function ProjectBrowser({
   onOpen,
@@ -187,23 +232,15 @@ export function ProjectBrowser({
               onClick={() => onOpen(p)}
               className="block w-full p-4 text-left"
             >
-              <div className="mb-4 flex h-16 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-background">
-                <Film className="size-6 text-primary/70" />
-              </div>
+              <ProjectPreview project={p} assets={workspace.assets} />
               <h3 className="truncate text-sm font-semibold">{p.title}</h3>
               <p className="mt-2 text-xs text-muted-foreground">
                 {p.aspectRatio} · {p.clips.length} {ui("clips")} ·{" "}
                 {Math.round(p.duration)}s
               </p>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {new Date(p.updatedAt).toLocaleDateString(getUiLocale())} ·{" "}
-                {ui(
-                  p.status === "editing"
-                    ? "Editing"
-                    : p.status === "review"
-                      ? "Review"
-                      : "Published"
-                )}
+                {ui("Last edited")}{" "}
+                {new Date(p.updatedAt).toLocaleDateString(getUiLocale())}
               </p>
             </button>
             <div className="border-t border-border px-3 py-2">

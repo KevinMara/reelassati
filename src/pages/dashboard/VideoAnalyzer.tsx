@@ -4,7 +4,6 @@ import { videoReviewFailureMessage } from "@contracts/video-analysis-errors";
 import {
   normalizeSavedAnalyzerReports,
   attachReportAudience,
-  requiresAnalysisQuoteReview,
   type AudienceResponse,
   type AnalyzerOptimization,
   type SavedAnalyzerReport,
@@ -189,10 +188,6 @@ export default function VideoAnalyzer() {
     capabilities.analysis &&
     capabilities.analysisTransportVersion === "foreground-v1" &&
     capabilities.analysisSchemaVersion === VIDEO_ANALYSIS_SCHEMA_VERSION;
-  const analysisCreditCost = timedCreditCost(
-    sourceAsset?.duration,
-    AI_CREDIT_COSTS.videoAnalysisPerMinute
-  );
 
   const saveUploadedAsset = async (asset: Asset, scope: UploadRequestScope) => {
     await updateWorkspace(current => {
@@ -217,7 +212,7 @@ export default function VideoAnalyzer() {
     });
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (estimateOnly = false) => {
     if (!sourceReady || !analysisReady || analyzing) return;
     const id = ++generation.current;
     controller.current?.abort();
@@ -264,13 +259,14 @@ export default function VideoAnalyzer() {
       await saveUploadedAsset(readyAsset, scope);
       if (id !== generation.current || abort.signal.aborted) return;
       setSourceAsset(readyAsset);
-      // Import/measurement never starts a paid analysis. A second click accepts the actual duration quote.
-      if (requiresAnalysisQuoteReview(sourceAsset, readyAsset)) {
+      if (estimateOnly) {
         setNotice(
-          ui(
-            "Source ready · {{seconds}} seconds. Review the measured credit quote, then press Analyze video.",
-            { seconds: readyAsset.duration!.toFixed(1) }
-          )
+          ui("Analyze video · {{credits}} credits", {
+            credits: timedCreditCost(
+              readyAsset.duration,
+              AI_CREDIT_COSTS.videoAnalysisPerMinute
+            ),
+          })
         );
         return;
       }
@@ -615,7 +611,10 @@ export default function VideoAnalyzer() {
       ) : null}
 
       <section className="mb-6 rounded-xl border border-border bg-surface p-6">
-        <div data-tour="analysis-source" className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div
+          data-tour="analysis-source"
+          className="mb-5 flex flex-wrap items-center justify-between gap-3"
+        >
           <div className="flex rounded-lg border border-border bg-background p-1">
             <button
               type="button"
@@ -835,7 +834,7 @@ export default function VideoAnalyzer() {
           data-tour="analysis-run"
           onClick={() => void handleAnalyze()}
           disabled={!sourceReady || analyzing || !analysisReady}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+          className="ai-magic mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-45"
         >
           {analyzing ? (
             <>
@@ -847,14 +846,20 @@ export default function VideoAnalyzer() {
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              {sourceAsset?.duration
-                ? ui("Analyze video · {{credits}} credits", {
-                    credits: analysisCreditCost,
-                  })
-                : ui("Prepare video · no credits")}
+              {ui("Analyze video")}
             </>
           )}
         </button>
+        <div className="mt-2 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => void handleAnalyze(true)}
+            disabled={!sourceReady || analyzing || !analysisReady}
+            className="text-xs text-sky-500 hover:text-sky-400 disabled:opacity-40"
+          >
+            {ui("Estimate credits")}
+          </button>
+        </div>
 
         {analyzing ? (
           <button

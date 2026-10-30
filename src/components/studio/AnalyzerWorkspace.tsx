@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowRight, Download, Sparkles, Upload } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   buildAnalyzerOptimization,
   parseAudienceResponse,
@@ -40,6 +40,7 @@ export function AnalyzerWorkspace({
   onAudienceChange?: (response: AudienceResponse | undefined) => Promise<void>;
 }) {
   const ui = useUiText();
+  const navigate = useNavigate();
   const [audience, setAudience] = useState<AudienceResponse | undefined>(
     initialAudience
   );
@@ -211,20 +212,40 @@ export function AnalyzerWorkspace({
               {ui("Optimize this video")}
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-foreground/65">
-              {ui(
-                "Review the evidence-based brief in a separate project before accepting the editor's credit quote."
-              )}
+              {ui("Open a separate edit with these recommendations.")}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => setPrepared(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 font-medium text-primary-foreground"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const id = projectId || (await onCreateProject(optimization));
+                if (id) {
+                  setProjectId(id);
+                  navigate(
+                    `/dashboard/edit?project=${encodeURIComponent(id)}&optimize=1`
+                  );
+                }
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="ai-magic inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40"
           >
             <Sparkles className="h-4 w-4" />
-            {ui("Prepare optimization · no credits")}
+            {ui(busy ? "Saving…" : "Optimize this video")}
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => setPrepared(!prepared)}
+          aria-expanded={prepared}
+          className="mt-3 text-xs text-muted-foreground hover:text-foreground"
+        >
+          {ui("Optimization brief")}
+        </button>
         {prepared ? (
           <div className="mt-5 space-y-3">
             <label
