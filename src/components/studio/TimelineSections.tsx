@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
-import { Pencil, Send, Check, X } from "lucide-react";
+import { Pencil, Send, Check, X, RotateCcw } from "lucide-react";
 import type { StoryBeat, StoryBeatKind } from "@contracts/story-beats";
-import { updateStoryBeat } from "@contracts/story-beats";
+import {
+  updateStoryBeat,
+  mergeStoryRanges,
+  storySectionShortName,
+} from "@contracts/story-beats";
 import {
   HoverCard,
   HoverCardContent,
@@ -31,7 +35,7 @@ export function TimelineSections({
   selectedIds: string[];
   onToggle(id: string): void;
   onChange(beats: StoryBeat[]): Promise<void>;
-  onSend(beat: StoryBeat): void;
+  onSend(beats: StoryBeat[]): void;
   disabled?: boolean;
 }) {
   const ui = useUiText();
@@ -134,13 +138,24 @@ export function TimelineSections({
         {beats.map(original => {
           const beat = draft?.id === original.id ? draft : original;
           const color = sectionColors[beat.kind];
+          const selection = selectedIds.includes(beat.id)
+            ? beats.filter(b => selectedIds.includes(b.id))
+            : [original];
+          const title = selection.map(storySectionShortName).join(" + ");
           return (
             <HoverCard key={beat.id} openDelay={1000} closeDelay={250}>
               <HoverCardTrigger asChild>
                 <button
                   type="button"
                   disabled={blocked}
-                  onClick={() => onToggle(beat.id)}
+                  onClick={() => {
+                    if (draft?.id === beat.id) {
+                      stopDragging.current?.();
+                      setDraft(null);
+                      setError("");
+                    }
+                    onToggle(beat.id);
+                  }}
                   aria-pressed={selectedIds.includes(beat.id)}
                   className="absolute inset-y-0 truncate rounded-md border px-2 text-left text-[10px] font-medium transition-shadow hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                   style={{
@@ -162,9 +177,11 @@ export function TimelineSections({
                 align="start"
                 className="w-72 rounded-xl border-border bg-surface p-3"
               >
-                <p className="text-sm font-medium">{beat.label}</p>
+                <p className="text-sm font-medium">{title}</p>
                 <p className="mt-1 font-mono text-xs text-muted-foreground">
-                  {beat.start.toFixed(2)}–{beat.end.toFixed(2)}s
+                  {mergeStoryRanges(selection)
+                    .map(r => `${r.start.toFixed(2)}–${r.end.toFixed(2)}s`)
+                    .join(" · ")}
                 </p>
                 <div className="mt-3 flex gap-2">
                   <button
@@ -174,7 +191,21 @@ export function TimelineSections({
                     onClick={() => {
                       stopDragging.current?.();
                       originalDraft.current = { ...original };
-                      setDraft({ ...original });
+                      setDraft({
+                        ...original,
+                        reelOriginal:
+                          original.reelOriginal ??
+                          (original.origin === "ai"
+                            ? {
+                                label: original.label,
+                                kind: original.kind,
+                                start: original.start,
+                                end: original.end,
+                              }
+                            : undefined),
+                      });
+                      if (!selectedIds.includes(original.id))
+                        onToggle(original.id);
                       setError("");
                     }}
                     className="rounded-lg border border-border p-2 text-primary"
@@ -184,7 +215,7 @@ export function TimelineSections({
                   <button
                     type="button"
                     disabled={blocked || draft?.id === beat.id}
-                    onClick={() => onSend(original)}
+                    onClick={() => onSend(selection)}
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary/15 px-3 py-2 text-xs text-primary"
                   >
                     <Send size={13} />
@@ -245,6 +276,19 @@ export function TimelineSections({
               className="w-20 rounded-lg border border-border bg-background px-2 py-1 text-xs"
             />
           ))}
+          {draft.reelOriginal && (
+            <button
+              type="button"
+              disabled={blocked}
+              title={ui("Restore Reel timing and title")}
+              aria-label={ui("Restore Reel timing and title")}
+              onClick={() => setDraft({ ...draft, ...draft.reelOriginal! })}
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-primary"
+            >
+              <RotateCcw size={14} />
+              {ui("Restore Reel version")}
+            </button>
+          )}
           <button
             type="submit"
             disabled={blocked}

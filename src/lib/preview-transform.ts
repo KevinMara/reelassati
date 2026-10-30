@@ -13,6 +13,151 @@ export type PreviewTransform = {
   rotation?: number;
 };
 
+export type PreviewBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+export function unionPreviewBounds(
+  boxes: PreviewBounds[]
+): PreviewBounds | undefined {
+  if (!boxes.length) return undefined;
+  const x = Math.min(...boxes.map(b => b.x)),
+    y = Math.min(...boxes.map(b => b.y));
+  return {
+    x,
+    y,
+    width: Math.max(...boxes.map(b => b.x + b.width)) - x,
+    height: Math.max(...boxes.map(b => b.y + b.height)) - y,
+  };
+}
+export function previewContains(b: PreviewBounds, x: number, y: number) {
+  return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height;
+}
+
+/** Snap in canvas units, using a screen-pixel tolerance supplied by the caller. */
+export function snapPreviewMove(
+  box: PreviewBounds,
+  dx: number,
+  dy: number,
+  others: PreviewBounds[],
+  width: number,
+  height: number,
+  toleranceX: number,
+  toleranceY: number
+) {
+  const guides: { axis: "x" | "y"; at: number }[] = [];
+  const axis = (
+    start: number,
+    size: number,
+    delta: number,
+    extent: number,
+    other: { start: number; size: number }[],
+    tolerance: number,
+    name: "x" | "y"
+  ) => {
+    const targets = [
+      0,
+      extent * 0.05,
+      extent / 2,
+      extent * 0.95,
+      extent,
+      ...other.flatMap(b => [b.start, b.start + b.size / 2, b.start + b.size]),
+    ];
+    // Equal spacing: fit midway between two neighbours, or repeat their gap.
+    const equalStarts: number[] = [];
+    const sorted = [...other].sort((a, b) => a.start - b.start);
+    for (let i = 1; i < sorted.length; i++) {
+      const a = sorted[i - 1],
+        b = sorted[i],
+        gap = b.start - a.start - a.size;
+      if (gap >= size) equalStarts.push(a.start + a.size + (gap - size) / 2);
+      if (gap >= 0)
+        equalStarts.push(b.start + b.size + gap, a.start - gap - size);
+    }
+    let correction = tolerance + 1,
+      guide: number | undefined;
+    for (const target of targets)
+      for (const edge of [
+        start + delta,
+        start + delta + size / 2,
+        start + delta + size,
+      ]) {
+        const d = target - edge;
+        if (Math.abs(d) < Math.abs(correction)) {
+          correction = d;
+          guide = target;
+        }
+      }
+    for (const target of equalStarts) {
+      const d = target - (start + delta);
+      if (Math.abs(d) < Math.abs(correction)) {
+        correction = d;
+        guide = target + size / 2;
+      }
+    }
+    if (guide !== undefined && Math.abs(correction) <= tolerance) {
+      guides.push({ axis: name, at: guide });
+      return delta + correction;
+    }
+    return delta;
+  };
+  return {
+    dx: axis(
+      box.x,
+      box.width,
+      dx,
+      width,
+      others.map(b => ({ start: b.x, size: b.width })),
+      toleranceX,
+      "x"
+    ),
+    dy: axis(
+      box.y,
+      box.height,
+      dy,
+      height,
+      others.map(b => ({ start: b.y, size: b.height })),
+      toleranceY,
+      "y"
+    ),
+    guides,
+  };
+}
+
+export function snapPreviewScale(
+  box: PreviewBounds,
+  scale: number,
+  others: PreviewBounds[],
+  width: number,
+  height: number,
+  toleranceX: number,
+  toleranceY: number
+) {
+  const candidates = [
+    1,
+    ...[0.25, 1 / 3, 0.5, 0.75, 1].flatMap(f => [
+      (width * f) / box.width,
+      (height * f) / box.height,
+    ]),
+    ...others.flatMap(b => [b.width / box.width, b.height / box.height]),
+  ];
+  return (
+    candidates
+      .filter(n => Number.isFinite(n) && n >= 0.1 && n <= 4)
+      .map(n => ({
+        n,
+        d: Math.max(
+          (Math.abs(n - scale) * box.width) / toleranceX,
+          (Math.abs(n - scale) * box.height) / toleranceY
+        ),
+      }))
+      .filter(v => v.d <= 1)
+      .sort((a, b) => a.d - b.d)[0]?.n ?? scale
+  );
+}
+
 /** Bounds of the visible picture, including contain letterboxing, crop and rotation. */
 export function mediaSelectionBounds(
   clip: TimelineClip,

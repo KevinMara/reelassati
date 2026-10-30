@@ -1,3 +1,5 @@
+import { editorOct30Ui } from "./ui-editor-oct30";
+import { translatePresetNames } from "@contracts/editor-presets";
 import { automaticResearchDisabled } from "./ui-manual-only";
 import { stylesWorkspaceUi } from "./ui-styles-workspace";
 import { editorReceiptUi } from "./ui-editor-receipts";
@@ -119,3 +121,9 @@ for (const [language, translation] of Object.entries(editingTraitUi)) {
 for (const [language, translation] of Object.entries(stylesWorkspaceUi)) {
   Object.assign(uiLocales[language], translation);
 }
+
+for (const [code, catalog] of Object.entries(uiLocales))
+  if (code !== "en") Object.assign(catalog, translatePresetNames(catalog));
+
+for (const [code, entries] of Object.entries(editorOct30Ui))
+  Object.assign(uiLocales[code], entries);

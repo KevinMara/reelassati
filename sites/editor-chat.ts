@@ -1,3 +1,12 @@
+import {
+  editorPresetCatalog,
+  EDITOR_PRESET_GUIDANCE,
+  resolveEditorPresetOperation,
+} from "../contracts/editor-preset-catalog";
+import {
+  readSelectionRanges,
+  assertActionWithinRanges,
+} from "../contracts/editor-selection-ranges";
 import { editorAudioCatalog } from "../contracts/editor-audio-catalog";
 import {
   normalizeEditStyleTemplate,
@@ -168,7 +177,15 @@ export function parseEditorChatRequest(raw: unknown): EditorChatRequest {
         );
     }
   }
-  const range = object(value.range);
+  let ranges: ReturnType<typeof readSelectionRanges> = undefined;
+  try {
+    ranges = readSelectionRanges(value.ranges);
+  } catch {
+    throw new EditorChatInputError("Choose valid section ranges.");
+  }
+  const range = ranges?.length
+    ? { start: ranges[0].start, end: ranges.at(-1)!.end }
+    : object(value.range);
   const history: NonNullable<EditorChatRequest["history"]> = [];
   for (const entry of Array.isArray(value.history)
     ? value.history.slice(-12)
@@ -196,6 +213,7 @@ export function parseEditorChatRequest(raw: unknown): EditorChatRequest {
       : {}),
     maxCredits: Number(value.maxCredits),
     selectedClipIds: uniqueStrings(value.selectedClipIds),
+    ...(ranges ? { ranges } : {}),
     references,
     history,
     ...(typeof range.start === "number" &&
@@ -211,6 +229,8 @@ export function parseEditorChatRequest(raw: unknown): EditorChatRequest {
 
 export interface EditorChatContext {
   request: EditorChatRequest;
+  personalStyles?: import("../contracts/editor-style-library").EditorSavedStyle[];
+  personalTransitions?: import("../contracts/transition-presets").TransitionPreset[];
   project: EditProject;
   /** Server-owned, brand-scoped assets only. */
   assets: Asset[];
@@ -321,6 +341,7 @@ export function editorChatModelContext(context: EditorChatContext) {
       project.clips.some(clip => clip.id === id)
     ),
     selectedRange: request.range,
+    selectedRanges: request.ranges,
     references: request.references,
     conversation: request.history,
     project: {
@@ -368,6 +389,10 @@ export function editorChatModelContext(context: EditorChatContext) {
         ] as const
       ).map(kind => [kind, context.capability(kind)])
     ),
+    presetCatalog: editorPresetCatalog(
+      context.personalStyles,
+      context.personalTransitions
+    ),
     captionStyles: CAPTION_PRESETS.map(({ id, description }) => ({
       id,
       description,
@@ -398,8 +423,8 @@ For a follow-up plan, completedEarlierSteps records work already fulfilled in th
 Every edit MUST be a complete nested action. Examples (replace IDs and times with actual project values):
 {"id":"cut","kind":"edit","label":"Trim ending","reason":"Remove measured dead air","scope":"requested","requestExcerpt":"trim ending","dependsOn":[],"operation":{"type":"trim","start":0,"end":8,"targetClipIds":["actual-clip-id"],"parameters":{"sourceIn":0}}}
 {"id":"remove","kind":"edit","label":"Remove selected callout","reason":"Requested removal","scope":"requested","requestExcerpt":"remove callout","dependsOn":[],"operation":{"type":"delete","start":0,"end":3,"targetClipIds":["actual-callout-id"],"parameters":{}}}
-Do not place type or targetClipIds beside kind. Do not use an operation string. Explicit IDs must exist; never guess IDs. Selected clips are context, not permission to change every clip. A selected time range is a hard boundary; plan only in-range actions and explain when a broader request needs the range cleared. Never emit actions you already know violate it.
-Manual groups and audio/video links are distinct. Existing clips with the same valid linkId have explicitly linked AV timing. A trim, split, move, delete, pacing change, or partial-range style/audio segmentation must include every matching linked clip ID explicitly in operation.targetClipIds, with compatible source clocks. Never add a linked peer outside the requested scope or selected range; explain the constraint and have the user select that scope or unlink first. Whole-clip picture/style and sound controls may target only the requested member. Never silently expand target IDs or break a link.
+Do not place type or targetClipIds beside kind. Do not use an operation string. Explicit IDs must exist; never guess IDs. Selected clips are context, not permission to change every clip. Selected ranges are a union: gaps between them are excluded. A selected time range is a hard boundary; plan only in-range actions and explain when a broader request needs the range cleared. Never emit actions you already know violate it.
+${EDITOR_PRESET_GUIDANCE} Manual groups and audio/video links are distinct. Existing clips with the same valid linkId have explicitly linked AV timing. A trim, split, move, delete, pacing change, or partial-range style/audio segmentation must include every matching linked clip ID explicitly in operation.targetClipIds, with compatible source clocks. Never add a linked peer outside the requested scope or selected range; explain the constraint and have the user select that scope or unlink first. Whole-clip picture/style and sound controls may target only the requested member. Never silently expand target IDs or break a link.
 Kinds and fields:
 Graphic creation versus revision: use operation.type="graphic" and parameters.graphicMode="create" to add one. To revise an existing graphic use parameters.graphicMode="update", targetClipIds:[the exact unlocked graphic ID], start/end covering that graphic, and parameters.graphic with the fields to change. Existing design fields are preserved. For example replace a callout's words with {type:"graphic",targetClipIds:["actual-id"],start:0,end:3,parameters:{graphicMode:"update",graphic:{text:"Something New",animation:"slide",motion:[{at:0,x:35,y:30,scale:0.9,rotation:0,easing:"ease-out"},{at:0.2,x:50,y:30,scale:1,rotation:0,easing:"hold"},{at:0.85,x:50,y:30,scale:1,rotation:0,easing:"ease-in"},{at:1,x:65,y:30,scale:0.95,rotation:0}]}}}. Use actual target times. Do not invent update-graphic, animate, motion-path or text-replace operation types. To change a graphic's timing, use trim/move separately. A selected video is not a graphic target; new graphics use create.
 - edit: operation follows {type:trim|split|move|delete|caption|silence|pacing|broll|audio|style|graphic,label,reason,start,end,confidence:0..1,intensity:light|balanced|aggressive,targetClipIds,parameters}. Only unlocked clips can be changed. Respect the selected range. Caption text must match supplied transcript or exactly requested words, with evidence-based timing; to caption untranscribed speech use transcribe. Never infer silence from a missing transcript. broll can use parameters.assetId of existing image/video ONLY; paid generation has its own generate action. trim sourceIn is a source-media offset, move destination an absolute timeline time, pacing speed 0.25..4, audio volume 0..2. style supports exposure:-2..2 stops,temperature/tint/highlights/shadows/whites/blacks:-1..1 (neutral0),fit:cover|contain,fadeIn/fadeOut:0..3,brightness:-0.5..0.5,contrast:0.5..2,saturation:0..2. For footage transforms use parameters.visual:{x/y:-100..100 (percent offset from canvas center),scale:0.1..4,rotation:-720..720,opacity:0..1,flipX/flipY:boolean,crop:{top/right/bottom/left:0..45 percent of fitted canvas},blendMode:normal|multiply|screen|overlay|darken|lighten|difference,mask:none|ellipse|rounded|polygon,polygon:[{x/y:0..100}] (3..12 points with even-odd fill),radius:0..50,keyframes:[{at:0..1,x,y,scale,rotation,opacity,easing:linear|ease-in|ease-out|ease-in-out|hold}],entrance/exit:{kind:none|dissolve|wipe-left|wipe-right|wipe-up|wipe-down|slide-left|slide-right|zoom,duration:0.05..5}}. Visual transitions leave audio unchanged. For a transition at an adjacent cut, use adjacent-transition with measured source handles; for existing overlapping video, use visual entrance/exit. A single-clip fade is not a cross-dissolve. Preserve existing keyframes when making unrelated style changes. graphic parameters.graphic supports kind:text|callout|counter|countdown|arrow|highlight|rectangle|ellipse|star|line|spatial-title|spatial-cube|spatial-orbit,text,color:#RRGGBB,background:#RRGGBB,x/y:10..90,size:2..16,animation:none|fade|pop|slide,from,to,prefix,suffix,rotation:-720..720,motion:[{at:0..1,x/y:0..100,scale:0.1..4,rotation:-720..720,opacity:0..1,easing:linear|ease-in|ease-out|ease-in-out|hold}]. Graphic compositions support composition:plain|lower-third|chapter|quote|statistic|progress,secondaryText (up to120 characters),accent:#RRGGBB,padding/cornerRadius:0..6,width:1..90,height:0.2..60 (both shape dimensions percent of canvas width),strokeWidth:0..4 (rectangle/line). Use a nameplate with a real name/role, a proof statistic with an actual measured value, or an attributed quote only when provided. Spatial graphics support spatial:{pitch/yaw:-70..70,depth:0.02..0.65,turns:-3..3,perspective:3..12}; spatial title at most 28 Latin characters. They are editable projected shapes, not tracked footage, arbitrary GLB models or Adobe project execution.
@@ -489,7 +514,12 @@ export function normalizeEditorChatPlan(
       if (row.kind === "edit") {
         // Accept the documented envelope, plus the unambiguous flat form from older plans.
         // Never infer destructive targets from selection or overlapping time ranges.
-        const raw = row.operation === undefined ? row : object(row.operation);
+        const raw = object(
+          resolveEditorPresetOperation(
+            row.operation === undefined ? row : object(row.operation),
+            context.personalStyles
+          )
+        );
         const types = [
           "trim",
           "split",
@@ -1173,7 +1203,9 @@ export function normalizeEditorChatPlan(
           ...(splitClips ? { splitClips: true } : {}),
         };
       } else throw new Error("Reel cannot execute this action type.");
+      if (action) assertActionWithinRanges(action, request.ranges, project);
     } catch (error) {
+      action = undefined;
       addBlocked(
         label,
         error instanceof Error

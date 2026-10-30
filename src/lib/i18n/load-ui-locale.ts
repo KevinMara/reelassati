@@ -1,3 +1,5 @@
+import { editorOct30Ui } from "./locales/ui-editor-oct30";
+import { translatePresetNames } from "@contracts/editor-presets";
 import { automaticResearchDisabled } from "./locales/ui-manual-only";
 import { editingTemplateUi } from "./locales/ui-edit-templates";
 import { editingTraitUi } from "./locales/ui-edit-template-traits";
@@ -143,6 +145,12 @@ export function loadUiLocale(
       ...editingTemplateUi[code],
       ...analyzerUi[code],
       ...stylesWorkspaceUi[code],
+    }));
+  if (code !== "en")
+    pending = pending.then(catalog => ({
+      ...catalog,
+      ...translatePresetNames(catalog),
+      ...editorOct30Ui[code],
     }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {

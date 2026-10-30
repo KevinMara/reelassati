@@ -55,7 +55,15 @@ const GlbModelComposer = lazy(async () => ({
 }));
 
 export type DockKind =
-  "library" | "image" | "video" | "audio" | "captions" | "graphics" | "effects" | "color" | "adjust";
+  | "library"
+  | "image"
+  | "video"
+  | "audio"
+  | "captions"
+  | "graphics"
+  | "effects"
+  | "color"
+  | "adjust";
 
 export function EditorCreationDock({
   project,
@@ -159,7 +167,10 @@ export function EditorCreationDock({
           assertTarget();
           return {
             ...current,
-            assets: [...current.assets.filter(a => a.id !== asset.id), {...asset,projectId:targetId}],
+            assets: [
+              ...current.assets.filter(a => a.id !== asset.id),
+              { ...asset, projectId: targetId },
+            ],
           };
         });
       } finally {
@@ -368,7 +379,7 @@ export function EditorCreationDock({
                       : `Suggest the best ${kind === "voice" ? "voiceover text and delivery" : kind === "audio" ? "music and sound design" : `${kind} generation prompt`} for this edit. Provide a usable prompt in the summary; do not generate media.`
                 )
               }
-              className="ai-magic mb-4 inline-flex items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-xs text-primary"
+              className="ai-magic mb-4 ml-auto flex w-fit items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-xs text-primary"
             >
               {ui("Ask Reel for suggestions")}
               <WandSparkles size={14} />
@@ -476,7 +487,11 @@ export function EditorCreationDock({
               />
             </div>
           </div>
-        ) : kind === "color" ? color : kind === "adjust" ? adjustment : kind === "image" && imageMode === "cutout" ? (
+        ) : kind === "color" ? (
+          color
+        ) : kind === "adjust" ? (
+          adjustment
+        ) : kind === "image" && imageMode === "cutout" ? (
           <PersonCutoutPanel key={project.id} projectId={project.id} />
         ) : kind === "image" && imageMode === "depth" ? (
           <ImageDepthPanel key={project.id} projectId={project.id} />

@@ -1135,21 +1135,6 @@ export function AutonomousEditor({
                         : `${ui("Review and plan")}: ${preparationCost} ${ui("credits")}. ${ui("Supporting media is estimated after planning.")}`}
                     </p>
                   </div>
-                  {quote && (
-                    <button
-                      type="button"
-                      disabled={
-                        busy ||
-                        !ready ||
-                        !project.clips.length ||
-                        !durationTarget
-                      }
-                      onClick={() => void run(true)}
-                      className="shrink-0 rounded-lg border border-border px-3 py-2 text-xs"
-                    >
-                      {ui("Estimate edit")}
-                    </button>
-                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {ui(
@@ -1161,7 +1146,7 @@ export function AutonomousEditor({
                   disabled={
                     busy || !ready || !project.clips.length || !durationTarget
                   }
-                  onClick={() => void run(!quote)}
+                  onClick={() => void run(false)}
                   className="ai-magic flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium disabled:opacity-40"
                 >
                   {busy ? (
@@ -1169,12 +1154,20 @@ export function AutonomousEditor({
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  {quote
-                    ? failure
-                      ? ui("Continue edit")
-                      : ui("Build my edit")
-                    : ui("Estimate edit")}
+                  {failure ? ui("Continue edit") : ui("Build my edit")}
                 </button>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={
+                      busy || !ready || !project.clips.length || !durationTarget
+                    }
+                    onClick={() => void run(true)}
+                    className="text-xs text-sky-400 hover:text-sky-300 disabled:opacity-40"
+                  >
+                    {ui("Estimate credits")}
+                  </button>
+                </div>
                 {busy && (
                   <button
                     type="button"

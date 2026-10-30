@@ -259,14 +259,14 @@ describe("captured editable editor styles", () => {
     );
   });
 
-  it("enforces IDs, names, animation span and the shared 50-style limit", () => {
+  it("enforces IDs, names, animation span and the shared 500-style limit", () => {
     const draft = captureEditorStyle("graphic", "Saved", clip, {}, 0);
-    const rows = Array.from({ length: 50 }, (_, i) => ({
+    const rows = Array.from({ length: 500 }, (_, i) => ({
       ...draft,
       id: `style-${i}`,
     }));
     expect(() => addEditorSavedStyle(rows, { ...draft, id: "extra" })).toThrow(
-      "limit is 50"
+      "limit is 500"
     );
     expect(() =>
       addEditorSavedStyle(rows, { ...draft, id: "style-0" })
@@ -296,13 +296,13 @@ describe("captured editable editor styles", () => {
         ...rows,
         rows[0],
       ])
-    ).toHaveLength(50);
+    ).toHaveLength(500);
     expect(normalizeEditorSavedStyles([rows[0], rows[0]])).toHaveLength(1);
     expect(
       addEditorSavedStyle(removeEditorSavedStyle(rows, "style-0"), {
         ...draft,
         id: "replacement",
       })
-    ).toHaveLength(50);
+    ).toHaveLength(500);
   });
 });

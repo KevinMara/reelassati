@@ -3,7 +3,7 @@ import { normalizeGraphic, type MotionGraphic } from "./motion-graphics";
 import { normalizeVisual, visualFrame, type ClipVisual } from "./clip-visual";
 import { getCaptionPreset, type CaptionAppearance } from "./editor-presets";
 
-export const EDITOR_SAVED_STYLE_LIMIT = 50;
+export const EDITOR_SAVED_STYLE_LIMIT = 500;
 export type EditorSavedStyleType = "graphic" | "captions" | "look";
 
 export type EditorSavedStyleDraft =
@@ -215,7 +215,7 @@ export function addEditorSavedStyle(
     throw new Error("This saved style ID already exists.");
   if (existing.length >= EDITOR_SAVED_STYLE_LIMIT)
     throw new Error(
-      "Delete a saved style before adding another. The limit is 50."
+      "Delete a saved style before adding another. The limit is 500."
     );
   return [...existing, next];
 }

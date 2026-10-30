@@ -356,6 +356,8 @@ export default function EditorPage() {
     id: number;
     range?: { start: number; end: number };
     section?: { id: string; label: string };
+    ranges?: { start: number; end: number }[];
+    sections?: import("@contracts/story-beats").StoryBeat[];
   }>();
   const [clipDraft, setClipDraft] = useState<TimelineClip | null>(null);
   const [transcriptDraft, setTranscriptDraft] = useState<TranscriptSegment[]>(
@@ -392,6 +394,7 @@ export default function EditorPage() {
   const clipboardRef = useRef<TimelineClip[]>([]);
   const clipboardTranscript = useRef<TranscriptSegment[]>([]);
   const keyboardActionPending = useRef(false);
+  const consumedSpace = useRef(false);
 
   const project = useMemo(
     () => workspace.projects.find(item => item.id === selectedProjectId),
@@ -1639,7 +1642,7 @@ export default function EditorPage() {
         !project ||
         exportOpen ||
         target?.closest(
-          "input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='textbox'], [role='combobox'], [role='dialog'], [role='listbox'], [role='menu']"
+          "input:not([type='range']):not([type='checkbox']):not([type='button']), textarea, select, [contenteditable]:not([contenteditable='false']), [role='textbox'], [role='combobox'], [role='dialog'], [role='listbox'], [role='menu']"
         )
       )
         return;
@@ -1648,6 +1651,11 @@ export default function EditorPage() {
       if (
         ["copy", "cut"].includes(actionId) &&
         window.getSelection()?.toString()
+      )
+        return;
+      if (
+        target?.closest("input[type=range]") &&
+        !["play", "undo", "redo"].includes(actionId)
       )
         return;
       const needsClip: EditorActionId[] = [
@@ -1750,6 +1758,8 @@ export default function EditorPage() {
       event.preventDefault();
       // Capture before a timeline button can treat Space as a click or scroll.
       event.stopPropagation();
+      if (event.code === "Space" || event.key === " ")
+        consumedSpace.current = true;
       if (
         (event.repeat &&
           !EDITOR_KEYBOARD_ACTIONS.find(row => row.id === actionId)?.repeat) ||
@@ -1764,8 +1774,24 @@ export default function EditorPage() {
           keyboardActionPending.current = false;
         });
     };
+    // A focused button activates on keyup. Consume both halves of an editor
+    // Space command, even if playback caused a render between them.
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (
+        (event.code === "Space" || event.key === " ") &&
+        consumedSpace.current
+      ) {
+        consumedSpace.current = false;
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
     window.addEventListener("keydown", handleKeyboard, true);
-    return () => window.removeEventListener("keydown", handleKeyboard, true);
+    window.addEventListener("keyup", handleKeyUp, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyboard, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
+    };
   });
 
   const saveTranscript = async () => {
@@ -2426,13 +2452,13 @@ export default function EditorPage() {
               <EditorPresetLibrary
                 mode="captions"
                 selectedCaptionId={project.captionStyle}
-                onCaptionPreset={id =>
+                onCaptionPreset={(id, appearance) =>
                   void saveProjectChange(
                     () =>
                       commitProject("Caption style changed", current => ({
                         ...current,
                         captionStyle: id,
-                        captionAppearance: undefined,
+                        captionAppearance: appearance,
                       })),
                     "Caption style could not be saved."
                   )
@@ -3094,8 +3120,29 @@ export default function EditorPage() {
                 zoom={previewZoom / 100}
                 pan={previewPan}
                 selectedClipId={selectedClipId}
-                onSelectClip={id => {
-                  setSelectedClipId(id);
+                selectedClipIds={selectedIds}
+                onTransformMany={async changes => {
+                  await commitProject("Transformed in preview", p =>
+                    changes.reduce((next, { id, change }) => {
+                      const clip = next.clips.find(c => c.id === id);
+                      return clip && !clip.locked
+                        ? replaceTimelineClip(
+                            next,
+                            id,
+                            transformPreviewClip(clip, change)
+                          )
+                        : next;
+                    }, p)
+                  );
+                }}
+                onSelectClip={(id, additive) => {
+                  const next = additive
+                    ? selectedIds.includes(id)
+                      ? selectedIds.filter(v => v !== id)
+                      : [...selectedIds, id]
+                    : [id];
+                  setSelectedClipId(next[0] ?? null);
+                  setExtraSelection(next.slice(1));
                   setLeftTool("adjust");
                   setMediaHidden(false);
                 }}
@@ -3490,7 +3537,24 @@ export default function EditorPage() {
               sections={
                 <TimelineSections
                   key={project.id}
-                  beats={project.storyBeats ?? []}
+                  beats={(project.storyBeats ?? []).map(beat => {
+                    const original =
+                      beat.reelOriginal ??
+                      project.revisions
+                        .flatMap(r => r.storyBeats ?? [])
+                        .find(b => b.id === beat.id && b.origin === "ai");
+                    return original
+                      ? {
+                          ...beat,
+                          reelOriginal: {
+                            label: original.label,
+                            kind: original.kind,
+                            start: original.start,
+                            end: original.end,
+                          },
+                        }
+                      : beat;
+                  })}
                   duration={project.duration}
                   selectedIds={selectedSections}
                   onToggle={id =>
@@ -3506,12 +3570,16 @@ export default function EditorPage() {
                       storyBeats,
                     }));
                   }}
-                  onSend={beat =>
+                  onSend={beats =>
                     setChatSeed({
                       text: "",
-                      range: { start: beat.start, end: beat.end },
-                      section: { id: beat.id, label: beat.label },
                       id: Date.now(),
+                      range: {
+                        start: Math.min(...beats.map(b => b.start)),
+                        end: Math.max(...beats.map(b => b.end)),
+                      },
+                      ranges: beats.map(b => ({ start: b.start, end: b.end })),
+                      sections: beats,
                     })
                   }
                   disabled={Boolean(busyAction)}

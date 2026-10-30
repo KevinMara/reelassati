@@ -1,3 +1,4 @@
+import { composerToken, rankComposerCommands } from "@/lib/composer-commands";
 import { creditReceiptTotal } from "@contracts/credit-receipt";
 import { ConciseResponse } from "./ConciseResponse";
 import { editorChatReceipt } from "@/lib/editor-chat-receipt";
@@ -19,6 +20,8 @@ import {
 } from "react";
 import {
   ArrowUp,
+  Maximize2,
+  Minimize2,
   AtSign,
   Brain,
   ClipboardList,
@@ -87,6 +90,8 @@ type Props = {
     id: number;
     range?: TimeRange;
     section?: { id: string; label: string };
+    ranges?: TimeRange[];
+    sections?: import("@contracts/story-beats").StoryBeat[];
   };
   onSeek: (time: number) => void;
   onAutoEdit: () => void;
@@ -125,6 +130,10 @@ const ACCEPT_FILES =
 const LIBRARY_DRAG_TYPE = "application/x-reelassati-asset-id";
 
 function fitComposer(node: HTMLTextAreaElement) {
+  if (node.dataset.expanded === "true") {
+    node.style.height = "";
+    return;
+  }
   node.style.height = "auto";
   if (node.value) node.style.height = `${Math.min(node.scrollHeight, 160)}px`;
 }
@@ -188,6 +197,10 @@ export function EditorChat({
     "execute"
   );
   const [excludedClip, setExcludedClip] = useState<string>();
+  const [expanded, setExpanded] = useState(false);
+  const [caret, setCaret] = useState(0);
+  const [commandIndex, setCommandIndex] = useState(0);
+  const [dismissedToken, setDismissedToken] = useState<string>();
   const [timeTarget, setTimeTarget] = useState<EditorChatTimeTarget>();
   const contextClip =
     !timeTarget && selectedClipId !== excludedClip
@@ -242,7 +255,14 @@ export function EditorChat({
     setLastSeed(seed.id);
     if (seed.text) setPrompt(seed.text);
     setTimeTarget(
-      seed.range ? { range: seed.range, section: seed.section } : undefined
+      seed.range
+        ? {
+            range: seed.range,
+            section: seed.section,
+            ranges: seed.ranges,
+            sections: seed.sections,
+          }
+        : undefined
     );
   }
   useEffect(() => {
@@ -251,7 +271,7 @@ export function EditorChat({
 
   useLayoutEffect(() => {
     if (input.current) fitComposer(input.current);
-  }, [prompt, project.id]);
+  }, [prompt, project.id, expanded]);
   useEffect(() => {
     const node = input.current;
     if (!node || typeof ResizeObserver === "undefined") return;
@@ -418,7 +438,12 @@ export function EditorChat({
         sentRefs,
         targetContext.range,
         targetContext.selectedClipIds,
-        { taskPreset: sentPreset, executionMode, effort }
+        {
+          taskPreset: sentPreset,
+          executionMode,
+          effort,
+          ranges: targetContext.ranges,
+        }
       );
       if (!submitted) {
         setPrompt(current => current || text);
@@ -442,6 +467,76 @@ export function EditorChat({
     setTaskPreset(id);
     input.current?.focus();
   }
+  const token = composerToken(prompt, caret);
+  const tokenKey = token
+    ? `${token.start}:${token.trigger}:${token.query}`
+    : "";
+  const commandChoices =
+    token?.trigger === "+"
+      ? [
+          {
+            id: "files",
+            label: ui("Attach reference files"),
+          },
+          {
+            id: "link",
+            label: ui("Attach a reference link"),
+          },
+          {
+            id: "range",
+            label: ui("Edit around the playhead"),
+          },
+          {
+            id: "sections",
+            label: ui("Find sections"),
+          },
+        ]
+      : [
+          {
+            id: "plan",
+            label: ui("Plan before editing"),
+          },
+          ...EDITOR_TASK_PRESETS.filter(p => p.id !== "range").map(p => ({
+            id: p.id,
+            label: ui(p.label),
+          })),
+        ];
+  const commands =
+    token &&
+    tokenKey !== dismissedToken &&
+    !externalBusy &&
+    !attachBusy &&
+    !chat.busy &&
+    !findingSections
+      ? rankComposerCommands(commandChoices, token.query)
+      : [];
+  const activeCommand = Math.min(
+    commandIndex,
+    Math.max(0, commands.length - 1)
+  );
+  function chooseCommand(index: number) {
+    const command = commands[index];
+    if (!command || !token) return;
+    setPrompt(prompt.slice(0, token.start) + prompt.slice(token.end));
+    setCaret(token.start);
+    setDismissedToken(tokenKey);
+    setCommandIndex(0);
+    if (token.trigger === "+") {
+      if (command.id === "files") fileInput.current?.click();
+      else if (command.id === "link") setUrlOpen(true);
+      else if (command.id === "sections") onFindSections?.();
+      else if (command.id === "range") {
+        const start = Math.max(0, Math.min(playhead, project.duration - 0.1));
+        setRangeDraft({ start, end: Math.min(project.duration, start + 5) });
+        setRangeOpen(true);
+      }
+    } else if (command.id === "plan") setExecutionMode("plan");
+    else {
+      const preset = EDITOR_TASK_PRESETS.find(p => p.id === command.id);
+      if (preset) starter(preset.id);
+    }
+  }
+
   const busyChoice =
     externalBusy ||
     chat.busy ||
@@ -524,7 +619,10 @@ export function EditorChat({
             followLatest.current =
               node.scrollHeight - node.scrollTop - node.clientHeight < 90;
         }}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4"
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4",
+          expanded && "hidden"
+        )}
         aria-label={ui("Conversation")}
       >
         {project.proposedChanges.some(
@@ -960,7 +1058,13 @@ export function EditorChat({
         {resultTools}
       </div>
 
-      <div data-chat-composer className="shrink-0 border-t border-border p-2">
+      <div
+        data-chat-composer
+        className={cn(
+          "relative border-t border-border p-2",
+          expanded ? "flex min-h-0 flex-1 flex-col" : "shrink-0"
+        )}
+      >
         {error && (
           <p
             role="alert"
@@ -972,14 +1076,19 @@ export function EditorChat({
         )}
         <form
           onSubmit={event => void send(event)}
-          className="rounded-xl border border-border bg-background/65 p-2 focus-within:border-primary/55 focus-within:ring-1 focus-within:ring-primary/15"
+          className={cn(
+            "relative flex flex-col rounded-xl border border-border bg-background/65 p-2 focus-within:border-primary/55",
+            expanded && "min-h-0 flex-1"
+          )}
         >
           {(range || contextClip || taskPreset || executionMode === "plan") && (
             <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] text-primary">
               {range && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 py-1 pl-1.5 pr-1">
                   <Clock3 className="size-3" />
-                  {seconds(range.start)}–{seconds(range.end)}
+                  {(targetContext.ranges ?? [range])
+                    .map(r => `${seconds(r.start)}–${seconds(r.end)}`)
+                    .join(" · ")}
                   <button
                     type="button"
                     aria-label={ui("Remove time range")}
@@ -1061,8 +1170,59 @@ export function EditorChat({
               ))}
             </div>
           )}
+          {commands.length > 0 && (
+            <div
+              id="reel-composer-commands"
+              role="listbox"
+              aria-label={ui("Reel commands")}
+              className={cn(
+                "absolute left-0 right-0 z-50 max-h-60 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-xl",
+                expanded ? "top-8" : "bottom-full mb-2"
+              )}
+            >
+              {commands.map((command, index) => (
+                <button
+                  type="button"
+                  role="option"
+                  id={`reel-command-${command.id}`}
+                  key={command.id}
+                  aria-selected={index === activeCommand}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => chooseCommand(index)}
+                  className={cn(
+                    "block w-full rounded-md px-3 py-2 text-left text-xs",
+                    index === activeCommand
+                      ? "bg-primary/15 text-primary"
+                      : "hover:bg-foreground/5"
+                  )}
+                >
+                  {command.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            aria-label={ui(expanded ? "Collapse composer" : "Expand composer")}
+            onClick={() => {
+              setExpanded(v => !v);
+              input.current?.focus();
+            }}
+            className="absolute right-1.5 top-1.5 z-10 flex size-6 items-center justify-center rounded text-foreground/45 hover:bg-foreground/5 hover:text-foreground"
+          >
+            {expanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+          </button>
           <textarea
             ref={input}
+            data-expanded={expanded}
+            aria-controls={
+              commands.length ? "reel-composer-commands" : undefined
+            }
+            aria-activedescendant={
+              commands[activeCommand]
+                ? `reel-command-${commands[activeCommand].id}`
+                : undefined
+            }
             aria-label={ui("Message Reel")}
             placeholder={
               taskPreset
@@ -1074,9 +1234,39 @@ export function EditorChat({
                   : ui("Ask Reel to edit your video…")
             }
             value={prompt}
-            onChange={event => setPrompt(event.target.value)}
+            onChange={event => {
+              setPrompt(event.target.value);
+              setCaret(event.target.selectionStart);
+              setCommandIndex(0);
+              setDismissedToken(undefined);
+            }}
+            onSelect={event => setCaret(event.currentTarget.selectionStart)}
             rows={2}
             onKeyDown={event => {
+              if (commands.length && !event.nativeEvent.isComposing) {
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault();
+                  setCommandIndex(
+                    (activeCommand +
+                      (event.key === "ArrowDown" ? 1 : commands.length - 1)) %
+                      commands.length
+                  );
+                  return;
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setDismissedToken(tokenKey);
+                  return;
+                }
+                if (
+                  (event.key === "Enter" && !event.shiftKey) ||
+                  event.key === "Tab"
+                ) {
+                  event.preventDefault();
+                  chooseCommand(activeCommand);
+                  return;
+                }
+              }
               if (
                 event.key === "Enter" &&
                 !event.shiftKey &&
@@ -1086,7 +1276,10 @@ export function EditorChat({
                 void send();
               }
             }}
-            className="block max-h-40 min-h-12 w-full resize-none border-0 bg-transparent font-sans text-[14px] font-normal leading-6 tracking-normal outline-none placeholder:font-normal placeholder:text-foreground/40"
+            className={cn(
+              "block w-full resize-none border-0 bg-transparent pr-6 font-sans text-xs font-normal leading-5 tracking-normal outline-none placeholder:text-foreground/40",
+              expanded ? "min-h-0 flex-1" : "max-h-32 min-h-10"
+            )}
           />
           <div className="relative flex items-center gap-1 sm:gap-1.5">
             <DropdownMenu>
@@ -1096,12 +1289,12 @@ export function EditorChat({
                   type="button"
                   aria-label={ui("Add a reference or time range")}
                   disabled={attachBusy || externalBusy}
-                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 disabled:opacity-40 sm:size-[30px]"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 disabled:opacity-40 "
                 >
                   {attachBusy ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    <Plus className="size-[15px] sm:size-4" />
+                    <Plus className="size-3.5" />
                   )}
                 </button>
               </DropdownMenuTrigger>
@@ -1163,9 +1356,9 @@ export function EditorChat({
                 <button
                   type="button"
                   aria-label={ui("Reel modes")}
-                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 hover:text-foreground sm:size-[30px]"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 hover:text-foreground "
                 >
-                  <AtSign className="size-[15px] sm:size-4" />
+                  <AtSign className="size-3.5" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -1340,9 +1533,9 @@ export function EditorChat({
                   type="button"
                   aria-label={ui("Reel effort and extras")}
                   title={ui("Reel effort and extras")}
-                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 hover:text-foreground sm:size-[30px]"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 hover:text-foreground "
                 >
-                  <Brain className="size-[15px] sm:size-4" />
+                  <Brain className="size-3.5" />
                 </button>
               </PopoverTrigger>
               <PopoverContent

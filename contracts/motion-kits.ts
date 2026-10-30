@@ -3,8 +3,26 @@ import {
   normalizeGraphic,
   type MotionGraphic,
 } from "./motion-graphics";
+import { GRAPHIC_PRESETS } from "./editor-presets";
 import { normalizeVisual } from "./clip-visual";
 import type { Asset, TimelineClip } from "./workspace";
+
+const extraKit = <T extends string>(
+  id: T,
+  presetId: string,
+  title: string,
+  subtitle: string
+) => {
+  const preset = GRAPHIC_PRESETS.find(p => p.id === presetId)!;
+  return {
+    id,
+    name: preset.name,
+    detail: preset.description,
+    title,
+    subtitle,
+    seconds: 5,
+  };
+};
 
 /** Original native compositions, with no Adobe files, subscriptions or provider calls. */
 export const MOTION_KITS = [
@@ -56,6 +74,44 @@ export const MOTION_KITS = [
     subtitle: "yourwebsite.com",
     seconds: 4,
   },
+  extraKit(
+    "feature-pointer",
+    "feature-callout",
+    "THE DETAIL",
+    "Describe what makes it different"
+  ),
+  extraKit(
+    "benefit-stack",
+    "benefit-label",
+    "MADE FOR YOU",
+    "Explain the benefit"
+  ),
+  extraKit(
+    "focus-ring",
+    "highlight",
+    "TAKE A CLOSER LOOK",
+    "Point out what matters"
+  ),
+  extraKit(
+    "floating-card",
+    "floating-label",
+    "A NEW PERSPECTIVE",
+    "Give the idea some room"
+  ),
+  extraKit(
+    "chapter-frame",
+    "chapter-card",
+    "02 · THE PROCESS",
+    "Show the next step"
+  ),
+  extraKit("title-orbit", "spatial-orbit", "YOUR NEXT IDEA", "A new dimension"),
+  extraKit("countdown-card", "countdown", "COMING NEXT", "Stay for the reveal"),
+  extraKit(
+    "clean-frame",
+    "clean-title",
+    "LESS, BUT BETTER",
+    "A simple idea with space to breathe"
+  ),
 ] as const;
 export type MotionKitId = (typeof MOTION_KITS)[number]["id"];
 export interface MotionKitDraft {
@@ -177,6 +233,129 @@ export function motionKitClips(
         exit: { kind: "dissolve", duration: Math.min(0.4, draft.seconds / 3) },
       }),
     });
+  const shape = (
+    kind: MotionGraphic["kind"],
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    motion: Parameters<typeof choreographGraphic>[1] = "focus"
+  ) =>
+    add(
+      kind,
+      {
+        kind,
+        text: "",
+        secondaryText: "",
+        x,
+        y,
+        width,
+        height,
+        size: 8,
+        color: draft.accent,
+        strokeWidth: 0.45,
+      },
+      motion
+    );
+  if (draft.kit === "feature-pointer") {
+    shape("highlight", 47, 39, 30, 18);
+    shape("arrow", 68, 53, 15, 8, "slide");
+    add(
+      draft.title,
+      {
+        kind: "callout",
+        composition: "lower-third",
+        y: 73,
+        size: 4,
+        padding: 2,
+      },
+      "rise"
+    );
+    return layers;
+  }
+  if (draft.kit === "benefit-stack") {
+    shape("line", 25, 39, 32, 1, "slide");
+    add(draft.title, { composition: "chapter", y: 49, size: 5 }, "rise");
+    shape("ellipse", 75, 65, 4, 4, "focus");
+    return layers;
+  }
+  if (draft.kit === "focus-ring") {
+    shape("highlight", 50, 38, 40, 23, "focus");
+    shape("line", 50, 57, 1, 12, "slide");
+    add(draft.title, { composition: "lower-third", y: 72, size: 3.8 }, "fade");
+    return layers;
+  }
+  if (draft.kit === "floating-card") {
+    shape("ellipse", 25, 28, 5, 5, "drift");
+    add(
+      draft.title,
+      {
+        kind: "callout",
+        composition: "lower-third",
+        y: 47,
+        size: 4.5,
+        padding: 3,
+        cornerRadius: 1,
+      },
+      "drift"
+    );
+    shape("line", 72, 68, 16, 1, "slide");
+    return layers;
+  }
+  if (draft.kit === "chapter-frame") {
+    shape("highlight", 50, 45, 80, 40, "focus");
+    add(
+      draft.title,
+      {
+        composition: "chapter",
+        y: 45,
+        size: 5,
+        background: "#141B24",
+        padding: 2,
+      },
+      "slide"
+    );
+    return layers;
+  }
+  if (draft.kit === "title-orbit") {
+    add(
+      draft.title,
+      {
+        kind: "spatial-orbit",
+        text: "",
+        secondaryText: "",
+        size: 13,
+        y: 30,
+        color: draft.accent,
+        spatial: {
+          pitch: -25,
+          yaw: -15,
+          depth: 0.15,
+          turns: 0.6,
+          perspective: 5,
+        },
+      },
+      "focus"
+    );
+    add(draft.title, { y: 60, size: 5 }, "rise");
+    return layers;
+  }
+  if (draft.kit === "countdown-card") {
+    shape("highlight", 50, 38, 34, 20, "focus");
+    add(
+      draft.title,
+      { kind: "countdown", secondaryText: "", y: 38, size: 10 },
+      "fade"
+    );
+    add(draft.title, { y: 67, size: 4 }, "rise");
+    return layers;
+  }
+  if (draft.kit === "clean-frame") {
+    shape("line", 50, 29, 26, 1, "slide");
+    shape("line", 50, 68, 26, 1, "slide");
+    add(draft.title, { y: 47, size: 5 }, "fade");
+    return layers;
+  }
   if (draft.kit === "speaker")
     add(
       "Name and role",

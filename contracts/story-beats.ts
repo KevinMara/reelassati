@@ -32,6 +32,12 @@ export interface StoryBeat {
   /** A change detector, not a security or provenance signature. */
   evidenceKey: string;
   origin: "ai" | "manual";
+  reelOriginal?: {
+    label: string;
+    kind: StoryBeatKind;
+    start: number;
+    end: number;
+  };
 }
 
 const finite = (value: unknown): value is number =>
@@ -261,6 +267,16 @@ export function updateStoryBeat(
       beat.id === id
         ? {
             ...beat,
+            reelOriginal:
+              beat.reelOriginal ??
+              (beat.origin === "ai"
+                ? {
+                    label: beat.label,
+                    kind: beat.kind,
+                    start: beat.start,
+                    end: beat.end,
+                  }
+                : undefined),
             ...patch,
             label: patch.label.trim().slice(0, 80),
             origin: "manual" as const,
@@ -268,4 +284,31 @@ export function updateStoryBeat(
         : beat
     )
     .sort((a, b) => a.start - b.start);
+}
+
+/** Adjacent sections share one interval; gaps remain outside the selection. */
+export function mergeStoryRanges(rows: { start: number; end: number }[]) {
+  const result: { start: number; end: number }[] = [];
+  for (const r of [...rows].sort((a, b) => a.start - b.start)) {
+    if (
+      !Number.isFinite(r.start) ||
+      !Number.isFinite(r.end) ||
+      r.start < 0 ||
+      r.end <= r.start
+    )
+      continue;
+    const previous = result.at(-1);
+    if (previous && r.start <= previous.end + 0.000001)
+      previous.end = Math.max(previous.end, r.end);
+    else result.push({ start: r.start, end: r.end });
+  }
+  return result;
+}
+export function storySectionShortName(beat: Pick<StoryBeat, "label" | "kind">) {
+  const prefix = beat.label.split(":")[0].trim();
+  return prefix.length <= 24
+    ? prefix
+    : beat.kind === "cta"
+      ? "CTA"
+      : labelFor(beat.kind);
 }

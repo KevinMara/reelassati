@@ -410,6 +410,7 @@ export interface GenerationJob {
 
 export interface WorkspaceDocument {
   analyzerReports?: import("./analyzer-report").SavedAnalyzerReport[];
+  transitionPresets?: import("./transition-presets").TransitionPreset[];
   editorStyles?: import("./editor-style-library").EditorSavedStyle[];
   editStyleTemplates?: import("./edit-style-template").EditStyleTemplate[];
   version: 1;

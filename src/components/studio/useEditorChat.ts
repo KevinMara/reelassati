@@ -431,7 +431,9 @@ export function useEditorChat(
         ...a,
         runtime: { ...a.runtime, result: JSON.stringify(results) },
       }));
-      const range = getMessage(messageId).range;
+      const message = getMessage(messageId);
+      const ranges =
+        message.request?.ranges ?? (message.range ? [message.range] : []);
       await finishAction(
         messageId,
         action,
@@ -441,7 +443,18 @@ export function useEditorChat(
           );
           const next = {
             ...p,
-            transcript: mergeChatTranscript(p, mapped, action.replace, range),
+            transcript: ranges.length
+              ? ranges.reduce(
+                  (current, range) =>
+                    mergeChatTranscript(
+                      { ...p, transcript: current },
+                      mapped,
+                      action.replace,
+                      range
+                    ),
+                  p.transcript
+                )
+              : mergeChatTranscript(p, mapped, action.replace),
             transcriptProvenance:
               results.length === 1 ? results[0].provenance : undefined,
           };
@@ -919,7 +932,7 @@ export function useEditorChat(
     selectedClipIds: string[] = [],
     options: Pick<
       EditorChatRequest,
-      "executionMode" | "taskPreset" | "effort"
+      "executionMode" | "taskPreset" | "effort" | "ranges"
     > = {}
   ) {
     if (!prompt.trim() || activeProjects.has(runKey)) return false;

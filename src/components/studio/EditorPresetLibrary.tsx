@@ -1,3 +1,4 @@
+import { PersonalPresetLibrary } from "./PersonalPresetLibrary";
 import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
 import { Check, Search, Type, SlidersHorizontal } from "lucide-react";
@@ -8,6 +9,7 @@ import {
   FADE_PRESETS,
   type GraphicPreset,
   type ClipLookPreset,
+  type CaptionAppearance,
 } from "@contracts/editor-presets";
 import type { TimelineClip } from "@contracts/workspace";
 import { CaptionStylePreview } from "./CaptionStylePreview";
@@ -16,7 +18,7 @@ import { MotionGraphicLayer } from "./MotionGraphicLayer";
 export interface EditorPresetLibraryProps {
   mode: "captions" | "graphics" | "looks";
   selectedCaptionId?: string;
-  onCaptionPreset?: (presetId: string) => void;
+  onCaptionPreset?: (presetId: string, appearance?: CaptionAppearance) => void;
   onGraphicPreset?: (preset: GraphicPreset) => void;
   onClipLook?: (preset: ClipLookPreset) => void;
   onFadePreset?: (settings: { fadeIn: number; fadeOut: number }) => void;
@@ -49,6 +51,29 @@ export function EditorPresetLibrary({
   );
   return (
     <section className="space-y-3" aria-label={heading}>
+      <PersonalPresetLibrary
+        mode={mode}
+        disabled={disabled}
+        onApply={style => {
+          if (style.type === "captions")
+            onCaptionPreset?.(style.captionStyle, style.captionAppearance);
+          else if (style.type === "graphic")
+            onGraphicPreset?.({
+              id: style.id,
+              name: style.name,
+              description: "",
+              graphic: style.graphic,
+              duration: style.graphicDuration,
+            });
+          else
+            onClipLook?.({
+              id: style.id,
+              name: style.name,
+              description: "",
+              settings: style.settings,
+            });
+        }}
+      />
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{heading}</h3>
         <span className="text-[11px] text-muted-foreground">

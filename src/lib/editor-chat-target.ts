@@ -1,7 +1,14 @@
+import {
+  mergeStoryRanges,
+  storySectionShortName,
+  type StoryBeat,
+} from "@contracts/story-beats";
 import type { EditorChatReference } from "@contracts/editor-chat";
 
 export type EditorChatTimeTarget = {
   range: { start: number; end: number };
+  ranges?: { start: number; end: number }[];
+  sections?: Pick<StoryBeat, "id" | "label" | "kind" | "start" | "end">[];
   section?: { id: string; label: string };
 };
 
@@ -11,16 +18,27 @@ export function editorChatTargetContext(
   target: EditorChatTimeTarget | undefined,
   selectedClipId?: string
 ) {
-  const sectionReference: EditorChatReference | undefined = target?.section
+  const ranges = target?.ranges ? mergeStoryRanges(target.ranges) : undefined;
+  const sectionReference: EditorChatReference | undefined = target?.sections
+    ?.length
     ? {
-        name: target.section.label,
+        name: target.sections.map(storySectionShortName).join(" + "),
         text: JSON.stringify({
-          timelineSection: { ...target.section, ...target.range },
+          timelineSections: target.sections,
+          selectedRanges: ranges,
         }),
       }
-    : undefined;
+    : target?.section
+      ? {
+          name: target.section.label,
+          text: JSON.stringify({
+            timelineSection: { ...target.section, ...target.range },
+          }),
+        }
+      : undefined;
   return {
     range: target?.range,
+    ranges,
     selectedClipIds: !target && selectedClipId ? [selectedClipId] : undefined,
     sectionReference,
   };

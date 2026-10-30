@@ -1,3 +1,4 @@
+import { Magnet } from "lucide-react";
 import { useUiText } from "@/lib/i18n/ui";
 import { colorGradeMatrix, colorToneTable } from "@/lib/color-grade";
 import { visualFrame } from "@contracts/clip-visual";
@@ -15,6 +16,11 @@ import {
 import {
   transformPreviewClip,
   mediaSelectionBounds,
+  unionPreviewBounds,
+  previewContains,
+  snapPreviewMove,
+  snapPreviewScale,
+  type PreviewBounds,
   type PreviewTransform,
 } from "@/lib/preview-transform";
 import {
@@ -254,6 +260,8 @@ export function TimelinePreview({
   zoom = 1,
   pan = { x: 0, y: 0 },
   selectedClipId,
+  selectedClipIds,
+  onTransformMany,
   onSelectClip,
   onTransform,
   onInspectClip,
@@ -266,7 +274,11 @@ export function TimelinePreview({
   zoom?: number;
   pan?: { x: number; y: number };
   selectedClipId?: string | null;
-  onSelectClip?(id: string): void;
+  selectedClipIds?: string[];
+  onSelectClip?(id: string, additive?: boolean): void;
+  onTransformMany?(
+    changes: { id: string; change: PreviewTransform }[]
+  ): Promise<void>;
   onTransform?(id: string, change: PreviewTransform): Promise<void>;
   onInspectClip?(id: string): void;
   onClipAction?(
@@ -278,11 +290,10 @@ export function TimelinePreview({
   const canvasRef = useRef<HTMLDivElement>(null);
   const stopGesture = useRef<(() => void) | undefined>(undefined);
   const [fit, setFit] = useState<{ width: number; height: number }>();
-  const [moving, setMoving] = useState<{
-    id: string;
-    base: TimelineClip;
-    change: PreviewTransform;
-  }>();
+  const [moving, setMoving] =
+    useState<{ id: string; base: TimelineClip; change: PreviewTransform }[]>();
+  const [magnetic, setMagnetic] = useState(true);
+  const [guides, setGuides] = useState<{ axis: "x" | "y"; at: number }[]>([]);
   const [dragError, setDragError] = useState("");
   const [mediaSizes, setMediaSizes] = useState<
     Record<string, { width: number; height: number }>
@@ -334,35 +345,35 @@ export function TimelinePreview({
         !(c.graphic && c.hidden)
     )
     .sort(compareTimelineLayers);
-  const selected = active.find(
-    c => c.id === selectedClipId && c.track !== "audio" && !c.hidden
-  );
-  const displayed = (clip: TimelineClip) =>
-    moving?.id === clip.id
-      ? transformPreviewClip(moving.base, moving.change)
-      : clip;
-  const selectedDisplay = selected && displayed(selected);
   const selectionHeight = 1000 / aspect;
-  const selectedAsset = assets.find(
-    asset => asset.id === selectedDisplay?.assetId
+  const ids = selectedClipIds ?? (selectedClipId ? [selectedClipId] : []);
+  const visible = active.filter(c => c.track !== "audio" && !c.hidden);
+  const selectedItems = visible.filter(c => ids.includes(c.id));
+  const selected =
+    selectedItems.find(c => c.id === selectedClipId) ?? selectedItems[0];
+  const displayed = (clip: TimelineClip) => {
+    const pending = moving?.find(m => m.id === clip.id);
+    return pending ? transformPreviewClip(pending.base, pending.change) : clip;
+  };
+  const bounds = (clip: TimelineClip): PreviewBounds | undefined => {
+    const asset = assets.find(a => a.id === clip.assetId);
+    const size =
+      asset &&
+      (mediaSizes[asset.id] ??
+        (asset.width && asset.height
+          ? { width: asset.width, height: asset.height }
+          : undefined));
+    return clip.graphic
+      ? graphicSelectionBounds(clip, time, 1000, selectionHeight)
+      : mediaSelectionBounds(clip, time, 1000, selectionHeight, size);
+  };
+  const selection = unionPreviewBounds(
+    selectedItems
+      .map(c => bounds(displayed(c)))
+      .filter((b): b is PreviewBounds => !!b)
   );
-  const selectedSize =
-    selectedAsset &&
-    (mediaSizes[selectedAsset.id] ??
-      (selectedAsset.width && selectedAsset.height
-        ? { width: selectedAsset.width, height: selectedAsset.height }
-        : undefined));
-  const selection = selectedDisplay?.graphic
-    ? graphicSelectionBounds(selectedDisplay, time, 1000, selectionHeight)
-    : selectedDisplay
-      ? mediaSelectionBounds(
-          selectedDisplay,
-          time,
-          1000,
-          selectionHeight,
-          selectedSize
-        )
-      : undefined;
+  const canTransform =
+    selectedItems.length > 0 && selectedItems.every(c => !c.locked);
   function begin(event: PointerEvent, resize = false) {
     if (
       event.button !== 0 ||
@@ -372,60 +383,121 @@ export function TimelinePreview({
       playing
     )
       return;
-    const chosen =
-      selected ??
-      [...active].reverse().find(c => c.track !== "audio" && !c.hidden);
+    const element = canvasRef.current!;
+    const rect = element.getBoundingClientRect();
+    const px = ((event.clientX - rect.left) / rect.width) * 1000;
+    const py = ((event.clientY - rect.top) / rect.height) * selectionHeight;
+    const hit = [...visible].reverse().find(c => {
+      const box = bounds(c);
+      return box && previewContains(box, px, py);
+    });
+    const chosen = resize ? selected : hit;
     if (!chosen) return;
     event.preventDefault();
     event.stopPropagation();
-    onSelectClip(chosen.id);
-    if (chosen.locked) return;
+    if (event.shiftKey && !resize) {
+      onSelectClip(chosen.id, true);
+      return;
+    }
+    const group = ids.includes(chosen.id) ? selectedItems : [chosen];
+    if (!ids.includes(chosen.id)) onSelectClip(chosen.id, false);
+    if (group.some(c => c.locked)) return;
+    const groupBounds = unionPreviewBounds(
+      group.map(bounds).filter((b): b is PreviewBounds => !!b)
+    );
+    if (!groupBounds) return;
+    const others = visible
+      .filter(c => !group.some(g => g.id === c.id))
+      .map(bounds)
+      .filter((b): b is PreviewBounds => !!b);
     setDragError("");
     stopGesture.current?.();
-    const element = canvasRef.current!;
-    const rect = element.getBoundingClientRect();
     const origin = { x: event.clientX, y: event.clientY };
-    const center = selection
-      ? {
-          x:
-            rect.left +
-            ((selection.x + selection.width / 2) / 1000) * rect.width,
-          y:
-            rect.top +
-            ((selection.y + selection.height / 2) / selectionHeight) *
-              rect.height,
-        }
-      : { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    const center = {
+      x: groupBounds.x + groupBounds.width / 2,
+      y: groupBounds.y + groupBounds.height / 2,
+    };
+    const screenCenter = {
+      x: rect.left + (center.x / 1000) * rect.width,
+      y: rect.top + (center.y / selectionHeight) * rect.height,
+    };
     const radius = Math.max(
       12,
-      Math.hypot(origin.x - center.x, origin.y - center.y)
+      Math.hypot(origin.x - screenCenter.x, origin.y - screenCenter.y)
     );
     element.setPointerCapture(event.pointerId);
-    let change: PreviewTransform = {};
+    let changes: {
+      id: string;
+      base: TimelineClip;
+      change: PreviewTransform;
+    }[] = [];
     const move = (e: globalThis.PointerEvent) => {
       if (e.pointerId !== event.pointerId) return;
-      change = resize
-        ? {
-            scale: Math.max(
-              0.1,
-              Math.min(
-                4,
-                Math.hypot(e.clientX - center.x, e.clientY - center.y) / radius
-              )
-            ),
-          }
-        : {
-            dx: ((e.clientX - origin.x) / rect.width) * 100,
-            dy: ((e.clientY - origin.y) / rect.height) * 100,
-          };
-      setMoving({ id: chosen.id, base: chosen, change });
+      let dx = ((e.clientX - origin.x) / rect.width) * 1000,
+        dy = ((e.clientY - origin.y) / rect.height) * selectionHeight;
+      let scale = 1;
+      if (resize) {
+        scale = Math.max(
+          0.1,
+          Math.min(
+            4,
+            Math.hypot(e.clientX - screenCenter.x, e.clientY - screenCenter.y) /
+              radius
+          )
+        );
+        if (magnetic)
+          scale = snapPreviewScale(
+            groupBounds,
+            scale,
+            others,
+            1000,
+            selectionHeight,
+            (7 / rect.width) * 1000,
+            (7 / rect.height) * selectionHeight
+          );
+        dx = 0;
+        dy = 0;
+      } else if (magnetic) {
+        const snap = snapPreviewMove(
+          groupBounds,
+          dx,
+          dy,
+          others,
+          1000,
+          selectionHeight,
+          (7 / rect.width) * 1000,
+          (7 / rect.height) * selectionHeight
+        );
+        dx = snap.dx;
+        dy = snap.dy;
+        setGuides(snap.guides);
+      }
+      changes = group.map(base => {
+        const b = bounds(base)!;
+        return {
+          id: base.id,
+          base,
+          change: {
+            dx: (dx + (b.x + b.width / 2 - center.x) * (scale - 1)) / 10,
+            dy:
+              ((dy + (b.y + b.height / 2 - center.y) * (scale - 1)) /
+                selectionHeight) *
+              100,
+            scale,
+          },
+        };
+      });
+      setMoving(changes);
     };
     const cleanup = () => {
       element.removeEventListener("pointermove", move);
       element.removeEventListener("pointerup", finish);
       element.removeEventListener("pointercancel", cancel);
       element.removeEventListener("lostpointercapture", cancel);
+      if (element.hasPointerCapture(event.pointerId))
+        element.releasePointerCapture(event.pointerId);
       stopGesture.current = undefined;
+      setGuides([]);
     };
     const cancel = () => {
       cleanup();
@@ -433,16 +505,16 @@ export function TimelinePreview({
     };
     const finish = () => {
       cleanup();
-      if (
-        Math.abs(change.dx ?? 0) +
-          Math.abs(change.dy ?? 0) +
-          Math.abs((change.scale ?? 1) - 1) >
-        0.001
-      )
-        void onTransform(chosen.id, change)
-          .catch(() => setDragError(ui("Could not save the position.")))
-          .finally(() => setMoving(undefined));
-      else setMoving(undefined);
+      if (!changes.length) {
+        setMoving(undefined);
+        return;
+      }
+      const save = onTransformMany
+        ? onTransformMany(changes)
+        : onTransform!(changes[0].id, changes[0].change);
+      void save
+        .catch(() => setDragError(ui("Could not save the position.")))
+        .finally(() => setMoving(undefined));
     };
     stopGesture.current = cancel;
     element.addEventListener("pointermove", move);
@@ -458,6 +530,19 @@ export function TimelinePreview({
   };
   return (
     <ContextMenu>
+      {canTransform && !playing && onTransform && (
+        <button
+          type="button"
+          aria-label={ui("Preview snapping")}
+          aria-pressed={magnetic}
+          title={ui("Snap to canvas, objects and spacing")}
+          onClick={() => setMagnetic(v => !v)}
+          className={`absolute left-2 top-2 z-40 flex size-8 items-center justify-center rounded-md border ${magnetic ? "border-primary/40 bg-primary/15 text-primary" : "border-border bg-background/80 text-foreground/60"}`}
+        >
+          <Magnet size={15} />
+        </button>
+      )}
+
       <ContextMenuTrigger asChild disabled={!onSelectClip}>
         <div
           ref={canvasRef}
@@ -466,6 +551,7 @@ export function TimelinePreview({
           onLoadedMetadataCapture={event => rememberMediaSize(event.target)}
           className="relative mx-auto shrink-0 overflow-hidden bg-black"
           onPointerDown={event => begin(event)}
+          onDragStart={event => event.preventDefault()}
           onDoubleClick={() => selected && onInspectClip?.(selected.id)}
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
@@ -512,9 +598,9 @@ export function TimelinePreview({
             frameRate={project.frameRate}
             time={time}
           />
-          {selection && !playing && onTransform && !selected?.locked && (
+          {selection && !playing && onTransform && canTransform && (
             <>
-              {selected?.graphic && (
+              {(selected?.graphic || selectedItems.length > 1) && (
                 <svg
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0 z-30 h-full w-full"
@@ -540,11 +626,16 @@ export function TimelinePreview({
                   key={`${x}-${y}`}
                   type="button"
                   aria-label={ui("Resize selected item")}
-                  className="absolute z-30 h-3 w-3 rounded-sm border border-black/60 bg-white shadow"
+                  className="absolute z-30 h-3 w-3 bg-transparent"
                   style={{
                     left: `clamp(6px, ${(selection.x + x * selection.width) / 10}%, calc(100% - 6px))`,
                     top: `clamp(6px, ${((selection.y + y * selection.height) / selectionHeight) * 100}%, calc(100% - 6px))`,
                     transform: "translate(-50%, -50%)",
+                    borderTop: y === 0 ? "2px solid white" : undefined,
+                    borderBottom: y === 1 ? "2px solid white" : undefined,
+                    borderLeft: x === 0 ? "2px solid white" : undefined,
+                    borderRight: x === 1 ? "2px solid white" : undefined,
+                    filter: "drop-shadow(0 1px 1px black)",
                     cursor: x === y ? "nwse-resize" : "nesw-resize",
                   }}
                   onPointerDown={event => begin(event, true)}
@@ -565,6 +656,26 @@ export function TimelinePreview({
                 />
               ))}
             </>
+          )}
+          {guides.length > 0 && (
+            <svg
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-30 h-full w-full"
+              viewBox={`0 0 1000 ${selectionHeight}`}
+            >
+              {guides.map((g, i) => (
+                <line
+                  key={i}
+                  x1={g.axis === "x" ? g.at : 0}
+                  x2={g.axis === "x" ? g.at : 1000}
+                  y1={g.axis === "y" ? g.at : 0}
+                  y2={g.axis === "y" ? g.at : selectionHeight}
+                  stroke="#a78bfa"
+                  strokeDasharray="4 3"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </svg>
           )}
           {dragError && (
             <p

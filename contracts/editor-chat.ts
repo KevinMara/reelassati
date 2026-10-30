@@ -33,6 +33,7 @@ export interface EditorChatRequest {
   maxCredits: number;
   selectedClipIds?: string[];
   range?: { start: number; end: number };
+  ranges?: { start: number; end: number }[];
   references?: EditorChatReference[];
   history?: Array<{ role: "user" | "assistant"; text: string }>;
 }
@@ -163,6 +164,7 @@ export interface EditorChatMessage {
     planSummary?: string;
   };
   range?: { start: number; end: number };
+  ranges?: { start: number; end: number }[];
   selectedClipIds?: string[];
   request?: EditorChatRequest;
   /** Separate from optional-extra approvals: a plan must be explicitly applied. */

@@ -1,4 +1,9 @@
-import { normalizeGraphic, type MotionGraphic } from "./motion-graphics";
+import {
+  normalizeGraphic,
+  choreographGraphic,
+  MOTION_CHOREOGRAPHIES,
+  type MotionGraphic,
+} from "./motion-graphics";
 import fontMetrics from "./caption-font-metrics.json";
 
 export const CAPTION_ANIMATIONS = [
@@ -55,7 +60,7 @@ const caption = (
 });
 
 /** Original presets; fonts are bundled locally and no asset subscription is required. */
-export const CAPTION_PRESETS: readonly CaptionPreset[] = [
+const BASE_CAPTION_PRESETS: readonly CaptionPreset[] = [
   caption("word-pop", "Word pop", "Each measured word settles into place.", {
     animation: "word-pop",
     size: 7,
@@ -200,6 +205,31 @@ export const CAPTION_PRESETS: readonly CaptionPreset[] = [
   ),
 ];
 
+/** Named layout variants use the same typography metrics in preview and export. */
+export const CAPTION_PRESETS: readonly CaptionPreset[] = [
+  ...BASE_CAPTION_PRESETS,
+  ...BASE_CAPTION_PRESETS.flatMap(p => [
+    {
+      ...p,
+      id: `${p.id}-compact`,
+      name: `${p.name} · Compact`,
+      size: Math.min(4.2, p.size),
+      maxCharacters: 44,
+      margin: 10,
+      outline: Math.min(0.22, p.outline),
+    },
+    {
+      ...p,
+      id: `${p.id}-top`,
+      name: `${p.name} · Top`,
+      position: "top" as const,
+      margin: 12,
+      size: Math.min(5.5, p.size),
+      maxCharacters: 28,
+    },
+  ]),
+];
+
 export type CaptionAppearance = Partial<
   Pick<
     CaptionPreset,
@@ -339,7 +369,7 @@ const graphic = (
   })!,
 });
 
-export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
+const BASE_GRAPHIC_PRESETS: readonly GraphicPreset[] = [
   graphic(
     "nameplate",
     "Accent nameplate",
@@ -708,13 +738,43 @@ export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
   ),
 ];
 
+/** Curated motion paths: deliberate entrance, readable hold, and a short exit. */
+export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
+  ...BASE_GRAPHIC_PRESETS,
+  ...BASE_GRAPHIC_PRESETS.flatMap(p =>
+    (p.graphic.kind === "line" || p.graphic.kind === "arrow"
+      ? (["slide", "fade"] as const)
+      : p.graphic.kind.startsWith("spatial")
+        ? (["focus", "drift"] as const)
+        : (["rise", "focus"] as const)
+    ).map(motion => ({
+      ...p,
+      id: `${p.id}-${motion}`,
+      name: `${p.name} · ${MOTION_CHOREOGRAPHIES.find(m => m.id === motion)!.name}`,
+      duration: Math.max(3.5, p.duration),
+      graphic: choreographGraphic(p.graphic, motion),
+    }))
+  ),
+];
+
 export interface ClipLookPreset {
   id: string;
   name: string;
   description: string;
-  settings: { brightness: number; contrast: number; saturation: number };
+  settings: {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    exposure?: number;
+    temperature?: number;
+    tint?: number;
+    highlights?: number;
+    shadows?: number;
+    whites?: number;
+    blacks?: number;
+  };
 }
-export const CLIP_LOOK_PRESETS: readonly ClipLookPreset[] = [
+const BASE_CLIP_LOOK_PRESETS: readonly ClipLookPreset[] = [
   {
     id: "original",
     name: "Original",
@@ -764,6 +824,73 @@ export const CLIP_LOOK_PRESETS: readonly ClipLookPreset[] = [
     settings: { brightness: -0.025, contrast: 1.35, saturation: 0 },
   },
 ];
+
+/** Native grades remain independent controls, rather than opaque baked LUTs. */
+export const CLIP_LOOK_PRESETS: readonly ClipLookPreset[] = [
+  ...BASE_CLIP_LOOK_PRESETS,
+  ...BASE_CLIP_LOOK_PRESETS.flatMap(p => [
+    {
+      ...p,
+      id: `${p.id}-warm`,
+      name: `${p.name} · Warm`,
+      settings: {
+        ...p.settings,
+        temperature: 0.16,
+        tint: 0.025,
+        highlights: -0.15,
+        shadows: 0.09,
+      },
+    },
+    {
+      ...p,
+      id: `${p.id}-cool`,
+      name: `${p.name} · Cool`,
+      settings: {
+        ...p.settings,
+        temperature: -0.13,
+        tint: 0.015,
+        highlights: -0.1,
+        blacks: -0.06,
+      },
+    },
+    {
+      ...p,
+      id: `${p.id}-soft`,
+      name: `${p.name} · Soft`,
+      settings: {
+        ...p.settings,
+        contrast: Math.max(0.8, p.settings.contrast - 0.08),
+        exposure: 0.08,
+        highlights: -0.28,
+        shadows: 0.18,
+        blacks: 0.05,
+      },
+    },
+  ]),
+];
+
+/** Localized variant names are composed from the already translated base and treatment. */
+export const PRESET_NAME_PARTS = [
+  ...CAPTION_PRESETS.filter(p => !BASE_CAPTION_PRESETS.includes(p)).map(p => ({
+    name: p.name,
+    parts: p.name.split(" · "),
+  })),
+  ...GRAPHIC_PRESETS.filter(p => !BASE_GRAPHIC_PRESETS.includes(p)).map(p => ({
+    name: p.name,
+    parts: p.name.split(" · "),
+  })),
+  ...CLIP_LOOK_PRESETS.filter(p => !BASE_CLIP_LOOK_PRESETS.includes(p)).map(
+    p => ({ name: p.name, parts: p.name.split(" · ") })
+  ),
+];
+export function translatePresetNames(catalog: Record<string, string>) {
+  return Object.fromEntries(
+    PRESET_NAME_PARTS.map(p => [
+      p.name,
+      p.parts.map(part => catalog[part] ?? part).join(" · "),
+    ])
+  );
+}
 
 export const FADE_PRESETS = [
   { id: "cut", name: "Cut", description: "No fade.", fadeIn: 0, fadeOut: 0 },
