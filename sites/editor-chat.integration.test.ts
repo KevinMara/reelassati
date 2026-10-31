@@ -727,7 +727,9 @@ describe("authenticated paid editing chat route", () => {
         /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
       );
       expect(firstBody.error).toContain(firstBody.reference);
-      expect(JSON.stringify({ ...firstBody, creditReceipt: undefined })).not.toMatch(
+      expect(
+        JSON.stringify({ ...firstBody, creditReceipt: undefined })
+      ).not.toMatch(
         /private diagnostic|depleted|OpenRouter|Kimi|api.?key|credits|charged|refunded/i
       );
       expect(failureLog).toHaveBeenCalledWith(
@@ -735,7 +737,10 @@ describe("authenticated paid editing chat route", () => {
         expect.objectContaining({ status: 402, reference: firstBody.reference })
       );
       expect(balance()).toBe(before);
-      expect(firstBody.creditReceipt).toMatchObject({ credits: 0, status: "released" });
+      expect(firstBody.creditReceipt).toMatchObject({
+        credits: 0,
+        status: "released",
+      });
       const ledger = sqlite
         .prepare(
           "SELECT amount,included_amount,topup_amount,status FROM credit_ledger WHERE owner_email='owner@example.com' AND json_extract(metadata_json,'$.requestId')=?"
@@ -975,8 +980,14 @@ describe("authenticated paid editing chat route", () => {
         reference: string;
       };
       expect(body.reference).toMatch(/^[a-f0-9-]{36}$/);
-      expect(Object.keys(body).sort()).toEqual(["creditReceipt", "error", "reference"]);
-      expect((body as typeof body & { creditReceipt: unknown }).creditReceipt).toMatchObject({ credits: 0, status: "released" });
+      expect(Object.keys(body).sort()).toEqual([
+        "creditReceipt",
+        "error",
+        "reference",
+      ]);
+      expect(
+        (body as typeof body & { creditReceipt: unknown }).creditReceipt
+      ).toMatchObject({ credits: 0, status: "released" });
       expect(JSON.stringify(body)).not.toMatch(
         /PRIVATE|gen-|schema|Gemini|OpenRouter/
       );
@@ -1506,25 +1517,6 @@ describe("authenticated paid editing chat route", () => {
       {
         output: {
           ...complete,
-          changes: [
-            {
-              type: "audio",
-              label: "Balance",
-              reason: "Observed sound masks speech",
-              evidence: "Music overlaps spoken steps",
-              start: 1,
-              end: 31,
-              confidence: 0.8,
-              intensity: "light",
-              parameters: { volume: 0.5 },
-            },
-          ],
-        },
-        reason: "invalid-edit-plan",
-      },
-      {
-        output: {
-          ...complete,
           insights: complete.insights.map(row => ({ ...row, role: "unknown" })),
         },
         reason: "invalid-intervals",
@@ -1557,6 +1549,51 @@ describe("authenticated paid editing chat route", () => {
       });
     }
   });
+  it.each([true, false])(
+    "retains complete review evidence without malformed edits or model retries (valid edit: %s)",
+    async includeValid => {
+      const edit = {
+        type: "audio",
+        label: "Balance",
+        reason: "Observed sound masks speech",
+        evidence: "Music overlaps spoken steps",
+        start: 1,
+        end: 5,
+        confidence: 0.8,
+        intensity: "light",
+        parameters: { volume: 0.5 },
+      };
+      nextOutput = {
+        ...videoAnalysisOutput(),
+        changes: [
+          ...(includeValid ? [edit] : []),
+          { ...edit, end: 31 },
+          { ...edit, parameters: { volume: 40 } },
+          { ...edit, confidence: null },
+        ],
+      };
+      const before = balance(),
+        calls = providerCalls.length;
+      const response = await request("/api/ai/analyze", { assetId: "source" });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        changes: unknown[];
+        overall: { status: string };
+      };
+      expect(body.overall.status).toBe("complete");
+      expect(body.changes).toHaveLength(includeValid ? 1 : 0);
+      if (includeValid)
+        expect(body.changes[0]).toMatchObject({
+          type: "audio",
+          start: 1,
+          end: 5,
+          parameters: { volume: 0.5 },
+        });
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before - 10);
+    }
+  );
+
   it("accepts an explained preserve-source review and bounded executable operations without inventing edits", async () => {
     const complete = videoAnalysisOutput();
     nextOutput = {

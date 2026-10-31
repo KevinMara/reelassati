@@ -408,15 +408,16 @@ export function EditorMediaLibrary({
         </button>
       </div>
       <div className="mb-3 flex items-center gap-2 text-sm">
-        <button
-          type="button"
-          disabled={!folderId}
-          aria-label={ui("Parent folder")}
-          onClick={() => setFolderId(currentFolder?.parentId ?? "")}
-          className="p-1 disabled:opacity-30"
-        >
-          <ArrowLeft size={16} />
-        </button>
+        {folderId && (
+          <button
+            type="button"
+            aria-label={ui("Parent folder")}
+            onClick={() => setFolderId(currentFolder?.parentId ?? "")}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-foreground"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        )}
         <span className="truncate">
           {currentFolder?.name ?? ui("Media library")}
         </span>

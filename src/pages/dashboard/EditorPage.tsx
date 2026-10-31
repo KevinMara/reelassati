@@ -1,4 +1,5 @@
 import { transformPreviewClip } from "@/lib/preview-transform";
+import { styleSaveKey, useStyleSaveProgress } from "@/lib/style-save-progress";
 import { PageGuideButton } from "@/components/help/PageGuide";
 import { CreditBalanceChip } from "@/components/studio/CreditBalanceChip";
 import { normalizeVisual, patchVisual } from "@contracts/clip-visual";
@@ -139,6 +140,7 @@ import {
   Library,
   Loader2,
   Maximize2,
+  Minimize2,
   FileOutput,
   PanelLeftClose,
   PanelLeftOpen,
@@ -316,6 +318,15 @@ export default function EditorPage() {
     patch: Partial<TimelineClip>;
   }>();
   const [mediaHidden, setMediaHidden] = useState(false);
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  useEffect(() => {
+    const changed = () =>
+      setPreviewFullscreen(
+        document.fullscreenElement?.id === "editor-preview-panel"
+      );
+    document.addEventListener("fullscreenchange", changed);
+    return () => document.removeEventListener("fullscreenchange", changed);
+  }, []);
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [previewZoom, setPreviewZoom] = useState(100);
   const [previewPan, setPreviewPan] = useState({ x: 0, y: 0 });
@@ -403,6 +414,11 @@ export default function EditorPage() {
   );
   const sectionsOwner = workspace.profile.email.toLowerCase();
   const sectionsBrand = selectedBrand(sectionsOwner);
+  const styleSave = useStyleSaveProgress(
+    styleSaveKey(sectionsOwner, sectionsBrand, project?.id)
+  );
+  const styleSaveBusy =
+    styleSave?.phase === "saving" || styleSave?.phase === "preview";
   const sectionsRunKey = project
     ? editorRunKey(sectionsOwner, sectionsBrand, project.id)
     : "";
@@ -1758,8 +1774,16 @@ export default function EditorPage() {
       event.preventDefault();
       // Capture before a timeline button can treat Space as a click or scroll.
       event.stopPropagation();
-      if (event.code === "Space" || event.key === " ")
+      if (event.code === "Space" || event.key === " ") {
         consumedSpace.current = true;
+        // Space switches :focus-visible on for the last pointer-focused lane.
+        // Keep keyboard focus in the editor without outlining or activating a row.
+        if (document.activeElement?.closest(".editor-timeline-scroll")) {
+          document
+            .getElementById("editor-timeline-panel")
+            ?.focus({ preventScroll: true });
+        }
+      }
       if (
         (event.repeat &&
           !EDITOR_KEYBOARD_ACTIONS.find(row => row.id === actionId)?.repeat) ||
@@ -2831,53 +2855,41 @@ export default function EditorPage() {
           </div>
           <button
             type="button"
-            onClick={() => setMediaHidden(!mediaHidden)}
-            aria-label={ui(
-              mediaHidden ? "Show media panel" : "Hide media panel"
-            )}
-            className="rounded-lg border border-border p-2 text-muted-foreground"
-          >
-            {mediaHidden ? (
-              <PanelLeftOpen size={17} />
-            ) : (
-              <PanelLeftClose size={17} />
-            )}
-          </button>
-          <span
-            className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs sm:flex ${
-              workspaceError
-                ? "bg-destructive/10 text-destructive"
-                : "bg-surface text-foreground/70"
-            }`}
-          >
-            {saving ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : workspaceError ? (
-              <AlertCircle className="h-3 w-3" />
-            ) : (
-              <Check className="h-3 w-3 text-success" />
-            )}
-            {saving
-              ? ui("Saving")
-              : workspaceError
-                ? ui("Save failed")
-                : ui("Saved")}
-          </span>
-          <button
-            type="button"
             disabled={
               !capabilities.editStyleTemplates ||
               !canCaptureEditStyle(project) ||
+              styleSaveBusy ||
               Boolean(busyAction)
             }
             onClick={() => setSaveTemplateOpen(true)}
-            title={ui("Save as template")}
-            aria-label={ui("Save as template")}
-            className="flex items-center gap-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground"
+            title={
+              styleSave?.error ||
+              ui(styleSave?.phase === "preview" ? "Style saved" : "Save style")
+            }
+            aria-label={
+              styleSave?.phase === "failed"
+                ? `${ui("Save failed")}: ${styleSave.error}`
+                : ui("Save style")
+            }
+            className={`flex items-center gap-1.5 rounded-lg border ${styleSave?.phase === "failed" ? "border-destructive/50 text-destructive" : "border-border text-muted-foreground hover:text-foreground"}`}
           >
-            <BookmarkPlus size={14} />
+            {styleSaveBusy ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : styleSave?.phase === "failed" ? (
+              <AlertCircle size={14} />
+            ) : (
+              <BookmarkPlus size={14} />
+            )}
+            {styleSaveBusy && (
+              <span>
+                {styleSave?.phase === "preview"
+                  ? `${Math.round(styleSave.percent)}%`
+                  : ui("Saving…")}
+              </span>
+            )}
+            {styleSave?.phase === "failed" && <span>{ui("Save failed")}</span>}
             <span className="hidden min-[1400px]:inline">
-              {ui("Save as template")}
+              {ui("Save style")}
             </span>
           </button>
           <button
@@ -3070,18 +3082,62 @@ export default function EditorPage() {
                 : "border-white/5"
             }`}
           >
+            <div className="editor-preview-heading flex h-8 items-center justify-between px-2">
+              <button
+                type="button"
+                onClick={() => setMediaHidden(!mediaHidden)}
+                aria-label={ui(
+                  mediaHidden ? "Show media panel" : "Hide media panel"
+                )}
+                className="rounded-lg border border-border p-1.5 text-muted-foreground hover:text-foreground"
+              >
+                {mediaHidden ? (
+                  <PanelLeftOpen size={17} />
+                ) : (
+                  <PanelLeftClose size={17} />
+                )}
+              </button>
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs  ${
+                  workspaceError
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-surface text-foreground/70"
+                }`}
+              >
+                {saving ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : workspaceError ? (
+                  <AlertCircle className="h-3 w-3" />
+                ) : (
+                  <Check className="h-3 w-3 text-success" />
+                )}
+                {saving
+                  ? ui("Saving")
+                  : workspaceError
+                    ? ui("Save failed")
+                    : ui("Saved")}
+              </span>
+            </div>
             <button
               type="button"
-              aria-label={ui("Fullscreen preview")}
-              title={ui("Fullscreen preview")}
+              aria-label={ui(
+                previewFullscreen ? "Exit fullscreen" : "Fullscreen preview"
+              )}
+              title={ui(
+                previewFullscreen ? "Exit fullscreen" : "Fullscreen preview"
+              )}
               onClick={() => {
                 const panel = document.getElementById("editor-preview-panel");
                 if (document.fullscreenElement) void document.exitFullscreen();
                 else void panel?.requestFullscreen();
               }}
-              className="absolute right-3 top-3 z-20 rounded-lg border border-white/15 bg-black/40 p-2 text-white/70 hover:text-white"
+              className="absolute right-2 top-10 z-20 rounded-lg border border-white/15 bg-black/40 p-2 text-white/70 hover:text-white"
             >
-              <Maximize2 size={16} />
+              {previewFullscreen ? (
+                <Minimize2 size={16} />
+              ) : (
+                <Maximize2 size={16} />
+              )}
             </button>
             <div
               className={`editor-preview-stage relative flex h-[400px] touch-none items-center justify-center overflow-hidden p-5 md:h-[410px] xl:h-[490px] ${previewZoom > 100 ? "cursor-grab active:cursor-grabbing" : ""}`}
@@ -3344,7 +3400,7 @@ export default function EditorPage() {
             }`}
           >
             <div className="timeline-toolbar flex flex-wrap items-start gap-1 border-b border-border p-2">
-              <div className="flex flex-col items-start">
+              <div className="timeline-upload relative flex flex-col items-start">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -3364,7 +3420,7 @@ export default function EditorPage() {
                   aria-pressed={snapping}
                   onClick={() => setSnapping(!snapping)}
                   title={ui("Snap clips to nearby edges")}
-                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-primary"
+                  className="timeline-snapping inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-primary"
                 >
                   <Magnet size={14} />
                   {ui("Clip snapping")} · {snapping ? ui("On") : ui("Off")}
@@ -3740,7 +3796,7 @@ export default function EditorPage() {
 
       <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogTitle>{ui("Save as template")}</DialogTitle>
+          <DialogTitle>{ui("Save style")}</DialogTitle>
           <DialogDescription className="sr-only">
             {ui("Save the reference video and every edit setting.")}
           </DialogDescription>
@@ -3749,6 +3805,7 @@ export default function EditorPage() {
               project={project}
               profile={captureEditStyle(project)}
               source="edit"
+              onStarted={() => setSaveTemplateOpen(false)}
             />
           )}
         </DialogContent>

@@ -275,6 +275,42 @@ export function AutonomousEditor({
     const resolvedMedia = new Map<string, string>();
     let timelineSaveStarted = false;
     const messageId = createUuid();
+    const inputMessage = {
+      id: `${messageId}-input`,
+      role: "user" as const,
+      text: quoteOnly ? ui("Estimate credits") : ui("AI auto-edit"),
+      createdAt: new Date().toISOString(),
+      inputDetails: [
+        {
+          label: ui("Describe the style and outcome"),
+          value: style.trim() || ui("Automatic"),
+        },
+        {
+          label: ui("Style"),
+          value: project.editStyleTemplate?.name || ui("No style"),
+        },
+        { label: ui("Reference"), value: referenceBrief || ui("None") },
+        {
+          label: ui("Edit duration"),
+          value:
+            durationMode === "range"
+              ? `${minimumDuration}–${maximumDuration} s`
+              : ui("No target duration"),
+        },
+        {
+          label: ui("Detect ending from content automatically"),
+          value: ui(automaticDuration ? "On" : "Off"),
+        },
+        {
+          label: ui("Transcribe and caption footage"),
+          value: ui(captions ? "On" : "Off"),
+        },
+        {
+          label: ui("Footage"),
+          value: sources.map(source => source.name).join("\n"),
+        },
+      ],
+    };
     let receipts: CreditReceipt[] = [];
     let receiptsComplete = true;
     const savedSteps: string[] = [];
@@ -329,6 +365,9 @@ export function AutonomousEditor({
                 ...chat,
                 messages: [
                   ...chat.messages.filter(item => item.id !== messageId),
+                  ...(chat.messages.some(item => item.id === inputMessage.id)
+                    ? []
+                    : [inputMessage]),
                   message,
                 ].slice(-60),
               },
@@ -894,22 +933,24 @@ export function AutonomousEditor({
           <DialogTitle>{ui("Auto-edit")}</DialogTitle>
           <DialogDescription className="-mt-3 text-xs">
             {ui(
-              "AI edits your footage using your reference, template or direction."
+              "AI edits your footage using your reference, style or direction."
             )}
           </DialogDescription>
           <section className="space-y-4">
             <div className="grid gap-5">
               <div>
-                <div className="auto-edit-template mb-3 rounded-xl border border-sky-400/25 bg-sky-400/5 p-3">
-                  <h3 className="mb-2 text-xs font-semibold">
-                    {ui("Match a template")}
-                  </h3>
-                  <EditStyleTemplates
-                    project={project}
-                    disabled={busy}
-                    compact
-                  />
-                </div>
+                <details className="auto-edit-template mb-3 rounded-xl border border-sky-400/25 bg-sky-400/5 p-3">
+                  <summary className="cursor-pointer text-xs font-semibold">
+                    {ui("Match a style")}
+                  </summary>
+                  <div className="mt-3">
+                    <EditStyleTemplates
+                      project={project}
+                      disabled={busy}
+                      compact
+                    />
+                  </div>
+                </details>
                 <div className="auto-edit-reference mb-4 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1">
                   <div>
                     {" "}
@@ -1000,7 +1041,7 @@ export function AutonomousEditor({
                         placeholder={ui(
                           "Premium skincare demo. Clean editorial captions, a fast before/after opening, subtle fades, warm colour, and a quiet product close-up at the end."
                         )}
-                        className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"
+                        className="mt-2 w-full rounded-lg border border-border bg-background p-2.5 text-xs leading-relaxed"
                       />
                     </label>
                     <div className="mt-2 flex gap-2">
@@ -1016,7 +1057,7 @@ export function AutonomousEditor({
                           }
                           className={`rounded-md border px-2.5 py-1.5 text-xs ${optionsPanel === panel ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
                         >
-                          {ui(panel === "presets" ? "Presets" : "More options")}
+                          {ui(panel === "presets" ? "Presets" : "Specs")}
                         </button>
                       ))}
                     </div>
@@ -1071,7 +1112,7 @@ export function AutonomousEditor({
                                 event.target.value as "none" | "range"
                               )
                             }
-                            className="w-full rounded-lg border border-border bg-background p-2"
+                            className="h-8 min-h-8 w-full rounded-lg border border-border bg-background px-2 text-xs"
                           >
                             <option value="none">
                               {ui("No target duration")}

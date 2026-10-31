@@ -7049,7 +7049,7 @@ async function handleAi(
           output.recommendations,
           analysisDuration || 0
         );
-        const noChangesReason = stringValue(output.noChangesReason).slice(
+        let noChangesReason = stringValue(output.noChangesReason).slice(
           0,
           1600
         );
@@ -7160,6 +7160,15 @@ async function handleAi(
           }
           return true;
         };
+        // A complete evidence review remains useful to the timeline planner even
+        // when an optional machine edit is unusable. Never pass that edit to
+        // mapEditOperations (which supplies defaults); discard it first.
+        const acceptedChanges = rawChanges?.filter(validChange) ?? [];
+        const omittedChanges =
+          (rawChanges?.length ?? 0) - acceptedChanges.length;
+        if (omittedChanges && !acceptedChanges.length && !noChangesReason)
+          noChangesReason =
+            "No executable changes were accepted. Build a new edit plan from the reviewed footage and editorial recommendations.";
         const rawInsightsValid =
           Array.isArray(output.insights) &&
           output.insights.length === insights.length &&
@@ -7202,9 +7211,7 @@ async function handleAi(
                             recommendations.length !==
                               output.recommendations.length
                           ? "invalid-recommendations"
-                          : !rawChanges ||
-                              rawChanges.length > 10 ||
-                              !rawChanges.every(validChange)
+                          : !rawChanges || rawChanges.length > 10
                             ? "invalid-edit-plan"
                             : !recommendations.length &&
                                 !rawChanges.length &&
@@ -7228,8 +7235,7 @@ async function handleAi(
           await failAiInvocation(env, invocation, `analysis_${invalidReason}`);
           return json(
             {
-              error:
-                "The video review was incomplete. No analysis credits were used.",
+              error: "The video review was incomplete. No credits were used.",
               analysisIncomplete: true,
               creditsRefunded: true,
               reason: invalidReason,
@@ -7241,7 +7247,9 @@ async function handleAi(
         output.insights = insights;
         output.structure = structure;
         output.recommendations = recommendations;
-        output.changes = rawChanges;
+        output.changes = acceptedChanges;
+        output.noChangesReason = noChangesReason;
+        output.omittedChangeCount = omittedChanges;
         output.overall = overall;
         // Normalize before provenance is recorded: invalid/old spatial metadata
         // never becomes a safe-placement claim merely through cache reuse.
@@ -7362,12 +7370,13 @@ async function handleAi(
           ...(input.extractStyle === true
             ? { editingStyle: normalizeReferenceEditStyle(output.editingStyle) }
             : {}),
-          changes: mapEditOperations(rawChanges, analysisDuration || 0).map(
-            change => ({
-              ...change,
-              provenance,
-            })
-          ),
+          changes: mapEditOperations(
+            acceptedChanges,
+            analysisDuration || 0
+          ).map(change => ({
+            ...change,
+            provenance,
+          })),
           provenance,
         });
       }

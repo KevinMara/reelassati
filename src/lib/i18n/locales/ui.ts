@@ -1,4 +1,5 @@
 import { studioPolishUi } from "./ui-studio-polish";
+import { editorOct31Ui } from "./ui-editor-oct31";
 import { editorOct30Ui } from "./ui-editor-oct30";
 import { translatePresetNames } from "@contracts/editor-presets";
 import { automaticResearchDisabled } from "./ui-manual-only";
@@ -130,4 +131,6 @@ for (const [code, entries] of Object.entries(editorOct30Ui))
   Object.assign(uiLocales[code], entries);
 
 for (const [code, entries] of Object.entries(studioPolishUi))
+  Object.assign(uiLocales[code as keyof typeof uiLocales], entries);
+for (const [code, entries] of Object.entries(editorOct31Ui))
   Object.assign(uiLocales[code as keyof typeof uiLocales], entries);

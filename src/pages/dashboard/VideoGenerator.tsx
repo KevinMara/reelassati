@@ -492,14 +492,14 @@ export default function VideoGenerator() {
         </div>
       ) : null}
 
-      <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.35fr)_minmax(0,0.83fr)]">
+      <div className="video-director-grid grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.35fr)_minmax(0,0.83fr)]">
         <div className="space-y-5">
           <section className="rounded-xl border border-border bg-surface p-5">
             <div className="mb-3 flex items-center gap-2">
               <Film className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-medium">{ui("Visual style")}</h2>
               <span className="ml-auto text-xs uppercase tracking-wider text-foreground/70">
-                {VIDEO_PROMPT_TEMPLATES.length} {ui("templates")}
+                {VIDEO_PROMPT_TEMPLATES.length} {ui("Styles")}
               </span>
             </div>
             <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">

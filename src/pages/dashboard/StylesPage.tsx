@@ -23,6 +23,7 @@ import {
 import type { WorkspaceDocument } from "@contracts/workspace";
 import { CaptionStyleFields } from "@/components/styles/CaptionStyleFields";
 import { EditingLanguageFields } from "@/components/styles/EditingLanguageFields";
+import { SavedStylePreview } from "@/components/studio/SavedStylePreview";
 import { GraphicStyleFields } from "@/components/styles/GraphicStyleFields";
 import { LookStyleFields } from "@/components/styles/LookStyleFields";
 import { StyleSelect } from "@/components/styles/StyleFields";
@@ -439,6 +440,13 @@ function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
                       </div>
                     )}
                   </div>
+                  {draft.kind === "editing" && draft.value.blueprint && (
+                    <SavedStylePreview
+                      key={draft.value.id}
+                      blueprint={draft.value.blueprint}
+                      assets={workspace.assets}
+                    />
+                  )}
                   {draft.kind === "editing" ? (
                     <EditingLanguageFields
                       value={draft.value.profile}

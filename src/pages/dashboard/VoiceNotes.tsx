@@ -459,9 +459,7 @@ export default function VoiceNotes() {
         <p className="mono-eyebrow mb-2 text-primary">{ui("Voice Studio")}</p>
         <h1 className="text-3xl font-semibold">{ui("Voice to Content")}</h1>
         <p className="mt-2 max-w-3xl text-foreground/60">
-          {ui(
-            "Upload a real audio asset, transcribe it by asset ID, shape the transcript into a short-form script, or synthesize a production-ready voice track."
-          )}
+          {ui("Turn audio into an editable transcript, script or voiceover.")}
         </p>
       </div>
 
@@ -497,9 +495,7 @@ export default function VoiceNotes() {
                   id="voice-source-description"
                   className="mt-1 text-xs text-foreground/65"
                 >
-                  {ui(
-                    "The uploaded workspace asset—not a local blob URL—is sent for transcription. Use Transcribe below to create its text alternative."
-                  )}
+                  {ui("Choose an audio file")}
                 </p>
               </div>
               <Mic className="h-5 w-5 text-primary" />
@@ -946,9 +942,7 @@ export default function VoiceNotes() {
                   {ui("Your transcript will stay editable")}
                 </h2>
                 <p className="mt-2 max-w-sm text-sm text-foreground/65">
-                  {ui(
-                    "Select a stored audio asset or upload a new one. The app waits for the real transcription response before showing content."
-                  )}
+                  {ui("Choose an audio file")}
                 </p>
               </motion.section>
             )}

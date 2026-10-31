@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  getStyleSaveProgress,
+  setStyleSaveProgress,
+  styleSaveKey,
+} from "@/lib/style-save-progress";
+import { useRef, useState } from "react";
 import { BookmarkPlus, Trash2 } from "lucide-react";
 import { useUiText } from "@/lib/i18n/ui";
 import { useWorkspace } from "@/providers/workspace";
@@ -19,9 +24,10 @@ import {
   type EditStyleTemplate,
 } from "@contracts/edit-style-template";
 import { captureEditBlueprint } from "@contracts/edit-template-blueprint";
-import type { Asset, EditProject } from "@contracts/workspace";
+import type { EditProject } from "@contracts/workspace";
 import { editingTraitLabel } from "@/lib/i18n/locales/ui-edit-template-traits";
 import { CaptionStylePreview } from "./CaptionStylePreview";
+import { SavedStylePreview } from "./SavedStylePreview";
 
 function EditStyleProfilePreview({ profile }: { profile: EditStyleProfile }) {
   const ui = useUiText();
@@ -71,8 +77,10 @@ export function SaveEditStyleTemplate({
   source,
   disabled = false,
   project,
+  onStarted,
 }: {
   project?: EditProject;
+  onStarted?: () => void;
   profile: EditStyleProfile;
   source: EditStyleTemplate["source"];
   disabled?: boolean;
@@ -88,10 +96,16 @@ export function SaveEditStyleTemplate({
   const abort = useRef<AbortController | null>(null);
   const owner = workspace.profile.email.toLowerCase();
   const brand = selectedBrand(owner);
-  useEffect(() => () => abort.current?.abort(), [owner, brand, project?.id]);
+  const jobKey = styleSaveKey(owner, brand, project?.id);
   if (!capabilities.editStyleTemplates) return null;
   async function save() {
-    if (busy || disabled || !name.trim()) return;
+    if (
+      busy ||
+      disabled ||
+      !name.trim() ||
+      ["saving", "preview"].includes(getStyleSaveProgress(jobKey)?.phase ?? "")
+    )
+      return;
     setBusy(true);
     setMessage("");
     setFailed(false);
@@ -99,6 +113,8 @@ export function SaveEditStyleTemplate({
     const controller = new AbortController();
     abort.current = controller;
     setProgress(0);
+    setStyleSaveProgress(jobKey, { phase: "saving", percent: 0 });
+    onStarted?.();
     const projectSnapshot = project ? structuredClone(project) : undefined;
     const snapshot = structuredClone(profile),
       templateName = name.trim();
@@ -129,58 +145,12 @@ export function SaveEditStyleTemplate({
       const blueprint = projectSnapshot
         ? captureEditBlueprint(projectSnapshot)
         : undefined;
-      let reference: Asset | undefined;
-      if (projectSnapshot) {
-        const { renderVideo } = await import("@/lib/render-video");
-        const rendered = await renderVideo(
-          projectSnapshot,
-          structuredClone(getWorkspaceSnapshot().assets),
-          {
-            resolution: 1080,
-            frameRate: projectSnapshot.frameRate ?? 30,
-            format: "mp4",
-            signal: controller.signal,
-            onProgress: value => {
-              if (!controller.signal.aborted) setProgress(value);
-            },
-            loadAsset: async (id, signal) =>
-              new Uint8Array(
-                await (
-                  await platformApi.downloadAssetBlob(id, signal, { scope })
-                ).arrayBuffer()
-              ),
-          }
-        );
-        assertScope();
-        await verifyUploadRequestScope(scope);
-        const current = getWorkspaceSnapshot().projects.find(
-          p => p.id === projectSnapshot.id
-        );
-        if (
-          !current ||
-          JSON.stringify(captureEditBlueprint(current)) !==
-            JSON.stringify(blueprint)
-        )
-          throw new Error(ui("The edit changed. Save the template again."));
-        reference = await platformApi.uploadAsset(
-          new File([rendered.file], `${templateName}.mp4`, {
-            type: rendered.file.type,
-          }),
-          "video",
-          undefined,
-          projectSnapshot.id,
-          { scope, signal: controller.signal }
-        );
-        await verifyUploadRequestScope(scope);
-        assertScope();
-      }
       const candidate = normalizeEditStyleTemplate({
         id: crypto.randomUUID(),
         name: templateName,
         source,
         profile: snapshot,
         blueprint,
-        referenceAssetId: reference?.id,
       });
       if (!candidate) throw new Error(ui("Save failed"));
       const saved = await updateWorkspace(w => {
@@ -200,16 +170,87 @@ export function SaveEditStyleTemplate({
         return {
           ...w,
           editStyleTemplates: [...templates, candidate],
-          assets: reference
-            ? [reference, ...w.assets.filter(a => a.id !== reference!.id)]
-            : w.assets,
         };
       });
       if (!saved.editStyleTemplates?.some(t => t.id === candidate.id))
         throw new Error(ui("Save failed"));
       setName("");
-      setMessage(ui("Template saved"));
+      setMessage(ui("Style saved"));
+      // This archive is already durable. The rendered MP4 is a convenience preview;
+      // the saved native composition can play without it if the browser closes.
+      setStyleSaveProgress(jobKey, { phase: "saved", percent: 100 });
+      try {
+        if (projectSnapshot && capabilities.uploads) {
+          setStyleSaveProgress(jobKey, { phase: "preview", percent: 0 });
+          const { renderVideo } = await import("@/lib/render-video");
+          const rendered = await renderVideo(
+            projectSnapshot,
+            structuredClone(getWorkspaceSnapshot().assets),
+            {
+              resolution: 1080,
+              frameRate: projectSnapshot.frameRate ?? 30,
+              format: "mp4",
+              signal: controller.signal,
+              onProgress: value => {
+                if (!controller.signal.aborted) {
+                  setProgress(value);
+                  setStyleSaveProgress(jobKey, {
+                    phase: "preview",
+                    percent: value,
+                  });
+                }
+              },
+              loadAsset: async (id, signal) =>
+                new Uint8Array(
+                  await (
+                    await platformApi.downloadAssetBlob(id, signal, { scope })
+                  ).arrayBuffer()
+                ),
+            }
+          );
+          assertScope();
+          await verifyUploadRequestScope(scope);
+          const reference = await platformApi.uploadAsset(
+            new File([rendered.file], `${templateName}.mp4`, {
+              type: rendered.file.type,
+            }),
+            "video",
+            undefined,
+            projectSnapshot.id,
+            { scope, signal: controller.signal }
+          );
+          await verifyUploadRequestScope(scope);
+          assertScope();
+          await updateWorkspace(w => {
+            assertScope();
+            // Merge into current state: editing after Save must never invalidate the snapshot.
+            if (!w.editStyleTemplates?.some(t => t.id === candidate.id))
+              return w;
+            return {
+              ...w,
+              editStyleTemplates: w.editStyleTemplates.map(t =>
+                t.id === candidate.id
+                  ? { ...t, referenceAssetId: reference.id }
+                  : t
+              ),
+              assets: [
+                reference,
+                ...w.assets.filter(a => a.id !== reference.id),
+              ],
+            };
+          });
+        }
+
+        setStyleSaveProgress(jobKey, { phase: "saved", percent: 100 });
+      } catch {
+        setStyleSaveProgress(jobKey, { phase: "saved", percent: 100 });
+      }
     } catch (error) {
+      setStyleSaveProgress(jobKey, {
+        phase: "failed",
+        percent: 0,
+        error: error instanceof Error ? error.message : ui("Save failed"),
+      });
       setFailed(true);
       setMessage(error instanceof Error ? error.message : ui("Save failed"));
     } finally {
@@ -232,7 +273,7 @@ export function SaveEditStyleTemplate({
         <EditStyleProfilePreview profile={profile} />
       </details>
       <label className="block text-xs">
-        {ui("Template name")}
+        {ui("Style name")}
         <input
           maxLength={60}
           value={name}
@@ -244,18 +285,13 @@ export function SaveEditStyleTemplate({
       <button
         type="button"
         onClick={() => void save()}
-        disabled={
-          disabled ||
-          busy ||
-          !name.trim() ||
-          Boolean(project && !capabilities.uploads)
-        }
+        disabled={disabled || busy || !name.trim()}
         className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-xs text-primary disabled:opacity-40"
       >
         <BookmarkPlus size={14} />
         {busy
           ? `${ui("Saving…")} ${project ? `${progress}%` : ""}`
-          : ui("Save editing template · no AI credits")}
+          : ui("Save style")}
       </button>
       {message && (
         <p role={failed ? "alert" : "status"} className="text-xs">
@@ -331,14 +367,14 @@ export function EditStyleTemplates({
   }
   return (
     <section
-      aria-label={ui("Editing templates")}
+      aria-label={ui("Saved styles")}
       className={
         compact ? "space-y-2" : "space-y-3 rounded-xl border border-border p-3"
       }
     >
       {!compact && (
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">{ui("Editing templates")}</h3>
+          <h3 className="text-sm font-semibold">{ui("Saved styles")}</h3>
           <span className="text-xs text-muted-foreground">
             {templates.length}/{EDIT_STYLE_TEMPLATE_LIMIT}
           </span>
@@ -355,7 +391,7 @@ export function EditStyleTemplates({
           }
           className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-2"
         >
-          <option value="">{ui("No template")}</option>
+          <option value="">{ui("No style")}</option>
           {active && !templates.some(t => t.id === active.id) && (
             <option value={active.id}>{active.name}</option>
           )}
@@ -366,11 +402,6 @@ export function EditStyleTemplates({
           ))}
         </StudioSelect>
       </label>
-      {!compact && (
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          {ui("Selecting a template does not start an edit or spend credits.")}
-        </p>
-      )}
       {active && (
         <details className="text-xs">
           <summary className="cursor-pointer">
@@ -393,12 +424,18 @@ export function EditStyleTemplates({
               </video>
             )}
           <EditStyleProfilePreview profile={active.profile} />
+          {active.blueprint && !active.referenceAssetId && (
+            <SavedStylePreview
+              blueprint={active.blueprint}
+              assets={workspace.assets}
+            />
+          )}
         </details>
       )}
       {!compact && profile && (
         <details>
           <summary className="cursor-pointer text-xs font-medium">
-            {ui("Save this edit as a template")}
+            {ui("Save style")}
           </summary>
           <div className="mt-2">
             <SaveEditStyleTemplate
@@ -413,7 +450,7 @@ export function EditStyleTemplates({
       {!compact && templates.length > 0 && (
         <details>
           <summary className="cursor-pointer text-xs text-muted-foreground">
-            {ui("Manage templates")}
+            {ui("Saved styles")}
           </summary>
           <div className="mt-2 space-y-1">
             {templates.map(t => (

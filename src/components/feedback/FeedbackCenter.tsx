@@ -403,7 +403,9 @@ export function FeedbackCenter({
                     }
                     rows={3}
                     className={`${FIELD_INPUT} resize-y`}
-                    placeholder={ui("1. Open…\\n2. Select…\\n3. Click…")}
+                    placeholder={ui(
+                      "1. Open…\\n2. Select…\\n3. Click…"
+                    ).replace(/\\n/g, "\n")}
                   />
                 </Field>
               </div>

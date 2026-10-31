@@ -493,7 +493,7 @@ export function videoAnalysisResponseSchema(
         action: string,
         reason: string,
         priority: { type: "string", enum: ["high", "medium", "low"] },
-        confidence,
+        confidence: { type: "number", minimum: 0, maximum: 1 },
       }),
     },
     noChangesReason: string,
@@ -540,7 +540,7 @@ export function videoAnalysisResponseSchema(
         evidence: string,
         start: time,
         end: time,
-        confidence,
+        confidence: { type: "number", minimum: 0, maximum: 1 },
         intensity: {
           type: "string",
           enum: ["light", "balanced", "aggressive"],

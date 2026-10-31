@@ -730,6 +730,90 @@ export function EditorChat({
                       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                         {message.text}
                       </p>
+                      {(!!message.inputDetails?.length ||
+                        !!message.request) && (
+                        <details className="mt-2 text-xs">
+                          <summary className="cursor-pointer text-foreground/65">
+                            {ui("Your instructions")}
+                          </summary>
+                          <dl className="mt-2 space-y-2 border-t border-border pt-2">
+                            {message.inputDetails?.map((detail, index) => (
+                              <div key={index}>
+                                <dt className="font-medium text-foreground/60">
+                                  {detail.label}
+                                </dt>
+                                <dd className="mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
+                                  {detail.value}
+                                </dd>
+                              </div>
+                            ))}
+                            {message.request && (
+                              <>
+                                <div>
+                                  <dt className="text-foreground/60">
+                                    {ui("Plan")}
+                                  </dt>
+                                  <dd>
+                                    {ui(
+                                      message.request.executionMode === "plan"
+                                        ? "Plan first"
+                                        : "Automatic"
+                                    )}
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt className="text-foreground/60">
+                                    {ui("Reel effort")}
+                                  </dt>
+                                  <dd>
+                                    {ui(
+                                      message.request.effort === "balanced"
+                                        ? "Balanced"
+                                        : "Maximum"
+                                    )}
+                                  </dd>
+                                </div>
+                                {(message.request.ranges?.length ||
+                                  message.request.range) && (
+                                  <div>
+                                    <dt className="text-foreground/60">
+                                      {ui("Time range")}
+                                    </dt>
+                                    <dd>
+                                      {(message.request.ranges?.length
+                                        ? message.request.ranges
+                                        : [message.request.range!]
+                                      )
+                                        .map(
+                                          range =>
+                                            `${range.start.toFixed(1)}–${range.end.toFixed(1)}s`
+                                        )
+                                        .join(", ")}
+                                    </dd>
+                                  </div>
+                                )}
+                                {!!message.request.selectedClipIds?.length && (
+                                  <div>
+                                    <dt className="text-foreground/60">
+                                      {ui("Selected clip")}
+                                    </dt>
+                                    <dd>
+                                      {message.request.selectedClipIds
+                                        .map(
+                                          id =>
+                                            project.clips.find(
+                                              clip => clip.id === id
+                                            )?.label ?? id
+                                        )
+                                        .join(", ")}
+                                    </dd>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </dl>
+                        </details>
+                      )}
                       {!!message.references?.length && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {message.references.map((ref, index) => (

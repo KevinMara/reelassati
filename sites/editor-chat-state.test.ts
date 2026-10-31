@@ -38,6 +38,50 @@ const message = {
 };
 
 describe("saved editing chat continuity", () => {
+  it("round-trips the user's automatic-edit settings alongside the reply", () => {
+    const input = {
+      id: "auto-input",
+      role: "user",
+      text: "AI auto-edit",
+      createdAt: message.createdAt,
+      inputDetails: [
+        {
+          label: "Direction",
+          value: "Keep the complete explanation.\nUse understated graphics.",
+        },
+        { label: "Style", value: "Clean editorial" },
+        { label: "Duration", value: "20–35 seconds" },
+        { label: "Reference", value: "Owned reference: pacing and graphics" },
+      ],
+    };
+    const state = normalizeEditorChatState({ messages: [input, message] })!;
+    expect(state.messages[0]).toMatchObject(input);
+    expect(normalizeEditorChatState(JSON.parse(JSON.stringify(state)))).toEqual(
+      state
+    );
+  });
+  it("drops malformed input details without losing the user's message", () => {
+    const state = normalizeEditorChatState({
+      messages: [
+        {
+          id: "input",
+          role: "user",
+          text: "My instructions",
+          createdAt: message.createdAt,
+          inputDetails: [
+            null,
+            "invalid",
+            { label: "Direction", value: 42 },
+            { label: "Style", value: "Editorial" },
+          ],
+        },
+      ],
+    })!;
+    expect(state.messages[0].text).toBe("My instructions");
+    expect(state.messages[0].inputDetails).toEqual([
+      { label: "Style", value: "Editorial" },
+    ]);
+  });
   it("retains only supported completed-operation categories without inventing legacy evidence", () => {
     const state = normalizeEditorChatState({
       messages: [

@@ -379,6 +379,23 @@ export function normalizeEditorChatState(
       role: row.role,
       text: string(row.text, 6000),
       createdAt: row.createdAt,
+      ...(Array.isArray(row.inputDetails)
+        ? {
+            inputDetails: row.inputDetails.slice(0, 16).flatMap(item => {
+              const detail = record(item);
+              return detail &&
+                string(detail.label, 100) &&
+                typeof detail.value === "string"
+                ? [
+                    {
+                      label: string(detail.label, 100),
+                      value: string(detail.value, 12000),
+                    },
+                  ]
+                : [];
+            }),
+          }
+        : {}),
       ...(Array.isArray(row.creditReceipts)
         ? {
             creditReceipts: receiptRows

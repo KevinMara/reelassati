@@ -428,7 +428,7 @@
   padding-top: 0;
 }
 .auto-edit-reference summary {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
 }
 .auto-edit-dialog > section {
@@ -461,6 +461,104 @@
   min-height: 32px;
   font-size: 12px;
 }
+
+/* One scrolling surface for the full timeline; horizontal zoom stays inside it. */
+@media (min-width: 1100px) {
+  .editor-workspace #editor-timeline-panel {
+    max-height: none;
+    overflow: visible;
+  }
+}
+.studio-shell .timeline-toolbar .timeline-upload {
+  width: max-content;
+  flex: 0 0 auto;
+}
+.studio-shell .timeline-toolbar .timeline-snapping {
+  position: absolute;
+  left: 0;
+  top: 30px;
+  width: max-content;
+}
+@media (max-width: 1099px) {
+  .studio-shell .timeline-toolbar {
+    padding-bottom: 30px;
+  }
+}
+#editor-timeline-panel:focus {
+  outline: none;
+}
+.editor-preview-heading {
+  background: hsl(var(--surface));
+  border-bottom: 1px solid hsl(var(--border) / 0.55);
+}
+.auto-edit-dialog
+  :is(textarea, input:not([type="checkbox"]), [data-slot="select-trigger"]),
+.reference-style-panel [data-slot="select-trigger"] {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.auto-edit-dialog [data-slot="select-trigger"],
+.reference-style-panel [data-slot="select-trigger"] {
+  height: 32px;
+  min-height: 32px;
+  padding: 5px 9px;
+}
+.auto-edit-reference .reference-style-panel {
+  margin: 10px 0;
+}
+.reference-style-panel fieldset > .grid + input {
+  margin-top: 10px;
+}
+
+/* Dense editor tools use one scale; preview content keeps its authored sizing. */
+.studio-shell
+  #editor-media-panel
+  :is(
+    input:not([type="range"]):not([type="checkbox"]),
+    textarea,
+    [data-slot="select-trigger"]
+  ) {
+  font-size: 12px;
+}
+.studio-shell #editor-media-panel [data-slot="select-trigger"] {
+  min-height: 32px;
+  height: 32px;
+  padding-block: 4px;
+}
+.studio-shell #editor-media-panel :is(label, legend) {
+  font-size: 11px;
+}
+.studio-shell #editor-media-panel button:not([role="tab"]) {
+  font-size: 11px;
+}
+.studio-shell #editor-media-panel :is(button, label) > svg {
+  width: 14px;
+  height: 14px;
+}
+.studio-shell #editor-media-panel textarea {
+  padding: 10px;
+  line-height: 1.55;
+}
+.studio-shell #editor-media-panel details {
+  border-radius: 8px;
+}
+@media (min-width: 1000px) and (max-width: 1279px) {
+  .video-director-grid {
+    grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.6fr);
+    align-items: start;
+  }
+  .video-director-grid > :first-child {
+    grid-row: 1 / span 2;
+  }
+  .video-director-grid > :not(:first-child) {
+    grid-column: 2;
+  }
+}
+@media (max-width: 999px) {
+  .video-director-grid > :first-child > section:first-child > .overflow-y-auto {
+    max-height: 220px;
+  }
+}
 /* Preserve mobile input size and content previews while tightening oversized forms. */
 @media (min-width: 768px) {
   .studio-shell:not([data-page="edit"])
@@ -490,4 +588,15 @@
 .editor-header-tools > div svg {
   width: 13px;
   height: 13px;
+}
+
+@media (max-width: 759px) {
+  .studio-shell
+    #editor-media-panel
+    input:not([type="range"]):not([type="checkbox"]),
+  .studio-shell #editor-media-panel textarea,
+  .auto-edit-dialog input:not([type="range"]):not([type="checkbox"]),
+  .auto-edit-dialog textarea {
+    font-size: 16px;
+  }
 }

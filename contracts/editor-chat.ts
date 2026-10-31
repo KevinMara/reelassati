@@ -140,6 +140,8 @@ export interface EditorChatResponse {
 }
 
 export interface EditorChatMessage {
+  /** The user's submitted settings; separate from model output and live controls. */
+  inputDetails?: Array<{ label: string; value: string }>;
   id: string;
   role: "user" | "assistant";
   text: string;

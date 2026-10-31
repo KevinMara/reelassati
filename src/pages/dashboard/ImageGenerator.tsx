@@ -165,7 +165,7 @@ export default function ImageGenerator() {
             id="image-prompt"
             value={prompt}
             maxLength={4000}
-            rows={9}
+            rows={6}
             onChange={event => {
               setPrompt(event.target.value);
               invalidateAttestation();

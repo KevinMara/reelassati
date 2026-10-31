@@ -196,7 +196,12 @@ export default function ContentLibrary() {
         .filter(item => {
           if (
             item.source === "asset" &&
-            !libraryOrganizationMatches(item.asset, organization, now, workspace.mediaFolders)
+            !libraryOrganizationMatches(
+              item.asset,
+              organization,
+              now,
+              workspace.mediaFolders
+            )
           )
             return false;
           if (
@@ -518,7 +523,10 @@ export default function ContentLibrary() {
         </div>
       ) : null}
 
-      <div data-tour="library-find" className="mb-6 flex flex-wrap items-center gap-3">
+      <div
+        data-tour="library-find"
+        className="mb-3 flex flex-wrap items-center gap-3"
+      >
         <label className="relative min-w-64 flex-1 sm:max-w-md">
           <span className="sr-only">{ui("Search library")}</span>
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/65" />
@@ -528,7 +536,7 @@ export default function ContentLibrary() {
             value={search}
             onChange={event => setSearch(event.target.value)}
             placeholder={ui("Search by name or type")}
-            className="w-full rounded-lg border border-border bg-surface py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+            className="h-9 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
           />
         </label>
         <div className="flex flex-wrap gap-1" aria-label={ui("Filter library")}>
@@ -578,31 +586,37 @@ export default function ContentLibrary() {
         </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-3">
-        <button
-          type="button"
-          aria-pressed={favoritesOnly}
-          onClick={() => setFavoritesOnly(!favoritesOnly)}
-          className={`flex items-center gap-2 rounded-pill border px-4 py-2 text-sm ${favoritesOnly ? "border-primary bg-primary/15" : "border-border"}`}
-        >
-          <Star className="h-4 w-4" />
-          {ui("Favorites")}
-        </button>
-        <StudioSelect
-          aria-label={ui("Filter Library by project")}
-          value={projectFilter}
-          onChange={event => setProjectFilter(event.target.value)}
-          className="rounded-lg border border-border bg-surface p-2 text-sm"
-        >
-          <option value="">{ui("All projects")}</option>
-          {workspace.projects.map(project => (
-            <option value={project.id} key={project.id}>
-              {project.title}
-            </option>
-          ))}
-        </StudioSelect>
-      </div>
-      <LibraryOrganization value={organization} onChange={setOrganization} />
+      <LibraryOrganization
+        value={organization}
+        onChange={setOrganization}
+        extraFiltersActive={favoritesOnly || Boolean(projectFilter)}
+        filterControls={
+          <div className="grid gap-3">
+            <button
+              type="button"
+              aria-pressed={favoritesOnly}
+              onClick={() => setFavoritesOnly(!favoritesOnly)}
+              className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${favoritesOnly ? "border-primary bg-primary/15" : "border-border"}`}
+            >
+              <Star className="h-4 w-4" />
+              {ui("Favorites")}
+            </button>
+            <StudioSelect
+              aria-label={ui("Filter Library by project")}
+              value={projectFilter}
+              onChange={event => setProjectFilter(event.target.value)}
+              className="h-8 w-full rounded-lg border border-border bg-surface px-2.5 text-xs"
+            >
+              <option value="">{ui("All projects")}</option>
+              {workspace.projects.map(project => (
+                <option value={project.id} key={project.id}>
+                  {project.title}
+                </option>
+              ))}
+            </StudioSelect>
+          </div>
+        }
+      />
       {organization.origin === "stock" && <StockLibrary />}
       {filteredItems.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-14 text-center">
@@ -731,7 +745,9 @@ export default function ContentLibrary() {
                               { value: "", label: ui("No folder") },
                               ...(workspace.mediaFolders ?? []).map(f => ({
                                 value: f.id,
-                                label: isStockCollection(f) ? ui("Stock") : f.name,
+                                label: isStockCollection(f)
+                                  ? ui("Stock")
+                                  : f.name,
                               })),
                             ]}
                             onValueChange={folderId =>

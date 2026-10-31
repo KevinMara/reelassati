@@ -1,4 +1,5 @@
 import { studioPolishUi } from "./locales/ui-studio-polish";
+import { editorOct31Ui } from "./locales/ui-editor-oct31";
 import { editorOct30Ui } from "./locales/ui-editor-oct30";
 import { translatePresetNames } from "@contracts/editor-presets";
 import { automaticResearchDisabled } from "./locales/ui-manual-only";
@@ -153,6 +154,7 @@ export function loadUiLocale(
       ...translatePresetNames(catalog),
       ...editorOct30Ui[code],
       ...studioPolishUi[code],
+      ...editorOct31Ui[code],
     }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {

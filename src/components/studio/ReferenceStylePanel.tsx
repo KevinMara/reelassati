@@ -9,10 +9,7 @@ import {
 import type { Asset } from "@contracts/workspace";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { AI_CREDIT_COSTS, timedCreditCost } from "@contracts/billing";
-import {
-  DIRECT_VIDEO_HELP,
-  validateDirectVideoUrl,
-} from "@contracts/public-video";
+import { validateDirectVideoUrl } from "@contracts/public-video";
 import { useWorkspace } from "@/providers/workspace";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -365,7 +362,7 @@ function ReferenceStyleSession({
 
   return (
     <details className="reference-style-panel my-3 border-t border-border pt-3">
-      <summary className="cursor-pointer text-sm font-medium">
+      <summary className="cursor-pointer text-xs font-medium">
         {purpose === "script"
           ? ui("Learn from a reference hook or script")
           : ui("Match a reference style or video")}
@@ -374,26 +371,37 @@ function ReferenceStyleSession({
         disabled={busy || disabled}
         className="mt-3 space-y-3 disabled:opacity-50"
       >
-        <p className="text-xs text-foreground/70">
-          {ui(
-            "Choose an owned video, upload an original, or import a final video file. Import and measurement use no AI credits. Analysis is a separate action at the measured quote. Reference source timestamps are mapped to your own footage when planning edits."
-          )}
-        </p>
-        <CompactSelect
-          aria-label={ui("Reference video")}
-          value={assetId}
-          onValueChange={value => {
-            invalidate();
-            setAssetId(value);
-            setUrl("");
-          }}
-          options={[
-            { value: "", label: "Import or upload a reference" },
-            ...workspace.assets
-              .filter(a => a.kind === "video" && a.status === "ready")
-              .map(a => ({ value: a.id, label: a.name })),
-          ]}
-        />
+        <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)] items-center">
+          <label className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-background px-3 text-xs hover:border-primary/50 focus-within:ring-2 focus-within:ring-primary">
+            {ui("Upload reference")}
+            <input
+              type="file"
+              accept="video/*"
+              className="sr-only"
+              aria-label={ui("Upload reference")}
+              onChange={e => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) upload(file);
+              }}
+            />
+          </label>
+          <CompactSelect
+            aria-label={ui("Reference video")}
+            value={assetId}
+            onValueChange={value => {
+              invalidate();
+              setAssetId(value);
+              setUrl("");
+            }}
+            options={[
+              { value: "", label: ui("Media library") },
+              ...workspace.assets
+                .filter(a => a.kind === "video" && a.status === "ready")
+                .map(a => ({ value: a.id, label: a.name })),
+            ]}
+          />
+        </div>
         {!assetId && (
           <>
             <input
@@ -406,11 +414,12 @@ function ReferenceStyleSession({
                 setRights(false);
               }}
               placeholder="https://cdn.example.com/reference.mp4"
-              className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+              className="h-8 w-full rounded-md border border-border bg-background px-2.5 text-xs"
             />
             <p className="text-xs text-foreground/70">
-              {DIRECT_VIDEO_HELP}{" "}
-              {ui("Direct imports: up to 256 MB and 2 minutes.")}
+              {ui(
+                "Direct video file · MP4, MOV or WebM · up to 256 MB / 2 min"
+              )}
             </p>
             <button
               type="button"
@@ -421,28 +430,15 @@ function ReferenceStyleSession({
                 !capabilities.uploads
               }
               onClick={importLink}
-              className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-40"
+              className="rounded-lg border border-border px-2.5 py-1.5 text-xs disabled:opacity-40"
             >
-              {ui("Import private reference · no AI credits")}
+              {ui("Import reference")}
             </button>
           </>
         )}
-        <label className="block text-xs">
-          {ui("Upload reference")}
-          <input
-            type="file"
-            accept="video/*"
-            className="mt-2 block w-full text-xs file:mr-3 file:rounded-xl file:border file:border-primary/25 file:bg-primary/10 file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary"
-            onChange={e => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) upload(file);
-            }}
-          />
-        </label>
         <button
           type="button"
-          className="text-xs text-primary"
+          className="block text-xs text-primary"
           onClick={() => {
             invalidate();
             setSelected(selected.length === aspects.length ? [] : [...aspects]);
@@ -467,7 +463,17 @@ function ReferenceStyleSession({
                   );
                 }}
               />
-              {aspect}
+              {aspect === "Cut pacing"
+                ? ui("Pacing")
+                : aspect === "Framing and color"
+                  ? `${ui("Framing")} · ${ui("Color")}`
+                  : aspect === "Caption treatment"
+                    ? ui("Captions")
+                    : aspect === "Transitions and graphics"
+                      ? `${ui("Transitions")} · ${ui("Graphics")}`
+                      : aspect === "Music mood and sound placement"
+                        ? ui("Sound")
+                        : aspect}
             </label>
           ))}
         </div>

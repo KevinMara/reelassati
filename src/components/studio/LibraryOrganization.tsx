@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { Folder, FolderPlus } from "lucide-react";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { useState, type ReactNode } from "react";
+import { Folder, FolderPlus, SlidersHorizontal } from "lucide-react";
 import { useWorkspace } from "@/providers/workspace";
 import { useUiText } from "@/lib/i18n/ui";
 import { CompactSelect } from "@/components/ui/compact-select";
@@ -9,8 +14,12 @@ import { isStockCollection } from "@/lib/library-organization";
 export function LibraryOrganization({
   value,
   onChange,
+  filterControls,
+  extraFiltersActive = false,
 }: {
   value: LibraryOrganizationState;
+  filterControls?: ReactNode;
+  extraFiltersActive?: boolean;
   onChange(value: LibraryOrganizationState): void;
 }) {
   const ui = useUiText();
@@ -43,20 +52,22 @@ export function LibraryOrganization({
           <Folder size={14} />
           {ui("Reel stock")}
         </button>
-        {(workspace.mediaFolders ?? []).filter(folder => !isStockCollection(folder)).map(folder => (
-          <button
-            type="button"
-            key={folder.id}
-            onClick={() =>
-              onChange({ ...value, folder: folder.id, origin: "all" })
-            }
-            aria-pressed={value.folder === folder.id}
-            className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${value.folder === folder.id ? "border-primary/40 bg-primary/10 text-primary" : "border-border"}`}
-          >
-            <Folder size={14} />
-            {folder.name}
-          </button>
-        ))}
+        {(workspace.mediaFolders ?? [])
+          .filter(folder => !isStockCollection(folder))
+          .map(folder => (
+            <button
+              type="button"
+              key={folder.id}
+              onClick={() =>
+                onChange({ ...value, folder: folder.id, origin: "all" })
+              }
+              aria-pressed={value.folder === folder.id}
+              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${value.folder === folder.id ? "border-primary/40 bg-primary/10 text-primary" : "border-border"}`}
+            >
+              <Folder size={14} />
+              {folder.name}
+            </button>
+          ))}
         <button
           type="button"
           onClick={() => setName("")}
@@ -65,6 +76,67 @@ export function LibraryOrganization({
         >
           <FolderPlus size={15} />
         </button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={`ml-auto flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs ${extraFiltersActive || value.date !== "all" || !["all", "stock"].includes(value.origin) ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}
+            >
+              <SlidersHorizontal size={14} /> {ui("Filters")}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 space-y-3 p-3">
+            {filterControls}
+            <div className="grid gap-3">
+              {(
+                [
+                  [
+                    "origin",
+                    "Source",
+                    [
+                      ["all", "All sources"],
+                      ["uploaded", "Uploaded"],
+                      ["generated", "Generated"],
+                      ["stock", "Stock"],
+                      ["export", "Exports"],
+                    ],
+                  ],
+                  [
+                    "date",
+                    "Uploaded",
+                    [
+                      ["all", "Any time"],
+                      ["1", "Past day"],
+                      ["7", "Past week"],
+                      ["30", "Past month"],
+                    ],
+                  ],
+                  [
+                    "sort",
+                    "Sort files",
+                    [
+                      ["recent", "Newest first"],
+                      ["oldest", "Oldest first"],
+                      ["name", "Name A–Z"],
+                    ],
+                  ],
+                ] as const
+              ).map(([key, label, options]) => (
+                <div key={key} className="min-w-0">
+                  <CompactSelect
+                    aria-label={ui(label)}
+                    value={value[key]}
+                    onValueChange={next => onChange({ ...value, [key]: next })}
+                    options={options.map(([value, label]) => ({
+                      value,
+                      label: ui(label),
+                    }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
       {name !== null && (
         <form
@@ -106,54 +178,6 @@ export function LibraryOrganization({
           </button>
         </form>
       )}
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            [
-              "origin",
-              "Source",
-              [
-                ["all", "All sources"],
-                ["uploaded", "Uploaded"],
-                ["generated", "Generated"],
-                ["stock", "Stock"],
-                ["export", "Exports"],
-              ],
-            ],
-            [
-              "date",
-              "Uploaded",
-              [
-                ["all", "Any time"],
-                ["1", "Past day"],
-                ["7", "Past week"],
-                ["30", "Past month"],
-              ],
-            ],
-            [
-              "sort",
-              "Sort files",
-              [
-                ["recent", "Newest first"],
-                ["oldest", "Oldest first"],
-                ["name", "Name A–Z"],
-              ],
-            ],
-          ] as const
-        ).map(([key, label, options]) => (
-          <div key={key} className="min-w-36 flex-1 sm:max-w-48">
-            <CompactSelect
-              aria-label={ui(label)}
-              value={value[key]}
-              onValueChange={next => onChange({ ...value, [key]: next })}
-              options={options.map(([value, label]) => ({
-                value,
-                label: ui(label),
-              }))}
-            />
-          </div>
-        ))}
-      </div>
       {error && (
         <p role="alert" className="text-xs text-destructive">
           {error}

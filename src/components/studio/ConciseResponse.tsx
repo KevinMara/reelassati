@@ -12,6 +12,8 @@ export function ConciseResponse({
   limit?: number;
 }) {
   const ui = useUiText();
+  text = text.replace(/\banalysis credits\b/gi, "credits");
+  detailsText = detailsText?.replace(/\banalysis credits\b/gi, "credits");
   const [expanded, setExpanded] = useState(false);
   const long = text.length > limit;
   const hasDetails = Boolean(detailsText?.trim() && detailsText !== text);
