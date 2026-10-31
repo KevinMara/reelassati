@@ -1,4 +1,5 @@
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   DEFAULT_GLB_POSE,
@@ -258,19 +259,12 @@ export function GlbModelComposer({
               />
             </label>
           ))}
-          <label
-            htmlFor={`${id}-tint`}
-            className="flex items-center justify-between text-sm"
-          >
-            {ui("Material tint")}
-            <input
-              id={`${id}-tint`}
-              type="color"
-              value={pose.tint}
-              disabled={disabled || saving}
-              onChange={event => change({ ...pose, tint: event.target.value })}
-            />
-          </label>
+          <ColorPicker
+            label={ui("Material tint")}
+            value={pose.tint}
+            disabled={disabled || saving}
+            onChange={tint => change({ ...pose, tint })}
+          />
           <div className="flex flex-wrap gap-2">
             <button
               type="button"

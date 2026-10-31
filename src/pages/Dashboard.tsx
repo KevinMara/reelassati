@@ -791,7 +791,7 @@ export default function Dashboard() {
       >
         <div className="h-14 flex items-center px-3 border-b border-border shrink-0">
           <Link to="/" className="flex-1">
-            <Logo collapsed={collapsed} />
+            <Logo size="sm" collapsed={collapsed} />
           </Link>
           <button
             type="button"

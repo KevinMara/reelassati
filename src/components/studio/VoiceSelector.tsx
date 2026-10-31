@@ -200,9 +200,7 @@ export function VoiceSelector({
       )}
       {selected?.tags.includes("multilingual") && (
         <p className="text-[11px] text-muted-foreground">
-          {ui(
-            "Speaks 90+ languages, including Italian, with expressive delivery. Uses the lower voice credit rate."
-          )}
+          {ui("Expressive voice in 90+ languages.")}
         </p>
       )}
       {showPreview && selected && (

@@ -1,7 +1,7 @@
 import { PersonalPresetLibrary } from "./PersonalPresetLibrary";
 import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
-import { Check, Search, Type, SlidersHorizontal } from "lucide-react";
+import { Check, Search, Type } from "lucide-react";
 import {
   CAPTION_PRESETS,
   GRAPHIC_PRESETS,
@@ -14,6 +14,7 @@ import {
 import type { TimelineClip } from "@contracts/workspace";
 import { CaptionStylePreview } from "./CaptionStylePreview";
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
+import { PresetPreview } from "./PresetPreview";
 
 export interface EditorPresetLibraryProps {
   mode: "captions" | "graphics" | "looks";
@@ -143,24 +144,24 @@ export function EditorPresetLibrary({
           ))}
         {mode === "looks" &&
           CLIP_LOOK_PRESETS.filter(match).map(p => (
-            <button
-              type="button"
+            <article
               key={p.id}
-              disabled={disabled}
-              onClick={() => onClipLook?.(p)}
-              title={ui(p.description)}
-              className="rounded-xl border border-border p-3 text-left transition hover:border-primary/60 disabled:opacity-50"
+              className="min-w-0 rounded-lg border border-border p-1.5 transition hover:border-primary/40"
             >
-              <div
-                className="mb-2 flex h-12 items-center justify-center rounded-md bg-gradient-to-br from-[#E9B58B] via-[#768D7D] to-[#394555]"
-                style={{
-                  filter: `brightness(${1 + p.settings.brightness}) contrast(${p.settings.contrast}) saturate(${p.settings.saturation})`,
-                }}
+              <PresetPreview name={p.name} look={p.settings} />
+              <button
+                type="button"
+                disabled={disabled}
+                title={ui(p.description)}
+                onClick={() => onClipLook?.(p)}
+                className="mt-1 flex w-full items-center justify-between gap-1 rounded px-1 py-1.5 text-left text-[11px] font-medium hover:bg-primary/10 disabled:opacity-40"
               >
-                <SlidersHorizontal size={20} className="text-white/80" />
-              </div>
-              <span className="text-xs font-medium">{ui(p.name)}</span>
-            </button>
+                <span className="truncate">{ui(p.name)}</span>
+                <span aria-hidden="true" className="text-primary">
+                  +
+                </span>
+              </button>
+            </article>
           ))}
       </div>
       {mode === "looks" && (
@@ -168,20 +169,26 @@ export function EditorPresetLibrary({
           <h4 className="text-xs font-medium text-muted-foreground">
             {ui("Clip entrance & exit")}
           </h4>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {FADE_PRESETS.filter(match).map(p => (
-              <button
+              <article
                 key={p.id}
-                type="button"
-                disabled={disabled}
-                title={ui(p.description)}
-                onClick={() =>
-                  onFadePreset?.({ fadeIn: p.fadeIn, fadeOut: p.fadeOut })
-                }
-                className="rounded-lg border border-border px-2.5 py-1.5 text-xs transition hover:border-primary/60 disabled:opacity-50"
+                className="min-w-0 rounded-lg border border-border p-1.5"
               >
-                {ui(p.name)}
-              </button>
+                <PresetPreview name={p.name} fade={p} />
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={disabled}
+                  title={ui(p.description)}
+                  onClick={() =>
+                    onFadePreset?.({ fadeIn: p.fadeIn, fadeOut: p.fadeOut })
+                  }
+                  className="mt-1 w-full rounded px-1 py-1.5 text-left text-[11px] transition hover:bg-primary/10 disabled:opacity-40"
+                >
+                  {ui(p.name)}
+                </button>
+              </article>
             ))}
           </div>
         </div>

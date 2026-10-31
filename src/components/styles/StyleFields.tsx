@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { useUiText } from "@/lib/i18n/ui";
+import { ColorPicker } from "@/components/ui/color-picker";
 
 export function StyleSelect({
   label,
@@ -108,17 +109,7 @@ export function StyleColor({
   value: string;
   onChange(value: string): void;
 }) {
-  return (
-    <label className="space-y-1.5 text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <input
-        type="color"
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        className="w-full cursor-pointer"
-      />
-    </label>
-  );
+  return <ColorPicker label={label} value={value} onChange={onChange} />;
 }
 
 export function StyleSection({

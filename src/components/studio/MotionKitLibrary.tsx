@@ -1,4 +1,5 @@
 import { useUiText } from "@/lib/i18n/ui";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { useEffect, useId, useState } from "react";
 import { Play, Pause, Layers } from "lucide-react";
 import {
@@ -213,16 +214,12 @@ export function MotionKitLibrary({
           </label>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs">
-            {ui("Accent color")}
-            <input
-              disabled={busy}
-              type="color"
-              value={draft.accent}
-              onChange={event => patch({ accent: event.target.value })}
-              className={field}
-            />
-          </label>
+          <ColorPicker
+            label={ui("Accent color")}
+            value={draft.accent}
+            disabled={busy}
+            onChange={accent => patch({ accent })}
+          />
           <label className="block text-xs">
             {ui("Duration (seconds)")}
             <input

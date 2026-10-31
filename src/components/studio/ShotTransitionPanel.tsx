@@ -8,6 +8,7 @@ import { Download, Upload } from "lucide-react";
 import { useUiText } from "@/lib/i18n/ui";
 import { useRef, useState } from "react";
 import { CompactSelect } from "@/components/ui/compact-select";
+import { PresetPreview } from "./PresetPreview";
 import {
   visualTransitions,
   type VisualTransition,
@@ -73,28 +74,38 @@ export function ShotTransitionPanel({
             )}
       </p>
       <div
-        className="grid grid-cols-3 gap-1.5"
+        className="grid grid-cols-2 gap-2"
         aria-label={ui("Transition presets")}
       >
         {TRANSITION_PRESETS.map(p => (
-          <button
+          <article
             key={p.id}
-            type="button"
-            disabled={disabled || saving}
-            onClick={() => {
-              setKind(p.kind);
-              setSeconds(p.duration);
-              setPersonalId(undefined);
-              setPersonalName(`${ui(p.name)} ${p.duration}s`);
-            }}
-            aria-pressed={
-              kind === p.kind && seconds === p.duration && !personalId
-            }
-            className="rounded-md border border-border px-2 py-2 text-left text-[11px] aria-pressed:border-primary aria-pressed:bg-primary/10"
+            className="min-w-0 rounded-lg border border-border p-1.5"
           >
-            <span className="block truncate">{ui(p.name)}</span>
-            <span className="text-foreground/50">{p.duration}s</span>
-          </button>
+            <PresetPreview
+              name={`${ui(p.name)} · ${p.duration}s`}
+              transition={p.kind}
+              seconds={p.duration}
+            />
+            <button
+              key={p.id}
+              type="button"
+              disabled={disabled || saving}
+              onClick={() => {
+                setKind(p.kind);
+                setSeconds(p.duration);
+                setPersonalId(undefined);
+                setPersonalName(`${ui(p.name)} ${p.duration}s`);
+              }}
+              aria-pressed={
+                kind === p.kind && seconds === p.duration && !personalId
+              }
+              className="mt-1 flex w-full items-center justify-between gap-1 rounded px-1 py-1.5 text-left text-[11px] aria-pressed:bg-primary/15 aria-pressed:text-primary disabled:opacity-40"
+            >
+              <span className="block truncate">{ui(p.name)}</span>
+              <span className="text-foreground/50">{p.duration}s</span>
+            </button>
+          </article>
         ))}
       </div>
       <details className="rounded-md border border-border p-2 text-xs">

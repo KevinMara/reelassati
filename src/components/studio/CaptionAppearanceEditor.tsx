@@ -8,6 +8,7 @@ import {
 import { CaptionStylePreview } from "./CaptionStylePreview";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { EditorInfo } from "./EditorInfo";
+import { ColorPicker } from "@/components/ui/color-picker";
 
 export function CaptionAppearanceEditor({
   presetId,
@@ -66,15 +67,12 @@ export function CaptionAppearanceEditor({
             ["activeColor", "Active word color"],
           ] as const
         ).map(([key, label]) => (
-          <label key={key} className="text-xs text-foreground/70">
-            {label}
-            <input
-              type="color"
-              value={p[key]}
-              onChange={e => patch({ [key]: e.target.value })}
-              className="mt-1 block h-8 w-full rounded-md border border-border"
-            />
-          </label>
+          <ColorPicker
+            key={key}
+            label={ui(label)}
+            value={p[key]}
+            onChange={value => patch({ [key]: value })}
+          />
         ))}
       </div>
       <CompactSelect
@@ -169,16 +167,11 @@ export function CaptionAppearanceEditor({
         </label>
       </div>
       {p.background && (
-        <label className="flex items-center justify-between text-xs">
-          {ui("Background color")}
-          <input
-            type="color"
-            aria-label={ui("Caption background")}
-            value={p.background}
-            onChange={e => patch({ background: e.target.value })}
-            className="h-8 w-14 rounded border border-border"
-          />
-        </label>
+        <ColorPicker
+          label={ui("Background color")}
+          value={p.background}
+          onChange={background => patch({ background })}
+        />
       )}
       <div className="flex gap-2">
         <button

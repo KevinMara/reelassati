@@ -1,4 +1,5 @@
 import { useUiText } from "@/lib/i18n/ui";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { useEffect, useId, useState } from "react";
 import { Play, Pause } from "lucide-react";
 import { CompactSelect } from "@/components/ui/compact-select";
@@ -30,11 +31,26 @@ export function GraphicComposer({
 }) {
   const ui = useUiText();
   const graphicKindLabels = {
-    text: ui("Text"), callout: ui("Callout"), counter: ui("Counter"), countdown: ui("Countdown"),
-    arrow: ui("Arrow"), highlight: ui("Highlight"), rectangle: ui("Rectangle"), ellipse: ui("Ellipse"),
-    star: ui("Star"), line: ui("Line"), "spatial-title": ui("3D title"), "spatial-cube": ui("3D cube"), "spatial-orbit": ui("3D orbit"),
+    text: ui("Text"),
+    callout: ui("Callout"),
+    counter: ui("Counter"),
+    countdown: ui("Countdown"),
+    arrow: ui("Arrow"),
+    highlight: ui("Highlight"),
+    rectangle: ui("Rectangle"),
+    ellipse: ui("Ellipse"),
+    star: ui("Star"),
+    line: ui("Line"),
+    "spatial-title": ui("3D title"),
+    "spatial-cube": ui("3D cube"),
+    "spatial-orbit": ui("3D orbit"),
   };
-  const animationLabels = { none: ui("None"), fade: ui("Fade"), pop: ui("Pop"), slide: ui("Slide") };
+  const animationLabels = {
+    none: ui("None"),
+    fade: ui("Fade"),
+    pop: ui("Pop"),
+    slide: ui("Slide"),
+  };
   const controlId = useId();
   const [g, setG] = useState<MotionGraphic>(() =>
     normalizeGraphic(initial ?? draft ?? { kind: "text", text: "" })!
@@ -171,7 +187,10 @@ export function GraphicComposer({
               onValueChange={value => patch("composition", value)}
               options={[
                 { value: "plain", label: ui("Plain title / label") },
-                { value: "lower-third", label: ui("Name + role with accent bar") },
+                {
+                  value: "lower-third",
+                  label: ui("Name + role with accent bar"),
+                },
                 { value: "chapter", label: ui("Chapter with top rule") },
                 { value: "quote", label: ui("Quote + attribution") },
                 { value: "statistic", label: ui("Statistic + explanation") },
@@ -188,15 +207,11 @@ export function GraphicComposer({
                 onChange={e => patch("secondaryText", e.target.value)}
               />
             </label>
-            <label className="block text-sm">
-              {ui("Accent color")}
-              <input
-                type="color"
-                aria-label={ui("Graphic accent color")}
-                value={g.accent ?? g.color}
-                onChange={e => patch("accent", e.target.value)}
-              />
-            </label>
+            <ColorPicker
+              label={ui("Graphic accent color")}
+              value={g.accent ?? g.color}
+              onChange={value => patch("accent", value)}
+            />
           </>
         )}
       {(["rectangle", "ellipse", "star", "line"].includes(g.kind) ||
@@ -288,26 +303,16 @@ export function GraphicComposer({
         </div>
       )}
       <div className="grid grid-cols-2 gap-2">
-        <label className="text-sm">
-          {ui("Color")}
-          <input
-            aria-label={ui("Graphic color")}
-            type="color"
-            className="block h-9 w-full"
-            value={g.color}
-            onChange={e => patch("color", e.target.value)}
-          />
-        </label>
-        <label className="text-sm">
-          {ui("Card color")}
-          <input
-            aria-label={ui("Graphic card color")}
-            type="color"
-            className="block h-9 w-full"
-            value={g.background}
-            onChange={e => patch("background", e.target.value)}
-          />
-        </label>
+        <ColorPicker
+          label={ui("Graphic color")}
+          value={g.color}
+          onChange={value => patch("color", value)}
+        />
+        <ColorPicker
+          label={ui("Graphic card color")}
+          value={g.background}
+          onChange={value => patch("background", value)}
+        />
       </div>
       {(
         [

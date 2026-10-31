@@ -90,3 +90,50 @@ for (const [language, value] of Object.entries(voiceIntro)) {
     "Turn audio into an editable transcript, script or voiceover."
   ] = value;
 }
+
+const controlKeys = [
+  "Expressive voice in 90+ languages.",
+  "Recent colors",
+  "Enter a valid hex color.",
+  "Preview {{name}}",
+  "Hue",
+];
+const controlRows: Partial<Record<InterfaceLanguage, string>> = {
+  it: "Voce espressiva in oltre 90 lingue.|Colori recenti|Inserisci un colore esadecimale valido.|Anteprima {{name}}|Tonalità",
+  es: "Voz expresiva en más de 90 idiomas.|Colores recientes|Introduce un color hexadecimal válido.|Vista previa de {{name}}|Tono",
+  fr: "Voix expressive dans plus de 90 langues.|Couleurs récentes|Saisissez une couleur hexadécimale valide.|Aperçu de {{name}}|Teinte",
+  de: "Ausdrucksstarke Stimme in über 90 Sprachen.|Zuletzt verwendete Farben|Gib einen gültigen Hex-Farbwert ein.|Vorschau: {{name}}|Farbton",
+  pt: "Voz expressiva em mais de 90 idiomas.|Cores recentes|Introduza uma cor hexadecimal válida.|Pré-visualização de {{name}}|Matiz",
+  nl: "Expressieve stem in meer dan 90 talen.|Recente kleuren|Voer een geldige hexkleur in.|Voorbeeld van {{name}}|Tint",
+  pl: "Ekspresyjny głos w ponad 90 językach.|Ostatnie kolory|Wpisz prawidłowy kolor szesnastkowy.|Podgląd {{name}}|Odcień",
+  ro: "Voce expresivă în peste 90 de limbi.|Culori recente|Introdu o culoare hexazecimală validă.|Previzualizare {{name}}|Nuanță",
+  tr: "90'dan fazla dilde etkileyici ses.|Son renkler|Geçerli bir onaltılık renk girin.|{{name}} önizlemesi|Renk tonu",
+  uk: "Виразний голос понад 90 мовами.|Нещодавні кольори|Введіть дійсний шістнадцятковий колір.|Перегляд {{name}}|Відтінок",
+  ru: "Выразительный голос более чем на 90 языках.|Недавние цвета|Введите допустимый шестнадцатеричный цвет.|Просмотр {{name}}|Оттенок",
+  ar: "صوت تعبيري بأكثر من 90 لغة.|الألوان الأخيرة|أدخل لونًا سداسيًا عشريًا صالحًا.|معاينة {{name}}|درجة اللون",
+  hi: "90 से अधिक भाषाओं में अभिव्यक्तिपूर्ण आवाज़।|हाल के रंग|मान्य हेक्स रंग दर्ज करें।|{{name}} का पूर्वावलोकन|रंगत",
+  ja: "90以上の言語に対応した表現豊かな音声。|最近使った色|有効な16進数の色を入力してください。|{{name}}をプレビュー|色相",
+  ko: "90개 이상의 언어로 표현력 있는 음성.|최근 색상|올바른 16진수 색상을 입력하세요.|{{name}} 미리보기|색조",
+  zh: "支持90多种语言的生动语音。|最近使用的颜色|请输入有效的十六进制颜色。|预览{{name}}|色相",
+  vi: "Giọng nói biểu cảm với hơn 90 ngôn ngữ.|Màu gần đây|Nhập mã màu hex hợp lệ.|Xem trước {{name}}|Sắc độ",
+  da: "Udtryksfuld stemme på over 90 sprog.|Seneste farver|Indtast en gyldig hex-farve.|Forhåndsvis {{name}}|Farvetone",
+  sv: "Uttrycksfull röst på över 90 språk.|Senaste färger|Ange en giltig hex-färg.|Förhandsvisa {{name}}|Nyans",
+  no: "Uttrykksfull stemme på over 90 språk.|Nylige farger|Skriv inn en gyldig heksadesimal farge.|Forhåndsvis {{name}}|Fargetone",
+  fi: "Ilmeikäs ääni yli 90 kielellä.|Viimeisimmät värit|Anna kelvollinen heksaväri.|Esikatsele {{name}}|Sävy",
+  cs: "Výrazný hlas ve více než 90 jazycích.|Nedávné barvy|Zadejte platnou hexadecimální barvu.|Náhled {{name}}|Odstín",
+  hu: "Kifejező hang több mint 90 nyelven.|Legutóbbi színek|Adj meg érvényes hexadecimális színt.|{{name}} előnézete|Árnyalat",
+  el: "Εκφραστική φωνή σε περισσότερες από 90 γλώσσες.|Πρόσφατα χρώματα|Εισαγάγετε έγκυρο δεκαεξαδικό χρώμα.|Προεπισκόπηση {{name}}|Απόχρωση",
+  he: "קול מלא הבעה ביותר מ-90 שפות.|צבעים אחרונים|יש להזין צבע הקסדצימלי תקין.|תצוגה מקדימה של {{name}}|גוון",
+  id: "Suara ekspresif dalam lebih dari 90 bahasa.|Warna terbaru|Masukkan warna heksadesimal yang valid.|Pratinjau {{name}}|Rona",
+  th: "เสียงที่มีอารมณ์ในกว่า 90 ภาษา|สีล่าสุด|ป้อนรหัสสีฐานสิบหกที่ถูกต้อง|ดูตัวอย่าง {{name}}|เฉดสี",
+};
+for (const [code, row] of Object.entries(controlRows)) {
+  const values = row.split("|");
+  if (values.length !== controlKeys.length)
+    throw new Error(`Invalid editor control copy: ${code}`);
+  Object.assign(
+    editorOct31Ui[code],
+    Object.fromEntries(controlKeys.map((key, i) => [key, values[i]]))
+  );
+  editorOct31Ui[code].HEX = "HEX";
+}

@@ -600,3 +600,30 @@
     font-size: 16px;
   }
 }
+/* Compact editor palette; explicit thumbs remain visible over every hue. */
+.color-picker-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+  background: #454550;
+  box-shadow: 0 0 0 1px #0005;
+}
+.color-picker-slider::-moz-range-thumb {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid white;
+  background: #454550;
+  box-shadow: 0 0 0 1px #0005;
+}
+.color-picker-slider:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 4px;
+}
+@media (max-width: 759px) {
+  .color-picker input:not([type="range"]) {
+    font-size: 16px;
+  }
+}

@@ -537,9 +537,14 @@ export function TimelinePreview({
           aria-pressed={magnetic}
           title={ui("Snap to canvas, objects and spacing")}
           onClick={() => setMagnetic(v => !v)}
-          className={`absolute left-2 top-2 z-40 flex size-8 items-center justify-center rounded-md border ${magnetic ? "border-primary/40 bg-primary/15 text-primary" : "border-border bg-background/80 text-foreground/60"}`}
+          className={`absolute left-2 top-2 z-40 flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium shadow-sm transition-colors ${magnetic ? "border-primary/60 bg-primary/20 text-primary ring-1 ring-primary/15" : "border-border bg-background/90 text-muted-foreground"}`}
         >
-          <Magnet size={15} />
+          <Magnet size={15} aria-hidden="true" />
+          <span>{ui("Snap")}</span>
+          <span
+            aria-hidden="true"
+            className={`size-1.5 rounded-full ${magnetic ? "bg-primary shadow-[0_0_6px_hsl(var(--primary))]" : "bg-muted-foreground/40"}`}
+          />
         </button>
       )}
 
