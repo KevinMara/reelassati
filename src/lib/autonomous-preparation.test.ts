@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Asset, EditProject } from "@contracts/workspace";
-import type { SavedAnalyzerReport } from "@contracts/analyzer-report";
+import {
+  checkpointAnalyzerReport,
+  type SavedAnalyzerReport,
+} from "@contracts/analyzer-report";
 import {
   createAutonomousPreparationCache,
   prepareAutonomousSources,
@@ -104,6 +107,56 @@ function savedReport(): SavedAnalyzerReport {
 }
 
 describe("saved paid review reuse", () => {
+  it("restores a paid checkpoint after speech failure and a fresh editor session", async () => {
+    const input = fixture();
+    let reports: SavedAnalyzerReport[] = [];
+    const report = savedReport();
+    report.result.review!.captions = "absent";
+    report.result.review!.audio = "present";
+    input.review.mockImplementation(async () => {
+      reports = checkpointAnalyzerReport(reports, report);
+      return report.result as never;
+    });
+    input.transcribe.mockRejectedValueOnce(new Error("Speech unavailable"));
+    await expect(prepareAutonomousSources(input)).rejects.toThrow(
+      "Speech unavailable"
+    );
+    const reopened = fixture();
+    const restored = await prepareAutonomousSources({
+      ...reopened,
+      savedReports: JSON.parse(JSON.stringify(reports)),
+    });
+    expect(input.review).toHaveBeenCalledTimes(1);
+    expect(reopened.review).not.toHaveBeenCalled();
+    expect(reopened.transcribe).toHaveBeenCalledTimes(1);
+    expect(restored.analysis[0].observations[0].visualEvidence).toBe(
+      report.result.insights[0].visualEvidence
+    );
+    expect(reports[0].result.provenance).toEqual(report.result.provenance);
+    expect(project.transcript).toEqual([]);
+  });
+  it("replaces only the same source/platform checkpoint and rejects incomplete evidence", () => {
+    const report = savedReport();
+    const otherSource = { ...report, assetId: "other-source" };
+    const otherPlatform = { ...report, platform: "youtube" };
+    const newer = { ...report, createdAt: "2026-11-01T18:00:00Z" };
+    const saved = checkpointAnalyzerReport(
+      [report, otherSource, otherPlatform],
+      newer
+    );
+    expect(saved.map(r => [r.assetId, r.platform, r.createdAt])).toEqual([
+      [newer.assetId, newer.platform, newer.createdAt],
+      [otherSource.assetId, otherSource.platform, otherSource.createdAt],
+      [otherPlatform.assetId, otherPlatform.platform, otherPlatform.createdAt],
+    ]);
+    expect(() =>
+      checkpointAnalyzerReport(saved, {
+        ...newer,
+        result: { ...newer.result, insights: [] },
+      })
+    ).toThrow("could not be saved");
+    expect(saved).toHaveLength(3);
+  });
   it("transcribes dialogue but never a built-in check sound or generated music during auto-edit", async () => {
     const input = fixture();
     const effect = {

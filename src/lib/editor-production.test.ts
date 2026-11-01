@@ -18,6 +18,30 @@ const clip = {
 const project = { clips: [clip] } as EditProject;
 const assets = [{ id: "media", kind: "video", duration: 28.3507 }] as Asset[];
 describe("automated edit delivery checks", () => {
+  it("rejects a new blank opening but permits existing gaps and a visible title before footage", () => {
+    const delayed = { ...project, clips: [{ ...clip, start: 4.9 }] };
+    expect(auditAutomatedEdit(project, delayed, assets)).toContain(
+      "The edit introduced a blank opening"
+    );
+    expect(auditAutomatedEdit(delayed, delayed, assets)).toEqual([]);
+    const title = {
+      ...clip,
+      id: "title",
+      assetId: undefined,
+      start: 0,
+      duration: 4.9,
+      inPoint: 0,
+      outPoint: 4.9,
+      graphic: normalizeGraphic({ kind: "text", text: "Opening title" }),
+    };
+    expect(
+      auditAutomatedEdit(
+        project,
+        { ...delayed, clips: [title, ...delayed.clips] },
+        assets
+      )
+    ).toEqual([]);
+  });
   it("rejects newly generated unreadable cards without imposing a redesign on existing user graphics", () => {
     const bad = {
       ...clip,

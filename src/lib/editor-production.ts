@@ -99,8 +99,8 @@ export function auditAutomatedEdit(
   const sourceKinds = new Map(assets.map(asset => [asset.id, asset.kind]));
   // Match renderer eligibility, including hidden/solo tracks. Audio must not
   // disguise complete picture loss; replacement media or graphics still count.
-  const hasPicture = (project: EditProject) =>
-    effectiveTimelineClips(project).some(clip => {
+  const pictureClips = (project: EditProject) =>
+    effectiveTimelineClips(project).filter(clip => {
       if (
         clip.hidden ||
         clip.duration <= 0 ||
@@ -117,8 +117,16 @@ export function auditAutomatedEdit(
         )
       );
     });
-  if (hasPicture(before) && !hasPicture(after))
+  const beforePicture = pictureClips(before);
+  const afterPicture = pictureClips(after);
+  if (beforePicture.length && !afterPicture.length)
     problems.push("The edit removed all visible picture content");
+  if (
+    beforePicture.some(clip => clip.start <= 0.001) &&
+    afterPicture.length &&
+    !afterPicture.some(clip => clip.start <= 0.001)
+  )
+    problems.push("The edit introduced a blank opening");
   for (const locked of before.clips.filter(c => c.locked)) {
     if (
       JSON.stringify(after.clips.find(c => c.id === locked.id)) !==

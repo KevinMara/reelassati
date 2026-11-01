@@ -42,7 +42,11 @@ import { EditStyleTemplates } from "./EditStyleTemplates";
 import { editTemplateDirection } from "@contracts/edit-style-template";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
 import { editorFailureMessage } from "@contracts/editor-errors";
-import { eligibleAnalyzerOptimization } from "@contracts/analyzer-report";
+import {
+  eligibleAnalyzerOptimization,
+  checkpointAnalyzerReport,
+  type SavedAnalyzerReport,
+} from "@contracts/analyzer-report";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
 import type {
@@ -411,7 +415,8 @@ export function AutonomousEditor({
           uiLocale: getUiLocale(),
           options: cacheOptions,
         });
-      const cacheKey = keyFor(workspace, project);
+      let expectedReports = workspace.analyzerReports;
+      let cacheKey = keyFor(workspace, project);
       const inputsStillCurrent = () => {
         const current = getWorkspaceSnapshot();
         const base = current.projects.find(p => p.id === project.id);
@@ -442,7 +447,7 @@ export function AutonomousEditor({
             setStatus(`Reviewing ${asset.name}…`);
             const { analyzeMedia } = await import("@/lib/analyze-media");
             checkpoint();
-            return analyzeMedia(
+            const review = await analyzeMedia(
               asset,
               project.platform,
               undefined,
@@ -453,6 +458,38 @@ export function AutonomousEditor({
               false,
               onCreditReceipt
             );
+            checkpoint();
+            const report: SavedAnalyzerReport = {
+              assetId: asset.id,
+              duration: asset.duration!,
+              platform: project.platform,
+              createdAt: new Date().toISOString(),
+              result: {
+                ...review,
+                schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+                insights: review.insights ?? [],
+              },
+            };
+            // Persist paid preparation now, before transcription or planning.
+            // A later failure, navigation or reload must not repurchase it.
+            await updateWorkspace(current => {
+              checkpoint(current);
+              return {
+                ...current,
+                analyzerReports: checkpointAnalyzerReport(
+                  current.analyzerReports,
+                  report
+                ),
+              };
+            });
+            // Account only for our own evidence checkpoint. Concurrent timeline,
+            // library or report edits must still invalidate the prepared plan.
+            expectedReports = checkpointAnalyzerReport(expectedReports, report);
+            cacheKey = keyFor(
+              { ...workspace, analyzerReports: expectedReports },
+              project
+            );
+            return review;
           },
           transcribe: async asset => {
             setStage(ui("Captions"));

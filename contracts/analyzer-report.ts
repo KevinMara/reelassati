@@ -101,7 +101,14 @@ export function normalizeSavedAnalyzerReports(
         ),
         result: {
           ...candidate.result,
-          ...(candidate.result.review ? { review: normalizeReview(candidate.result.review, candidate.duration) } : {}),
+          ...(candidate.result.review
+            ? {
+                review: normalizeReview(
+                  candidate.result.review,
+                  candidate.duration
+                ),
+              }
+            : {}),
           insights,
           recommendations: normalizeVideoRecommendations(
             candidate.result.recommendations,
@@ -112,6 +119,24 @@ export function normalizeSavedAnalyzerReports(
       },
     ];
   });
+}
+
+/** Checkpoint a completed, paid review before later editing steps can fail.
+ * Keep the full evidence and provenance; never replace it with a short summary. */
+export function checkpointAnalyzerReport(
+  reports: SavedAnalyzerReport[] | undefined,
+  report: SavedAnalyzerReport
+): SavedAnalyzerReport[] {
+  const validated = normalizeSavedAnalyzerReports([report]);
+  if (!validated.length)
+    throw new Error("The completed video review could not be saved.");
+  return normalizeSavedAnalyzerReports([
+    ...validated,
+    ...(reports ?? []).filter(
+      saved =>
+        saved.assetId !== report.assetId || saved.platform !== report.platform
+    ),
+  ]);
 }
 
 /** An oversized import must fail before the workspace mutation, never evict

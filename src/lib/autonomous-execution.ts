@@ -7,6 +7,7 @@ import type {
 import { applyEditOperation } from "./edit-timeline";
 import { assertSupportingMedia } from "@contracts/supporting-media";
 import { auditAutomatedEdit } from "./editor-production";
+import { assertAutonomousTrimSemantics } from "@contracts/edit-cut-semantics";
 import {
   automaticGraphicProblems,
   graphicRequestScope,
@@ -339,6 +340,7 @@ export function executeAutonomousPlan(
   checkpoint: () => void = () => undefined,
   onStep?: (project: EditProject, operation: EditOperation) => void
 ): EditProject {
+  assertAutonomousTrimSemantics(project, operations);
   let working = structuredClone(project);
   const roots = new Map(project.clips.map(clip => [clip.id, clip.id]));
   const seen = new Set<string>();
