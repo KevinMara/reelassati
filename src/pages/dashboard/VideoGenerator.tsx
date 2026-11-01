@@ -460,16 +460,13 @@ export default function VideoGenerator() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">
-          {ui("AI Video Studio")}
-        </p>
-        <h1 className="text-3xl font-semibold">{ui("Prompt Director")}</h1>
-        <p className="mt-2 max-w-3xl text-foreground/60">
-          {ui(
-            "Direct a new clip or continue a previous scene while keeping its subject, setting, and visual language consistent."
-          )}
+    <div className="creation-workspace mx-auto max-w-6xl">
+      <div className="mb-5">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {ui("Video Generator")}
+        </h1>
+        <p className="mt-1.5 max-w-3xl text-sm text-foreground/60">
+          {ui("Describe your scene, choose a visual style, and create a clip.")}
         </p>
       </div>
 
@@ -492,174 +489,8 @@ export default function VideoGenerator() {
         </div>
       ) : null}
 
-      <div className="video-director-grid grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.35fr)_minmax(0,0.83fr)]">
-        <div className="space-y-5">
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <Film className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-medium">{ui("Visual style")}</h2>
-              <span className="ml-auto text-xs uppercase tracking-wider text-foreground/70">
-                {VIDEO_PROMPT_TEMPLATES.length} {ui("Styles")}
-              </span>
-            </div>
-            <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">
-              {VIDEO_PROMPT_TEMPLATES.map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => selectTemplate(item.id)}
-                  aria-pressed={selectedTemplate === item.id}
-                  className={`w-full rounded-lg border p-3 text-left transition-all ${
-                    selectedTemplate === item.id
-                      ? "border-primary bg-primary/5"
-                      : "border-border bg-background hover:border-primary/35"
-                  }`}
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">{ui(item.name)}</span>
-                    <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-xs uppercase tracking-wider text-foreground/65">
-                      {ui(item.category)}
-                    </span>
-                  </span>
-                  <span className="mt-1 block text-xs leading-relaxed text-foreground/65">
-                    {ui(item.description)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-medium">{ui("Output controls")}</h2>
-            </div>
-
-            <label
-              className="mb-2 block text-xs font-medium text-foreground/70"
-              htmlFor="video-asset-name"
-            >
-              {ui("Video name")}
-            </label>
-            <input
-              id="video-asset-name"
-              value={assetName}
-              maxLength={110}
-              onChange={event => setAssetName(event.target.value)}
-              placeholder={ui("Summer launch — clip 01")}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-            />
-
-            <fieldset>
-              <legend className="mb-2 text-xs font-medium text-foreground/70">
-                {ui("Aspect ratio")}
-              </legend>
-              <div className="grid grid-cols-3 gap-2">
-                {RATIOS.map(item => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      if (item.id === ratio) return;
-                      setRatio(item.id);
-                      invalidateRightsAttestations();
-                    }}
-                    aria-pressed={ratio === item.id}
-                    title={ui(item.description)}
-                    className={`rounded-lg border px-2 py-2.5 text-center transition-colors ${
-                      ratio === item.id
-                        ? "border-primary bg-primary/5 text-primary"
-                        : "border-border bg-background hover:border-primary/35"
-                    }`}
-                  >
-                    <span className="block text-sm font-medium">
-                      {item.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <div className="mt-4">
-              <label
-                className="mb-2 block text-xs font-medium text-foreground/70"
-                htmlFor="video-duration"
-              >
-                {ui("Duration")}
-              </label>
-              <StudioSelect
-                id="video-duration"
-                value={duration}
-                onChange={event => {
-                  const nextDuration = Number(event.target.value);
-                  if (nextDuration === duration) return;
-                  setDuration(nextDuration);
-                  invalidateRightsAttestations();
-                }}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-              >
-                {DURATIONS.map(seconds => (
-                  <option key={seconds} value={seconds}>
-                    {seconds} {ui("seconds")}
-                  </option>
-                ))}
-              </StudioSelect>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {(["720p", "1080p"] as const).map(value => (
-                <button
-                  type="button"
-                  key={value}
-                  onClick={() => setResolution(value)}
-                  aria-pressed={resolution === value}
-                  className={`rounded-lg border py-2 text-xs font-medium ${
-                    resolution === value
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border bg-background"
-                  }`}
-                >
-                  {value}
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              aria-pressed={generateAudio}
-              onClick={() => {
-                setGenerateAudio(current => !current);
-                invalidateRightsAttestations();
-              }}
-              className="mt-4 flex w-full items-center gap-3 rounded-lg border border-border bg-background p-3 text-left"
-            >
-              <span
-                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                  generateAudio ? "bg-primary" : "bg-foreground/20"
-                }`}
-              >
-                <span
-                  className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                    generateAudio ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </span>
-              <span>
-                <span className="flex items-center gap-1.5 text-sm font-medium">
-                  <Volume2 className="h-3.5 w-3.5" />
-                  {ui("Native audio")}
-                </span>
-                <span className="mt-0.5 block text-xs text-foreground/65">
-                  {generateAudio
-                    ? ui("Requested with the video")
-                    : ui("Silent output requested")}
-                </span>
-              </span>
-            </button>
-          </section>
-        </div>
-
-        <div className="space-y-5">
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.85fr)]">
+        <div className="min-w-0 space-y-4">
           <section className="rounded-xl border border-border bg-surface p-5">
             <div className="mb-3 flex items-center gap-2">
               <Layers3 className="h-4 w-4 text-primary" />
@@ -681,7 +512,7 @@ export default function VideoGenerator() {
                     if (mode === "continue" && duration < 4) setDuration(4);
                     invalidateRightsAttestations();
                   }}
-                  className={`rounded-lg border px-3 py-2.5 text-xs font-medium transition-colors ${
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
                     clipMode === mode
                       ? "border-primary bg-primary/5 text-primary"
                       : "border-border bg-background hover:border-primary/35"
@@ -708,7 +539,7 @@ export default function VideoGenerator() {
                       setContinuitySourceJobId(event.target.value);
                       invalidateRightsAttestations();
                     }}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >
                     {completedVideoJobs.map(candidate => {
                       const asset = candidate.resultAssetId
@@ -744,8 +575,8 @@ export default function VideoGenerator() {
             )}
           </section>
 
-          <section className="rounded-xl border border-border bg-surface p-6">
-            <div className="mb-5 flex items-start justify-between gap-3">
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">{ui("Scene direction")}</p>
                 <p className="mt-1 text-xs text-foreground/65">
@@ -757,31 +588,23 @@ export default function VideoGenerator() {
               <WandSparkles className="h-5 w-5 text-primary" />
             </div>
 
-            <ScenePresets
-              direction={{ ...direction }}
-              onSelect={value => {
-                setDirection({ ...EMPTY_DIRECTION, ...value });
-                setRightsConfirmed(false);
-                setRealPersonConsentConfirmed(false);
-                requestIdRef.current = null;
-              }}
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
                 <label
                   className="mb-2 block text-xs font-medium"
                   htmlFor="director-subject"
                 >
                   {ui("Subject")}
                 </label>
-                <input
+                <textarea
+                  rows={2}
                   id="director-subject"
                   value={direction.subject}
                   onChange={event =>
                     updateDirection("subject", event.target.value)
                   }
                   placeholder={ui("A ceramic artist in her late twenties")}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 />
               </div>
               <div>
@@ -798,7 +621,7 @@ export default function VideoGenerator() {
                     updateDirection("action", event.target.value)
                   }
                   placeholder={ui("Glazes a finished cup, then reveals it")}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 />
               </div>
               <div>
@@ -815,7 +638,7 @@ export default function VideoGenerator() {
                     updateDirection("location", event.target.value)
                   }
                   placeholder={ui("A sunlit working studio")}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -838,7 +661,7 @@ export default function VideoGenerator() {
                       updateDirection("camera", event.target.value)
                     }
                     placeholder={ui("Slow push-in, then a macro detail")}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
@@ -855,7 +678,7 @@ export default function VideoGenerator() {
                       updateDirection("mood", event.target.value)
                     }
                     placeholder={ui("Warm morning light, tactile and calm")}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
@@ -874,7 +697,7 @@ export default function VideoGenerator() {
                     placeholder={ui(
                       "The detail that makes every cup different."
                     )}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
@@ -891,7 +714,7 @@ export default function VideoGenerator() {
                       updateDirection("sound", event.target.value)
                     }
                     placeholder={ui("Brush on clay, room tone, no music")}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
@@ -908,7 +731,7 @@ export default function VideoGenerator() {
                       updateDirection("avoid", event.target.value)
                     }
                     placeholder={ui("Extra fingers, warped cup, logos")}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   />
                 </div>
               </div>
@@ -960,7 +783,7 @@ export default function VideoGenerator() {
                       invalidateRightsAttestations();
                     }}
                     placeholder="https://cdn.example.com/frame.jpg"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   />
                   {firstFrameError ? (
                     <p className="mt-1 text-xs text-red-500">
@@ -986,7 +809,7 @@ export default function VideoGenerator() {
                       invalidateRightsAttestations();
                     }}
                     placeholder="https://cdn.example.com/frame.jpg"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   />
                   {lastFrameError ? (
                     <p className="mt-1 text-xs text-red-500">
@@ -1001,12 +824,56 @@ export default function VideoGenerator() {
                 </p>
               </div>
             ) : null}
+            <ScenePresets
+              direction={{ ...direction }}
+              onSelect={value => {
+                setDirection({ ...EMPTY_DIRECTION, ...value });
+                setRightsConfirmed(false);
+                setRealPersonConsentConfirmed(false);
+                requestIdRef.current = null;
+              }}
+            />
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5">
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="mb-3 flex items-center gap-2">
+              <Film className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-medium">{ui("Visual style")}</h2>
+              <span className="ml-auto text-xs text-foreground/60">
+                {VIDEO_PROMPT_TEMPLATES.length} {ui("Styles")}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {VIDEO_PROMPT_TEMPLATES.map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => selectTemplate(item.id)}
+                  aria-pressed={selectedTemplate === item.id}
+                  title={ui(item.description)}
+                  className={`rounded-md border px-3 py-2 text-left text-xs font-medium transition-colors ${
+                    selectedTemplate === item.id
+                      ? "border-primary bg-primary/5"
+                      : "border-border bg-background hover:border-primary/35"
+                  }`}
+                >
+                  {ui(item.name)}
+                </button>
+              ))}
+            </div>
+            {template ? (
+              <p className="mt-3 text-xs leading-relaxed text-foreground/65">
+                {ui(template.description)}
+              </p>
+            ) : null}
+          </section>
+
+          <details className="rounded-xl border border-border bg-surface p-4">
+            <summary className="cursor-pointer text-xs font-medium">
+              {ui("Compiled prompt")}
+            </summary>
+            <div className="mb-3 mt-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium">{ui("Compiled prompt")}</p>
                 <p className="mt-0.5 text-xs text-foreground/65">
                   {template?.name ?? "Custom"} {ui("· ready to generate")}
                 </p>
@@ -1036,17 +903,150 @@ export default function VideoGenerator() {
                 {ui("Finishing workflow:")} {template.finishingNote}
               </p>
             ) : null}
-          </section>
+          </details>
         </div>
+        <div className="min-w-0 space-y-4">
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-medium">{ui("Output controls")}</h2>
+            </div>
 
-        <div className="space-y-5">
-          <section className="rounded-xl border border-primary/20 bg-primary/5 p-5">
+            <label
+              className="mb-2 block text-xs font-medium text-foreground/70"
+              htmlFor="video-asset-name"
+            >
+              {ui("Video name")}
+            </label>
+            <input
+              id="video-asset-name"
+              value={assetName}
+              maxLength={110}
+              onChange={event => setAssetName(event.target.value)}
+              placeholder={ui("Summer launch — clip 01")}
+              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            />
+
+            <fieldset>
+              <legend className="mb-2 text-xs font-medium text-foreground/70">
+                {ui("Aspect ratio")}
+              </legend>
+              <div className="grid grid-cols-3 gap-2">
+                {RATIOS.map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (item.id === ratio) return;
+                      setRatio(item.id);
+                      invalidateRightsAttestations();
+                    }}
+                    aria-pressed={ratio === item.id}
+                    title={ui(item.description)}
+                    className={`rounded-lg border px-2 py-2 text-center transition-colors ${
+                      ratio === item.id
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border bg-background hover:border-primary/35"
+                    }`}
+                  >
+                    <span className="block text-sm font-medium">
+                      {item.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <div className="mt-4">
+              <label
+                className="mb-2 block text-xs font-medium text-foreground/70"
+                htmlFor="video-duration"
+              >
+                {ui("Duration")}
+              </label>
+              <StudioSelect
+                id="video-duration"
+                value={duration}
+                onChange={event => {
+                  const nextDuration = Number(event.target.value);
+                  if (nextDuration === duration) return;
+                  setDuration(nextDuration);
+                  invalidateRightsAttestations();
+                }}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
+                {DURATIONS.map(seconds => (
+                  <option key={seconds} value={seconds}>
+                    {seconds} {ui("seconds")}
+                  </option>
+                ))}
+              </StudioSelect>
+            </div>
+
+            <fieldset className="mt-4">
+              <legend className="mb-2 text-xs font-medium text-foreground/70">
+                {ui("Resolution")}
+              </legend>
+              <div className="grid grid-cols-2 gap-2">
+                {(["720p", "1080p"] as const).map(value => (
+                  <button
+                    type="button"
+                    key={value}
+                    onClick={() => setResolution(value)}
+                    aria-pressed={resolution === value}
+                    className={`rounded-lg border py-2 text-xs font-medium ${
+                      resolution === value
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border bg-background"
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <button
+              type="button"
+              aria-pressed={generateAudio}
+              onClick={() => {
+                setGenerateAudio(current => !current);
+                invalidateRightsAttestations();
+              }}
+              className="mt-4 flex w-full items-center gap-3 rounded-lg border border-border bg-background p-3 text-left"
+            >
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                  generateAudio ? "bg-primary" : "bg-foreground/20"
+                }`}
+              >
+                <span
+                  className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                    generateAudio ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </span>
+              <span>
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                  <Volume2 className="h-3.5 w-3.5" />
+                  {ui("Native audio")}
+                </span>
+                <span className="mt-0.5 block text-xs text-foreground/65">
+                  {generateAudio
+                    ? ui("Requested with the video")
+                    : ui("Silent output requested")}
+                </span>
+              </span>
+            </button>
+          </section>
+
+          <section className="rounded-xl border border-border bg-surface p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-foreground/65">
                   {ui("Ready to generate")}
                 </p>
-                <p className="mt-1 text-lg font-semibold text-primary">
+                <p className="mt-1 text-sm font-semibold">
                   {clipMode === "continue"
                     ? ui("Continuity Lock enabled")
                     : ui("New clip")}
@@ -1058,20 +1058,20 @@ export default function VideoGenerator() {
               {ui("Generation uses REELassati credits inside your workspace.")}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg border border-primary/10 bg-background/70 p-2.5">
+              <div className="rounded-lg border border-border bg-background p-2.5">
                 <span className="block text-foreground/65">{ui("Output")}</span>
                 <span className="mt-1 block font-medium">
                   {duration}s · {resolution}
                 </span>
               </div>
-              <div className="rounded-lg border border-primary/10 bg-background/70 p-2.5">
+              <div className="rounded-lg border border-border bg-background p-2.5">
                 <span className="block text-foreground/65">{ui("Format")}</span>
                 <span className="mt-1 block font-medium">
                   {ratio} · {generateAudio ? ui("audio") : ui("silent")}
                 </span>
               </div>
             </div>
-            <div className="mt-4 space-y-2 rounded-lg border border-primary/15 bg-background/70 p-3 text-xs leading-relaxed">
+            <div className="mt-4 space-y-2 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed">
               <label className="flex items-start gap-2 text-foreground/65">
                 <input
                   type="checkbox"
@@ -1266,7 +1266,7 @@ export default function VideoGenerator() {
               <a
                 href={resultAsset.url}
                 download={resultAsset.name}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2.5 text-sm font-medium transition-colors hover:border-primary/45"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2 text-sm font-medium transition-colors hover:border-primary/45"
               >
                 <Download className="h-4 w-4" />
                 {ui("Download video")}
@@ -1281,7 +1281,7 @@ export default function VideoGenerator() {
                     setRealPersonConsentConfirmed(false);
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
                 >
                   <Layers3 className="h-4 w-4" />
                   {ui("Continue this clip")}

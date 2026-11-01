@@ -131,7 +131,7 @@ export default function ClientsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">
             {ui("Brand DNA")}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-foreground/70">
+          <p className="mt-1.5 max-w-2xl text-sm text-foreground/70">
             {ui("Save your voice, audience, colors, and caption style.")}
           </p>
         </div>
@@ -160,7 +160,7 @@ export default function ClientsPage() {
         </div>
       ) : null}
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
         <form
           onSubmit={saveBrandKit}
           className="space-y-5 rounded-lg border border-border bg-surface p-4 sm:p-5"
@@ -168,7 +168,7 @@ export default function ClientsPage() {
           <section>
             <div className="mb-4 flex items-center gap-2">
               <Target className="h-4 w-4 text-primary" />
-              <h2 className="font-medium">{ui("Positioning")}</h2>
+              <h2 className="text-sm font-medium">{ui("Positioning")}</h2>
             </div>
             <div className="grid gap-4">
               <label className="text-sm">
@@ -178,7 +178,7 @@ export default function ClientsPage() {
                 <input
                   value={draft.name}
                   onChange={event => updateDraft("name", event.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder={ui("Your public-facing brand")}
                   required
                 />
@@ -191,7 +191,7 @@ export default function ClientsPage() {
                   value={draft.voice}
                   onChange={event => updateDraft("voice", event.target.value)}
                   rows={3}
-                  className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder={ui(
                     "How the brand speaks, phrases it avoids, energy level, point of view, and proof style"
                   )}
@@ -212,7 +212,7 @@ export default function ClientsPage() {
                     updateDraft("audience", event.target.value)
                   }
                   rows={3}
-                  className="w-full resize-y rounded-lg border border-border bg-background px-4 py-2.5 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder={ui(
                     "Who this is for, what they already believe, and what problem creates urgency"
                   )}
@@ -224,7 +224,7 @@ export default function ClientsPage() {
           <section className="border-t border-border pt-5">
             <div className="mb-4 flex items-center gap-2">
               <Palette className="h-4 w-4 text-primary" />
-              <h2 className="font-medium">{ui("Visual system")}</h2>
+              <h2 className="text-sm font-medium">{ui("Visual system")}</h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-sm">
@@ -245,7 +245,7 @@ export default function ClientsPage() {
                         event.target.value.toUpperCase()
                       )
                     }
-                    className="h-10 w-12 rounded-lg border border-border bg-background p-1"
+                    className="h-9 w-10 rounded-lg border border-border bg-background p-1"
                     aria-label={ui("Choose primary color")}
                   />
                   <input
@@ -276,7 +276,7 @@ export default function ClientsPage() {
                         event.target.value.toUpperCase()
                       )
                     }
-                    className="h-10 w-12 rounded-lg border border-border bg-background p-1"
+                    className="h-9 w-10 rounded-lg border border-border bg-background p-1"
                     aria-label={ui("Choose accent color")}
                   />
                   <input
@@ -296,7 +296,7 @@ export default function ClientsPage() {
                 <input
                   value={draft.font}
                   onChange={event => updateDraft("font", event.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2"
                   placeholder="Geist"
                 />
               </label>
@@ -306,7 +306,7 @@ export default function ClientsPage() {
           <section className="border-t border-border pt-5">
             <div className="mb-4 flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4 text-primary" />
-              <h2 className="font-medium">{ui("Editing defaults")}</h2>
+              <h2 className="text-sm font-medium">{ui("Editing defaults")}</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               {CAPTION_PRESETS.map(preset => (
@@ -321,8 +321,8 @@ export default function ClientsPage() {
                       : "border-border bg-background hover:border-primary/35"
                   }`}
                 >
-                  <Captions className="h-4 w-4 text-primary" />
-                  <span className="mt-2 block text-sm font-medium">
+                  <span className="flex items-center gap-2 text-xs font-medium">
+                    <Captions className="h-3.5 w-3.5 text-primary" />
                     {ui(preset.label)}
                   </span>
                   <span className="mt-1 block text-xs leading-relaxed text-foreground/70">
@@ -331,14 +331,16 @@ export default function ClientsPage() {
                 </button>
               ))}
             </div>
-            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label
                 htmlFor="client-safe-zone"
                 aria-label={ui("Safe-zone inset")}
                 className="text-sm"
               >
                 <span className="mb-2 flex items-center justify-between">
-                  <span className="font-medium">{ui("Safe-zone inset")}</span>
+                  <span className="text-sm font-medium">
+                    {ui("Safe-zone inset")}
+                  </span>
                   <span className="font-mono text-xs text-primary">
                     {draft.safeZone}%
                   </span>
@@ -442,7 +444,9 @@ export default function ClientsPage() {
               </div>
             </div>
             <div className="p-4">
-              <h2 className="font-medium">{draft.name || "Unnamed brand"}</h2>
+              <h2 className="text-sm font-medium">
+                {draft.name || "Unnamed brand"}
+              </h2>
               <p className="mt-1 text-xs leading-relaxed text-foreground/70">
                 {draft.audience ||
                   "Define the audience tension to make creative decisions more specific."}

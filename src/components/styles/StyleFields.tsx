@@ -16,6 +16,14 @@ export function StyleSelect({
 }) {
   const ui = useUiText();
   const id = useId();
+  // Imported workspaces can contain duplicate source/project records. Keep the
+  // first option, matching the first record used when resolving a selection.
+  const seen = new Set<string>();
+  const uniqueOptions = options.filter(option => {
+    if (seen.has(option.value)) return false;
+    seen.add(option.value);
+    return true;
+  });
   return (
     <label htmlFor={id} className="space-y-1.5 text-xs">
       <span className="text-muted-foreground">{label}</span>
@@ -25,7 +33,7 @@ export function StyleSelect({
         onChange={event => onChange(event.target.value)}
         className="h-9 w-full text-xs"
       >
-        {options.map(option => (
+        {uniqueOptions.map(option => (
           <option key={option.value} value={option.value}>
             {option.translate === false ? option.label : ui(option.label)}
           </option>

@@ -89,8 +89,7 @@ export function findSavedAutonomousReview(
 ): Review | undefined {
   if (asset.kind !== "video" || !asset.duration) return;
   const candidates = reports
-    ?.slice(0, 6)
-    .filter(
+    ?.filter(
       candidate =>
         candidate?.assetId === asset.id &&
         candidate.platform === platform &&

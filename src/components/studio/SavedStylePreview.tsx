@@ -60,9 +60,20 @@ export function SavedStylePreview({
   return (
     <section
       aria-label={ui("Preview")}
-      className="my-3 overflow-hidden rounded-lg border border-border bg-black"
+      className="my-3 overflow-hidden rounded-lg border border-border bg-muted/30"
     >
-      <div className="flex h-56 items-center justify-center p-2">
+      <div
+        className="flex items-center justify-center p-3"
+        style={{
+          height:
+            project.aspectRatio === "9:16"
+              ? "min(65vh, 620px)"
+              : project.aspectRatio === "1:1"
+                ? "min(60vh, 520px)"
+                : "min(52vh, 460px)",
+          minHeight: 260,
+        }}
+      >
         <TimelinePreview
           project={project}
           assets={assets}

@@ -139,15 +139,14 @@ export default function SocialHub() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="mono-eyebrow mb-2 text-primary">
-            {ui("Distribution layer")}
-          </p>
-          <h1 className="text-3xl font-semibold">{ui("Social Hub")}</h1>
-          <p className="mt-2 max-w-2xl text-foreground/60">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {ui("Social Hub")}
+          </h1>
+          <p className="mt-1.5 max-w-2xl text-sm text-foreground/60">
             {ui(
-              "Link real publishing accounts, then use the same verified destinations everywhere in your workspace."
+              "Connect your accounts and use them across your publishing workspace."
             )}
           </p>
         </div>
@@ -200,9 +199,9 @@ export default function SocialHub() {
         </div>
       )}
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-surface p-5">
-          <p className="text-3xl font-semibold">
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <p className="text-xl font-semibold tabular-nums">
             {
               workspace.accounts.filter(
                 account => account.status === "connected"
@@ -213,11 +212,13 @@ export default function SocialHub() {
             {ui("Connected accounts")}
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-5">
-          <p className="text-3xl font-semibold">{connectedPlatforms.size}</p>
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <p className="text-xl font-semibold tabular-nums">
+            {connectedPlatforms.size}
+          </p>
           <p className="text-sm text-foreground/70">{ui("Active platforms")}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-lg border border-border bg-surface p-4">
           <p className="text-sm font-medium">
             {lastSyncedAt
               ? new Date(lastSyncedAt).toLocaleTimeString(getUiLocale(), {
@@ -233,18 +234,18 @@ export default function SocialHub() {
       </div>
 
       {workspace.accounts.length > 0 && (
-        <section className="mb-10">
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/70">
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-medium">
             {ui("Connected destinations")}
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {workspace.accounts.map(account => {
               const meta = PLATFORM_META[account.platform];
               return (
                 <motion.article
                   key={account.id}
                   whileHover={{ y: -2 }}
-                  className="rounded-xl border border-border bg-surface p-5"
+                  className="rounded-lg border border-border bg-surface p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
@@ -254,7 +255,7 @@ export default function SocialHub() {
                         {meta.mark}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="truncate font-medium">
+                        <h3 className="truncate text-sm font-medium">
                           {account.accountName}
                         </h3>
                         <p className="truncate text-xs text-foreground/70">
@@ -270,7 +271,7 @@ export default function SocialHub() {
                       }`}
                     />
                   </div>
-                  <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
                     <span className="text-xs capitalize text-foreground/70">
                       {account.status}
                     </span>
@@ -296,10 +297,8 @@ export default function SocialHub() {
       )}
 
       <section>
-        <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/70">
-          {ui("Add a destination")}
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="mb-3 text-sm font-medium">{ui("Add a destination")}</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {CONNECTABLE_PLATFORMS.map(platform => {
             const meta = PLATFORM_META[platform];
             const alreadyConnected = connectedPlatforms.has(platform);
@@ -330,7 +329,7 @@ export default function SocialHub() {
                   disabled={
                     !configured || alreadyConnected || connecting === platform
                   }
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-35"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary/[0.035] px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {connecting === platform ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />

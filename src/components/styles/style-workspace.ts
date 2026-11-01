@@ -2,6 +2,9 @@ import {
   EDIT_STYLE_TEMPLATE_LIMIT,
   normalizeEditStyleTemplate,
   normalizeEditStyleTemplates,
+  EDIT_STYLE_EXAMPLE_LIMIT,
+  captureEditStyle,
+  type EditStyleExample,
   type EditStyleTemplate,
 } from "@contracts/edit-style-template";
 import {
@@ -12,7 +15,12 @@ import {
 } from "@contracts/editor-style-library";
 import { normalizeGraphic } from "@contracts/motion-graphics";
 import { normalizeVisual } from "@contracts/clip-visual";
-import type { WorkspaceDocument } from "@contracts/workspace";
+import { captureEditBlueprint } from "@contracts/edit-template-blueprint";
+import type {
+  Asset,
+  EditProject,
+  WorkspaceDocument,
+} from "@contracts/workspace";
 
 export type StyleKind = "editing" | "captions" | "graphic" | "look";
 export type WorkspaceStyle =
@@ -21,6 +29,88 @@ export type WorkspaceStyle =
 
 export function styleKind(style: WorkspaceStyle): StyleKind {
   return style.kind === "editing" ? "editing" : style.value.type;
+}
+
+export function addStyleExample(
+  template: EditStyleTemplate,
+  example: EditStyleExample
+): EditStyleTemplate {
+  const examples = template.examples ?? [];
+  if (
+    examples.some(
+      item =>
+        item.id === example.id ||
+        (example.assetId && item.assetId === example.assetId)
+    )
+  )
+    throw new Error("This example is already in the style.");
+  if (examples.length >= EDIT_STYLE_EXAMPLE_LIMIT)
+    throw new Error("Remove an example before adding another.");
+  return { ...template, examples: [...examples, structuredClone(example)] };
+}
+
+export function projectStyleExample(
+  project: EditProject,
+  id: string
+): EditStyleExample {
+  return {
+    id,
+    name: project.title.slice(0, 240),
+    source: "edit",
+    projectId: project.id,
+    profile: captureEditStyle(project),
+    blueprint: captureEditBlueprint(project),
+  };
+}
+
+export function assetStyleExample(asset: Asset, id: string): EditStyleExample {
+  if (asset.kind !== "video" || asset.status !== "ready")
+    throw new Error("Choose a video file.");
+  return {
+    id,
+    name: asset.name.slice(0, 240),
+    source: "reference",
+    assetId: asset.id,
+  };
+}
+
+export function filterWorkspaceStyles(
+  styles: WorkspaceStyle[],
+  filters: {
+    query?: string;
+    kind?: string;
+    folder?: string;
+    contentType?: string;
+    language?: string;
+  }
+): WorkspaceStyle[] {
+  const query = filters.query?.trim().toLocaleLowerCase() ?? "";
+  return styles.filter(style => {
+    const metadata = style.value;
+    return (
+      (!filters.kind || styleKind(style) === filters.kind) &&
+      (!filters.folder ||
+        (filters.folder === "__unfiled__"
+          ? !metadata.folder
+          : metadata.folder === filters.folder)) &&
+      (!filters.contentType || metadata.contentType === filters.contentType) &&
+      (!filters.language || metadata.language === filters.language) &&
+      (!query ||
+        [
+          metadata.name,
+          metadata.folder,
+          metadata.contentType,
+          metadata.language,
+          ...(style.kind === "editing"
+            ? (style.value.examples?.map(example => example.name) ?? [])
+            : []),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(query))
+    );
+  });
 }
 
 export function workspaceStyles(

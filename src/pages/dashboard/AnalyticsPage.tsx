@@ -1,9 +1,12 @@
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
 import { SocialPerformance } from "@/components/studio/SocialPerformance";
+import { AnalyticsNavigation } from "@/components/analytics/AnalyticsNavigation";
+import { buildWeeklyReview } from "@/lib/weekly-review";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   CalendarClock,
+  ArrowRight,
   CheckCircle2,
   FileText,
   Film,
@@ -106,6 +109,7 @@ export default function AnalyticsPage() {
     "assets",
   ]);
   const [rangeDays, setRangeDays] = useState(14);
+  const weeklyReview = useMemo(() => buildWeeklyReview(workspace), [workspace]);
 
   const chartSeries = useMemo(
     () => buildAnalyticsSeries(workspace, rangeDays, new Date(), locale),
@@ -244,7 +248,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-8">
+      <div className="mb-6">
         <p className="mono-eyebrow mb-2 text-primary">
           {ui("Measured workspace")}
         </p>
@@ -256,32 +260,57 @@ export default function AnalyticsPage() {
         </p>
       </div>
 
+      <AnalyticsNavigation active="overview" />
+
+      <section
+        className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-5 py-4"
+        aria-label={ui("Weekly coach")}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-primary">
+            {ui("Weekly coach")}
+          </p>
+          <h2 className="mt-1 text-sm font-semibold">
+            {ui(weeklyReview.actions[0].title)}
+          </h2>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {ui(
+              weeklyReview.actions[0].evidence,
+              weeklyReview.actions[0].values
+            )}
+          </p>
+        </div>
+        <Link
+          to="/dashboard/coaching"
+          className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+        >
+          {ui("Review next steps")}
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
+      </section>
+
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map(kpi => (
           <article
             key={ui(kpi.label)}
-            className="group relative overflow-hidden rounded-xl border border-border bg-surface p-5 transition duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-primary/[0.06]"
+            className="rounded-xl border border-border bg-surface p-4"
           >
-            <div className="pointer-events-none absolute -right-10 -top-12 h-24 w-24 rounded-full bg-primary/[0.06] blur-2xl transition group-hover:bg-primary/[0.11]" />
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <p className="mono-eyebrow text-xs text-foreground/70">
                 {ui(kpi.label)}
               </p>
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/[0.08] text-primary transition group-hover:scale-105 group-hover:bg-primary/[0.13]">
+              <span className="text-primary">
                 <kpi.icon className="h-4 w-4" />
               </span>
             </div>
-            <p className="relative text-3xl font-semibold tabular-nums">
-              {kpi.value}
-            </p>
+            <p className="text-2xl font-semibold tabular-nums">{kpi.value}</p>
             <p className="mt-1 text-xs text-foreground/70">{kpi.detail}</p>
           </article>
         ))}
       </div>
 
       <SocialPerformance />
-      <section className="relative mb-6 overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.09] via-surface to-surface p-5 shadow-sm sm:p-6">
-        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-primary/[0.12] blur-3xl" />
+      <section className="mb-6 rounded-xl border border-border bg-surface p-5 sm:p-6">
         <div className="relative mb-5 flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -303,7 +332,7 @@ export default function AnalyticsPage() {
           </div>
           <div className="flex items-center gap-2">
             <div
-              className="flex rounded-xl border border-border/70 bg-background/55 p-1 backdrop-blur"
+              className="flex rounded-lg border border-border bg-background p-1"
               role="group"
               aria-label={ui("Analytics time range")}
             >
@@ -317,7 +346,7 @@ export default function AnalyticsPage() {
                     onClick={() => setRangeDays(range.days)}
                     className={`rounded-lg px-2.5 py-1.5 font-mono text-xs font-medium transition duration-200 ${
                       selected
-                        ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                        ? "bg-primary/10 text-primary"
                         : "text-foreground/70 hover:bg-surface hover:text-foreground/75"
                     }`}
                   >
@@ -326,12 +355,12 @@ export default function AnalyticsPage() {
                 );
               })}
             </div>
-            <div className="rounded-xl border border-primary/15 bg-background/70 px-4 py-2.5 text-right backdrop-blur">
+            <div className="border-l border-border pl-4 text-right">
               <p className="text-2xl font-semibold tabular-nums text-primary">
                 {selectedTotal}
               </p>
               <p className="text-xs uppercase tracking-wide text-foreground/70">
-                {ui("selected output")}
+                {ui("selected records")}
               </p>
             </div>
           </div>
@@ -356,17 +385,17 @@ export default function AnalyticsPage() {
                     ? ui("Keep at least one metric selected")
                     : `${selected ? ui("Hide") : ui("Show")} ${metric.label.toLowerCase()}`
                 }
-                className={`group/metric inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition duration-200 hover:-translate-y-px ${
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
                   selected
-                    ? "border-primary/20 bg-background text-foreground shadow-sm"
+                    ? "border-primary/25 bg-primary/5 text-foreground"
                     : "border-border/70 bg-background/35 text-foreground/70 hover:border-border hover:text-foreground/70"
                 }`}
               >
                 <span
-                  className={`h-2 w-2 rounded-full transition ${selected ? "scale-110 shadow-[0_0_10px_currentColor]" : "opacity-45"}`}
+                  className={`h-2 w-2 rounded-full ${selected ? "" : "opacity-45"}`}
                   style={{ backgroundColor: metric.color, color: metric.color }}
                 />
-                {metric.shortLabel}
+                {ui(metric.shortLabel)}
                 <span
                   className={`font-mono text-xs tabular-nums ${selected ? "text-foreground/70" : "text-foreground/70"}`}
                 >
@@ -377,7 +406,7 @@ export default function AnalyticsPage() {
           })}
         </div>
 
-        <div className="relative rounded-xl border border-border/70 bg-background/70 p-2 shadow-inner backdrop-blur sm:p-4">
+        <div className="rounded-lg border border-border bg-background p-2 sm:p-4">
           <ChartContainer
             config={ANALYTICS_CHART_CONFIG}
             className="h-[300px] w-full aspect-auto"
@@ -421,8 +450,7 @@ export default function AnalyticsPage() {
                     strokeWidth: 2,
                     fill: "hsl(var(--background))",
                   }}
-                  isAnimationActive
-                  animationDuration={650}
+                  isAnimationActive={false}
                 />
               ))}
             </LineChart>

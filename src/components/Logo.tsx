@@ -4,6 +4,7 @@ interface LogoProps {
   className?: string;
   size?: "sm" | "md" | "lg";
   glyphOnly?: boolean;
+  glyphSize?: number;
   collapsed?: boolean;
 }
 
@@ -11,11 +12,12 @@ export function Logo({
   className,
   size = "md",
   glyphOnly = false,
+  glyphSize,
   collapsed = false,
 }: LogoProps) {
   const wordSize =
     size === "sm" ? "text-base" : size === "lg" ? "text-2xl" : "text-lg";
-  const glyphPx = size === "sm" ? 22 : size === "lg" ? 38 : 30;
+  const glyphPx = glyphSize ?? (size === "sm" ? 22 : size === "lg" ? 38 : 30);
 
   return (
     <span

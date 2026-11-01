@@ -154,14 +154,11 @@ export default function ReferralPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">
+      <div className="mb-5">
+        <h1 className="text-2xl font-semibold tracking-tight">
           {ui("Creator rewards")}
-        </p>
-        <h1 className="text-3xl font-semibold">
-          {ui("Refer creators. Earn studio credits.")}
         </h1>
-        <p className="mt-2 max-w-2xl text-foreground/60">
+        <p className="mt-1.5 max-w-3xl text-sm text-foreground/60">
           {billingReady
             ? ui(
                 "Earn 500 credits—$5.00 of REELassati product value—when a referred creator successfully buys a paid plan. Link visits and sign-ups do not count."
@@ -172,7 +169,70 @@ export default function ReferralPage() {
         </p>
       </div>
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-4 rounded-xl border border-primary/20 bg-primary/[0.025] p-5">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10">
+            <Link2 className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-sm font-medium">{ui("Your creator link")}</h2>
+            <p className="text-xs text-foreground/70">
+              {ui("Share the full link or the short creator code.")}
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex h-24 items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          </div>
+        ) : stats ? (
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                readOnly
+                value={stats.shareUrl}
+                onFocus={event => event.currentTarget.select()}
+                aria-label={ui("Referral link")}
+                className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => void copyValue("link", stats.shareUrl)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:border-primary/50"
+              >
+                {copied === "link" ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+                {copied === "link" ? ui("Copied") : ui("Copy")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void share()}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-white hover:bg-primary-hover"
+              >
+                <Send className="h-4 w-4" /> {ui("Share")}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => void copyValue("code", stats.code)}
+              className="inline-flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 font-mono text-xs text-primary"
+            >
+              {stats.code}
+              {copied === "code" ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           icon={Users}
           label={ui("Successful referrals")}
@@ -223,72 +283,9 @@ export default function ReferralPage() {
         />
       </div>
 
-      <section className="mb-6 rounded-xl border border-primary/20 bg-surface p-6">
-        <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Link2 className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h2 className="font-medium">{ui("Your creator link")}</h2>
-            <p className="text-xs text-foreground/70">
-              {ui("Share the full link or the short creator code.")}
-            </p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex h-24 items-center justify-center">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-          </div>
-        ) : stats ? (
-          <div className="space-y-3">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                readOnly
-                value={stats.shareUrl}
-                onFocus={event => event.currentTarget.select()}
-                aria-label={ui("Referral link")}
-                className="min-w-0 flex-1 rounded-lg border border-border bg-background px-4 py-3 text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => void copyValue("link", stats.shareUrl)}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-3 text-sm font-medium hover:border-primary/50"
-              >
-                {copied === "link" ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-                {copied === "link" ? ui("Copied") : ui("Copy")}
-              </button>
-              <button
-                type="button"
-                onClick={() => void share()}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-white hover:bg-primary-hover"
-              >
-                <Send className="h-4 w-4" /> {ui("Share")}
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => void copyValue("code", stats.code)}
-              className="inline-flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 font-mono text-xs text-primary"
-            >
-              {stats.code}
-              {copied === "code" ? (
-                <Check className="h-3.5 w-3.5" />
-              ) : (
-                <Copy className="h-3.5 w-3.5" />
-              )}
-            </button>
-          </div>
-        ) : null}
-      </section>
-
-      <div className="grid gap-6 lg:grid-cols-[1.3fr_.7fr]">
-        <section className="rounded-xl border border-border bg-surface p-6">
-          <h2 className="font-medium">{ui("Reward history")}</h2>
+      <div className="grid items-start gap-4 lg:grid-cols-[1.3fr_.7fr]">
+        <section className="rounded-xl border border-border bg-surface p-5">
+          <h2 className="text-sm font-medium">{ui("Reward history")}</h2>
           <p className="mt-1 text-xs text-foreground/70">
             {billingReady
               ? ui("Paid-plan purchases verified by the billing system.")
@@ -299,7 +296,7 @@ export default function ReferralPage() {
           <div className="mt-5 divide-y divide-border">
             {stats?.referrals.length ? (
               stats.referrals.map(referral => (
-                <div key={referral.id} className="flex items-center gap-3 py-4">
+                <div key={referral.id} className="flex items-center gap-3 py-3">
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-full ${referral.status === "verified" ? "bg-emerald-500/10" : "bg-primary/10"}`}
                   >
@@ -342,15 +339,15 @@ export default function ReferralPage() {
                 </div>
               ))
             ) : (
-              <div className="py-10 text-center text-sm text-foreground/70">
+              <div className="py-6 text-center text-sm text-foreground/70">
                 {ui("Your first successful referral will appear here.")}
               </div>
             )}
           </div>
         </section>
 
-        <section className="h-fit rounded-xl border border-border bg-surface p-6">
-          <h2 className="font-medium">{ui("Have a creator code?")}</h2>
+        <section className="h-fit rounded-xl border border-border bg-surface p-5">
+          <h2 className="text-sm font-medium">{ui("Have a creator code?")}</h2>
           <p className="mt-1 text-xs leading-relaxed text-foreground/70">
             {billingReady
               ? ui(
@@ -362,15 +359,16 @@ export default function ReferralPage() {
           </p>
           <input
             value={claimCode}
+            aria-label={ui("Have a creator code?")}
             onChange={event => setClaimCode(event.target.value.toUpperCase())}
             placeholder="REEL-XXXXXXXX"
-            className="mt-4 w-full rounded-lg border border-border bg-background px-4 py-3 font-mono text-sm uppercase"
+            className="mt-4 w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm uppercase"
           />
           <button
             type="button"
             onClick={() => void applyCode()}
             disabled={!claimCode.trim() || claiming}
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-3 text-sm font-medium text-background disabled:opacity-45"
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background disabled:opacity-45"
           >
             {claiming ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -420,11 +418,11 @@ function Metric({
         : "text-foreground/60";
   return (
     <div
-      className={`rounded-xl border bg-surface p-5 ${tone === "primary" ? "border-primary/20" : "border-border"}`}
+      className={`rounded-lg border bg-surface p-4 ${tone === "primary" ? "border-primary/20" : "border-border"}`}
     >
-      <Icon className={`mb-3 h-5 w-5 ${iconClass}`} />
+      <Icon className={`mb-2 h-4 w-4 ${iconClass}`} />
       <p
-        className={`text-3xl font-semibold ${tone === "primary" ? "text-primary" : ""}`}
+        className={`text-xl font-semibold tabular-nums ${tone === "primary" ? "text-primary" : ""}`}
       >
         {value}
       </p>

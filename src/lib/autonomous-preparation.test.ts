@@ -107,6 +107,85 @@ function savedReport(): SavedAnalyzerReport {
 }
 
 describe("saved paid review reuse", () => {
+  it("reuses every paid source review after reopening an edit with more than six videos", async () => {
+    const sources = Array.from({ length: 9 }, (_, index) => ({
+      ...source,
+      id: `source-${index}`,
+    }));
+    const edit = {
+      ...project,
+      clips: sources.map((asset, index) => ({
+        ...project.clips[0],
+        id: `clip-${index}`,
+        assetId: asset.id,
+        start: index * 4,
+      })),
+    };
+    let reports: SavedAnalyzerReport[] = [];
+    const initial = fixture();
+    initial.transcribe.mockRejectedValueOnce(new Error("Speech unavailable"));
+    const review = vi.fn(async (asset: Asset) => {
+      const report = savedReport();
+      report.assetId = asset.id;
+      report.result.review!.captions = "absent";
+      report.result.review!.audio = "present";
+      report.result.insights[0].visualEvidence = `Observed evidence for ${asset.id}`;
+      reports = checkpointAnalyzerReport(reports, report);
+      return report.result;
+    });
+    await expect(
+      prepareAutonomousSources({
+        ...initial,
+        sources,
+        project: edit,
+        review,
+      })
+    ).rejects.toThrow("Speech unavailable");
+    expect(review).toHaveBeenCalledTimes(sources.length);
+    expect(reports).toHaveLength(sources.length);
+
+    const reopened = fixture();
+    const restored = await prepareAutonomousSources({
+      ...reopened,
+      sources,
+      project: edit,
+      savedReports: JSON.parse(JSON.stringify(reports)),
+    });
+    expect(reopened.review).not.toHaveBeenCalled();
+    expect(reopened.transcribe).toHaveBeenCalledTimes(sources.length);
+    expect(restored.analysis).toHaveLength(sources.length);
+    for (const asset of sources) {
+      expect(
+        restored.analysis.find(item => item.assetId === asset.id)
+          ?.observations[0].visualEvidence
+      ).toBe(`Observed evidence for ${asset.id}`);
+      expect(
+        reports.find(report => report.assetId === asset.id)?.result.provenance
+      ).toEqual(savedReport().result.provenance);
+    }
+  });
+
+  it("rejects an oversized review without evicting already saved evidence", () => {
+    const existing = Array.from({ length: 9 }, (_, index) => ({
+      ...savedReport(),
+      assetId: `saved-${index}`,
+    }));
+    const oversized = savedReport();
+    oversized.result.summary = "x".repeat(250_001);
+    expect(() => checkpointAnalyzerReport(existing, oversized)).toThrow(
+      "could not be saved"
+    );
+    expect(existing).toHaveLength(9);
+    for (const report of existing)
+      expect(
+        findSavedAutonomousReview(
+          { ...source, id: report.assetId },
+          project.platform,
+          existing
+        )
+      ).toBeDefined();
+  });
+
   it("restores a paid checkpoint after speech failure and a fresh editor session", async () => {
     const input = fixture();
     let reports: SavedAnalyzerReport[] = [];

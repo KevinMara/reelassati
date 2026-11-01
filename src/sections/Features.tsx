@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   BrainCircuit,
@@ -56,7 +57,7 @@ const FEATURES: Record<"en" | "it", Feature[]> = {
       icon: Film,
     },
     {
-      title: "Prompt Director",
+      title: "Video Generator",
       description:
         "Turn a brief into production-aware direction with camera, subject, lighting, audio, timing, and negative constraints—not a vague one-line prompt.",
       status: "10 presets",
@@ -100,7 +101,7 @@ const FEATURES: Record<"en" | "it", Feature[]> = {
       icon: Film,
     },
     {
-      title: "Prompt Director",
+      title: "Generatore di video",
       description:
         "Trasforma un brief in direzione produttiva: camera, soggetto, luce, audio, timing e vincoli negativi, non una riga generica.",
       status: "10 preset",
@@ -124,6 +125,7 @@ const FEATURES: Record<"en" | "it", Feature[]> = {
 };
 
 export function Features() {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const reduceMotion = useReducedMotion();
   const isItalian = i18n.resolvedLanguage?.startsWith("it");
@@ -164,7 +166,12 @@ export function Features() {
             const Icon = feature.icon;
             return (
               <motion.article
-                key={feature.title}
+                key={
+                  feature.title === "Video Generator" ||
+                  feature.title === "Generatore di video"
+                    ? ui("Video Generator")
+                    : feature.title
+                }
                 variants={fadeUp}
                 whileHover={
                   reduceMotion
@@ -190,7 +197,10 @@ export function Features() {
                   </div>
                 </div>
                 <h3 className="text-xl font-semibold tracking-tight">
-                  {feature.title}
+                  {feature.title === "Video Generator" ||
+                  feature.title === "Generatore di video"
+                    ? ui("Video Generator")
+                    : feature.title}
                 </h3>
                 <p className="mt-3 text-sm leading-relaxed text-foreground/65">
                   {feature.description}

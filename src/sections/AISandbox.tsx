@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -90,7 +91,7 @@ const COPY = {
     manual: "Manual",
     assist: "Assisted",
     quality: "Preflight",
-    director: "Prompt Director handoff",
+    director: "Video Generator",
     directorLead:
       "Use this production direction when a generated insert is needed:",
     open: "Continue in the Studio",
@@ -111,7 +112,7 @@ const COPY = {
     manual: "Manuale",
     assist: "Assistito",
     quality: "Preflight",
-    director: "Passaggio a Prompt Director",
+    director: "Generatore di video",
     directorLead:
       "Usa questa direzione produttiva se serve un inserto generato:",
     open: "Continua nello Studio",
@@ -519,6 +520,7 @@ function buildLocalPlan(
 }
 
 export default function AISandbox() {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const reduceMotion = useReducedMotion();
   const language: Language = i18n.resolvedLanguage?.startsWith("it")
@@ -792,7 +794,7 @@ export default function AISandbox() {
                     </div>
                     <div className="rounded-lg border border-primary/20 bg-primary/[0.045] p-4">
                       <p className="mono-eyebrow mb-2 text-primary">
-                        {copy.director}
+                        {ui("Video Generator")}
                       </p>
                       <p className="text-[11px] leading-relaxed text-foreground/50">
                         {copy.directorLead}

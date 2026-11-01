@@ -262,7 +262,7 @@ export default function BillingPage() {
           <h1 className="text-2xl font-semibold tracking-tight">
             {ui("Plan & credits")}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
             {ui(
               "One transparent REELassati balance for every AI tool. Plan credits refresh monthly; purchased top-ups roll over."
             )}
@@ -331,7 +331,7 @@ export default function BillingPage() {
         <div className="flex items-center gap-3">
           <Sparkles className="h-4 w-4 shrink-0 text-primary" />
           <div>
-            <h2 className="font-medium">{ui("Credit top-ups")}</h2>
+            <h2 className="text-sm font-medium">{ui("Credit top-ups")}</h2>
             <p className="text-sm text-foreground/70">
               {ui(
                 "Extra credits at a lower unit price than any plan. Yours to keep across renewals, with an active subscription."
@@ -362,13 +362,13 @@ export default function BillingPage() {
                     </p>
                   </div>
                   {index === 2 ? (
-                    <span className="rounded-pill bg-primary/10 px-2 py-1 font-mono text-xs uppercase tracking-wide text-primary">
+                    <span className="rounded-md bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
                       {ui("Best credit value")}
                     </span>
                   ) : null}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="font-medium">
+                  <span className="text-sm font-medium">
                     {pack.price.toFixed(2)} USD
                   </span>
                   {busy === `topup:${id}` ? (
@@ -426,14 +426,16 @@ export default function BillingPage() {
         </p>
       </section>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
-        <section className="relative overflow-hidden rounded-lg border border-border bg-surface p-5">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[.8fr_1.2fr]">
+        <section className="relative overflow-hidden rounded-lg border border-primary/15 bg-primary/[0.025] p-5">
           <div className="relative flex items-start justify-between gap-4">
             <div>
-              <p className="mono-eyebrow text-primary">{ui("Available now")}</p>
+              <p className="text-xs font-medium text-foreground/65">
+                {ui("Available now")}
+              </p>
               <div className="mt-3 flex items-center gap-3">
                 <Coins className="h-5 w-5 text-primary" />
-                <span className="text-3xl font-semibold tracking-tight tabular-nums">
+                <span className="text-2xl font-semibold tracking-tight tabular-nums">
                   {loading
                     ? "—"
                     : (summary?.availableCredits || 0).toLocaleString(
@@ -459,8 +461,8 @@ export default function BillingPage() {
               )}
             </p>
           )}
-          <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-border/70 bg-background/55 p-4 backdrop-blur">
+          <div className="relative mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-border bg-background/60 p-3">
               <p className="text-xs text-foreground/70">{ui("Plan credits")}</p>
               <p className="mt-1 text-xl font-semibold">
                 {(summary?.includedCredits || 0).toLocaleString(getUiLocale())}
@@ -472,7 +474,7 @@ export default function BillingPage() {
                 />
               </div>
             </div>
-            <div className="rounded-xl border border-border/70 bg-background/55 p-4 backdrop-blur">
+            <div className="rounded-lg border border-border bg-background/60 p-3">
               <p className="text-xs text-foreground/70">
                 {ui("Rollover top-ups")}
               </p>
@@ -490,11 +492,11 @@ export default function BillingPage() {
 
       <CreditPlanner />
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[.85fr_1.15fr]">
-        <section className="rounded-2xl border border-border bg-surface p-6">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[.85fr_1.15fr]">
+        <section className="rounded-lg border border-border bg-surface p-5">
           <div className="flex items-center gap-2">
             <Gauge className="h-4 w-4 text-primary" />
-            <h2 className="font-medium">{ui("Credit guide")}</h2>
+            <h2 className="text-sm font-medium">{ui("Credit guide")}</h2>
           </div>
           <p className="mt-2 text-xs text-foreground/60">
             {ui(
@@ -553,12 +555,14 @@ export default function BillingPage() {
           )}
         </section>
 
-        <section className="rounded-2xl border border-border bg-surface p-6">
-          <h2 className="font-medium">{ui("What can your credits create?")}</h2>
+        <section className="rounded-lg border border-border bg-surface p-5">
+          <h2 className="text-sm font-medium">
+            {ui("What can your credits create?")}
+          </h2>
           <p className="mt-2 text-sm text-foreground/70">
             {ui("With your current balance, choose up to one of these:")}
           </p>
-          <div className="my-5 grid grid-cols-2 gap-3">
+          <div className="my-4 grid grid-cols-2 gap-3">
             {[
               [ui("scripts"), AI_CREDIT_COSTS.script],
               [ui("1K images"), AI_CREDIT_COSTS.image1K],
@@ -570,9 +574,9 @@ export default function BillingPage() {
             ].map(([label, cost]) => (
               <div
                 key={label}
-                className="rounded-xl border border-primary/15 bg-primary/5 p-4"
+                className="rounded-lg border border-border bg-background p-3"
               >
-                <p className="text-2xl font-semibold text-primary">
+                <p className="text-xl font-semibold tabular-nums text-primary">
                   {loading
                     ? "—"
                     : Math.floor(
@@ -586,7 +590,9 @@ export default function BillingPage() {
           <p className="mb-6 text-xs text-foreground/65">
             {ui("Examples are alternatives, not a combined allowance.")}
           </p>
-          <h2 className="font-medium">{ui("Recent credit activity")}</h2>
+          <h2 className="text-sm font-medium">
+            {ui("Recent credit activity")}
+          </h2>
           <p className="mt-1 text-xs text-foreground/70">
             {ui(
               "Failed AI jobs are released automatically and do not consume credits."
@@ -724,7 +730,7 @@ function PlanChooser({
                     : ui("For a larger content output across your channels.")}
               </p>
               <p className="mt-4">
-                <span className="text-3xl font-semibold tracking-tight tabular-nums">
+                <span className="text-2xl font-semibold tracking-tight tabular-nums">
                   {price.toLocaleString(locale, {
                     maximumFractionDigits: 2,
                   })}
@@ -891,15 +897,15 @@ function UsageChart({
   const total = totals.reduce((sum, category) => sum + category.total, 0);
   return (
     <section
-      className="min-w-0 rounded-2xl border border-border bg-surface p-6"
+      className="min-w-0 rounded-lg border border-border bg-surface p-5"
       aria-labelledby="usage-title"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="usage-title" className="text-xl font-semibold">
+          <h2 id="usage-title" className="text-sm font-medium">
             {ui("Your creative activity")}
           </h2>
-          <p className="mt-2 text-3xl font-semibold">
+          <p className="mt-2 text-2xl font-semibold tabular-nums">
             {loading || !summary?.usage ? "—" : total.toLocaleString(locale)}{" "}
             <span className="text-sm font-normal text-foreground/70">
               {ui("credits used")}
@@ -917,7 +923,7 @@ function UsageChart({
         </StudioSelect>
       </div>
       <div
-        className="mt-5 h-56"
+        className="mt-4 h-48"
         role="img"
         aria-label={ui(
           "Daily credit usage by tool over {{days}} days: {{credits}} credits. Exact totals listed below.",

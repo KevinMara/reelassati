@@ -113,7 +113,7 @@ export default function TemplatesPage() {
               {ui("Back to home")}
             </Link>
             <p className="mono-eyebrow mb-2 text-primary">
-              {ui("Prompt Director")}
+              {ui("Video Generator")}
             </p>
             <h1 className="text-4xl font-semibold md:text-5xl">
               {ui("Production presets, not viral formulas.")}
@@ -299,7 +299,7 @@ export default function TemplatesPage() {
                   )}&subject=${encodeURIComponent(subject.trim().slice(0, 1200))}`}
                   className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
                 >
-                  {ui("Open Prompt Director")}{" "}
+                  {ui("Video Generator")}{" "}
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
                 <p className="mt-3 text-center text-[10px] leading-relaxed text-foreground/40">

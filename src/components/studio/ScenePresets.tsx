@@ -42,9 +42,12 @@ export function ScenePresets({
     }
   }
   return (
-    <div className="mb-5 rounded-xl border border-border bg-background/60 p-4">
-      <label className="text-sm font-medium">
+    <details className="mt-4 border-t border-border pt-3">
+      <summary className="cursor-pointer text-xs font-medium">
         {ui("Saved scenes")}
+      </summary>
+      <label className="mt-3 block text-xs font-medium">
+        {ui("Reuse a saved scene")}
         <StudioSelect
           aria-label={ui("Reuse a saved scene")}
           defaultValue=""
@@ -87,6 +90,6 @@ export function ScenePresets({
           {ui(notice)}
         </p>
       )}
-    </div>
+    </details>
   );
 }

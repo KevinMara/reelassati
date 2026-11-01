@@ -411,7 +411,7 @@ export function EditStyleTemplates({
             workspace.assets.find(a => a.id === active.referenceAssetId)
               ?.url && (
               <video
-                className="mt-2 max-h-48 w-full rounded-lg bg-black"
+                className="mx-auto mt-2 max-h-[65vh] max-w-full rounded-lg"
                 src={
                   workspace.assets.find(a => a.id === active.referenceAssetId)!
                     .url
@@ -424,6 +424,11 @@ export function EditStyleTemplates({
               </video>
             )}
           <EditStyleProfilePreview profile={active.profile} />
+          {Boolean(active.examples?.length) && (
+            <p className="mt-2 text-muted-foreground">
+              {ui("Style examples")}: {active.examples!.length}
+            </p>
+          )}
           {active.blueprint && !active.referenceAssetId && (
             <SavedStylePreview
               blueprint={active.blueprint}

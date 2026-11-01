@@ -1,5 +1,5 @@
 import { getUiLocale, translateUi, useUiText } from "@/lib/i18n/ui";
-import { formatMinutesDuration } from "@/lib/format-duration";
+import { WorkspaceMomentum } from "@/components/studio/WorkspaceMomentum";
 import { isWorkspaceInterfaceActivity } from "@contracts/workspace-activity-ui";
 import { OwnerOperations } from "@/components/studio/OwnerOperations";
 import { CreationStart } from "@/components/studio/CreationStart";
@@ -23,8 +23,7 @@ import {
   Bell,
   Sun,
   Moon,
-  Users,
-  FileText,
+  Fingerprint,
   BarChart3,
   PenLine,
   Scissors,
@@ -54,9 +53,6 @@ import {
   BrainCircuit,
   Radio,
   Sparkles,
-  CheckCircle2,
-  Timer,
-  Activity,
   type LucideIcon,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -124,7 +120,7 @@ function DashboardHome() {
   const ui = useUiText();
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { workspace, capabilities, loading, saving, error } = useWorkspace();
+  const { workspace, loading, saving, error } = useWorkspace();
   const [now] = useState(() => Date.now());
   const [hour] = useState(() => new Date().getHours());
   const greetKey =
@@ -133,76 +129,6 @@ function DashboardHome() {
       : hour < 18
         ? "dash.greet_afternoon"
         : "dash.greet_evening";
-
-  const publishedThisWeek = workspace.posts.filter(post => {
-    if (!post.publishedAt) return false;
-    return (
-      now - new Date(post.publishedAt).getTime() <= 7 * 24 * 60 * 60 * 1000
-    );
-  }).length;
-  const weekActivity = workspace.activity.filter(item => {
-    const createdAt = new Date(item.createdAt).getTime();
-    return Number.isFinite(createdAt) && now - createdAt <= 7 * 86_400_000;
-  });
-  const activeDays = new Set(
-    weekActivity.map(item =>
-      new Date(item.createdAt).toISOString().slice(0, 10)
-    )
-  ).size;
-  const estimatedMinutesSaved = weekActivity.reduce((total, item) => {
-    const minutesByAction: Record<(typeof item)["type"], number> = {
-      generation: 18,
-      script: 12,
-      project: 8,
-      publish: 5,
-      upload: 0,
-      goal: 0,
-      calendar: 0,
-    };
-    return total + minutesByAction[item.type];
-  }, 0);
-  const formattedTimeSaved = formatMinutesDuration(
-    estimatedMinutesSaved,
-    getUiLocale()
-  );
-  const stats = [
-    {
-      label: "Editing projects",
-      value: workspace.projects.length,
-      sub: ui("Edits in progress: {{count}}", {
-        count: workspace.projects.filter(
-          project => project.status === "editing"
-        ).length,
-      }),
-      icon: Scissors,
-      to: "/dashboard/edit",
-    },
-    {
-      label: "Media assets",
-      value: workspace.assets.length,
-      sub: "Stored in your private library",
-      icon: Library,
-      to: "/dashboard/library",
-    },
-    {
-      label: t("dash.post_settimana"),
-      value: publishedThisWeek,
-      sub: "Published in the last 7 days",
-      icon: FileText,
-      to: "/dashboard/analytics",
-    },
-    {
-      label: "Connected accounts",
-      value: workspace.accounts.filter(
-        account => account.status === "connected"
-      ).length,
-      sub: capabilities.publishing
-        ? ui("Publishing connection is ready")
-        : ui("Publishing setup is incomplete"),
-      icon: AtSign,
-      to: "/dashboard/social",
-    },
-  ];
 
   const quickStart = [
     {
@@ -268,15 +194,6 @@ function DashboardHome() {
   const onboardingProgress = Math.round(
     (onboardingDone / onboarding.length) * 100
   );
-  const momentumMessage =
-    weekActivity.length === 0
-      ? ui("Your next idea can start here")
-      : weekActivity.length < 3
-        ? ui("Finish one useful step")
-        : weekActivity.length < 7
-          ? ui("Keep progress current")
-          : ui("Refine, review, and export");
-
   if (loading) {
     return (
       <div className="min-h-[55vh] flex items-center justify-center">
@@ -320,86 +237,7 @@ function DashboardHome() {
       </div>
       <CreationStart />
 
-      <section
-        className="mb-6 border-y border-border py-4"
-        aria-label={ui("Weekly momentum")}
-      >
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-          <div className="min-w-[180px] flex-1">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Sparkles className="h-3.5 w-3.5" />
-              </span>
-              <div>
-                <p className="text-xs font-medium">{ui("Weekly momentum")}</p>
-                <p className="text-xs text-foreground/70">{momentumMessage}</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex min-w-[110px] items-center gap-2.5">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <div>
-              <p className="text-sm font-semibold tabular">
-                {weekActivity.length}
-              </p>
-              <p className="text-xs uppercase tracking-wide text-foreground/70">
-                {ui("actions this week")}
-              </p>
-            </div>
-          </div>
-          <div
-            className="flex min-w-[120px] items-center gap-2.5"
-            title={ui(
-              "Estimate based only on AI-assisted actions recorded in this workspace"
-            )}
-          >
-            <Timer className="h-4 w-4 text-primary" />
-            <div>
-              <p className="text-sm font-semibold tabular">
-                {formattedTimeSaved}
-              </p>
-              <p className="text-xs uppercase tracking-wide text-foreground/70">
-                {ui("time reclaimed")}
-              </p>
-              <span className="sr-only">
-                {ui(
-                  "Estimated only from AI-assisted actions recorded in this workspace."
-                )}
-              </span>
-            </div>
-          </div>
-          <div className="flex min-w-[105px] items-center gap-2.5">
-            <Activity className="h-4 w-4 text-amber-500" />
-            <div>
-              <p className="text-sm font-semibold tabular">{activeDays}</p>
-              <p className="text-xs uppercase tracking-wide text-foreground/70">
-                {ui("active days")}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        {stats.map(s => (
-          <Link
-            key={s.to}
-            to={s.to}
-            data-reward-surface
-            className="studio-stat-card group bg-surface border border-border rounded-xl p-5 shadow-card"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="mono-eyebrow text-foreground/70 text-xs">
-                {ui(s.label)}
-              </span>
-              <s.icon className="h-4 w-4 text-foreground/70 transition-colors group-hover:text-primary" />
-            </div>
-            <div className="text-2xl font-semibold tabular">{s.value}</div>
-            <p className="text-xs text-foreground/70 mt-1">{ui(s.sub)}</p>
-          </Link>
-        ))}
-      </div>
+      <WorkspaceMomentum workspace={workspace} now={now} />
 
       {/* Quick start */}
       <div className="flex items-center justify-between mb-6">
@@ -712,7 +550,7 @@ export default function Dashboard() {
     { icon: BarChart3, label: t("nav.analytics"), to: "/dashboard/analytics" },
     { separator: true, label: ui("Workspace") },
     { icon: Library, label: t("nav.library"), to: "/dashboard/library" },
-    { icon: Users, label: t("nav.clients"), to: "/dashboard/clients" },
+    { icon: Fingerprint, label: ui("Brand DNA"), to: "/dashboard/clients" },
     { icon: Calendar, label: t("nav.calendar"), to: "/dashboard/calendar" },
     {
       icon: Mail,
@@ -791,7 +629,7 @@ export default function Dashboard() {
       >
         <div className="h-14 flex items-center px-3 border-b border-border shrink-0">
           <Link to="/" className="flex-1">
-            <Logo size="sm" collapsed={collapsed} />
+            <Logo size="sm" glyphSize={25} collapsed={collapsed} />
           </Link>
           <button
             type="button"
@@ -965,7 +803,9 @@ export default function Dashboard() {
             {ui(
               path === "/dashboard"
                 ? "Dashboard"
-                : path.split("/")[2]?.replaceAll("-", " ") || "Studio"
+                : path.startsWith("/dashboard/clients")
+                  ? "Brand DNA"
+                  : path.split("/")[2]?.replaceAll("-", " ") || "Studio"
             )}
           </span>
           <div className="flex-1" />

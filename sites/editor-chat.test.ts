@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Asset, EditOperation, EditProject } from "../contracts/workspace";
 import { editorChatNeedsApproval } from "../contracts/editor-chat";
+import { captureEditStyle } from "../contracts/edit-style-template";
+import { captureEditBlueprint } from "../contracts/edit-template-blueprint";
 import {
   editorChatModelContext,
   normalizeEditorChatPlan,
@@ -109,6 +111,82 @@ const operation = (patch: Partial<EditOperation> = {}): EditOperation => ({
 });
 
 describe("Reel authorization and actual cost planning", () => {
+  it("resolves the selected style example instead of the base layer with the same index", () => {
+    const baseline = captureEditBlueprint(project);
+    baseline.clips[0].brightness = -0.2;
+    const example = structuredClone(baseline);
+    example.clips[0].brightness = 0.3;
+    const styleProject = {
+      ...project,
+      editStyleTemplate: {
+        id: "multiple",
+        name: "Multiple",
+        source: "edit" as const,
+        profile: captureEditStyle(project),
+        blueprint: baseline,
+        examples: [
+          {
+            id: "example",
+            name: "Example",
+            source: "edit" as const,
+            profile: captureEditStyle(project),
+            blueprint: example,
+          },
+        ],
+      },
+    };
+    const normalizeOperations = vi.fn(raw => raw as EditOperation[]);
+    normalizeEditorChatPlan(
+      {
+        summary: "Apply the example look",
+        actions: [
+          {
+            ...base,
+            kind: "edit",
+            operation: {
+              ...operation({ type: "style" }),
+              parameters: {
+                templateExampleId: "example",
+                templateClipId: "layer-0",
+              },
+            },
+          },
+        ],
+      },
+      context({ project: styleProject, normalizeOperations })
+    );
+    expect(
+      (normalizeOperations.mock.calls[0][0] as EditOperation[])[0].parameters
+        ?.brightness
+    ).toBe(0.3);
+    const input = editorChatModelContext(context({ project: styleProject }));
+    expect(input.project.styleAdaptation).toContain("example");
+    expect(input.project.styleAdaptation).toContain("ALL observed examples");
+  });
+
+  it("requires the priced style review before sending unobserved video examples to the model", () => {
+    const styleProject = {
+      ...project,
+      editStyleTemplate: {
+        id: "multiple",
+        name: "Multiple",
+        source: "edit" as const,
+        profile: captureEditStyle(project),
+        examples: [
+          {
+            id: "example",
+            name: "Video",
+            source: "reference" as const,
+            assetId: "source",
+          },
+        ],
+      },
+    };
+    expect(() =>
+      editorChatModelContext(context({ project: styleProject }))
+    ).toThrow("Review this style");
+  });
+
   it("does not promote analyzer advice or legacy mixed notes into source facts", () => {
     const input = editorChatModelContext(
       context({

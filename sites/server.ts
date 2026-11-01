@@ -2,7 +2,6 @@ import {
   EDIT_CUT_GUIDANCE,
   assertAutonomousTrimSemantics,
 } from "../contracts/edit-cut-semantics";
-import { resolveBlueprintOperations } from "../contracts/edit-template-blueprint";
 import {
   editorPresetCatalog,
   EDITOR_PRESET_GUIDANCE,
@@ -121,6 +120,7 @@ import {
   normalizeEditStyleTemplate,
   normalizeReferenceEditStyle,
   editTemplateDirection,
+  resolveEditStyleOperations,
 } from "../contracts/edit-style-template";
 import { pcmWaveDuration } from "../contracts/audio-chunks";
 import {
@@ -6526,6 +6526,15 @@ async function handleAi(
       return errorResponse("Choose a supported editing model.", 422);
     }
     const project = input.project;
+    if (
+      normalizeEditStyleTemplate(project.editStyleTemplate)?.examples?.some(
+        example => example.source === "reference" && !example.profile
+      )
+    )
+      return errorResponse(
+        "Review this style's video examples with Reel before planning the edit.",
+        409
+      );
     const projectId = stringValue(project.id);
     if (!projectId) {
       return errorResponse(
@@ -6578,6 +6587,9 @@ async function handleAi(
       localOnly: input.localOnly === true,
       editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
         ?.profile,
+      styleAdaptation: project.editStyleTemplate
+        ? editTemplateDirection(project.editStyleTemplate)
+        : undefined,
     };
     const captionStyling =
       input.captionStyling === true &&
@@ -6620,9 +6632,6 @@ async function handleAi(
           JSON.stringify({
             command: input.command,
             project: projectContext,
-            styleAdaptation: project.editStyleTemplate
-              ? editTemplateDirection(project.editStyleTemplate)
-              : undefined,
           }),
           requestedModel,
           true,
@@ -6738,9 +6747,9 @@ async function handleAi(
             )
           : undefined;
         let changes = mapEditOperations(
-          resolveBlueprintOperations(
+          resolveEditStyleOperations(
             output.changes,
-            normalizeEditStyleTemplate(project.editStyleTemplate)?.blueprint
+            project.editStyleTemplate
           ),
           duration,
           project.clips,

@@ -42,6 +42,16 @@ export function autonomousPlanCacheKey(input: AutonomousPlanCacheInput) {
   });
 }
 
+/** Quotes belong to the inputs that produced the plan, including only its own
+ * evidence checkpoints. Never stamp an old result with a newer workspace. */
+export function autonomousQuoteKey(planKey: string): string {
+  const accepted = JSON.parse(planKey) as AutonomousPlanCacheInput;
+  return JSON.stringify({
+    ...accepted,
+    scope: { ...accepted.scope, ownerId: accepted.scope.ownerEmail },
+  });
+}
+
 /** One completed response, held only in the mounted editor. Reading never starts
  * requests or retries. Clear before media/publishing side effects and on success. */
 export function createAutonomousPlanCache() {
@@ -49,6 +59,9 @@ export function createAutonomousPlanCache() {
     | { key: string; working: EditProject; result: AutonomousPlanResult }
     | undefined;
   return {
+    has(key: string) {
+      return entry?.key === key;
+    },
     read(key: string) {
       if (entry?.key !== key) {
         entry = undefined;

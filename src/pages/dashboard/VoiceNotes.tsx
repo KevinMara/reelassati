@@ -454,11 +454,12 @@ export default function VoiceNotes() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">{ui("Voice Studio")}</p>
-        <h1 className="text-3xl font-semibold">{ui("Voice to Content")}</h1>
-        <p className="mt-2 max-w-3xl text-foreground/60">
+    <div className="creation-workspace mx-auto max-w-6xl">
+      <div className="mb-5">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {ui("Audio Studio")}
+        </h1>
+        <p className="mt-1.5 max-w-3xl text-sm text-foreground/60">
           {ui("Turn audio into an editable transcript, script or voiceover.")}
         </p>
       </div>
@@ -485,12 +486,24 @@ export default function VoiceNotes() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-        <div className="space-y-5">
-          <section className="rounded-xl border border-border bg-surface p-6">
-            <div className="mb-5 flex items-start justify-between gap-3">
+      {error ? (
+        <div
+          className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-4 mb-4 text-sm text-red-500"
+          role="alert"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>{ui(error)}</p>
+        </div>
+      ) : null}
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="min-w-0 space-y-4">
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-medium">{ui("Source voice note")}</h2>
+                <h2 className="text-sm font-medium">
+                  {ui("Source voice note")}
+                </h2>
                 <p
                   id="voice-source-description"
                   className="mt-1 text-xs text-foreground/65"
@@ -512,7 +525,7 @@ export default function VoiceNotes() {
               value={title}
               onChange={event => setTitle(event.target.value)}
               placeholder={ui("Launch idea — raw voice note")}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
             />
 
             <input
@@ -530,7 +543,7 @@ export default function VoiceNotes() {
               {...dropZoneProps}
               onClick={() => fileInputRef.current?.click()}
               disabled={!capabilities.uploads || Boolean(busyAction)}
-              className={`mt-4 flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed p-5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
+              className={`mt-4 flex min-h-24 w-full items-center justify-center gap-3 rounded-xl border border-dashed p-5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
                 isDragging
                   ? "scale-[1.01] border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                   : "border-border bg-background hover:border-primary/50"
@@ -563,7 +576,7 @@ export default function VoiceNotes() {
                 type="button"
                 onClick={() => void handleUpload()}
                 disabled={Boolean(busyAction) || !capabilities.uploads}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2.5 text-sm font-medium hover:border-primary/45 disabled:opacity-45"
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2 text-sm font-medium hover:border-primary/45 disabled:opacity-45"
               >
                 {busyAction === "upload" ? (
                   <>
@@ -637,7 +650,7 @@ export default function VoiceNotes() {
                 setSpeechAsset(null);
                 invalidateVoiceAttestation();
               }}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
             >
               <option value="">{ui("No saved audio selected")}</option>
               {audioAssets.map(asset => (
@@ -656,7 +669,7 @@ export default function VoiceNotes() {
                 aria-label={ui("Transcription language")}
                 value={language}
                 onChange={event => setLanguage(event.target.value)}
-                className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
                 {CONTENT_LANGUAGES.map(item => (
                   <option key={item.code} value={item.code}>
@@ -676,7 +689,7 @@ export default function VoiceNotes() {
                   !capabilities.transcription ||
                   !(sourceAsset?.duration || fileDuration)
                 }
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {busyAction === "transcribe" ? (
                   <>
@@ -702,166 +715,20 @@ export default function VoiceNotes() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-border bg-surface p-6">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-medium">{ui("Speech synthesis")}</h2>
-                <p className="mt-1 text-xs text-foreground/65">
-                  {ui("Render approved copy into a saved audio asset.")}
-                </p>
-              </div>
-              <Volume2 className="h-5 w-5 text-primary" />
-            </div>
-            <label
-              className="mb-2 block text-xs font-medium"
-              htmlFor="speech-asset-name"
-            >
-              {ui("Audio name")}
-            </label>
-            <input
-              id="speech-asset-name"
-              value={speechAssetName}
-              maxLength={110}
-              onChange={event => setSpeechAssetName(event.target.value)}
-              placeholder={ui("Launch voice-over — final")}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-            />
-            <label
-              className="mb-2 block text-xs font-medium"
-              htmlFor="speech-copy"
-            >
-              {ui("Copy to speak")}
-            </label>
-            <textarea
-              id="speech-copy"
-              value={speechText}
-              onChange={event => {
-                if (event.target.value === speechText) return;
-                setSpeechText(event.target.value);
-                invalidateVoiceAttestation();
-              }}
-              rows={7}
-              placeholder={ui(
-                "Paste final voice-over copy or transcribe a note first."
-              )}
-              className="w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-relaxed"
-            />
-            <label
-              className="mb-2 mt-4 block text-sm font-medium"
-              htmlFor="voice-id"
-            >
-              {ui("Voice")}
-            </label>
-            <VoiceSelector
-              id="voice-id"
-              value={voiceId}
-              onChange={voice => {
-                setVoiceId(voice);
-                invalidateVoiceAttestation();
-              }}
-            />
-            <p className="mt-2 text-sm text-foreground/70">
-              {ui(
-                "Choose the voice that fits your story. Your generated audio stays in this brand’s Library."
-              )}
-            </p>
-            <p className="mt-3 flex items-center gap-1.5 text-xs text-foreground/65">
-              <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
-              {ui("REELassati AI-generated audio")}
-            </p>
-            <label className="mt-2 flex items-start gap-2 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground/60">
-              <input
-                type="checkbox"
-                checked={voiceRightsConfirmed}
-                onChange={event =>
-                  setVoiceRightsConfirmed(event.target.checked)
-                }
-                className="mt-0.5 accent-primary"
-              />
-              <span>
-                {ui(
-                  "I may use this text and voice. If the voice identifies a real person, I have documented consent or another verified legal basis."
-                )}
-              </span>
-            </label>
-            <button
-              type="button"
-              onClick={() => void handleSynthesize()}
-              disabled={
-                !speechText.trim() ||
-                !voiceId.trim() ||
-                !speechAssetName.trim() ||
-                !voiceRightsConfirmed ||
-                Boolean(busyAction) ||
-                !capabilities.speech
-              }
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {busyAction === "speech" ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {ui("Synthesizing")}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  {ui("Generate speech ·")} {speechCredits} {ui("credits")}
-                </>
-              )}
-            </button>
-
-            {speechAsset ? (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3"
-              >
-                <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                  <Save className="h-3.5 w-3.5" />
-                  {ui("Saved to your audio library")}
-                </div>
-                <div className="mt-2">
-                  <AiProvenanceBadge provenance={speechAsset.provenance} />
-                </div>
-                <AudioPlayer
-                  src={speechAsset.url}
-                  downloadName={speechAsset.name}
-                  controls
-                  preload="metadata"
-                  aria-label={ui("Generated speech preview: {{name}}", {
-                    name: speechAsset.name,
-                  })}
-                  aria-describedby="generated-speech-transcript"
-                  className="mt-3 w-full"
-                />
-                <p id="generated-speech-transcript" className="sr-only">
-                  {ui("Spoken text:")} {speechText}
-                </p>
-                <EditAssetLink
-                  assetId={speechAsset.id}
-                  label={ui("Add audio to Edit")}
-                  className="mt-3"
-                />
-              </motion.div>
-            ) : null}
-          </section>
-        </div>
-
-        <div className="space-y-5">
           <AnimatePresence mode="wait">
             {transcription ? (
               <motion.section
                 key="transcript"
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-xl border border-border bg-surface p-6"
+                className="rounded-xl border border-border bg-surface p-5"
               >
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="mono-eyebrow mb-1 text-primary">
                       {ui("Transcript")}
                     </p>
-                    <h2 className="font-medium">
+                    <h2 className="text-sm font-medium">
                       {ui("Clean the thought before writing")}
                     </h2>
                   </div>
@@ -898,7 +765,7 @@ export default function VoiceNotes() {
                       setScriptPlatform(event.target.value as Platform)
                     }
                     aria-label={ui("Script platform")}
-                    className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >
                     {SCRIPT_PLATFORMS.map(item => (
                       <option key={item.value} value={item.value}>
@@ -914,7 +781,7 @@ export default function VoiceNotes() {
                       Boolean(busyAction) ||
                       !capabilities.ai
                     }
-                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {busyAction === "script" ? (
                       <>
@@ -935,10 +802,10 @@ export default function VoiceNotes() {
                 key="transcript-empty"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex min-h-80 flex-col items-center justify-center rounded-xl border border-border bg-surface p-10 text-center"
+                className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-border bg-surface p-5 text-center"
               >
-                <AudioLines className="h-9 w-9 text-primary/40" />
-                <h2 className="mt-4 text-lg font-medium text-foreground/65">
+                <AudioLines className="h-6 w-6 text-primary/50" />
+                <h2 className="mt-3 text-sm font-medium text-foreground/65">
                   {ui("Your transcript will stay editable")}
                 </h2>
                 <p className="mt-2 max-w-sm text-sm text-foreground/65">
@@ -952,14 +819,16 @@ export default function VoiceNotes() {
             <motion.section
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl border border-border bg-surface p-6"
+              className="rounded-xl border border-border bg-surface p-5"
             >
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="mono-eyebrow mb-1 text-primary">
                     {ui("Saved script")}
                   </p>
-                  <h2 className="font-medium">{generatedScript.title}</h2>
+                  <h2 className="text-sm font-medium">
+                    {generatedScript.title}
+                  </h2>
                   <p className="mt-1 text-xs text-foreground/65">
                     {generatedScript.platform} · {generatedScript.duration}s
                   </p>
@@ -1013,21 +882,160 @@ export default function VoiceNotes() {
               type="button"
               onClick={resetSource}
               disabled={Boolean(busyAction)}
-              className="w-full rounded-lg border border-border bg-surface py-2.5 text-sm font-medium transition-colors hover:border-primary/45 disabled:opacity-45"
+              className="w-full rounded-lg border border-border bg-surface py-2 text-sm font-medium transition-colors hover:border-primary/45 disabled:opacity-45"
             >
               {ui("Start a new voice note")}
             </button>
           ) : null}
-
-          {error ? (
-            <div
-              className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-500"
-              role="alert"
-            >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>{ui(error)}</p>
+        </div>
+        <div
+          className={`min-w-0 space-y-4 ${requestedScript ? "order-first lg:order-last" : ""}`}
+        >
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-medium">
+                  {ui("Speech synthesis")}
+                </h2>
+                <p className="mt-1 text-xs text-foreground/65">
+                  {ui("Render approved copy into a saved audio asset.")}
+                </p>
+              </div>
+              <Volume2 className="h-5 w-5 text-primary" />
             </div>
-          ) : null}
+            <label
+              className="mb-2 block text-xs font-medium"
+              htmlFor="speech-asset-name"
+            >
+              {ui("Audio name")}
+            </label>
+            <input
+              id="speech-asset-name"
+              value={speechAssetName}
+              maxLength={110}
+              onChange={event => setSpeechAssetName(event.target.value)}
+              placeholder={ui("Launch voice-over — final")}
+              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            />
+            <label
+              className="mb-2 block text-xs font-medium"
+              htmlFor="speech-copy"
+            >
+              {ui("Copy to speak")}
+            </label>
+            <textarea
+              id="speech-copy"
+              value={speechText}
+              onChange={event => {
+                if (event.target.value === speechText) return;
+                setSpeechText(event.target.value);
+                invalidateVoiceAttestation();
+              }}
+              rows={5}
+              placeholder={ui(
+                "Paste final voice-over copy or transcribe a note first."
+              )}
+              className="w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-sm leading-relaxed"
+            />
+            <label
+              className="mb-2 mt-4 block text-sm font-medium"
+              htmlFor="voice-id"
+            >
+              {ui("Voice")}
+            </label>
+            <VoiceSelector
+              id="voice-id"
+              value={voiceId}
+              onChange={voice => {
+                setVoiceId(voice);
+                invalidateVoiceAttestation();
+              }}
+            />
+            <p className="mt-2 text-xs leading-relaxed text-foreground/65">
+              {ui(
+                "Choose the voice that fits your story. Your generated audio stays in this brand’s Library."
+              )}
+            </p>
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-foreground/65">
+              <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
+              {ui("REELassati AI-generated audio")}
+            </p>
+            <label className="mt-2 flex items-start gap-2 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground/60">
+              <input
+                type="checkbox"
+                checked={voiceRightsConfirmed}
+                onChange={event =>
+                  setVoiceRightsConfirmed(event.target.checked)
+                }
+                className="mt-0.5 accent-primary"
+              />
+              <span>
+                {ui(
+                  "I may use this text and voice. If the voice identifies a real person, I have documented consent or another verified legal basis."
+                )}
+              </span>
+            </label>
+            <button
+              type="button"
+              onClick={() => void handleSynthesize()}
+              disabled={
+                !speechText.trim() ||
+                !voiceId.trim() ||
+                !speechAssetName.trim() ||
+                !voiceRightsConfirmed ||
+                Boolean(busyAction) ||
+                !capabilities.speech
+              }
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {busyAction === "speech" ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {ui("Synthesizing")}
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  {ui("Generate speech ·")} {speechCredits} {ui("credits")}
+                </>
+              )}
+            </button>
+
+            {speechAsset ? (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3"
+              >
+                <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  <Save className="h-3.5 w-3.5" />
+                  {ui("Saved to your audio library")}
+                </div>
+                <div className="mt-2">
+                  <AiProvenanceBadge provenance={speechAsset.provenance} />
+                </div>
+                <AudioPlayer
+                  src={speechAsset.url}
+                  downloadName={speechAsset.name}
+                  controls
+                  preload="metadata"
+                  aria-label={ui("Generated speech preview: {{name}}", {
+                    name: speechAsset.name,
+                  })}
+                  aria-describedby="generated-speech-transcript"
+                  className="mt-3 w-full"
+                />
+                <p id="generated-speech-transcript" className="sr-only">
+                  {ui("Spoken text:")} {speechText}
+                </p>
+                <EditAssetLink
+                  assetId={speechAsset.id}
+                  label={ui("Add audio to Edit")}
+                  className="mt-3"
+                />
+              </motion.div>
+            ) : null}
+          </section>
         </div>
       </div>
     </div>

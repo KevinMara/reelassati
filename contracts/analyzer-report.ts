@@ -61,12 +61,14 @@ export type SavedAnalyzerReport = {
 };
 
 /** Workspace snapshots are notes, never server-authoritative evidence for
- * charges or permission to run a provider. Keep only six complete reports. */
+ * charges or permission to run a provider. Retain every valid paid review:
+ * record-size validation and the bounded workspace payload limit storage,
+ * rather than silently evicting evidence by source count. */
 export function normalizeSavedAnalyzerReports(
   value: unknown
 ): SavedAnalyzerReport[] {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 6).flatMap((candidate: SavedAnalyzerReport) => {
+  return value.flatMap((candidate: SavedAnalyzerReport) => {
     if (
       !candidate ||
       typeof candidate.assetId !== "string" ||

@@ -1,3 +1,5 @@
+import { styleExamplesUi } from "./ui-style-examples";
+
 const english =
   "Active word color|Add color|Bold|Characters per line|Choose a project|Choose a project to use this language for its next edit.|Color / look|Color preview|Contain|Cover|Create an editing language, caption treatment, graphic or color look.|Create your visual language. Reuse it in every edit.|Define the rhythm and visual language for your next edits.|Delete style|Delete this saved style?|Depth|Discard unsaved changes?|Edit style|Editing language|Graphic preview|Graphics per minute|Include caption treatment|Include color treatment|Include graphic treatment|Layout|Long shot|Make it your style|New style|No matching styles|Numbers|Open a project, then apply this style from Saved styles.|Outline / label padding|Outline color|Perspective|Pitch|Saving is unavailable in this workspace.|Search styles|Set graphics frequency|Set shot duration guidance|Short shot|Style deleted|Style editor|Style saved|Style type|Text color|The saved style changed. Open it again before saving.|The style or project changed. Choose it again.|This saved style ID already exists.|This style was removed. Create a new style to save your changes.|Turns|Typical shot|Unsaved changes|Uppercase|Use a style name of 1 to 60 characters.|Use in editor|Yaw|Your saved styles appear here.".split(
     "|"
@@ -45,9 +47,12 @@ export const stylesWorkspaceUi: Record<
       );
     return [
       language,
-      Object.fromEntries(
-        english.map((key, index) => [key, translations[index]])
-      ),
+      {
+        ...Object.fromEntries(
+          english.map((key, index) => [key, translations[index]])
+        ),
+        ...styleExamplesUi[language],
+      },
     ];
   })
 );

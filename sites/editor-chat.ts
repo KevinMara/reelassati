@@ -1,5 +1,4 @@
 import { EDIT_CUT_GUIDANCE } from "../contracts/edit-cut-semantics";
-import { resolveBlueprintOperations } from "../contracts/edit-template-blueprint";
 import {
   editorPresetCatalog,
   EDITOR_PRESET_GUIDANCE,
@@ -13,6 +12,8 @@ import { editorAudioCatalog } from "../contracts/editor-audio-catalog";
 import {
   normalizeEditStyleTemplate,
   editTemplateDirection,
+  resolveEditStyleOperations,
+  editStyleSourceAssetIds,
 } from "../contracts/edit-style-template";
 import {
   catalogAudioPlacement,
@@ -265,9 +266,23 @@ export function editorChatModelContext(context: EditorChatContext) {
       "assetId" in reference ? [reference.assetId] : []
     ),
   ]);
+  const styleSourceIds = editStyleSourceAssetIds(project.editStyleTemplate);
+  if (
+    project.editStyleTemplate?.examples?.some(
+      example => example.source === "reference" && !example.profile
+    )
+  )
+    throw new EditorChatInputError(
+      "Review this style's video examples with Reel before planning the edit.",
+      409
+    );
   const candidates = [
     ...assets.filter(asset => relevantIds.has(asset.id)),
-    ...assets.filter(asset => !relevantIds.has(asset.id)).slice(0, 80),
+    ...assets
+      .filter(
+        asset => !relevantIds.has(asset.id) && !styleSourceIds.has(asset.id)
+      )
+      .slice(0, 80),
   ];
   // Keep every language represented without spending thousands of tokens on the full manual catalog.
   const languages = [...new Set(VOICE_CATALOG.map(voice => voice.language))];
@@ -567,7 +582,7 @@ export function normalizeEditorChatPlan(
         if (raw.start < 0 || raw.end > project.duration || raw.end < raw.start)
           throw new Error("This edit needs a valid timeline range.");
         const operation = context.normalizeOperations(
-          resolveBlueprintOperations(
+          resolveEditStyleOperations(
             [
               {
                 ...raw,
@@ -575,7 +590,7 @@ export function normalizeEditorChatPlan(
                 reason: raw.reason ?? row.reason,
               },
             ],
-            normalizeEditStyleTemplate(project.editStyleTemplate)?.blueprint
+            project.editStyleTemplate
           )
         )[0];
         if (!operation)

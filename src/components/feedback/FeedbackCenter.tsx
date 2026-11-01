@@ -80,8 +80,8 @@ export function FeedbackCenter({
 
   const { user } = useAuth();
 
-  const [type, setType] = useState<FeedbackType>("bug");
-  const [impact, setImpact] = useState<Impact>("minor");
+  const [type, setType] = useState<FeedbackType>("feedback");
+  const [impact, setImpact] = useState<Impact>("idea");
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
   const [expected, setExpected] = useState("");
@@ -221,25 +221,7 @@ export function FeedbackCenter({
   };
 
   return (
-    <div className="space-y-8">
-      {owner ? (
-        <OwnerInbox
-          feedback={feedback}
-          visibleFeedback={visibleFeedback}
-          selected={selected}
-          loading={inboxLoading}
-          savingId={savingId}
-          search={search}
-          statusFilter={statusFilter}
-          typeFilter={typeFilter}
-          setSearch={setSearch}
-          setStatusFilter={setStatusFilter}
-          setTypeFilter={setTypeFilter}
-          setSelectedId={setSelectedId}
-          updateItem={updateItem}
-        />
-      ) : null}
-
+    <div className="feedback-workspace space-y-8">
       <section
         id="send-feedback"
         className={
@@ -252,7 +234,7 @@ export function FeedbackCenter({
           onSubmit={submit}
           className={
             compact
-              ? "rounded-lg border border-border bg-surface p-4 sm:p-5"
+              ? "rounded-xl border border-primary/15 bg-surface p-4 sm:p-5"
               : "rounded-2xl border border-border bg-surface p-5 shadow-card sm:p-7"
           }
         >
@@ -301,19 +283,25 @@ export function FeedbackCenter({
           >
             <TypeButton
               compact={compact}
-              active={type === "bug"}
-              icon={AlertTriangle}
-              title={ui("Report a bug")}
-              description={ui("Something is not working as expected")}
-              onClick={() => setType("bug")}
-            />
-            <TypeButton
-              compact={compact}
               active={type === "feedback"}
               icon={Lightbulb}
               title={ui("Suggest an improvement")}
               description={ui("An idea that would make REELassati better")}
-              onClick={() => setType("feedback")}
+              onClick={() => {
+                setType("feedback");
+                setImpact("idea");
+              }}
+            />
+            <TypeButton
+              compact={compact}
+              active={type === "bug"}
+              icon={AlertTriangle}
+              title={ui("Report a bug")}
+              description={ui("Something is not working as expected")}
+              onClick={() => {
+                setType("bug");
+                setImpact("minor");
+              }}
             />
           </div>
 
@@ -493,7 +481,9 @@ export function FeedbackCenter({
           </p>
         </form>
 
-        <aside className={compact ? "space-y-2" : "space-y-4"}>
+        <aside
+          className={compact ? "space-y-2 lg:sticky lg:top-16" : "space-y-4"}
+        >
           <InfoCard
             compact={compact}
             icon={Sparkles}
@@ -516,6 +506,24 @@ export function FeedbackCenter({
           />
         </aside>
       </section>
+
+      {owner ? (
+        <OwnerInbox
+          feedback={feedback}
+          visibleFeedback={visibleFeedback}
+          selected={selected}
+          loading={inboxLoading}
+          savingId={savingId}
+          search={search}
+          statusFilter={statusFilter}
+          typeFilter={typeFilter}
+          setSearch={setSearch}
+          setStatusFilter={setStatusFilter}
+          setTypeFilter={setTypeFilter}
+          setSelectedId={setSelectedId}
+          updateItem={updateItem}
+        />
+      ) : null}
     </div>
   );
 }

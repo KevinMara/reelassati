@@ -576,14 +576,13 @@ export default function VideoAnalyzer() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">
-          {ui("Edit Intelligence")}
-        </p>
-        <h1 className="text-3xl font-semibold">{ui("Video Analyzer")}</h1>
-        <p className="mt-2 max-w-3xl text-foreground/60">
+      <div className="mb-5">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {ui("Video Analyzer")}
+        </h1>
+        <p className="mt-1.5 max-w-3xl text-sm text-foreground/60">
           {ui(
-            "Find the moments that earn attention. Review your video, identify hooks and payoffs, and turn the evidence into a sharper short."
+            "Review your video, find its strongest moments, and plan the next edit."
           )}
         </p>
       </div>
@@ -607,7 +606,7 @@ export default function VideoAnalyzer() {
         </div>
       ) : null}
 
-      <section className="mb-6 rounded-xl border border-border bg-surface p-6">
+      <section className="mb-4 rounded-xl border border-border bg-surface p-5">
         <div
           data-tour="analysis-source"
           className="mb-5 flex flex-wrap items-center justify-between gap-3"
@@ -625,7 +624,7 @@ export default function VideoAnalyzer() {
               aria-pressed={sourceMode === "upload"}
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
                 sourceMode === "upload"
-                  ? "bg-primary text-white"
+                  ? "bg-primary/10 text-primary"
                   : "text-foreground/70"
               }`}
             >
@@ -645,7 +644,7 @@ export default function VideoAnalyzer() {
               aria-pressed={sourceMode === "url"}
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
                 sourceMode === "url"
-                  ? "bg-primary text-white"
+                  ? "bg-primary/10 text-primary"
                   : "text-foreground/70"
               }`}
             >
@@ -697,7 +696,7 @@ export default function VideoAnalyzer() {
                 {...dropZoneProps}
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!capabilities.uploads || analyzing}
-                className={`flex min-h-28 w-full items-center justify-center gap-3 rounded-xl border border-dashed p-5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
+                className={`flex min-h-24 w-full items-center justify-center gap-3 rounded-xl border border-dashed p-5 text-left transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
                   isDragging
                     ? "scale-[1.01] border-primary bg-primary/10 shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                     : "border-border bg-background hover:border-primary/50"
@@ -940,7 +939,7 @@ export default function VideoAnalyzer() {
             key="analysis-result"
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
+            className="space-y-4"
           >
             {analyzedAsset && (
               <AnalyzerWorkspace
@@ -959,7 +958,7 @@ export default function VideoAnalyzer() {
                 onAudienceChange={saveAudienceResponse}
               />
             )}
-            <section className="rounded-xl border border-border bg-surface p-6">
+            <section className="rounded-xl border border-border bg-surface p-5">
               <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                 <div className="max-w-3xl">
                   <p className="mono-eyebrow mb-2 text-primary">
@@ -978,14 +977,14 @@ export default function VideoAnalyzer() {
               </div>
             </section>
 
-            <div className="grid gap-6">
-              <section className="rounded-xl border border-border bg-surface p-6">
+            <div className="grid gap-4">
+              <section className="rounded-xl border border-border bg-surface p-5">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="flex items-center gap-2 font-medium">
                     <WandSparkles className="h-4 w-4 text-primary" />
                     {ui("Actionable edit plan")}
                   </h2>
-                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium uppercase tracking-wider text-primary">
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                     {(result.recommendations?.length ?? 0) +
                       result.changes.length}{" "}
                     {ui("recommendations")}
@@ -995,7 +994,7 @@ export default function VideoAnalyzer() {
                   {result.recommendations?.map(recommendation => (
                     <article
                       key={recommendation.id}
-                      className="analysis-recommendation rounded-xl border border-border bg-background p-5"
+                      className="analysis-recommendation rounded-xl border border-border bg-background p-4"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-mono text-xs text-primary">
@@ -1155,10 +1154,10 @@ export default function VideoAnalyzer() {
             key="analysis-empty"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-border bg-surface p-10 text-center"
+            className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-border bg-surface p-5 text-center"
           >
             <Gauge className="h-9 w-9 text-primary/40" />
-            <h2 className="mt-4 text-lg font-medium text-foreground/65">
+            <h2 className="mt-3 text-sm font-medium text-foreground/75">
               {ui("Bring your short into focus")}
             </h2>
             <p className="mt-2 max-w-md text-sm text-foreground/70">

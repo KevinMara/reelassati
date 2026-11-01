@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createEmptyWorkspace, type EditProject } from "@contracts/workspace";
 import {
   autonomousPlanCacheKey,
+  autonomousQuoteKey,
   createAutonomousPlanCache,
   type AutonomousPlanCacheInput,
   type AutonomousPlanResult,
@@ -129,6 +130,39 @@ function fixture() {
 }
 
 describe("manual same-input plan recovery", () => {
+  it("binds a quote to its accepted checkpoints instead of concurrent timeline or Library changes", () => {
+    const { input } = fixture();
+    const accepted = structuredClone(input);
+    accepted.project.sourceReviews![0].reviewedAt = "checkpointed-review";
+    const planKey = autonomousPlanCacheKey(accepted);
+    const quoteKey = autonomousQuoteKey(planKey);
+    const visibleKey = (value: AutonomousPlanCacheInput) =>
+      autonomousPlanCacheKey({
+        ...value,
+        scope: { ...value.scope, ownerId: value.scope.ownerEmail },
+      });
+    expect(quoteKey).toBe(visibleKey(accepted));
+    expect(quoteKey).not.toBe(visibleKey(input));
+    const concurrent = structuredClone(accepted);
+    concurrent.project.clips[0].start = 2;
+    expect(quoteKey).not.toBe(visibleKey(concurrent));
+    concurrent.project = structuredClone(accepted.project);
+    concurrent.assets[0].name = "Changed while planning.mp4";
+    expect(quoteKey).not.toBe(visibleKey(concurrent));
+    expect(autonomousQuoteKey(planKey)).toBe(quoteKey);
+  });
+  it("reports reusable planning without consuming or invalidating the cached response", () => {
+    const { input, result, working } = fixture();
+    const cache = createAutonomousPlanCache();
+    const key = autonomousPlanCacheKey(input);
+    expect(cache.has(key)).toBe(false);
+    cache.write(key, working, result);
+    expect(cache.has("other-inputs")).toBe(false);
+    expect(cache.has(key)).toBe(true);
+    expect(cache.read(key)?.result).toEqual(result);
+    cache.clear();
+    expect(cache.has(key)).toBe(false);
+  });
   it("retains the completed signed response and prepared evidence after local preflight fails", () => {
     const { input, result, working } = fixture();
     const cache = createAutonomousPlanCache();

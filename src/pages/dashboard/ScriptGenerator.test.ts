@@ -55,17 +55,30 @@ beforeEach(() => {
   });
 });
 
-function render() {
+function render(path = "/dashboard/scripts?script=private-draft-a") {
   return renderToStaticMarkup(
     createElement(
       MemoryRouter,
-      { initialEntries: ["/dashboard/scripts?script=private-draft-a"] },
+      { initialEntries: [path] },
       createElement(ScriptGenerator)
     )
   );
 }
 
 describe("script workspace bootstrap ownership", () => {
+  it("starts a new brief with Instagram and readable tone labels", () => {
+    const html = render("/dashboard/script");
+    expect(html).toContain(
+      '<option value="instagram" selected="">Instagram Reels</option>'
+    );
+    expect(html).toContain(
+      '<option value="energetic" selected="">Energetic</option>'
+    );
+    expect(html).toContain(
+      '<option value="professional">Professional</option>'
+    );
+  });
+
   it("does not seed or display the prior owner's requested draft after an auth switch", () => {
     state.email = "owner-b@example.com";
     const html = render();

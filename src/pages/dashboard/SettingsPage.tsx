@@ -14,7 +14,6 @@ import {
   Globe2,
   Loader2,
   Moon,
-  Palette,
   Radio,
   Save,
   Settings2,
@@ -23,17 +22,16 @@ import {
   Video,
   Volume2,
 } from "lucide-react";
-import type { BrandKit, WorkspaceProfile } from "@contracts/workspace";
+import type { WorkspaceProfile } from "@contracts/workspace";
 import { useTheme } from "@/hooks/useTheme";
 import { useWorkspace } from "@/providers/workspace";
 import { WRITING_LANGUAGES, localizedLanguageLabel } from "@/lib/languages";
 import { selectLanguage, supportedLanguages } from "@/lib/i18n";
 
-type Tab = "profile" | "brand" | "appearance" | "integrations";
+type Tab = "profile" | "appearance" | "integrations";
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof User }> = [
   { id: "profile", label: "Studio profile", icon: User },
-  { id: "brand", label: "Brand DNA", icon: Palette },
   { id: "appearance", label: "Appearance", icon: Sun },
   { id: "integrations", label: "Capabilities", icon: Settings2 },
 ];
@@ -64,7 +62,6 @@ export default function SettingsPage() {
   const [profileEdits, setProfileEdits] = useState<Partial<WorkspaceProfile>>(
     {}
   );
-  const [brandEdits, setBrandEdits] = useState<Partial<BrandKit>>({});
   const [notice, setNotice] = useState<{
     tone: "success" | "error";
     message: string;
@@ -73,12 +70,7 @@ export default function SettingsPage() {
     () => ({ ...workspace.profile, ...profileEdits }),
     [profileEdits, workspace.profile]
   );
-  const brandDraft = useMemo(
-    () => ({ ...workspace.brandKit, ...brandEdits }),
-    [brandEdits, workspace.brandKit]
-  );
   const profileDirty = Object.keys(profileEdits).length > 0;
-  const brandDirty = Object.keys(brandEdits).length > 0;
 
   const timezones = useMemo(
     () =>
@@ -93,14 +85,6 @@ export default function SettingsPage() {
     value: WorkspaceProfile[Key]
   ) => {
     setProfileEdits(current => ({ ...current, [key]: value }));
-    setNotice(null);
-  };
-
-  const setBrandField = <Key extends keyof BrandKit>(
-    key: Key,
-    value: BrandKit[Key]
-  ) => {
-    setBrandEdits(current => ({ ...current, [key]: value }));
     setNotice(null);
   };
 
@@ -131,36 +115,6 @@ export default function SettingsPage() {
           cause instanceof Error
             ? cause.message
             : "Profile could not be saved.",
-      });
-    }
-  };
-
-  const saveBrand = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!brandDraft.name.trim()) {
-      setNotice({ tone: "error", message: "Brand name is required." });
-      return;
-    }
-    try {
-      const next: BrandKit = {
-        ...brandDraft,
-        name: brandDraft.name.trim(),
-        voice: brandDraft.voice.trim(),
-        audience: brandDraft.audience.trim(),
-        font: brandDraft.font.trim() || "Geist",
-        safeZone: Math.max(0, Math.min(25, brandDraft.safeZone)),
-        audioDucking: Math.max(0, Math.min(100, brandDraft.audioDucking)),
-      };
-      await updateWorkspace(current => ({ ...current, brandKit: next }));
-      setBrandEdits({});
-      setNotice({ tone: "success", message: "Brand defaults saved." });
-    } catch (cause) {
-      setNotice({
-        tone: "error",
-        message:
-          cause instanceof Error
-            ? cause.message
-            : "Brand defaults could not be saved.",
       });
     }
   };
@@ -219,7 +173,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="settings-workspace mx-auto max-w-5xl">
       <div className="mb-8">
         <p className="mono-eyebrow mb-2 text-primary">
           {ui("Workspace control")}
@@ -246,9 +200,9 @@ export default function SettingsPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[190px_minmax(0,1fr)]">
         <nav
-          className="flex gap-1 overflow-x-auto lg:flex-col"
+          className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-surface/60 p-1.5 self-start lg:flex-col"
           aria-label={ui("Settings")}
         >
           {TABS.map(tab => (
@@ -405,178 +359,6 @@ export default function SettingsPage() {
                     <Save className="h-4 w-4" />
                   )}
                   {ui("Save profile")}
-                </button>
-              </div>
-            </form>
-          ) : null}
-
-          {activeTab === "brand" ? (
-            <form
-              onSubmit={saveBrand}
-              className="space-y-5 rounded-xl border border-border bg-surface p-6"
-            >
-              <div>
-                <h2 className="text-lg font-medium">{ui("Brand defaults")}</h2>
-                <p className="mt-1 text-sm text-foreground/70">
-                  {ui(
-                    "These constraints are reusable across scripts, AI plans, and edits."
-                  )}
-                </p>
-              </div>
-              <div className="grid gap-4">
-                <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">
-                    {ui("Brand name")}
-                  </span>
-                  <input
-                    value={brandDraft.name}
-                    onChange={event =>
-                      setBrandField("name", event.target.value)
-                    }
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
-                    required
-                  />
-                </label>
-                <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">
-                    {ui("Voice rules")}
-                  </span>
-                  <textarea
-                    value={brandDraft.voice}
-                    onChange={event =>
-                      setBrandField("voice", event.target.value)
-                    }
-                    rows={4}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
-                    placeholder={ui(
-                      "Specific language, energy, point of view, and phrases to avoid"
-                    )}
-                  />
-                </label>
-                <label className="text-sm">
-                  <span className="mb-1.5 block font-medium">
-                    {ui("Audience")}
-                  </span>
-                  <textarea
-                    value={brandDraft.audience}
-                    onChange={event =>
-                      setBrandField("audience", event.target.value)
-                    }
-                    rows={4}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
-                    placeholder={ui(
-                      "Who they are, what they believe, and what creates urgency"
-                    )}
-                  />
-                </label>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="text-sm">
-                    <span className="mb-1.5 block font-medium">
-                      {ui("Typeface")}
-                    </span>
-                    <input
-                      value={brandDraft.font}
-                      onChange={event =>
-                        setBrandField("font", event.target.value)
-                      }
-                      className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
-                    />
-                  </label>
-                  <label htmlFor="settings-caption-preset" className="text-sm">
-                    <span className="mb-1.5 block font-medium">
-                      {ui("Caption preset")}
-                    </span>
-                    <StudioSelect
-                      id="settings-caption-preset"
-                      value={brandDraft.captionPreset}
-                      onChange={event =>
-                        setBrandField(
-                          "captionPreset",
-                          event.target.value as BrandKit["captionPreset"]
-                        )
-                      }
-                      className="w-full rounded-lg border border-border bg-background px-4 py-2.5"
-                    >
-                      <option value="kinetic">{ui("Kinetic")}</option>
-                      <option value="editorial">{ui("Editorial")}</option>
-                      <option value="minimal">{ui("Minimal")}</option>
-                    </StudioSelect>
-                  </label>
-                  <label className="text-sm">
-                    <span className="mb-1.5 block font-medium">
-                      {ui("Primary color")}
-                    </span>
-                    <input
-                      type="color"
-                      value={brandDraft.primaryColor}
-                      onChange={event =>
-                        setBrandField("primaryColor", event.target.value)
-                      }
-                      className="h-11 w-full rounded-lg border border-border bg-background p-1"
-                    />
-                  </label>
-                  <label className="text-sm">
-                    <span className="mb-1.5 block font-medium">
-                      {ui("Accent color")}
-                    </span>
-                    <input
-                      type="color"
-                      value={brandDraft.accentColor}
-                      onChange={event =>
-                        setBrandField("accentColor", event.target.value)
-                      }
-                      className="h-11 w-full rounded-lg border border-border bg-background p-1"
-                    />
-                  </label>
-                  <label className="text-sm">
-                    <span className="mb-1.5 flex justify-between font-medium">
-                      {ui("Safe zone")} <span>{brandDraft.safeZone}%</span>
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="25"
-                      value={brandDraft.safeZone}
-                      onChange={event =>
-                        setBrandField("safeZone", Number(event.target.value))
-                      }
-                      className="w-full accent-primary"
-                    />
-                  </label>
-                  <label className="text-sm">
-                    <span className="mb-1.5 flex justify-between font-medium">
-                      {ui("Audio ducking")}{" "}
-                      <span>{brandDraft.audioDucking}%</span>
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={brandDraft.audioDucking}
-                      onChange={event =>
-                        setBrandField(
-                          "audioDucking",
-                          Number(event.target.value)
-                        )
-                      }
-                      className="w-full accent-primary"
-                    />
-                  </label>
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-t border-border pt-5">
-                <Link
-                  to="/dashboard/clients"
-                  className="text-xs font-medium text-primary"
-                >
-                  {ui("Open the full Brand DNA editor")}
-                </Link>
-                <button
-                  type="submit"
-                  disabled={!brandDirty || saving}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white disabled:opacity-45"
-                >
-                  <Save className="h-4 w-4" /> {ui("Save defaults")}
                 </button>
               </div>
             </form>
