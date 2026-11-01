@@ -27,6 +27,7 @@ import { SavedStylePreview } from "@/components/studio/SavedStylePreview";
 import { GraphicStyleFields } from "@/components/styles/GraphicStyleFields";
 import { LookStyleFields } from "@/components/styles/LookStyleFields";
 import { StyleSelect } from "@/components/styles/StyleFields";
+import { StyleExamples } from "@/components/styles/StyleExamples";
 import {
   newWorkspaceStyle,
   removeWorkspaceStyle,
@@ -34,6 +35,7 @@ import {
   selectProjectEditingStyle,
   styleKind,
   workspaceStyles,
+  filterWorkspaceStyles,
   type StyleKind,
   type WorkspaceStyle,
 } from "@/components/styles/style-workspace";
@@ -77,18 +79,38 @@ function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
   const [query, setQuery] = useState("");
   const [projectId, setProjectId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [kindFilter, setKindFilter] = useState("");
+  const [folderFilter, setFolderFilter] = useState("");
+  const [contentFilter, setContentFilter] = useState("");
+  const [languageFilter, setLanguageFilter] = useState("");
   const busyRef = useRef(false);
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const library = workspaceStyles(workspace);
-  const filtered = library.filter(style =>
-    `${style.value.name} ${ui(kindLabels[styleKind(style)])}`
-      .toLocaleLowerCase()
-      .includes(query.toLocaleLowerCase())
-  );
+  const metadataOptions = (key: "folder" | "contentType" | "language") =>
+    [
+      ...new Set(
+        library
+          .map(style => style.value[key])
+          .filter((value): value is string => Boolean(value))
+      ),
+    ]
+      .sort()
+      .map(value => ({ value, label: value, translate: false }));
+  const folders = metadataOptions("folder");
+  const contentTypes = metadataOptions("contentType");
+  const languages = metadataOptions("language");
+  const filtered = filterWorkspaceStyles(library, {
+    query,
+    kind: kindFilter,
+    folder: folderFilter,
+    contentType: contentFilter,
+    language: languageFilter,
+  });
   const dirty = draft !== null && JSON.stringify(draft) !== baseline;
-  const blocked = busy || saving;
+  const blocked = busy || saving || uploading;
   const canPersist =
     capabilities.persistence &&
     (draft?.kind !== "editing" || capabilities.editStyleTemplates);
@@ -132,7 +154,7 @@ function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
   }
 
   async function run(task: () => Promise<void>) {
-    if (busyRef.current || saving) return;
+    if (busyRef.current || saving || uploading) return;
     busyRef.current = true;
     setBusy(true);
     setMessage("");
@@ -275,6 +297,55 @@ function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
               />
             </label>
           )}
+          {library.length > 0 && (
+            <div className="space-y-2">
+              <StyleSelect
+                label={ui("Folders")}
+                value={folderFilter}
+                options={[
+                  { value: "", label: "All folders" },
+                  { value: "__unfiled__", label: "Unfiled" },
+                  ...folders,
+                ]}
+                onChange={setFolderFilter}
+              />
+              <details className="rounded-lg border border-border px-3 py-2">
+                <summary className="cursor-pointer text-xs text-muted-foreground">
+                  {ui("Filters")}
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <StyleSelect
+                    label={ui("Style type")}
+                    value={kindFilter}
+                    options={[
+                      { value: "", label: "All styles" },
+                      ...(Object.keys(kindLabels) as StyleKind[]).map(kind => ({
+                        value: kind,
+                        label: kindLabels[kind],
+                      })),
+                    ]}
+                    onChange={setKindFilter}
+                  />
+                  {contentTypes.length > 0 && (
+                    <StyleSelect
+                      label={ui("Content type")}
+                      value={contentFilter}
+                      options={[{ value: "", label: "All" }, ...contentTypes]}
+                      onChange={setContentFilter}
+                    />
+                  )}
+                  {languages.length > 0 && (
+                    <StyleSelect
+                      label={ui("Language")}
+                      value={languageFilter}
+                      options={[{ value: "", label: "All" }, ...languages]}
+                      onChange={setLanguageFilter}
+                    />
+                  )}
+                </div>
+              </details>
+            </div>
+          )}
           <div className="space-y-2">
             {filtered.map(style => {
               const Icon = kindIcons[styleKind(style)];
@@ -300,6 +371,10 @@ function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
                     </span>
                     <span className="mt-0.5 block text-xs text-muted-foreground">
                       {ui(kindLabels[styleKind(style)])}
+                      {style.kind === "editing" &&
+                        Boolean(style.value.examples?.length) &&
+                        ` · ${style.value.examples!.length} ${ui("examples")}`}
+                      {style.value.folder && ` · ${style.value.folder}`}
                     </span>
                   </span>
                 </button>
@@ -431,6 +506,9 @@ function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
                             draft.value.id
                           );
                           next.value.name = draft.value.name;
+                          next.value.folder = draft.value.folder;
+                          next.value.contentType = draft.value.contentType;
+                          next.value.language = draft.value.language;
                           setDraft(next);
                         }}
                       />
@@ -440,11 +518,61 @@ function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
                       </div>
                     )}
                   </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {(["folder", "contentType", "language"] as const).map(
+                      key => (
+                        <label key={key} className="space-y-1.5 text-xs">
+                          <span className="text-muted-foreground">
+                            {ui(
+                              key === "folder"
+                                ? "Folder"
+                                : key === "contentType"
+                                  ? "Content type"
+                                  : "Language"
+                            )}
+                          </span>
+                          <input
+                            maxLength={60}
+                            list={`style-${key}-options`}
+                            value={draft.value[key] ?? ""}
+                            placeholder={ui(
+                              key === "folder"
+                                ? "Choose or create a folder"
+                                : "Optional"
+                            )}
+                            onChange={event =>
+                              setDraft({
+                                ...draft,
+                                value: {
+                                  ...draft.value,
+                                  [key]: event.target.value,
+                                },
+                              } as WorkspaceStyle)
+                            }
+                          />
+                          <datalist id={`style-${key}-options`}>
+                            {metadataOptions(key).map(option => (
+                              <option key={option.value} value={option.value} />
+                            ))}
+                          </datalist>
+                        </label>
+                      )
+                    )}
+                  </div>
                   {draft.kind === "editing" && draft.value.blueprint && (
                     <SavedStylePreview
                       key={draft.value.id}
                       blueprint={draft.value.blueprint}
                       assets={workspace.assets}
+                    />
+                  )}
+                  {draft.kind === "editing" && (
+                    <StyleExamples
+                      key={draft.value.id}
+                      value={draft.value}
+                      disabled={blocked}
+                      onBusyChange={setUploading}
+                      onChange={value => setDraft({ kind: "editing", value })}
                     />
                   )}
                   {draft.kind === "editing" ? (
@@ -465,6 +593,7 @@ function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
                         setDraft({
                           kind: "element",
                           value: {
+                            ...draft.value,
                             id: draft.value.id,
                             name: draft.value.name,
                             type: "captions",
@@ -486,6 +615,7 @@ function StylesWorkspace({ owner, brand }: { owner: string; brand: string }) {
                         setDraft({
                           kind: "element",
                           value: {
+                            ...draft.value,
                             id: draft.value.id,
                             name: draft.value.name,
                             type: "look",

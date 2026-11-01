@@ -93,7 +93,9 @@ export function ScriptCtaOptions({
             </p>
             <button
               type="button"
-              aria-label={ui("Use call to action {{number}}", { number: index + 1 })}
+              aria-label={ui("Use call to action {{number}}", {
+                number: index + 1,
+              })}
               aria-pressed={selected}
               disabled={disabled || selected}
               onClick={() => onUseCta(cta)}
@@ -138,10 +140,7 @@ export function ScriptWritingPack({
     );
   const edited = spokenText(pack.scriptText) !== spokenText(fullScript);
   return (
-    <section
-      aria-label={ui("Generated writing plan")}
-      className="mt-6 min-w-0 border-t border-border pt-5"
-    >
+    <section aria-label={ui("Generated writing plan")} className="min-w-0">
       <h2 className="text-sm font-medium">{ui("Writing options")}</h2>
       <p className="mt-1 text-xs leading-relaxed text-foreground/65">
         {ui(
@@ -175,7 +174,7 @@ export function ScriptWritingPack({
         </TabsList>
         <TabsContent value="hooks" className="min-w-0 pt-2">
           <ol
-            className="max-h-[28rem] space-y-2 overflow-y-auto pr-1"
+            className="max-h-[20rem] space-y-2 overflow-y-auto pr-1"
             aria-label={ui("Ranked hook alternatives")}
           >
             {pack.hooks.map(hook => {
@@ -215,7 +214,9 @@ export function ScriptWritingPack({
                   </details>
                   <button
                     type="button"
-                    aria-label={ui("Use hook {{number}}", { number: hook.rank })}
+                    aria-label={ui("Use hook {{number}}", {
+                      number: hook.rank,
+                    })}
                     aria-pressed={selected}
                     disabled={disabled || selected}
                     onClick={() => onUseHook(hook.spoken)}

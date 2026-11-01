@@ -390,7 +390,7 @@ export default function CalendarPage() {
   const visibleItems = selectedDate ? selectedItems : upcoming;
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="calendar-workspace mx-auto max-w-6xl">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="mono-eyebrow mb-2 text-primary">
@@ -475,8 +475,8 @@ export default function CalendarPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <section className="rounded-xl border border-border bg-surface p-4 sm:p-6 lg:col-span-2">
-          <div className="mb-6 flex items-center justify-between">
+        <section className="calendar-month rounded-xl border border-border bg-surface p-4 sm:p-5 lg:col-span-2">
+          <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
             <h2 className="text-lg font-semibold">
               {new Intl.DateTimeFormat(locale, {
                 month: "long",
@@ -516,17 +516,20 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="calendar-grid grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border">
             {days.map((day, index) => (
               <div
                 key={index}
-                className="py-2 text-center text-xs uppercase tracking-wider text-foreground/65 sm:text-xs"
+                className="bg-surface py-2 text-center text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
               >
                 {day}
               </div>
             ))}
             {Array.from({ length: firstDay }, (_, index) => (
-              <div key={`empty-${index}`} className="min-h-16 sm:min-h-24" />
+              <div
+                key={`empty-${index}`}
+                className="min-h-16 bg-background/35 sm:min-h-20"
+              />
             ))}
             {Array.from({ length: daysInMonth }, (_, index) => {
               const day = index + 1;
@@ -546,18 +549,22 @@ export default function CalendarPage() {
                     }).format(new Date(year, month, day)),
                     count: items.length,
                   })}
-                  className={`group min-h-16 rounded-lg border p-1.5 text-left transition-all sm:min-h-24 sm:p-2 ${
+                  aria-pressed={isSelected}
+                  aria-current={isToday ? "date" : undefined}
+                  className={`calendar-day group min-h-16 border p-1.5 text-left transition-colors sm:min-h-20 sm:p-2 ${
                     isSelected
-                      ? "border-primary bg-primary/10 shadow-sm"
+                      ? "border-primary/55 bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/.15)]"
                       : isToday
-                        ? "border-primary/30 bg-primary/5"
-                        : "border-transparent hover:-translate-y-0.5 hover:border-border hover:bg-background hover:shadow-sm"
+                        ? "border-transparent bg-primary/5"
+                        : "border-transparent bg-surface hover:bg-primary/[.04]"
                   }`}
                 >
                   <span className="flex items-center justify-between">
                     <span
-                      className={`text-xs font-medium sm:text-sm ${
-                        isToday ? "text-primary" : ""
+                      className={`inline-flex h-5 min-w-5 items-center justify-center rounded-md text-[11px] font-medium tabular-nums ${
+                        isToday
+                          ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                          : "text-foreground/80"
                       }`}
                     >
                       {day}
@@ -611,6 +618,16 @@ export default function CalendarPage() {
                 </button>
               );
             })}
+            {Array.from(
+              { length: (7 - ((firstDay + daysInMonth) % 7)) % 7 },
+              (_, index) => (
+                <div
+                  key={`trailing-${index}`}
+                  aria-hidden="true"
+                  className="min-h-16 bg-background/35 sm:min-h-20"
+                />
+              )
+            )}
           </div>
           <p className="mt-4 text-center text-xs text-foreground/70">
             {ui("Tip: double-click a day to create an event immediately.")}

@@ -1,3 +1,4 @@
+import { useUiText } from "@/lib/i18n/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
@@ -268,6 +269,7 @@ function HeroEditorPreview({
 }
 
 function MarqueeBar() {
+  const ui = useUiText();
   const { i18n } = useTranslation();
   const isItalian = i18n.resolvedLanguage?.startsWith("it");
   const labels = isItalian
@@ -275,7 +277,7 @@ function MarqueeBar() {
         "Timeline manuale",
         "Piano AI revisionabile",
         "Generazione su intervallo",
-        "Prompt Director",
+        "Generatore di video",
         "Versioni",
         "TRIBE v2",
         "Sottotitoli",
@@ -285,7 +287,7 @@ function MarqueeBar() {
         "Manual timeline",
         "Reviewable AI plan",
         "Selected-range generation",
-        "Prompt Director",
+        "Video Generator",
         "Version history",
         "TRIBE v2",
         "Captions",
@@ -298,11 +300,13 @@ function MarqueeBar() {
       <div className="flex animate-marquee whitespace-nowrap py-4 motion-reduce:animate-none">
         {doubled.map((label, index) => (
           <span
-            key={`${label}-${index}`}
+            key={`${label === "Video Generator" || label === "Generatore di video" ? ui("Video Generator") : label}-${index}`}
             className="mono-eyebrow mx-6 inline-flex items-center text-foreground/70"
           >
             <span className="mr-6 h-1 w-1 rounded-full bg-primary" />
-            {label}
+            {label === "Video Generator" || label === "Generatore di video"
+              ? ui("Video Generator")
+              : label}
           </span>
         ))}
       </div>

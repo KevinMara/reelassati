@@ -16,6 +16,7 @@ import { v4 as createUuid } from "uuid";
 import { publishAutonomousSteps } from "@/lib/autonomous-live-publish";
 import {
   autonomousPlanCacheKey,
+  autonomousQuoteKey,
   createAutonomousPlanCache,
   type AutonomousPlanResult,
 } from "@/lib/autonomous-plan-cache";
@@ -39,10 +40,18 @@ import {
 } from "@/lib/editor-production";
 import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { EditStyleTemplates } from "./EditStyleTemplates";
-import { editTemplateDirection } from "@contracts/edit-style-template";
+import { editStyleSourceAssetIds } from "@contracts/edit-style-template";
+import {
+  pendingStyleExampleAssets,
+  saveStyleExampleReview,
+} from "@/lib/style-example-preparation";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
 import { editorFailureMessage } from "@contracts/editor-errors";
-import { eligibleAnalyzerOptimization } from "@contracts/analyzer-report";
+import {
+  eligibleAnalyzerOptimization,
+  checkpointAnalyzerReport,
+  type SavedAnalyzerReport,
+} from "@contracts/analyzer-report";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
 import type {
@@ -123,6 +132,7 @@ export function AutonomousEditor({
   );
   const [savedQuote, setQuote] = useState<{
     key: string;
+    cacheKey: string;
     minimum: number;
     maximum: number;
     images: number;
@@ -138,12 +148,12 @@ export function AutonomousEditor({
   const [failure, setFailure] = useState("");
   const [stage, setStage] = useState("");
   const preparationCache = useRef(createAutonomousPreparationCache());
-  const planCache = useRef(createAutonomousPlanCache());
+  const [planCache] = useState(createAutonomousPlanCache);
   const stopped = useRef(false);
   const runController = useRef<AbortController | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
-    const cache = planCache.current;
+    const cache = planCache;
     mounted.current = true;
     return () => {
       mounted.current = false;
@@ -151,14 +161,14 @@ export function AutonomousEditor({
       runController.current?.abort();
       cache.clear();
     };
-  }, []);
+  }, [planCache]);
   useEffect(() => {
-    const cache = planCache.current;
+    const cache = planCache;
     return () => {
       runController.current?.abort();
       cache.clear();
     };
-  }, [referenceOwner, referenceBrand, project.id]);
+  }, [referenceOwner, referenceBrand, project.id, planCache]);
   const sources = workspace.assets.filter(
     a =>
       project.clips.some(c => c.assetId === a.id) &&
@@ -181,8 +191,21 @@ export function AutonomousEditor({
       0
     );
   const transcriptCost = 0;
+  const unreviewedExamples =
+    project.editStyleTemplate?.examples?.filter(
+      example => example.source === "reference" && !example.profile
+    ) ?? [];
+  const styleExampleCost = unreviewedExamples.reduce(
+    (sum, example) =>
+      sum +
+      timedCreditCost(
+        workspace.assets.find(asset => asset.id === example.assetId)?.duration,
+        AI_CREDIT_COSTS.videoAnalysisPerMinute
+      ),
+    0
+  );
   const preparationCost =
-    AI_CREDIT_COSTS.editPlan + analysisCost + transcriptCost;
+    AI_CREDIT_COSTS.editPlan + analysisCost + transcriptCost + styleExampleCost;
   // Saves and playhead changes must not invalidate an estimate. Editing inputs do.
   const cacheOptions = {
     model,
@@ -212,11 +235,13 @@ export function AutonomousEditor({
     options: cacheOptions,
   });
   const quote = savedQuote?.key === quoteKey ? savedQuote : undefined;
+  const estimatePreparationCost =
+    quote && planCache.has(quote.cacheKey) ? 0 : preparationCost;
   const ready =
     capabilities.ai &&
     capabilities.editPlanTransportVersion === "foreground-v1" &&
     capabilities.editingModel === "moonshotai/kimi-k3" &&
-    (!sources.some(a => a.kind === "video") ||
+    ((!sources.some(a => a.kind === "video") && !unreviewedExamples.length) ||
       (capabilities.analysis &&
         capabilities.analysisTransportVersion === "foreground-v1" &&
         capabilities.analysisSchemaVersion ===
@@ -400,6 +425,10 @@ export function AutonomousEditor({
           )
         );
       const requestOptions = { scope, signal, onCreditReceipt };
+      const pendingStyleExamples = pendingStyleExampleAssets(
+        project.editStyleTemplate,
+        workspace.assets
+      );
       const keyFor = (current: WorkspaceDocument, base: EditProject) =>
         autonomousPlanCacheKey({
           scope,
@@ -411,19 +440,21 @@ export function AutonomousEditor({
           uiLocale: getUiLocale(),
           options: cacheOptions,
         });
-      const cacheKey = keyFor(workspace, project);
+      let expectedReports = workspace.analyzerReports;
+      let expectedProject = project;
+      let cacheKey = keyFor(workspace, project);
       const inputsStillCurrent = () => {
         const current = getWorkspaceSnapshot();
         const base = current.projects.find(p => p.id === project.id);
         return Boolean(base && keyFor(current, base) === cacheKey);
       };
-      const cached = planCache.current.read(cacheKey);
+      const cached = planCache.read(cacheKey);
       let result: AutonomousPlanResult;
       if (cached && inputsStillCurrent()) {
         working = cached.working;
         result = cached.result;
       } else {
-        planCache.current.clear();
+        planCache.clear();
         const prepared = await prepareAutonomousSources({
           project,
           sources,
@@ -442,7 +473,7 @@ export function AutonomousEditor({
             setStatus(`Reviewing ${asset.name}…`);
             const { analyzeMedia } = await import("@/lib/analyze-media");
             checkpoint();
-            return analyzeMedia(
+            const review = await analyzeMedia(
               asset,
               project.platform,
               undefined,
@@ -453,6 +484,38 @@ export function AutonomousEditor({
               false,
               onCreditReceipt
             );
+            checkpoint();
+            const report: SavedAnalyzerReport = {
+              assetId: asset.id,
+              duration: asset.duration!,
+              platform: project.platform,
+              createdAt: new Date().toISOString(),
+              result: {
+                ...review,
+                schemaVersion: VIDEO_ANALYSIS_SCHEMA_VERSION,
+                insights: review.insights ?? [],
+              },
+            };
+            // Persist paid preparation now, before transcription or planning.
+            // A later failure, navigation or reload must not repurchase it.
+            await updateWorkspace(current => {
+              checkpoint(current);
+              return {
+                ...current,
+                analyzerReports: checkpointAnalyzerReport(
+                  current.analyzerReports,
+                  report
+                ),
+              };
+            });
+            // Account only for our own evidence checkpoint. Concurrent timeline,
+            // library or report edits must still invalidate the prepared plan.
+            expectedReports = checkpointAnalyzerReport(expectedReports, report);
+            cacheKey = keyFor(
+              { ...workspace, analyzerReports: expectedReports },
+              expectedProject
+            );
+            return review;
           },
           transcribe: async asset => {
             setStage(ui("Captions"));
@@ -471,9 +534,51 @@ export function AutonomousEditor({
           },
         });
         working = prepared.working;
-        const templateDirection = working.editStyleTemplate
-          ? editTemplateDirection(working.editStyleTemplate)
-          : "";
+        for (const { example, asset } of pendingStyleExamples) {
+          checkpoint();
+          setStage(ui("Style examples"));
+          setStatus(`Reviewing ${asset.name}…`);
+          const { analyzeMedia } = await import("@/lib/analyze-media");
+          const review = await analyzeMedia(
+            asset,
+            project.platform,
+            "Observe only the reusable editing style: pacing, framing, color, motion, transitions, caption treatment, graphic density and sound role. Keep unknown traits unknown. Never include source dialogue, names, claims or facts in the style profile.",
+            progress,
+            signal,
+            scope,
+            getUiLocale(),
+            true,
+            onCreditReceipt
+          );
+          checkpoint();
+          const expected = working.editStyleTemplate!;
+          const saved = await updateWorkspace(current => {
+            checkpoint(current);
+            return saveStyleExampleReview(
+              current,
+              project.id,
+              expected,
+              example.id,
+              review.editingStyle
+            );
+          });
+          checkpoint();
+          working.editStyleTemplate = structuredClone(
+            saved.projects.find(item => item.id === project.id)!
+              .editStyleTemplate
+          );
+          expectedProject = {
+            ...expectedProject,
+            editStyleTemplate: working.editStyleTemplate,
+          };
+          cacheKey = keyFor(
+            { ...workspace, analyzerReports: expectedReports },
+            expectedProject
+          );
+        }
+        const styleSourceIds = editStyleSourceAssetIds(
+          working.editStyleTemplate
+        );
         const blueprint = working.editStyleTemplate?.blueprint;
         if (blueprint) {
           working.aspectRatio = blueprint.aspectRatio;
@@ -507,7 +612,7 @@ export function AutonomousEditor({
         result = await platformApi.generateEditPlan(
           {
             project: working,
-            command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. ${templateDirection} Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. Choose the number of supporting images and video shots from the story and actual coverage gaps; there is no per-edit image, video, or credit cap. Use broll operations with parameters.prompt and parameters.mediaKind. Each generated image is 1K and each generated video is 5 seconds; fit the requested insert to its usable length. Prefer relevant licensed stock or owned footage when it achieves the intended picture. Generated extras are authorized. Mark a generated shot parameters.optional=true only if the core story remains complete without it; required coverage is optional=false. This distinction informs the estimate, never a media quota. Do not add decorative filler just to spend credits. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+            command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.filter(a => !styleSourceIds.has(a.id) || working.clips.some(clip => clip.assetId === a.id)).map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. Choose the number of supporting images and video shots from the story and actual coverage gaps; there is no per-edit image, video, or credit cap. Use broll operations with parameters.prompt and parameters.mediaKind. Each generated image is 1K and each generated video is 5 seconds; fit the requested insert to its usable length. Prefer relevant licensed stock or owned footage when it achieves the intended picture. Generated extras are authorized. Mark a generated shot parameters.optional=true only if the core story remains complete without it; required coverage is optional=false. This distinction informs the estimate, never a media quota. Do not add decorative filler just to spend credits. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
             model,
             stock: true,
             captionStyling: captions,
@@ -518,8 +623,7 @@ export function AutonomousEditor({
           requestOptions
         );
         checkpoint();
-        if (inputsStillCurrent())
-          planCache.current.write(cacheKey, working, result);
+        if (inputsStillCurrent()) planCache.write(cacheKey, working, result);
       }
       checkpoint();
       if (captions)
@@ -600,7 +704,11 @@ export function AutonomousEditor({
         preparationCost
       );
       const { images, videos } = estimate;
-      setQuote({ key: quoteKey, ...estimate });
+      setQuote({
+        cacheKey,
+        key: autonomousQuoteKey(cacheKey),
+        ...estimate,
+      });
       if (quoteOnly) {
         await saveActivity(
           ui("Your edit plan is ready."),
@@ -613,7 +721,7 @@ export function AutonomousEditor({
       }
       // Recovery covers local validation only, not already-started media jobs
       // or partially published timelines that need their own execution ledger.
-      planCache.current.clear();
+      planCache.clear();
       working.proposedChanges = [
         ...working.proposedChanges.filter(c => c.status !== "proposed"),
         ...result.changes,
@@ -823,7 +931,7 @@ export function AutonomousEditor({
         },
       });
       checkpoint();
-      planCache.current.clear();
+      planCache.clear();
       const receipt = autonomousResultReceipt(
         result.summary,
         [...appliedOperations, ...preparationCategories],
@@ -844,7 +952,7 @@ export function AutonomousEditor({
       setStatus(receipt.summary);
       onFinished(receipt.summary);
     } catch (e) {
-      if (signal.aborted) planCache.current.clear();
+      if (signal.aborted) planCache.clear();
       if (!mounted.current || runController.current !== controller) return;
       const failureText = signal.aborted
         ? `Stopped. Provider work already submitted may still finish in your Library; no further steps will start. ${timelineSaveStarted ? "The timeline save had already started; review your project and use Undo if needed." : "Your original timeline is intact."}`
@@ -1226,9 +1334,11 @@ export function AutonomousEditor({
                       busy || !ready || !project.clips.length || !durationTarget
                     }
                     onClick={() => void run(true)}
+                    title={`${ui("Estimating runs paid review and planning: up to {{credits}} credits. Completed preparation is reused.", { credits: estimatePreparationCost })}${unreviewedExamples.length ? ` ${ui("Style example review: {{credits}} credits.", { credits: styleExampleCost })}` : ""}`}
                     className="text-xs text-sky-400 hover:text-sky-300 disabled:opacity-40"
                   >
-                    {ui("Estimate credits")}
+                    {ui("Estimate credits")} · {estimatePreparationCost}{" "}
+                    {ui("credits")}
                   </button>
                 </div>
                 {busy && (

@@ -36,7 +36,7 @@ export function Footer() {
                 to: "/#features",
               },
               { label: ui("Walkthroughs"), to: "/showcase" },
-              { label: "Prompt Director", to: "/templates" },
+              { label: ui("Video Generator"), to: "/templates" },
               {
                 label: ui("Pricing"),
                 to: "/pricing",

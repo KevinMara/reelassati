@@ -2,6 +2,7 @@ import type { EditProject, TimelineClip } from "./workspace";
 import { normalizeGraphic, type MotionGraphic } from "./motion-graphics";
 import { normalizeVisual, visualFrame, type ClipVisual } from "./clip-visual";
 import { getCaptionPreset, type CaptionAppearance } from "./editor-presets";
+import { normalizeStyleMetadata, type StyleMetadata } from "./style-metadata";
 
 export const EDITOR_SAVED_STYLE_LIMIT = 500;
 export type EditorSavedStyleType = "graphic" | "captions" | "look";
@@ -37,7 +38,8 @@ export type EditorSavedStyleDraft =
         visual: ClipVisual;
       };
     };
-export type EditorSavedStyle = EditorSavedStyleDraft & { id: string };
+export type EditorSavedStyle = EditorSavedStyleDraft &
+  StyleMetadata & { id: string };
 
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -183,7 +185,9 @@ export function normalizeEditorSavedStyle(
   if (typeof row.id !== "string" || !/^[a-z\d_-]{1,100}$/i.test(row.id))
     return undefined;
   const draft = normalizeDraft(row);
-  return draft ? { id: row.id, ...draft } : undefined;
+  return draft
+    ? { id: row.id, ...draft, ...normalizeStyleMetadata(row) }
+    : undefined;
 }
 
 /** Load only known editable fields; malformed rows and repeated IDs are discarded. */

@@ -78,7 +78,7 @@ export function EditingLanguageFields({
                   type="number"
                   min={0.1}
                   max={180}
-                  step={0.1}
+                  step="any"
                   value={value.shotSeconds![key]}
                   onChange={event => {
                     const next = Math.min(

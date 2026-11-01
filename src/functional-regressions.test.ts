@@ -388,11 +388,14 @@ describe("platform-wide functional invariants", () => {
 
   it("keeps subtle Studio rewards grounded in real workspace activity", () => {
     const dashboard = source("./pages/Dashboard.tsx");
+    const momentum = source("./components/studio/WorkspaceMomentum.tsx");
+    const progress = source("./lib/workspace-progress.ts");
     const styles = source("./index.css");
 
-    expect(dashboard).toContain("Weekly momentum");
-    expect(dashboard).toContain("estimatedMinutesSaved");
-    expect(dashboard).toContain("weekActivity.reduce");
+    expect(dashboard).toContain("<WorkspaceMomentum");
+    expect(momentum).toContain("Weekly momentum");
+    expect(momentum).toContain("Time reclaimed · estimate");
+    expect(progress).toContain("weekActivity.reduce");
     expect(dashboard).toMatch(
       /aria-label=(?:"Studio setup progress"|\{ui\("Studio setup progress"\)\})/
     );

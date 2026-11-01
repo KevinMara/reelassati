@@ -112,15 +112,14 @@ export default function ImageGenerator() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">
-          {ui("AI Image Studio")}
-        </p>
-        <h1 className="text-3xl font-semibold">{ui("Create a visual")}</h1>
-        <p className="mt-2 max-w-3xl text-foreground/60">
+    <div className="creation-workspace mx-auto max-w-6xl">
+      <div className="mb-5">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {ui("Image Generator")}
+        </h1>
+        <p className="mt-1.5 max-w-3xl text-sm text-foreground/60">
           {ui(
-            "Generate campaign images, thumbnails, backgrounds, and supporting visuals. Every result is saved automatically to your connected media library under the name you choose."
+            "Create images for your content. Every result is saved to your media library."
           )}
         </p>
       </div>
@@ -141,24 +140,9 @@ export default function ImageGenerator() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)]">
-        <section className="rounded-xl border border-border bg-surface p-6">
-          <label className="block text-xs font-medium" htmlFor="image-name">
-            {ui("Image name")}
-          </label>
-          <input
-            id="image-name"
-            value={assetName}
-            maxLength={110}
-            onChange={event => setAssetName(event.target.value)}
-            placeholder={ui("Summer launch — hero image")}
-            className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-          />
-
-          <label
-            className="mt-5 block text-xs font-medium"
-            htmlFor="image-prompt"
-          >
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section className="rounded-xl border border-border bg-surface p-5">
+          <label className="block text-sm font-medium" htmlFor="image-prompt">
             {ui("Describe the image")}
           </label>
           <textarea
@@ -176,6 +160,21 @@ export default function ImageGenerator() {
           <p className="mt-1 text-right text-xs text-foreground/70">
             {prompt.length}/4000
           </p>
+
+          <label
+            className="mt-4 block text-xs font-medium"
+            htmlFor="image-name"
+          >
+            {ui("Image name")}
+          </label>
+          <input
+            id="image-name"
+            value={assetName}
+            maxLength={110}
+            onChange={event => setAssetName(event.target.value)}
+            placeholder={ui("Summer launch — hero image")}
+            className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          />
 
           <fieldset className="mt-5">
             <legend className="mb-2 text-xs font-medium">
@@ -200,23 +199,28 @@ export default function ImageGenerator() {
             </div>
           </fieldset>
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {(["1K", "2K"] as const).map(value => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={resolution === value}
-                onClick={() => setResolution(value)}
-                className={`rounded-lg border py-2.5 text-xs font-medium ${
-                  resolution === value
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-border bg-background"
-                }`}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
+          <fieldset className="mt-4">
+            <legend className="mb-2 text-xs font-medium">
+              {ui("Resolution")}
+            </legend>
+            <div className="grid grid-cols-2 gap-2">
+              {(["1K", "2K"] as const).map(value => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={resolution === value}
+                  onClick={() => setResolution(value)}
+                  className={`rounded-lg border py-2 text-xs font-medium ${
+                    resolution === value
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
           <div className="mt-5 space-y-2 rounded-lg border border-border bg-background p-3 text-xs leading-relaxed">
             <label className="flex items-start gap-2 text-foreground/65">
@@ -274,7 +278,7 @@ export default function ImageGenerator() {
               (containsRealPerson && !realPersonConsentConfirmed) ||
               generating
             }
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
           >
             {generating ? (
               <>
@@ -293,7 +297,7 @@ export default function ImageGenerator() {
           </p>
         </section>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           <section className="rounded-xl border border-border bg-surface p-5">
             {resultAsset ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -323,15 +327,15 @@ export default function ImageGenerator() {
                 <a
                   href={resultAsset.url}
                   download={resultAsset.name}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2.5 text-sm font-medium hover:border-primary/45"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background py-2 text-sm font-medium hover:border-primary/45"
                 >
                   <Download className="h-4 w-4" /> {ui("Download image")}
                 </a>
               </motion.div>
             ) : (
-              <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                  <ImageIcon className="h-6 w-6 text-primary" />
+              <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+                  <ImageIcon className="h-5 w-5 text-primary" />
                 </span>
                 <p className="mt-4 text-sm font-medium">
                   {ui("Your generated image will appear here")}
@@ -349,7 +353,7 @@ export default function ImageGenerator() {
             <section className="rounded-xl border border-border bg-surface p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-medium">{ui("Recent images")}</h2>
-                <span className="text-xs uppercase tracking-wider text-foreground/70">
+                <span className="text-xs text-foreground/60">
                   {ui("Connected library")}
                 </span>
               </div>

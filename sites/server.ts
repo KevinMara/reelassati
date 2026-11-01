@@ -1,4 +1,7 @@
-import { resolveBlueprintOperations } from "../contracts/edit-template-blueprint";
+import {
+  EDIT_CUT_GUIDANCE,
+  assertAutonomousTrimSemantics,
+} from "../contracts/edit-cut-semantics";
 import {
   editorPresetCatalog,
   EDITOR_PRESET_GUIDANCE,
@@ -117,6 +120,7 @@ import {
   normalizeEditStyleTemplate,
   normalizeReferenceEditStyle,
   editTemplateDirection,
+  resolveEditStyleOperations,
 } from "../contracts/edit-style-template";
 import { pcmWaveDuration } from "../contracts/audio-chunks";
 import {
@@ -6522,6 +6526,15 @@ async function handleAi(
       return errorResponse("Choose a supported editing model.", 422);
     }
     const project = input.project;
+    if (
+      normalizeEditStyleTemplate(project.editStyleTemplate)?.examples?.some(
+        example => example.source === "reference" && !example.profile
+      )
+    )
+      return errorResponse(
+        "Review this style's video examples with Reel before planning the edit.",
+        409
+      );
     const projectId = stringValue(project.id);
     if (!projectId) {
       return errorResponse(
@@ -6574,6 +6587,9 @@ async function handleAi(
       localOnly: input.localOnly === true,
       editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
         ?.profile,
+      styleAdaptation: project.editStyleTemplate
+        ? editTemplateDirection(project.editStyleTemplate)
+        : undefined,
     };
     const captionStyling =
       input.captionStyling === true &&
@@ -6612,13 +6628,10 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${EDITOR_PRESET_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
+          `${EDIT_CUT_GUIDANCE} ${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${EDITOR_PRESET_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
           JSON.stringify({
             command: input.command,
             project: projectContext,
-            styleAdaptation: project.editStyleTemplate
-              ? editTemplateDirection(project.editStyleTemplate)
-              : undefined,
           }),
           requestedModel,
           true,
@@ -6687,7 +6700,7 @@ async function handleAi(
               env,
               user,
               "edit-planning",
-              `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Choose the number of useful stock shots from the source and story; insert them as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Follow the generation authorization in the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,
+              `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} ${EDIT_CUT_GUIDANCE} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Choose the number of useful stock shots from the source and story; insert them as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Follow the generation authorization in the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,
               [
                 {
                   type: "text",
@@ -6734,9 +6747,9 @@ async function handleAi(
             )
           : undefined;
         let changes = mapEditOperations(
-          resolveBlueprintOperations(
+          resolveEditStyleOperations(
             output.changes,
-            normalizeEditStyleTemplate(project.editStyleTemplate)?.blueprint
+            project.editStyleTemplate
           ),
           duration,
           project.clips,
@@ -6769,6 +6782,7 @@ async function handleAi(
               end: Math.min(end, change.end),
             }));
         }
+        assertAutonomousTrimSemantics(project, changes);
         const normalizedProjection = {
           summary,
           ...(captionTreatment ? { captionTreatment } : {}),

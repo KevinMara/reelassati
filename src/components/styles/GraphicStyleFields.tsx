@@ -183,6 +183,7 @@ export function GraphicStyleFields({
                 {ui(key === "from" ? "From" : "To")}
                 <input
                   type="number"
+                  step="any"
                   value={graphic[key]}
                   min={-1e9}
                   max={1e9}

@@ -586,12 +586,11 @@ function PublisherComposer() {
     .join("\n\n");
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-8">
-        <p className="mono-eyebrow mb-2 text-primary">
-          {ui("Distribution control")}
-        </p>
-        <h1 className="text-3xl font-semibold">{ui("Publisher")}</h1>
-        <p className="mt-2 max-w-2xl text-foreground/60">
+      <div className="mb-5">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {ui("Publisher")}
+        </h1>
+        <p className="mt-1.5 max-w-2xl text-sm text-foreground/60">
           {ui(
             "Prepare your next post. Choose its destinations, shape the copy, and set the timing."
           )}
@@ -617,9 +616,12 @@ function PublisherComposer() {
         </motion.div>
       )}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <section data-tour="publish-compose" className="rounded-xl border border-border bg-surface p-6">
-          <div className="mb-6 flex items-center justify-between">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section
+          data-tour="publish-compose"
+          className="rounded-xl border border-border bg-surface p-5"
+        >
+          <div className="mb-4 flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-medium">
               <Send className="h-4 w-4 text-primary" />
               {editingId ? ui("Edit draft") : ui("New publication")}
@@ -635,7 +637,7 @@ function PublisherComposer() {
             )}
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-4">
             <div>
               <label
                 htmlFor="publisher-platform"
@@ -743,7 +745,7 @@ function PublisherComposer() {
                   invalidateReleaseReview();
                 }}
                 placeholder="#productdesign #creatortips"
-                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
 
@@ -762,7 +764,7 @@ function PublisherComposer() {
                   setMediaAssetId(nextId);
                   invalidateReleaseReview();
                 }}
-                className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
                 <option value="">{ui("Text-only publication")}</option>
                 {publishableAssets.map(asset => (
@@ -881,7 +883,7 @@ function PublisherComposer() {
                     !brief.trim() ||
                     (!aiFields.caption && !aiFields.hashtags)
                   }
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-40"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:opacity-40"
                 >
                   {generatingCopy ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -896,7 +898,7 @@ function PublisherComposer() {
 
             <section
               aria-label={ui("Post preview")}
-              className="rounded-xl border border-border bg-background p-4"
+              className="rounded-lg border border-primary/15 bg-primary/[0.025] p-4"
             >
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-medium">{ui("Post preview")}</h3>
@@ -943,7 +945,7 @@ function PublisherComposer() {
                     setScheduleDate(event.target.value);
                     invalidateReleaseReview();
                   }}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 />
               </div>
               <div>
@@ -961,7 +963,7 @@ function PublisherComposer() {
                     setScheduleTime(event.target.value);
                     invalidateReleaseReview();
                   }}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -1057,7 +1059,7 @@ function PublisherComposer() {
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                         post.status === "published"
                           ? "bg-emerald-500/10 text-emerald-600"
                           : post.status === "scheduled"
@@ -1084,7 +1086,7 @@ function PublisherComposer() {
                   </div>
                   {post.outgoingContent ? (
                     <div>
-                      <p className="mb-1 font-mono text-xs uppercase tracking-wide text-foreground/70">
+                      <p className="mb-1 text-xs font-medium text-foreground/60">
                         {ui("Final delivery content")}
                       </p>
                       <p className="line-clamp-4 whitespace-pre-line text-sm font-medium">
@@ -1097,7 +1099,7 @@ function PublisherComposer() {
                     </p>
                   )}
                   {post.complianceReview ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-medium uppercase tracking-wide">
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-medium">
                       <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-600">
                         {ui("Origin label prepared")}
                       </span>

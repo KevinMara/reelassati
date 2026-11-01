@@ -358,13 +358,27 @@ function ReferenceStyleSession({
     });
   }
 
+  const Panel = purpose === "script" ? "section" : "details";
+  const Heading = purpose === "script" ? "h2" : "summary";
   return (
-    <details className="reference-style-panel my-3 border-t border-border pt-3">
-      <summary className="cursor-pointer text-xs font-medium">
+    <Panel
+      className={
+        purpose === "script"
+          ? "reference-style-panel rounded-xl border border-primary/20 bg-primary/[0.035] p-4"
+          : "reference-style-panel my-3 border-t border-border pt-3"
+      }
+    >
+      <Heading
+        className={
+          purpose === "script"
+            ? "text-sm font-medium"
+            : "cursor-pointer text-xs font-medium"
+        }
+      >
         {purpose === "script"
           ? ui("Learn from a reference hook or script")
           : ui("Match a reference style or video")}
-      </summary>
+      </Heading>
       <fieldset
         disabled={busy || disabled}
         className="mt-3 space-y-3 disabled:opacity-50"
@@ -493,7 +507,11 @@ function ReferenceStyleSession({
             (purpose === "edit" && !capabilities.editStyleTemplates)
           }
           onClick={analyze}
-          className="ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+          className={
+            purpose === "script"
+              ? "inline-flex items-center gap-2 rounded-md border border-primary/25 bg-primary/10 px-3 py-2 text-xs font-medium text-primary disabled:opacity-40"
+              : "ai-magic inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm disabled:opacity-40"
+          }
         >
           {cost === null
             ? ui("Measure a reference before analysis")
@@ -530,6 +548,6 @@ function ReferenceStyleSession({
           />
         </div>
       )}
-    </details>
+    </Panel>
   );
 }

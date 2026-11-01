@@ -43,7 +43,7 @@ function createPlans(ui: ReturnType<typeof useUiText>): Plan[] {
         ui("1 brand workspace"),
         ui("1 connected social account"),
         ui("Precision Studio and reviewable edit plans"),
-        ui("Scripts, Prompt Director, calendar, and analytics"),
+        ui("Scripts, Video Generator, calendar, and analytics"),
         ui("Version history and finished MP4 exports"),
       ],
     },

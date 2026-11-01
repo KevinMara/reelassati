@@ -64,6 +64,116 @@ function op(
   };
 }
 describe("complete auto-edit draft execution", () => {
+  it("rejects the four-gap production failure encoded as repeated retained trims before applying any step", () => {
+    const before = {
+      ...project,
+      duration: 28.350708,
+      clips: [
+        { ...project.clips[0], duration: 28.350708, outPoint: 28.350708 },
+      ],
+    };
+    const actions = [
+      [22.88, 23.28],
+      [17.06, 17.22],
+      [9.78, 10.08],
+      [4.9, 5.2],
+    ].map(([start, end], index) =>
+      op(`gap-${index}`, "trim", start, end, { sourceIn: start })
+    );
+    let applied = 0;
+    expect(() =>
+      executeAutonomousPlan(
+        before,
+        actions,
+        [{ ...asset, duration: before.duration }],
+        undefined,
+        () => applied++
+      )
+    ).toThrow(/same clip more than once/);
+    expect(applied).toBe(0);
+    expect(before.clips[0]).toMatchObject({
+      start: 0,
+      inPoint: 0,
+      outPoint: 28.350708,
+    });
+  });
+
+  it("ripple-removes evidenced gaps while retaining surrounding speech, a visible opening and the ending", () => {
+    const duration = 28.350708;
+    const ranges = [
+      [22.88, 23.28],
+      [17.06, 17.22],
+      [9.78, 10.08],
+      [4.9, 5.2],
+    ];
+    const words = [
+      [0.3, 4.8],
+      [5.3, 9.7],
+      [10.2, 17],
+      [17.3, 22.8],
+      [23.4, 28],
+    ].map(([start, end], index) => ({ text: `phrase-${index}`, start, end }));
+    const before = {
+      ...project,
+      duration,
+      clips: [{ ...project.clips[0], duration, outPoint: duration }],
+      sourceSpeech: [
+        {
+          assetId: asset.id,
+          segments: words.map((word, index) => ({
+            ...word,
+            id: `phrase-${index}`,
+            words: [word],
+          })),
+        },
+      ],
+    } as EditProject;
+    const actions = ranges.map(([start, end], index) =>
+      op(`gap-${index}`, "silence", start, end)
+    );
+    const assets = [{ ...asset, duration }];
+    expect(() =>
+      preflightAutonomousPlan(before, actions, assets)
+    ).not.toThrow();
+    const after = executeAutonomousPlan(before, actions, assets);
+    expect(after.duration).toBeCloseTo(27.190708);
+    expect(Math.min(...after.clips.map(clip => clip.start))).toBe(0);
+    expect(Math.max(...after.clips.map(clip => clip.outPoint))).toBe(duration);
+    for (const word of words) {
+      expect(
+        after.clips.some(
+          clip => clip.inPoint <= word.start && clip.outPoint >= word.end
+        )
+      ).toBe(true);
+    }
+    expect(auditAutomatedEdit(before, after, assets)).toEqual([]);
+  });
+
+  it("keeps a single retained trim and rejects extending it outside the selected source", () => {
+    const after = executeAutonomousPlan(
+      project,
+      [op("keep", "trim", 0, 6, { sourceIn: 2 })],
+      [asset]
+    );
+    expect(after.clips[0]).toMatchObject({
+      start: 0,
+      duration: 6,
+      inPoint: 2,
+      outPoint: 8,
+    });
+    const trimmed = {
+      ...project,
+      clips: [{ ...project.clips[0], inPoint: 2, outPoint: 8, duration: 6 }],
+    };
+    expect(() =>
+      executeAutonomousPlan(
+        trimmed,
+        [op("expand", "trim", 0, 3, { sourceIn: 0 })],
+        [asset]
+      )
+    ).toThrow(/inside the selected source/);
+  });
+
   it("omits invalid automatic sound cues, retains valid edits, and reports the omission without altering proposals", () => {
     const sound = {
       ...asset,

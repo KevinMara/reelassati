@@ -83,50 +83,58 @@ function ServiceDiagnosticsCheck({ signedIn }: { signedIn: boolean }) {
   }
 
   return (
-    <article className="mt-6 rounded-xl border border-border bg-background p-4">
-      <h3 className="text-sm font-medium">{ui("Owner connection check")}</h3>
-      <p className="mt-1 text-xs leading-relaxed text-foreground/65">
+    <article className="mt-4 rounded-lg border border-primary/15 bg-primary/[0.025] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-medium">{ui("Owner connection check")}</h3>
+        <button
+          type="button"
+          disabled={busy || !signedIn}
+          onClick={() => void check()}
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:border-primary/35 disabled:opacity-60"
+        >
+          {busy ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          ) : null}
+          {busy ? ui("Checking connections…") : ui("Check connections")}
+        </button>
+      </div>
+      <p className="mt-2 max-w-3xl text-xs leading-relaxed text-foreground/65">
         {ui(
           "Check OpenRouter key authentication and sound service settings. This check creates no media, spends no REELassati credits, and does not verify a generation."
         )}
       </p>
-      <button
-        type="button"
-        disabled={busy || !signedIn}
-        onClick={() => void check()}
-        className="mt-3 inline-flex items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-xs font-medium text-primary disabled:opacity-60"
-      >
-        {busy ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-        ) : null}
-        {busy ? ui("Checking connections…") : ui("Check connections")}
-      </button>
       <div
         aria-live="polite"
         aria-atomic="true"
-        className="mt-3 text-xs leading-relaxed"
+        className={`${error || result ? "mt-3 border-t border-border pt-3" : ""} text-xs leading-relaxed`}
       >
         {error ? <p className="text-destructive">{error}</p> : null}
         {result ? (
           <>
-            <p className="font-medium">
-              {ui("AI:")} {statusLabels[result.ai.status]}
-            </p>
-            <p className="mt-1 text-foreground/70">{result.ai.note}</p>
-            <p className="mt-3 font-medium">
-              {ui("Sound effects:")}{" "}
-              {result.soundEffects.configured
-                ? ui("Settings present")
-                : ui("Setup needed")}
-            </p>
-            <p className="mt-1 text-foreground/70">
-              {result.soundEffects.note}
-            </p>
-            {result.soundEffects.missing.length ? (
-              <p className="mt-1 break-words font-mono text-foreground/70">
-                {result.soundEffects.missing.join(", ")}
-              </p>
-            ) : null}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="font-medium">
+                  {ui("AI:")} {statusLabels[result.ai.status]}
+                </p>
+                <p className="mt-1 text-foreground/70">{result.ai.note}</p>
+              </div>
+              <div>
+                <p className="font-medium">
+                  {ui("Sound effects:")}{" "}
+                  {result.soundEffects.configured
+                    ? ui("Settings present")
+                    : ui("Setup needed")}
+                </p>
+                <p className="mt-1 text-foreground/70">
+                  {result.soundEffects.note}
+                </p>
+                {result.soundEffects.missing.length ? (
+                  <p className="mt-1 break-words font-mono text-foreground/70">
+                    {result.soundEffects.missing.join(", ")}
+                  </p>
+                ) : null}
+              </div>
+            </div>
             <p className="mt-3 text-foreground/55">
               {ui("Checked")}{" "}
               {new Date(result.checkedAt).toLocaleString(getUiLocale())}

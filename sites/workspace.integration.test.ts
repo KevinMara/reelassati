@@ -1,7 +1,12 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import worker from "./server";
-import { createEmptyWorkspace } from "../contracts/workspace";
+import { createEmptyWorkspace, type EditProject } from "../contracts/workspace";
+import {
+  captureEditStyle,
+  normalizeEditStyleTemplate,
+} from "../contracts/edit-style-template";
+import { captureEditBlueprint } from "../contracts/edit-template-blueprint";
 
 const sqlite = new DatabaseSync(":memory:");
 class Statement {
@@ -88,6 +93,126 @@ afterAll(() => {
 });
 
 describe("real SQLite workspace separation", () => {
+  it("persists multiple style examples, folders and project selection through server save/reload", async () => {
+    const owner = "multiple-style-examples@example.com";
+    const initial = await request(
+      "/api/workspace",
+      "default",
+      "GET",
+      undefined,
+      owner
+    );
+    const { workspace } = (await initial.json()) as {
+      workspace: ReturnType<typeof createEmptyWorkspace>;
+    };
+    const project: EditProject = {
+      id: "style-project",
+      title: "Private source title",
+      template: "blank",
+      status: "editing",
+      platform: "instagram",
+      aspectRatio: "9:16",
+      duration: 10,
+      playhead: 0,
+      createdAt: "",
+      updatedAt: "",
+      transcript: [],
+      proposedChanges: [],
+      qualitySignals: [],
+      revisions: [],
+      clips: [
+        {
+          id: "footage",
+          assetId: "owned-video",
+          track: "video",
+          start: 0,
+          duration: 10,
+          inPoint: 0,
+          outPoint: 10,
+          label: "Private source",
+          locked: false,
+          color: "#123456",
+        },
+      ],
+    };
+    const blueprint = captureEditBlueprint(project);
+    const template = normalizeEditStyleTemplate({
+      id: "many-examples",
+      name: "Shared visual style",
+      source: "edit",
+      folder: "Education",
+      contentType: "Interview",
+      language: "Italian",
+      profile: captureEditStyle(project),
+      blueprint,
+      examples: [
+        {
+          id: "reference-one",
+          name: "First.mp4",
+          source: "reference",
+          assetId: "video-one",
+        },
+        {
+          id: "reference-two",
+          name: "Second.mp4",
+          source: "reference",
+          assetId: "video-two",
+        },
+        {
+          id: "native-example",
+          name: "Saved project",
+          source: "edit",
+          projectId: project.id,
+          profile: captureEditStyle(project),
+          blueprint,
+        },
+      ],
+    })!;
+    workspace.editStyleTemplates = [template];
+    workspace.projects = [
+      { ...project, editStyleTemplate: structuredClone(template) },
+    ];
+    const saved = await request(
+      "/api/workspace",
+      "default",
+      "PUT",
+      { workspace },
+      owner
+    );
+    expect(saved.status).toBe(200);
+    const loaded = (await (
+      await request("/api/workspace", "default", "GET", undefined, owner)
+    ).json()) as { workspace: typeof workspace };
+    expect(loaded.workspace.editStyleTemplates).toEqual([template]);
+    expect(loaded.workspace.projects[0].editStyleTemplate).toEqual(template);
+    loaded.workspace.editStyleTemplates![0].examples!.splice(1, 1);
+    expect(
+      (
+        await request(
+          "/api/workspace",
+          "default",
+          "PUT",
+          { workspace: loaded.workspace },
+          owner
+        )
+      ).status
+    ).toBe(200);
+    const reloaded = (await (
+      await request("/api/workspace", "default", "GET", undefined, owner)
+    ).json()) as { workspace: typeof workspace };
+    expect(
+      reloaded.workspace.editStyleTemplates![0].examples!.map(
+        example => example.id
+      )
+    ).toEqual(["reference-one", "native-example"]);
+    expect(reloaded.workspace.editStyleTemplates![0].blueprint).toEqual(
+      blueprint
+    );
+    expect(
+      reloaded.workspace.projects[0].editStyleTemplate!.examples
+    ).toHaveLength(3);
+  });
+
   it("preserves the original workspace while creating isolated brands and enforcing plan limits", async () => {
     expect((await request("/api/workspace")).status).toBe(200);
     // Billing initializes from the real schema before activating a test entitlement.

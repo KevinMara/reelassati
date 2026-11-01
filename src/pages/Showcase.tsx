@@ -256,7 +256,7 @@ const ITEMS: ShowcaseItem[] = [
         },
       },
       {
-        interval: "Prompt Director",
+        interval: "Video Generator",
         action: {
           en: "Specify camera, light, action, audio, and exclusions",
           it: "Specifica camera, luce, azione, audio ed esclusioni",
@@ -279,7 +279,7 @@ const ITEMS: ShowcaseItem[] = [
       },
     ],
     capabilities: [
-      { en: "Prompt Director", it: "Prompt Director" },
+      { en: "Video Generator", it: "Generatore di video" },
       { en: "Credit-based", it: "A crediti" },
       { en: "Versioned insert", it: "Inserto versionato" },
     ],
@@ -561,7 +561,9 @@ export default function Showcase() {
                           key={capability.en}
                           className="rounded-pill bg-primary/8 px-2 py-1 text-xs font-medium text-primary"
                         >
-                          {capability[language]}
+                          {capability.en === "Video Generator"
+                            ? ui("Video Generator")
+                            : capability[language]}
                         </span>
                       ))}
                     </div>
@@ -644,11 +646,13 @@ export default function Showcase() {
                 <div className="space-y-2">
                   {selectedItem.steps.map(step => (
                     <article
-                      key={`${selectedItem.id}-${step.interval}`}
+                      key={`${selectedItem.id}-${step.interval === "Video Generator" ? ui("Video Generator") : step.interval}`}
                       className="grid gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-[105px_1fr]"
                     >
                       <span className="font-mono text-xs text-primary">
-                        {step.interval}
+                        {step.interval === "Video Generator"
+                          ? ui("Video Generator")
+                          : step.interval}
                       </span>
                       <div>
                         <p className="text-sm font-medium">
