@@ -1,10 +1,12 @@
 import { useUiText } from "@/lib/i18n/ui";
-import { useEffect, useRef, useState } from "react";
-import type { Asset } from "@contracts/workspace";
 import {
-  DIRECT_VIDEO_HELP,
-  validateDirectVideoUrl,
-} from "@contracts/public-video";
+  socialVideoSource,
+  SOCIAL_VIDEO_UNAVAILABLE,
+} from "@contracts/social-video";
+import { Link2, Upload, Loader2 } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import type { Asset } from "@contracts/workspace";
+import { validateDirectVideoUrl } from "@contracts/public-video";
 import { importDirectVideo } from "@/lib/direct-video-import";
 import {
   captureUploadRequestScope,
@@ -15,13 +17,15 @@ import {
 export function DirectVideoImport({
   disabled = false,
   onImported,
+  onUpload,
 }: {
   disabled?: boolean;
   onImported: (asset: Asset, scope: UploadRequestScope) => Promise<void> | void;
+  onUpload?: () => void;
 }) {
   const ui = useUiText();
+  const inputId = useId();
   const [url, setUrl] = useState("");
-  const [rights, setRights] = useState(false);
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState("");
   const controller = useRef<AbortController | null>(null);
@@ -64,12 +68,11 @@ export function DirectVideoImport({
       await onImported(asset, scope);
       if (generation.current === id) {
         setUrl("");
-        setRights(false);
-        setDetail("Video saved to your private Library. It is ready to use.");
+        setDetail(ui("Video saved to Library."));
       }
-    } catch (error) {
+    } catch {
       if (generation.current === id && !abort.signal.aborted)
-        setDetail(error instanceof Error ? error.message : DIRECT_VIDEO_HELP);
+        setDetail(ui(SOCIAL_VIDEO_UNAVAILABLE));
     } finally {
       if (generation.current === id) {
         setBusy(false);
@@ -77,51 +80,54 @@ export function DirectVideoImport({
       }
     }
   }
-  const error = validateDirectVideoUrl(url);
+  const error = socialVideoSource(url) ? null : validateDirectVideoUrl(url);
   return (
-    <details className="mb-3 rounded-lg border border-border p-3">
-      <summary className="cursor-pointer text-sm font-medium">
-        {ui("Import a direct video link")}
-      </summary>
-      <p className="mt-2 text-xs text-foreground/70">
-        {DIRECT_VIDEO_HELP}{" "}
-        {ui(
-          "Maximum 256 MB and 2 minutes. Uploading the original is always available."
-        )}
-      </p>
-      <input
-        type="url"
-        aria-label={ui("Direct video URL")}
-        value={url}
-        onChange={event => {
-          invalidate();
-          setUrl(event.target.value);
-          setRights(false);
-        }}
-        placeholder="https://cdn.example.com/video.mp4"
-        className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm"
-        disabled={disabled}
-      />
-      <label className="mt-2 flex gap-2 text-xs">
+    <section
+      aria-label={ui("Add media")}
+      className="mb-3 rounded-lg border border-primary/20 bg-primary/5 p-2.5"
+    >
+      {onUpload && (
+        <div className="mb-2.5 border-b border-primary/15 pb-2.5">
+          <button
+            type="button"
+            disabled={disabled || busy}
+            onClick={onUpload}
+            className="flex h-8 w-full items-center justify-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 text-xs font-medium hover:bg-primary/20 disabled:opacity-40"
+          >
+            <Upload size={14} />
+            {ui("Upload files")}
+          </button>
+        </div>
+      )}
+      <label
+        htmlFor={inputId}
+        className="mb-1.5 flex items-center gap-1.5 text-xs font-medium"
+      >
+        <Link2 size={13} />
+        {ui("Import video link")}
+      </label>
+      <div className="flex gap-1.5">
         <input
-          type="checkbox"
-          checked={rights}
+          id={inputId}
+          type="url"
+          aria-label={ui("Video link")}
+          value={url}
           onChange={event => {
             invalidate();
-            setRights(event.target.checked);
+            setUrl(event.target.value);
           }}
+          placeholder={ui("Paste a video or social link")}
+          className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs"
           disabled={disabled}
         />
-        {ui("I am authorized to download and use this video.")}
-      </label>
-      <div className="mt-2 flex gap-2">
         <button
           type="button"
-          disabled={disabled || busy || !rights || !!error}
+          aria-label={busy ? ui("Importing…") : ui("Import")}
+          disabled={disabled || busy || !!error}
           onClick={() => void run()}
-          className="rounded-md bg-primary px-3 py-2 text-xs text-white disabled:opacity-40"
+          className="flex h-8 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
         >
-          {busy ? ui("Importing…") : ui("Save private video · no AI credits")}
+          {busy ? <Loader2 size={13} className="animate-spin" /> : ui("Import")}
         </button>
         {busy ? (
           <button type="button" onClick={invalidate} className="text-xs">
@@ -129,11 +135,11 @@ export function DirectVideoImport({
           </button>
         ) : null}
       </div>
-      {detail || (url && error) ? (
+      {detail ? (
         <p role="status" className="mt-2 text-xs text-foreground/70">
-          {detail || error}
+          {detail}
         </p>
       ) : null}
-    </details>
+    </section>
   );
 }

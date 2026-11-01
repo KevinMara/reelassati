@@ -1,0 +1,25 @@
+import { describe, expect, it } from "vitest";
+import { editorFailureMessage } from "./editor-errors";
+
+describe("editor failure copy", () => {
+  it.each([
+    "The local model returned speech without usable word timings (word 2: start=0.5, end=0.5, source=0.26227083333333334s). No paid fallback was started.",
+    "The review proposed edits that could not be safely prepared. (422) · Reference: a010e3bc-305e",
+    "The service is temporarily rate-limited. Wait at least 1 seconds. (429)",
+    new Error("secret response from upstream"),
+  ])("does not show provider diagnostics or invent a credit refund", error => {
+    expect(editorFailureMessage(error)).not.toMatch(
+      /word 2|source=|fallback|422|429|Reference|secret|credits/i
+    );
+    expect(editorFailureMessage(error).length).toBeLessThan(90);
+  });
+  it("keeps useful recovery instructions", () => {
+    expect(editorFailureMessage({ status: 401 })).toContain("sign in");
+    expect(editorFailureMessage({ status: 402 })).toContain("credits");
+    expect(
+      editorFailureMessage(
+        "The timeline changed while this action was running."
+      )
+    ).toContain("current timeline");
+  });
+});

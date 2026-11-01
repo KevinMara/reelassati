@@ -1,3 +1,9 @@
+import { socialVideoSource } from "./social-video";
+
+export function validateVideoImportUrl(value: string): string | null {
+  return socialVideoSource(value) ? null : validateDirectVideoUrl(value);
+}
+
 export const PUBLIC_VIDEO_MAX_BYTES = 256 * 1024 * 1024;
 export const PUBLIC_VIDEO_TIMEOUT_MS = 120_000;
 export const PUBLIC_VIDEO_MAX_SECONDS = 120;

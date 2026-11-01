@@ -13,6 +13,16 @@ import {
 } from "@contracts/analyzer-report";
 import { normalizeVideoStructure } from "@contracts/video-analysis";
 
+/** Sound-design assets are not dialogue, including vocal SFX such as a shout.
+ * Use recorded origin, never duration or filenames, to make this decision. */
+export function isAutonomousSpeechSource(asset: Asset) {
+  return (
+    (asset.kind === "video" || asset.kind === "audio") &&
+    !asset.variantGroupId?.startsWith("builtin-audio:") &&
+    asset.provenance?.operation !== "audio-generation"
+  );
+}
+
 /** Captions on another source are not evidence that this source was transcribed.
  * Linked picture/sound share a speech clock; do not buy it twice. */
 export function autonomousTranscriptTargets(
@@ -20,11 +30,13 @@ export function autonomousTranscriptTargets(
   asset: Asset
 ) {
   const review = project.sourceReviews?.find(r => r.assetId === asset.id);
+  if (!isAutonomousSpeechSource(asset)) return [];
   if (review?.captions === "present" || review?.audio === "absent") return [];
   return project.clips.filter(
     clip =>
       clip.assetId === asset.id &&
       !clip.muted &&
+      clip.volume !== 0 &&
       !clip.graphic &&
       !clip.transitionHandle &&
       !project.clips.some(
@@ -195,10 +207,16 @@ export async function prepareAutonomousSources(input: {
     const key = keys.get(asset.id)!;
     const review = working.sourceReviews?.find(r => r.assetId === asset.id);
     if (
+      isAutonomousSpeechSource(asset) &&
       (input.speechTiming || input.captions) &&
       (input.speechTiming
         ? working.clips.some(
-            c => c.assetId === asset.id && !c.muted && !c.graphic
+            c =>
+              c.assetId === asset.id &&
+              !c.muted &&
+              c.volume !== 0 &&
+              !c.graphic &&
+              !c.transitionHandle
           )
         : autonomousTranscriptTargets(working, asset).length > 0) &&
       review?.audio !== "absent"

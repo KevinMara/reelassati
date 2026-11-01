@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchDirectVideo, probePlayableVideo } from "./direct-video-import";
 import { PUBLIC_VIDEO_MAX_BYTES } from "@contracts/public-video";
+import { platformApi } from "./platform-api";
 
 const mp4 = new Uint8Array([0,0,0,24,102,116,121,112,105,115,111,109,0,0,0,0]);
 function fakeVideo(patch: Record<string, unknown> = {}) {
@@ -36,7 +37,18 @@ describe("bounded browser video ingestion", () => {
     fakeVideo(metadata);
     await expect(probePlayableVideo(new Blob([mp4]))).rejects.toThrow("playable video");
   });
-  it("never downloads a social page or starts after cancellation", async () => {
+  it("resolves public social posts through the authenticated importer and still verifies playable bytes", async () => {
+    fakeVideo();
+    const resolver = vi.spyOn(platformApi, "fetchSocialVideo").mockResolvedValue(new Response(mp4));
+    const directFetch = vi.fn(); vi.stubGlobal("fetch", directFetch);
+    const result = await fetchDirectVideo("https://www.instagram.com/reel/DZJzU9rAQqX/");
+    expect(resolver).toHaveBeenCalledOnce();
+    expect(directFetch).not.toHaveBeenCalled();
+    expect(result.duration).toBe(8.125);
+    resolver.mockResolvedValueOnce(new Response("<html>Login required</html>"));
+    await expect(fetchDirectVideo("https://www.instagram.com/reel/DZJzU9rAQqX/")).rejects.toThrow("downloaded bytes");
+  });
+  it("never downloads an invalid social post or starts after cancellation", async () => {
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
     await expect(fetchDirectVideo("https://youtube.com/watch?v=1")).rejects.toThrow("Social video pages");
     const controller = new AbortController(); controller.abort();

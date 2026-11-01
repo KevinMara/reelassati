@@ -1,6 +1,7 @@
 import { composerToken, rankComposerCommands } from "@/lib/composer-commands";
 import { creditReceiptTotal } from "@contracts/credit-receipt";
 import { ConciseResponse } from "./ConciseResponse";
+import { editorFailureMessage } from "@contracts/editor-errors";
 import { editorChatReceipt } from "@/lib/editor-chat-receipt";
 import { persistedAutonomousReceipt } from "@/lib/autonomous-result-receipt";
 import {
@@ -620,7 +621,7 @@ export function EditorChat({
               node.scrollHeight - node.scrollTop - node.clientHeight < 90;
         }}
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4",
+          "min-h-0 flex-1 overflow-y-auto px-3 py-4",
           expanded && "hidden"
         )}
         aria-label={ui("Conversation")}
@@ -726,7 +727,7 @@ export function EditorChat({
                   className={cn("min-w-0", message.role === "user" && "ml-5")}
                 >
                   {message.role === "user" ? (
-                    <div className="rounded-2xl rounded-tr-sm bg-primary/12 px-3 py-2.5">
+                    <div className="rounded-2xl rounded-tr-sm border border-primary/20 bg-primary/10 px-3 py-2.5">
                       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                         {message.text}
                       </p>
@@ -860,21 +861,29 @@ export function EditorChat({
                       {message.text && (
                         <ConciseResponse
                           text={
-                            persistedAutonomousReceipt(message, project, ui) ??
-                            editorChatReceipt(message, ui) ??
-                            message.text
+                            message.status === "failed"
+                              ? ui(editorFailureMessage(message.text))
+                              : (persistedAutonomousReceipt(
+                                  message,
+                                  project,
+                                  ui
+                                ) ??
+                                editorChatReceipt(message, ui) ??
+                                message.text)
                           }
                           detailsText={
-                            message.activity?.kind === "auto-edit" &&
-                            message.status === "completed"
-                              ? message.activity.planSummary
-                                ? `${ui("Plan")}: ${message.activity.planSummary}`
-                                : message.activity.appliedTypes === undefined
+                            message.status === "failed"
+                              ? undefined
+                              : message.activity?.kind === "auto-edit" &&
+                                  message.status === "completed"
+                                ? message.activity.planSummary
+                                  ? `${ui("Plan")}: ${message.activity.planSummary}`
+                                  : message.activity.appliedTypes === undefined
+                                    ? `${ui("Plan")}: ${message.text}`
+                                    : undefined
+                                : editorChatReceipt(message, ui)
                                   ? `${ui("Plan")}: ${message.text}`
                                   : undefined
-                              : editorChatReceipt(message, ui)
-                                ? `${ui("Plan")}: ${message.text}`
-                                : undefined
                           }
                         />
                       )}
@@ -1155,7 +1164,7 @@ export function EditorChat({
             className="mb-2 flex items-start gap-1.5 rounded-lg bg-destructive/10 p-2 text-xs text-destructive"
           >
             <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
-            {error}
+            {ui(editorFailureMessage(error))}
           </p>
         )}
         <form
@@ -1877,7 +1886,7 @@ function ActionCard({
 
       {action.error && (
         <p className="mt-2 break-words text-[11px] leading-relaxed text-destructive">
-          {action.error}
+          {ui(editorFailureMessage(action.error))}
         </p>
       )}
       {needsChoice ? (

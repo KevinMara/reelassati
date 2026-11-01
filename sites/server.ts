@@ -9,6 +9,11 @@ import { LOCAL_SPEECH_MODEL } from "../contracts/local-speech-model";
 import { parseLocalTranscriptSegments } from "../contracts/local-transcript";
 import type { StockMedia } from "../contracts/stock-media";
 import { editorAudioCatalog } from "../contracts/editor-audio-catalog";
+import { fetchSocialVideo } from "./social-video";
+import {
+  SOCIAL_VIDEO_UNAVAILABLE,
+  socialVideoSource,
+} from "../contracts/social-video";
 import { editModel, editReasoningEffort } from "../contracts/edit-model";
 import { searchStock, resolveStock, downloadStock } from "./stock-media";
 import { normalizeSavedAnalyzerReports } from "../contracts/analyzer-report";
@@ -13430,6 +13435,26 @@ async function handleApi(
       },
     });
     return json({ transcript, segments, provenance });
+  }
+  if (
+    url.pathname === "/api/imports/social-video" &&
+    request.method === "POST"
+  ) {
+    const input = await parseJsonBody<{ url?: string }>(request);
+    if (
+      typeof input.url !== "string" ||
+      input.url.length > 4000 ||
+      !socialVideoSource(input.url)
+    )
+      return errorResponse(SOCIAL_VIDEO_UNAVAILABLE, 422);
+    try {
+      return await fetchSocialVideo(
+        input.url,
+        AbortSignal.any([request.signal, AbortSignal.timeout(120_000)])
+      );
+    } catch {
+      return errorResponse(SOCIAL_VIDEO_UNAVAILABLE, 422);
+    }
   }
   if (url.pathname.startsWith("/api/stock/")) {
     const signal = AbortSignal.any([

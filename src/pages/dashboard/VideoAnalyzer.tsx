@@ -43,10 +43,7 @@ import {
   verifyUploadRequestScope,
   PlatformApiError,
 } from "@/lib/platform-api";
-import {
-  validateDirectVideoUrl,
-  DIRECT_VIDEO_HELP,
-} from "@contracts/public-video";
+import { validateVideoImportUrl } from "@contracts/public-video";
 import { importDirectVideo } from "@/lib/direct-video-import";
 import { selectedBrand } from "@/lib/workspace-scope";
 import type { UploadRequestScope } from "@/lib/platform-api";
@@ -179,7 +176,7 @@ export default function VideoAnalyzer() {
     [workspace.assets]
   );
   const urlError =
-    sourceMode === "url" ? validateDirectVideoUrl(publicUrl) : null;
+    sourceMode === "url" ? validateVideoImportUrl(publicUrl) : null;
   const sourceReady =
     sourceMode === "upload"
       ? Boolean(file || sourceAsset)
@@ -803,7 +800,9 @@ export default function VideoAnalyzer() {
                 publicUrl && urlError ? "text-red-500" : "text-foreground/70"
               }`}
             >
-              {publicUrl && urlError ? urlError : DIRECT_VIDEO_HELP}
+              {publicUrl && urlError
+                ? urlError
+                : ui("Paste a video or social link")}
             </p>
           </div>
         )}

@@ -2940,7 +2940,7 @@ export default function EditorPage() {
       <ResizableWorkspace mediaHidden={mediaHidden}>
         <section
           id="editor-media-panel"
-          className="min-w-0 max-h-[560px] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface md:col-start-1 md:row-start-1 md:h-[540px] xl:h-[620px] xl:max-h-none"
+          className="min-w-0 max-h-[560px] overflow-y-auto rounded-xl border border-border bg-surface md:col-start-1 md:row-start-1 md:h-[540px] xl:h-[620px] xl:max-h-none"
         >
           {" "}
           <EditorCreationDock

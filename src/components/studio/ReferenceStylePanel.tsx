@@ -9,7 +9,7 @@ import {
 import type { Asset } from "@contracts/workspace";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { AI_CREDIT_COSTS, timedCreditCost } from "@contracts/billing";
-import { validateDirectVideoUrl } from "@contracts/public-video";
+import { validateVideoImportUrl } from "@contracts/public-video";
 import { useWorkspace } from "@/providers/workspace";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -61,7 +61,6 @@ function ReferenceStyleSession({
   const [assetId, setAssetId] = useState("");
   const [url, setUrl] = useState("");
   const [selected, setSelected] = useState<string[]>([...aspects]);
-  const [rights, setRights] = useState(false);
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState("");
   const [result, setResult] = useState("");
@@ -262,7 +261,6 @@ function ReferenceStyleSession({
   }
 
   function importLink() {
-    if (!rights) return;
     void run(async (scope, signal, current, progress) => {
       const imported = await importDirectVideo(url, {
         scope,
@@ -299,7 +297,7 @@ function ReferenceStyleSession({
   }
 
   function analyze() {
-    if (!rights || !measured || !asset || !selected.length) return;
+    if (!measured || !asset || !selected.length) return;
     const source = asset;
     const chosen = [...selected];
     void run(async (scope, signal, current, progress) => {
@@ -406,27 +404,20 @@ function ReferenceStyleSession({
           <>
             <input
               type="url"
-              aria-label={ui("Reference direct video link")}
+              aria-label={ui("Video link")}
               value={url}
               onChange={e => {
                 invalidate();
                 setUrl(e.target.value);
-                setRights(false);
               }}
-              placeholder="https://cdn.example.com/reference.mp4"
+              placeholder={ui("Paste a video or social link")}
               className="h-8 w-full rounded-md border border-border bg-background px-2.5 text-xs"
             />
-            <p className="text-xs text-foreground/70">
-              {ui(
-                "Direct video file · MP4, MOV or WebM · up to 256 MB / 2 min"
-              )}
-            </p>
             <button
               type="button"
               disabled={
-                !rights ||
                 !url.trim() ||
-                !!validateDirectVideoUrl(url) ||
+                !!validateVideoImportUrl(url) ||
                 !capabilities.uploads
               }
               onClick={importLink}
@@ -477,19 +468,6 @@ function ReferenceStyleSession({
             </label>
           ))}
         </div>
-        <label className="flex items-start gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={rights}
-            onChange={e => {
-              invalidate();
-              setRights(e.target.checked);
-            }}
-          />
-          {ui(
-            "I may download this reference and submit it to the AI analysis provider."
-          )}
-        </label>
         {asset && !measured && (
           <button
             type="button"
@@ -508,7 +486,6 @@ function ReferenceStyleSession({
         <button
           type="button"
           disabled={
-            !rights ||
             !selected.length ||
             !measured ||
             !capabilities.analysis ||

@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { directVideoType, validateDirectVideoUrl } from "./public-video";
+import { directVideoType, validateDirectVideoUrl, validateVideoImportUrl } from "./public-video";
 
 describe("final direct video sources", () => {
+  it("accepts public post links for importing while keeping the direct-file validator strict", () => {
+    const post = "https://www.instagram.com/reel/DZJzU9rAQqX/";
+    expect(validateVideoImportUrl(post)).toBeNull();
+    expect(validateDirectVideoUrl(post)).toBeTruthy();
+    expect(validateVideoImportUrl("https://www.instagram.com/accounts/login/")).toBeTruthy();
+  });
   it.each(["https://127.0.0.1/a.mp4", "https://2130706433/a.mp4", "https://0x7f000001/a.mp4", "https://127.1/a.mp4", "https://[::1]/a.mp4", "https://[::ffff:127.0.0.1]/a.mp4", "https://printer.local/a.mp4", "https://secret.internal/a.mp4", "https://localhost./a.mp4", "https://user:secret@cdn.test.org/a.mp4", "http://cdn.test.org/a.mp4", "https://cdn.test.org:9443/a.mp4", "https://youtube.com/watch?v=1", "https://sub.tiktok.com/a.mp4", "https://cdn.test.org/page.html", "https://cdn.test.org/?video=a.mp4"])("rejects unsafe or non-file URL %s", url => { expect(validateDirectVideoUrl(url)).toBeTruthy(); });
   it("accepts a final signed file without exposing its query in metadata", () => { expect(validateDirectVideoUrl("https://cdn.test.org/clip.MP4?sig=private#fragment")).toBeNull(); });
   it("distinguishes video container signatures from HTML and audio-only ISO files", () => {

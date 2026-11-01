@@ -826,6 +826,28 @@ export const platformApi = {
     };
   },
 
+  fetchSocialVideo: async (
+    url: string,
+    signal?: AbortSignal,
+    scope?: UploadRequestScope
+  ): Promise<Response> => {
+    signal?.throwIfAborted();
+    const session = await requestSession();
+    assertRequestScope(session, scope);
+    return fetch(platformApiUrl("/api/imports/social-video"), {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Reelassati-Brand":
+          scope?.brandId ?? selectedBrand(session?.user.email),
+        ...(session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {}),
+      },
+      body: JSON.stringify({ url }),
+    });
+  },
   downloadAssetBlob: async (
     id: string,
     signal?: AbortSignal,

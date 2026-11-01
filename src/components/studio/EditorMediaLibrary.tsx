@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { v4 as createUuid } from "uuid";
 import {
   FolderPlus,
-  Upload,
   LayoutGrid,
   List,
   ArrowLeft,
@@ -344,6 +343,7 @@ export function EditorMediaLibrary({
       <DirectVideoImport
         key={`${owner}:${brand}:${folderId}`}
         disabled={busy || !capabilities.uploads}
+        onUpload={() => input.current?.click()}
         onImported={async (asset, scope) => {
           await updateWorkspace(w => {
             if (
@@ -366,15 +366,6 @@ export function EditorMediaLibrary({
         }}
       />
       <div className="mb-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={busy || !capabilities.uploads}
-          onClick={() => input.current?.click()}
-          className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-40"
-        >
-          <Upload size={15} />
-          {ui("Upload")}
-        </button>
         <button
           type="button"
           disabled={busy}

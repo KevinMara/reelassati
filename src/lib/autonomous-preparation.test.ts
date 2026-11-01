@@ -104,6 +104,71 @@ function savedReport(): SavedAnalyzerReport {
 }
 
 describe("saved paid review reuse", () => {
+  it("transcribes dialogue but never a built-in check sound or generated music during auto-edit", async () => {
+    const input = fixture();
+    const effect = {
+      ...source,
+      id: "check",
+      kind: "audio",
+      duration: 0.26227083333333334,
+      variantGroupId: "builtin-audio:zen-check",
+    } as Asset;
+    const music = {
+      ...source,
+      id: "music",
+      kind: "audio",
+      provenance: { operation: "audio-generation" },
+    } as Asset;
+    input.sources = [effect, music, source];
+    input.project = {
+      ...project,
+      clips: [
+        ...project.clips,
+        ...[effect, music].map(asset => ({
+          ...project.clips[0],
+          id: asset.id,
+          assetId: asset.id,
+          track: "audio" as const,
+          duration: asset.duration!,
+        })),
+      ],
+    };
+    input.transcribe.mockImplementation(async (asset?: Asset) => {
+      if (asset?.id !== source.id)
+        throw new Error("Sound effects must not be transcribed");
+      return {
+        transcript: "Actual speech",
+        segments: [{ id: "word", text: "Actual speech", start: 0, end: 1 }],
+      } as never;
+    });
+    const result = await prepareAutonomousSources({
+      ...input,
+      speechTiming: true,
+    });
+    expect(input.transcribe).toHaveBeenCalledTimes(1);
+    expect(input.transcribe).toHaveBeenCalledWith(source);
+    expect(result.working.clips).toEqual(input.project.clips);
+    expect(result.working.sourceSpeech?.map(item => item.assetId)).toEqual([
+      source.id,
+    ]);
+  });
+  it("still transcribes a short uploaded voice without guessing its role from duration or filename", async () => {
+    const input = fixture();
+    const voice = {
+      ...source,
+      id: "voice",
+      name: "ping.wav",
+      kind: "audio",
+      duration: 0.26,
+    } as Asset;
+    input.sources = [voice];
+    input.project = {
+      ...project,
+      clips: [{ ...project.clips[0], assetId: voice.id, track: "audio" }],
+    };
+    await prepareAutonomousSources({ ...input, speechTiming: true });
+    expect(input.transcribe).toHaveBeenCalledWith(voice);
+  });
   it("upgrades an open editor's legacy cache from a new saved spatial review without inference", async () => {
     const input = fixture(),
       old = savedReport();

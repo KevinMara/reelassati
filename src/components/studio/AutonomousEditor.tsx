@@ -41,7 +41,7 @@ import { ReferenceStylePanel } from "./ReferenceStylePanel";
 import { EditStyleTemplates } from "./EditStyleTemplates";
 import { editTemplateDirection } from "@contracts/edit-style-template";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
-import { videoReviewFailureMessage } from "@contracts/video-analysis-errors";
+import { editorFailureMessage } from "@contracts/editor-errors";
 import { eligibleAnalyzerOptimization } from "@contracts/analyzer-report";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
@@ -54,7 +54,6 @@ import type {
 import { AI_CREDIT_COSTS, timedCreditCost } from "@contracts/billing";
 import { useWorkspace } from "@/providers/workspace";
 import {
-  PlatformApiError,
   captureUploadRequestScope,
   platformApi,
   verifyUploadRequestScope,
@@ -847,17 +846,9 @@ export function AutonomousEditor({
     } catch (e) {
       if (signal.aborted) planCache.current.clear();
       if (!mounted.current || runController.current !== controller) return;
-      const reviewDetail =
-        e instanceof PlatformApiError
-          ? videoReviewFailureMessage(e.reason)
-          : undefined;
       const failureText = signal.aborted
         ? `Stopped. Provider work already submitted may still finish in your Library; no further steps will start. ${timelineSaveStarted ? "The timeline save had already started; review your project and use Undo if needed." : "Your original timeline is intact."}`
-        : e instanceof PlatformApiError
-          ? `${ui(e.message)}${reviewDetail ? ` ${ui(reviewDetail)}` : ""} (${e.status})${e.reference ? ` · ${ui("Reference")}: ${e.reference}` : ""}`
-          : e instanceof Error
-            ? e.message
-            : "The edit could not complete. Your original timeline is preserved.";
+        : ui(editorFailureMessage(e));
       setFailure(failureText);
       await saveActivity(
         failureText,
