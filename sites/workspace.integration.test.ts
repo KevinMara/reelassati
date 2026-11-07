@@ -93,6 +93,70 @@ afterAll(() => {
 });
 
 describe("real SQLite workspace separation", () => {
+  it("acknowledges a lost save response once and rejects changed or superseded replays", async () => {
+    const owner = "save-recovery@example.com";
+    const initial = await request(
+      "/api/workspace",
+      "default",
+      "GET",
+      undefined,
+      owner
+    );
+    const { workspace } = (await initial.json()) as {
+      workspace: ReturnType<typeof createEmptyWorkspace>;
+    };
+    workspace.brandKit.name = "First save";
+    const body = { workspace, writeId: "save-recovery-first-write" };
+    const first = await request(
+      "/api/workspace",
+      "default",
+      "PUT",
+      body,
+      owner
+    );
+    expect(first.status).toBe(200);
+    const committed = (await first.json()) as { workspace: typeof workspace };
+    // Simulate the response disappearing after the database commit.
+    const replay = await request(
+      "/api/workspace",
+      "default",
+      "PUT",
+      body,
+      owner
+    );
+    expect(replay.status).toBe(200);
+    const recovered = (await replay.json()) as { workspace: typeof workspace };
+    expect(recovered.workspace.revision).toBe(committed.workspace.revision);
+    expect(recovered.workspace.brandKit.name).toBe("First save");
+    const altered = {
+      ...body,
+      workspace: {
+        ...workspace,
+        brandKit: { ...workspace.brandKit, name: "Different payload" },
+      },
+    };
+    expect(
+      (await request("/api/workspace", "default", "PUT", altered, owner)).status
+    ).toBe(409);
+    const second = {
+      workspace: {
+        ...recovered.workspace,
+        brandKit: { ...workspace.brandKit, name: "Newer save" },
+      },
+      writeId: "save-recovery-second-write",
+    };
+    expect(
+      (await request("/api/workspace", "default", "PUT", second, owner)).status
+    ).toBe(200);
+    expect(
+      (await request("/api/workspace", "default", "PUT", body, owner)).status
+    ).toBe(409);
+    const latest = (await (
+      await request("/api/workspace", "default", "GET", undefined, owner)
+    ).json()) as { workspace: typeof workspace };
+    expect(latest.workspace.brandKit.name).toBe("Newer save");
+  });
+
   it("persists multiple style examples, folders and project selection through server save/reload", async () => {
     const owner = "multiple-style-examples@example.com";
     const initial = await request(

@@ -1,4 +1,5 @@
 import { useUiText } from "@/lib/i18n/ui";
+import { editorFailureMessage } from "@contracts/editor-errors";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { WandSparkles } from "lucide-react";
 import { SaveEditStyleTemplate } from "./EditStyleTemplates";
@@ -34,6 +35,8 @@ interface ReferenceStylePanelProps {
   disabled: boolean;
   purpose?: "edit" | "script";
   projectId?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 export function ReferenceStylePanel(props: ReferenceStylePanelProps) {
   const { user } = useAuth();
@@ -51,6 +54,8 @@ function ReferenceStyleSession({
   disabled,
   purpose = "edit",
   projectId,
+  open,
+  onOpenChange,
 }: ReferenceStylePanelProps) {
   const ui = useUiText();
   const { workspace, updateWorkspace, getWorkspaceSnapshot, capabilities } =
@@ -179,11 +184,7 @@ function ReferenceStyleSession({
       await task(scope, abort.signal, current, progress);
     } catch (cause) {
       if (mounted.current && generation.current === id && !abort.signal.aborted)
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "The reference could not be inspected. Upload the original instead."
-        );
+        setError(ui(editorFailureMessage(cause)));
     } finally {
       if (mounted.current && generation.current === id) {
         setBusy(false);
@@ -362,6 +363,7 @@ function ReferenceStyleSession({
   const Heading = purpose === "script" ? "h2" : "summary";
   return (
     <Panel
+      {...(purpose === "edit" && open !== undefined ? { open } : {})}
       className={
         purpose === "script"
           ? "reference-style-panel rounded-xl border border-primary/20 bg-primary/[0.035] p-4"
@@ -369,6 +371,14 @@ function ReferenceStyleSession({
       }
     >
       <Heading
+        onClick={
+          onOpenChange
+            ? event => {
+                event.preventDefault();
+                onOpenChange(!open);
+              }
+            : undefined
+        }
         className={
           purpose === "script"
             ? "text-sm font-medium"
@@ -377,7 +387,7 @@ function ReferenceStyleSession({
       >
         {purpose === "script"
           ? ui("Learn from a reference hook or script")
-          : ui("Match a reference style or video")}
+          : ui("Match a link or Library video")}
       </Heading>
       <fieldset
         disabled={busy || disabled}
@@ -453,7 +463,7 @@ function ReferenceStyleSession({
             ? ui("Deselect all")
             : ui("Select all")}
         </button>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-x-5 gap-y-2 px-2 sm:grid-cols-2">
           {aspects.map(aspect => (
             <label key={aspect} className="flex items-center gap-2 text-xs">
               <input

@@ -289,6 +289,8 @@ export default function EditorPage() {
     loading,
     saving,
     error: workspaceError,
+    retrySave,
+    canRetrySave,
     updateWorkspace,
     getWorkspaceSnapshot,
     capabilities,
@@ -356,6 +358,11 @@ export default function EditorPage() {
   const [autoEditSummary, setAutoEditSummary] = useState("");
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [autoEditing, setAutoEditing] = useState(false);
+  const [autoEditActivityHost, setAutoEditActivityHost] =
+    useState<HTMLDivElement | null>(null);
+  const [autoEditProjectId, setAutoEditProjectId] = useState<string | null>(
+    requestedProject?.id ?? null
+  );
   const [reelBusy, setReelBusy] = useState(false);
   const [stylesOpen, setStylesOpen] = useState(
     searchParams.get("panel") === "styles"
@@ -426,7 +433,6 @@ export default function EditorPage() {
   if (editorStateScope !== sectionsRunKey) {
     setEditorStateScope(sectionsRunKey);
     setFindingSections(false);
-    setAutoEditing(false);
     setReelBusy(false);
     setAutoEditSummary("");
   }
@@ -513,6 +519,7 @@ export default function EditorPage() {
     };
     setTranscriptConflict(false);
     setSelectedProjectId(item.id);
+    if (!autoEditing) setAutoEditProjectId(item.id);
     setDurationDraft(null);
     setTitleDraft(item.title);
     setPlayhead(item.playhead);
@@ -1999,6 +2006,48 @@ export default function EditorPage() {
     }
   };
 
+  const runningProject = workspace.projects.find(
+    p => p.id === autoEditProjectId
+  );
+  // Stable sibling position preserves the explicitly started run across the
+  // editor/project-browser view. Leaving this route still aborts on unmount.
+  const withAutoEdit = (content: React.ReactNode) => (
+    <>
+      {runningProject && (
+        <AutonomousEditor
+          key={runningProject.id}
+          project={runningProject}
+          activityHost={autoEditActivityHost}
+          open={autoEditOpen && runningProject.id === selectedProjectId}
+          onBusyChange={setAutoEditing}
+          onOpenChange={setAutoEditOpen}
+          onFinished={summary => {
+            setAutoEditSummary(summary);
+            setAutoEditOpen(false);
+          }}
+        />
+      )}
+      {autoEditing &&
+        runningProject &&
+        selectedProjectId !== runningProject.id && (
+          <section className="mb-4 rounded-xl border border-primary/25 bg-primary/5 p-3">
+            <button
+              type="button"
+              className="text-xs font-medium text-primary"
+              onClick={() => openProject(runningProject)}
+            >
+              {runningProject.title}
+            </button>
+            <div
+              ref={setAutoEditActivityHost}
+              id={`editor-autoedit-activity-${runningProject.id}`}
+            />
+          </section>
+        )}
+      {content}
+    </>
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -2011,7 +2060,7 @@ export default function EditorPage() {
   }
 
   if (!project) {
-    return (
+    return withAutoEdit(
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -2799,7 +2848,7 @@ export default function EditorPage() {
     </>
   );
 
-  return (
+  return withAutoEdit(
     <div className="min-w-0">
       <input
         ref={fileInputRef}
@@ -2816,9 +2865,16 @@ export default function EditorPage() {
           onClick={() => {
             setPlaying(false);
             setSelectedProjectId(null);
+            setAutoEditOpen(false);
+            setSearchParams(
+              params => {
+                params.delete("project");
+                return params;
+              },
+              { replace: true }
+            );
           }}
           className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground/70 hover:text-foreground"
-          disabled={saving || Boolean(busyAction)}
           aria-label={ui("Back to projects")}
         >
           <ChevronLeft className="h-4 w-4" />
@@ -2888,9 +2944,7 @@ export default function EditorPage() {
               </span>
             )}
             {styleSave?.phase === "failed" && <span>{ui("Save failed")}</span>}
-            <span className="hidden min-[1400px]:inline">
-              {ui("Save style")}
-            </span>
+            <span>{ui("Save style")}</span>
           </button>
           <button
             type="button"
@@ -2907,8 +2961,20 @@ export default function EditorPage() {
         <div className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
           <span className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            {localError ?? workspaceError}
+            {workspaceError ?? localError}
           </span>
+          {canRetrySave && (
+            <button
+              type="button"
+              onClick={() => {
+                setLocalError(null);
+                void retrySave();
+              }}
+              className="ml-auto shrink-0 text-xs font-medium underline"
+            >
+              {ui("Retry save")}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setLocalError(null)}
@@ -3097,7 +3163,14 @@ export default function EditorPage() {
                   <PanelLeftClose size={17} />
                 )}
               </button>
-              <span
+              <button
+                type="button"
+                disabled={!canRetrySave}
+                onClick={() => {
+                  setLocalError(null);
+                  void retrySave();
+                }}
+                title={workspaceError ? workspaceError : undefined}
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs  ${
                   workspaceError
                     ? "bg-destructive/10 text-destructive"
@@ -3114,9 +3187,9 @@ export default function EditorPage() {
                 {saving
                   ? ui("Saving")
                   : workspaceError
-                    ? ui("Save failed")
+                    ? ui(canRetrySave ? "Retry save" : "Save failed")
                     : ui("Saved")}
-              </span>
+              </button>
             </div>
             <button
               type="button"
@@ -3757,6 +3830,11 @@ export default function EditorPage() {
         >
           <div className="min-h-0 flex-1">
             <EditorChat
+              onActivityHost={
+                project.id === autoEditProjectId
+                  ? setAutoEditActivityHost
+                  : undefined
+              }
               key={project.id}
               project={project}
               playhead={playhead}
@@ -3766,29 +3844,14 @@ export default function EditorPage() {
               onFindSections={() => void findStorySections()}
               findingSections={findingSections}
               onAutoEdit={() => {
-                if (!reelBusy && !autoEditing && !findingSections)
+                if (!reelBusy && !autoEditing && !findingSections) {
+                  setAutoEditProjectId(project.id);
                   setAutoEditOpen(true);
+                }
               }}
               onBusyChange={setReelBusy}
               externalBusy={autoEditing || findingSections}
               hasAutoActivity={autoEditing || Boolean(autoEditSummary)}
-              resultTools={
-                autoEditSummary && canCaptureEditStyle(project) ? (
-                  <details className="mt-3 text-xs">
-                    <summary className="cursor-pointer text-muted-foreground">
-                      {ui("Save style")}
-                    </summary>
-                    <div className="mt-2">
-                      <SaveEditStyleTemplate
-                        profile={captureEditStyle(project)}
-                        project={project}
-                        source="edit"
-                        disabled={Boolean(busyAction)}
-                      />
-                    </div>
-                  </details>
-                ) : null
-              }
             />
           </div>
         </aside>
@@ -3923,17 +3986,6 @@ export default function EditorPage() {
         </DialogContent>
       </Dialog>
 
-      <AutonomousEditor
-        key={project.id}
-        project={project}
-        open={autoEditOpen}
-        onBusyChange={setAutoEditing}
-        onOpenChange={setAutoEditOpen}
-        onFinished={summary => {
-          setAutoEditSummary(summary);
-          setAutoEditOpen(false);
-        }}
-      />
       {exportOpen && (
         <RenderExportPanel
           project={project}

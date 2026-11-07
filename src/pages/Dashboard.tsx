@@ -541,7 +541,6 @@ export default function Dashboard() {
   > = [
     { icon: LayoutDashboard, label: t("nav.dashboard"), to: "/dashboard" },
     { separator: true, label: "", compact: true },
-    { icon: Palette, label: ui("Styles"), to: "/dashboard/styles" },
     { icon: PenLine, label: t("nav.script"), to: "/dashboard/script" },
     { group: "create" },
     { icon: Scissors, label: t("nav.edit"), to: "/dashboard/edit" },
@@ -550,6 +549,7 @@ export default function Dashboard() {
     { icon: BarChart3, label: t("nav.analytics"), to: "/dashboard/analytics" },
     { separator: true, label: ui("Workspace") },
     { icon: Library, label: t("nav.library"), to: "/dashboard/library" },
+    { icon: Palette, label: ui("Styles"), to: "/dashboard/styles" },
     { icon: Fingerprint, label: ui("Brand DNA"), to: "/dashboard/clients" },
     { icon: Calendar, label: t("nav.calendar"), to: "/dashboard/calendar" },
     {

@@ -1,6 +1,7 @@
 import { studioPolishUi } from "./locales/ui-studio-polish";
 import { editorOct31Ui } from "./locales/ui-editor-oct31";
 import { editorNov1Ui } from "./locales/ui-editor-nov1";
+import { editorNov7Ui } from "./locales/ui-editor-nov7";
 import { editorOct30Ui } from "./locales/ui-editor-oct30";
 import { translatePresetNames } from "@contracts/editor-presets";
 import { automaticResearchDisabled } from "./locales/ui-manual-only";
@@ -157,6 +158,7 @@ export function loadUiLocale(
       ...studioPolishUi[code],
       ...editorOct31Ui[code],
       ...editorNov1Ui[code],
+      ...editorNov7Ui[code],
     }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {
