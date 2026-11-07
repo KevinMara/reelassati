@@ -99,6 +99,7 @@ type Props = {
   onBusyChange?: (busy: boolean) => void;
   externalBusy?: boolean;
   hasAutoActivity?: boolean;
+  onActivityHost?: (element: HTMLDivElement | null) => void;
   resultTools?: ReactNode;
   onFindSections?: () => void;
   findingSections?: boolean;
@@ -182,6 +183,7 @@ export function EditorChat({
   onBusyChange,
   externalBusy = false,
   hasAutoActivity = false,
+  onActivityHost,
   resultTools,
   onFindSections,
   findingSections,
@@ -1147,7 +1149,10 @@ export function EditorChat({
               ))}
           </div>
         )}
-        <div id="editor-autoedit-activity" />
+        <div
+          ref={onActivityHost}
+          id={`editor-autoedit-activity-${project.id}`}
+        />
         {resultTools}
       </div>
 

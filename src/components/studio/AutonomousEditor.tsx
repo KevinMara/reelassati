@@ -53,6 +53,7 @@ import {
   type SavedAnalyzerReport,
 } from "@contracts/analyzer-report";
 import { useEffect, useRef, useState } from "react";
+import { workspaceSaveError } from "@/lib/workspace-save-error";
 import { AlertCircle, Loader2, Sparkles, Square } from "lucide-react";
 import type {
   Asset,
@@ -86,7 +87,9 @@ export function AutonomousEditor({
   open,
   onOpenChange,
   onBusyChange,
+  activityHost,
 }: {
+  activityHost: HTMLElement | null;
   onBusyChange: (busy: boolean) => void;
   open: boolean;
   onOpenChange: (value: boolean) => void;
@@ -113,8 +116,40 @@ export function AutonomousEditor({
       ""
   );
   const [referenceBrief, setReferenceBrief] = useState(
-    project.referenceStyleBrief ?? ""
+    project.editStyleTemplate ? "" : (project.referenceStyleBrief ?? "")
   );
+  const [matchMode, setMatchMode] = useState<"style" | "reference" | null>(
+    project.editStyleTemplate
+      ? "style"
+      : project.referenceStyleBrief
+        ? "reference"
+        : null
+  );
+  const [matching, setMatching] = useState(false);
+  async function chooseMatch(mode: "style" | "reference" | null) {
+    if (busy || matching) return;
+    setMatchMode(mode);
+    if (mode === "style") setReferenceBrief("");
+    setMatching(true);
+    try {
+      await updateWorkspace(w => ({
+        ...w,
+        projects: w.projects.map(p =>
+          p.id === project.id
+            ? {
+                ...p,
+                ...(mode === "reference"
+                  ? { editStyleTemplate: undefined }
+                  : {}),
+                ...(mode === "style" ? { referenceStyleBrief: undefined } : {}),
+              }
+            : p
+        ),
+      }));
+    } finally {
+      setMatching(false);
+    }
+  }
   const [durationMode, setDurationMode] = useState<"none" | "range">("none");
   const [minimumDuration, setMinimumDuration] = useState(() =>
     String(
@@ -249,7 +284,8 @@ export function AutonomousEditor({
     (!transcriptCost || capabilities.transcription);
 
   async function run(quoteOnly = false) {
-    if (activeEditorProjects.has(runKey) || runController.current) return;
+    if (matching || activeEditorProjects.has(runKey) || runController.current)
+      return;
     // Validate before scope capture, paid preparation, or any provider request.
     if (!durationTarget) {
       setFailure(
@@ -1023,10 +1059,9 @@ export function AutonomousEditor({
       )}
     </section>
   );
-  const host = document.getElementById("editor-autoedit-activity");
   return (
     <>
-      {host && activity && createPortal(activity, host)}
+      {activityHost && activity && createPortal(activity, activityHost)}
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="auto-edit-dialog max-h-[88dvh] overflow-y-auto sm:max-w-2xl">
           <DialogTitle>{ui("Auto-edit")}</DialogTitle>
@@ -1038,14 +1073,26 @@ export function AutonomousEditor({
           <section className="space-y-4">
             <div className="grid gap-5">
               <div>
-                <details className="auto-edit-template mb-3 rounded-xl border border-sky-400/25 bg-sky-400/5 p-3">
-                  <summary className="cursor-pointer text-xs font-semibold">
+                <details
+                  open={matchMode === "style"}
+                  className="auto-edit-template mb-3 rounded-xl border border-sky-400/25 bg-sky-400/5 p-3"
+                >
+                  <summary
+                    onClick={event => {
+                      event.preventDefault();
+                      void chooseMatch(
+                        matchMode === "style" ? null : "style"
+                      ).catch(() => undefined);
+                    }}
+                    className="cursor-pointer text-xs font-semibold"
+                  >
                     {ui("Match a style")}
                   </summary>
                   <div className="mt-3">
                     <EditStyleTemplates
                       project={project}
-                      disabled={busy}
+                      disabled={busy || matching}
+                      onSelect={() => setReferenceBrief("")}
                       compact
                     />
                   </div>
@@ -1054,8 +1101,14 @@ export function AutonomousEditor({
                   <div>
                     {" "}
                     <ReferenceStylePanel
-                      key={project.id}
+                      key={`${project.id}-${Boolean(project.editStyleTemplate)}`}
                       projectId={project.id}
+                      open={matchMode === "reference"}
+                      onOpenChange={next =>
+                        void chooseMatch(next ? "reference" : null).catch(
+                          () => undefined
+                        )
+                      }
                       onChange={brief => {
                         const current = getWorkspaceSnapshot();
                         if (
@@ -1097,7 +1150,13 @@ export function AutonomousEditor({
                               ...w,
                               projects: w.projects.map(p =>
                                 p.id === project.id
-                                  ? { ...p, referenceStyleBrief: brief }
+                                  ? {
+                                      ...p,
+                                      referenceStyleBrief: brief,
+                                      ...(brief
+                                        ? { editStyleTemplate: undefined }
+                                        : {}),
+                                    }
                                   : p
                               ),
                             };
@@ -1110,14 +1169,12 @@ export function AutonomousEditor({
                               referenceOwner &&
                             selectedBrand(referenceOwner) === referenceBrand
                           )
-                            setStatus(
-                              e instanceof Error
-                                ? e.message
-                                : "Reference direction could not be saved."
-                            );
+                            setStatus(workspaceSaveError(e));
                         });
                       }}
-                      disabled={busy}
+                      disabled={
+                        busy || matching || Boolean(project.editStyleTemplate)
+                      }
                     />
                   </div>
                 </div>

@@ -237,18 +237,22 @@ function createIntegrityD1() {
               document: bindings[1],
               updated_at: bindings[2],
               revision: 0,
+              last_write_id: bindings[3] ?? null,
+              last_write_hash: bindings[4] ?? null,
             });
           }
         } else if (normalized.startsWith("update workspace_state")) {
           const row = state.workspaces.find(
             candidate =>
-              candidate.owner_email === bindings[3] &&
-              candidate.revision === bindings[4]
+              candidate.owner_email === bindings[5] &&
+              candidate.revision === bindings[6]
           );
           if (row) {
             row.document = bindings[0];
             row.updated_at = bindings[1];
             row.revision = bindings[2];
+            row.last_write_id = bindings[3];
+            row.last_write_hash = bindings[4];
           } else {
             changes = 0;
           }
@@ -918,6 +922,7 @@ function operationProjection(operation: EditOperation) {
     end: operation.end,
     confidence: operation.confidence,
     intensity: operation.intensity,
+    ...(operation.parameters ? { parameters: operation.parameters } : {}),
     targetClipIds: operation.targetClipIds,
   };
 }
@@ -2113,7 +2118,7 @@ describe("provenance integrity boundaries", () => {
     });
   });
 
-  it("binds normalized edit-plan provenance to the exact project and operation", async () => {
+  it("preserves plans beyond 80 operations and binds each to the exact project", async () => {
     const DB = createIntegrityD1();
     const BUCKET = createMemoryBucket();
     globalThis.fetch = async () => {
@@ -2133,6 +2138,15 @@ describe("provenance integrity boundaries", () => {
                     confidence: 4,
                     intensity: "light",
                   },
+                  ...Array.from({ length: 85 }, (_, index) => ({
+                    type: "style",
+                    label: `Treatment ${index + 1}`,
+                    reason: "Preserve the complete proposed treatment",
+                    start: 0,
+                    end: 30,
+                    targetClipIds: ["clip-a"],
+                    parameters: { contrast: 1.05 },
+                  })),
                 ],
               }),
             },
@@ -2189,6 +2203,8 @@ describe("provenance integrity boundaries", () => {
       provenance: ContentProvenance;
     };
     expect(plan.changes[0]).toMatchObject({ start: 0, end: 30, confidence: 1 });
+    expect(plan.changes).toHaveLength(86);
+    expect(plan.changes[85].label).toBe("Treatment 85");
 
     const projectionSha = await sha256(
       JSON.stringify({

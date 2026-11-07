@@ -14,10 +14,16 @@ import {
   type CapabilityState,
   type WorkspaceDocument,
 } from "@contracts/workspace";
-import { captureUploadRequestScope, platformApi, PlatformApiError } from "@/lib/platform-api";
+import {
+  captureUploadRequestScope,
+  platformApi,
+  PlatformApiError,
+} from "@/lib/platform-api";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { WorkspaceSaveLifecycle } from "@/lib/workspace-save-lifecycle";
 import { reconcileAcknowledgedWorkspace } from "@/lib/workspace-save-reconcile";
+import { workspaceSaveError } from "@/lib/workspace-save-error";
+import { translateUi } from "@/lib/i18n/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { rememberAuthNext, safeDashboardNext } from "@/lib/auth-next";
 
@@ -49,6 +55,8 @@ interface WorkspaceContextValue {
   ) => Promise<WorkspaceDocument>;
   adoptWorkspace: (workspace: WorkspaceDocument) => void;
   refresh: () => Promise<boolean>;
+  retrySave: () => Promise<void>;
+  canRetrySave: boolean;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -77,6 +85,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const saveLifecycle = useRef(new WorkspaceSaveLifecycle());
   const readyRef = useRef(false);
   const saveConflictRef = useRef(false);
+  const uncertainSave = useRef<{
+    workspace: WorkspaceDocument;
+    scope: Awaited<ReturnType<typeof captureUploadRequestScope>>;
+    writeId: string;
+    epoch: number;
+  } | null>(null);
 
   // Every mutation below writes this ref before publishing React state. Never
   // mirror an older render back into it: in-flight editing reads the latest ref.
@@ -84,6 +98,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const epoch = saveLifecycle.current.reset();
+    uncertainSave.current = null;
     readyRef.current = false;
     setReady(false);
     setSaving(false);
@@ -123,7 +138,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (authLoading) return;
     let active = true;
-    queueMicrotask(() => { if (active) void refresh(); });
+    queueMicrotask(() => {
+      if (active) void refresh();
+    });
     const lifecycle = saveLifecycle.current;
     return () => {
       active = false;
@@ -164,7 +181,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       };
       const mutation = ++mutationRef.current;
       const epoch = saveLifecycle.current.begin();
-      const ownsContext = () => saveLifecycle.current.current(epoch) &&
+      const ownsContext = () =>
+        saveLifecycle.current.current(epoch) &&
         currentRef.current.profile.email.toLowerCase() === ownerEmail &&
         selectedBrand(ownerEmail) === brandId;
       currentRef.current = stamped;
@@ -173,16 +191,43 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       const save = async () => {
+        let pending: typeof uncertainSave.current = null;
         try {
           const captured = await scopeResult;
-          if (!ownsContext()) throw new Error("The workspace changed before this save could run. No newer workspace was modified.");
+          if (!ownsContext())
+            throw new Error(
+              "The workspace changed before this save could run. No newer workspace was modified."
+            );
           if (!captured.scope) throw captured.error;
-          if (captured.scope.ownerEmail !== ownerEmail || captured.scope.brandId !== brandId)
-            throw new Error("Your account or brand changed before saving. Reload the intended workspace before editing.");
-          const result = await platformApi.saveWorkspace({
-            ...stamped,
-            revision: serverRevisionRef.current,
-          }, captured.scope);
+          if (
+            captured.scope.ownerEmail !== ownerEmail ||
+            captured.scope.brandId !== brandId
+          )
+            throw new Error(
+              "Your account or brand changed before saving. Reload the intended workspace before editing."
+            );
+          const uncertain = uncertainSave.current;
+          if (uncertain && uncertain.epoch === epoch) {
+            const recovered = await platformApi.saveWorkspace(
+              uncertain.workspace,
+              uncertain.scope,
+              uncertain.writeId
+            );
+            if (!ownsContext()) return recovered.workspace;
+            serverRevisionRef.current = recovered.workspace.revision;
+            uncertainSave.current = null;
+          }
+          pending = {
+            workspace: { ...stamped, revision: serverRevisionRef.current },
+            scope: captured.scope,
+            writeId: crypto.randomUUID(),
+            epoch,
+          };
+          const result = await platformApi.saveWorkspace(
+            pending.workspace,
+            pending.scope,
+            pending.writeId
+          );
           if (!ownsContext()) return result.workspace;
           serverRevisionRef.current = result.workspace.revision;
           const reconciled = reconcileAcknowledgedWorkspace(
@@ -202,12 +247,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             saveConflictRef.current = true;
             setSaveConflict(true);
           }
+          if (
+            pending &&
+            (cause instanceof TypeError ||
+              (cause instanceof PlatformApiError && cause.status >= 500))
+          )
+            uncertainSave.current = pending;
           setUnsaved(true);
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : "Changes could not be saved"
-          );
+          setError(translateUi(workspaceSaveError(cause)));
           throw cause;
         } finally {
           if (saveLifecycle.current.finish(epoch) === true) setSaving(false);
@@ -226,6 +273,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const adoptWorkspace = useCallback((next: WorkspaceDocument) => {
     saveLifecycle.current.reset();
+    uncertainSave.current = null;
     setSaving(false);
     mutationRef.current += 1;
     serverRevisionRef.current = next.revision;
@@ -239,6 +287,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setError(null);
   }, []);
 
+  const retrySave = useCallback(async () => {
+    if (saveConflictRef.current || !readyRef.current) return;
+    await updateWorkspace(current => current).catch(() => undefined);
+  }, [updateWorkspace]);
+
   const value = useMemo(
     () => ({
       workspace,
@@ -250,6 +303,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       updateWorkspace,
       adoptWorkspace,
       refresh,
+      retrySave,
+      canRetrySave: unsaved && !saveConflict && !saving,
     }),
     [
       workspace,
@@ -261,6 +316,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       updateWorkspace,
       adoptWorkspace,
       refresh,
+      retrySave,
+      unsaved,
+      saveConflict,
     ]
   );
 
@@ -382,7 +440,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             {!saveConflict ? (
               <button
                 type="button"
-                onClick={() => void updateWorkspace(currentRef.current)}
+                onClick={() => void retrySave()}
+                disabled={saving}
                 className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white"
               >
                 Retry save

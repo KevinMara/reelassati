@@ -1,3 +1,4 @@
+import { createEmptyWorkspace } from "@contracts/workspace";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   platformApi,
@@ -34,6 +35,40 @@ afterEach(() => {
 });
 
 describe("platform API transport", () => {
+  it("retries a disconnected workspace save once with the identical write receipt", async () => {
+    const workspace = createEmptyWorkspace("creator@example.com");
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(Response.json({ workspace }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(platformApi.saveWorkspace(workspace)).resolves.toMatchObject({
+      workspace: { revision: workspace.revision },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][1].body).toBe(
+      fetchMock.mock.calls[1][1].body
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).writeId).toMatch(
+      /^[\w-]+$/
+    );
+  });
+  it("does not loop saves or retry a conflict", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("offline"));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      platformApi.saveWorkspace(createEmptyWorkspace("creator@example.com"))
+    ).rejects.toThrow("offline");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fetchMock
+      .mockReset()
+      .mockResolvedValue(Response.json({ error: "Conflict" }, { status: 409 }));
+    await expect(
+      platformApi.saveWorkspace(createEmptyWorkspace("creator@example.com"))
+    ).rejects.toMatchObject({ status: 409 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ["missing-story-assessment", true, "missing-story-assessment"],
     ["PRIVATE_UNTRUSTED_PROVIDER_DETAIL", true, undefined],
@@ -42,19 +77,17 @@ describe("platform API transport", () => {
   ])(
     "keeps only a known analyzer validation code (%s)",
     async (reason, analysisIncomplete, expected) => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(
-          Response.json(
-            {
-              error: "Incomplete report",
-              reason,
-              analysisIncomplete,
-              reference: "safe-review-123",
-            },
-            { status: 422 }
-          )
-        );
+      const fetchMock = vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            error: "Incomplete report",
+            reason,
+            analysisIncomplete,
+            reference: "safe-review-123",
+          },
+          { status: 422 }
+        )
+      );
       vi.stubGlobal("fetch", fetchMock);
       await expect(
         platformApi.analyzeVideo({ assetId: "owned", platform: "tiktok" })

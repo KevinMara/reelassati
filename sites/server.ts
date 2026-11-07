@@ -102,6 +102,7 @@ import {
   type ProviderTranscript,
 } from "../contracts/transcript-timing";
 import { normalizeReview, sourceReviewFacts } from "../contracts/source-review";
+import { editPlanningMedia } from "../contracts/edit-planning-media";
 import {
   SOURCE_VISUAL_EVIDENCE_GUIDANCE,
   normalizeSourceVisualEvidence,
@@ -1007,6 +1008,13 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
           await env.DB.prepare(
             "ALTER TABLE workspace_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 0"
           ).run();
+        }
+        for (const name of ["last_write_id", "last_write_hash"]) {
+          if (!columns.results.some(column => column.name === name)) {
+            await env.DB.prepare(
+              `ALTER TABLE workspace_state ADD COLUMN ${name} TEXT`
+            ).run();
+          }
         }
         const jobColumns = await env.DB.prepare(
           "PRAGMA table_info(generation_jobs)"
@@ -3096,7 +3104,8 @@ async function rollbackProvisionalWorkspaceProvenance(
 async function saveWorkspace(
   env: SitesEnvironment,
   user: AuthenticatedUser,
-  workspaceValue: unknown
+  workspaceValue: unknown,
+  writeId?: string
 ): Promise<WorkspaceDocument> {
   await initializeSchema(env);
   let workspace = normalizeWorkspace(workspaceValue, user);
@@ -3104,10 +3113,37 @@ async function saveWorkspace(
   // by changing the workspace document.
   workspace.profile.credits = 0;
   const current = await env.DB.prepare(
-    "SELECT revision FROM workspace_state WHERE owner_email = ?"
+    "SELECT revision, document, last_write_id, last_write_hash FROM workspace_state WHERE owner_email = ?"
   )
     .bind(workspaceOwnerKey(user))
-    .first<{ revision: number }>();
+    .first<{
+      revision: number;
+      document: string;
+      last_write_id: string | null;
+      last_write_hash: string | null;
+    }>();
+  // The receipt is committed atomically with the document. Replaying a lost
+  // response acknowledges that exact write; it never overwrites a newer one.
+  const writeHash = writeId
+    ? await sha256Hex(JSON.stringify(workspaceValue))
+    : null;
+  if (writeId && current?.last_write_id === writeId) {
+    if (current.last_write_hash !== writeHash)
+      throw new Response(
+        JSON.stringify({
+          error: "This save request has changed. Retry the latest changes.",
+        }),
+        { status: 409, headers: { "Content-Type": "application/json" } }
+      );
+    return reconcileWorkspaceProvenance(
+      env,
+      user,
+      normalizeWorkspace(JSON.parse(current.document), user),
+      {
+        resealScriptEdits: false,
+      }
+    );
+  }
   const expectedRevision = workspace.revision;
 
   if (!current) {
@@ -3170,7 +3206,7 @@ async function saveWorkspace(
       ? await env.DB.prepare(
           `
         UPDATE workspace_state
-        SET document = ?, updated_at = ?, revision = ?
+        SET document = ?, updated_at = ?, revision = ?, last_write_id = ?, last_write_hash = ?
         WHERE owner_email = ? AND revision = ?
       `
         )
@@ -3178,6 +3214,8 @@ async function saveWorkspace(
             serialized,
             workspace.updatedAt,
             workspace.revision,
+            writeId ?? null,
+            writeHash,
             workspaceOwnerKey(user),
             expectedRevision
           )
@@ -3185,12 +3223,18 @@ async function saveWorkspace(
       : await env.DB.prepare(
           `
         INSERT INTO workspace_state
-          (owner_email, document, updated_at, revision)
-        VALUES (?, ?, ?, 0)
+          (owner_email, document, updated_at, revision, last_write_id, last_write_hash)
+        VALUES (?, ?, ?, 0, ?, ?)
         ON CONFLICT(owner_email) DO NOTHING
       `
         )
-          .bind(workspaceOwnerKey(user), serialized, workspace.updatedAt)
+          .bind(
+            workspaceOwnerKey(user),
+            serialized,
+            workspace.updatedAt,
+            writeId ?? null,
+            writeHash
+          )
           .run();
     if ((result.meta?.changes || 0) !== 1) {
       throw new Response(
@@ -4353,7 +4397,6 @@ function mapEditOperations(
     selectedClipIds.filter(id => clips.some(clip => clip.id === id))
   );
   return value
-    .slice(0, 80)
     .filter(
       item =>
         item &&
@@ -6564,6 +6607,10 @@ async function handleAi(
       captionStyle: input.project.captionStyle,
       captionAppearance: input.project.captionAppearance,
       sourceReviews: factualSourceReviews,
+      libraryMedia: editPlanningMedia(presetWorkspace.assets, [
+        ...presetWorkspace.projects,
+        project,
+      ]),
       storyEvidence: buildStoryBeatEvidence({
         ...input.project,
         sourceReviews: factualSourceReviews,
@@ -6628,7 +6675,7 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `${EDIT_CUT_GUIDANCE} ${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${EDITOR_PRESET_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Prefer a small coherent set of edits over decorative changes. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Prefer fewer high-impact operations. Explain the audience-retention reason concretely.`,
+          `${EDIT_CUT_GUIDANCE} ${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${EDITOR_PRESET_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Deliver the complete requested treatment. Judge each beat for coverage, clarity, framing, motion design, sound and finishing; implement every useful supported improvement, not just trims and color. Do not minimize the operation count or stop after the easiest changes. Preserve restraint only where it serves the actual source or selected style. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Choose as many high-impact operations as the story needs. A generated-media quota or operation quota must not determine the treatment. Explain the audience-retention reason concretely.`,
           JSON.stringify({
             command: input.command,
             project: projectContext,
@@ -6747,10 +6794,7 @@ async function handleAi(
             )
           : undefined;
         let changes = mapEditOperations(
-          resolveEditStyleOperations(
-            output.changes,
-            project.editStyleTemplate
-          ),
+          resolveEditStyleOperations(output.changes, project.editStyleTemplate),
           duration,
           project.clips,
           Array.isArray(input.selectedClipIds) ? input.selectedClipIds : [],
@@ -13617,12 +13661,21 @@ async function handleApi(
       });
     }
     if (request.method === "PUT") {
-      const body = await parseJsonBody<{ workspace?: unknown }>(request);
+      const body = await parseJsonBody<{
+        workspace?: unknown;
+        writeId?: string;
+      }>(request);
+      if (
+        body.writeId !== undefined &&
+        (typeof body.writeId !== "string" ||
+          !/^[a-zA-Z0-9-]{16,80}$/.test(body.writeId))
+      )
+        return errorResponse("Invalid save request");
       if (!recordValue(body.workspace)) {
         return errorResponse("A complete workspace document is required");
       }
       return json({
-        workspace: await saveWorkspace(env, user, body.workspace),
+        workspace: await saveWorkspace(env, user, body.workspace, body.writeId),
       });
     }
     return errorResponse("Method not allowed", 405);

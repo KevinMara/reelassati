@@ -602,16 +602,34 @@ export const platformApi = {
       capabilities: CapabilityState;
     }>("/api/workspace", undefined, false, scope),
 
-  saveWorkspace: (workspace: WorkspaceDocument, scope?: UploadRequestScope) =>
-    requestJson<{ workspace: WorkspaceDocument }>(
-      "/api/workspace",
-      {
-        method: "PUT",
-        body: JSON.stringify({ workspace }),
-      },
-      false,
-      scope
-    ),
+  saveWorkspace: async (
+    workspace: WorkspaceDocument,
+    scope?: UploadRequestScope,
+    writeId: string = crypto.randomUUID()
+  ) => {
+    const send = () =>
+      requestJson<{ workspace: WorkspaceDocument }>(
+        "/api/workspace",
+        { method: "PUT", body: JSON.stringify({ workspace, writeId }) },
+        false,
+        scope
+      );
+    try {
+      return await send();
+    } catch (cause) {
+      // Exactly one immediate retry for this idempotent storage write only.
+      // AI/provider calls never pass through this recovery path.
+      if (
+        !(cause instanceof TypeError) &&
+        !(
+          cause instanceof PlatformApiError &&
+          [502, 503, 504].includes(cause.status)
+        )
+      )
+        throw cause;
+      return send();
+    }
+  },
 
   editBrief: (projectId: string) =>
     requestJson<{ filename: string; brief: Record<string, unknown> }>(

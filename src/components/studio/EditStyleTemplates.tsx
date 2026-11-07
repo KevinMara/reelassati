@@ -1,3 +1,4 @@
+import { workspaceSaveError } from "@/lib/workspace-save-error";
 import {
   getStyleSaveProgress,
   setStyleSaveProgress,
@@ -353,6 +354,9 @@ export function EditStyleTemplates({
                       editStyleTemplate: template
                         ? structuredClone(template)
                         : undefined,
+                      referenceStyleBrief: template
+                        ? undefined
+                        : p.referenceStyleBrief,
                     }
                   : p
               ),
@@ -360,7 +364,7 @@ export function EditStyleTemplates({
       });
       if (!deleteId) onSelect?.(template);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : ui("Save failed"));
+      setError(ui(workspaceSaveError(cause)));
     } finally {
       setBusy(false);
     }
