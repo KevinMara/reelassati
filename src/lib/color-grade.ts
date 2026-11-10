@@ -39,7 +39,10 @@ export function colorGradeMatrix(clip: Partial<TimelineClip>): number[] {
   ];
 }
 
-export function colorGradeFilter(clip: Partial<TimelineClip>): string {
+export function colorGradeFilter(
+  clip: Partial<TimelineClip>,
+  scope = 0
+): string {
   if (
     [
       clip.exposure,
@@ -79,6 +82,38 @@ export function colorGradeFilter(clip: Partial<TimelineClip>): string {
     return (
       "format=gbrap,lutrgb=" + expressions.join(":") + colorToneFilter(clip)
     );
+  }
+  const basicGrade =
+    [
+      clip.exposure,
+      clip.temperature,
+      clip.tint,
+      clip.highlights,
+      clip.shadows,
+      clip.whites,
+      clip.blacks,
+    ].every(value => !value) &&
+    Math.abs(clip.brightness ?? 0) <= 0.1 &&
+    (clip.contrast ?? 1) >= 0.85 &&
+    (clip.contrast ?? 1) <= 1.15 &&
+    (clip.saturation ?? 1) >= 0.85 &&
+    (clip.saturation ?? 1) <= 1.15;
+  if (basicGrade) {
+    // A 16-bit mixer adds all matrix terms and the offset before clipping.
+    // Keep the original alpha separately: only the temporary opaque alpha is
+    // the constant used for ra/ga/ba. Native and shipped WASM output differs
+    // from geq truncation by at most one 8-bit RGB level in this bounded range.
+    // Stronger grades and tone curves keep their original quantization path.
+    const prefix = `grade${Number.isSafeInteger(scope) && scope >= 0 ? scope : 0}`;
+    const channels = ["r", "g", "b"];
+    const coefficients = channels.flatMap((channel, row) => [
+      ...channels.map(
+        (source, col) =>
+          `${channel}${source}=${Number(matrix[row * 5 + col].toFixed(8))}`
+      ),
+      `${channel}a=${Number((matrix[row * 5 + 4] * 255).toFixed(8)) / 255}`,
+    ]);
+    return `format=gbrap,split[${prefix}alphaIn][${prefix}rgbIn];[${prefix}alphaIn]alphaextract[${prefix}alpha];[${prefix}rgbIn]format=gbrap16le,lutrgb=a=65535,colorchannelmixer=${coefficients.join(":")},format=gbrp[${prefix}rgb];[${prefix}rgb][${prefix}alpha]alphamerge`;
   }
   const channels = ["r", "g", "b"];
   const expressions = channels.map((channel, row) => {

@@ -117,7 +117,7 @@ export function buildRenderPlan(
         Number.isFinite(value)
           ? Math.min(max, Math.max(min, value!))
           : fallback;
-      const grade = colorGradeFilter(clip);
+      const grade = colorGradeFilter(clip, index);
       const terminalPadding =
         asset.kind === "image"
           ? ""
