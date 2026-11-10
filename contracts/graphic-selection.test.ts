@@ -71,6 +71,29 @@ describe("preview graphic selection", () => {
     expect(graphicSelectionBounds(c, 6, 1000, 1000)).toBeUndefined();
   });
 
+  it("bounds shared highlight strokes with explicit controls and legacy aspect defaults", () => {
+    const legacy = clip({ kind: "highlight", text: "" });
+    const legacyBounds = graphicSelectionBounds(legacy, 3, 720, 1280)!;
+    expect(legacyBounds.width).toBeCloseTo(720 * 0.4042);
+    expect(legacyBounds.height).toBeCloseTo(1280 * 0.15 + 720 * 0.0042);
+    const explicit = clip({
+      kind: "highlight",
+      text: "",
+      width: 30,
+      height: 20,
+      strokeWidth: 4,
+    });
+    const bounds = graphicSelectionBounds(explicit, 3, 720, 1280)!;
+    expect(bounds.width).toBeCloseTo(720 * 0.34);
+    expect(bounds.height).toBeCloseTo(720 * 0.24);
+    explicit.graphic!.rotation = 90;
+    const rotated = graphicSelectionBounds(explicit, 3, 720, 1280)!;
+    expect(rotated.width).toBeCloseTo(bounds.height);
+    expect(rotated.height).toBeCloseTo(bounds.width);
+    explicit.graphic!.strokeWidth = 0;
+    expect(graphicSelectionBounds(explicit, 3, 720, 1280)).toBeUndefined();
+  });
+
   it("bounds projected 3D faces, not the full square SVG", () => {
     const bounds = graphicSelectionBounds(
       clip({ kind: "spatial-cube" }),

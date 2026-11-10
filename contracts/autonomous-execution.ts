@@ -1,0 +1,477 @@
+import type {
+  Asset,
+  EditOperation,
+  EditProject,
+  TimelineClip,
+} from "./workspace";
+import { applyEditOperation } from "./edit-timeline";
+import { assertSupportingMedia } from "./supporting-media";
+import { auditAutomatedEdit } from "./automated-edit-audit";
+import { assertAutonomousTrimSemantics } from "./edit-cut-semantics";
+import { orderAutonomousOperations } from "./autonomous-operation-order";
+import {
+  automaticGraphicProblems,
+  graphicRequestScope,
+  type AutomaticGraphicPolicy,
+  type GraphicProtectionIssue,
+} from "./automatic-graphic-protection";
+const captionKey = (text: string) =>
+  (
+    text
+      .normalize("NFKC")
+      .toLocaleLowerCase("en")
+      .match(/[\p{L}\p{M}]+|\p{N}+(?:[.,]\p{N}+)*/gu) ?? []
+  ).join("\u001f");
+
+const overlaps = (clip: TimelineClip, operation: EditOperation) =>
+  clip.start < operation.end && clip.start + clip.duration > operation.start;
+
+/** Validate the entire generation allowance before submitting the first asset. */
+export function assertAutonomousMediaBudget(
+  operations: EditOperation[],
+  limits?: { images: number; videos: number }
+) {
+  let images = 0,
+    videos = 0;
+  for (const op of operations) {
+    if (op.type !== "broll" || op.parameters?.assetId || !op.parameters?.prompt)
+      continue;
+    if (op.parameters.mediaKind === "video") videos++;
+    else if (op.parameters.mediaKind === "image") images++;
+    else
+      throw new Error(`${op.label}: choose an image or video generation type.`);
+  }
+  if (limits && (images > limits.images || videos > limits.videos))
+    throw new Error(
+      "The edit plan exceeds the approved supporting-media allowance. No media generation was started."
+    );
+}
+
+/** Exercise the complete draft before buying optional media. Placeholders model
+ * the exact five-second video allowance; they are never saved or rendered. */
+export function draftAutonomousPlan(
+  project: EditProject,
+  operations: EditOperation[],
+  assets: Asset[],
+  checkpoint: () => void = () => undefined
+) {
+  const placeholders: Asset[] = [];
+  const reserved = new Set(assets.map(asset => asset.id));
+  const resolved = operations.map(operation => {
+    if (
+      operation.type !== "broll" ||
+      operation.parameters?.assetId ||
+      !operation.parameters?.prompt
+    )
+      return operation;
+    if (!["image", "video"].includes(operation.parameters.mediaKind ?? ""))
+      throw new Error(
+        `${operation.label}: choose an image or video generation type.`
+      );
+    let id = `preflight-${operation.id}`;
+    while (reserved.has(id)) id += "-placeholder";
+    reserved.add(id);
+    const kind = operation.parameters.mediaKind as "image" | "video";
+    placeholders.push({
+      id,
+      name: operation.label,
+      kind,
+      duration: kind === "video" ? 5 : undefined,
+      status: "ready",
+      contentType: kind === "video" ? "video/mp4" : "image/png",
+      size: 0,
+      url: "",
+      createdAt: "",
+    });
+    return {
+      ...operation,
+      parameters: { ...operation.parameters, assetId: id },
+    };
+  });
+  const allAssets = [...assets, ...placeholders];
+  let previous = project;
+  const graphicOwners = new Map<string, string>();
+  const draft = executeAutonomousPlan(
+    project,
+    resolved,
+    allAssets,
+    checkpoint,
+    (next, operation) => {
+      const parents = [...previous.clips].sort(
+        (a, b) => b.id.length - a.id.length
+      );
+      for (const clip of next.clips) {
+        if (!clip.graphic) continue;
+        const old = previous.clips.find(candidate => candidate.id === clip.id);
+        if (
+          operation.type === "graphic" &&
+          (!old || JSON.stringify(old.graphic) !== JSON.stringify(clip.graphic))
+        )
+          graphicOwners.set(clip.id, operation.id);
+        else if (!old) {
+          const parent = parents.find(
+            candidate =>
+              clip.id.startsWith(`${candidate.id}-`) &&
+              graphicOwners.has(candidate.id)
+          );
+          if (parent) graphicOwners.set(clip.id, graphicOwners.get(parent.id)!);
+        }
+      }
+      previous = next;
+    }
+  );
+  return { draft, allAssets, graphicOwners };
+}
+
+export interface AutonomousGraphicDecision {
+  operationId: string;
+  label: string;
+  issues: GraphicProtectionIssue[];
+}
+export interface AutonomousGraphicReview {
+  changes: EditOperation[];
+  omitted: AutonomousGraphicDecision[];
+  warnings: AutonomousGraphicDecision[];
+  omittedSounds?: Array<{ operationId: string; label: string; reason: string }>;
+}
+
+function soundExecution(
+  project: EditProject,
+  operation: EditOperation,
+  assets: Asset[]
+): EditOperation {
+  const asset = assets.find(a => a.id === operation.parameters?.assetId);
+  const sourceIn = operation.parameters?.sourceIn ?? 0;
+  if (!asset || asset.kind !== "audio")
+    throw new Error(
+      `${operation.label}: sound placement requires an available audio file.`
+    );
+  if (
+    !Number.isFinite(asset.duration) ||
+    !asset.duration ||
+    asset.duration <= 0
+  )
+    throw new Error(
+      `${operation.label}: sound placement requires a measured audio duration.`
+    );
+  if (!Number.isFinite(sourceIn) || sourceIn < 0 || sourceIn >= asset.duration)
+    throw new Error(
+      `${operation.label}: the sound placement starts outside the audio source.`
+    );
+  if (
+    !Number.isFinite(operation.start) ||
+    !Number.isFinite(operation.end) ||
+    operation.start < 0 ||
+    operation.end <= operation.start ||
+    operation.end > project.duration
+  )
+    throw new Error(
+      `${operation.label}: the sound placement is outside the edit.`
+    );
+  // Keep the start and source offset; a short cue ends naturally, without looping.
+  const end = Math.min(
+    operation.end,
+    operation.start + asset.duration - sourceIn
+  );
+  return end < operation.end ? { ...operation, end } : operation;
+}
+
+/** Validate the final composed draft, not the proposal's pre-cut clock. Omit
+ * unsafe unsolicited graphics without discarding other useful paid planning.
+ * Signed proposals stay unchanged; omissions are a separate execution receipt. */
+export function filterAutonomousGraphics(
+  project: EditProject,
+  operations: EditOperation[],
+  assets: Asset[],
+  policy: AutomaticGraphicPolicy = "automatic",
+  checkpoint: () => void = () => undefined
+): AutonomousGraphicReview {
+  if (!operations.some(operation => operation.type === "graphic"))
+    return { changes: operations, omitted: [], warnings: [] };
+  let changes = operations;
+  const omitted: AutonomousGraphicDecision[] = [];
+  // Each nonfinal pass removes at least one operation, so this is bounded by
+  // the submitted graphic count. Rebuild because omitting an update restores
+  // its original graphic, which can obstruct another previously clear title.
+  for (
+    let pass = 0;
+    pass <= operations.filter(op => op.type === "graphic").length;
+    pass++
+  ) {
+    const { draft, allAssets, graphicOwners } = draftAutonomousPlan(
+      project,
+      changes,
+      assets,
+      checkpoint
+    );
+    const decisions = new Map<
+      string,
+      { issues: GraphicProtectionIssue[]; requested: boolean }
+    >();
+    for (const clip of draft.clips) {
+      const operationId = graphicOwners.get(clip.id);
+      if (!operationId || !clip.graphic) continue;
+      checkpoint();
+      const { intent, replacementRegions } = graphicRequestScope(
+        draft,
+        clip.graphic,
+        policy
+      );
+      const issues = automaticGraphicProblems(
+        draft,
+        clip,
+        allAssets,
+        intent,
+        checkpoint,
+        replacementRegions
+      );
+      if (issues.length)
+        decisions.set(operationId, {
+          issues: [...(decisions.get(operationId)?.issues ?? []), ...issues],
+          requested: intent !== "automatic",
+        });
+    }
+    const rejected: AutonomousGraphicDecision[] = [],
+      warnings: AutonomousGraphicDecision[] = [];
+    for (const operation of changes) {
+      const result = decisions.get(operation.id);
+      if (!result?.issues.length) continue;
+      const decision = {
+        operationId: operation.id,
+        label: operation.label,
+        issues: [
+          ...new Map(
+            result.issues.map(issue => [issue.reason, issue])
+          ).values(),
+        ],
+      };
+      if (result.requested && result.issues.every(issue => issue.uncertain))
+        warnings.push(decision);
+      else rejected.push(decision);
+    }
+    if (!rejected.length) return { changes, omitted, warnings };
+    omitted.push(...rejected);
+    const excluded = new Set(rejected.map(decision => decision.operationId));
+    changes = changes.filter(operation => !excluded.has(operation.id));
+  }
+  throw new Error("The graphic placement check did not reach a stable draft.");
+}
+
+export function autonomousGraphicReceipt(review: AutonomousGraphicReview) {
+  const parts: string[] = [];
+  if (review.omittedSounds?.length)
+    parts.push(
+      `Skipped ${review.omittedSounds.length} unavailable sound cue${review.omittedSounds.length === 1 ? "" : "s"}.`
+    );
+  if (review.omitted.length)
+    parts.push(
+      `Skipped ${review.omitted.length} graphic${review.omitted.length === 1 ? "" : "s"}: ${[...new Set(review.omitted.flatMap(item => item.issues.map(issue => issue.detail)))].slice(0, 2).join(" ")}`
+    );
+  if (review.warnings.length)
+    parts.push(
+      `Placement of ${review.warnings.length} requested graphic${review.warnings.length === 1 ? "" : "s"} could not be verified from the saved source analysis.`
+    );
+  return parts.join(" ");
+}
+
+/** Exercise the complete filtered draft before buying optional media. Existing
+ * callers keep their explicit-edit behavior unless an auto-edit intent is set. */
+export function preflightAutonomousPlan(
+  project: EditProject,
+  operations: EditOperation[],
+  assets: Asset[],
+  checkpoint: () => void = () => undefined,
+  graphicIntent?: AutomaticGraphicPolicy
+): AutonomousGraphicReview {
+  const omittedSounds: NonNullable<AutonomousGraphicReview["omittedSounds"]> =
+    [];
+  // Unusable decorative cues must not discard an otherwise valid automatic edit.
+  // Never invent a replacement, change the signed proposal, or relax manual edits.
+  const executable =
+    graphicIntent === undefined
+      ? operations
+      : operations.filter(operation => {
+          if (operation.type !== "sound") return true;
+          checkpoint();
+          try {
+            soundExecution(project, operation, assets);
+            return true;
+          } catch (error) {
+            omittedSounds.push({
+              operationId: operation.id,
+              label: operation.label,
+              reason:
+                error instanceof Error ? error.message : "Unavailable audio",
+            });
+            return false;
+          }
+        });
+  const review =
+    graphicIntent === undefined
+      ? { changes: operations, omitted: [], warnings: [] }
+      : filterAutonomousGraphics(
+          project,
+          executable,
+          assets,
+          graphicIntent,
+          checkpoint
+        );
+  const { draft, allAssets } = draftAutonomousPlan(
+    project,
+    review.changes,
+    assets,
+    checkpoint
+  );
+  const problems = auditAutomatedEdit(project, draft, allAssets);
+  if (problems.length)
+    throw new Error(
+      `The edit plan needs correction: ${problems.slice(0, 3).join("; ")}. No supporting media was generated.`
+    );
+  return omittedSounds.length ? { ...review, omittedSounds } : review;
+}
+
+/** Execute one proposal against its original timeline clock. Local operations
+ * can split a source into several pieces: subsequent local operations must find
+ * those pieces, rather than silently address only the old ID's surviving tail.
+ * Any failed operation rejects the draft; callers publish only the full result. */
+export function executeAutonomousPlan(
+  project: EditProject,
+  operations: EditOperation[],
+  assets: Asset[],
+  checkpoint: () => void = () => undefined,
+  onStep?: (project: EditProject, operation: EditOperation) => void
+): EditProject {
+  assertAutonomousTrimSemantics(project, operations);
+  let working = structuredClone(project);
+  const roots = new Map(project.clips.map(clip => [clip.id, clip.id]));
+  const seen = new Set<string>();
+  // Materialize original-clock layers before cuts, then retain clock-preserving
+  // source trims before local style/audio operations split their target clips.
+  const ordered = orderAutonomousOperations(project, operations);
+  for (const operation of ordered) {
+    checkpoint();
+    if (seen.has(operation.id))
+      throw new Error("The edit plan repeats an operation.");
+    seen.add(operation.id);
+    const base = project.clips.filter(c =>
+      operation.targetClipIds.includes(c.id)
+    );
+    // A sound is inserted on its own lane. Referencing a locked picture as its
+    // timing anchor does not grant permission to alter that picture.
+    if (operation.type !== "sound" && base.some(c => c.locked))
+      throw new Error(`${operation.label}: a requested clip is locked.`);
+    let execution = operation;
+    if (["style", "audio", "split", "delete"].includes(operation.type)) {
+      const targetClipIds = working.clips
+        .filter(
+          c =>
+            operation.targetClipIds.includes(roots.get(c.id) ?? c.id) &&
+            (operation.type === "delete"
+              ? true
+              : operation.type === "split"
+                ? operation.start > c.start &&
+                  operation.start < c.start + c.duration
+                : overlaps(c, operation))
+        )
+        .map(c => c.id);
+      if (!targetClipIds.length)
+        throw new Error(
+          `${operation.label}: its source interval is no longer available.`
+        );
+      execution = { ...operation, targetClipIds };
+    }
+    if (operation.type === "caption") {
+      const words = captionKey(operation.parameters?.text ?? "");
+      if (!words)
+        throw new Error(`${operation.label}: caption words are missing.`);
+      // Preparation already installs real captions. A planner repeating them is
+      // not permission to put a second caption layer over the same speech.
+      if (
+        working.transcript.some(
+          s =>
+            s.start <= operation.start + 0.001 &&
+            s.end >= operation.end - 0.001 &&
+            captionKey(s.text) === words
+        )
+      ) {
+        working.proposedChanges = working.proposedChanges.map(op =>
+          op.id === operation.id
+            ? {
+                ...op,
+                status: "accepted",
+                reviewedAt: new Date().toISOString(),
+              }
+            : op
+        );
+        continue;
+      }
+      if (
+        working.transcript.some(
+          s => s.start < operation.end && s.end > operation.start
+        )
+      )
+        throw new Error(
+          `${operation.label}: this would overlap existing captions.`
+        );
+    }
+    if (operation.type === "sound") {
+      // A cue may finish before its visual beat. Shorten only its execution copy:
+      // never stretch/loop audio, move its start/source offset, or rewrite the
+      // signed recommendation retained in proposedChanges. The resulting range
+      // is a subset of the already-approved placement, including local ranges.
+      execution = soundExecution(project, operation, assets);
+    }
+    if (operation.type === "broll") {
+      const asset = assets.find(a => a.id === operation.parameters?.assetId);
+      try {
+        assertSupportingMedia(
+          asset,
+          operation.parameters?.sourceIn ?? 0,
+          operation.end - operation.start
+        );
+      } catch (error) {
+        throw new Error(`${operation.label}: ${(error as Error).message}`);
+      }
+    }
+    const before = working;
+    try {
+      working = applyEditOperation(working, execution);
+      // Staging sound must not shrink the original clock before a later cut
+      // addresses an intentional gap or outro within that clock.
+      if (operation.type === "sound")
+        working.duration = Math.max(before.duration, working.duration);
+    } catch (error) {
+      throw new Error(
+        `${operation.label}: ${error instanceof Error ? error.message : "the operation could not be applied."}`
+      );
+    }
+    // Only IDs actually created by this operation can inherit a source root.
+    // Never infer membership by matching unrelated pre-existing clip names.
+    const priorIds = new Set(before.clips.map(c => c.id));
+    const splitParents = [...before.clips].sort(
+      (a, b) => b.id.length - a.id.length
+    );
+    for (const clip of working.clips) {
+      if (priorIds.has(clip.id)) continue;
+      const parent = splitParents.find(
+        c => clip.id.startsWith(`${c.id}-`) && c.assetId === clip.assetId
+      );
+      if (parent) roots.set(clip.id, roots.get(parent.id) ?? parent.id);
+    }
+    // A structural decision referring to an original source after it moved or
+    // split needs a fresh decision, not a best-effort change to the wrong piece.
+    if (
+      ["trim", "move", "pacing"].includes(operation.type) &&
+      base.some(
+        c =>
+          before.clips.filter(piece => roots.get(piece.id) === c.id).length > 1
+      )
+    )
+      throw new Error(
+        `${operation.label}: split source pieces need explicit structural targets.`
+      );
+    onStep?.(structuredClone(working), operation);
+  }
+  checkpoint();
+  return working;
+}

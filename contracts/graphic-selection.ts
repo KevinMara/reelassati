@@ -39,7 +39,7 @@ export function graphicSelectionBounds(
     );
   } else {
     const frame = graphicFrame(g, elapsed, duration);
-    const local = graphicShapes(g, elapsed, duration).flatMap(
+    const local = graphicShapes(g, elapsed, duration, height / width).flatMap(
       shape => shape.points
     );
     const box = (left: number, top: number, w: number, h: number) => {
@@ -87,8 +87,6 @@ export function graphicSelectionBounds(
       );
     }
     if (g.kind === "arrow") box(-12.5, -6, 25, 12);
-    if (g.kind === "highlight")
-      box(-20, (-7.5 * height) / width, 40, (15 * height) / width);
     points = graphicShapePixels(local, frame, width, height);
   }
   if (!points.length) return undefined;

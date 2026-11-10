@@ -3,7 +3,10 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import worker from "./server";
-import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
+import {
+  ANALYZER_STREAM_TYPE,
+  EDIT_PLAN_DEADLINE_MS,
+} from "../contracts/analyzer-transport";
 import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
 import type { WorkspaceDocument } from "../contracts/workspace";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "../contracts/video-analysis";
@@ -105,6 +108,8 @@ const env = {
   ASSETS: { fetch: () => new Response("static") },
 };
 const providerCalls: Record<string, unknown>[] = [];
+let providerOutputFactory:
+  ((payload: Record<string, unknown>) => Record<string, unknown>) | undefined;
 // A captured public endpoint contract, not a fabricated successful completion.
 // The old forced temperature fails this compatibility check even though our
 // completion mock would otherwise accept it.
@@ -414,6 +419,8 @@ beforeAll(async () => {
           status: trendVerificationStatus,
         });
       providerCalls.push(JSON.parse(String(init?.body || "{}")));
+      const responseOutput =
+        providerOutputFactory?.(providerCalls.at(-1)!) ?? nextOutput;
       if (providerGate) {
         const signal = init?.signal;
         let canceled: (() => void) | undefined;
@@ -447,7 +454,7 @@ beforeAll(async () => {
             { headers: { "Content-Type": "text/event-stream" } }
           );
         return new Response(
-          `: OPENROUTER PROCESSING\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: { reasoning: "Discard private reasoning", content: providerContentOverride ?? JSON.stringify(nextOutput) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+          `: OPENROUTER PROCESSING\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: { reasoning: "Discard private reasoning", content: providerContentOverride ?? JSON.stringify(responseOutput) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
           { headers: { "Content-Type": "text/event-stream" } }
         );
       }
@@ -529,6 +536,8 @@ beforeAll(async () => {
       size: 128,
       duration: 30,
       url: "/api/assets/source",
+      width: 720,
+      height: 1280,
       status: "ready",
       createdAt: new Date().toISOString(),
     },
@@ -615,6 +624,432 @@ describe("foreground K3 auto-edit planning", () => {
       expect(providerCalls.length).toBe(calls + 1);
     } finally {
       providerStreamFailure = undefined;
+    }
+  });
+  const graphicDraft = () => ({
+    summary: "Grade, music and source emphasis",
+    changes: [
+      {
+        type: "style",
+        label: "Retained grade",
+        start: 0,
+        end: 30,
+        targetClipIds: ["clip"],
+        parameters: { contrast: 1.03 },
+      },
+      {
+        type: "sound",
+        label: "Retained music",
+        start: 0,
+        end: 30,
+        targetClipIds: ["clip"],
+        parameters: { assetId: "catalog:chill-lofi", volume: 0.18 },
+      },
+      {
+        type: "graphic",
+        label: "Proposed claim",
+        start: 1,
+        end: 4,
+        targetClipIds: ["clip"],
+        parameters: {
+          graphicMode: "create",
+          graphic: {
+            kind: "callout",
+            text: "UNSUPPORTED PRIVATE CLAIM",
+            x: 50,
+            y: 40,
+            size: 5,
+            animation: "none",
+          },
+        },
+      },
+    ],
+  });
+  const graphicInput = async () => {
+    const body = await input();
+    body.project.sourceSpeech = [
+      {
+        assetId: "source",
+        segments: [
+          {
+            id: "speech",
+            start: 1,
+            end: 3,
+            text: "30 domande",
+            words: [
+              { text: "30", start: 1, end: 1.4 },
+              { text: "domande", start: 1.4, end: 2 },
+            ],
+          },
+        ],
+      },
+    ];
+    body.project.sourceReviews = [
+      {
+        assetId: "source",
+        reviewedAt: "2026-11-10",
+        summary: "Measured source",
+        captions: "absent",
+        captionNote: "",
+        audio: "present",
+        audioNote: "Measured speech",
+        moments: [],
+        visualProtection: {
+          version: 1,
+          sourceDuration: 30,
+          coverage: "complete",
+          reviewedRanges: [{ start: 0, end: 30 }],
+          observedText: [],
+          regions: [
+            {
+              id: "face",
+              kind: "face",
+              start: 0,
+              end: 30,
+              rect: { x: 0.3, y: 0.2, width: 0.4, height: 0.4 },
+              confidence: 0.95,
+            },
+          ],
+        },
+      },
+    ];
+    return { ...body, graphicRequest: "" };
+  };
+  type CorrectionFeedback = {
+    rejected: Array<{
+      operationId: string;
+      operation: Record<string, unknown>;
+      issues: Array<{ reason: string }>;
+    }>;
+    immutableChanges: Array<Record<string, unknown>>;
+    geometry: { protectedRegions: unknown[] };
+  };
+  const qualityInput = (payload: Record<string, unknown>) =>
+    JSON.parse((payload.messages as Array<{ content: string }>)[1].content) as {
+      feedback?: CorrectionFeedback;
+      command: string;
+      project: Record<string, unknown>;
+      graphicRequest: string;
+    };
+
+  it("corrects rejected graphics once before signing, preserves accepted IDs, charges one quote and binds the final plan", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    let feedback!: CorrectionFeedback;
+    providerOutputFactory = payload => {
+      const input = qualityInput(payload);
+      if (!input.feedback) return graphicDraft();
+      feedback = input.feedback;
+      expect(input.graphicRequest).toBe("");
+      expect(input.project.speechEvidence).toEqual(expect.any(Array));
+      expect(feedback.geometry.protectedRegions.length).toBeGreaterThan(0);
+      return {
+        summary: "Grade, quiet music, and measured 30 domande emphasis",
+        corrections: [
+          {
+            operationId: feedback.rejected[0].operationId,
+            operation: {
+              ...feedback.rejected[0].operation,
+              parameters: {
+                graphicMode: "create",
+                graphic: {
+                  kind: "callout",
+                  text: "30 domande",
+                  x: 50,
+                  y: 80,
+                  size: 4,
+                  animation: "none",
+                },
+              },
+            },
+          },
+        ],
+      };
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", await graphicInput());
+      const result = await response.json();
+      expect(response.status, JSON.stringify(result)).toBe(200);
+      expect(providerCalls.length).toBe(calls + 2);
+      expect(balance()).toBe(before - 5);
+      expect(result.changes).toHaveLength(3);
+      for (const original of feedback.immutableChanges) {
+        const retained = result.changes.find(
+          (operation: { id: string }) => operation.id === original.id
+        );
+        const { provenance, ...unsigned } = retained;
+        expect(provenance).toBeDefined();
+        expect(unsigned).toEqual(original);
+      }
+      expect(result.changes[2]).toMatchObject({
+        id: feedback.rejected[0].operationId,
+        type: "graphic",
+        parameters: { graphic: { text: "30 domande" } },
+      });
+      expect(result.qualityReview).toEqual({
+        repairedOperationIds: [feedback.rejected[0].operationId],
+        withdrawn: [],
+      });
+      const record = sqlite
+        .prepare("SELECT metadata_json FROM ai_provenance_records WHERE id=?")
+        .get(result.provenance.recordId) as { metadata_json: string };
+      const metadata = JSON.parse(record.metadata_json);
+      expect(
+        metadata.operationBindings.map(
+          (binding: { operationId: string }) => binding.operationId
+        )
+      ).toEqual(
+        result.changes.map((operation: { id: string }) => operation.id)
+      );
+      expectAuthorCompatibleK3(providerCalls.at(-1)!);
+    } finally {
+      providerOutputFactory = undefined;
+    }
+  });
+
+  it("reports deliberate source-grounded withdrawals without representing them as executed changes", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    providerOutputFactory = payload => {
+      const { feedback } = qualityInput(payload);
+      return feedback
+        ? {
+            summary:
+              "Retain grade and music; source already communicates the point",
+            corrections: [
+              {
+                operationId: feedback.rejected[0].operationId,
+                withdraw: { reason: "source-overlap" },
+              },
+            ],
+          }
+        : graphicDraft();
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", await graphicInput());
+      const result = await response.json();
+      expect(response.status).toBe(200);
+      expect(
+        result.changes.map((operation: { type: string }) => operation.type)
+      ).toEqual(["style", "sound"]);
+      expect(result.qualityReview.withdrawn).toMatchObject([
+        { issues: [{ reason: "source-overlap" }] },
+      ]);
+      expect(providerCalls.length).toBe(calls + 2);
+      expect(balance()).toBe(before - 5);
+    } finally {
+      providerOutputFactory = undefined;
+    }
+  });
+  it("does not buy a correction when the actual graphic already passes", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    providerOutputFactory = () => {
+      const draft = graphicDraft();
+      draft.changes[2].parameters = {
+        graphicMode: "create",
+        graphic: {
+          kind: "callout",
+          text: "30 domande",
+          x: 50,
+          y: 80,
+          size: 4,
+          animation: "none",
+        },
+      };
+      return draft;
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", await graphicInput());
+      expect(response.status).toBe(200);
+      expect((await response.json()).qualityReview).toBeUndefined();
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before - 5);
+    } finally {
+      providerOutputFactory = undefined;
+    }
+  });
+
+  it("does not interpret the generated command as permission to bypass source-copy protection", async () => {
+    const calls = providerCalls.length;
+    const body = await graphicInput();
+    body.command =
+      'AUTONOMOUS COMPLETE EDIT. Add a title "UNSUPPORTED PRIVATE CLAIM".';
+    providerOutputFactory = payload => {
+      const { feedback } = qualityInput(payload);
+      if (feedback) {
+        expect(feedback.rejected[0].issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ reason: "unsupported-source-copy" }),
+          ])
+        );
+        return {
+          summary: "Source-led grade and music",
+          corrections: [
+            {
+              operationId: feedback.rejected[0].operationId,
+              withdraw: { reason: "unsupported-source-copy" },
+            },
+          ],
+        };
+      }
+      const draft = graphicDraft();
+      draft.changes[2].parameters.graphic!.y = 80;
+      return draft;
+    };
+    try {
+      expect((await request("/api/ai/edit-plan", body)).status).toBe(200);
+      expect(providerCalls.length).toBe(calls + 2);
+    } finally {
+      providerOutputFactory = undefined;
+    }
+  });
+
+  it("never starts correction after the original foreground deadline has elapsed", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    const body = await graphicInput();
+    vi.useFakeTimers();
+    providerOutputFactory = () => {
+      vi.setSystemTime(Date.now() + EDIT_PLAN_DEADLINE_MS + 1);
+      return graphicDraft();
+    };
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const response = await request("/api/ai/edit-plan", body);
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before);
+    } finally {
+      providerOutputFactory = undefined;
+      vi.useRealTimers();
+      log.mockRestore();
+    }
+  });
+
+  it.each(["malformed", "unsafe", "new-media", "new-target"])(
+    "rejects %s corrections without retry, signature or charge",
+    async kind => {
+      const before = balance(),
+        calls = providerCalls.length;
+      const signatures = Number(
+        sqlite
+          .prepare("SELECT COUNT(*) AS count FROM ai_provenance_records")
+          .get()?.count
+      );
+      const log = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      providerOutputFactory = payload => {
+        const { feedback } = qualityInput(payload);
+        if (!feedback) return graphicDraft();
+        if (kind === "malformed")
+          return { summary: "Claimed success", corrections: [] };
+        const prior = feedback.rejected[0];
+        return {
+          summary: "Claimed success",
+          corrections: [
+            {
+              operationId: prior.operationId,
+              operation: {
+                ...prior.operation,
+                ...(kind === "new-media"
+                  ? {
+                      type: "broll",
+                      parameters: {
+                        prompt: "PRIVATE generation",
+                        mediaKind: "image",
+                      },
+                    }
+                  : {}),
+                ...(kind === "new-target"
+                  ? { targetClipIds: ["unrelated"] }
+                  : {}),
+              },
+            },
+          ],
+        };
+      };
+      try {
+        const response = await request(
+          "/api/ai/edit-plan",
+          await graphicInput()
+        );
+        const result = await response.json();
+        expect(response.status).toBe(422);
+        expect(result).toMatchObject({
+          reason: "edit_plan_invalid",
+          validation: {
+            reason: expect.stringMatching(/graphic_refinement|target_invalid/),
+          },
+        });
+        expect(providerCalls.length).toBe(calls + 2);
+        expect(balance()).toBe(before);
+        expect(
+          Number(
+            sqlite
+              .prepare("SELECT COUNT(*) AS count FROM ai_provenance_records")
+              .get()?.count
+          )
+        ).toBe(signatures);
+        const ledger = sqlite
+          .prepare(
+            "SELECT status,metadata_json FROM credit_ledger WHERE owner_email='owner@example.com' AND reference_id='project' ORDER BY rowid DESC LIMIT 1"
+          )
+          .get() as { status: string; metadata_json: string };
+        expect(ledger.status).toBe("released");
+        expect(JSON.parse(ledger.metadata_json).editPlanValidation).toEqual(
+          result.validation
+        );
+        expect(JSON.stringify(log.mock.calls)).not.toContain("PRIVATE");
+        expect(JSON.stringify(log.mock.calls)).not.toContain("Proposed claim");
+      } finally {
+        providerOutputFactory = undefined;
+        log.mockRestore();
+      }
+    }
+  );
+
+  it("cancels an active correction on the same foreground hold without another inference", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    const body = {
+      ...(await graphicInput()),
+      requestId: "quality-correction-cancel-20261110",
+    };
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    providerOutputFactory = payload => {
+      const { feedback } = qualityInput(payload);
+      if (feedback) providerGate = gate;
+      return feedback ? { summary: "unused", corrections: [] } : graphicDraft();
+    };
+    vi.useFakeTimers();
+    try {
+      const raw = await worker.fetch(
+        new Request("https://studio.example/api/ai/edit-plan", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer owner@example.com",
+            "Content-Type": "application/json",
+            Accept: ANALYZER_STREAM_TYPE,
+          },
+          body: JSON.stringify(body),
+        }),
+        env as never
+      );
+      const result = unwrapAnalyzerResponse(raw);
+      await vi.waitFor(() => expect(providerCalls.length).toBe(calls + 2));
+      await request("/api/ai/edit-plan/cancel", { requestId: body.requestId });
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect((await result).status).toBeGreaterThanOrEqual(400);
+      expect(balance()).toBe(before);
+      expect(providerCalls.length).toBe(calls + 2);
+    } finally {
+      release();
+      providerGate = undefined;
+      providerOutputFactory = undefined;
+      vi.useRealTimers();
     }
   });
   it("compiles measured cue timing before signing the plan and exposes actual native capabilities", async () => {

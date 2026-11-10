@@ -7,6 +7,7 @@ import {
 } from "@contracts/motion-graphics";
 import { MotionGraphicLayer } from "@/components/studio/MotionGraphicLayer";
 import { GraphicMotionEditor } from "@/components/studio/GraphicMotionEditor";
+import { graphicShapeDimensions } from "@contracts/graphic-layout";
 import { useUiText } from "@/lib/i18n/ui";
 import {
   StyleColor,
@@ -42,6 +43,7 @@ export function GraphicStyleFields({
   const ui = useUiText();
   const [position, setPosition] = useState(0.5);
   const graphic = value.graphic;
+  const shapeDimensions = graphicShapeDimensions(graphic, 9 / 16);
   const patch = (patch: Partial<MotionGraphic>) =>
     onChange({
       ...value,
@@ -166,7 +168,11 @@ export function GraphicStyleFields({
             <StyleRange
               key={key}
               label={ui(label)}
-              value={graphic[key] ?? fallback}
+              value={
+                key === "width" || key === "height" || key === "strokeWidth"
+                  ? shapeDimensions[key]
+                  : (graphic[key] ?? fallback)
+              }
               min={min}
               max={max}
               step={0.1}

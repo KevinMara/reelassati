@@ -11,6 +11,7 @@ export interface AutonomousPlanResult {
   changes: EditOperation[];
   stockMedia?: StockMedia[];
   captionTreatment?: AutonomousCaptionTreatment;
+  qualityReview?: import("@contracts/edit-plan-quality").EditPlanQualityReview;
   summary: string;
   provenance: ContentProvenance;
 }
@@ -32,6 +33,7 @@ export interface AutonomousPlanCacheInput {
 export function autonomousPlanCacheKey(input: AutonomousPlanCacheInput) {
   return JSON.stringify({
     ...input,
+    planningContract: "graphic-preflight-v1",
     project: {
       ...input.project,
       playhead: undefined,

@@ -53,6 +53,74 @@ describe("automatic edit source geometry", () => {
       )
     ).toEqual([{ ...current, width: 720, height: 1280 }]);
   });
+  it("measures visible overlay footage even when its sound is muted, excluding non-picture and transition clips", async () => {
+    const ids = [
+      "overlay",
+      "hidden",
+      "transition",
+      "sound",
+      "captions",
+      "graphic",
+    ];
+    const assets = ids.map(id => ({ ...video, id }));
+    const resolve = vi.fn(async (asset: Asset) => ({
+      ...asset,
+      width: 1920,
+      height: 1080,
+    }));
+    const measured = await resolveAutonomousSourceMetadata(
+      {
+        ...project,
+        clips: [
+          { assetId: "overlay", track: "overlay", muted: true, volume: 0 },
+          { assetId: "hidden", track: "overlay", hidden: true },
+          { assetId: "transition", track: "video", transitionHandle: true },
+          { assetId: "sound", track: "audio" },
+          { assetId: "captions", track: "captions" },
+          { assetId: "graphic", track: "overlay", graphic: { kind: "text" } },
+        ],
+      } as EditProject,
+      assets,
+      undefined,
+      resolve
+    );
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(measured.map(asset => asset.id)).toEqual(["overlay"]);
+  });
+  it("respects effective picture solo without treating sound solo as picture hiding", async () => {
+    const overlay = { ...video, id: "overlay" };
+    const resolve = vi.fn(async (asset: Asset) => ({
+      ...asset,
+      width: 720,
+      height: 1280,
+    }));
+    const edit = {
+      ...project,
+      clips: [
+        { assetId: video.id, track: "video", lane: 1 },
+        { assetId: overlay.id, track: "overlay", lane: 2 },
+      ],
+      trackSettings: [{ kind: "video", number: 2, soloPicture: true }],
+    } as EditProject;
+    const measured = await resolveAutonomousSourceMetadata(
+      edit,
+      [video, overlay],
+      undefined,
+      resolve
+    );
+    expect(measured.map(asset => asset.id)).toEqual(["overlay"]);
+    resolve.mockClear();
+    const soundSolo = await resolveAutonomousSourceMetadata(
+      {
+        ...edit,
+        trackSettings: [{ kind: "video", number: 2, soloSound: true }],
+      },
+      [video, overlay],
+      undefined,
+      resolve
+    );
+    expect(soundSolo.map(asset => asset.id)).toEqual([video.id, overlay.id]);
+  });
   it("never recreates a removed source or writes dimensions to replaced bytes", () => {
     expect(() => mergeAutonomousSourceMetadata([], [video])).toThrow(
       "source changed"

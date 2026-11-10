@@ -10,6 +10,7 @@ import { applyEditOperation } from "./edit-timeline";
 import { buildRenderPlan } from "./render-plan";
 import { verifyExportMetadata } from "./export-verification";
 import { graphicAssEvents } from "./graphic-ass";
+import { graphicSelectionBounds } from "@contracts/graphic-selection";
 
 const project = {
   duration: 3,
@@ -196,6 +197,86 @@ it.skipIf(!nativeAvailable)(
     }
   },
   65000
+);
+it.skipIf(!nativeAvailable)(
+  "renders an explicitly sized portrait highlight with a hollow interior and matching painted bounds",
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "reelassati-highlight-"));
+    try {
+      const next = applyEditOperation(
+        { ...project, duration: 1, aspectRatio: "9:16" },
+        {
+          ...operation,
+          start: 0,
+          end: 1,
+          parameters: {
+            graphic: normalizeGraphic({
+              kind: "highlight",
+              text: "",
+              x: 50,
+              y: 50,
+              width: 30,
+              height: 20,
+              strokeWidth: 1,
+              animation: "none",
+              color: "#FFFFFF",
+            }),
+          },
+        }
+      );
+      const plan = buildRenderPlan(next, [], new Set());
+      writeFileSync(join(dir, "captions.ass"), plan.ass);
+      const frame = execFileSync(
+        "ffmpeg",
+        [
+          "-v",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "color=black:s=720x1280:d=0.1",
+          "-vf",
+          "ass=captions.ass",
+          "-frames:v",
+          "1",
+          "-pix_fmt",
+          "gray",
+          "-f",
+          "rawvideo",
+          "-",
+        ],
+        { cwd: dir, timeout: 15000, maxBuffer: 2 * 1024 * 1024 }
+      );
+      expect(frame.length).toBe(720 * 1280);
+      let left = 720,
+        right = -1,
+        top = 1280,
+        bottom = -1;
+      for (let i = 0; i < frame.length; i++) {
+        if (frame[i] <= 100) continue;
+        const x = i % 720,
+          y = Math.floor(i / 720);
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+      const bounds = graphicSelectionBounds(next.clips[0], 0.5, 720, 1280)!;
+      expect(Math.abs(left - bounds.x)).toBeLessThanOrEqual(1.5);
+      expect(Math.abs(right - bounds.x - bounds.width)).toBeLessThanOrEqual(
+        1.5
+      );
+      expect(Math.abs(top - bounds.y)).toBeLessThanOrEqual(1.5);
+      expect(Math.abs(bottom - bounds.y - bounds.height)).toBeLessThanOrEqual(
+        1.5
+      );
+      expect(frame[640 * 720 + 360]).toBeLessThanOrEqual(3);
+      expect(frame[568 * 720 + 360]).toBeGreaterThan(200);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+  20000
 );
 it.skipIf(!nativeAvailable)(
   "renders all six graphics to a decodable MP4 and confines them to their timeline interval",

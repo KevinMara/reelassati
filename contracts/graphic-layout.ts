@@ -14,6 +14,23 @@ export function graphicTextLines(text: string, size: number) {
 }
 
 export type GraphicPoint = [number, number];
+/** Shape controls use canvas-width units. Only omitted legacy highlight height
+ * follows canvas height; storing an explicit height makes it aspect independent. */
+export function graphicShapeDimensions(
+  g: MotionGraphic,
+  canvasHeightToWidth = 1
+) {
+  const ratio =
+    Number.isFinite(canvasHeightToWidth) && canvasHeightToWidth > 0
+      ? canvasHeightToWidth
+      : 1;
+  return {
+    width: g.width ?? (g.kind === "highlight" ? 40 : 30),
+    height: g.height ?? (g.kind === "highlight" ? 15 * ratio : 12),
+    strokeWidth: g.strokeWidth ?? (g.kind === "highlight" ? 0.42 : 0),
+  };
+}
+
 export function graphicCardLayout(
   text: string,
   size: number,
@@ -54,7 +71,8 @@ export function graphicCardLayout(
 export function graphicShapes(
   g: MotionGraphic,
   elapsed: number,
-  duration: number
+  duration: number,
+  canvasHeightToWidth = 1
 ) {
   const f = graphicFrame(g, elapsed, duration);
   const shapes: Array<{ points: GraphicPoint[]; color: string }> = [];
@@ -80,9 +98,11 @@ export function graphicShapes(
       }
     shapes.push({ points, color });
   };
-  const w = g.width ?? 30,
-    h = g.height ?? 12,
-    border = g.strokeWidth ?? 0;
+  const {
+    width: w,
+    height: h,
+    strokeWidth: border,
+  } = graphicShapeDimensions(g, canvasHeightToWidth);
   if (g.kind === "callout") {
     const card = graphicCardLayout(f.text, g.size, g.padding, g.secondaryText);
     rect(
@@ -117,6 +137,16 @@ export function graphicShapes(
       rect(0, h / 2 - border / 2, w, border, g.color);
       rect(-w / 2 + border / 2, 0, border, h, g.color);
       rect(w / 2 - border / 2, 0, border, h, g.color);
+    }
+  }
+  if (g.kind === "highlight") {
+    // Explicit dimensions use canvas-width units like other shapes. Older
+    // highlights had a 40vw x 15vh outline, with a centered 0.42vw stroke.
+    if (border > 0) {
+      rect(0, -h / 2, w + border, border, g.color);
+      rect(0, h / 2, w + border, border, g.color);
+      rect(-w / 2, 0, border, h, g.color);
+      rect(w / 2, 0, border, h, g.color);
     }
   }
   if (g.kind === "line") rect(0, 0, w, Math.max(0.2, border || 0.4), g.color);

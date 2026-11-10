@@ -115,13 +115,7 @@ export function graphicAssEvents(
         .padStart(2, "0");
       let tags = `\\an5\\pos(${Math.round((f.x * width) / 100)},${Math.round((f.y * height) / 100)})\\frz${-Math.round(f.rotation * 1000) / 1000}\\fs${Math.round((width * g.size) / 100)}\\fscx${Math.round(f.scale * 100)}\\fscy${Math.round(f.scale * 100)}\\1c${assColor(g.color)}\\alpha&H${alpha}&\\shad0`;
       let text = escapeAss(graphicTextLines(f.text, g.size));
-      if (g.kind === "highlight") {
-        const w = Math.round(width * 0.4),
-          h = Math.round(height * 0.15),
-          b = Math.max(2, Math.round(width / 240));
-        tags += "\\bord0\\p1";
-        text = `m 0 0 l ${w} 0 ${w} ${b} 0 ${b} m 0 ${h - b} l ${w} ${h - b} ${w} ${h} 0 ${h} m 0 ${b} l ${b} ${b} ${b} ${h - b} 0 ${h - b} m ${w - b} ${b} l ${w} ${b} ${w} ${h - b} ${w - b} ${h - b}`;
-      } else if (g.kind === "arrow") {
+      if (g.kind === "arrow") {
         const w = Math.round(width * 0.25),
           h = Math.round(width * 0.12);
         tags += "\\bord0\\p1";
@@ -130,7 +124,8 @@ export function graphicAssEvents(
       const shapes = graphicShapes(
         g,
         graphicElapsed(frame / 30),
-        graphicDuration
+        graphicDuration,
+        height / width
       ).map(shape => {
         const points = graphicShapePixels(shape.points, f, width, height);
         const path =
@@ -142,9 +137,13 @@ export function graphicAssEvents(
             .join(" ") + " c";
         return `{\\an7\\pos(0,0)\\bord0\\shad0\\1c${assColor(shape.color)}\\alpha&H${alpha}&\\p1}${path}`;
       });
-      const shapeOnly = ["rectangle", "ellipse", "star", "line"].includes(
-        g.kind
-      );
+      const shapeOnly = [
+        "rectangle",
+        "ellipse",
+        "star",
+        "line",
+        "highlight",
+      ].includes(g.kind);
       const payload = shapeOnly ? "" : `{${tags}}${text}`;
       let secondary = "";
       if (g.secondaryText) {

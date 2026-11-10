@@ -8,6 +8,8 @@ export const EDIT_PLAN_VALIDATION_STAGES = [
   "executable",
   "trim",
   "composition",
+  "graphic_preflight",
+  "graphic_refinement",
 ] as const;
 export type EditPlanValidationStage =
   (typeof EDIT_PLAN_VALIDATION_STAGES)[number];
@@ -40,6 +42,9 @@ export const EDIT_PLAN_VALIDATION_REASONS = [
   "style_example_excluded",
   "preset_unavailable",
   "graphic_mode_invalid",
+  "graphic_refinement_invalid",
+  "graphic_refinement_scope",
+  "graphic_refinement_unsafe",
   "validation_failed",
 ] as const;
 export type EditPlanValidationReason =

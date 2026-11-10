@@ -275,6 +275,38 @@ describe("source-aware automatic graphic placement", () => {
     ).not.toContain("source-overlap");
   });
 
+  it.each([
+    { x: 32, y: 72, rect: { x: 0.14, y: 0.62, width: 0.3, height: 0.2 } },
+    { x: 60, y: 70, rect: { x: 0.45, y: 0.58, width: 0.28, height: 0.2 } },
+    { x: 60, y: 70, rect: { x: 0.38, y: 0.56, width: 0.32, height: 0.2 } },
+  ])(
+    "checks the actual portrait highlight strokes around a source label at $x,$y",
+    ({ x, y, rect }) => {
+      const p = project(evidence({ regions: [{ ...region(), rect }] }));
+      p.aspectRatio = "9:16";
+      const portrait = { ...asset, width: 720, height: 1280 };
+      const outline = graphic({
+        graphic: normalizeGraphic({
+          kind: "highlight",
+          text: "",
+          x,
+          y,
+          animation: "pop",
+        })!,
+      });
+      // These strokes cross the label's observed rectangle; the empty interior
+      // is not the reason for rejection, even though the shape is hollow.
+      expect(reasons(p, outline, [portrait])).toContain("source-overlap");
+      p.sourceReviews![0].visualProtection!.regions[0].rect = {
+        x: x / 100 - 0.03,
+        y: y / 100 - 0.01,
+        width: 0.06,
+        height: 0.02,
+      };
+      expect(reasons(p, outline, [portrait])).not.toContain("source-overlap");
+    }
+  );
+
   it("uses painted edges for rotated outlines while still protecting actual edge collisions", () => {
     const p = project(
       evidence({
@@ -326,6 +358,41 @@ describe("source-aware automatic graphic placement", () => {
     peer.graphic!.x = 60;
     peer.graphic!.y = 39;
     expect(reasons(p, outline)).toContain("competing-text");
+  });
+
+  it("uses explicit highlight height and stroke without filling its hollow interior", () => {
+    const p = project(
+      evidence({
+        regions: [
+          {
+            ...region(),
+            rect: { x: 0.45, y: 0.48, width: 0.1, height: 0.04 },
+          },
+        ],
+      })
+    );
+    p.aspectRatio = "9:16";
+    const portrait = { ...asset, width: 720, height: 1280 };
+    const outline = graphic({
+      graphic: normalizeGraphic({
+        kind: "highlight",
+        text: "",
+        x: 50,
+        y: 50,
+        width: 30,
+        height: 10,
+        strokeWidth: 0.4,
+        animation: "none",
+      })!,
+    });
+    expect(reasons(p, outline, [portrait])).not.toContain("source-overlap");
+    outline.graphic!.height = 4;
+    expect(reasons(p, outline, [portrait])).toContain("source-overlap");
+    outline.graphic!.height = 10;
+    outline.graphic!.strokeWidth = 4;
+    expect(reasons(p, outline, [portrait])).toContain("source-overlap");
+    outline.graphic!.strokeWidth = 0.4;
+    expect(reasons(p, outline, [portrait])).not.toContain("source-overlap");
   });
 
   it("checks animated graphics between their safe entrance and exit positions", () => {

@@ -18,28 +18,7 @@ export function laneForClip(clip: TimelineClip): TimelineLane {
   return { kind: clipLaneKind(clip), number: clipLaneNumber(clip) };
 }
 
-export function allocateTimelineLane(
-  clips: TimelineClip[],
-  kind: TimelineLaneKind,
-  start: number,
-  duration: number,
-  preferred = 1,
-  excludeId?: string
-): number {
-  let lane = Math.max(1, Math.floor(preferred));
-  while (
-    clips.some(
-      c =>
-        c.id !== excludeId &&
-        clipLaneKind(c) === kind &&
-        clipLaneNumber(c) === lane &&
-        c.start < start + duration - 0.001 &&
-        c.start + c.duration > start + 0.001
-    )
-  )
-    lane += 1;
-  return lane;
-}
+export { allocateTimelineLane } from "@contracts/timeline-edit-helpers";
 
 export function timelineLanes(clips: TimelineClip[]): TimelineLane[] {
   const kinds: TimelineLaneKind[] = [
@@ -145,18 +124,8 @@ export function trimTimelineClip(
   };
 }
 
-/** Preserve the source animation clock when a clip is shortened or split. */
-export function preserveGraphicDuration(clip: TimelineClip): TimelineClip {
-  if (clip.visual && clip.visualDuration === undefined)
-    clip = {
-      ...clip,
-      visualStart: clip.inPoint,
-      visualDuration: clip.outPoint - clip.inPoint,
-    };
-  return clip.graphic && clip.graphicDuration === undefined
-    ? { ...clip, graphicDuration: clip.outPoint ?? clip.duration }
-    : clip;
-}
+import { preserveGraphicDuration } from "@contracts/timeline-edit-helpers";
+export { preserveGraphicDuration } from "@contracts/timeline-edit-helpers";
 
 /** Actual audio/video source bounds; still images and generated graphics can hold longer. */
 export function clipTimingLimits(

@@ -67,7 +67,7 @@ export function MotionGraphicLayer({
     );
   }
   const f = graphicFrame(g, elapsed, graphicDuration);
-  const shapes = graphicShapes(g, elapsed, graphicDuration);
+  const shapes = graphicShapes(g, elapsed, graphicDuration, ratio);
   const lines = graphicTextLines(f.text, g.size).split("\n");
   const layout = graphicCardLayout(f.text, g.size, g.padding, g.secondaryText);
   const primary = ![
@@ -102,17 +102,6 @@ export function MotionGraphicLayer({
             <path
               fill={g.color}
               d="M-125 -12 H37.5 V-60 L125 0 L37.5 60 V12 H-125 Z"
-            />
-          )}
-          {g.kind === "highlight" && (
-            <rect
-              x={-200}
-              y={-75 * ratio}
-              width={400}
-              height={150 * ratio}
-              fill="none"
-              stroke={g.color}
-              strokeWidth={4.2}
             />
           )}
           {primary && (

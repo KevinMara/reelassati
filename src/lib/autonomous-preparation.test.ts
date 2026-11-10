@@ -696,6 +696,170 @@ describe("saved paid review reuse", () => {
   });
 });
 describe("auto-edit source preparation recovery", () => {
+  it("reconciles unavailable interval audio with overlapping timed words and rebuilds the final command facts", async () => {
+    const input = fixture();
+    const observations = [
+      {
+        start: 0,
+        end: 1,
+        visualEvidence: "Opening",
+        audioEvidence:
+          "Audio not supplied; speech inferred only from captions.",
+      },
+      {
+        start: 1,
+        end: 2,
+        visualEvidence: "Pause",
+        audioEvidence: "Audio could not be verified.",
+      },
+      {
+        start: 2,
+        end: 3,
+        visualEvidence: "Demonstration",
+        audioEvidence:
+          "Audio could not be verified; A quiet piano bed plays at 0.5 volume.",
+      },
+      {
+        start: 3,
+        end: 4,
+        visualEvidence: "Ending",
+        audioEvidence: "A cymbal hit closes the segment.",
+      },
+    ];
+    input.review.mockResolvedValue({
+      summary: "Picture review",
+      review: {
+        captions: "present",
+        audio: "unknown",
+        audioNote: "A quiet piano bed plays under the speaker.",
+      },
+      insights: observations,
+      retention: [],
+    } as never);
+    input.transcribe.mockResolvedValue({
+      transcript: "First last",
+      segments: [
+        {
+          id: "spanning",
+          start: 0,
+          end: 3,
+          text: "First last",
+          words: [
+            { text: "First", start: 0.2, end: 0.8 },
+            { text: "last", start: 2.2, end: 2.8 },
+          ],
+        },
+        {
+          id: "ending",
+          start: 3.1,
+          end: 3.5,
+          text: "Done",
+          words: [{ text: "Done", start: 3.1, end: 3.5 }],
+        },
+        { id: "invalid", start: -2, end: -1, text: "Invalid speech" },
+      ],
+    } as never);
+    const result = await prepareAutonomousSources({
+      ...input,
+      captions: false,
+      speechTiming: true,
+    });
+    const review = result.working.sourceReviews![0];
+    const facts = result.analysis[0].observations;
+    expect(facts).toEqual(review.observations);
+    expect(facts[0].audioEvidence).toContain(
+      'Measured source speech (0.2–0.8s): "First"'
+    );
+    expect(facts[0].audioEvidence).not.toMatch(
+      /not supplied|inferred|last|Invalid/
+    );
+    expect(facts[1].audioEvidence).toBe(observations[1].audioEvidence);
+    expect(facts[2].audioEvidence).toContain(
+      "A quiet piano bed plays at 0.5 volume."
+    );
+    expect(facts[2].audioEvidence).toContain(
+      'Measured source speech (2.2–2.8s): "last"'
+    );
+    expect(facts[2].audioEvidence).not.toContain("could not be verified");
+    expect(facts[3].audioEvidence).toBe(observations[3].audioEvidence);
+    expect(facts[0].audioEvidence).toContain(
+      "Transcription does not assess music or noise."
+    );
+    expect(review.audioNote).toContain(
+      "A quiet piano bed plays under the speaker."
+    );
+    expect(review.moments[0].note).toContain('"First"');
+    expect(review.moments[0].note).not.toContain("not supplied");
+    expect(observations[0].audioEvidence).toContain("not supplied");
+    expect(input.transcribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses existing source speech without buying it again and does not assign an untimed phrase to a partial interval", async () => {
+    const input = fixture(),
+      report = savedReport();
+    report.result.insights = [
+      { ...report.result.insights[0], start: 0, end: 1 },
+      { ...report.result.insights[0], start: 1, end: 3 },
+      { ...report.result.insights[0], start: 3, end: 4 },
+    ];
+    const result = await prepareAutonomousSources({
+      ...input,
+      speechTiming: true,
+      project: {
+        ...project,
+        sourceSpeech: [
+          {
+            assetId: source.id,
+            segments: [
+              {
+                id: "measured",
+                start: 0.5,
+                end: 2.5,
+                text: "Whole measured phrase",
+              },
+            ],
+          },
+        ],
+      },
+      savedReports: [report],
+    });
+    expect(input.review).not.toHaveBeenCalled();
+    expect(input.transcribe).not.toHaveBeenCalled();
+    expect(result.analysis[0].observations[0].audioEvidence).toContain(
+      "exact speech timing and words within this interval are not established"
+    );
+    expect(result.analysis[0].observations[0].audioEvidence).not.toContain(
+      "Whole measured phrase"
+    );
+    expect(result.analysis[0].observations[1].audioEvidence).not.toContain(
+      "Whole measured phrase"
+    );
+    expect(result.analysis[0].observations[2].audioEvidence).toBe(
+      report.result.insights[2].audioEvidence
+    );
+    expect(result.analysis[0].observations).toEqual(
+      result.working.sourceReviews![0].observations
+    );
+  });
+
+  it("does not turn an empty transcript into interval speech evidence", async () => {
+    const input = fixture(),
+      report = savedReport();
+    input.transcribe.mockResolvedValue({
+      transcript: "",
+      segments: [],
+    } as never);
+    const result = await prepareAutonomousSources({
+      ...input,
+      speechTiming: true,
+      savedReports: [report],
+    });
+    expect(result.analysis[0].observations[0].audioEvidence).toBe(
+      report.result.insights[0].audioEvidence
+    );
+    expect(result.working.sourceReviews![0].audio).toBe("unknown");
+  });
+
   it("retains actual picture/audio observations instead of only editorial rationale", async () => {
     const input = fixture();
     const observed = {

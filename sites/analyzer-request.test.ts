@@ -5,11 +5,45 @@ import {
   type AnalysisControl,
 } from "./analyzer-request";
 import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
-import { ANALYZER_DEADLINE_MS } from "../contracts/analyzer-transport";
+import {
+  ANALYZER_DEADLINE_MS,
+  EDIT_PLAN_DEADLINE_MS,
+} from "../contracts/analyzer-transport";
 
 afterEach(() => vi.useRealTimers());
 
 describe("foreground analyzer transport", () => {
+  it("reserves a fixed three-phase edit deadline while retaining Analyze's five-minute bound", async () => {
+    vi.useFakeTimers();
+    const startedAt = Date.now();
+    let control!: AnalysisControl;
+    const run = vi.fn((_, active: AnalysisControl) => {
+      control = active;
+      return new Promise<Response>((_, reject) =>
+        active.signal.addEventListener(
+          "abort",
+          () => reject(active.signal.reason),
+          { once: true }
+        )
+      );
+    });
+    const result = unwrapAnalyzerResponse(
+      foregroundAnalysisResponse(
+        new Request("https://test/api/ai/edit-plan"),
+        run
+      )
+    );
+    expect(control.deadlineAt).toBe(startedAt + EDIT_PLAN_DEADLINE_MS);
+    await vi.advanceTimersByTimeAsync(ANALYZER_DEADLINE_MS);
+    expect(control.signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(
+      EDIT_PLAN_DEADLINE_MS - ANALYZER_DEADLINE_MS
+    );
+    expect(control.signal.aborted).toBe(true);
+    expect((await result).status).toBe(504);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it.each(["analyze", "edit-plan"])(
     "keeps a slow %s request readable past the observed 65-second cancellation without returning partial output",
     async route => {

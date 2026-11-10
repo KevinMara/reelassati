@@ -1,5 +1,6 @@
 import {
   ANALYZER_DEADLINE_MS,
+  EDIT_PLAN_DEADLINE_MS,
   ANALYZER_HEARTBEAT_MS,
   ANALYZER_MAX_RESULT_BYTES,
   ANALYZER_STREAM_TYPE,
@@ -27,6 +28,10 @@ export function foregroundAnalysisResponse(
     analysisIncomplete: true,
   }
 ): Response {
+  const deadlineMs =
+    new URL(request.url).pathname === "/api/ai/edit-plan"
+      ? EDIT_PLAN_DEADLINE_MS
+      : ANALYZER_DEADLINE_MS;
   const abort = new AbortController();
   const cleanups = new Set<() => Promise<unknown>>();
   let closed = false;
@@ -71,7 +76,7 @@ export function foregroundAnalysisResponse(
   };
   const control: AnalysisControl = {
     signal: abort.signal,
-    deadlineAt: Date.now() + ANALYZER_DEADLINE_MS,
+    deadlineAt: Date.now() + deadlineMs,
     onAbort(cleanup) {
       if (abort.signal.aborted) clean([cleanup]);
       else cleanups.add(cleanup);
@@ -127,7 +132,7 @@ export function foregroundAnalysisResponse(
           new DOMException("Analysis request deadline exceeded", "TimeoutError")
         );
         finish(504, JSON.stringify(failure));
-      }, ANALYZER_DEADLINE_MS);
+      }, deadlineMs);
       if (request.signal.aborted) disconnect();
       // This promise belongs to the open response body. It is deliberately NOT
       // registered with waitUntil; closing the body aborts the provider request.

@@ -2,6 +2,15 @@ import {
   EDIT_CUT_GUIDANCE,
   assertAutonomousTrimSemantics,
 } from "../contracts/edit-cut-semantics";
+import {
+  EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION,
+  editPlanQualityAssets,
+  editPlanGraphicFeedback,
+  mergeGraphicRefinement,
+  reviewEditPlanGraphics,
+  type EditPlanQualityReview,
+} from "../contracts/edit-plan-quality";
+import type { AutonomousGraphicReview } from "../contracts/autonomous-execution";
 import { assertAutonomousComposition } from "../contracts/autonomous-operation-order";
 import {
   EditPlanValidationError,
@@ -108,6 +117,7 @@ import {
 import { normalizeGraphic } from "../contracts/motion-graphics";
 import {
   autonomousCaptionDirection,
+  applyAutonomousCaptionTreatment,
   normalizeAutonomousCaptionTreatment,
 } from "../contracts/editorial-captions";
 import { normalizeVisual } from "../contracts/clip-visual";
@@ -6595,6 +6605,7 @@ async function handleAi(
       effort?: string;
       stock?: boolean;
       captionStyling?: boolean;
+      graphicRequest?: string;
     }>(request);
     if (
       !analysisControl ||
@@ -6852,7 +6863,7 @@ async function handleAi(
             invocation = refined.invocation;
           }
         }
-        const summary = stringValue(
+        let summary = stringValue(
           output.summary,
           "Edit plan ready for review"
         );
@@ -6862,11 +6873,12 @@ async function handleAi(
               output.captionTreatment
             )
           : undefined;
-        let changes: EditOperation[];
         let validationStage: EditPlanValidationStage = "references";
-        try {
+        const compileChanges = (raw: unknown): EditOperation[] => {
+          validationStage = "references";
+          let changes: EditOperation[];
           const referencedChanges = resolveEditPlanningReferences(
-            output.changes,
+            raw,
             planningContext,
             duration,
             Array.isArray(input.selectedClipIds) ? input.selectedClipIds : []
@@ -6919,11 +6931,13 @@ async function handleAi(
           assertAutonomousTrimSemantics(project, changes);
           validationStage = "composition";
           assertAutonomousComposition(project, changes);
-        } catch (error) {
+          return changes;
+        };
+        const rejectPlan = async (error: unknown, raw: unknown) => {
           const validation = editPlanValidationDiagnostic(
             error,
             validationStage,
-            Array.isArray(output.changes) ? output.changes.length : 0
+            Array.isArray(raw) ? raw.length : 0
           );
           console.warn("REELassati edit plan rejected", {
             reference: invocation.id,
@@ -6950,10 +6964,83 @@ async function handleAi(
             },
             422
           );
+        };
+        const checkpoint = () => {
+          analysisControl.signal.throwIfAborted();
+          if (Date.now() >= analysisControl.deadlineAt)
+            throw new DOMException("The edit planning deadline elapsed.", "TimeoutError");
+        };
+        let changes: EditOperation[];
+        let graphicReview: AutonomousGraphicReview | undefined;
+        let qualityReview: EditPlanQualityReview | undefined;
+        const qualityAssets = editPlanQualityAssets(presetWorkspace.assets, stockMedia);
+        const qualityProject = captionTreatment
+          ? applyAutonomousCaptionTreatment(project, captionTreatment)
+          : project;
+        // Human intent is separate from the generated editing command. Old
+        // clients default to automatic protection, never inferred permission.
+        const graphicRequest = stringValue(input.graphicRequest);
+        try {
+          changes = compileChanges(output.changes);
+          if (changes.some(operation => operation.type === "graphic")) {
+            validationStage = "graphic_preflight";
+            graphicReview = reviewEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
+          }
+        } catch (error) {
+          checkpoint();
+          return rejectPlan(error, output.changes);
         }
+        if (graphicReview?.omitted.length) {
+          let feedback: ReturnType<typeof editPlanGraphicFeedback>;
+          try {
+            feedback = editPlanGraphicFeedback(qualityProject,
+              changes.filter(operation => !graphicReview!.omittedSounds?.some(item => item.operationId === operation.id)),
+              qualityAssets, graphicReview, checkpoint);
+          } catch (error) {
+            checkpoint();
+            return rejectPlan(error, changes);
+          }
+          checkpoint();
+          if (analysisControl.onCheck && !(await analysisControl.onCheck()))
+            throw new DOMException("The edit request was canceled.", "AbortError");
+          checkpoint();
+          // Exactly one correction inside this same foreground reservation.
+          // Provider/abort failures retain their normal failure path, not a
+          // compiler error or an automatic retry. No new media is authorized.
+          const corrected = await chatJson(env, user, "edit-planning",
+            `${EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION} ${EDIT_PLANNING_CAPABILITIES} ${EDITOR_GRAPHIC_GUIDANCE}`,
+            JSON.stringify({ command: input.command, graphicRequest, project: projectContext,
+              captionTreatment, feedback }),
+            requestedModel, true, 24000, false, undefined, analysisControl,
+            editReasoningEffort(input.effort));
+          invocation = corrected.invocation;
+          try {
+            validationStage = "graphic_refinement";
+            const repaired = mergeGraphicRefinement(changes, graphicReview.omitted, corrected.output, raw => {
+              const compiled = compileChanges(raw);
+              validationStage = "graphic_refinement";
+              return compiled;
+            });
+            changes = repaired.changes;
+            summary = repaired.summary;
+            qualityReview = repaired.qualityReview;
+            validationStage = "graphic_refinement";
+            assertExecutableEditPlan(changes);
+            assertAutonomousTrimSemantics(project, changes);
+            assertAutonomousComposition(project, changes);
+            const finalReview = reviewEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
+            if (finalReview.omitted.length)
+              throw new EditPlanValidationError("graphic_refinement_unsafe", "The corrected graphics still fail the actual timeline checks.");
+          } catch (error) {
+            checkpoint();
+            return rejectPlan(error, changes);
+          }
+        }
+        checkpoint();
         const normalizedProjection = {
           summary,
           ...(captionTreatment ? { captionTreatment } : {}),
+          ...(qualityReview ? { qualityReview } : {}),
           changes: changes.map(editOperationProvenanceProjection),
         };
         const normalizedProjectionJson = JSON.stringify(normalizedProjection);
@@ -6983,6 +7070,7 @@ async function handleAi(
         return json({
           summary,
           ...(captionTreatment ? { captionTreatment } : {}),
+          ...(qualityReview ? { qualityReview } : {}),
           stockMedia: stockMedia.filter(item =>
             changes.some(
               change =>

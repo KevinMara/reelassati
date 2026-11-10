@@ -130,6 +130,12 @@ function fixture() {
 }
 
 describe("manual same-input plan recovery", () => {
+  it("invalidates plans produced before shared server graphic preflight", () => {
+    const { input } = fixture();
+    expect(JSON.parse(autonomousPlanCacheKey(input)).planningContract).toBe(
+      "graphic-preflight-v1"
+    );
+  });
   it("binds a quote to its accepted checkpoints instead of concurrent timeline or Library changes", () => {
     const { input } = fixture();
     const accepted = structuredClone(input);

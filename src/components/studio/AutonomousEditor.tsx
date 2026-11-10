@@ -15,7 +15,7 @@ import {
 } from "@/lib/autonomous-credit-estimate";
 import { activeEditorProjects, editorRunKey } from "@/lib/editor-run-lock";
 import { ConciseResponse } from "./ConciseResponse";
-import { editorAudioCatalog } from "@contracts/editor-audio-catalog";
+import { editPlanQualityAssets } from "@contracts/edit-plan-quality";
 import { resolveChatCatalogAudio } from "@/lib/editor-chat-catalog-audio";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
@@ -680,6 +680,9 @@ export function AutonomousEditor({
             model,
             stock: true,
             captionStyling: captions,
+            graphicRequest: style.startsWith("ANALYZER OPTIMIZATION BRIEF")
+              ? ""
+              : style,
             effort: "max",
             selectedClipIds: [],
             range: { start: 0, end: working.duration },
@@ -694,6 +697,19 @@ export function AutonomousEditor({
         working = applyAutonomousCaptionTreatment(
           working,
           result.captionTreatment
+        );
+      if (result.qualityReview?.withdrawn.length)
+        savedSteps.push(
+          ...autonomousResultReceipt(
+            "",
+            [],
+            {
+              changes: [],
+              omitted: result.qualityReview.withdrawn,
+              warnings: [],
+            },
+            ui
+          ).details
         );
       const preparationCategories: Array<{ type: "trim" | "caption" }> = [];
       if (JSON.stringify(working.clips) !== JSON.stringify(project.clips))
@@ -728,31 +744,7 @@ export function AutonomousEditor({
       const graphicReview = preflightAutonomousPlan(
         working,
         changesToApply,
-        [
-          ...runWorkspace.assets,
-          ...(result.stockMedia ?? []).map(item => ({
-            id: `stock:${item.provider}:${item.id}`,
-            name: item.title,
-            kind: item.kind,
-            status: "ready" as const,
-            duration: item.duration,
-            url: "",
-            size: 0,
-            createdAt: "",
-            contentType: `${item.kind}/${item.kind === "video" ? "webm" : "jpeg"}`,
-          })),
-          ...editorAudioCatalog.map(a => ({
-            id: `catalog:${a.id}`,
-            kind: "audio" as const,
-            name: a.name,
-            status: "ready" as const,
-            duration: a.duration,
-            url: "",
-            size: 0,
-            createdAt: "",
-            contentType: "audio/wav",
-          })),
-        ],
+        editPlanQualityAssets(runWorkspace.assets, result.stockMedia ?? []),
         checkpoint,
         // Analyzer optimization contains generated recommendations, not a
         // verbatim human instruction to add or cover source text.
@@ -761,6 +753,10 @@ export function AutonomousEditor({
         }
       );
       changesToApply = graphicReview.changes;
+      // A fresh user-initiated run must not reuse a proposal that still failed
+      // actual execution checks (including an older server response).
+      if (graphicReview.omitted.length || graphicReview.omittedSounds?.length)
+        planCache.clear();
       // Price the validated execution plan. An invalid draft must never be
       // presented as ready, and omitted operations must not buy unused media.
       const estimate = autonomousCreditEstimate(

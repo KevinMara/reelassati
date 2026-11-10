@@ -10,6 +10,7 @@ import {
 } from "@contracts/motion-graphics";
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
 import { GraphicMotionEditor } from "./GraphicMotionEditor";
+import { graphicShapeDimensions } from "@contracts/graphic-layout";
 import type { TimelineClip } from "@contracts/workspace";
 import {
   isSpatialGraphic,
@@ -79,6 +80,7 @@ export function GraphicComposer({
     setG(normalizeGraphic({ ...g, [key]: value })!);
   const field =
     "w-full rounded-lg border border-border bg-background p-2 text-sm";
+  const shapeDimensions = graphicShapeDimensions(g, 9 / 16);
   const clip: TimelineClip = {
     id: "preview",
     track: "overlay",
@@ -214,7 +216,9 @@ export function GraphicComposer({
             />
           </>
         )}
-      {(["rectangle", "ellipse", "star", "line"].includes(g.kind) ||
+      {(["rectangle", "ellipse", "star", "line", "highlight"].includes(
+        g.kind
+      ) ||
         g.composition === "progress") && (
         <div className="grid grid-cols-2 gap-2">
           {(
@@ -226,9 +230,10 @@ export function GraphicComposer({
           )
             .filter(
               ([key]) =>
-                key !== "strokeWidth" || ["rectangle", "line"].includes(g.kind)
+                key !== "strokeWidth" ||
+                ["rectangle", "line", "highlight"].includes(g.kind)
             )
-            .map(([key, label, min, max, fallback]) => (
+            .map(([key, label, min, max]) => (
               <label key={key} className="text-sm">
                 {label}
                 <input
@@ -237,7 +242,7 @@ export function GraphicComposer({
                   step={0.1}
                   min={min}
                   max={max}
-                  value={g[key] ?? fallback}
+                  value={shapeDimensions[key]}
                   onChange={e => patch(key, Number(e.target.value))}
                 />
               </label>

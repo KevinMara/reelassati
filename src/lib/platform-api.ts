@@ -1069,6 +1069,7 @@ export const platformApi = {
       effort?: import("@contracts/edit-model").EditEffort;
       stock?: boolean;
       captionStyling?: boolean;
+      graphicRequest?: string;
     },
     options?: UploadRequestOptions
   ) => {
@@ -1117,6 +1118,7 @@ export const platformApi = {
         changes: EditOperation[];
         stockMedia?: import("@contracts/stock-media").StockMedia[];
         captionTreatment?: import("@contracts/editorial-captions").AutonomousCaptionTreatment;
+        qualityReview?: import("@contracts/edit-plan-quality").EditPlanQualityReview;
         summary: string;
         provenance: ContentProvenance;
       }>(

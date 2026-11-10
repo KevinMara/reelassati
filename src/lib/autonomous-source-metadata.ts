@@ -1,4 +1,5 @@
 import type { Asset, EditProject } from "@contracts/workspace";
+import { effectiveTimelineClips } from "@contracts/timeline-mixer";
 import { resolveVideoMetadata } from "./media-metadata";
 
 /** Legacy library records can have a duration but no geometry. Preview keeps its
@@ -10,8 +11,15 @@ export async function resolveAutonomousSourceMetadata(
   resolve = resolveVideoMetadata
 ): Promise<Asset[]> {
   const sourceIds = new Set(
-    project.clips
-      .filter(clip => clip.track === "video" && !clip.hidden && !clip.graphic)
+    effectiveTimelineClips(project)
+      .filter(
+        clip =>
+          clip.track !== "audio" &&
+          clip.track !== "captions" &&
+          !clip.hidden &&
+          !clip.graphic &&
+          !clip.transitionHandle
+      )
       .map(clip => clip.assetId)
   );
   const measured: Asset[] = [];

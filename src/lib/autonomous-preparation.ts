@@ -4,6 +4,7 @@ import {
   normalizeSourceObservations,
   sourceReviewFacts,
   type SourceObservation,
+  type SourceReview,
 } from "@contracts/source-review";
 import { mapChatTranscript } from "./editor-chat-execution";
 import { captionOwner } from "@contracts/caption-ownership";
@@ -137,6 +138,107 @@ export function findSavedAutonomousReview(
   };
 }
 
+/** Replace only explicit lack-of-access statements, never an acoustic observation. */
+const unassessedAudioClause = (text: string) =>
+  /^(?:(?:audio|sound)(?: (?:was|is))? (?:not (?:supplied|provided|available|verified|assessed)|unavailable|unverified|unknown|(?:could not|cannot) be (?:verified|assessed|heard))|speech inferred (?:only )?from (?:the )?captions|no (?:music|noise) confirmed|(?:music|noise|music and noise)(?: (?:were|was|are|is))? not (?:assessed|verified))$/i.test(
+    text
+  );
+
+const audioClauses = (text: string) =>
+  text
+    .split(/;|(?<=[.!?])\s+/)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+const assessedAudioClauses = (clauses: string[]) =>
+  clauses.filter(text => !unassessedAudioClause(text.replace(/[.!?]+$/, "")));
+function withMeasuredSpeechStatus(review: SourceReview): SourceReview {
+  const retained = assessedAudioClauses(audioClauses(review.audioNote));
+  return {
+    ...review,
+    audio: "present",
+    audioNote: retained.length
+      ? `Timed source speech is available. ${retained.join(" ")} Transcription does not assess music or noise.`
+      : "Timed source speech is available. Music and noise were not assessed.",
+  };
+}
+
+function reconcileMeasuredSpeech(
+  review: SourceReview,
+  segments: EditProject["transcript"]
+): SourceReview {
+  const measured = segments.filter(
+    segment =>
+      segment.text.trim() &&
+      Number.isFinite(segment.start) &&
+      Number.isFinite(segment.end) &&
+      segment.start >= 0 &&
+      segment.end > segment.start
+  );
+  if (!measured.length) return review;
+  const observations = (review.observations ?? []).map(observation => {
+    const overlapping = measured.filter(
+      segment =>
+        segment.start < observation.end && segment.end > observation.start
+    );
+    if (!overlapping.length) return observation;
+    const clauses = audioClauses(observation.audioEvidence);
+    const retained = assessedAudioClauses(clauses);
+    if (clauses.length && retained.length === clauses.length)
+      return observation;
+    const speech = overlapping.flatMap(segment => {
+      const words = segment.words?.filter(
+        word =>
+          word.text.trim() &&
+          Number.isFinite(word.start) &&
+          Number.isFinite(word.end) &&
+          word.end > word.start &&
+          word.start >= segment.start &&
+          word.end <= segment.end &&
+          word.start < observation.end &&
+          word.end > observation.start
+      );
+      if (words?.length)
+        return [
+          {
+            start: Math.min(...words.map(word => word.start)),
+            end: Math.max(...words.map(word => word.end)),
+            text: words.map(word => word.text).join(" "),
+          },
+        ];
+      // A segment's enclosing range is not proof of speech in a gap between
+      // its timed words. Never fill such a gap with neighboring dialogue.
+      if (segment.words?.length) return [];
+      const complete =
+        segment.start >= observation.start && segment.end <= observation.end;
+      return [
+        {
+          start: Math.max(segment.start, observation.start),
+          end: Math.min(segment.end, observation.end),
+          // A partial segment does not locate its individual words in this interval.
+          text: complete && !segment.words?.length ? segment.text : "",
+        },
+      ];
+    });
+    if (!speech.length) return observation;
+    const time = (seconds: number) =>
+      String(Math.round(seconds * 1_000_000) / 1_000_000);
+    const facts = speech.map(item =>
+      item.text
+        ? `Measured source speech (${time(item.start)}–${time(item.end)}s): ${JSON.stringify(item.text)}.`
+        : `A measured transcript segment overlaps ${time(item.start)}–${time(item.end)}s; exact speech timing and words within this interval are not established.`
+    );
+    return {
+      ...observation,
+      audioEvidence: [
+        ...retained.map(text => (/[.!?]$/.test(text) ? text : `${text}.`)),
+        ...facts,
+        "Transcription does not assess music or noise.",
+      ].join(" "),
+    };
+  });
+  return sourceReviewFacts({ ...review, observations });
+}
+
 /** A failed later step must not repurchase completed source preparation.
  * This cache lives only in the open editor, and is scoped to its exact inputs. */
 export async function prepareAutonomousSources(input: {
@@ -229,12 +331,6 @@ export async function prepareAutonomousSources(input: {
         ...(working.sourceReviews ?? []).filter(r => r.assetId !== asset.id),
         review,
       ];
-      analysis.push({
-        assetId: asset.id,
-        observations: observed,
-        visualProtection: normalizeReview(review, asset.duration)
-          .visualProtection,
-      });
     }
   }
   // Review every picture source before deciding which speech clocks are needed.
@@ -254,12 +350,7 @@ export async function prepareAutonomousSources(input: {
     if (measuredSpeech)
       working.sourceReviews = working.sourceReviews?.map(review =>
         review.assetId === asset.id && review.audio !== "present"
-          ? {
-              ...review,
-              audio: "present",
-              audioNote:
-                "Timed source speech is available. Music and noise were not assessed.",
-            }
+          ? withMeasuredSpeechStatus(review)
           : review
       );
     const review = working.sourceReviews?.find(r => r.assetId === asset.id);
@@ -307,12 +398,7 @@ export async function prepareAutonomousSources(input: {
       )
         working.sourceReviews = working.sourceReviews?.map(review =>
           review.assetId === asset.id && review.audio !== "present"
-            ? {
-                ...review,
-                audio: "present",
-                audioNote:
-                  "Timed source speech is available. Music and noise were not assessed.",
-              }
+            ? withMeasuredSpeechStatus(review)
             : review
         );
       if (!input.captions || review?.captions === "present") continue;
@@ -325,6 +411,34 @@ export async function prepareAutonomousSources(input: {
         )
       );
     }
+  }
+  working.sourceReviews = working.sourceReviews?.map(review =>
+    keys.has(review.assetId)
+      ? reconcileMeasuredSpeech(
+          review,
+          working.sourceSpeech?.find(
+            speech => speech.assetId === review.assetId
+          )?.segments ?? []
+        )
+      : review
+  );
+  // The command and structured project context must see the same final facts,
+  // including speech measured after the initial picture review.
+  for (const asset of input.sources) {
+    if (asset.kind !== "video") continue;
+    const review = working.sourceReviews?.find(
+      item => item.assetId === asset.id
+    );
+    if (!review) continue;
+    analysis.push({
+      assetId: asset.id,
+      observations: normalizeSourceObservations(
+        review.observations,
+        asset.duration
+      ),
+      visualProtection: normalizeReview(review, asset.duration)
+        .visualProtection,
+    });
   }
   input.checkpoint();
   return { working, analysis };
