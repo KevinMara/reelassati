@@ -1158,6 +1158,7 @@ export const platformApi = {
       assetId?: string;
       analysisAssetId?: string;
       analysisFramesPerSecond?: number;
+      analysisProxy?: import("@contracts/analysis-proxy").AnalysisProxyDescriptor;
       publicUrl?: string;
       platform: string;
       sourceRightsConfirmed?: boolean;

@@ -4,6 +4,10 @@ import {
 } from "@contracts/credit-receipt";
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 import { applyAutonomousCaptionTreatment } from "@contracts/editorial-captions";
+import {
+  resolveAutonomousSourceMetadata,
+  mergeAutonomousSourceMetadata,
+} from "@/lib/autonomous-source-metadata";
 import { autonomousResultReceipt } from "@/lib/autonomous-result-receipt";
 import {
   autonomousCreditEstimate,
@@ -456,9 +460,35 @@ export function AutonomousEditor({
           )
         );
       const requestOptions = { scope, signal, onCreditReceipt };
+      const measuredSources = await resolveAutonomousSourceMetadata(
+        project,
+        workspace.assets,
+        signal
+      );
+      checkpoint();
+      const runWorkspace = {
+        ...workspace,
+        assets: mergeAutonomousSourceMetadata(
+          workspace.assets,
+          measuredSources
+        ),
+      };
+      if (measuredSources.length) {
+        await updateWorkspace(current => {
+          checkpoint(current);
+          return {
+            ...current,
+            assets: mergeAutonomousSourceMetadata(
+              current.assets,
+              measuredSources
+            ),
+          };
+        });
+        checkpoint();
+      }
       const pendingStyleExamples = pendingStyleExampleAssets(
         project.editStyleTemplate,
-        workspace.assets
+        runWorkspace.assets
       );
       const keyFor = (current: WorkspaceDocument, base: EditProject) =>
         autonomousPlanCacheKey({
@@ -473,7 +503,7 @@ export function AutonomousEditor({
         });
       let expectedReports = workspace.analyzerReports;
       let expectedProject = project;
-      let cacheKey = keyFor(workspace, project);
+      let cacheKey = keyFor(runWorkspace, project);
       const inputsStillCurrent = () => {
         const current = getWorkspaceSnapshot();
         const base = current.projects.find(p => p.id === project.id);
@@ -488,7 +518,9 @@ export function AutonomousEditor({
         planCache.clear();
         const prepared = await prepareAutonomousSources({
           project,
-          sources,
+          sources: sources.map(source =>
+            runWorkspace.assets.find(asset => asset.id === source.id)!
+          ),
           captions,
           speechTiming: true,
           context: JSON.stringify([
@@ -544,7 +576,7 @@ export function AutonomousEditor({
             // library or report edits must still invalidate the prepared plan.
             expectedReports = checkpointAnalyzerReport(expectedReports, report);
             cacheKey = keyFor(
-              { ...workspace, analyzerReports: expectedReports },
+              { ...runWorkspace, analyzerReports: expectedReports },
               expectedProject
             );
             return review;
@@ -604,7 +636,7 @@ export function AutonomousEditor({
             editStyleTemplate: working.editStyleTemplate,
           };
           cacheKey = keyFor(
-            { ...workspace, analyzerReports: expectedReports },
+            { ...runWorkspace, analyzerReports: expectedReports },
             expectedProject
           );
         }
@@ -634,7 +666,7 @@ export function AutonomousEditor({
         const analysis = prepared.analysis;
         checkpoint();
         if (automaticDuration)
-          working = trimObservedEnding(working, workspace.assets);
+          working = trimObservedEnding(working, runWorkspace.assets);
         const durationDirection = editDurationDirection(
           durationTarget,
           automaticDuration
@@ -644,7 +676,7 @@ export function AutonomousEditor({
         result = await platformApi.generateEditPlan(
           {
             project: working,
-            command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(workspace.assets.filter(a => !styleSourceIds.has(a.id) || working.clips.some(clip => clip.assetId === a.id)).map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. Choose the number of supporting images and video shots from the story and actual coverage gaps; there is no per-edit image, video, or credit cap. Use broll operations with parameters.prompt and parameters.mediaKind. Each generated image is 1K and each generated video is 5 seconds; fit the requested insert to its usable length. Prefer relevant licensed stock or owned footage when it achieves the intended picture. Generated extras are authorized. Mark a generated shot parameters.optional=true only if the core story remains complete without it; required coverage is optional=false. This distinction informs the estimate, never a media quota. Do not add decorative filler just to spend credits. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
+            command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(runWorkspace.assets.filter(a => !styleSourceIds.has(a.id) || working.clips.some(clip => clip.assetId === a.id)).map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. Choose the number of supporting images and video shots from the story and actual coverage gaps; there is no per-edit image, video, or credit cap. Use broll operations with parameters.prompt and parameters.mediaKind. Each generated image is 1K and each generated video is 5 seconds; fit the requested insert to its usable length. Prefer relevant licensed stock or owned footage when it achieves the intended picture. Generated extras are authorized. Mark a generated shot parameters.optional=true only if the core story remains complete without it; required coverage is optional=false. This distinction informs the estimate, never a media quota. Do not add decorative filler just to spend credits. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
             model,
             stock: true,
             captionStyling: captions,
@@ -697,7 +729,7 @@ export function AutonomousEditor({
         working,
         changesToApply,
         [
-          ...workspace.assets,
+          ...runWorkspace.assets,
           ...(result.stockMedia ?? []).map(item => ({
             id: `stock:${item.provider}:${item.id}`,
             name: item.title,
@@ -801,7 +833,7 @@ export function AutonomousEditor({
         setStatus(`Adding free sound · ${op.label}`);
         const asset = await resolveChatCatalogAudio(
           id.slice(8),
-          [...workspace.assets, ...generatedAssets],
+          [...runWorkspace.assets, ...generatedAssets],
           file =>
             platformApi.uploadAsset(
               file,
@@ -920,7 +952,7 @@ export function AutonomousEditor({
       checkpoint();
       setStatus("Applying the edit to your timeline…");
       setStage(ui("Timeline"));
-      const allAssets = [...workspace.assets, ...generatedAssets];
+      const allAssets = [...runWorkspace.assets, ...generatedAssets];
       const executable = changesToApply.map(op =>
         resolvedMedia.has(op.id)
           ? {

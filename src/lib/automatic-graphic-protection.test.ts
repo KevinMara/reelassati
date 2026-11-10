@@ -698,6 +698,49 @@ describe("source-aware automatic graphic placement", () => {
     p.sourceSpeech![0].segments[1].start = 2.5;
     expect(reasons(p, g)).toContain("unsupported-source-copy");
   });
+
+  it("grounds an overlay in overlapping measured words while retaining hard source trim boundaries", () => {
+    const p = project();
+    p.sourceSpeech![0].segments = [
+      {
+        id: "first",
+        start: 1.1,
+        end: 1.7,
+        text: "Short",
+        words: [{ text: "Short", start: 1.1, end: 1.7 }],
+      },
+      {
+        id: "second",
+        start: 1.7,
+        end: 3.08,
+        text: "title",
+        words: [{ text: "title", start: 1.7, end: 3.08 }],
+      },
+    ];
+    const g = graphic({ start: 1.15, duration: 1.85, outPoint: 1.85 });
+    expect(reasons(p, g)).not.toContain("unsupported-source-copy");
+    // Moving the first word wholly outside the visual interval does not grant
+    // support merely because it is nearby in the same transcript.
+    p.sourceSpeech![0].segments[0].words![0].end = 1.15;
+    expect(reasons(p, g)).toContain("unsupported-source-copy");
+    p.sourceSpeech![0].segments[0].words![0].end = 1.7;
+    // Ending the source itself at 3.0 removes the end of the spoken word.
+    p.clips[0] = { ...source, duration: 3, outPoint: 3 };
+    expect(reasons(p, g)).toContain("unsupported-source-copy");
+    p.clips[0] = { ...source, inPoint: 1.2, outPoint: 4.2, duration: 3 };
+    expect(
+      reasons(p, { ...g, start: 0, duration: 1.8, outPoint: 1.8 })
+    ).toContain("unsupported-source-copy");
+  });
+
+  it("does not infer partial phrase words without measured word clocks", () => {
+    const p = project();
+    p.sourceSpeech![0].segments = [
+      { id: "phrase", start: 1.1, end: 3.08, text: "Short title" },
+    ];
+    const g = graphic({ start: 1.15, duration: 1.85, outPoint: 1.85 });
+    expect(reasons(p, g)).toContain("unsupported-source-copy");
+  });
 });
 
 describe("bounded auto-edit graphic decisions", () => {
@@ -869,6 +912,82 @@ describe("bounded auto-edit graphic decisions", () => {
     expect(result.changes.map(op => op.id)).toEqual(["cue"]);
     expect(result.omitted[0].issues[0].reason).toBe("unknown-source-layout");
     expect(autonomousGraphicReceipt(result)).toContain("Skipped 1 graphic");
+    expect({ p, actions }).toEqual(before);
+  });
+
+  it("keeps grounded timed accents beside imported sound while still omitting a duplicated obstructing title", () => {
+    const p = project(
+      evidence({
+        regions: [region(1, 2.8)],
+        observedText: [
+          {
+            id: "original-title",
+            regionId: "prop",
+            start: 1,
+            end: 2.8,
+            text: "First step",
+            confidence: 1,
+          },
+        ],
+      })
+    );
+    const titles = ["First step", "Second step", "Third step", "Fourth step"];
+    p.sourceSpeech![0].segments = titles.map((text, index) => {
+      const start = 1 + index * 2;
+      return {
+        id: `speech-${index}`,
+        start,
+        end: start + 1.88,
+        text,
+        words: [
+          { text: text.split(" ")[0], start, end: start + 0.6 },
+          { text: "step", start: start + 0.6, end: start + 1.88 },
+        ],
+      };
+    });
+    const sound = { id: "sound", kind: "audio", duration: 0.5 } as Asset;
+    p.clips.push({
+      ...source,
+      id: "imported-sound",
+      assetId: sound.id,
+      track: "audio",
+      start: 5.4,
+      duration: 0.5,
+      outPoint: 0.5,
+    });
+    const actions = titles.map((text, index) =>
+      operation(
+        graphic({
+          id: `accent-${index}`,
+          start: 1 + index * 2,
+          duration: 1.8,
+          outPoint: 1.8,
+          graphic: normalizeGraphic({
+            ...graphic().graphic,
+            text,
+            y: index === 0 ? 50 : 15,
+          })!,
+        })
+      )
+    );
+    const before = structuredClone({ p, actions });
+    const result = preflightAutonomousPlan(
+      p,
+      actions,
+      [asset, sound],
+      undefined,
+      "automatic"
+    );
+    expect(result.changes.map(op => op.id)).toEqual([
+      "accent-1",
+      "accent-2",
+      "accent-3",
+    ]);
+    expect(result.omitted).toHaveLength(1);
+    expect(result.omitted[0].issues.map(issue => issue.reason)).toEqual([
+      "source-overlap",
+      "repeated-source-text",
+    ]);
     expect({ p, actions }).toEqual(before);
   });
 

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import worker from "./server";
 import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
 import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
@@ -72,14 +73,24 @@ const objects = new Map<string, Uint8Array>();
 const env = {
   DB,
   BUCKET: {
-    async get(key: string) {
+    async get(
+      key: string,
+      options?: { range?: { offset: number; length: number } }
+    ) {
       const bytes = objects.get(key);
+      const data =
+        bytes && options?.range
+          ? bytes.slice(
+              options.range.offset,
+              options.range.offset + options.range.length
+            )
+          : bytes;
       return bytes
         ? {
             size: bytes.length,
             etag: "test-etag",
-            body: new Response(bytes).body,
-            arrayBuffer: async () => bytes.slice().buffer,
+            body: new Response(data).body,
+            arrayBuffer: async () => data!.slice().buffer,
           }
         : null;
     },
@@ -208,6 +219,85 @@ function mp4(seconds: number) {
   view.setUint32(40, 1000);
   view.setUint32(44, seconds * 1000);
   return data;
+}
+// Metadata-only boundary fixture. Actual encoded frames are exercised by analysis-proxy.test.ts.
+function mp4FrameMetadata(seconds: number, fps = 30) {
+  const join = (...parts: Uint8Array[]) => {
+    const out = new Uint8Array(
+      parts.reduce((sum, part) => sum + part.length, 0)
+    );
+    let at = 0;
+    for (const part of parts) {
+      out.set(part, at);
+      at += part.length;
+    }
+    return out;
+  };
+  const box = (name: string, data: Uint8Array) => {
+    const header = new Uint8Array(8);
+    new DataView(header.buffer).setUint32(0, data.length + 8);
+    header.set(new TextEncoder().encode(name), 4);
+    return join(header, data);
+  };
+  const movie = mp4(seconds).slice(28);
+  const tkhd = new Uint8Array(84),
+    track = new DataView(tkhd.buffer);
+  track.setUint32(40, 65536);
+  track.setUint32(56, 65536);
+  track.setUint32(72, 1073741824);
+  track.setUint32(76, 720 * 65536);
+  track.setUint32(80, 1280 * 65536);
+  const mdhd = new Uint8Array(24),
+    media = new DataView(mdhd.buffer);
+  media.setUint32(12, 30000);
+  media.setUint32(16, seconds * 30000);
+  const handler = new Uint8Array(12);
+  handler.set(new TextEncoder().encode("vide"), 8);
+  const entry = new Uint8Array(78),
+    visual = new DataView(entry.buffer);
+  visual.setUint16(24, 720);
+  visual.setUint16(26, 1280);
+  const stsd = new Uint8Array(8);
+  new DataView(stsd.buffer).setUint32(4, 1);
+  const stts = new Uint8Array(16),
+    timing = new DataView(stts.buffer);
+  timing.setUint32(4, 1);
+  timing.setUint32(8, seconds * fps);
+  timing.setUint32(12, 30000 / fps);
+  const stsz = new Uint8Array(12),
+    sizes = new DataView(stsz.buffer);
+  sizes.setUint32(4, 1);
+  sizes.setUint32(8, seconds * fps);
+  return box(
+    "moov",
+    join(
+      box("mvhd", movie),
+      box(
+        "trak",
+        join(
+          box("tkhd", tkhd),
+          box(
+            "mdia",
+            join(
+              box("mdhd", mdhd),
+              box("hdlr", handler),
+              box(
+                "minf",
+                box(
+                  "stbl",
+                  join(
+                    box("stsd", join(stsd, box("avc1", entry))),
+                    box("stts", stts),
+                    box("stsz", stsz)
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  );
 }
 function videoAnalysisOutput() {
   const insight = {
@@ -600,9 +690,15 @@ describe("foreground K3 auto-edit planning", () => {
       }>;
       expect(messages[0].content).toContain("parameters.visual");
       expect(messages[0].content).toContain("does NOT support");
-      expect(messages[0].content).toContain("keyframe at is normalized progress, not seconds");
-      expect(messages[0].content).toContain("Do not say audio or dialogue was absent");
-      expect(messages[0].content).toContain("exact contiguous phrase of timed speech/captions or observedText");
+      expect(messages[0].content).toContain(
+        "keyframe at is normalized progress, not seconds"
+      );
+      expect(messages[0].content).toContain(
+        "Do not say audio or dialogue was absent"
+      );
+      expect(messages[0].content).toContain(
+        "exact contiguous phrase of timed speech/captions or observedText"
+      );
       const context = JSON.parse(
         messages.find(message => message.role === "user")!.content
       ).project;
@@ -694,6 +790,74 @@ describe("foreground K3 auto-edit planning", () => {
       nextOutput = original;
       errorLog.mockRestore();
       warningLog.mockRestore();
+    }
+  });
+  it("signs an explicit catalog music selection as a sound insertion instead of a voice volume adjustment", async () => {
+    const original = nextOutput,
+      before = balance(),
+      calls = providerCalls.length;
+    const body = await input();
+    body.project.duration = 28.350708;
+    body.project.clips[0] = {
+      ...body.project.clips[0],
+      duration: 28.350708,
+      outPoint: 28.350708,
+      volume: 1,
+    };
+    nextOutput = {
+      summary: "Add a quiet music bed",
+      changes: [
+        {
+          type: "audio",
+          start: 0,
+          end: 28.350708,
+          targetClipIds: ["clip"],
+          label: "Music bed under speech",
+          parameters: { assetId: "catalog:chill-lofi", volume: 0.18 },
+        },
+      ],
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", body);
+      expect(response.status).toBe(200);
+      const result = await response.json();
+      const music = result.changes[0];
+      expect(music).toMatchObject({
+        type: "sound",
+        start: 0,
+        end: 28.350708,
+        targetClipIds: ["clip"],
+        parameters: { assetId: "catalog:chill-lofi", volume: 0.18 },
+        provenance: { recordId: expect.any(String) },
+      });
+      const projection = {
+        id: music.id,
+        type: "sound",
+        label: music.label,
+        reason: music.reason,
+        start: music.start,
+        end: music.end,
+        confidence: music.confidence,
+        intensity: music.intensity,
+        parameters: music.parameters,
+        targetClipIds: music.targetClipIds,
+      };
+      const row = sqlite
+        .prepare("SELECT metadata_json FROM ai_provenance_records WHERE id=?")
+        .get(music.provenance.recordId) as { metadata_json: string };
+      expect(JSON.parse(row.metadata_json).operationBindings).toEqual([
+        {
+          operationId: music.id,
+          contentSha256: createHash("sha256")
+            .update(JSON.stringify(projection))
+            .digest("hex"),
+        },
+      ]);
+      expect(body.project.clips[0].volume).toBe(1);
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before - 5);
+    } finally {
+      nextOutput = original;
     }
   });
   it("normalizes optional null annotations and a rounded global grade before signing a retained edit", async () => {
@@ -1446,6 +1610,86 @@ describe("authenticated paid editing chat route", () => {
         .get()
     ).toMatchObject({ model: "moonshotai/kimi-k3", provider: "OpenRouter" });
     expect(balance()).toBe(before - 10);
+  });
+  it("preserves model coverage only after independently matching both owned MP4 frame tables", async () => {
+    const source = objects.get("source")!,
+      proxy = objects.get("proxy")!,
+      previousOutput = nextOutput;
+    const replace = (id: string, data: Uint8Array) => {
+      objects.set(id, data);
+      sqlite
+        .prepare("UPDATE assets SET bytes=? WHERE id=?")
+        .run(data.length, id);
+    };
+    const model = (coverage: "complete" | "unknown") => {
+      const report = videoAnalysisOutput();
+      return {
+        ...report,
+        review: {
+          ...report.review,
+          visualProtection: {
+            version: 1,
+            sourceDuration: 30,
+            coverage,
+            reviewedRanges:
+              coverage === "complete" ? [{ start: 0, end: 30 }] : [],
+            regions: [],
+            observedText: [],
+          },
+        },
+      };
+    };
+    try {
+      replace("source", mp4FrameMetadata(30));
+      replace("proxy", mp4FrameMetadata(30));
+      for (const coverage of ["complete", "unknown"] as const) {
+        nextOutput = model(coverage);
+        const response = await request("/api/ai/analyze", {
+          assetId: "source",
+          analysisAssetId: "proxy",
+          analysisProxy: { version: "full-frame-v1" },
+        });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          review: {
+            captions: "absent",
+            ending: { time: 28 },
+            visualProtection: { coverage },
+          },
+          coverage: {
+            proxyFramesPerSecond: 30,
+            providerFrameSampling: "provider-controlled",
+          },
+        });
+        const payload = JSON.stringify(providerCalls.at(-1));
+        expect(payload).toContain("independently verified");
+        expect(payload).not.toContain(
+          "It does not contain every original visual frame"
+        );
+      }
+      nextOutput = model("complete");
+      replace("proxy", mp4FrameMetadata(30, 8));
+      const mismatched = await request("/api/ai/analyze", {
+        assetId: "source",
+        analysisAssetId: "proxy",
+        analysisProxy: { version: "full-frame-v1" },
+      });
+      expect(mismatched.status).toBe(200);
+      expect(await mismatched.json()).toMatchObject({
+        review: {
+          ending: null,
+          captions: "unknown",
+          visualProtection: { coverage: "unknown", reviewedRanges: [] },
+        },
+      });
+      expect(JSON.stringify(providerCalls.at(-1))).toContain(
+        "unverified or legacy"
+      );
+    } finally {
+      replace("source", source);
+      replace("proxy", proxy);
+      nextOutput = previousOutput;
+    }
   });
   it("refuses a legacy analyzer client before reserving credits or calling the provider", async () => {
     const before = balance(),

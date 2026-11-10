@@ -167,6 +167,12 @@ export function buildEditPlanningContext(
     clipTargets: effectiveTimelineClips(normalizeClipGroups(project)).map(
       clip => ({
         id: clip.id,
+        assetId: clip.assetId,
+        catalogAssetId: byAsset
+          .get(clip.assetId ?? "")
+          ?.variantGroupId?.startsWith("builtin-audio:")
+          ? `catalog:${byAsset.get(clip.assetId ?? "")!.variantGroupId!.slice("builtin-audio:".length)}`
+          : undefined,
         track: clip.track,
         linkId: clip.linkId,
         locked: clip.locked,
@@ -252,6 +258,57 @@ export function resolveEditPlanningReferences(
     // Null means no annotation; non-null malformed references still reject.
     for (const key of ["cue", "mediaExcerptId", "targetClipIds"])
       if (operation[key] === null) delete operation[key];
+    const parameters = Object.fromEntries(
+      Object.entries(record(operation.parameters) ?? {}).filter(
+        ([, value]) => value !== null
+      )
+    );
+    if (operation.type === "audio" && parameters.assetId !== undefined) {
+      // Existing-clip mixing and insertion are different executor operations.
+      // An explicit new audio source must never be ignored while ducking voice.
+      const sound =
+        context.freeSounds.find(row => row.assetId === parameters.assetId) ??
+        context.libraryMedia.find(
+          row => row.assetId === parameters.assetId && row.kind === "audio"
+        );
+      if (!sound)
+        invalid(
+          "reference_unavailable",
+          `Edit ${index + 1} selects an unavailable audio asset.`
+        );
+      const mixTargets =
+        Array.isArray(operation.targetClipIds) && operation.targetClipIds.length
+          ? operation.targetClipIds
+          : selectedClipIds;
+      if (
+        context.clipTargets.some(
+          clip =>
+            mixTargets.includes(clip.id) &&
+            (clip.assetId === parameters.assetId ||
+              clip.catalogAssetId === parameters.assetId)
+        )
+      )
+        invalid(
+          "reference_conflict",
+          `Edit ${index + 1} must distinguish an existing audio mix from a new sound insertion.`
+        );
+      if (!finite(sound.duration) || sound.duration <= 0)
+        invalid(
+          "duration_invalid",
+          `Edit ${index + 1} needs a measured audio source duration.`
+        );
+      if (
+        parameters.sourceIn !== undefined &&
+        (!finite(parameters.sourceIn) ||
+          parameters.sourceIn < 0 ||
+          parameters.sourceIn >= sound.duration)
+      )
+        invalid(
+          "source_offset_conflict",
+          `Edit ${index + 1} starts outside the selected audio source.`
+        );
+      operation.type = "sound";
+    }
     if (operation.targetClipIds !== undefined) {
       if (
         !Array.isArray(operation.targetClipIds) ||
@@ -269,11 +326,6 @@ export function resolveEditPlanningReferences(
           `Edit ${index + 1} references an unavailable or locked target.`
         );
     }
-    const parameters = Object.fromEntries(
-      Object.entries(record(operation.parameters) ?? {}).filter(
-        ([, value]) => value !== null
-      )
-    );
     const excerptId = operation.mediaExcerptId;
     if (excerptId !== undefined) {
       const excerpt = context.mediaExcerpts.find(row => row.id === excerptId);
@@ -534,6 +586,11 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
     ): never => {
       throw new EditPlanValidationError(reason, detail, index, operation.type);
     };
+    if (operation.type === "audio" && parameters.assetId != null)
+      fail(
+        "an audio asset requires a sound insertion, not an existing-clip volume adjustment.",
+        "reference_conflict"
+      );
     if (
       operation.type === "style" &&
       !(
@@ -626,6 +683,13 @@ moving a clip or changing its playback speed cannot be combined with dependent c
 on the old clock: that needs a new plan after the structural edit. For ordinary
 evidenced gap removal use silence ripple cuts; inserted pictures, graphics and sound
 are projected through those cuts together with the source.
+Audio mixing and audio insertion are distinct: type=audio changes only the volume
+of existing targetClipIds and must not include assetId. To ADD music or an SFX use
+type=sound with parameters.assetId, even for a full-length music bed. For example,
+{type:"sound",start:0,end:12,targetClipIds:[],parameters:{assetId:"catalog:chill-lofi",volume:0.18}}
+adds a quiet music lane and preserves source speech volume. To duck existing music,
+target its actual audio clip with type=audio; never target the speaking video merely
+because the new bed should be quiet. sourceIn selects the audio-file offset in seconds.
 For a catalog sound cue, use cue:{speechId,wordIndex,edge:start,align:peak|start} or
 cue:{sceneId,edge:start,align:peak|start}; omit duration/start/end and sourceIn. The
 compiler aligns the measured waveform peak estimate or file onset, preserves natural

@@ -9,6 +9,7 @@ import { editorAudioCatalog } from "./editor-audio-catalog";
 import type { Asset, EditOperation, EditProject } from "./workspace";
 import { executeAutonomousPlan } from "../src/lib/autonomous-execution";
 import { normalizeVisual, visualFrame } from "./clip-visual";
+import { applyEditOperation } from "../src/lib/edit-timeline";
 
 function fixture() {
   const assets = [
@@ -133,6 +134,247 @@ function fixture() {
 }
 
 describe("evidence-backed auto-edit planning", () => {
+  it("compiles the live audio-plus-catalog music bed into an insertion and preserves source voice", () => {
+    const { project, assets } = fixture();
+    const duration = 28.350708;
+    project.duration = duration;
+    project.clips = [
+      {
+        ...project.clips[0],
+        start: 0,
+        duration,
+        inPoint: 0,
+        outPoint: duration,
+        speed: 1,
+        volume: 1,
+      },
+    ];
+    assets[0].duration = duration;
+    const catalog = editorAudioCatalog.find(
+      sound => sound.id === "chill-lofi"
+    )!;
+    const music = {
+      id: "catalog:chill-lofi",
+      kind: "audio",
+      status: "ready",
+      duration: catalog.duration,
+    } as Asset;
+    const original = structuredClone(project);
+    const proposed: EditOperation = {
+      id: "music",
+      type: "audio",
+      start: 0,
+      end: duration,
+      targetClipIds: ["first"],
+      label: "Music bed under speech",
+      reason: "A quiet music bed",
+      confidence: 0.6,
+      intensity: "balanced",
+      status: "proposed",
+      parameters: { volume: 0.18, assetId: music.id },
+    };
+    const [compiled] = resolveEditPlanningReferences(
+      [proposed],
+      buildEditPlanningContext(project, assets),
+      duration
+    ) as EditOperation[];
+    expect(compiled).toEqual({ ...proposed, type: "sound" });
+    expect(() => assertExecutableEditPlan([compiled])).not.toThrow();
+    const result = executeAutonomousPlan(
+      project,
+      [compiled],
+      [...assets, music]
+    );
+    expect(result.clips.find(clip => clip.id === "first")).toEqual(
+      original.clips[0]
+    );
+    expect(result.clips.find(clip => clip.id === "music")).toMatchObject({
+      assetId: music.id,
+      track: "audio",
+      start: 0,
+      duration,
+      inPoint: 0,
+      outPoint: duration,
+      volume: 0.18,
+    });
+    expect(result.sourceSpeech).toEqual(original.sourceSpeech);
+    expect(result.transcript).toEqual(original.transcript);
+    expect(project).toEqual(original);
+    expect(proposed.type).toBe("audio");
+    expect(() => assertExecutableEditPlan([proposed])).toThrow(
+      /sound insertion/
+    );
+    expect(() => applyEditOperation(project, proposed)).toThrow(
+      /sound insertion/
+    );
+    expect(() =>
+      executeAutonomousPlan(project, [proposed], [...assets, music])
+    ).toThrow(/sound insertion/);
+    expect(project).toEqual(original);
+  });
+
+  it("preserves owned audio offsets, natural source length and locked picture anchors when compiling an insertion", () => {
+    const { project, assets } = fixture();
+    project.clips = project.clips.map(clip => ({
+      ...clip,
+      volume: 1,
+      locked: true,
+    }));
+    const audio = {
+      id: "owned-music",
+      kind: "audio",
+      status: "ready",
+      duration: 8,
+    } as Asset;
+    const original = structuredClone(project);
+    const [compiled] = resolveEditPlanningReferences(
+      [
+        {
+          id: "music",
+          type: "audio",
+          start: 3,
+          end: 12,
+          targetClipIds: ["first"],
+          parameters: { assetId: audio.id, sourceIn: 5, volume: 0.18 },
+        },
+      ],
+      buildEditPlanningContext(project, [...assets, audio]),
+      12
+    ) as EditOperation[];
+    expect(compiled).toMatchObject({
+      type: "sound",
+      start: 3,
+      end: 12,
+      parameters: { sourceIn: 5, volume: 0.18 },
+    });
+    const result = executeAutonomousPlan(
+      project,
+      [compiled],
+      [...assets, audio]
+    );
+    expect(result.clips.filter(clip => clip.assetId === "source")).toEqual(
+      original.clips
+    );
+    expect(result.clips.find(clip => clip.id === "music")).toMatchObject({
+      assetId: audio.id,
+      start: 3,
+      duration: 3,
+      inPoint: 5,
+      outPoint: 8,
+      volume: 0.18,
+    });
+    expect(compiled.end).toBe(12);
+  });
+
+  it("rejects ambiguous existing-asset mixing and unavailable audio selections before a voice can be ducked", () => {
+    const { project, assets } = fixture();
+    const music = {
+      id: "music",
+      kind: "audio",
+      status: "ready",
+      duration: 12,
+      variantGroupId: "builtin-audio:chill-lofi",
+    } as Asset;
+    project.clips.push({
+      ...project.clips[0],
+      id: "existing-music",
+      assetId: music.id,
+      track: "audio",
+      inPoint: 0,
+      outPoint: 6,
+      speed: 1,
+    });
+    const context = buildEditPlanningContext(project, [...assets, music]);
+    for (const parameters of [
+      { assetId: "catalog:missing", volume: 0.18 },
+      { assetId: "detail", volume: 0.18 },
+      { assetId: "music", sourceIn: 12, volume: 0.18 },
+    ]) {
+      expect(() =>
+        resolveEditPlanningReferences(
+          [
+            {
+              type: "audio",
+              start: 0,
+              end: 3,
+              targetClipIds: ["first"],
+              parameters,
+            },
+          ],
+          context,
+          12
+        )
+      ).toThrow();
+    }
+    expect(() =>
+      resolveEditPlanningReferences(
+        [
+          {
+            type: "audio",
+            start: 0,
+            end: 3,
+            targetClipIds: ["existing-music"],
+            parameters: { assetId: "music", volume: 0.18 },
+          },
+        ],
+        context,
+        12
+      )
+    ).toThrow(/distinguish an existing audio mix/);
+    expect(() =>
+      resolveEditPlanningReferences(
+        [
+          {
+            type: "audio",
+            start: 0,
+            end: 3,
+            parameters: { assetId: "music", volume: 0.18 },
+          },
+        ],
+        context,
+        12,
+        ["existing-music"]
+      )
+    ).toThrow(/distinguish an existing audio mix/);
+    expect(() =>
+      resolveEditPlanningReferences(
+        [
+          {
+            type: "audio",
+            start: 0,
+            end: 3,
+            targetClipIds: ["existing-music"],
+            parameters: { assetId: "catalog:chill-lofi", volume: 0.18 },
+          },
+        ],
+        context,
+        12
+      )
+    ).toThrow(/distinguish an existing audio mix/);
+    const [mix] = resolveEditPlanningReferences(
+      [
+        {
+          id: "mix",
+          type: "audio",
+          start: 0,
+          end: 6,
+          targetClipIds: ["existing-music"],
+          parameters: { volume: 0.18 },
+        },
+      ],
+      context,
+      12
+    ) as EditOperation[];
+    const result = executeAutonomousPlan(project, [mix], [...assets, music]);
+    expect(
+      result.clips.find(clip => clip.id === "existing-music")?.volume
+    ).toBe(0.18);
+    expect(result.clips.filter(clip => clip.assetId === "source")).toEqual(
+      project.clips.filter(clip => clip.assetId === "source")
+    );
+    expect(result.clips).toHaveLength(project.clips.length);
+  });
+
   it("accepts omitted-equivalent optional nulls without discarding numeric treatments or measured cues", () => {
     const { context } = fixture();
     const excerpt = context.mediaExcerpts.find(

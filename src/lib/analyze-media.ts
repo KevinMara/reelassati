@@ -7,18 +7,14 @@ import {
   captureUploadRequestScope,
   type UploadRequestScope,
 } from "./platform-api";
-import { probeExportMetadata } from "./export-probe";
 import {
   ANALYSIS_DIRECT_BYTES,
   ANALYSIS_PROXY_BYTES,
-  ANALYSIS_PROXY_FPS,
-  ANALYSIS_PROXY_SIDE,
   analysisProxyArguments,
   analysisProxyVideoBitrate,
-  readAnalysisSourceMetadata,
+  probeAnalysisVideo,
+  verifyAnalysisProxy,
 } from "./analysis-proxy";
-
-let probeSequence = 0;
 
 /** Caller has selected an owned source and accepted its measured analysis cost. */
 export async function analyzeMedia(
@@ -102,30 +98,7 @@ export async function analyzeMedia(
       { blobs: [{ name: "media", data: source }] },
       "/source"
     );
-    const probePath = `analysis-source-${++probeSequence}.json`;
-    let metadata: ReturnType<typeof readAnalysisSourceMetadata>;
-    try {
-      const code = await ffmpeg.ffprobe([
-        "-v",
-        "error",
-        "-show_error",
-        "-show_format",
-        "-show_streams",
-        "-of",
-        "json",
-        "/source/media",
-        "-o",
-        probePath,
-      ]);
-      if (code !== 0 && code !== -1)
-        throw new Error("The source video could not be inspected.");
-      const report = await ffmpeg.readFile(probePath, "utf8");
-      if (typeof report !== "string")
-        throw new Error("The source video metadata is unavailable.");
-      metadata = readAnalysisSourceMetadata(JSON.parse(report));
-    } finally {
-      await ffmpeg.deleteFile(probePath).catch(() => false);
-    }
+    const metadata = await probeAnalysisVideo(ffmpeg, "/source/media");
     let videoBitrate = analysisProxyVideoBitrate(metadata);
     let output: Uint8Array | undefined;
     const progress = ({ time }: { time: number }) => {
@@ -134,7 +107,7 @@ export async function analyzeMedia(
         Math.min(99, Math.floor((time / 1_000_000 / metadata.duration) * 100))
       );
       onProgress?.(
-        `Preparing full-length analysis · ${fraction}% · 8 fps, complete audio`
+        `Preparing full-length analysis · ${fraction}% · source frame cadence, complete audio`
       );
     };
     ffmpeg.on("progress", progress);
@@ -167,12 +140,13 @@ export async function analyzeMedia(
         "The complete video could not fit the provider's analysis size limit. No section was discarded."
       );
     signal?.throwIfAborted();
-    onProgress?.("Checking the analysis copy's full duration and playback…");
-    await probeExportMetadata(ffmpeg, {
-      width: ANALYSIS_PROXY_SIDE,
-      height: ANALYSIS_PROXY_SIDE,
-      duration: metadata.duration,
-    });
+    onProgress?.(
+      "Checking every source frame, presentation cadence and full duration…"
+    );
+    verifyAnalysisProxy(
+      metadata,
+      await probeAnalysisVideo(ffmpeg, "output.mp4")
+    );
     const decoded = await ffmpeg.exec([
       "-v",
       "error",
@@ -210,13 +184,13 @@ export async function analyzeMedia(
     temporaryAssetId = uploaded.id;
     signal?.throwIfAborted();
     onProgress?.(
-      `Analyzing ${asset.name} · complete audio, sampled video at 8 fps…`
+      `Analyzing ${asset.name} · source frame cadence and complete audio…`
     );
     return await platformApi.analyzeVideo(
       {
         ...input,
         analysisAssetId: uploaded.id,
-        analysisFramesPerSecond: ANALYSIS_PROXY_FPS,
+        analysisProxy: { version: "full-frame-v1" },
       },
       signal,
       scope,

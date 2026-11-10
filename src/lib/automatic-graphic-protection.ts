@@ -118,7 +118,8 @@ const copyKey = (text: string) =>
 function timedSpeechPhrases(
   segments: readonly TranscriptSegment[],
   start: number,
-  end: number
+  end: number,
+  retained: { start: number; end: number }
 ) {
   const phrases = segments
     .flatMap(segment => {
@@ -127,7 +128,14 @@ function timedSpeechPhrases(
         segment.text,
         segment.words
       )?.filter(
-        word => word.start >= start - 0.000001 && word.end <= end + 0.000001
+        // An overlay may enter or leave during a spoken word. Its visual
+        // window does not trim the source audio: overlapping measured words
+        // still support exact copy. Actual source trims remain hard limits.
+        word =>
+          word.start < end - 0.000001 &&
+          word.end > start + 0.000001 &&
+          word.start >= retained.start - 0.000001 &&
+          word.end <= retained.end + 0.000001
       );
       if (words)
         return words.length
@@ -627,7 +635,8 @@ export function automaticGraphicProblems(
     const sourceCopy = timedSpeechPhrases(
       project.transcript,
       graphicClip.start,
-      graphicClip.start + graphicClip.duration
+      graphicClip.start + graphicClip.duration,
+      { start: 0, end: project.duration }
     );
     for (const { clip, evidence } of sources) {
       const speed = clip.speed ?? 1;
@@ -653,7 +662,11 @@ export function automaticGraphicProblems(
           project.sourceSpeech?.find(speech => speech.assetId === clip.assetId)
             ?.segments ?? [],
           start,
-          end
+          end,
+          {
+            start: clip.inPoint,
+            end: Math.min(clip.outPoint, clip.inPoint + clip.duration * speed),
+          }
         )
       );
     }

@@ -1,3 +1,42 @@
+import {
+  readMp4VideoTiming,
+  readMp4VideoTimingByRange,
+  sameAnalysisVideoTiming,
+  type AnalysisVideoTiming,
+} from "../contracts/analysis-proxy";
+
+/** An observed proxy frame rate is separate from equivalence with its original. */
+export function analysisProxyFrameRate(buffer: ArrayBuffer): number | null {
+  const timing = readMp4VideoTiming(buffer);
+  return timing
+    ? Math.round((timing.frameTimes.length / timing.videoDuration) * 1000) /
+        1000
+    : null;
+}
+
+/** The request descriptor is only a hint. Compare both actual owned files before lifting legacy limits. */
+export async function verifyFullFrameAnalysisProxy(
+  descriptor: unknown,
+  proxyBytes: ArrayBuffer,
+  original: {
+    contentType: string;
+    size: number;
+    read: (offset: number, length: number) => Promise<ArrayBuffer | null>;
+  }
+): Promise<AnalysisVideoTiming | null> {
+  if (
+    !descriptor ||
+    typeof descriptor !== "object" ||
+    (descriptor as { version?: unknown }).version !== "full-frame-v1" ||
+    !["video/mp4", "video/quicktime"].includes(original.contentType)
+  )
+    return null;
+  const proxy = readMp4VideoTiming(proxyBytes);
+  if (!proxy) return null;
+  const source = await readMp4VideoTimingByRange(original.size, original.read);
+  return source && sameAnalysisVideoTiming(source, proxy) ? proxy : null;
+}
+
 /** Read the movie header duration from actual uploaded proxy bytes, without decoding video. */
 export function mp4MovieDuration(buffer: ArrayBuffer): number | null {
   const bytes = new Uint8Array(buffer);

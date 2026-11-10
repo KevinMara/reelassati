@@ -232,6 +232,10 @@ export function applyEditOperation(
   op: EditOperation
 ): EditProject {
   const p = op.parameters ?? {};
+  if (op.type === "audio" && p.assetId != null)
+    throw new Error(
+      "An audio asset needs a sound insertion. Audio adjustments only change existing clip volume."
+    );
   const targets = new Set(op.targetClipIds);
   const targeted = (c: TimelineClip) => targets.has(c.id) && !c.locked;
   if (
