@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Asset, EditOperation, EditProject } from "./workspace";
 import { normalizeGraphic } from "./motion-graphics";
+import { visualFrame } from "./clip-visual";
 import {
   editPlanGraphicFeedback,
   editPlanQualityAssets,
@@ -184,24 +185,29 @@ describe("bounded graphic quality correction", () => {
     );
   });
 
-  it("can replace an unsupported overlay with a local visual emphasis without changing speech, source clocks or the accepted grade", () => {
+  it("can replace an unsupported overlay with bounded color without changing speech, source clocks or accepted framing and grade", () => {
+    const framing = operation("framing", "style", {
+      visual: { scale: 1.04, x: 2 },
+    });
+    const original = [grade, framing, bad];
+    const savedOriginal = structuredClone(original);
     const review = reviewEditPlanGraphics(
       project,
-      [grade, bad],
+      original,
       [asset],
       "",
       checkpoint
     );
     const repaired = mergeGraphicRefinement(
-      [grade, bad],
+      original,
       review.omitted,
       {
-        summary: "Local visual emphasis with the original grade",
+        summary: "Subtle local color with the original framing and grade",
         corrections: [
           {
             operationId: bad.id,
             operation: operation("temporary", "style", {
-              visual: { scale: 1.04 },
+              saturation: 1.05,
             }),
           },
         ],
@@ -209,7 +215,9 @@ describe("bounded graphic quality correction", () => {
       compile
     );
     expect(repaired.changes[0]).toBe(grade);
-    expect(repaired.changes[1]).toMatchObject({
+    expect(repaired.changes[1]).toBe(framing);
+    expect(original).toEqual(savedOriginal);
+    expect(repaired.changes[2]).toMatchObject({
       id: bad.id,
       type: "style",
       start: 1,
@@ -238,8 +246,127 @@ describe("bounded graphic quality correction", () => {
     ]);
     expect(result.clips.find(clip => clip.start === 1)).toMatchObject({
       contrast: 1.03,
-      visual: { scale: 1.04 },
+      saturation: 1.05,
+      visual: { scale: 1.04, x: 2, opacity: 1 },
     });
+  });
+
+  it("rejects the opacity-zero correction that otherwise passes graphic preflight and hides the source", () => {
+    const invisible = operation("invisible", "style", {
+      visual: { opacity: 0 },
+    });
+    // The general executor permits intentional opacity edits; a repair must
+    // enforce its narrower scope before it reaches that executor.
+    expect(
+      reviewEditPlanGraphics(project, [invisible], [asset], "", checkpoint)
+        .omitted
+    ).toEqual([]);
+    const unchecked = executeAutonomousPlan(project, [invisible], [asset]);
+    const hiddenSource = unchecked.clips.find(clip => clip.start === 1)!;
+    expect(visualFrame(hiddenSource, 2).opacity).toBe(0);
+    const original = [grade, bad];
+    const savedOriginal = structuredClone(original);
+    const review = reviewEditPlanGraphics(
+      project,
+      original,
+      [asset],
+      "",
+      checkpoint
+    );
+    expect(() =>
+      mergeGraphicRefinement(
+        original,
+        review.omitted,
+        {
+          summary: "Claimed safe emphasis",
+          corrections: [{ operationId: bad.id, operation: invisible }],
+        },
+        compile
+      )
+    ).toThrow(expect.objectContaining({ reason: "graphic_refinement_scope" }));
+    expect(original).toEqual(savedOriginal);
+  });
+
+  it.each([
+    { visual: { crop: { left: 40 } } },
+    { visual: { x: 100 } },
+    { visual: { y: -100 } },
+    { visual: { scale: 1.04 } },
+    { visual: { rotation: 90 } },
+    { visual: { entrance: { kind: "dissolve", duration: 3 } } },
+    { visual: { exit: { kind: "dissolve", duration: 3 } } },
+    { visual: { keyframes: [{ time: 1, opacity: 0 }] } },
+    { fit: "cover" },
+    { fit: "contain" },
+    { fadeIn: 3 },
+    { fadeOut: 3 },
+    { brightness: -1 },
+    { exposure: 2 },
+    { saturation: 0 },
+    { temperature: Number.NaN },
+    { highlights: Number.POSITIVE_INFINITY },
+    { tint: "0.1" },
+  ])(
+    "rejects source-changing or unbounded style fallbacks without normalization: %j",
+    parameters => {
+      const review = reviewEditPlanGraphics(
+        project,
+        [bad],
+        [asset],
+        "",
+        checkpoint
+      );
+      let compiled = false;
+      expect(() =>
+        mergeGraphicRefinement(
+          [bad],
+          review.omitted,
+          {
+            summary: "Claimed repair",
+            corrections: [
+              {
+                operationId: bad.id,
+                operation: { ...bad, type: "style", parameters },
+              },
+            ],
+          },
+          raw => {
+            compiled = true;
+            return compile(raw);
+          }
+        )
+      ).toThrow(
+        expect.objectContaining({ reason: "graphic_refinement_scope" })
+      );
+      expect(compiled).toBe(false);
+    }
+  );
+
+  it("rejects unsafe controls introduced during compilation", () => {
+    const review = reviewEditPlanGraphics(
+      project,
+      [bad],
+      [asset],
+      "",
+      checkpoint
+    );
+    const correction = operation("temporary", "style", { saturation: 1.05 });
+    expect(() =>
+      mergeGraphicRefinement(
+        [bad],
+        review.omitted,
+        {
+          summary: "Subtle color",
+          corrections: [{ operationId: bad.id, operation: correction }],
+        },
+        () => [
+          {
+            ...correction,
+            parameters: { saturation: 1.05, visual: { opacity: 0 } },
+          },
+        ]
+      )
+    ).toThrow(expect.objectContaining({ reason: "graphic_refinement_scope" }));
   });
 
   it("records a deliberate withdrawal using an observed reason and keeps all other operations unchanged", () => {
@@ -278,6 +405,7 @@ describe("bounded graphic quality correction", () => {
     { type: "style", parameters: { volume: 0.1 } },
     { type: "style", parameters: { fadeIn: 1 } },
     { type: "style", parameters: { contrast: 2 } },
+    { type: "style", parameters: { contrast: 1.05 } },
     { type: "graphic", targetClipIds: ["unrelated"] },
     { type: "graphic", start: 0 },
     { type: "graphic", end: 8 },

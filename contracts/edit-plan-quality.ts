@@ -175,20 +175,43 @@ const scopeError = () =>
     "graphic_refinement_scope",
     "A graphic correction exceeds its original edit scope."
   );
-const styleParameters = new Set([
-  "visual",
-  "fit",
-  "exposure",
-  "temperature",
-  "tint",
-  "highlights",
-  "shadows",
-  "whites",
-  "blacks",
-  "brightness",
-  "contrast",
-  "saturation",
-]);
+// A rejected overlay must not be "repaired" by hiding or reframing its source.
+// Geometry, fit, opacity and transition controls need their own editorial
+// decision. Only a subtle grade is available as a graphic-to-style fallback.
+const refinementColorBounds = {
+  exposure: [-0.5, 0.5],
+  temperature: [-0.15, 0.15],
+  tint: [-0.15, 0.15],
+  highlights: [-0.15, 0.15],
+  shadows: [-0.15, 0.15],
+  whites: [-0.15, 0.15],
+  blacks: [-0.15, 0.15],
+  brightness: [-0.1, 0.1],
+  contrast: [0.85, 1.15],
+  saturation: [0.85, 1.15],
+} satisfies Record<string, readonly [number, number]>;
+
+function assertRefinementParameters(type: unknown, value: unknown) {
+  const parameters = record(value);
+  if (!parameters || !Object.keys(parameters).length) throw scopeError();
+  for (const [key, control] of Object.entries(parameters)) {
+    if (type === "graphic") {
+      if (!["graphic", "graphicMode"].includes(key)) throw scopeError();
+    } else if (type === "style") {
+      const bounds = Object.hasOwn(refinementColorBounds, key)
+        ? refinementColorBounds[key as keyof typeof refinementColorBounds]
+        : undefined;
+      if (
+        !bounds ||
+        typeof control !== "number" ||
+        !Number.isFinite(control) ||
+        control < bounds[0] ||
+        control > bounds[1]
+      )
+        throw scopeError();
+    } else throw scopeError();
+  }
+}
 
 /** Repairs can replace only rejected graphics. No general replanning, new
  * spending, speech changes, new targets or silent omission of valid operations. */
@@ -252,19 +275,14 @@ export function mergeGraphicRefinement(
       !["graphic", "style"].includes(String(operation.type))
     )
       throw scopeError();
-    const params = record(operation.parameters);
-    if (
-      params &&
-      Object.keys(params).some(key =>
-        operation.type === "style"
-          ? !styleParameters.has(key)
-          : !["graphic", "graphicMode"].includes(key)
-      )
-    )
-      throw scopeError();
+    assertRefinementParameters(operation.type, operation.parameters);
     const compiled = compile([operation]);
     if (compiled.length !== 1) throw invalid();
     const replacement = compiled[0];
+    if (replacement.type !== operation.type) throw scopeError();
+    // Reject unsafe controls; never rely on normalization silently dropping or
+    // clamping them, or allow compilation to add a new control after this check.
+    assertRefinementParameters(replacement.type, replacement.parameters);
     if (
       replacement.start < prior.start - 0.001 ||
       replacement.end > prior.end + 0.001 ||
@@ -320,4 +338,4 @@ export function mergeGraphicRefinement(
   };
 }
 
-export const EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION = `The draft has failed the editor's deterministic graphic preflight. Make one bounded correction, not a new plan. Return JSON only {"summary":"accurate final proposal summary", "corrections":[{"operationId":"exact rejected ID","operation":{...complete replacement operation...}} OR {"operationId":"exact rejected ID","withdraw":{"reason":"one of this ID's exact reported reason codes"}}]}. Account for every rejected ID exactly once. Immutable changes and the prepared captions must remain unchanged; do not return them or add new operations. Prefer a useful source-supported graphic repair; a non-destructive style treatment may replace it on the same targets and within the original interval. If the source already communicates the point, or no useful safe treatment fits, explicitly withdraw that rejected graphic with its actual reported reason. Do not force a graphic quota or claim withdrawn work was applied. Replacements may only be graphic or style, within the original interval and target IDs. Never create media, sounds, captions, speech, structural edits, new targets, or spending. Keep graphicMode=create unless repairing an existing update. For graphic parameters use only graphic and graphicMode; style accepts only visual, fit and color controls. Do not overwrite any immutable style control on an overlapping target and interval; add a different supported control instead. Use exact contiguous source speech/OCR phrases overlapping the graphic interval; never paraphrase a medical claim or invent text. Place the actual painted shape clear of all protected regions and concurrent text across its full motion, preserve readability time, and respect source aspect/fit/crop/transform. Source evidence, source coordinates and timeline clocks in the request remain authoritative. A generated command's general instruction to use graphics is not permission to cover source content. Summary must describe the final proposal, including important deliberate withdrawals, and never claim execution.`;
+export const EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION = `The draft has failed the editor's deterministic graphic preflight. Make one bounded correction, not a new plan. Return JSON only {"summary":"accurate final proposal summary", "corrections":[{"operationId":"exact rejected ID","operation":{...complete replacement operation...}} OR {"operationId":"exact rejected ID","withdraw":{"reason":"one of this ID's exact reported reason codes"}}]}. Account for every rejected ID exactly once. Immutable changes and the prepared captions must remain unchanged; do not return them or add new operations. Prefer a useful source-supported graphic repair; a subtle color-only style treatment may replace it on the same targets and within the original interval. If the source already communicates the point, or no useful safe treatment fits, explicitly withdraw that rejected graphic with its actual reported reason. Do not force a graphic quota or claim withdrawn work was applied. Replacements may only be graphic or style, within the original interval and target IDs. Never create media, sounds, captions, speech, structural edits, new targets, or spending. Keep graphicMode=create unless repairing an existing update. For graphic parameters use only graphic and graphicMode; style accepts only finite color controls within these inclusive bounds: ${JSON.stringify(refinementColorBounds)}. Never use visual, fit, position, scale, rotation, crop, masks, keyframes, opacity, fades or transitions as a graphic replacement. Rejecting a graphic never authorizes hiding or removing its source. Do not overwrite any immutable style control on an overlapping target and interval; add a different supported control instead. Use exact contiguous source speech/OCR phrases overlapping the graphic interval; never paraphrase a medical claim or invent text. Place the actual painted shape clear of all protected regions and concurrent text across its full motion, preserve readability time, and respect source aspect/fit/crop/transform. Source evidence, source coordinates and timeline clocks in the request remain authoritative. A generated command's general instruction to use graphics is not permission to cover source content. Summary must describe the final proposal, including important deliberate withdrawals, and never claim execution.`;
