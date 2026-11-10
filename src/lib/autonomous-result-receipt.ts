@@ -52,10 +52,16 @@ export function autonomousResultReceipt(
   const appliedCategories = [
     ...new Set(applied.map(operation => categories[operation.type])),
   ].slice(0, 2);
+  const partial =
+    review.omitted.length > 0 || Boolean(review.omittedSounds?.length);
+  const appliedSummary = appliedCategories.length
+    ? appliedCategories.join(" ")
+    : ui("Edit saved.");
   return {
-    summary: appliedCategories.length
-      ? appliedCategories.join(" ")
-      : ui("Edit saved."),
+    status: partial ? ("partial" as const) : ("completed" as const),
+    summary: partial
+      ? `${ui("Partial edit saved.")}${appliedCategories.length ? ` ${appliedSummary}` : ""}`
+      : appliedSummary,
     details,
     planSummary: proposedSummary.trim(),
   };
@@ -70,21 +76,33 @@ export function persistedAutonomousReceipt(
   project: EditProject,
   ui: (text: string) => string
 ): string | undefined {
-  if (message.activity?.kind !== "auto-edit" || message.status !== "completed")
+  if (
+    message.activity?.kind !== "auto-edit" ||
+    !["completed", "partial"].includes(message.status ?? "")
+  )
     return;
   const saved = project.editorChat?.messages.find(
     candidate =>
       candidate.id === message.id && candidate.createdAt === message.createdAt
   );
   const start = Date.parse(message.createdAt);
-  if (!saved || !Number.isFinite(start)) return ui("Edit saved.");
+  if (!saved || !Number.isFinite(start))
+    return message.status === "partial"
+      ? ui("Partial edit saved.")
+      : ui("Edit saved.");
+  const completeSummary = (summary: string) =>
+    saved.status === "partial"
+      ? `${ui("Partial edit saved.")}${summary === ui("Edit saved.") ? "" : ` ${summary}`}`
+      : summary;
   if (saved.activity?.appliedTypes)
-    return autonomousResultReceipt(
-      "",
-      saved.activity.appliedTypes.map(type => ({ type })),
-      { changes: [], omitted: [], warnings: [] },
-      ui
-    ).summary;
+    return completeSummary(
+      autonomousResultReceipt(
+        "",
+        saved.activity.appliedTypes.map(type => ({ type })),
+        { changes: [], omitted: [], warnings: [] },
+        ui
+      ).summary
+    );
   const next = Math.min(
     ...(project.editorChat?.messages ?? [])
       .map(candidate => Date.parse(candidate.createdAt))
@@ -94,7 +112,7 @@ export function persistedAutonomousReceipt(
     .filter(revision => revision.label === "Auto-edit")
     .map(revision => Date.parse(revision.createdAt))
     .filter(time => Number.isFinite(time) && time >= start && time < next);
-  if (completions.length !== 1) return ui("Edit saved.");
+  if (completions.length !== 1) return completeSummary(ui("Edit saved."));
   const applied = project.proposedChanges.filter(operation => {
     const reviewed = Date.parse(operation.reviewedAt ?? "");
     return (
@@ -105,10 +123,12 @@ export function persistedAutonomousReceipt(
       message.activity!.steps.includes(operation.label)
     );
   });
-  return autonomousResultReceipt(
-    "",
-    applied,
-    { changes: [], omitted: [], warnings: [] },
-    ui
-  ).summary;
+  return completeSummary(
+    autonomousResultReceipt(
+      "",
+      applied,
+      { changes: [], omitted: [], warnings: [] },
+      ui
+    ).summary
+  );
 }

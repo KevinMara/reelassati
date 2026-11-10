@@ -598,6 +598,8 @@ polygon:[{x/y:0..100}] (3..12 points),radius:0..50,
 keyframes:[{at:0..1,x,y,scale,rotation,opacity,easing:linear|ease-in|ease-out|ease-in-out|hold}],
 entrance/exit:{kind:none|dissolve|wipe-left|wipe-right|wipe-up|wipe-down|slide-left|
 slide-right|zoom,duration:0.05..5}}. A local style operation isolates its actual range;
+keyframe at is normalized progress, not seconds: on a 4.2-second local style,
+at:0 is its start, at:0.5 is 2.1 seconds into it, and at:1 is its end.
 preserve existing animation when not changing it. A subtle emphasis needs a settled
 hold, not constant oscillation. Reframe only when known source detail remains visible.
 An entrance/exit affects one clip's picture and leaves speech intact; it is not a
@@ -638,4 +640,10 @@ footage, not generated or licensed stock. Ordinary assetId/sourceIn also remain 
 Optional planning annotations may be omitted or null. A numeric operation needs no
 cue or mediaExcerptId. For a scene cue, omit speechId/wordIndex; for a speech cue, omit
 sceneId. Non-null references must identify the supplied evidence exactly.
+Measured speechEvidence is supplied source audio evidence even when no separate
+audio attachment is present. Do not say audio or dialogue was absent when measured
+source speech is available; unassessed music/noise remain unknown. Automatic graphic
+copy must be an exact contiguous phrase of timed speech/captions or observedText
+supporting its interval. Include every word's measured span in that interval; do not
+borrow a phrase from another beat, extend a claim, or merely promise it in summary.
 `.trim();

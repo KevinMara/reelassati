@@ -479,6 +479,7 @@ export function normalizeEditorChatState(
         "ready",
         "running",
         "completed",
+        "partial",
         "failed",
         "stopped",
       ].includes(String(row.status))

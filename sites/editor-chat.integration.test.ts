@@ -600,6 +600,9 @@ describe("foreground K3 auto-edit planning", () => {
       }>;
       expect(messages[0].content).toContain("parameters.visual");
       expect(messages[0].content).toContain("does NOT support");
+      expect(messages[0].content).toContain("keyframe at is normalized progress, not seconds");
+      expect(messages[0].content).toContain("Do not say audio or dialogue was absent");
+      expect(messages[0].content).toContain("exact contiguous phrase of timed speech/captions or observedText");
       const context = JSON.parse(
         messages.find(message => message.role === "user")!.content
       ).project;

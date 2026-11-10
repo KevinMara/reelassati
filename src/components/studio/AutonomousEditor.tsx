@@ -5,7 +5,10 @@ import {
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 import { applyAutonomousCaptionTreatment } from "@contracts/editorial-captions";
 import { autonomousResultReceipt } from "@/lib/autonomous-result-receipt";
-import { autonomousCreditEstimate } from "@/lib/autonomous-credit-estimate";
+import {
+  autonomousCreditEstimate,
+  autonomousSourceReviewCost,
+} from "@/lib/autonomous-credit-estimate";
 import { activeEditorProjects, editorRunKey } from "@/lib/editor-run-lock";
 import { ConciseResponse } from "./ConciseResponse";
 import { editorAudioCatalog } from "@contracts/editor-audio-catalog";
@@ -30,7 +33,6 @@ import {
 import {
   createAutonomousPreparationCache,
   prepareAutonomousSources,
-  findSavedAutonomousReview,
 } from "@/lib/autonomous-preparation";
 import {
   EDIT_RECIPES,
@@ -209,22 +211,11 @@ export function AutonomousEditor({
       project.clips.some(c => c.assetId === a.id) &&
       (a.kind === "video" || a.kind === "audio")
   );
-  const analysisCost = sources
-    .filter(
-      a =>
-        a.kind === "video" &&
-        !findSavedAutonomousReview(
-          a,
-          project.platform,
-          workspace.analyzerReports
-        )
-    )
-    .reduce(
-      (sum, a) =>
-        sum +
-        timedCreditCost(a.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute),
-      0
-    );
+  const analysisCost = autonomousSourceReviewCost(
+    sources,
+    project.platform,
+    workspace.analyzerReports
+  );
   const transcriptCost = 0;
   const unreviewedExamples =
     project.editStyleTemplate?.examples?.filter(
@@ -379,7 +370,8 @@ export function AutonomousEditor({
     const savedSteps: string[] = [];
     const saveActivity = async (
       text: string,
-      state: "running" | "ready" | "completed" | "failed" | "stopped",
+      state:
+        "running" | "ready" | "completed" | "partial" | "failed" | "stopped",
       appliedTypes?: EditOperation["type"][],
       planSummary?: string
     ) => {
@@ -505,6 +497,7 @@ export function AutonomousEditor({
             getUiLocale(),
           ]),
           cache: preparationCache.current,
+          runId: messageId,
           savedReports: workspace.analyzerReports,
           checkpoint,
           review: async asset => {
@@ -515,7 +508,7 @@ export function AutonomousEditor({
             const review = await analyzeMedia(
               asset,
               project.platform,
-              undefined,
+              "Establish source-clock spatial evidence for the full retained footage: protect faces, existing captions/text and meaningful demonstrations with conservative time-bounded regions; transcribe exact readable labels into observedText. Return review.visualProtection with truthful reviewedRanges and coverage. This review prepares editable graphics; do not replace missing layout evidence with general editing advice, and keep unobserved areas unknown.",
               progress,
               signal,
               scope,
@@ -749,13 +742,19 @@ export function AutonomousEditor({
         ...estimate,
       });
       if (quoteOnly) {
-        await saveActivity(
-          ui("Your edit plan is ready."),
-          "ready",
-          undefined,
-          result.summary
+        const previewReceipt = autonomousResultReceipt(
+          "",
+          [],
+          graphicReview,
+          ui
         );
-        setStatus(ui("Your edit plan is ready."));
+        savedSteps.push(...previewReceipt.details);
+        const previewStatus =
+          previewReceipt.status === "partial"
+            ? previewReceipt.details.join(" ")
+            : ui("Your edit plan is ready.");
+        await saveActivity(previewStatus, "ready", undefined, result.summary);
+        setStatus(previewStatus);
         return;
       }
       // Recovery covers local validation only, not already-started media jobs
@@ -957,7 +956,19 @@ export function AutonomousEditor({
       checkpoint();
       timelineSaveStarted = true;
       working.lastCommand = style.trim() || AUTOMATIC_EDIT_DIRECTION;
-      steps.push({ label: "Saved the finished edit", project: working });
+      const receipt = autonomousResultReceipt(
+        result.summary,
+        [...appliedOperations, ...preparationCategories],
+        graphicReview,
+        ui
+      );
+      steps.push({
+        label:
+          receipt.status === "partial"
+            ? ui("Partial edit saved.")
+            : "Saved the finished edit",
+        project: working,
+      });
       await publishAutonomousSteps({
         original: project,
         steps,
@@ -971,17 +982,11 @@ export function AutonomousEditor({
       });
       checkpoint();
       planCache.clear();
-      const receipt = autonomousResultReceipt(
-        result.summary,
-        [...appliedOperations, ...preparationCategories],
-        graphicReview,
-        ui
-      );
       savedSteps.push(...receipt.details);
       setCompletedSteps([...savedSteps]);
       await saveActivity(
         receipt.summary,
-        "completed",
+        receipt.status,
         [...appliedOperations, ...preparationCategories].map(
           operation => operation.type
         ),

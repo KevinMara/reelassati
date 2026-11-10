@@ -73,6 +73,35 @@ const planFailureText: Partial<Record<InterfaceLanguage, string>> = {
   id: "Reel tidak dapat menyelesaikan suntingan ini. Coba lagi.",
   th: "Reel ตัดต่อครั้งนี้ไม่สำเร็จ โปรดลองอีกครั้ง",
 };
+const partialEditText: Partial<Record<InterfaceLanguage, string>> = {
+  it: "Montaggio parziale salvato.",
+  es: "Edición parcial guardada.",
+  fr: "Montage partiel enregistré.",
+  de: "Teilweise bearbeitet und gespeichert.",
+  pt: "Edição parcial salva.",
+  nl: "Gedeeltelijke montage opgeslagen.",
+  pl: "Zapisano częściowy montaż.",
+  ro: "Montaj parțial salvat.",
+  tr: "Kısmi düzenleme kaydedildi.",
+  uk: "Частковий монтаж збережено.",
+  ru: "Частичный монтаж сохранён.",
+  ar: "تم حفظ المونتاج الجزئي.",
+  hi: "आंशिक संपादन सहेजा गया।",
+  ja: "一部の編集を保存しました。",
+  ko: "일부 편집을 저장했습니다.",
+  zh: "已保存部分剪辑。",
+  vi: "Đã lưu bản dựng một phần.",
+  da: "Delvis redigering gemt.",
+  sv: "Delvis redigering sparad.",
+  no: "Delvis redigering lagret.",
+  fi: "Osittainen muokkaus tallennettu.",
+  cs: "Částečný střih uložen.",
+  hu: "Részleges vágás mentve.",
+  el: "Αποθηκεύτηκε το μερικό μοντάζ.",
+  he: "העריכה החלקית נשמרה.",
+  id: "Suntingan sebagian disimpan.",
+  th: "บันทึกการตัดต่อบางส่วนแล้ว",
+};
 export const editorNov1Ui = Object.fromEntries(
   Object.entries(rows).map(([code, row]) => {
     const values = row.split("|");
@@ -84,6 +113,8 @@ export const editorNov1Ui = Object.fromEntries(
     copy["Reel couldn't finish this edit. Please try again."] =
       planFailureText[code as InterfaceLanguage] ??
       "Reel couldn't finish this edit. Please try again.";
+    copy["Partial edit saved."] =
+      partialEditText[code as InterfaceLanguage] ?? "Partial edit saved.";
     return [code, copy] as const;
   })
 ) as Record<InterfaceLanguage, Record<string, string>>;

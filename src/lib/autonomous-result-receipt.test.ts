@@ -5,6 +5,7 @@ import {
 } from "./autonomous-result-receipt";
 import type { EditOperation, EditProject } from "@contracts/workspace";
 import type { EditorChatMessage } from "@contracts/editor-chat";
+import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 
 describe("auto-edit execution receipt", () => {
   it("reports unavailable sound omissions without claiming they were applied", () => {
@@ -21,7 +22,10 @@ describe("auto-edit execution receipt", () => {
       },
       text => text
     );
-    expect(receipt.summary).toBe("Updated the visual treatment.");
+    expect(receipt.summary).toBe(
+      "Partial edit saved. Updated the visual treatment."
+    );
+    expect(receipt.status).toBe("partial");
     expect(receipt.details).toEqual(["Skipped sound cues: 1."]);
   });
   it("cannot repeat a planner's discarded-overlay claim in the saved answer", () => {
@@ -47,7 +51,8 @@ describe("auto-edit execution receipt", () => {
       },
       text => text
     );
-    expect(receipt.summary).toBe("Updated the sound.");
+    expect(receipt.summary).toBe("Partial edit saved. Updated the sound.");
+    expect(receipt.status).toBe("partial");
     expect(receipt.details).toEqual([
       "Skipped overlays: 1. Overlay adds unsupported text. Overlay would cover source content.",
     ]);
@@ -104,7 +109,7 @@ describe("auto-edit execution receipt", () => {
     };
     expect(
       autonomousResultReceipt("Added a card", [], review, text => text).summary
-    ).toBe("Edit saved.");
+    ).toBe("Partial edit saved.");
     expect(
       autonomousResultReceipt(
         "Added a card",
@@ -112,7 +117,7 @@ describe("auto-edit execution receipt", () => {
         review,
         text => text
       ).summary
-    ).toBe("Updated the captions.");
+    ).toBe("Partial edit saved. Updated the captions.");
     expect(
       autonomousResultReceipt(
         "Added a card",
@@ -120,7 +125,7 @@ describe("auto-edit execution receipt", () => {
         review,
         text => text
       ).summary
-    ).toBe("Updated the visual treatment.");
+    ).toBe("Partial edit saved. Updated the visual treatment.");
   });
   it("always describes applied categories even when the plan needed no omissions", () => {
     const receipt = autonomousResultReceipt(
@@ -153,6 +158,39 @@ describe("auto-edit execution receipt", () => {
 });
 
 describe("display-only receipts for saved auto-edit messages", () => {
+  it("persists partial completion and keeps the omission visible after reopening", () => {
+    const state = normalizeEditorChatState({
+      mode: "ask",
+      maxCredits: 100,
+      messages: [
+        {
+          id: "partial",
+          role: "assistant",
+          createdAt: "2026-11-10T16:00:00Z",
+          status: "partial",
+          text: "Partial edit saved. Updated the visual treatment.",
+          activity: {
+            kind: "auto-edit",
+            steps: ["Skipped overlays: 5."],
+            appliedTypes: ["style", "sound"],
+            planSummary: "Five editable callouts",
+          },
+        },
+      ],
+    })!;
+    const partial = state.messages[0];
+    expect(partial.status).toBe("partial");
+    expect(partial.activity?.planSummary).toBe("Five editable callouts");
+    expect(
+      persistedAutonomousReceipt(
+        partial,
+        { editorChat: state } as EditProject,
+        text => text
+      )
+    ).toBe(
+      "Partial edit saved. Updated the visual treatment. Updated the sound."
+    );
+  });
   const message = {
     id: "auto",
     role: "assistant",

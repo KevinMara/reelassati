@@ -1,5 +1,31 @@
-import { AI_CREDIT_COSTS, videoCreditCost } from "@contracts/billing";
-import type { EditOperation } from "@contracts/workspace";
+import {
+  AI_CREDIT_COSTS,
+  timedCreditCost,
+  videoCreditCost,
+} from "@contracts/billing";
+import type { Asset, EditOperation, EditProject } from "@contracts/workspace";
+import type { SavedAnalyzerReport } from "@contracts/analyzer-report";
+import { findSavedAutonomousReview } from "./autonomous-preparation";
+
+/** Auto-edit needs measured layout, not only a legacy editorial review. */
+export function autonomousSourceReviewCost(
+  sources: Asset[],
+  platform: EditProject["platform"],
+  reports: SavedAnalyzerReport[] | undefined
+) {
+  return sources
+    .filter(
+      asset =>
+        asset.kind === "video" &&
+        !findSavedAutonomousReview(asset, platform, reports, true)
+    )
+    .reduce(
+      (cost, asset) =>
+        cost +
+        timedCreditCost(asset.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute),
+      0
+    );
+}
 
 /** A tariff-based forecast of the model's actual media plan, never a spending cap.
  * Only explicitly optional shots widen the range. Owned and stock assets are free. */

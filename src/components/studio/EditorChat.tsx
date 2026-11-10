@@ -877,7 +877,8 @@ export function EditorChat({
                             message.status === "failed"
                               ? undefined
                               : message.activity?.kind === "auto-edit" &&
-                                  message.status === "completed"
+                                  (message.status === "completed" ||
+                                    message.status === "partial")
                                 ? message.activity.planSummary
                                   ? `${ui("Plan")}: ${message.activity.planSummary}`
                                   : message.activity.appliedTypes === undefined

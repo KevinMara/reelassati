@@ -150,7 +150,13 @@ export interface EditorChatMessage {
   references?: EditorChatReference[];
   plan?: EditorChatResponse;
   status?:
-    "planning" | "ready" | "running" | "completed" | "failed" | "stopped";
+    | "planning"
+    | "ready"
+    | "running"
+    | "completed"
+    | "partial"
+    | "failed"
+    | "stopped";
   mode?: EditorChatMode;
   maxCredits?: number;
   usedCredits?: number;

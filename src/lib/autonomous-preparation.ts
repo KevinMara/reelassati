@@ -75,9 +75,22 @@ type Transcript = {
 export type AutonomousPreparationCache = {
   reviews: Map<string, Review>;
   transcripts: Map<string, Transcript>;
+  /** One foreground attempt per source/run, including a rejected attempt. */
+  reviewAttempts: Map<string, Promise<Review>>;
 };
 export function createAutonomousPreparationCache(): AutonomousPreparationCache {
-  return { reviews: new Map(), transcripts: new Map() };
+  return {
+    reviews: new Map(),
+    transcripts: new Map(),
+    reviewAttempts: new Map(),
+  };
+}
+
+export function hasCompleteAutonomousLayout(review: Review, asset: Asset) {
+  return (
+    normalizeReview(review.review, asset.duration).visualProtection
+      ?.coverage === "complete"
+  );
 }
 
 /** Reuse only a complete review of this immutable owned source and platform.
@@ -85,7 +98,8 @@ export function createAutonomousPreparationCache(): AutonomousPreparationCache {
 export function findSavedAutonomousReview(
   asset: Asset,
   platform: EditProject["platform"],
-  reports: SavedAnalyzerReport[] | undefined
+  reports: SavedAnalyzerReport[] | undefined,
+  requireSpatialEvidence = false
 ): Review | undefined {
   if (asset.kind !== "video" || !asset.duration) return;
   const candidates = reports
@@ -102,7 +116,10 @@ export function findSavedAutonomousReview(
       normalizeVideoStructure(
         candidate.result.structure,
         candidate.result.insights
-      ).length === 5
+      ).length === 5 &&
+      (!requireSpatialEvidence ||
+        normalizeReview(candidate.result.review, asset.duration)
+          .visualProtection?.coverage === "complete")
   );
   if (!report) return;
   const review = normalizeReview(report.result.review, asset.duration);
@@ -128,6 +145,8 @@ export async function prepareAutonomousSources(input: {
   captions: boolean;
   speechTiming?: boolean;
   context: string;
+  /** Changes only for a new explicit user run; never schedules another attempt. */
+  runId?: string;
   savedReports?: SavedAnalyzerReport[];
   cache: AutonomousPreparationCache;
   checkpoint: () => void;
@@ -157,19 +176,38 @@ export async function prepareAutonomousSources(input: {
       const saved = findSavedAutonomousReview(
         asset,
         input.project.platform,
-        input.savedReports
+        input.savedReports,
+        true
       );
-      // A newly saved review can upgrade evidence while this editor stays open.
-      // Legacy/spatially-unknown reviews still reuse normally: never buy an
-      // analysis merely to satisfy the optional graphic-placement guard.
+      const completeCached =
+        cached && hasCompleteAutonomousLayout(cached, asset)
+          ? cached
+          : undefined;
+      // A source review must actually establish spatial coverage before it can
+      // bypass preparation for a complete auto-edit. Legacy analysis is useful
+      // context, but cannot make the later graphic-placement review succeed.
       const preferSaved =
         saved &&
-        (!cached ||
+        (!completeCached ||
           (saved.savedAt &&
-            (!cached.savedAt || saved.savedAt > cached.savedAt)));
-      const result =
-        (preferSaved ? saved : (cached ?? saved)) ??
-        (await input.review(asset));
+            (!completeCached.savedAt ||
+              saved.savedAt > completeCached.savedAt)));
+      let result = preferSaved ? saved : completeCached;
+      if (!result) {
+        const attemptKey = JSON.stringify([key, input.runId ?? ""]);
+        let attempt = input.cache.reviewAttempts.get(attemptKey);
+        if (!attempt) {
+          input.checkpoint();
+          attempt = Promise.resolve().then(() => {
+            input.checkpoint();
+            return input.review(asset);
+          });
+          input.cache.reviewAttempts.set(attemptKey, attempt);
+        }
+        // Unknown/partial results and failures never trigger another call in
+        // this run. A fresh explicit run can retry with its displayed estimate.
+        result = await attempt;
+      }
       input.checkpoint();
       input.cache.reviews.set(key, {
         ...result,
@@ -204,6 +242,26 @@ export async function prepareAutonomousSources(input: {
   for (const asset of input.sources) {
     input.checkpoint();
     const key = keys.get(asset.id)!;
+    const measuredSpeech = working.sourceSpeech
+      ?.find(s => s.assetId === asset.id)
+      ?.segments.some(
+        segment =>
+          segment.text.trim() &&
+          Number.isFinite(segment.start) &&
+          Number.isFinite(segment.end) &&
+          segment.end > segment.start
+      );
+    if (measuredSpeech)
+      working.sourceReviews = working.sourceReviews?.map(review =>
+        review.assetId === asset.id && review.audio !== "present"
+          ? {
+              ...review,
+              audio: "present",
+              audioNote:
+                "Timed source speech is available. Music and noise were not assessed.",
+            }
+          : review
+      );
     const review = working.sourceReviews?.find(r => r.assetId === asset.id);
     if (
       isAutonomousSpeechSource(asset) &&
@@ -242,6 +300,21 @@ export async function prepareAutonomousSources(input: {
           provenance: result.provenance,
         },
       ];
+      if (
+        result.segments.some(
+          segment => segment.text.trim() && segment.end > segment.start
+        )
+      )
+        working.sourceReviews = working.sourceReviews?.map(review =>
+          review.assetId === asset.id && review.audio !== "present"
+            ? {
+                ...review,
+                audio: "present",
+                audioNote:
+                  "Timed source speech is available. Music and noise were not assessed.",
+              }
+            : review
+        );
       if (!input.captions || review?.captions === "present") continue;
       if (result.provenance) working.transcriptProvenance = result.provenance;
       working.transcript.push(

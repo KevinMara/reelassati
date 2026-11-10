@@ -275,6 +275,59 @@ describe("source-aware automatic graphic placement", () => {
     ).not.toContain("source-overlap");
   });
 
+  it("uses painted edges for rotated outlines while still protecting actual edge collisions", () => {
+    const p = project(
+      evidence({
+        regions: [
+          {
+            ...region(),
+            kind: "face",
+            rect: { x: 0.48, y: 0.48, width: 0.04, height: 0.04 },
+          },
+        ],
+      })
+    );
+    const outline = graphic({
+      graphic: normalizeGraphic({
+        kind: "rectangle",
+        text: "",
+        x: 50,
+        y: 50,
+        width: 30,
+        height: 30,
+        strokeWidth: 0.4,
+        rotation: 45,
+        animation: "none",
+      })!,
+    });
+    expect(reasons(p, outline)).not.toContain("source-overlap");
+    p.sourceReviews![0].visualProtection!.regions[0].rect = {
+      x: 0.59,
+      y: 0.38,
+      width: 0.04,
+      height: 0.04,
+    };
+    expect(reasons(p, outline)).toContain("source-overlap");
+    p.sourceReviews![0].visualProtection!.regions = [];
+    const peer = graphic({
+      id: "peer",
+      graphic: normalizeGraphic({
+        kind: "ellipse",
+        text: "",
+        width: 4,
+        height: 4,
+        x: 50,
+        y: 50,
+        animation: "none",
+      })!,
+    });
+    p.clips.push(peer);
+    expect(reasons(p, outline)).not.toContain("competing-text");
+    peer.graphic!.x = 60;
+    peer.graphic!.y = 39;
+    expect(reasons(p, outline)).toContain("competing-text");
+  });
+
   it("checks animated graphics between their safe entrance and exit positions", () => {
     const p = project(
       evidence({
@@ -460,6 +513,147 @@ describe("source-aware automatic graphic placement", () => {
     expect(reasons(p, g)).toContain("competing-text");
     p.captionAppearance.position = "top";
     expect(reasons(p, g)).not.toContain("competing-text");
+  });
+
+  it("protects motion-caption anchors, visible units and the static no-clock fallback", () => {
+    const p = project();
+    p.transcript = [
+      {
+        id: "caption",
+        start: 1,
+        end: 4,
+        text: "Short title",
+        words: [
+          { text: "Short", start: 1.1, end: 1.4 },
+          { text: "title", start: 1.4, end: 1.8 },
+        ],
+      },
+    ];
+    p.captionStyle = "motion-focus";
+    p.captionAppearance = {
+      size: 8,
+      motion: {
+        recipe: "focus",
+        unit: "line",
+        verticalAnchor: "center",
+        anchor: "center",
+        blur: 0,
+      },
+    };
+    expect(reasons(p)).toContain("competing-text");
+    expect(
+      reasons(
+        p,
+        graphic({ graphic: normalizeGraphic({ ...graphic().graphic, y: 82 })! })
+      )
+    ).not.toContain("competing-text");
+    p.transcript[0].words = undefined;
+    expect(reasons(p)).toContain("competing-text");
+    p.captionAppearance.motion = {
+      recipe: "rise",
+      unit: "letter",
+      anchor: "left",
+      verticalAnchor: "top",
+    };
+    const left = graphic({
+      graphic: normalizeGraphic({
+        kind: "rectangle",
+        text: "",
+        width: 3,
+        height: 3,
+        x: 10,
+        y: 17,
+        animation: "none",
+      })!,
+    });
+    expect(reasons(p, left)).toContain("competing-text");
+    // No glyph has appeared before the first measured word. The settled layout
+    // must not invent an occupied caption region during that empty interval.
+    p.transcript[0].words = [
+      { text: "Short", start: 3, end: 3.3 },
+      { text: "title", start: 3.3, end: 3.8 },
+    ];
+    expect(reasons(p, { ...left, duration: 1, outPoint: 1 })).not.toContain(
+      "competing-text"
+    );
+  });
+
+  it("grounds editable transcript copy only in measured words inside the graphic interval", () => {
+    const p = project();
+    p.sourceSpeech = [];
+    p.transcript = [
+      {
+        id: "late",
+        start: 0,
+        end: 10,
+        text: "Short title",
+        words: [
+          { text: "Short", start: 8, end: 8.5 },
+          { text: "title", start: 8.5, end: 9 },
+        ],
+      },
+    ];
+    expect(reasons(p)).toContain("unsupported-source-copy");
+    p.transcript[0].words = [
+      { text: "Short", start: 1.1, end: 1.4 },
+      { text: "title", start: 1.4, end: 1.8 },
+    ];
+    expect(reasons(p)).not.toContain("unsupported-source-copy");
+    p.transcript[0].words = undefined;
+    expect(reasons(p)).toContain("unsupported-source-copy");
+    p.transcript[0].start = 1;
+    p.transcript[0].end = 4;
+    expect(reasons(p)).not.toContain("unsupported-source-copy");
+  });
+
+  it("grounds countdowns in their actual end-exclusive displayed values", () => {
+    const p = project();
+    p.sourceSpeech = [
+      {
+        assetId: asset.id,
+        segments: [
+          {
+            id: "count",
+            start: 1,
+            end: 4,
+            text: "3 2 1",
+            words: [
+              { text: "3", start: 1, end: 2 },
+              { text: "2", start: 2, end: 3 },
+              { text: "1", start: 3, end: 4 },
+            ],
+          },
+        ],
+      },
+    ];
+    const countdown = graphic({
+      graphic: normalizeGraphic({
+        kind: "countdown",
+        prefix: "",
+        suffix: "",
+        x: 50,
+        y: 50,
+        size: 5,
+        animation: "none",
+      })!,
+    });
+    expect(reasons(p, countdown)).not.toContain("unsupported-source-copy");
+    p.sourceSpeech[0].segments = [{ id: "wrong", start: 1, end: 4, text: "0" }];
+    expect(reasons(p, countdown)).toContain("unsupported-source-copy");
+    // Trimming the source clock removes 3 from the visible sequence; an unseen
+    // original value must not be required for the retained 2,1 interval.
+    p.sourceSpeech[0].segments = [
+      { id: "trimmed", start: 1, end: 3, text: "2 1" },
+    ];
+    expect(
+      reasons(p, {
+        ...countdown,
+        inPoint: 1,
+        outPoint: 3,
+        graphicDuration: 3,
+        duration: 2,
+      })
+    ).not.toContain("unsupported-source-copy");
   });
 
   it("does not confuse decimal values with ranges or borrow words outside the measured interval", () => {

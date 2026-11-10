@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Asset, EditProject } from "@contracts/workspace";
+import type { Asset, EditOperation, EditProject } from "@contracts/workspace";
+import { normalizeGraphic } from "@contracts/motion-graphics";
+import {
+  preflightAutonomousPlan,
+  executeAutonomousPlan,
+} from "./autonomous-execution";
 import {
   checkpointAnalyzerReport,
   type SavedAnalyzerReport,
@@ -8,7 +13,10 @@ import {
   createAutonomousPreparationCache,
   prepareAutonomousSources,
   findSavedAutonomousReview,
+  hasCompleteAutonomousLayout,
 } from "./autonomous-preparation";
+import { autonomousSourceReviewCost } from "./autonomous-credit-estimate";
+import { AI_CREDIT_COSTS, timedCreditCost } from "@contracts/billing";
 
 const source = {
   id: "source",
@@ -98,6 +106,14 @@ function savedReport(): SavedAnalyzerReport {
         audio: "unknown",
         audioNote: "Audio was not verified",
         ending: null,
+        visualProtection: {
+          version: 1,
+          sourceDuration: 4,
+          coverage: "complete",
+          reviewedRanges: [{ start: 0, end: 4 }],
+          regions: [],
+          observedText: [],
+        },
       },
       retention: [],
       changes: [],
@@ -107,6 +123,275 @@ function savedReport(): SavedAnalyzerReport {
 }
 
 describe("saved paid review reuse", () => {
+  it("turns a formerly omitted source-grounded graphic into an executable native layer after one measured layout refresh", async () => {
+    const input = fixture(),
+      legacy = savedReport(),
+      fresh = savedReport();
+    legacy.result.review!.visualProtection = undefined;
+    fresh.result.review!.visualProtection!.regions = [
+      {
+        id: "face",
+        kind: "face",
+        start: 0,
+        end: 4,
+        rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+        confidence: 0.95,
+      },
+    ];
+    const media = {
+      ...source,
+      width: 1000,
+      height: 1778,
+      status: "ready" as const,
+    };
+    const sourceSpeech = [
+      {
+        assetId: source.id,
+        segments: [
+          {
+            id: "phrase",
+            start: 1,
+            end: 2,
+            text: "Actual speech",
+            words: [
+              { text: "Actual", start: 1.1, end: 1.4 },
+              { text: "speech", start: 1.5, end: 1.9 },
+            ],
+          },
+        ],
+      },
+    ];
+    const original = {
+      ...project,
+      id: "edit",
+      duration: 4,
+      aspectRatio: "9:16",
+      playhead: 0,
+      clips: [
+        { ...project.clips[0], track: "video", locked: false, label: "Source" },
+      ],
+      sourceSpeech,
+      proposedChanges: [],
+      qualitySignals: [],
+      revisions: [],
+      sourceReviews: [
+        {
+          ...legacy.result.review,
+          assetId: source.id,
+          reviewedAt: legacy.createdAt,
+          summary: "",
+          moments: [],
+        },
+      ],
+    } as EditProject;
+    const graphic: EditOperation = {
+      id: "grounded-callout",
+      type: "graphic",
+      start: 1,
+      end: 3,
+      targetClipIds: ["clip"],
+      label: "Measured explanation",
+      reason: "Emphasize the actual source words",
+      confidence: 1,
+      intensity: "balanced",
+      status: "proposed",
+      parameters: {
+        graphic: normalizeGraphic({
+          kind: "callout",
+          text: "Actual speech",
+          size: 4,
+          x: 75,
+          y: 65,
+          animation: "none",
+          color: "#FFFFFF",
+          background: "#111111",
+        })!,
+      },
+    };
+    expect(
+      preflightAutonomousPlan(
+        original,
+        [graphic],
+        [media],
+        undefined,
+        "automatic"
+      ).omitted[0].issues.map(issue => issue.reason)
+    ).toContain("unknown-source-layout");
+    input.review.mockResolvedValue(fresh.result as never);
+    const prepared = await prepareAutonomousSources({
+      ...input,
+      project: original,
+      sources: [media],
+      savedReports: [legacy],
+      speechTiming: true,
+      runId: "explicit-run",
+    });
+    const review = preflightAutonomousPlan(
+      prepared.working,
+      [graphic],
+      [media],
+      undefined,
+      "automatic"
+    );
+    expect(input.review).toHaveBeenCalledTimes(1);
+    expect(input.transcribe).not.toHaveBeenCalled();
+    expect(review.omitted).toEqual([]);
+    const result = executeAutonomousPlan(prepared.working, review.changes, [
+      media,
+    ]);
+    expect(result.clips.find(clip => clip.graphic)?.graphic?.text).toBe(
+      "Actual speech"
+    );
+    expect(result.sourceSpeech).toEqual(sourceSpeech);
+    expect(result.transcript).toEqual([]);
+  });
+
+  it.each(["missing", "partial", "malformed"] as const)(
+    "refreshes %s spatial evidence once and prices that same preparation",
+    async quality => {
+      const input = fixture();
+      const legacy = savedReport();
+      if (quality === "missing")
+        legacy.result.review!.visualProtection = undefined;
+      if (quality === "partial")
+        legacy.result.review!.visualProtection!.coverage = "partial";
+      if (quality === "malformed")
+        legacy.result.review!.visualProtection!.reviewedRanges[0].end = 5;
+      expect(
+        findSavedAutonomousReview(source, project.platform, [legacy])
+      ).toBeDefined();
+      expect(
+        findSavedAutonomousReview(source, project.platform, [legacy], true)
+      ).toBeUndefined();
+      expect(
+        autonomousSourceReviewCost([source], project.platform, [legacy])
+      ).toBe(
+        timedCreditCost(source.duration, AI_CREDIT_COSTS.videoAnalysisPerMinute)
+      );
+      const complete = savedReport();
+      input.review.mockResolvedValue(complete.result as never);
+      const prepared = await prepareAutonomousSources({
+        ...input,
+        savedReports: [legacy],
+        runId: "manual-run",
+      });
+      expect(input.review).toHaveBeenCalledTimes(1);
+      expect(prepared.analysis[0].visualProtection?.coverage).toBe("complete");
+      await prepareAutonomousSources({
+        ...input,
+        savedReports: [legacy],
+        runId: "manual-run",
+      });
+      expect(input.review).toHaveBeenCalledTimes(1);
+      expect(
+        autonomousSourceReviewCost(
+          [source, { ...source, kind: "audio" }],
+          project.platform,
+          [complete]
+        )
+      ).toBe(0);
+    }
+  );
+
+  it("keeps a newly reviewed unknown layout truthful without another purchase in that run", async () => {
+    const input = fixture();
+    const legacy = savedReport();
+    legacy.result.review!.visualProtection = undefined;
+    const first = await prepareAutonomousSources({
+      ...input,
+      savedReports: [legacy],
+      runId: "one",
+    });
+    const second = await prepareAutonomousSources({
+      ...input,
+      savedReports: [legacy],
+      runId: "one",
+    });
+    expect(input.review).toHaveBeenCalledTimes(1);
+    expect(first.analysis[0].visualProtection?.coverage).toBe("unknown");
+    expect(second.analysis[0].visualProtection?.coverage).toBe("unknown");
+    expect(
+      hasCompleteAutonomousLayout([...input.cache.reviews.values()][0], source)
+    ).toBe(false);
+    expect(
+      autonomousSourceReviewCost([source], project.platform, [legacy])
+    ).toBeGreaterThan(0);
+  });
+
+  it("retains a failed refresh within the run, then permits only a new explicit run to try again", async () => {
+    const input = fixture();
+    const legacy = savedReport();
+    legacy.result.review!.visualProtection = undefined;
+    input.review.mockRejectedValueOnce(new Error("Layout review unavailable"));
+    for (let attempt = 0; attempt < 2; attempt++)
+      await expect(
+        prepareAutonomousSources({
+          ...input,
+          savedReports: [legacy],
+          runId: "one",
+        })
+      ).rejects.toThrow("Layout review unavailable");
+    expect(input.review).toHaveBeenCalledTimes(1);
+    expect(input.transcribe).not.toHaveBeenCalled();
+    input.review.mockResolvedValue(savedReport().result as never);
+    await prepareAutonomousSources({
+      ...input,
+      savedReports: [legacy],
+      runId: "explicit-new-run",
+    });
+    expect(input.review).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses verified source speech despite a stale absent-audio note without inventing captions", async () => {
+    const input = fixture();
+    const report = savedReport();
+    report.result.review!.audio = "absent";
+    report.result.review!.audioNote = "Audio was not supplied";
+    const speech = [
+      {
+        assetId: source.id,
+        segments: [
+          {
+            id: "speech",
+            start: 1,
+            end: 2,
+            text: "Measured words",
+            words: [
+              { text: "Measured", start: 1, end: 1.4 },
+              { text: "words", start: 1.5, end: 2 },
+            ],
+          },
+        ],
+      },
+    ];
+    const result = await prepareAutonomousSources({
+      ...input,
+      project: { ...project, sourceSpeech: speech },
+      savedReports: [report],
+      speechTiming: true,
+    });
+    expect(input.review).not.toHaveBeenCalled();
+    expect(input.transcribe).not.toHaveBeenCalled();
+    expect(result.working.sourceSpeech).toEqual(speech);
+    expect(result.working.transcript).toEqual([]);
+    expect(result.working.sourceReviews?.[0]).toMatchObject({
+      audio: "present",
+      audioNote:
+        "Timed source speech is available. Music and noise were not assessed.",
+    });
+    report.result.review!.audio = "present";
+    report.result.review!.audioNote = "Speech over a quiet recorded music bed";
+    const observed = await prepareAutonomousSources({
+      ...input,
+      project: { ...project, sourceSpeech: speech },
+      savedReports: [{ ...report, createdAt: "2026-11-11T00:00:00Z" }],
+      speechTiming: true,
+    });
+    expect(observed.working.sourceReviews?.[0].audioNote).toBe(
+      "Speech over a quiet recorded music bed"
+    );
+  });
+
   it("reuses every paid source review after reopening an edit with more than six videos", async () => {
     const sources = Array.from({ length: 9 }, (_, index) => ({
       ...source,
@@ -304,6 +589,8 @@ describe("saved paid review reuse", () => {
   it("upgrades an open editor's legacy cache from a new saved spatial review without inference", async () => {
     const input = fixture(),
       old = savedReport();
+    old.result.review!.visualProtection = undefined;
+    input.review.mockResolvedValue(old.result as never);
     const legacy = await prepareAutonomousSources({
       ...input,
       savedReports: [old],
@@ -324,7 +611,7 @@ describe("saved paid review reuse", () => {
       savedReports: [old, fresh],
     });
     expect(updated.analysis[0].visualProtection?.coverage).toBe("complete");
-    expect(input.review).not.toHaveBeenCalled();
+    expect(input.review).toHaveBeenCalledTimes(1);
     expect(input.transcribe).not.toHaveBeenCalled();
   });
   it("prepares the exact source from its complete saved review without another provider call", async () => {
@@ -348,7 +635,7 @@ describe("saved paid review reuse", () => {
         audioEvidence: report.result.insights[0].audioEvidence,
       },
     ]);
-    expect(result.analysis[0].visualProtection?.coverage).toBe("unknown");
+    expect(result.analysis[0].visualProtection?.coverage).toBe("complete");
     expect(JSON.stringify(result.analysis)).not.toContain(
       report.result.insights[0].improvement
     );

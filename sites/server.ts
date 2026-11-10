@@ -3311,6 +3311,13 @@ async function createAuthoritativeEditBrief(
         acceptedChanges: project.proposedChanges.filter(
           change => change.status === "accepted"
         ),
+        // Keep the editable decision record inspectable even when a treatment
+        // was held back. These belong only to the selected, owned project.
+        pendingChanges: project.proposedChanges.filter(
+          change => change.status === "proposed"
+        ),
+        sourceReviews: project.sourceReviews ?? [],
+        sourceSpeech: project.sourceSpeech ?? [],
       },
       assets: workspace.assets
         .filter(asset => project.clips.some(clip => clip.assetId === asset.id))

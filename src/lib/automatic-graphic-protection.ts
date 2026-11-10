@@ -15,8 +15,13 @@ import { graphicSelectionBounds } from "@contracts/graphic-selection";
 import { effectiveTimelineClips } from "@contracts/timeline-mixer";
 import { normalizeSourceVisualEvidence } from "@contracts/source-visual-evidence";
 import { sourcePointToCanvas } from "./tracked-graphic";
-import { captionLineWidth, getCaptionPreset } from "@contracts/editor-presets";
+import {
+  captionLineWidth,
+  getCaptionPreset,
+  type CaptionPreset,
+} from "@contracts/editor-presets";
 import { captionMotion, captionRuns } from "@contracts/caption-runs";
+import { captionMotionFrame } from "@contracts/caption-motion";
 import { normalizeTranscriptWords } from "@contracts/transcript-timing";
 
 export type AutomaticGraphicIntent = "automatic" | "requested" | "replace";
@@ -35,6 +40,8 @@ export interface GraphicProtectionIssue {
   uncertain?: boolean;
 }
 type Rect = { x: number; y: number; width: number; height: number };
+type Point = [number, number];
+type PaintArea = Rect & { polygon?: Point[] };
 const intersection = (a: Rect, b: Rect): Rect | undefined => {
   const x = Math.max(a.x, b.x),
     y = Math.max(a.y, b.y),
@@ -44,6 +51,61 @@ const intersection = (a: Rect, b: Rect): Rect | undefined => {
     ? { x, y, width: right - x, height: bottom - y }
     : undefined;
 };
+const corners = (rect: Rect): Point[] => [
+  [rect.x, rect.y],
+  [rect.x + rect.width, rect.y],
+  [rect.x + rect.width, rect.y + rect.height],
+  [rect.x, rect.y + rect.height],
+];
+/** Broad bounds reject distant shapes; actual polygon edges preserve the empty
+ * interior of rotated outlines. Text retains its conservative layout envelope. */
+function paintIntersects(a: PaintArea, b: PaintArea): boolean {
+  if (!intersection(a, b)) return false;
+  if (!a.polygon && !b.polygon) return true;
+  const first = a.polygon ?? corners(a),
+    second = b.polygon ?? corners(b);
+  const cross = (a: Point, b: Point, c: Point) =>
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const onSegment = (a: Point, b: Point, p: Point) =>
+    Math.abs(cross(a, b, p)) <= 1e-7 &&
+    p[0] >= Math.min(a[0], b[0]) - 1e-7 &&
+    p[0] <= Math.max(a[0], b[0]) + 1e-7 &&
+    p[1] >= Math.min(a[1], b[1]) - 1e-7 &&
+    p[1] <= Math.max(a[1], b[1]) + 1e-7;
+  const inside = (point: Point, polygon: Point[]) => {
+    let contained = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const a = polygon[i],
+        b = polygon[j];
+      if (onSegment(a, b, point)) return true;
+      if (
+        a[1] > point[1] !== b[1] > point[1] &&
+        point[0] < ((b[0] - a[0]) * (point[1] - a[1])) / (b[1] - a[1]) + a[0]
+      )
+        contained = !contained;
+    }
+    return contained;
+  };
+  if (first.some(p => inside(p, second)) || second.some(p => inside(p, first)))
+    return true;
+  return first.some((a, i) => {
+    const b = first[(i + 1) % first.length];
+    return second.some((c, j) => {
+      const d = second[(j + 1) % second.length];
+      const abC = cross(a, b, c),
+        abD = cross(a, b, d),
+        cdA = cross(c, d, a),
+        cdB = cross(c, d, b);
+      return (
+        (abC * abD < 0 && cdA * cdB < 0) ||
+        onSegment(a, b, c) ||
+        onSegment(a, b, d) ||
+        onSegment(c, d, a) ||
+        onSegment(c, d, b)
+      );
+    });
+  });
+}
 const copyKey = (text: string) =>
   (
     text
@@ -231,7 +293,7 @@ function graphicPaintBounds(
   clip: TimelineClip,
   time: number,
   canvas: { width: number; height: number }
-): Rect[] {
+): PaintArea[] {
   const g = normalizeGraphic(clip.graphic)!;
   const whole = graphicSelectionBounds(clip, time, canvas.width, canvas.height);
   if (!whole) return [];
@@ -289,7 +351,80 @@ function graphicPaintBounds(
       y,
       width: Math.max(...points.map(point => point[0])) - x,
       height: Math.max(...points.map(point => point[1])) - y,
+      polygon: points,
     };
+  });
+}
+
+/** Match CaptionLayer's stacked blocks and the same per-unit motion frame used
+ * by ASS. Blur/glow expand the envelope, rather than inventing clear space. */
+function motionCaptionBounds(
+  segments: readonly TranscriptSegment[],
+  preset: CaptionPreset,
+  time: number,
+  frameRate: number,
+  canvas: { width: number; height: number }
+): Rect[] {
+  const blocks = segments.map(segment => {
+    const frame = captionMotionFrame(segment, preset, time, frameRate);
+    const lines = captionRuns(segment, preset, time)
+      .map(run => run.text)
+      .join("")
+      .split("\n");
+    return {
+      frame,
+      lines,
+      height:
+        frame?.height ??
+        lines.length * preset.size * 1.2 +
+          (preset.background ? 2 * preset.outline : 0),
+    };
+  });
+  const unit = canvas.width / 100;
+  const totalHeight = blocks.reduce((sum, b) => sum + b.height * unit, 0);
+  const vertical =
+    preset.motion?.verticalAnchor && preset.motion.verticalAnchor !== "auto"
+      ? preset.motion.verticalAnchor
+      : preset.position;
+  const anchor = preset.motion?.anchor ?? "center";
+  const x =
+    canvas.width * (anchor === "left" ? 0.08 : anchor === "right" ? 0.92 : 0.5);
+  let top =
+    vertical === "center"
+      ? (canvas.height - totalHeight) / 2
+      : vertical === "top"
+        ? (canvas.height * preset.margin) / 100
+        : canvas.height * (1 - preset.margin / 100) - totalHeight;
+  return blocks.flatMap(block => {
+    const blockTop = top;
+    top += block.height * unit;
+    if (block.frame)
+      return block.frame.units
+        .filter(part => part.opacity > 0.05)
+        .map(part => {
+          const fringe =
+            (preset.outline * part.scale + part.blur * 3 + part.glow * 2) *
+            unit;
+          const height = preset.size * 1.2 * part.scale * unit;
+          return {
+            x: x + part.x * unit - fringe,
+            y: blockTop + part.y * unit - height / 2 - fringe,
+            width: part.width * part.scale * unit + 2 * fringe,
+            height: height + 2 * fringe,
+          };
+        });
+    const width =
+      (Math.max(...block.lines.map(line => captionLineWidth(line, preset))) +
+        2 * preset.outline) *
+      unit;
+    return [
+      {
+        x: x - (anchor === "left" ? 0 : anchor === "right" ? width : width / 2),
+        y: blockTop - preset.outline * unit,
+        width,
+        height: block.height * unit + 2 * preset.outline * unit,
+      },
+    ];
   });
 }
 
@@ -489,13 +624,11 @@ export function automaticGraphicProblems(
     if (!problems.has(issue.reason)) problems.set(issue.reason, issue);
   };
   if (intent === "automatic") {
-    const sourceCopy = project.transcript
-      .filter(
-        segment =>
-          segment.start < graphicClip.start + graphicClip.duration &&
-          segment.end > graphicClip.start
-      )
-      .map(segment => segment.text);
+    const sourceCopy = timedSpeechPhrases(
+      project.transcript,
+      graphicClip.start,
+      graphicClip.start + graphicClip.duration
+    );
     for (const { clip, evidence } of sources) {
       const speed = clip.speed ?? 1;
       const start =
@@ -535,18 +668,35 @@ export function automaticGraphicProblems(
       "spatial-cube",
       "spatial-orbit",
     ].includes(graphic.kind);
-    const parts = [
-      primaryIsVisible
-        ? ["counter", "countdown"].includes(graphic.kind)
-          ? graphicFrame(
-              graphic,
-              graphicClip.graphicDuration ?? graphicClip.outPoint,
-              graphicClip.graphicDuration ?? graphicClip.outPoint
-            ).text
-          : graphic.text
-        : "",
-      graphic.secondaryText ?? "",
-    ]
+    const primaryCopy =
+      primaryIsVisible && graphic.kind === "countdown"
+        ? [
+            ...new Set(
+              times
+                .map(time =>
+                  graphicFrame(
+                    graphic,
+                    graphicClip.inPoint +
+                      (time - graphicClip.start) * (graphicClip.speed ?? 1),
+                    graphicClip.graphicDuration ?? graphicClip.outPoint
+                  )
+                )
+                .filter(frame => frame.opacity > 0.05)
+                .map(frame => frame.text)
+            ),
+          ]
+        : [
+            primaryIsVisible
+              ? graphic.kind === "counter"
+                ? graphicFrame(
+                    graphic,
+                    graphicClip.graphicDuration ?? graphicClip.outPoint,
+                    graphicClip.graphicDuration ?? graphicClip.outPoint
+                  ).text
+                : graphic.text
+              : "",
+          ];
+    const parts = [...primaryCopy, graphic.secondaryText ?? ""]
       .map(copyKey)
       .filter(Boolean);
     if (
@@ -626,7 +776,7 @@ export function automaticGraphicProblems(
         // blanket permission to cover faces, demonstrations or other graphics.
         if (
           protectedBounds &&
-          painted.some(area => intersection(area, protectedBounds)) &&
+          painted.some(area => paintIntersects(area, protectedBounds)) &&
           !(
             intent === "replace" &&
             region.kind === "text" &&
@@ -675,7 +825,7 @@ export function automaticGraphicProblems(
         peerFrame.opacity > 0.05 &&
         painted.some(area =>
           graphicPaintBounds(peer, time, canvas).some(peerArea =>
-            intersection(area, peerArea)
+            paintIntersects(area, peerArea)
           )
         )
       )
@@ -692,6 +842,25 @@ export function automaticGraphicProblems(
       segment =>
         segment.start <= time && segment.end > time && segment.text.trim()
     );
+    if (preset.animation === "motion") {
+      const captionsPaint = motionCaptionBounds(
+        captions,
+        preset,
+        time,
+        project.frameRate ?? 30,
+        canvas
+      );
+      if (
+        painted.some(area =>
+          captionsPaint.some(caption => paintIntersects(area, caption))
+        )
+      )
+        record({
+          reason: "competing-text",
+          detail: "The graphic overlaps the editable caption layer.",
+        });
+      continue;
+    }
     let captionWidth = 0,
       captionHeight = 0,
       captionShift = 0;
@@ -737,7 +906,7 @@ export function automaticGraphicProblems(
         width: captionWidth,
         height: captionHeight + 2 * captionShift,
       };
-      if (painted.some(area => intersection(area, captionBounds)))
+      if (painted.some(area => paintIntersects(area, captionBounds)))
         record({
           reason: "competing-text",
           detail: "The graphic overlaps the editable caption layer.",
