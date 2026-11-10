@@ -1,4 +1,5 @@
 import { studioPolishUi } from "./locales/ui-studio-polish";
+import { momentumCalendarUi } from "./locales/ui-momentum-calendar";
 import { editorOct31Ui } from "./locales/ui-editor-oct31";
 import { editorNov1Ui } from "./locales/ui-editor-nov1";
 import { editorNov7Ui } from "./locales/ui-editor-nov7";
@@ -156,6 +157,7 @@ export function loadUiLocale(
       ...translatePresetNames(catalog),
       ...editorOct30Ui[code],
       ...studioPolishUi[code],
+      ...momentumCalendarUi[code],
       ...editorOct31Ui[code],
       ...editorNov1Ui[code],
       ...editorNov7Ui[code],

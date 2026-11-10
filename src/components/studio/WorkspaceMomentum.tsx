@@ -5,13 +5,14 @@ import {
   ArrowRight,
   AtSign,
   BarChart3,
-  ChartArea,
+  CalendarDays,
   ChartLine,
   FileText,
   Library,
   Scissors,
 } from "lucide-react";
 import type { WorkspaceDocument } from "@contracts/workspace";
+import { MomentumCalendar } from "./MomentumCalendar";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { formatMinutesDuration } from "@/lib/format-duration";
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
@@ -24,7 +25,7 @@ import {
 const CHART_TYPES = [
   { key: "bars", label: "Bar chart", icon: BarChart3 },
   { key: "line", label: "Line chart", icon: ChartLine },
-  { key: "area", label: "Area chart", icon: ChartArea },
+  { key: "calendar", label: "Activity calendar", icon: CalendarDays },
 ] as const;
 
 export function WorkspaceMomentum({
@@ -229,82 +230,85 @@ export function WorkspaceMomentum({
         </div>
       </div>
       <figure className="mt-3" aria-label={`${metricLabels[metric]}: ${total}`}>
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight + 2}`}
-          className="h-28 w-full overflow-visible text-primary"
-          preserveAspectRatio="none"
-          role="img"
-          aria-label={ui("Daily workspace activity chart")}
-        >
-          <title>{metricLabels[metric]}</title>
-          {[0, 0.5, 1].map(ratio => (
-            <line
-              key={ratio}
-              x1={0}
-              x2={chartWidth}
-              y1={chartHeight - ratio * 80}
-              y2={chartHeight - ratio * 80}
-              stroke="currentColor"
-              strokeOpacity={ratio === 0 ? 0.2 : 0.07}
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
-          {chartType === "area" && total > 0 ? (
-            <polygon
-              points={`${coordinates[0].x},${chartHeight} ${line} ${coordinates.at(-1)!.x},${chartHeight}`}
-              fill="currentColor"
-              fillOpacity={0.08}
-            />
-          ) : null}
-          {chartType !== "bars" && total > 0 ? (
-            <polyline
-              points={line}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              vectorEffect="non-scaling-stroke"
-            />
-          ) : null}
-          {series.map((point, index) =>
-            chartType === "bars" ? (
-              <rect
-                key={point.date}
-                x={coordinates[index].x - step * 0.27}
-                y={coordinates[index].y}
-                width={step * 0.54}
-                height={chartHeight - coordinates[index].y}
-                rx={2}
-                fill="currentColor"
-                fillOpacity={0.6}
-              >
-                <title>
-                  {formatDay(point.date)}: {point[metric]}
-                </title>
-              </rect>
-            ) : (
-              <circle
-                key={point.date}
-                cx={coordinates[index].x}
-                cy={coordinates[index].y}
-                r={point[metric] ? 2 : 0}
-                fill="currentColor"
-              >
-                <title>
-                  {formatDay(point.date)}: {point[metric]}
-                </title>
-              </circle>
-            )
-          )}
-        </svg>
-        <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-          <span>{formatDay(series[0].date)}</span>
-          <span>
-            {total === 0
-              ? ui("No records in this period")
-              : ui("Daily records · UTC")}
-          </span>
-          <span>{formatDay(series.at(-1)!.date)}</span>
-        </div>
+        {chartType === "calendar" ? (
+          <MomentumCalendar
+            series={series}
+            metric={metric}
+            label={metricLabels[metric]}
+          />
+        ) : (
+          <>
+            <svg
+              viewBox={`0 0 ${chartWidth} ${chartHeight + 2}`}
+              className="h-28 w-full overflow-visible text-primary"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={ui("Daily workspace activity chart")}
+            >
+              <title>{metricLabels[metric]}</title>
+              {[0, 0.5, 1].map(ratio => (
+                <line
+                  key={ratio}
+                  x1={0}
+                  x2={chartWidth}
+                  y1={chartHeight - ratio * 80}
+                  y2={chartHeight - ratio * 80}
+                  stroke="currentColor"
+                  strokeOpacity={ratio === 0 ? 0.2 : 0.07}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+              {chartType !== "bars" && total > 0 ? (
+                <polyline
+                  points={line}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ) : null}
+              {series.map((point, index) =>
+                chartType === "bars" ? (
+                  <rect
+                    key={point.date}
+                    x={coordinates[index].x - step * 0.27}
+                    y={coordinates[index].y}
+                    width={step * 0.54}
+                    height={chartHeight - coordinates[index].y}
+                    rx={2}
+                    fill="currentColor"
+                    fillOpacity={0.6}
+                  >
+                    <title>
+                      {formatDay(point.date)}: {point[metric]}
+                    </title>
+                  </rect>
+                ) : (
+                  <circle
+                    key={point.date}
+                    cx={coordinates[index].x}
+                    cy={coordinates[index].y}
+                    r={point[metric] ? 2 : 0}
+                    fill="currentColor"
+                  >
+                    <title>
+                      {formatDay(point.date)}: {point[metric]}
+                    </title>
+                  </circle>
+                )
+              )}
+            </svg>
+            <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+              <span>{formatDay(series[0].date)}</span>
+              <span>
+                {total === 0
+                  ? ui("No records in this period")
+                  : ui("Daily records · UTC")}
+              </span>
+              <span>{formatDay(series.at(-1)!.date)}</span>
+            </div>
+          </>
+        )}
         <figcaption className="sr-only">
           <table>
             <caption>{metricLabels[metric]}</caption>

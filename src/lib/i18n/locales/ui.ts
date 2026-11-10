@@ -1,4 +1,5 @@
 import { studioPolishUi } from "./ui-studio-polish";
+import { momentumCalendarUi } from "./ui-momentum-calendar";
 import { editorOct31Ui } from "./ui-editor-oct31";
 import { editorNov1Ui } from "./ui-editor-nov1";
 import { editorNov7Ui } from "./ui-editor-nov7";
@@ -133,6 +134,8 @@ for (const [code, entries] of Object.entries(editorOct30Ui))
   Object.assign(uiLocales[code], entries);
 
 for (const [code, entries] of Object.entries(studioPolishUi))
+  Object.assign(uiLocales[code as keyof typeof uiLocales], entries);
+for (const [code, entries] of Object.entries(momentumCalendarUi))
   Object.assign(uiLocales[code as keyof typeof uiLocales], entries);
 for (const [code, entries] of Object.entries(editorOct31Ui))
   Object.assign(uiLocales[code as keyof typeof uiLocales], entries);
