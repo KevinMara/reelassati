@@ -260,9 +260,10 @@ export function assertAutonomousComposition(
   }
 }
 
-/** Insertions use the original clock and must exist before ripple cuts project
- * their source samples. Safe retained trims then precede local splits. Other
- * decisions retain the established descending-time execution order. */
+/** Insertions and local treatments use the original clock. Materialize them
+ * before ripple cuts project their source samples; otherwise a treatment that
+ * spans a later cut would address already-shifted source pieces. Safe retained
+ * trims still precede local splits; ripple cuts remain in descending time. */
 export function orderAutonomousOperations(
   project: Pick<EditProject, "clips">,
   operations: EditOperation[]
@@ -275,7 +276,9 @@ export function orderAutonomousOperations(
         ? 1
         : trimPreservesTimelineClock(project, operation)
           ? 2
-          : 3;
+          : ["style", "audio", "split", "graphic"].includes(operation.type)
+            ? 3
+            : 4;
   return [...operations].sort(
     (a, b) => phase(a) - phase(b) || b.start - a.start
   );

@@ -12,11 +12,7 @@ import {
   normalizeClipGroups,
   splitGrouping,
 } from "./clip-groups";
-import type {
-  EditOperation,
-  EditProject,
-  TimelineClip,
-} from "./workspace";
+import type { EditOperation, EditProject, TimelineClip } from "./workspace";
 
 export function contentDuration(clips: TimelineClip[], empty = 1): number {
   return Math.max(empty, ...clips.map(c => c.start + c.duration));
@@ -504,8 +500,7 @@ export function applyEditOperation(
         if (visual && p.visual?.keyframes !== undefined) {
           // Replacing pose animation must not restart an unrelated transition.
           const previousClock = visualClock(c);
-          if (!p.visual.entrance)
-            visual.entrance.at ??= previousClock.start;
+          if (!p.visual.entrance) visual.entrance.at ??= previousClock.start;
           if (!p.visual.exit)
             visual.exit.at ??= previousClock.start + previousClock.duration;
         }
@@ -527,15 +522,19 @@ export function applyEditOperation(
           ...(visual && p.visual
             ? {
                 visual,
-                // New local keyframes describe this isolated range. Reusing an
-                // older full-source clock would skip their entrance and exit.
-                // Unrelated pose/grade edits keep the existing animation clock.
-                visualStart: p.visual.keyframes !== undefined
-                  ? c.inPoint
-                  : c.visualStart ?? c.inPoint,
-                visualDuration: p.visual.keyframes !== undefined
-                  ? c.outPoint - c.inPoint
-                  : c.visualDuration ?? c.outPoint - c.inPoint,
+                // One operation defines one timeline motion range, even when
+                // earlier local edits have already segmented its targets.
+                // Map that full range into each piece's source clock. Later
+                // splits/ripple cuts preserve it rather than replaying 0..1.
+                // Unrelated pose/grade edits retain the previous motion clock.
+                visualStart:
+                  p.visual.keyframes !== undefined
+                    ? c.inPoint + (op.start - c.start) * (c.speed ?? 1)
+                    : (c.visualStart ?? c.inPoint),
+                visualDuration:
+                  p.visual.keyframes !== undefined
+                    ? (op.end - op.start) * (c.speed ?? 1)
+                    : (c.visualDuration ?? c.outPoint - c.inPoint),
               }
             : {}),
         };
