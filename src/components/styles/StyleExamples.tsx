@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
 import {
   EDIT_STYLE_EXAMPLE_LIMIT,
+  EDIT_STYLE_FEEDBACK_NOTE_LIMIT,
   canCaptureEditStyle,
   type EditStyleTemplate,
 } from "@contracts/edit-style-template";
@@ -299,49 +300,113 @@ export function StyleExamples({
           {examples.map(example => (
             <div
               key={example.id}
-              className="flex items-center gap-2 rounded-lg border border-border px-3 py-2"
+              className="space-y-2 rounded-lg border border-border px-3 py-2"
             >
-              <button
-                type="button"
-                disabled={disabled}
-                aria-pressed={preview === example.id}
-                onClick={() =>
-                  setPreview(preview === example.id ? "" : example.id)
-                }
-                className="min-w-0 flex-1 text-left"
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={disabled}
+                  aria-pressed={preview === example.id}
+                  onClick={() =>
+                    setPreview(preview === example.id ? "" : example.id)
+                  }
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <span className="block truncate text-xs font-medium">
+                    {example.name}
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    {ui(
+                      example.feedback === "exclude"
+                        ? "Excluded from style review"
+                        : example.source === "edit"
+                          ? "Saved project edit"
+                          : example.profile
+                            ? "Style reviewed"
+                            : "Reviewed when you run Reel"
+                    )}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  aria-label={ui("Remove example {{name}}", {
+                    name: example.name,
+                  })}
+                  onClick={() =>
+                    onChange({
+                      ...value,
+                      examples: examples.filter(item => item.id !== example.id),
+                    })
+                  }
+                  className="rounded p-1.5 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              <div
+                role="group"
+                aria-label={ui("Feedback for {{name}}", { name: example.name })}
+                className="flex flex-wrap gap-1"
               >
-                <span className="block truncate text-xs font-medium">
-                  {example.name}
-                </span>
-                <span className="block text-[11px] text-muted-foreground">
-                  {ui(
-                    example.source === "edit"
-                      ? "Saved project edit"
-                      : example.profile
-                        ? "Style reviewed"
-                        : "Reviewed when you run Reel"
-                  )}
-                </span>
-              </button>
-              <button
-                type="button"
-                disabled={disabled}
-                aria-label={ui("Remove example {{name}}", {
-                  name: example.name,
-                })}
-                onClick={() =>
-                  onChange({
-                    ...value,
-                    examples: examples.filter(item => item.id !== example.id),
-                  })
-                }
-                className="rounded p-1.5 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 size={14} />
-              </button>
+                {(["keep", "adjust", "exclude"] as const).map(feedback => (
+                  <button
+                    key={feedback}
+                    type="button"
+                    disabled={disabled}
+                    aria-pressed={(example.feedback ?? "keep") === feedback}
+                    onClick={() => {
+                      onChange({
+                        ...value,
+                        examples: examples.map(item =>
+                          item.id === example.id ? { ...item, feedback } : item
+                        ),
+                      });
+                      setPreview(example.id);
+                    }}
+                    className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground aria-pressed:border-primary/50 aria-pressed:bg-primary/10 aria-pressed:text-primary disabled:opacity-40"
+                  >
+                    {feedback === "keep"
+                      ? ui("Keep")
+                      : feedback === "adjust"
+                        ? ui("Adjust")
+                        : ui("Exclude")}
+                  </button>
+                ))}
+              </div>
+              {preview === example.id && (
+                <textarea
+                  rows={2}
+                  maxLength={EDIT_STYLE_FEEDBACK_NOTE_LIMIT}
+                  disabled={disabled}
+                  aria-label={ui("Style notes for {{name}}", {
+                    name: example.name,
+                  })}
+                  placeholder={ui("What should stay, change, or be avoided?")}
+                  value={example.feedbackNotes ?? ""}
+                  onChange={event =>
+                    onChange({
+                      ...value,
+                      examples: examples.map(item =>
+                        item.id === example.id
+                          ? { ...item, feedbackNotes: event.target.value }
+                          : item
+                      ),
+                    })
+                  }
+                  className="w-full resize-y rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-40"
+                />
+              )}
             </div>
           ))}
         </div>
+      )}
+      {examples.length > 0 && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {ui(
+            "Your feedback is saved with the style. Excluded examples are not analyzed or used."
+          )}
+        </p>
       )}
       {selected?.blueprint && (
         <SavedStylePreview
@@ -367,7 +432,10 @@ export function StyleExamples({
         </p>
       )}
       {examples.some(
-        example => example.source === "reference" && !example.profile
+        example =>
+          example.source === "reference" &&
+          !example.profile &&
+          example.feedback !== "exclude"
       ) && (
         <p className="text-xs leading-relaxed text-muted-foreground">
           {ui(

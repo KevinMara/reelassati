@@ -10,7 +10,8 @@ export function captionRuns(
 ): Array<{ text: string; active: boolean; hidden?: boolean }> {
   const text = captionLines(segment.text, preset);
   const words = normalizeTranscriptWords(segment.text, segment.words);
-  if (preset.animation === "none" || !words) return [{ text, active: false }];
+  if (preset.animation === "none" || preset.animation === "motion" || !words)
+    return [{ text, active: false }];
   const normalized = words.map(w =>
     spokenText(preset.uppercase ? w.text.toUpperCase() : w.text)
   );

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { allowedStockUrl } from "../contracts/stock-media";
-import { downloadStock, resolveStock, searchStock } from "./stock-media";
+import {
+  downloadStock,
+  resolveStock,
+  searchStock,
+  searchStockPage,
+} from "./stock-media";
 import type { StockMedia } from "../contracts/stock-media";
 import { editAttribution } from "../contracts/media-attribution";
 import type { Asset, EditProject } from "../contracts/workspace";
@@ -47,6 +52,107 @@ const openverse = (overrides: Record<string, unknown> = {}) => ({
 afterEach(() => vi.unstubAllGlobals());
 
 describe("on-demand licensed stock", () => {
+  it("accepts provider-returned public CC BY music delivery without permitting arbitrary query services", async () => {
+    const url =
+      "https://prod-1.storage.jamendo.com/?trackid=1468788&format=mp32";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          results: [openverse({ url, category: "music", duration: 180000 })],
+          page_count: 1,
+        })
+      )
+    );
+    const result = await searchStockPage("audio", "piano", signal(), {
+      category: "music",
+    });
+    expect(result.items[0]).toMatchObject({
+      url,
+      duration: 180,
+      kind: "audio",
+      license: "CC BY 4.0",
+    });
+    expect(
+      allowedStockUrl(
+        "https://prod-1.storage.jamendo.com/download/track/1468788/mp32/"
+      )
+    ).toBe(true);
+    for (const invalid of [
+      "https://prod-1.storage.jamendo.com/?trackid=1&format=mp32&redirect=https://private.test",
+      "https://prod-1.storage.jamendo.com/admin",
+      "https://api.jamendo.com/v3.0/tracks/",
+      "https://prod-1.storage.jamendo.com/?trackid=1&trackid=2",
+      "https://prod-1.storage.jamendo.com.evil.test/?trackid=1&format=mp32",
+    ])
+      expect(allowedStockUrl(invalid)).toBe(false);
+  });
+  it("pages Openverse audio and sends the selected music category", async () => {
+    const fetcher = vi.fn<(url: URL) => Promise<Response>>(async () =>
+      Response.json({ results: [openverse()], page_count: 4 })
+    );
+    vi.stubGlobal("fetch", fetcher);
+    const result = await searchStockPage("audio", "quiet piano", signal(), {
+      page: 2,
+      category: "music",
+    });
+    const url = new URL(String(fetcher.mock.calls[0][0]));
+    expect(url.searchParams.get("page")).toBe("2");
+    expect(url.searchParams.get("category")).toBe("music");
+    expect(result).toMatchObject({ page: 2, hasMore: true });
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("keeps usable Openverse images when the other image provider is unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: URL) =>
+        url.hostname === "commons.wikimedia.org"
+          ? new Response("unavailable", { status: 503 })
+          : Response.json({
+              page_count: 2,
+              results: [
+                openverse({
+                  url: "https://live.staticflickr.com/12/12345_abcd_b.jpg",
+                  width: 1600,
+                  height: 900,
+                  category: "photograph",
+                }),
+              ],
+            })
+      )
+    );
+    const result = await searchStockPage("image", "coast", signal());
+    expect(result.items[0]).toMatchObject({
+      kind: "image",
+      provider: "openverse",
+      width: 1600,
+      height: 900,
+    });
+    expect(result.hasMore).toBe(true);
+  });
+
+  it("revalidates an Openverse image and limits image-CDN access to static paths", async () => {
+    const url = "https://live.staticflickr.com/12/12345_abcd_b.jpg";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(openverse({ url, category: "photograph" }))
+      )
+    );
+    expect(
+      (await resolveStock("openverse", audioId, "image", signal())).url
+    ).toBe(url);
+    expect(allowedStockUrl(url)).toBe(true);
+    for (const invalid of [
+      "https://live.staticflickr.com/account",
+      "https://api.flickr.com/services/rest/",
+      "https://live.staticflickr.com.evil.test/12/12345_abcd.jpg",
+      "https://live.staticflickr.com/12/%2e%2e%2faccount",
+    ])
+      expect(allowedStockUrl(invalid)).toBe(false);
+  });
+
   it("accepts only known public media hosts and paths", () => {
     for (const url of [
       "http://upload.wikimedia.org/wikipedia/commons/a.jpg",
@@ -350,12 +456,12 @@ describe("on-demand licensed stock", () => {
         })
     );
     vi.stubGlobal("fetch", fetcher);
-    await expect(searchStock("image", "rain", signal())).rejects.toThrow(
+    await expect(searchStock("video", "rain", signal())).rejects.toThrow(
       "large"
     );
     expect(canceled).toHaveBeenCalledOnce();
     const aborted = AbortSignal.abort();
-    await expect(searchStock("image", "rain", aborted)).rejects.toThrow();
+    await expect(searchStock("video", "rain", aborted)).rejects.toThrow();
     await expect(
       downloadStock({ url: mediaUrl, kind: "video" } as StockMedia, aborted)
     ).rejects.toThrow();

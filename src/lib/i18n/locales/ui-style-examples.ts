@@ -102,3 +102,52 @@ for (const [language, row] of Object.entries(preparationRows)) {
     )
   );
 }
+
+const feedbackKeys = [
+  "Keep",
+  "Adjust",
+  "Exclude",
+  "Feedback for {{name}}",
+  "Style notes for {{name}}",
+  "What should stay, change, or be avoided?",
+  "Excluded from style review",
+  "Your feedback is saved with the style. Excluded examples are not analyzed or used.",
+];
+const feedbackRows: Record<string, string> = {
+  it: "Mantieni|Modifica|Escludi|Feedback per {{name}}|Note sullo stile per {{name}}|Cosa mantenere, modificare o evitare?|Escluso dall’analisi dello stile|Il feedback viene salvato con lo stile. Gli esempi esclusi non vengono analizzati né utilizzati.",
+  es: "Mantener|Ajustar|Excluir|Comentarios sobre {{name}}|Notas de estilo para {{name}}|¿Qué mantener, cambiar o evitar?|Excluido del análisis de estilo|Tus comentarios se guardan con el estilo. Los ejemplos excluidos no se analizan ni se usan.",
+  fr: "Garder|Ajuster|Exclure|Avis sur {{name}}|Notes de style pour {{name}}|Que faut-il garder, modifier ou éviter ?|Exclu de l’analyse du style|Vos avis sont enregistrés avec le style. Les exemples exclus ne sont ni analysés ni utilisés.",
+  de: "Behalten|Anpassen|Ausschließen|Feedback zu {{name}}|Stilnotizen zu {{name}}|Was soll bleiben, sich ändern oder vermieden werden?|Von der Stilanalyse ausgeschlossen|Dein Feedback wird mit dem Stil gespeichert. Ausgeschlossene Beispiele werden weder analysiert noch verwendet.",
+  pt: "Manter|Ajustar|Excluir|Comentários sobre {{name}}|Notas de estilo para {{name}}|O que manter, alterar ou evitar?|Excluído da análise de estilo|Os comentários são guardados com o estilo. Os exemplos excluídos não são analisados nem usados.",
+  nl: "Behouden|Aanpassen|Uitsluiten|Feedback voor {{name}}|Stijlnotities voor {{name}}|Wat moet blijven, veranderen of worden vermeden?|Uitgesloten van stijlanalyse|Je feedback wordt met de stijl opgeslagen. Uitgesloten voorbeelden worden niet geanalyseerd of gebruikt.",
+  pl: "Zachowaj|Dostosuj|Wyklucz|Opinia o {{name}}|Notatki stylu dla {{name}}|Co zachować, zmienić lub czego unikać?|Wykluczono z analizy stylu|Opinie są zapisywane ze stylem. Wykluczone przykłady nie są analizowane ani używane.",
+  ro: "Păstrează|Ajustează|Exclude|Feedback pentru {{name}}|Note de stil pentru {{name}}|Ce păstrăm, schimbăm sau evităm?|Exclus din analiza stilului|Feedbackul este salvat cu stilul. Exemplele excluse nu sunt analizate sau folosite.",
+  tr: "Koru|Düzenle|Hariç tut|{{name}} için geri bildirim|{{name}} için stil notları|Neler kalmalı, değişmeli veya kaçınılmalı?|Stil analizinden çıkarıldı|Geri bildiriminiz stille kaydedilir. Hariç tutulan örnekler analiz edilmez veya kullanılmaz.",
+  uk: "Зберегти|Змінити|Виключити|Відгук про {{name}}|Нотатки стилю для {{name}}|Що зберегти, змінити або чого уникати?|Виключено з аналізу стилю|Відгук зберігається зі стилем. Виключені приклади не аналізуються й не використовуються.",
+  ru: "Сохранить|Изменить|Исключить|Отзыв о {{name}}|Заметки о стиле для {{name}}|Что сохранить, изменить или чего избегать?|Исключено из анализа стиля|Отзыв сохраняется вместе со стилем. Исключённые примеры не анализируются и не используются.",
+  ar: "احتفظ|عدّل|استبعد|ملاحظات حول {{name}}|ملاحظات النمط لـ {{name}}|ما الذي يجب الاحتفاظ به أو تغييره أو تجنبه؟|مستبعد من تحليل النمط|تُحفظ ملاحظاتك مع النمط. لا تُحلل الأمثلة المستبعدة ولا تُستخدم.",
+  hi: "रखें|बदलें|हटाएँ|{{name}} के लिए प्रतिक्रिया|{{name}} के लिए शैली नोट्स|क्या रखना, बदलना या टालना है?|शैली विश्लेषण से बाहर|आपकी प्रतिक्रिया शैली के साथ सहेजी जाती है। बाहर किए गए उदाहरणों का विश्लेषण या उपयोग नहीं होता।",
+  ja: "維持|調整|除外|{{name}}へのフィードバック|{{name}}のスタイルメモ|維持、変更、避けたい点は？|スタイル分析から除外|フィードバックはスタイルとともに保存されます。除外した例は分析・使用されません。",
+  ko: "유지|조정|제외|{{name}}에 대한 피드백|{{name}}의 스타일 메모|유지하거나 바꾸거나 피할 점은 무엇인가요?|스타일 분석에서 제외됨|피드백은 스타일과 함께 저장됩니다. 제외된 예시는 분석하거나 사용하지 않습니다.",
+  zh: "保留|调整|排除|对 {{name}} 的反馈|{{name}} 的风格备注|哪些应保留、更改或避免？|已从风格分析中排除|反馈会随风格一起保存。被排除的示例不会被分析或使用。",
+  vi: "Giữ|Điều chỉnh|Loại trừ|Phản hồi cho {{name}}|Ghi chú phong cách cho {{name}}|Cần giữ, thay đổi hay tránh điều gì?|Đã loại khỏi phân tích phong cách|Phản hồi được lưu cùng phong cách. Các ví dụ bị loại sẽ không được phân tích hay sử dụng.",
+  da: "Behold|Tilpas|Udeluk|Feedback til {{name}}|Stilnoter til {{name}}|Hvad skal beholdes, ændres eller undgås?|Udelukket fra stilanalyse|Din feedback gemmes med stilen. Udelukkede eksempler analyseres eller bruges ikke.",
+  sv: "Behåll|Justera|Uteslut|Feedback för {{name}}|Stilanteckningar för {{name}}|Vad ska behållas, ändras eller undvikas?|Utesluten från stilanalys|Din feedback sparas med stilen. Uteslutna exempel analyseras eller används inte.",
+  no: "Behold|Juster|Utelat|Tilbakemelding for {{name}}|Stilnotater for {{name}}|Hva skal beholdes, endres eller unngås?|Utelatt fra stilanalyse|Tilbakemeldingen lagres med stilen. Utelatte eksempler blir ikke analysert eller brukt.",
+  fi: "Säilytä|Muokkaa|Sulje pois|Palaute: {{name}}|Tyylimuistiinpanot: {{name}}|Mitä säilyttää, muuttaa tai välttää?|Suljettu pois tyylianalyysistä|Palaute tallennetaan tyylin kanssa. Pois suljettuja esimerkkejä ei analysoida eikä käytetä.",
+  cs: "Ponechat|Upravit|Vyloučit|Zpětná vazba pro {{name}}|Poznámky ke stylu pro {{name}}|Co zachovat, změnit nebo čemu se vyhnout?|Vyloučeno z analýzy stylu|Zpětná vazba se uloží se stylem. Vyloučené příklady se neanalyzují ani nepoužívají.",
+  hu: "Megtartás|Módosítás|Kizárás|Visszajelzés: {{name}}|Stílusjegyzetek: {{name}}|Mit tartsunk meg, módosítsunk vagy kerüljünk?|Kizárva a stíluselemzésből|A visszajelzés a stílussal mentődik. A kizárt példákat nem elemezzük és nem használjuk.",
+  el: "Διατήρηση|Προσαρμογή|Εξαίρεση|Σχόλια για {{name}}|Σημειώσεις στυλ για {{name}}|Τι να διατηρηθεί, να αλλάξει ή να αποφευχθεί;|Εξαιρέθηκε από την ανάλυση στυλ|Τα σχόλιά σας αποθηκεύονται με το στυλ. Τα εξαιρεμένα παραδείγματα δεν αναλύονται ούτε χρησιμοποιούνται.",
+  he: "לשמור|להתאים|להחריג|משוב על {{name}}|הערות סגנון עבור {{name}}|מה לשמור, לשנות או להימנע ממנו?|הוחרג מניתוח הסגנון|המשוב נשמר עם הסגנון. דוגמאות שהוחרגו אינן מנותחות ואינן בשימוש.",
+  id: "Pertahankan|Sesuaikan|Kecualikan|Masukan untuk {{name}}|Catatan gaya untuk {{name}}|Apa yang perlu dipertahankan, diubah, atau dihindari?|Dikecualikan dari analisis gaya|Masukan disimpan bersama gaya. Contoh yang dikecualikan tidak dianalisis atau digunakan.",
+  th: "เก็บไว้|ปรับ|ยกเว้น|ความคิดเห็นสำหรับ {{name}}|บันทึกสไตล์สำหรับ {{name}}|ควรเก็บ เปลี่ยน หรือหลีกเลี่ยงอะไร?|ยกเว้นจากการวิเคราะห์สไตล์|ความคิดเห็นจะบันทึกพร้อมสไตล์ ตัวอย่างที่ยกเว้นจะไม่ถูกวิเคราะห์หรือนำไปใช้",
+};
+for (const [language, row] of Object.entries(feedbackRows)) {
+  const values = row.split("|");
+  if (values.length !== feedbackKeys.length)
+    throw new Error(`Incomplete style feedback catalog: ${language}`);
+  Object.assign(
+    styleExamplesUi[language],
+    Object.fromEntries(feedbackKeys.map((key, index) => [key, values[index]]))
+  );
+}

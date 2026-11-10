@@ -1,5 +1,7 @@
 import { studioPolishUi } from "./locales/ui-studio-polish";
 import { momentumCalendarUi } from "./locales/ui-momentum-calendar";
+import { captionMotionUi } from "./locales/ui-caption-motion";
+import { stockExpansionUi } from "./locales/ui-stock-expansion";
 import { editorOct31Ui } from "./locales/ui-editor-oct31";
 import { editorNov1Ui } from "./locales/ui-editor-nov1";
 import { editorNov7Ui } from "./locales/ui-editor-nov7";
@@ -154,10 +156,12 @@ export function loadUiLocale(
   if (code !== "en")
     pending = pending.then(catalog => ({
       ...catalog,
-      ...translatePresetNames(catalog),
+      ...captionMotionUi[code],
+      ...translatePresetNames({ ...catalog, ...captionMotionUi[code] }),
       ...editorOct30Ui[code],
       ...studioPolishUi[code],
       ...momentumCalendarUi[code],
+      ...stockExpansionUi[code],
       ...editorOct31Ui[code],
       ...editorNov1Ui[code],
       ...editorNov7Ui[code],

@@ -5,7 +5,7 @@ import {
   preserveGraphicDuration,
 } from "./timeline-lanes";
 import { normalizeGraphic } from "@contracts/motion-graphics";
-import { patchVisual } from "@contracts/clip-visual";
+import { patchVisual, visualClock } from "@contracts/clip-visual";
 import { assertNoShotTransition } from "@contracts/adjacent-transition";
 import {
   assertLinkedEditTargets,
@@ -247,7 +247,7 @@ export function applyEditOperation(
       project.clips.filter(targeted).map(c => c.id)
     );
   if (
-    !["caption", "broll", "silence", "graphic"].includes(op.type) &&
+    !["caption", "broll", "silence", "graphic", "sound"].includes(op.type) &&
     !project.clips.some(targeted)
   )
     throw new Error(
@@ -255,7 +255,11 @@ export function applyEditOperation(
     );
   let next = {
     ...project,
-    clips: project.clips.map(c => ({ ...preserveGraphicDuration(c) })),
+    // A new sound lives on its own lane. It must not normalize or change
+    // unrelated visual metadata, especially on locked footage/graphics.
+    clips: project.clips.map(c => ({
+      ...(op.type === "sound" ? c : preserveGraphicDuration(c)),
+    })),
     transcript: project.transcript.map(s => ({ ...s })),
   };
   const captionSplits: Array<{
@@ -382,8 +386,29 @@ export function applyEditOperation(
       ...(p.sourceClipId ? { sourceClipId: p.sourceClipId } : {}),
     });
   } else if (op.type === "sound") {
-    if(!p.assetId || op.end<=op.start)throw new Error("Choose a sound and valid placement.");
-    next.clips.push({id:op.id,assetId:p.assetId,label:op.label,color:"#8b7bf0",track:"audio",lane:allocateTimelineLane(next.clips,"audio",op.start,op.end-op.start),start:op.start,duration:op.end-op.start,inPoint:p.sourceIn??0,outPoint:(p.sourceIn??0)+op.end-op.start,volume:p.volume??.2,fadeIn:Math.min(p.fadeIn??.015,(op.end-op.start)/2),fadeOut:Math.min(p.fadeOut??.04,(op.end-op.start)/2),locked:false});
+    if (!p.assetId || op.end <= op.start)
+      throw new Error("Choose a sound and valid placement.");
+    next.clips.push({
+      id: op.id,
+      assetId: p.assetId,
+      label: op.label,
+      color: "#8b7bf0",
+      track: "audio",
+      lane: allocateTimelineLane(
+        next.clips,
+        "audio",
+        op.start,
+        op.end - op.start
+      ),
+      start: op.start,
+      duration: op.end - op.start,
+      inPoint: p.sourceIn ?? 0,
+      outPoint: (p.sourceIn ?? 0) + op.end - op.start,
+      volume: p.volume ?? 0.2,
+      fadeIn: Math.min(p.fadeIn ?? 0.015, (op.end - op.start) / 2),
+      fadeOut: Math.min(p.fadeOut ?? 0.04, (op.end - op.start) / 2),
+      locked: false,
+    });
   } else if (op.type === "broll") {
     if (!p.assetId)
       throw new Error("Generate or choose the supporting media first.");
@@ -470,7 +495,16 @@ export function applyEditOperation(
       }
       if (op.type === "audio")
         return { ...c, volume: p.volume ?? 0.25, muted: false };
-      if (op.type === "style")
+      if (op.type === "style") {
+        const visual = p.visual ? patchVisual(c, p.visual) : undefined;
+        if (visual && p.visual?.keyframes !== undefined) {
+          // Replacing pose animation must not restart an unrelated transition.
+          const previousClock = visualClock(c);
+          if (!p.visual.entrance)
+            visual.entrance.at ??= previousClock.start;
+          if (!p.visual.exit)
+            visual.exit.at ??= previousClock.start + previousClock.duration;
+        }
         return {
           ...c,
           fit: p.fit ?? c.fit,
@@ -486,14 +520,22 @@ export function applyEditOperation(
           brightness: p.brightness ?? c.brightness,
           contrast: p.contrast ?? c.contrast,
           saturation: p.saturation ?? c.saturation,
-          ...(p.visual
+          ...(visual && p.visual
             ? {
-                visual: patchVisual(c, p.visual),
-                visualStart: c.visualStart ?? c.inPoint,
-                visualDuration: c.visualDuration ?? c.outPoint - c.inPoint,
+                visual,
+                // New local keyframes describe this isolated range. Reusing an
+                // older full-source clock would skip their entrance and exit.
+                // Unrelated pose/grade edits keep the existing animation clock.
+                visualStart: p.visual.keyframes !== undefined
+                  ? c.inPoint
+                  : c.visualStart ?? c.inPoint,
+                visualDuration: p.visual.keyframes !== undefined
+                  ? c.outPoint - c.inPoint
+                  : c.visualDuration ?? c.outPoint - c.inPoint,
               }
             : {}),
         };
+      }
       return c;
     });
   }

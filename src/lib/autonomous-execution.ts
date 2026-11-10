@@ -8,6 +8,7 @@ import { applyEditOperation } from "./edit-timeline";
 import { assertSupportingMedia } from "@contracts/supporting-media";
 import { auditAutomatedEdit } from "./editor-production";
 import { assertAutonomousTrimSemantics } from "@contracts/edit-cut-semantics";
+import { orderAutonomousOperations } from "@contracts/autonomous-operation-order";
 import {
   automaticGraphicProblems,
   graphicRequestScope,
@@ -344,14 +345,9 @@ export function executeAutonomousPlan(
   let working = structuredClone(project);
   const roots = new Map(project.clips.map(clip => [clip.id, clip.id]));
   const seen = new Set<string>();
-  // Sounds are specified on the original clock. Materialize them before cuts
-  // so rippleRemove keeps their surviving samples in sync, including a bed
-  // spanning a cut, equal-start cues and cues removed entirely by that cut.
-  const ordered = [...operations].sort(
-    (a, b) =>
-      Number(b.type === "sound") - Number(a.type === "sound") ||
-      b.start - a.start
-  );
+  // Materialize original-clock layers before cuts, then retain clock-preserving
+  // source trims before local style/audio operations split their target clips.
+  const ordered = orderAutonomousOperations(project, operations);
   for (const operation of ordered) {
     checkpoint();
     if (seen.has(operation.id))
@@ -360,7 +356,9 @@ export function executeAutonomousPlan(
     const base = project.clips.filter(c =>
       operation.targetClipIds.includes(c.id)
     );
-    if (base.some(c => c.locked))
+    // A sound is inserted on its own lane. Referencing a locked picture as its
+    // timing anchor does not grant permission to alter that picture.
+    if (operation.type !== "sound" && base.some(c => c.locked))
       throw new Error(`${operation.label}: a requested clip is locked.`);
     let execution = operation;
     if (["style", "audio", "split", "delete"].includes(operation.type)) {

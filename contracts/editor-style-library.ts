@@ -105,6 +105,7 @@ function safeCaptionAppearance(style: string, value: unknown) {
       margin: preset.margin,
       maxCharacters: preset.maxCharacters,
       animation: preset.animation,
+      ...(preset.motion ? { motion: { ...preset.motion } } : {}),
     } satisfies CaptionAppearance,
   };
 }

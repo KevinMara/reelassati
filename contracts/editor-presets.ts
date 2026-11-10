@@ -16,10 +16,94 @@ export const CAPTION_ANIMATIONS = [
   "word-slide",
   "word-fade",
   "word-type",
+  "motion",
 ] as const;
 export type CaptionAnimation = (typeof CAPTION_ANIMATIONS)[number];
+export const CAPTION_MOTION_RECIPES = [
+  "rise",
+  "pop",
+  "drift",
+  "focus",
+  "bounce",
+  "sweep",
+] as const;
+export interface CaptionMotionSettings {
+  recipe: (typeof CAPTION_MOTION_RECIPES)[number];
+  unit: "letter" | "word" | "line";
+  direction: "up" | "down" | "left" | "right";
+  duration: number;
+  delay: number;
+  stagger: number;
+  amount: number;
+  easing: "smooth" | "snappy" | "bounce" | "linear";
+  blur: number;
+  glow: number;
+  anchor: "left" | "center" | "right";
+  verticalAnchor: "auto" | "top" | "center" | "bottom";
+}
+export const DEFAULT_CAPTION_MOTION: CaptionMotionSettings = {
+  recipe: "rise",
+  unit: "word",
+  direction: "up",
+  duration: 0.32,
+  delay: 0,
+  stagger: 0.025,
+  amount: 0.6,
+  easing: "smooth",
+  blur: 0,
+  glow: 0,
+  anchor: "center",
+  verticalAnchor: "auto",
+};
+export function normalizeCaptionMotion(
+  value?: Partial<CaptionMotionSettings>
+): CaptionMotionSettings {
+  const result = { ...DEFAULT_CAPTION_MOTION };
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return result;
+  // Choosing a recipe supplies a complete intentional entrance. Subsequent
+  // explicit parameters still win, so custom saved styles remain editable.
+  const recipes: Record<
+    CaptionMotionSettings["recipe"],
+    Partial<CaptionMotionSettings>
+  > = {
+    rise: {},
+    pop: { amount: 0.7, easing: "snappy" },
+    drift: { unit: "line", direction: "left", amount: 0.45, duration: 0.5 },
+    focus: { unit: "line", amount: 0.25, blur: 0.45, duration: 0.42 },
+    bounce: { amount: 0.65, easing: "bounce", duration: 0.4 },
+    sweep: { unit: "letter", amount: 0.85, glow: 0.35, easing: "linear" },
+  };
+  if (value.recipe && CAPTION_MOTION_RECIPES.includes(value.recipe))
+    Object.assign(result, recipes[value.recipe]);
+  for (const [key, choices] of [
+    ["recipe", CAPTION_MOTION_RECIPES],
+    ["unit", ["letter", "word", "line"]],
+    ["direction", ["up", "down", "left", "right"]],
+    ["easing", ["smooth", "snappy", "bounce", "linear"]],
+    ["anchor", ["left", "center", "right"]],
+    ["verticalAnchor", ["auto", "top", "center", "bottom"]],
+  ] as const) {
+    if ((choices as readonly unknown[]).includes(value[key]))
+      Object.assign(result, { [key]: value[key] });
+  }
+  for (const [key, min, max] of [
+    ["duration", 0.08, 1.5],
+    ["delay", 0, 0.5],
+    ["stagger", 0, 0.12],
+    ["amount", 0, 2],
+    ["blur", 0, 1.2],
+    ["glow", 0, 1.2],
+  ] as const) {
+    const n = value[key];
+    if (typeof n === "number" && Number.isFinite(n))
+      result[key] = Math.max(min, Math.min(max, n));
+  }
+  return result;
+}
 export interface CaptionPreset {
   animation: CaptionAnimation;
+  motion?: CaptionMotionSettings;
   activeColor: string;
   id: string;
   name: string;
@@ -61,6 +145,79 @@ const caption = (
 
 /** Original presets; fonts are bundled locally and no asset subscription is required. */
 const BASE_CAPTION_PRESETS: readonly CaptionPreset[] = [
+  ...(
+    [
+      [
+        "motion-rise",
+        "Measured rise",
+        "Words rise into a stable, readable phrase.",
+        { recipe: "rise", unit: "word" },
+      ],
+      [
+        "motion-letters",
+        "Letter cascade",
+        "Letters settle in sequence inside measured speech intervals.",
+        { recipe: "rise", unit: "letter", amount: 0.45, stagger: 0.025 },
+      ],
+      [
+        "motion-focus",
+        "Soft focus",
+        "Each line comes into focus with a restrained entrance.",
+        {
+          recipe: "focus",
+          unit: "line",
+          blur: 0.45,
+          duration: 0.42,
+          amount: 0.25,
+        },
+      ],
+      [
+        "motion-bounce",
+        "Elastic words",
+        "An elastic entrance lands each spoken word precisely.",
+        {
+          recipe: "bounce",
+          unit: "word",
+          amount: 0.65,
+          easing: "bounce",
+          duration: 0.4,
+        },
+      ],
+      [
+        "motion-drift",
+        "Editorial drift",
+        "Lines slide into place with a quiet horizontal movement.",
+        {
+          recipe: "drift",
+          unit: "line",
+          direction: "left",
+          amount: 0.45,
+          duration: 0.5,
+        },
+      ],
+      [
+        "motion-sweep",
+        "Letter light",
+        "A soft accent passes across the letters as each word arrives.",
+        {
+          recipe: "sweep",
+          unit: "letter",
+          amount: 0.85,
+          glow: 0.35,
+          stagger: 0.025,
+        },
+      ],
+    ] as const
+  ).map(([id, name, description, motion]) =>
+    caption(id, name, description, {
+      animation: "motion",
+      motion: normalizeCaptionMotion(motion),
+      size: 5.2,
+      maxCharacters: 26,
+      outline: 0.22,
+      activeColor: "#7AF5CF",
+    })
+  ),
   caption("word-pop", "Word pop", "Each measured word settles into place.", {
     animation: "word-pop",
     size: 7,
@@ -245,7 +402,7 @@ export type CaptionAppearance = Partial<
     | "animation"
     | "activeColor"
   >
-> & { background?: string | null };
+> & { background?: string | null; motion?: Partial<CaptionMotionSettings> };
 
 export function getCaptionPreset(
   id?: string,
@@ -284,6 +441,21 @@ export function getCaptionPreset(
     result.position = appearance.position;
   if (CAPTION_ANIMATIONS.includes(appearance.animation as CaptionAnimation))
     result.animation = appearance.animation!;
+  if (appearance.motion && typeof appearance.motion === "object") {
+    const recipe = appearance.motion.recipe;
+    const recipeChanged =
+      recipe !== undefined &&
+      CAPTION_MOTION_RECIPES.includes(recipe) &&
+      recipe !== base.motion?.recipe;
+    result.motion = normalizeCaptionMotion({
+      // A newly chosen recipe starts with its intentional defaults. Keeping
+      // the old recipe's resolved values would silently disable focus/glow.
+      ...(recipeChanged ? undefined : base.motion),
+      ...appearance.motion,
+    });
+  }
+  if (result.animation === "motion" && !result.motion)
+    result.motion = normalizeCaptionMotion();
   return result;
 }
 

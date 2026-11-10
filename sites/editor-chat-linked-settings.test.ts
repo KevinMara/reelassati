@@ -117,6 +117,71 @@ const fpsStep = (frameRate: unknown) => ({
   frameRate,
 });
 
+describe("Reel caption motion planning", () => {
+  it("preserves normalized custom motion through the server action and actual project application", () => {
+    const ctx = context();
+    ctx.request.prompt =
+      "Make the measured caption words rise with a soft glow";
+    const transcript = structuredClone(ctx.project.transcript);
+    const plan = normalizeEditorChatPlan(
+      {
+        actions: [
+          {
+            ...step,
+            kind: "settings",
+            requestExcerpt: ctx.request.prompt,
+            captionAppearance: {
+              animation: "motion",
+              motion: {
+                recipe: "rise",
+                unit: "word",
+                direction: "up",
+                duration: 0.3,
+                delay: 0.02,
+                stagger: 0.04,
+                amount: 0.7,
+                easing: "smooth",
+                blur: 0.2,
+                glow: 0.3,
+                anchor: "center",
+              },
+            },
+          },
+        ],
+      },
+      ctx
+    );
+    expect(plan.blockedReasons).toEqual([]);
+    expect(plan.actions).toHaveLength(1);
+    expect(plan.actions[0]).toMatchObject({
+      kind: "settings",
+      captionAppearance: {
+        animation: "motion",
+        motion: {
+          recipe: "rise",
+          unit: "word",
+          direction: "up",
+          duration: 0.3,
+          delay: 0.02,
+          stagger: 0.04,
+          amount: 0.7,
+          easing: "smooth",
+          blur: 0.2,
+          glow: 0.3,
+          anchor: "center",
+        },
+      },
+    });
+    const edited = applyChatAction(ctx.project, plan.actions[0], []);
+    expect(edited.captionAppearance?.motion).toMatchObject({
+      recipe: "rise",
+      glow: 0.3,
+      duration: 0.3,
+    });
+    expect(edited.transcript).toEqual(transcript);
+  });
+});
+
 describe("Reel explicit linked AV planning", () => {
   it("plans a matching pair and executes its exact IDs with measured speech clocks intact", () => {
     const ctx = context(),

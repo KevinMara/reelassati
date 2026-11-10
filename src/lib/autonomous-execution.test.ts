@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Asset, EditOperation, EditProject } from "@contracts/workspace";
 import { editorAudioCatalog } from "@contracts/editor-audio-catalog";
 import { normalizeGraphic } from "@contracts/motion-graphics";
+import { normalizeVisual } from "@contracts/clip-visual";
 import {
   AI_COMPLIANCE_POLICY_VERSION,
   AI_PROVENANCE_SCHEME,
@@ -64,6 +65,48 @@ function op(
   };
 }
 describe("complete auto-edit draft execution", () => {
+  it("places an independent cue against locked picture without changing the source", () => {
+    const before = {
+      ...project,
+      clips: [
+        {
+          ...project.clips[0],
+          locked: true,
+          visual: normalizeVisual({ scaleX: 1.1, scaleY: 1.1 }),
+        },
+      ],
+    };
+    const cue = {
+      id: "cue",
+      kind: "audio",
+      duration: 0.4,
+      status: "ready",
+    } as Asset;
+    const result = executeAutonomousPlan(
+      before,
+      [op("accent", "sound", 2, 2.4, { assetId: "cue", volume: 0.15 })],
+      [asset, cue]
+    );
+    expect(result.clips.find(clip => clip.id === "picture")).toEqual(
+      before.clips[0]
+    );
+    expect(result.clips.find(clip => clip.id === "accent")).toMatchObject({
+      track: "audio",
+      start: 2,
+      assetId: "cue",
+    });
+    expect(
+      result.clips.find(clip => clip.id === "accent")?.duration
+    ).toBeCloseTo(0.4);
+    expect(auditAutomatedEdit(before, result, [asset, cue])).toEqual([]);
+    expect(() =>
+      executeAutonomousPlan(
+        before,
+        [op("look", "style", 2, 3, { contrast: 1.1 })],
+        [asset]
+      )
+    ).toThrow(/locked/);
+  });
   it("rejects the four-gap production failure encoded as repeated retained trims before applying any step", () => {
     const before = {
       ...project,
@@ -791,13 +834,15 @@ describe("complete auto-edit draft execution", () => {
         [asset, { ...sound, kind: "video" }]
       )
     ).toThrow(/sound placement/);
-    expect(() =>
-      executeAutonomousPlan(
-        { ...project, clips: project.clips.map(c => ({ ...c, locked: true })) },
-        [action],
-        [asset, sound]
-      )
-    ).toThrow(/locked/);
+    const locked = {
+      ...project,
+      clips: project.clips.map(c => ({ ...c, locked: true })),
+    };
+    const withCue = executeAutonomousPlan(locked, [action], [asset, sound]);
+    expect(withCue.clips.find(c => c.id === "picture")).toEqual(
+      locked.clips[0]
+    );
+    expect(withCue.clips.some(c => c.assetId === sound.id)).toBe(true);
     expect(project.clips).toHaveLength(1);
   });
   it("inserts the observed excerpt inside a supporting video and rejects overruns", () => {

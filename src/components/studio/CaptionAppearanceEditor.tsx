@@ -9,6 +9,7 @@ import { CaptionStylePreview } from "./CaptionStylePreview";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { EditorInfo } from "./EditorInfo";
 import { ColorPicker } from "@/components/ui/color-picker";
+import { CaptionMotionFields } from "./CaptionMotionFields";
 
 export function CaptionAppearanceEditor({
   presetId,
@@ -26,8 +27,10 @@ export function CaptionAppearanceEditor({
   const [busy, setBusy] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const p = getCaptionPreset(presetId, draft);
-  const patch = (value: CaptionAppearance) =>
+  const patch = (value: CaptionAppearance) => {
     setDraft(d => ({ ...d, ...value }));
+    setPreviewPlaying(true);
+  };
   return (
     <section
       className="space-y-3 rounded-xl border border-border p-3"
@@ -91,8 +94,15 @@ export function CaptionAppearanceEditor({
           { value: "word-slide", label: "Raise each spoken word" },
           { value: "word-fade", label: "Fade each spoken word" },
           { value: "word-type", label: "Type each spoken word" },
+          { value: "motion", label: "Editable motion" },
         ]}
       />
+      {p.animation === "motion" && (
+        <CaptionMotionFields
+          value={p.motion}
+          onChange={motion => patch({ motion })}
+        />
+      )}
       {p.animation !== "none" && (
         <p className="text-sm text-foreground/65">
           {ui(

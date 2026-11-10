@@ -269,7 +269,10 @@ export function editorChatModelContext(context: EditorChatContext) {
   const styleSourceIds = editStyleSourceAssetIds(project.editStyleTemplate);
   if (
     project.editStyleTemplate?.examples?.some(
-      example => example.source === "reference" && !example.profile
+      example =>
+        example.feedback !== "exclude" &&
+        example.source === "reference" &&
+        !example.profile
     )
   )
     throw new EditorChatInputError(
@@ -451,7 +454,7 @@ Graphic creation versus revision: use operation.type="graphic" and parameters.gr
 - generate: media:image|video|speech|music|sfx,prompt,name,seconds for video/music/sfx,voice for speech from supplied voiceIds, optional language. Image is 1K; video 720p with no generated audio, 3–15 integer seconds. Music 5–30 seconds; SFX 0.5–30 seconds. Speech prompt is the exact words to speak, not directions; preserve the language. Output goes to Library by default. Only include insert:{start,duration?} if the command explicitly asks to place/add it in this edit; do not automatically insert assets merely requested for generation. Do not use a real-person voice likeness or claim reference identity.
 - catalog-audio: catalogId from supplied freeAudioCatalog; optional insert:{start,duration?}. Uses an existing bundled CC0 sound/music file, with zero action credits and no audio-generation provider. Prefer this for a whoosh, impact, transition sound, or music bed when a catalog entry fits; never label it newly generated. Use available names/tags to choose, not invented sonic details. Omit insert when only asked to save/find a sound: it goes to Library. Include insert only when asked to add/place sound in the edit. Default duration is bounded by source length and remaining edit/selected range; never stretch or silently loop it. Explicitly requested original/custom generation still uses generate, subject to provider availability. Optional extra sound placements retain extra scope and approval.
 - insert: owned assetId,start,duration?; only actual image/video/audio assets. Reuses the real asset without generation cost.
-- settings: aspectRatio:9:16|16:9|1:1,frameRate:24|25|30|60 (project/export FPS; never approximate an unsupported rate),duration,captionStyle from supplied captionStyles; captionAppearance supports animation:none|active-word|word-reveal|word-only|word-pulse|word-pop|word-slide|word-fade|word-type (every word animation requires measured word timestamps; transcribe first if absent),activeColor:#RRGGBB,color/outlineColor/background:#RRGGBB (background:null removes the box),size:2..12 percent of width,bold:boolean,uppercase:boolean,outline:0..2,position:top|bottom,margin:2..40 percent,maxCharacters:12..64. Use these controls for specific styling requests, preserving untouched appearance fields. Do not shorten a project if that would cut locked clips or truncate content outside a requested range.
+- settings: aspectRatio:9:16|16:9|1:1,frameRate:24|25|30|60 (project/export FPS; never approximate an unsupported rate),duration,captionStyle from supplied captionStyles; captionAppearance supports animation:none|active-word|word-reveal|word-only|word-pulse|word-pop|word-slide|word-fade|word-type|motion (every word animation requires measured word timestamps; transcribe first if absent),activeColor:#RRGGBB,color/outlineColor/background:#RRGGBB (background:null removes the box),size:2..12 percent of width,bold:boolean,uppercase:boolean,outline:0..2,position:top|bottom,margin:2..40 percent,maxCharacters:12..64; motion:{recipe:rise|pop|drift|focus|bounce|sweep,unit:letter|word|line,direction:up|down|left|right,duration:0.08..1.5,delay:0..0.5,stagger:0..0.12,amount:0..2,easing:smooth|snappy|bounce|linear,blur:0..1.2,glow:0..1.2,anchor:left|center|right,verticalAnchor:auto|top|center|bottom}. Caption motion changes visual presentation only; preserve measured speech timing. Use these controls for specific styling requests, preserving untouched appearance fields. Do not shorten a project if that would cut locked clips or truncate content outside a requested range.
 - speech-zoom: targetClipIds (picture only),amount:1.02..1.4,replacePath:boolean. Zero action credits; creates editable source-time punch-ins at measured speech phrase changes. Requires actual word timestamps belonging to the clip or its linked audio. Transcribe first if absent. Keep replacePath false unless the user explicitly requests replacing existing motion. No face/camera tracking. Whole-clip selection only.
 - beat-cuts: sourceClipId of actual audible music/audio/video,targetClipIds containing the exact picture clips AND every linked AV peer,every:1..8,minimumGap:0.2..10 seconds,sensitivity:0.5..2. Zero action credits. Measures percussive onsets in actual source waveform (five minutes / 16 MB maximum), maps through trim/speed, and splits only targets; independent music stays in place. Does not invent a tempo grid, rearrange shots or infer downbeats. Whole-clip selection only; max48 measured cuts, use spacing for long sources. Never supply invented cut timestamps.
 - history: direction:undo|redo. Do not combine with other mutation actions in one response.
@@ -1099,6 +1102,7 @@ export function normalizeEditorChatPlan(
             maxCharacters,
             animation,
             activeColor,
+            motion,
           } = resolved;
           captionAppearance = {
             color,
@@ -1113,6 +1117,7 @@ export function normalizeEditorChatPlan(
             maxCharacters,
             animation,
             activeColor,
+            ...(motion ? { motion } : {}),
           };
         }
         const duration =

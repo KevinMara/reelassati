@@ -228,7 +228,10 @@ export function AutonomousEditor({
   const transcriptCost = 0;
   const unreviewedExamples =
     project.editStyleTemplate?.examples?.filter(
-      example => example.source === "reference" && !example.profile
+      example =>
+        example.source === "reference" &&
+        !example.profile &&
+        example.feedback !== "exclude"
     ) ?? [];
   const styleExampleCost = unreviewedExamples.reduce(
     (sum, example) =>

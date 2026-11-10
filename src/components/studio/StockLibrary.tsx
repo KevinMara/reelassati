@@ -1,7 +1,11 @@
 import { selectedBrand } from "@/lib/workspace-scope";
 import { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, Loader2, Search } from "lucide-react";
-import type { StockKind, StockMedia } from "@contracts/stock-media";
+import type {
+  StockKind,
+  StockMedia,
+  StockSearchOptions,
+} from "@contracts/stock-media";
 import { useWorkspace } from "@/providers/workspace";
 import {
   platformApi,
@@ -17,26 +21,58 @@ export function StockLibrary() {
   const { updateWorkspace } = useWorkspace();
   const [kind, setKind] = useState<StockKind>("video");
   const [query, setQuery] = useState("");
+  const [category, setCategory] =
+    useState<StockSearchOptions["category"]>("all");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const lastSearch = useRef<
+    | {
+        kind: StockKind;
+        query: string;
+        category: StockSearchOptions["category"];
+      }
+    | undefined
+  >(undefined);
   const [items, setItems] = useState<StockMedia[]>([]);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
-  async function search() {
-    if (busy || !query.trim()) return;
+  async function search(more = false) {
+    const criteria = more
+      ? lastSearch.current
+      : { kind, query: query.trim(), category };
+    if (busy || !criteria?.query) return;
     const abort = new AbortController();
     controller.current = abort;
-    setBusy("search");
+    setBusy(more ? "more" : "search");
     setMessage("");
-    setItems([]);
+    if (!more) {
+      setItems([]);
+      setHasMore(false);
+    }
     try {
       const result = await platformApi.searchStock(
-        kind,
-        query.trim(),
-        abort.signal
+        criteria.kind,
+        criteria.query,
+        abort.signal,
+        { page: more ? page + 1 : 1, category: criteria.category }
       );
-      setItems(result.items);
-      if (!result.items.length)
+      abort.signal.throwIfAborted();
+      lastSearch.current = criteria;
+      setPage(result.page);
+      setHasMore(result.hasMore);
+      setItems(previous => {
+        const all = more ? [...previous, ...result.items] : result.items;
+        const seen = new Set<string>();
+        return all.filter(item => {
+          const id = `${item.provider}:${item.id}`;
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+      });
+      if (!result.items.length && !more)
         setMessage(ui("No eligible stock found. Try a more specific search."));
     } catch (e) {
       if (!abort.signal.aborted)
@@ -94,42 +130,67 @@ export function StockLibrary() {
           e.preventDefault();
           void search();
         }}
-        className="flex flex-wrap gap-2"
+        className="space-y-2"
       >
-        <CompactSelect
-          aria-label={ui("Stock type")}
-          value={kind}
-          onValueChange={value => {
-            setKind(value as StockKind);
-            setItems([]);
-            setMessage("");
-          }}
-          options={[
-            { value: "video", label: ui("Video") },
-            { value: "image", label: ui("Images") },
-            { value: "audio", label: ui("Sound effects") },
-          ]}
-        />
-        <input
-          type="search"
-          aria-label={ui("Search stock")}
-          placeholder={ui("Search stock…")}
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={!!busy || !query.trim()}
-          aria-label={ui("Search stock")}
-          className="rounded-xl bg-primary px-3 text-primary-foreground disabled:opacity-40"
-        >
-          {busy === "search" ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Search size={16} />
+        <div className="flex flex-wrap gap-2">
+          <CompactSelect
+            aria-label={ui("Stock type")}
+            disabled={!!busy}
+            className="w-28"
+            value={kind}
+            onValueChange={value => {
+              setKind(value as StockKind);
+              setItems([]);
+              setHasMore(false);
+              setMessage("");
+            }}
+            options={[
+              { value: "video", label: ui("Video") },
+              { value: "image", label: ui("Images") },
+              { value: "audio", label: ui("Audio") },
+            ]}
+          />
+          {kind === "audio" && (
+            <CompactSelect
+              aria-label={ui("Audio type")}
+              value={category ?? "all"}
+              disabled={!!busy}
+              className="w-32"
+              onValueChange={value => {
+                setCategory(value as StockSearchOptions["category"]);
+                setItems([]);
+                setHasMore(false);
+              }}
+              options={[
+                { value: "all", label: ui("All") },
+                { value: "sound_effect", label: ui("Sound effects") },
+                { value: "music", label: ui("Music") },
+              ]}
+            />
           )}
-        </button>
+        </div>
+        <div className="flex min-w-0 gap-2">
+          <input
+            type="search"
+            aria-label={ui("Search stock")}
+            placeholder={ui("Search stock…")}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs"
+          />
+          <button
+            type="submit"
+            disabled={!!busy || !query.trim()}
+            aria-label={ui("Search stock")}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"
+          >
+            {busy === "search" ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Search size={16} />
+            )}
+          </button>
+        </div>
       </form>
       <p className="text-xs text-muted-foreground">
         {ui(
@@ -141,7 +202,13 @@ export function StockLibrary() {
           {message}
         </p>
       )}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        className="grid gap-3"
+        style={{
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(100%, 11rem), 1fr))",
+        }}
+      >
         {items.map(item => (
           <article
             key={`${item.provider}:${item.id}`}
@@ -211,6 +278,31 @@ export function StockLibrary() {
           </article>
         ))}
       </div>
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => void search(true)}
+          disabled={!!busy}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-border py-2 text-xs hover:bg-primary/10 disabled:opacity-40"
+        >
+          {busy === "more" && <Loader2 size={13} className="animate-spin" />}
+          {ui("Load more")}
+        </button>
+      )}
+      {(kind === "audio" || kind === "image") && (
+        <p className="text-[10px] text-muted-foreground">
+          <a
+            href="https://openverse.org"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2"
+          >
+            {ui("Made using Openverse")}
+          </a>
+          {" · "}
+          {ui("Not endorsed or certified by Openverse.")}
+        </p>
+      )}
       {kind === "audio" && <EditorSoundLibrary />}
     </section>
   );

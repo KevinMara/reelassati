@@ -700,10 +700,11 @@ export const platformApi = {
   searchStock: (
     kind: import("@contracts/stock-media").StockKind,
     query: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options: import("@contracts/stock-media").StockSearchOptions = {}
   ) =>
-    requestJson<{ items: import("@contracts/stock-media").StockMedia[] }>(
-      `/api/stock/search?kind=${kind}&q=${encodeURIComponent(query)}`,
+    requestJson<import("@contracts/stock-media").StockSearchPage>(
+      `/api/stock/search?${new URLSearchParams({ kind, q: query, page: String(options.page ?? 1), category: options.category ?? "all" })}`,
       { signal }
     ),
   importStock: (

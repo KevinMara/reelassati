@@ -15,6 +15,7 @@ import {
 } from "../contracts/workspace";
 import { normalizeEditorSavedStyles } from "../contracts/editor-style-library";
 import { captureEditStyle } from "../contracts/edit-style-template";
+import { HOOK_STORY_GUIDANCE } from "../contracts/storytelling-guidance";
 import { normalizeVisual } from "../contracts/clip-visual";
 import {
   buildAnalyzerOptimization,
@@ -1038,6 +1039,7 @@ describe("script writing pack route", () => {
     expect(system.content).toContain("exactly ten distinct opening options");
     expect(system.content).toContain("not observed transcript");
     expect(system.content).toContain("Never promise an automated DM");
+    expect(system.content).toContain(HOOK_STORY_GUIDANCE);
     expect(system.content).not.toContain(brandVoice);
     expect(JSON.parse(providerCalls[0].messages[1].content)).toMatchObject({
       duration: 30,
@@ -2019,7 +2021,15 @@ describe("provenance integrity boundaries", () => {
     const workspace = JSON.parse(
       String(DB.state.workspaces[0].document)
     ) as ReturnType<typeof createEmptyWorkspace>;
-    const project = { ...workspace.projects[0], duration: 10 };
+    const project = {
+      ...workspace.projects[0],
+      duration: 10,
+      clips: [{
+        id: "source-clip", assetId: "owned-video", label: "Actual target",
+        track: "video" as const, start: 0, duration: 10, inPoint: 0,
+        outPoint: 10, locked: false, color: "#808080",
+      }],
+    };
     let providerBody: Record<string, unknown> | undefined;
     globalThis.fetch = async (_url, init) => {
       providerBody = JSON.parse(String(init?.body));

@@ -6,6 +6,7 @@ import { ANALYZER_STREAM_TYPE } from "../contracts/analyzer-transport";
 import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
 import type { WorkspaceDocument } from "../contracts/workspace";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "../contracts/video-analysis";
+import { HOOK_STORY_GUIDANCE } from "../contracts/storytelling-guidance";
 import {
   captureEditStyle,
   normalizeReferenceEditStyle,
@@ -463,7 +464,7 @@ describe("foreground K3 auto-edit planning", () => {
       }
     ).workspace.projects[0],
     command: "Adapt the edit to this footage without generated media",
-    selectedClipIds: [],
+    selectedClipIds: [] as string[],
   });
   it("advertises K3 and rejects legacy planning before charging or contacting a provider", async () => {
     const caps = await (await request("/api/capabilities")).json();
@@ -524,6 +525,200 @@ describe("foreground K3 auto-edit planning", () => {
       expect(providerCalls.length).toBe(calls + 1);
     } finally {
       providerStreamFailure = undefined;
+    }
+  });
+  it("compiles measured cue timing before signing the plan and exposes actual native capabilities", async () => {
+    const original = nextOutput,
+      before = balance(),
+      calls = providerCalls.length;
+    const body = await input();
+    body.project.clips.push({
+      ...body.project.clips[0],
+      id: "second-selected",
+      track: "audio",
+      muted: true,
+    });
+    body.selectedClipIds = ["clip", "second-selected"];
+    body.project.sourceSpeech = [
+      {
+        assetId: "source",
+        segments: [
+          {
+            id: "phrase",
+            start: 4,
+            end: 7,
+            text: "The result appears",
+            words: [
+              { text: "The", start: 4, end: 4.3 },
+              { text: "result", start: 4.6, end: 5 },
+              { text: "appears", start: 5.5, end: 6 },
+            ],
+          },
+        ],
+      },
+    ];
+    nextOutput = {
+      summary: "Emphasize the demonstrated result at its measured word",
+      changes: [
+        {
+          type: "style",
+          label: "Result emphasis",
+          reason: "Match the measured word",
+          cue: { speechId: "speech:0", wordIndex: 1, duration: 1.4 },
+          parameters: {
+            visual: {
+              scale: 1.04,
+              keyframes: [
+                { at: 0, scale: 1, easing: "ease-out" },
+                { at: 0.2, scale: 1.04, easing: "hold" },
+                { at: 1, scale: 1.04, easing: "hold" },
+              ],
+            },
+          },
+        },
+      ],
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", body);
+      expect(response.status).toBe(200);
+      const result = await response.json();
+      expect(result.changes).toHaveLength(1);
+      expect(result.changes[0]).toMatchObject({
+        type: "style",
+        start: 4.6,
+        end: 6,
+        targetClipIds: ["clip"],
+        parameters: { visual: { scale: 1.04, keyframes: expect.any(Array) } },
+        provenance: expect.any(Object),
+      });
+      expect(result.changes[0]).not.toHaveProperty("cue");
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before - 5);
+      const messages = providerCalls.at(-1)?.messages as Array<{
+        role: string;
+        content: string;
+      }>;
+      expect(messages[0].content).toContain("parameters.visual");
+      expect(messages[0].content).toContain("does NOT support");
+      const context = JSON.parse(
+        messages.find(message => message.role === "user")!.content
+      ).project;
+      expect(context.speechEvidence[0]).toMatchObject({
+        id: "speech:0",
+        clipId: "clip",
+      });
+      expect(context.scenes[0]).toMatchObject({
+        start: 0,
+        end: 30,
+        pictureAvailable: true,
+      });
+      expect(context.freeSounds[0]).toHaveProperty("peakSeconds");
+      expect(context.presetCatalog.graphics[0]).toHaveProperty("description");
+      expect(context.presetCatalog.transitions).toEqual([]);
+    } finally {
+      nextOutput = original;
+    }
+  });
+  it("releases an unsupported operation instead of silently returning a smaller successful edit", async () => {
+    const original = nextOutput,
+      before = balance(),
+      calls = providerCalls.length;
+    nextOutput = {
+      summary: "A claimed zoom transition",
+      changes: [{ type: "zoom-transition", start: 1, end: 2 }],
+    };
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await request("/api/ai/edit-plan", await input());
+      expect(response.status).toBe(422);
+      const failure = await response.json();
+      expect(failure).toMatchObject({
+        code: "edit_plan_invalid",
+        creditReceipt: { status: "released", credits: 0 },
+      });
+      expect(failure).not.toHaveProperty("changes");
+      expect(JSON.stringify(failure)).not.toContain("Retry once");
+      expect(balance()).toBe(before);
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(
+        sqlite
+          .prepare(
+            "SELECT status FROM credit_ledger WHERE owner_email='owner@example.com' ORDER BY rowid DESC LIMIT 1"
+          )
+          .get()
+      ).toMatchObject({ status: "released" });
+    } finally {
+      nextOutput = original;
+      errorLog.mockRestore();
+    }
+  });
+  it("preserves explicit verified linked audio peers in a local visual treatment", async () => {
+    const original = nextOutput;
+    const body = await input();
+    body.project.clips[0].linkId = "explicit-av";
+    body.project.clips.push({
+      ...body.project.clips[0],
+      id: "voice",
+      track: "audio",
+    });
+    nextOutput = {
+      summary: "Keep linked source pieces aligned",
+      changes: [
+        {
+          type: "style",
+          start: 4,
+          end: 6,
+          targetClipIds: ["clip", "voice"],
+          parameters: { contrast: 1.1 },
+        },
+      ],
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", body);
+      expect(response.status).toBe(200);
+      expect((await response.json()).changes[0]).toMatchObject({
+        targetClipIds: ["clip", "voice"],
+        start: 4,
+        end: 6,
+      });
+    } finally {
+      nextOutput = original;
+    }
+  });
+  it("rejects a moved retained range with dependent local treatment before signing or settling the plan", async () => {
+    const original = nextOutput,
+      before = balance(),
+      calls = providerCalls.length;
+    nextOutput = {
+      summary: "Shift source speech and emphasize the old timeline",
+      changes: [
+        {
+          type: "trim",
+          start: 0,
+          end: 29,
+          targetClipIds: ["clip"],
+          parameters: { sourceIn: 1 },
+        },
+        {
+          type: "style",
+          start: 4,
+          end: 6,
+          targetClipIds: ["clip"],
+          parameters: { contrast: 1.1 },
+        },
+      ],
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", await input());
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        code: "edit_plan_invalid",
+        creditReceipt: { status: "released", credits: 0 },
+      });
+      expect(balance()).toBe(before);
+      expect(providerCalls.length).toBe(calls + 1);
+    } finally {
+      nextOutput = original;
     }
   });
   it.each(["/api/ai/analyze", "/api/ai/edit-plan"])(
@@ -1075,6 +1270,7 @@ describe("authenticated paid editing chat route", () => {
       ])
     );
     expect(payload.messages[0].content).toContain("language code it");
+    expect(payload.messages[0].content).toContain(HOOK_STORY_GUIDANCE);
     expect(payload).toMatchObject({
       model: "moonshotai/kimi-k3",
       response_format: {

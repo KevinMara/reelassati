@@ -44,7 +44,7 @@ export function CaptionStylePreview({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [animate]);
+  }, [animate, presetId, appearance]);
   return (
     <div
       className={`relative overflow-hidden rounded-lg bg-[#252A32] ${compact ? "aspect-[1.8]" : "aspect-video"}`}

@@ -8,6 +8,7 @@ import {
   type CaptionAnimation,
 } from "@contracts/editor-presets";
 import { CaptionStylePreview } from "@/components/studio/CaptionStylePreview";
+import { CaptionMotionFields } from "@/components/studio/CaptionMotionFields";
 import { useUiText } from "@/lib/i18n/ui";
 import {
   StyleColor,
@@ -26,6 +27,7 @@ const animationLabels = [
   "Word rise",
   "Word fade",
   "Word type",
+  "Editable motion",
 ];
 
 export function CaptionStyleFields({
@@ -40,8 +42,10 @@ export function CaptionStyleFields({
   const ui = useUiText();
   const [playing, setPlaying] = useState(false);
   const resolved = getCaptionPreset(preset, appearance);
-  const patch = (value: CaptionAppearance) =>
+  const patch = (value: CaptionAppearance) => {
     onChange(preset, { ...appearance, ...value });
+    setPlaying(true);
+  };
   return (
     <div className="space-y-4">
       <CaptionStylePreview
@@ -87,6 +91,12 @@ export function CaptionStyleFields({
           onChange={value => patch({ position: value as "bottom" | "top" })}
         />
       </div>
+      {resolved.animation === "motion" && (
+        <CaptionMotionFields
+          value={resolved.motion}
+          onChange={motion => patch({ motion })}
+        />
+      )}
       <div className="grid grid-cols-3 gap-3">
         {(
           [

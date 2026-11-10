@@ -11,7 +11,12 @@ export function pendingStyleExampleAssets(
   assets: readonly Asset[]
 ): Array<{ example: EditStyleExample; asset: Asset }> {
   return (template?.examples ?? [])
-    .filter(example => example.source === "reference" && !example.profile)
+    .filter(
+      example =>
+        example.source === "reference" &&
+        !example.profile &&
+        example.feedback !== "exclude"
+    )
     .map(example => {
       const asset = assets.find(asset => asset.id === example.assetId);
       if (!asset || asset.kind !== "video" || asset.status !== "ready")

@@ -1,5 +1,6 @@
 import { referenceStyleSchema } from "./edit-style-template";
 import { sourceVisualEvidenceSchema } from "./source-visual-evidence";
+import { HOOK_STORY_GUIDANCE } from "./storytelling-guidance";
 /** Versioned source-clock evidence returned by the multimodal video reviewer. */
 export const VIDEO_ANALYSIS_SCHEMA_VERSION = "video-analysis-v2" as const;
 export const VIDEO_ROLES = [
@@ -571,6 +572,8 @@ Assess audiovisual delivery separately from factual accuracy. A clear or compell
 /** Shared by standalone analysis and editor review; additions do not replace
  * the five presence/absence assessments required by existing clients. */
 export const VIDEO_ANALYSIS_DIRECTION = `
+${HOOK_STORY_GUIDANCE}
+
 Adapt the review to the observed form: tutorial, documentary, comedy, narrative, performance, product, interview, montage or another justified genre. Do not assume every video is an advertisement. Assess whether each interval advances its own purpose, not whether it has rapid cuts or a CTA. Intentional stillness, suspense, musical phrasing and emotional resolution can be strengths.
 Pacing is an editorial fit-to-purpose assessment: 0–20 means progression is repeatedly blocked by unjustified delays or premature cuts; 40–60 means useful progression with uneven holds or information timing; 80–100 means intentional timing that preserves comprehension, performance, suspense and payoff. Do not reward speed itself. Explain the rating with observed intervals.
 Additional interval roles: setup establishes context; tension introduces a question/conflict or stakes; development advances an explanation/story; demonstration shows a process/result; transition connects ideas/scenes; resolution closes the story; loop creates a meaningful return to the opening. Use the most specific evidenced role. Proof requires substantiation, not merely an assertion. A rhetorical question alone does not prove a hook worked. Section boundaries follow observable changes in purpose; a section can contain several short observation intervals. The existing structure array still assesses hook/core/proof/payoff/cta; core includes development and demonstration, payoff includes resolution. Never invent a missing function or penalize an absent CTA when it is unnecessary.

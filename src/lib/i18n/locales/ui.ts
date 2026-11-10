@@ -1,5 +1,7 @@
 import { studioPolishUi } from "./ui-studio-polish";
 import { momentumCalendarUi } from "./ui-momentum-calendar";
+import { captionMotionUi } from "./ui-caption-motion";
+import { stockExpansionUi } from "./ui-stock-expansion";
 import { editorOct31Ui } from "./ui-editor-oct31";
 import { editorNov1Ui } from "./ui-editor-nov1";
 import { editorNov7Ui } from "./ui-editor-nov7";
@@ -127,6 +129,9 @@ for (const [language, translation] of Object.entries(stylesWorkspaceUi)) {
   Object.assign(uiLocales[language], translation);
 }
 
+for (const [code, entries] of Object.entries(captionMotionUi))
+  Object.assign(uiLocales[code], entries);
+
 for (const [code, catalog] of Object.entries(uiLocales))
   if (code !== "en") Object.assign(catalog, translatePresetNames(catalog));
 
@@ -136,6 +141,8 @@ for (const [code, entries] of Object.entries(editorOct30Ui))
 for (const [code, entries] of Object.entries(studioPolishUi))
   Object.assign(uiLocales[code as keyof typeof uiLocales], entries);
 for (const [code, entries] of Object.entries(momentumCalendarUi))
+  Object.assign(uiLocales[code as keyof typeof uiLocales], entries);
+for (const [code, entries] of Object.entries(stockExpansionUi))
   Object.assign(uiLocales[code as keyof typeof uiLocales], entries);
 for (const [code, entries] of Object.entries(editorOct31Ui))
   Object.assign(uiLocales[code as keyof typeof uiLocales], entries);

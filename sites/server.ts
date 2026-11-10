@@ -2,6 +2,7 @@ import {
   EDIT_CUT_GUIDANCE,
   assertAutonomousTrimSemantics,
 } from "../contracts/edit-cut-semantics";
+import { assertAutonomousComposition } from "../contracts/autonomous-operation-order";
 import {
   editorPresetCatalog,
   EDITOR_PRESET_GUIDANCE,
@@ -11,14 +12,20 @@ import { normalizeTransitionPresets } from "../contracts/transition-presets";
 import { LOCAL_SPEECH_MODEL } from "../contracts/local-speech-model";
 import { parseLocalTranscriptSegments } from "../contracts/local-transcript";
 import type { StockMedia } from "../contracts/stock-media";
-import { editorAudioCatalog } from "../contracts/editor-audio-catalog";
+import { GRAPHIC_PRESETS, CLIP_LOOK_PRESETS } from "../contracts/editor-presets";
+import {
+  buildEditPlanningContext,
+  resolveEditPlanningReferences,
+  assertExecutableEditPlan,
+  EDIT_PLANNING_CAPABILITIES,
+} from "../contracts/edit-planning-context";
 import { fetchSocialVideo } from "./social-video";
 import {
   SOCIAL_VIDEO_UNAVAILABLE,
   socialVideoSource,
 } from "../contracts/social-video";
 import { editModel, editReasoningEffort } from "../contracts/edit-model";
-import { searchStock, resolveStock, downloadStock } from "./stock-media";
+import { searchStock, searchStockPage, resolveStock, downloadStock } from "./stock-media";
 import { normalizeSavedAnalyzerReports } from "../contracts/analyzer-report";
 import {
   runPaidMediaRequest,
@@ -90,7 +97,6 @@ import {
   readSoundEffectAudio,
 } from "./music-generation";
 import { normalizeGraphic } from "../contracts/motion-graphics";
-import { buildEditorialSpeechEvidence } from "../contracts/editorial-evidence";
 import {
   autonomousCaptionDirection,
   normalizeAutonomousCaptionTreatment,
@@ -102,7 +108,6 @@ import {
   type ProviderTranscript,
 } from "../contracts/transcript-timing";
 import { normalizeReview, sourceReviewFacts } from "../contracts/source-review";
-import { editPlanningMedia } from "../contracts/edit-planning-media";
 import {
   SOURCE_VISUAL_EVIDENCE_GUIDANCE,
   normalizeSourceVisualEvidence,
@@ -4390,7 +4395,8 @@ function mapEditOperations(
   duration: number,
   clips: WorkspaceDocument["projects"][number]["clips"] = [],
   selectedClipIds: string[] = [],
-  personalStyles: WorkspaceDocument["editorStyles"] = []
+  personalStyles: WorkspaceDocument["editorStyles"] = [],
+  preserveExplicitTargets = false
 ): EditOperation[] {
   if (!Array.isArray(value)) return [];
   const validSelectedIds = new Set(
@@ -4448,11 +4454,13 @@ function mapEditOperations(
         ? typed.targetClipIds.filter(
             (id): id is string =>
               typeof id === "string" &&
-              clips.some(c => c.id === id && !c.locked)
+              clips.some(c => c.id === id && (!c.locked || type === "sound"))
           )
         : [];
       const targetClipIds = validSelectedIds.size
-        ? Array.from(validSelectedIds)
+        ? preserveExplicitTargets && requestedIds.length
+          ? requestedIds
+          : Array.from(validSelectedIds)
         : requestedIds.length
           ? requestedIds
           : clips
@@ -6571,7 +6579,10 @@ async function handleAi(
     const project = input.project;
     if (
       normalizeEditStyleTemplate(project.editStyleTemplate)?.examples?.some(
-        example => example.source === "reference" && !example.profile
+        example =>
+          example.feedback !== "exclude" &&
+          example.source === "reference" &&
+          !example.profile
       )
     )
       return errorResponse(
@@ -6596,6 +6607,15 @@ async function handleAi(
       input.project.sourceReviews?.map(sourceReviewFacts);
     const presetWorkspace = await getWorkspace(env, user);
     const personalStyles = presetWorkspace.editorStyles ?? [];
+    const planningContext = buildEditPlanningContext(
+      project,
+      presetWorkspace.assets,
+      presetWorkspace.projects
+    );
+    const presetCatalog = editorPresetCatalog(
+      personalStyles,
+      presetWorkspace.transitionPresets
+    );
     const projectContext = {
       title: input.project.title,
       duration,
@@ -6603,14 +6623,14 @@ async function handleAi(
       aspectRatio: input.project.aspectRatio,
       clips: input.project.clips,
       transcript: input.project.transcript,
-      speechEvidence: buildEditorialSpeechEvidence(input.project),
+      speechEvidence: planningContext.speechEvidence,
+      scenes: planningContext.scenes,
+      planningClock: planningContext.clock,
       captionStyle: input.project.captionStyle,
       captionAppearance: input.project.captionAppearance,
       sourceReviews: factualSourceReviews,
-      libraryMedia: editPlanningMedia(presetWorkspace.assets, [
-        ...presetWorkspace.projects,
-        project,
-      ]),
+      libraryMedia: planningContext.libraryMedia,
+      mediaExcerpts: planningContext.mediaExcerpts,
       storyEvidence: buildStoryBeatEvidence({
         ...input.project,
         sourceReviews: factualSourceReviews,
@@ -6620,17 +6640,29 @@ async function handleAi(
         ? input.selectedClipIds.slice(0, 20)
         : [],
       selectedRange: input.range,
-      presetCatalog: editorPresetCatalog(
-        personalStyles,
-        presetWorkspace.transitionPresets
-      ),
-      freeSounds: editorAudioCatalog.map(a => ({
-        assetId: `catalog:${a.id}`,
-        name: a.name,
-        duration: a.duration,
-        tags: a.tags,
-        type: a.type,
-      })),
+      presetCatalog: {
+        ...presetCatalog,
+        graphics: GRAPHIC_PRESETS.map(preset => ({
+          id: preset.id,
+          name: preset.name,
+          description: preset.description,
+          duration: preset.duration,
+          kind: preset.graphic.kind,
+          composition: preset.graphic.composition,
+          animation: preset.graphic.animation,
+        })),
+        looks: CLIP_LOOK_PRESETS.map(preset => ({
+          id: preset.id,
+          name: preset.name,
+          description: preset.description,
+          settings: preset.settings,
+        })),
+        // Adjacent-transition is an interactive chat action, not an auto-edit
+        // operation. Do not advertise a catalog the executor cannot apply.
+        transitions: [],
+        personalTransitions: [],
+      },
+      freeSounds: planningContext.freeSounds,
       localOnly: input.localOnly === true,
       editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
         ?.profile,
@@ -6675,7 +6707,7 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `${EDIT_CUT_GUIDANCE} ${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, start, end, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, and parameters. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${EDITOR_PRESET_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Deliver the complete requested treatment. Judge each beat for coverage, clarity, framing, motion design, sound and finishing; implement every useful supported improvement, not just trims and color. Do not minimize the operation count or stop after the easiest changes. Preserve restraint only where it serves the actual source or selected style. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Choose as many high-impact operations as the story needs. A generated-media quota or operation quota must not determine the treatment. Explain the audience-retention reason concretely.`,
+          `${EDIT_CUT_GUIDANCE} ${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, parameters, and either start/end or a supported evidence cue. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio parameters.volume is 0..2 (1 = original, 0.2 = music bed); caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${EDITOR_PRESET_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Deliver the complete requested treatment. Judge each beat for coverage, clarity, framing, motion design, sound and finishing; implement every useful supported improvement, not just trims and color. Do not minimize the operation count or stop after the easiest changes. Preserve restraint only where it serves the actual source or selected style. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Choose as many high-impact operations as the story needs. A generated-media quota or operation quota must not determine the treatment. Explain the audience-retention reason concretely.`,
           JSON.stringify({
             command: input.command,
             project: projectContext,
@@ -6747,7 +6779,7 @@ async function handleAi(
               env,
               user,
               "edit-planning",
-              `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} ${EDIT_CUT_GUIDANCE} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Choose the number of useful stock shots from the source and story; insert them as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Follow the generation authorization in the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,
+              `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} ${EDIT_CUT_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Choose the number of useful stock shots from the source and story; insert them as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Follow the generation authorization in the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,
               [
                 {
                   type: "text",
@@ -6793,40 +6825,61 @@ async function handleAi(
               output.captionTreatment
             )
           : undefined;
-        let changes = mapEditOperations(
-          resolveEditStyleOperations(output.changes, project.editStyleTemplate),
-          duration,
-          project.clips,
-          Array.isArray(input.selectedClipIds) ? input.selectedClipIds : [],
-          personalStyles
-        );
-        if (input.localOnly === true) {
-          const start = boundedNumber(input.range?.start, 0, 0, duration);
-          const end = boundedNumber(input.range?.end, start, start, duration);
-          changes = changes
-            .filter(
-              change =>
-                [
-                  "style",
-                  "audio",
-                  "sound",
-                  "caption",
-                  "broll",
-                  "graphic",
-                ].includes(change.type) &&
-                change.end > start &&
-                change.start < end &&
-                (!["broll", "sound"].includes(change.type) ||
-                  (change.start >= start && change.end <= end)) &&
-                (change.type !== "broll" || Boolean(change.parameters?.assetId))
-            )
-            .map(change => ({
-              ...change,
-              start: Math.max(start, change.start),
-              end: Math.min(end, change.end),
-            }));
+        let changes: EditOperation[];
+        try {
+          changes = mapEditOperations(
+            resolveEditStyleOperations(
+              resolveEditPlanningReferences(
+                output.changes,
+                planningContext,
+                duration,
+                Array.isArray(input.selectedClipIds) ? input.selectedClipIds : []
+              ),
+              project.editStyleTemplate
+            ),
+            duration,
+            project.clips,
+            Array.isArray(input.selectedClipIds) ? input.selectedClipIds : [],
+            personalStyles,
+            true
+          );
+          if (input.localOnly === true) {
+            const start = boundedNumber(input.range?.start, 0, 0, duration);
+            const end = boundedNumber(input.range?.end, start, start, duration);
+            changes = changes
+              .filter(
+                change =>
+                  [
+                    "style",
+                    "audio",
+                    "sound",
+                    "caption",
+                    "broll",
+                    "graphic",
+                  ].includes(change.type) &&
+                  change.end > start &&
+                  change.start < end &&
+                  (!["broll", "sound"].includes(change.type) ||
+                    (change.start >= start && change.end <= end)) &&
+                  (change.type !== "broll" || Boolean(change.parameters?.assetId))
+              )
+              .map(change => ({
+                ...change,
+                start: Math.max(start, change.start),
+                end: Math.min(end, change.end),
+              }));
+          }
+          assertExecutableEditPlan(changes);
+          assertAutonomousTrimSemantics(project, changes);
+          assertAutonomousComposition(project, changes);
+        } catch {
+          // This response releases the actual reservation and carries its credit
+          // receipt. Never return raw model labels, payloads, or a retry command.
+          return json({
+            error: "The edit plan could not pass the executable timeline checks. No edit was applied.",
+            code: "edit_plan_invalid",
+          }, 422);
         }
-        assertAutonomousTrimSemantics(project, changes);
         const normalizedProjection = {
           summary,
           ...(captionTreatment ? { captionTreatment } : {}),
@@ -13524,13 +13577,17 @@ async function handleApi(
         query = stringValue(url.searchParams.get("q")).trim();
       if (!["audio", "video", "image"].includes(kind || "") || !query)
         return errorResponse("Choose a media type and search term.", 422);
-      return json({
-        items: await searchStock(
+      return json(await searchStockPage(
           kind as "audio" | "video" | "image",
           query,
-          signal
-        ),
-      });
+          signal,
+          {
+            page: Number(url.searchParams.get("page") || 1),
+            category: ["music", "sound_effect"].includes(url.searchParams.get("category") || "")
+              ? url.searchParams.get("category") as "music" | "sound_effect"
+              : "all",
+          }
+        ));
     }
     if (url.pathname === "/api/stock/import" && request.method === "POST") {
       const input = await parseJsonBody<{

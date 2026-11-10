@@ -3,6 +3,8 @@ import {
   stockUrlSource,
   type StockKind,
   type StockMedia,
+  type StockSearchOptions,
+  type StockSearchPage,
 } from "../contracts/stock-media";
 
 const MAX_MEDIA_BYTES = 40 * 1024 * 1024;
@@ -129,7 +131,11 @@ async function read(url: URL, signal: AbortSignal) {
     throw new Error("The stock provider is unavailable. Try again later.");
   }
   const chunks = await readBytes(response, 2 * 1024 * 1024, signal);
-  return record(JSON.parse(await new Blob(chunks).text()));
+  try {
+    return record(JSON.parse(await new Blob(chunks).text()));
+  } catch {
+    throw new Error("The stock provider is unavailable. Try again later.");
+  }
 }
 
 function licenseLink(value: unknown, license: string): string | undefined {
@@ -216,7 +222,10 @@ function commonsItem(
   };
 }
 
-function openverseItem(raw: unknown): StockMedia | undefined {
+function openverseItem(
+  raw: unknown,
+  kind: "audio" | "image" = "audio"
+): StockMedia | undefined {
   const item = record(raw);
   const id = String(item.id);
   const license =
@@ -231,24 +240,34 @@ function openverseItem(raw: unknown): StockMedia | undefined {
     typeof item.url !== "string" ||
     !allowedStockUrl(item.url) ||
     (positive(item.filesize) ?? 0) > MAX_MEDIA_BYTES ||
-    item.category === "pronunciation"
+    (kind === "audio" && item.category === "pronunciation") ||
+    (kind === "image" &&
+      !["commons", "flickr", "archive"].includes(
+        stockUrlSource(String(item.url)) ?? ""
+      ))
   )
     return;
   return {
     id,
     provider: "openverse",
-    kind: "audio",
+    kind,
     title: plain(item.title),
     creator: creator || "Unknown creator",
     attribution: plain(item.attribution, 2000) || undefined,
-    source: link(item.foreign_landing_url, `https://openverse.org/audio/${id}`),
+    source: link(
+      item.foreign_landing_url,
+      `https://openverse.org/${kind}/${id}`
+    ),
     license,
     licenseUrl,
     url: item.url,
     thumbnail: thumbnail(item.thumbnail),
-    duration: positive(item.duration)
-      ? positive(item.duration)! / 1000
-      : undefined,
+    width: kind === "image" ? positive(item.width) : undefined,
+    height: kind === "image" ? positive(item.height) : undefined,
+    duration:
+      kind === "audio" && positive(item.duration)
+        ? positive(item.duration)! / 1000
+        : undefined,
   };
 }
 
@@ -257,40 +276,96 @@ export async function searchStock(
   query: string,
   signal: AbortSignal
 ): Promise<StockMedia[]> {
-  if (kind === "audio") {
-    const url = new URL("https://api.openverse.org/v1/audio/");
+  return (await searchStockPage(kind, query, signal)).items;
+}
+
+/** Each explicit page request is bounded. Failed providers never erase results
+ * from an independent provider; imports still revalidate provider metadata. */
+export async function searchStockPage(
+  kind: StockKind,
+  query: string,
+  signal: AbortSignal,
+  options: StockSearchOptions = {}
+): Promise<StockSearchPage> {
+  const page = Number.isFinite(options.page)
+    ? Math.min(50, Math.max(1, Math.floor(options.page!)))
+    : 1;
+  const openverseSearch = async (): Promise<StockSearchPage> => {
+    const url = new URL(
+      `https://api.openverse.org/v1/${kind === "image" ? "images" : "audio"}/`
+    );
     url.search = new URLSearchParams({
       q: query.slice(0, 150),
       license: "cc0,by",
+      mature: "false",
       page_size: "20",
+      page: String(page),
+      ...(kind === "audio" &&
+      ["music", "sound_effect"].includes(options.category ?? "")
+        ? { category: options.category! }
+        : {}),
     }).toString();
     const data = await read(url, signal);
-    return (
+    const items = (
       Array.isArray(data.results) ? data.results.slice(0, 20) : []
     ).flatMap(row => {
-      const item = openverseItem(row);
+      const item = openverseItem(row, kind === "image" ? "image" : "audio");
       return item ? [item] : [];
     });
-  }
-  const url = new URL("https://commons.wikimedia.org/w/api.php");
-  url.search = new URLSearchParams({
-    action: "query",
-    format: "json",
-    generator: "search",
-    gsrsearch: `${query.slice(0, 150)} filetype:${kind === "video" ? "video" : "bitmap"}`,
-    gsrnamespace: "6",
-    gsrlimit: "20",
-    prop: "imageinfo",
-    iiprop: "url|size|mime|extmetadata",
-    iiurlwidth: "420",
-  }).toString();
-  const data = await read(url, signal);
-  return Object.values(record(record(data.query).pages))
-    .slice(0, 20)
-    .flatMap(page => {
-      const item = commonsItem(record(page), kind);
-      return item ? [item] : [];
+    return {
+      items,
+      page,
+      hasMore: page < Math.min(50, positive(data.page_count) ?? 1),
+    };
+  };
+  const commonsSearch = async (): Promise<StockSearchPage> => {
+    const url = new URL("https://commons.wikimedia.org/w/api.php");
+    url.search = new URLSearchParams({
+      action: "query",
+      format: "json",
+      generator: "search",
+      gsrsearch: `${query.slice(0, 150)} filetype:${kind === "video" ? "video" : "bitmap"}`,
+      gsrnamespace: "6",
+      gsrlimit: "20",
+      gsroffset: String((page - 1) * 20),
+      prop: "imageinfo",
+      iiprop: "url|size|mime|extmetadata",
+      iiurlwidth: "420",
+    }).toString();
+    const data = await read(url, signal);
+    const items = Object.values(record(record(data.query).pages))
+      .slice(0, 20)
+      .flatMap(page => {
+        const item = commonsItem(record(page), kind);
+        return item ? [item] : [];
+      });
+    return {
+      items,
+      page,
+      hasMore: page < 50 && Number.isFinite(record(data.continue).gsroffset),
+    };
+  };
+  if (kind === "audio") return openverseSearch();
+  if (kind === "video") return commonsSearch();
+  const responses = await Promise.allSettled([
+    commonsSearch(),
+    openverseSearch(),
+  ]);
+  signal.throwIfAborted();
+  const available = responses.flatMap(response =>
+    response.status === "fulfilled" ? [response.value] : []
+  );
+  if (!available.length)
+    throw new Error("The stock provider is unavailable. Try again later.");
+  const seen = new Set<string>();
+  const items = available
+    .flatMap(response => response.items)
+    .filter(item => {
+      if (seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
     });
+  return { items, page, hasMore: available.some(response => response.hasMore) };
 }
 
 /** Re-fetch provider-owned metadata. The client never chooses a download URL. */
@@ -318,10 +393,16 @@ export async function resolveStock(
   } else if (
     provider === "openverse" &&
     OPENVERSE_ID.test(id) &&
-    kind === "audio"
+    (kind === "audio" || kind === "image")
   ) {
     result = openverseItem(
-      await read(new URL(`https://api.openverse.org/v1/audio/${id}/`), signal)
+      await read(
+        new URL(
+          `https://api.openverse.org/v1/${kind === "image" ? "images" : "audio"}/${id}/`
+        ),
+        signal
+      ),
+      kind
     );
   }
   if (!result || result.id.toLowerCase() !== id.toLowerCase())
