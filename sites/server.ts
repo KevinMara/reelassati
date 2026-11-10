@@ -4,6 +4,11 @@ import {
 } from "../contracts/edit-cut-semantics";
 import { assertAutonomousComposition } from "../contracts/autonomous-operation-order";
 import {
+  EditPlanValidationError,
+  editPlanValidationDiagnostic,
+  type EditPlanValidationStage,
+} from "../contracts/edit-plan-validation";
+import {
   editorPresetCatalog,
   EDITOR_PRESET_GUIDANCE,
   resolveEditorPresetOperation,
@@ -4423,10 +4428,21 @@ function mapEditOperations(
         ].includes(String(item.type))
     )
     .map((item, index) => {
-      const row = resolveEditorPresetOperation(
-        item && typeof item === "object" ? item : {},
-        personalStyles
-      );
+      let row;
+      try {
+        row = resolveEditorPresetOperation(
+          item && typeof item === "object" ? item : {},
+          personalStyles
+        );
+      } catch {
+        // The preceding filter restricts item.type to our operation enum.
+        throw new EditPlanValidationError(
+          "preset_unavailable",
+          "The selected preset cannot be used for this operation.",
+          index,
+          item.type as EditOperation["type"]
+        );
+      }
       const typed = row as Record<string, unknown>;
       const start = boundedNumber(typed.start, 0, 0, duration);
       const end = boundedNumber(
@@ -4476,7 +4492,12 @@ function mapEditOperations(
           params.graphicMode !== "create" &&
           params.graphicMode !== "update"
         )
-          throw new Error("Choose create or update for a motion graphic.");
+          throw new EditPlanValidationError(
+            "graphic_mode_invalid",
+            "Choose create or update for a motion graphic.",
+            index,
+            type
+          );
         parameters.graphicMode =
           params.graphicMode === "update" ? "update" : "create";
         if (
@@ -4485,8 +4506,11 @@ function mapEditOperations(
           validSelectedIds.size &&
           (requestedIds.length !== 1 || !validSelectedIds.has(requestedIds[0]))
         )
-          throw new Error(
-            "The graphic target does not match your selected clip. Select the intended graphic first."
+          throw new EditPlanValidationError(
+            "target_invalid",
+            "The graphic target does not match your selected clip. Select the intended graphic first.",
+            index,
+            type
           );
         const target =
           parameters.graphicMode === "update" && targetClipIds.length === 1
@@ -6702,7 +6726,7 @@ async function handleAi(
         },
         analysisControl,
       },
-      async () => {
+      async reservation => {
         let { output, invocation } = await chatJson(
           env,
           user,
@@ -6826,23 +6850,29 @@ async function handleAi(
             )
           : undefined;
         let changes: EditOperation[];
+        let validationStage: EditPlanValidationStage = "references";
         try {
+          const referencedChanges = resolveEditPlanningReferences(
+            output.changes,
+            planningContext,
+            duration,
+            Array.isArray(input.selectedClipIds) ? input.selectedClipIds : []
+          );
+          validationStage = "template";
+          const styledChanges = resolveEditStyleOperations(
+            referencedChanges,
+            project.editStyleTemplate
+          );
+          validationStage = "normalization";
           changes = mapEditOperations(
-            resolveEditStyleOperations(
-              resolveEditPlanningReferences(
-                output.changes,
-                planningContext,
-                duration,
-                Array.isArray(input.selectedClipIds) ? input.selectedClipIds : []
-              ),
-              project.editStyleTemplate
-            ),
+            styledChanges,
             duration,
             project.clips,
             Array.isArray(input.selectedClipIds) ? input.selectedClipIds : [],
             personalStyles,
             true
           );
+          validationStage = "scope";
           if (input.localOnly === true) {
             const start = boundedNumber(input.range?.start, 0, 0, duration);
             const end = boundedNumber(input.range?.end, start, start, duration);
@@ -6861,7 +6891,8 @@ async function handleAi(
                   change.start < end &&
                   (!["broll", "sound"].includes(change.type) ||
                     (change.start >= start && change.end <= end)) &&
-                  (change.type !== "broll" || Boolean(change.parameters?.assetId))
+                  (change.type !== "broll" ||
+                    Boolean(change.parameters?.assetId))
               )
               .map(change => ({
                 ...change,
@@ -6869,16 +6900,43 @@ async function handleAi(
                 end: Math.min(end, change.end),
               }));
           }
+          validationStage = "executable";
           assertExecutableEditPlan(changes);
+          validationStage = "trim";
           assertAutonomousTrimSemantics(project, changes);
+          validationStage = "composition";
           assertAutonomousComposition(project, changes);
-        } catch {
+        } catch (error) {
+          const validation = editPlanValidationDiagnostic(
+            error,
+            validationStage,
+            Array.isArray(output.changes) ? output.changes.length : 0
+          );
+          console.warn("REELassati edit plan rejected", {
+            reference: invocation.id,
+            ...validation,
+          });
+          // Keep provider completion truthful. Store only the bounded compiler
+          // diagnostic on this owned credit hold, alongside its invocation ID.
+          await env.DB.prepare(
+            "UPDATE credit_ledger SET metadata_json = json_set(metadata_json, '$.editPlanValidation', json(?)) WHERE id = ? AND owner_email = ? AND status = 'reserved'"
+          )
+            .bind(JSON.stringify(validation), reservation.id, user.email)
+            .run()
+            .catch(() => undefined);
           // This response releases the actual reservation and carries its credit
           // receipt. Never return raw model labels, payloads, or a retry command.
-          return json({
-            error: "The edit plan could not pass the executable timeline checks. No edit was applied.",
-            code: "edit_plan_invalid",
-          }, 422);
+          return json(
+            {
+              error:
+                "The edit plan could not pass the executable timeline checks. No edit was applied.",
+              code: "edit_plan_invalid",
+              reason: "edit_plan_invalid",
+              reference: invocation.id,
+              validation,
+            },
+            422
+          );
         }
         const normalizedProjection = {
           summary,

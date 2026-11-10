@@ -133,6 +133,110 @@ function fixture() {
 }
 
 describe("evidence-backed auto-edit planning", () => {
+  it("accepts omitted-equivalent optional nulls without discarding numeric treatments or measured cues", () => {
+    const { context } = fixture();
+    const excerpt = context.mediaExcerpts.find(
+      row => row.assetId === "detail"
+    )!;
+    const result = resolveEditPlanningReferences(
+      [
+        {
+          type: "style",
+          start: 0,
+          end: 2,
+          cue: null,
+          mediaExcerptId: null,
+          targetClipIds: null,
+          parameters: { brightness: 0.1, visual: null, presetId: null },
+        },
+        {
+          type: "broll",
+          cue: {
+            sceneId: "scene:1",
+            speechId: null,
+            wordIndex: null,
+            edge: null,
+            align: null,
+            duration: 2,
+          },
+          mediaExcerptId: excerpt.id,
+          parameters: { sourceIn: null, assetId: null, prompt: null },
+        },
+        {
+          type: "sound",
+          cue: { sceneId: "scene:1", speechId: null, edge: null, align: null },
+          parameters: {
+            assetId: context.freeSounds.find(sound => sound.type === "sfx")!
+              .assetId,
+            sourceIn: null,
+          },
+        },
+      ],
+      context,
+      12
+    ) as EditOperation[];
+    expect(result[0]).toEqual({
+      type: "style",
+      start: 0,
+      end: 2,
+      targetClipIds: ["first"],
+      parameters: { brightness: 0.1 },
+    });
+    expect(result[1]).toMatchObject({
+      type: "broll",
+      start: 2,
+      end: 4,
+      parameters: { sourceIn: 5, assetId: "detail" },
+    });
+    expect(result[2]).toMatchObject({
+      type: "sound",
+      start: 2,
+      parameters: { sourceIn: 0 },
+    });
+    expect(
+      result.every(
+        operation => !("cue" in operation) && !("mediaExcerptId" in operation)
+      )
+    ).toBe(true);
+  });
+
+  it.each([
+    [{ cue: {} }, "cue_invalid"],
+    [{ cue: "PRIVATE" }, "cue_unsupported"],
+    [{ mediaExcerptId: "PRIVATE" }, "reference_unavailable"],
+    [{ targetClipIds: ["PRIVATE"] }, "target_invalid"],
+    [{ cue: { sceneId: "scene:0", duration: 1 }, start: 1 }, "timing_conflict"],
+  ])(
+    "retains strict validation for non-null malformed evidence %#",
+    (patch, reason) => {
+      const { context } = fixture();
+      try {
+        resolveEditPlanningReferences(
+          [
+            {
+              type: "style",
+              start: 0,
+              end: 1,
+              parameters: { brightness: 0.1 },
+              ...patch,
+            },
+          ],
+          context,
+          12
+        );
+        expect.fail(
+          "Malformed evidence must not be treated as an omitted annotation"
+        );
+      } catch (error) {
+        expect(error).toMatchObject({
+          reason,
+          operationIndex: 0,
+          operationType: "style",
+        });
+      }
+    }
+  );
+
   it("maps observations and repeated speech occurrences through trim and speed", () => {
     const { context } = fixture();
     expect(context.scenes.map(scene => [scene.start, scene.end])).toEqual([

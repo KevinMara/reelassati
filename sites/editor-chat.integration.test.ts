@@ -624,32 +624,168 @@ describe("foreground K3 auto-edit planning", () => {
       before = balance(),
       calls = providerCalls.length;
     nextOutput = {
-      summary: "A claimed zoom transition",
-      changes: [{ type: "zoom-transition", start: 1, end: 2 }],
+      summary: "PRIVATE_SUMMARY",
+      changes: [
+        {
+          type: "PRIVATE_UNSUPPORTED_OPERATION",
+          start: 1,
+          end: 2,
+          label: "PRIVATE_LABEL",
+          reason: "PRIVATE_REASON",
+          parameters: {
+            prompt: "PRIVATE_PROMPT",
+            url: "https://private.example/token",
+          },
+        },
+      ],
     };
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warningLog = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       const response = await request("/api/ai/edit-plan", await input());
       expect(response.status).toBe(422);
       const failure = await response.json();
       expect(failure).toMatchObject({
         code: "edit_plan_invalid",
+        reason: "edit_plan_invalid",
+        reference: expect.stringMatching(/^[a-f0-9-]{36}$/),
+        validation: {
+          version: 1,
+          stage: "references",
+          reason: "unsupported_operation",
+          operationCount: 1,
+          operationIndex: 0,
+        },
         creditReceipt: { status: "released", credits: 0 },
       });
       expect(failure).not.toHaveProperty("changes");
       expect(JSON.stringify(failure)).not.toContain("Retry once");
+      expect(JSON.stringify(failure)).not.toMatch(/PRIVATE|private.example/);
+      expect(failure.validation).not.toHaveProperty("operationType");
+      expect(warningLog).toHaveBeenCalledWith("REELassati edit plan rejected", {
+        reference: failure.reference,
+        ...failure.validation,
+      });
+      expect(JSON.stringify(warningLog.mock.calls)).not.toMatch(
+        /PRIVATE|private.example/
+      );
       expect(balance()).toBe(before);
       expect(providerCalls.length).toBe(calls + 1);
+      const ledger = sqlite
+        .prepare(
+          "SELECT status,metadata_json FROM credit_ledger WHERE owner_email='owner@example.com' ORDER BY rowid DESC LIMIT 1"
+        )
+        .get() as { status: string; metadata_json: string };
+      expect(ledger.status).toBe("released");
+      expect(JSON.parse(ledger.metadata_json)).toMatchObject({
+        analysisInvocationId: failure.reference,
+        editPlanValidation: failure.validation,
+      });
+      expect(ledger.metadata_json).not.toMatch(/PRIVATE|private.example/);
       expect(
         sqlite
-          .prepare(
-            "SELECT status FROM credit_ledger WHERE owner_email='owner@example.com' ORDER BY rowid DESC LIMIT 1"
-          )
-          .get()
-      ).toMatchObject({ status: "released" });
+          .prepare("SELECT status FROM ai_invocations WHERE id=?")
+          .get(failure.reference)
+      ).toMatchObject({ status: "completed" });
     } finally {
       nextOutput = original;
       errorLog.mockRestore();
+      warningLog.mockRestore();
+    }
+  });
+  it("normalizes optional null annotations and a rounded global grade before signing a retained edit", async () => {
+    const original = nextOutput,
+      before = balance(),
+      calls = providerCalls.length;
+    const body = await input();
+    body.project.duration = 28.350708;
+    body.project.clips[0] = {
+      ...body.project.clips[0],
+      duration: 28.350708,
+      outPoint: 28.350708,
+    };
+    nextOutput = {
+      summary: "Retain the demonstrated sequence with a consistent grade",
+      changes: [
+        {
+          type: "trim",
+          start: 0,
+          end: 25,
+          targetClipIds: ["clip"],
+          parameters: { sourceIn: 0 },
+          cue: null,
+          mediaExcerptId: null,
+        },
+        {
+          type: "style",
+          start: 0,
+          end: 28,
+          targetClipIds: null,
+          cue: null,
+          mediaExcerptId: null,
+          parameters: { contrast: 1.1, presetId: null, visual: null },
+        },
+      ],
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", body);
+      expect(response.status).toBe(200);
+      const result = await response.json();
+      expect(result.changes).toHaveLength(2);
+      expect(result.changes[1]).toMatchObject({
+        type: "style",
+        start: 0,
+        end: 28,
+        targetClipIds: ["clip"],
+        parameters: { contrast: 1.1 },
+        provenance: expect.any(Object),
+      });
+      expect(result.changes[1]).not.toHaveProperty("cue");
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before - 5);
+    } finally {
+      nextOutput = original;
+    }
+  });
+  it("retains an actionable normalization code for an unavailable preset without exposing its identifier", async () => {
+    const original = nextOutput,
+      before = balance(),
+      calls = providerCalls.length;
+    const warningLog = vi.spyOn(console, "warn").mockImplementation(() => {});
+    nextOutput = {
+      summary: "PRIVATE_SUMMARY",
+      changes: [
+        {
+          type: "graphic",
+          start: 0,
+          end: 2,
+          parameters: { presetId: "PRIVATE_PRESET" },
+        },
+      ],
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", await input());
+      expect(response.status).toBe(422);
+      const failure = await response.json();
+      expect(failure).toMatchObject({
+        reason: "edit_plan_invalid",
+        validation: {
+          version: 1,
+          stage: "normalization",
+          reason: "preset_unavailable",
+          operationCount: 1,
+          operationIndex: 0,
+          operationType: "graphic",
+        },
+        creditReceipt: { status: "released", credits: 0 },
+      });
+      expect(JSON.stringify(failure)).not.toContain("PRIVATE");
+      expect(JSON.stringify(warningLog.mock.calls)).not.toContain("PRIVATE");
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before);
+    } finally {
+      nextOutput = original;
+      warningLog.mockRestore();
     }
   });
   it("preserves explicit verified linked audio peers in a local visual treatment", async () => {
@@ -713,6 +849,15 @@ describe("foreground K3 auto-edit planning", () => {
       expect(response.status).toBe(422);
       expect(await response.json()).toMatchObject({
         code: "edit_plan_invalid",
+        reason: "edit_plan_invalid",
+        validation: {
+          version: 1,
+          stage: "composition",
+          reason: "clock_conflict",
+          operationCount: 2,
+          operationIndex: 0,
+          operationType: "trim",
+        },
         creditReceipt: { status: "released", credits: 0 },
       });
       expect(balance()).toBe(before);

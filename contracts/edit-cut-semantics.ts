@@ -1,4 +1,5 @@
 import type { EditOperation, EditProject } from "./workspace";
+import { EditPlanValidationError } from "./edit-plan-validation";
 
 /** Shared by every planning pass: a retained range is not a removed range. */
 export const EDIT_CUT_GUIDANCE =
@@ -11,16 +12,25 @@ export function assertAutonomousTrimSemantics(
   operations: EditOperation[]
 ) {
   const trimmed = new Set<string>();
-  for (const operation of operations) {
+  for (const [index, operation] of operations.entries()) {
     if (operation.type !== "trim") continue;
     for (const id of new Set(operation.targetClipIds)) {
       if (trimmed.has(id))
-        throw new Error(
-          "The edit plan trims the same clip more than once. Gap removals need separate ripple cuts."
+        throw new EditPlanValidationError(
+          "trim_duplicate",
+          "The edit plan trims the same clip more than once. Gap removals need separate ripple cuts.",
+          index,
+          operation.type
         );
       trimmed.add(id);
       const clip = project.clips.find(candidate => candidate.id === id);
-      if (!clip) throw new Error("The trim target is no longer available.");
+      if (!clip)
+        throw new EditPlanValidationError(
+          "missing_target",
+          "The trim target is no longer available.",
+          index,
+          operation.type
+        );
       const sourceIn = operation.parameters?.sourceIn ?? clip.inPoint;
       const sourceOut =
         sourceIn + (operation.end - operation.start) * (clip.speed ?? 1);
@@ -31,8 +41,11 @@ export function assertAutonomousTrimSemantics(
         sourceIn < clip.inPoint - 0.001 ||
         sourceOut > clip.outPoint + 0.001
       )
-        throw new Error(
-          "The trim must retain a range inside the selected source clip."
+        throw new EditPlanValidationError(
+          "trim_bounds_invalid",
+          "The trim must retain a range inside the selected source clip.",
+          index,
+          operation.type
         );
     }
   }

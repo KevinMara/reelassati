@@ -22,4 +22,22 @@ describe("editor failure copy", () => {
       )
     ).toContain("current timeline");
   });
+  it("distinguishes a rejected plan from a service outage without diagnostics", () => {
+    const expected = "Reel couldn't finish this edit. Please try again.";
+    expect(
+      editorFailureMessage({
+        reason: "edit_plan_invalid",
+        status: 422,
+        message: "private provider payload",
+      })
+    ).toBe(expected);
+    expect(
+      editorFailureMessage(
+        "The edit plan could not pass the executable timeline checks. No edit was applied."
+      )
+    ).toBe(expected);
+    expect(
+      editorFailureMessage({ status: 503, message: "upstream unavailable" })
+    ).not.toBe(expected);
+  });
 });

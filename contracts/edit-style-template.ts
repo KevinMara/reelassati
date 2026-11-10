@@ -5,6 +5,7 @@ import {
   type EditTemplateBlueprint,
 } from "./edit-template-blueprint";
 import type { EditProject } from "./workspace";
+import { EditPlanValidationError } from "./edit-plan-validation";
 import { normalizeStyleMetadata, type StyleMetadata } from "./style-metadata";
 import { getCaptionPreset, type CaptionAppearance } from "./editor-presets";
 import { isPrimaryFootage } from "./timeline-layers";
@@ -605,7 +606,7 @@ export function resolveEditStyleOperations(
   if (!template || !Array.isArray(changes)) return changes;
   const safe = normalizeEditStyleTemplate(template);
   if (!safe) return changes;
-  return changes.map(value => {
+  return changes.map((value, index) => {
     const params = object(object(value).parameters);
     if (
       safe.examples?.some(
@@ -614,7 +615,11 @@ export function resolveEditStyleOperations(
           example.feedback === "exclude"
       )
     )
-      throw new Error("The edit plan references an excluded style example.");
+      throw new EditPlanValidationError(
+        "style_example_excluded",
+        "The edit plan references an excluded style example.",
+        index
+      );
     const blueprint =
       typeof params.templateExampleId === "string"
         ? safe.examples?.find(

@@ -1,5 +1,9 @@
 import type { EditOperation, EditProject, TimelineClip } from "./workspace";
 import { assertLinkedEditTargets } from "./clip-groups";
+import {
+  EditPlanValidationError,
+  type EditPlanValidationReason,
+} from "./edit-plan-validation";
 
 const EPSILON = 0.000001;
 const additive = (operation: EditOperation) =>
@@ -72,8 +76,29 @@ export function assertAutonomousComposition(
   project: Pick<EditProject, "clips">,
   operations: EditOperation[]
 ) {
-  for (const operation of operations)
-    assertLinkedEditTargets(project, operation);
+  const invalid = (
+    reason: EditPlanValidationReason,
+    message: string,
+    operation: EditOperation
+  ): never => {
+    throw new EditPlanValidationError(
+      reason,
+      message,
+      operations.indexOf(operation),
+      operation.type
+    );
+  };
+  for (const operation of operations) {
+    try {
+      assertLinkedEditTargets(project, operation);
+    } catch {
+      invalid(
+        "linked_targets_invalid",
+        "Include linked audio or unlock the linked targets before changing their timing.",
+        operation
+      );
+    }
+  }
   const retained = operations.filter(operation =>
     trimPreservesTimelineClock(project, operation)
   );
@@ -82,16 +107,20 @@ export function assertAutonomousComposition(
       for (const local of operations) {
         if (local === trim || !local.targetClipIds.includes(clip.id)) continue;
         if (local.type === "delete")
-          throw new Error(
-            "A retained trim and whole-clip deletion conflict. Choose the intended structural edit."
+          invalid(
+            "retained_range_conflict",
+            "A retained trim and whole-clip deletion conflict. Choose the intended structural edit.",
+            local
           );
         if (
           local.type === "split" &&
           (local.start <= trim.start + EPSILON ||
             local.start >= trim.end - EPSILON)
         )
-          throw new Error(
-            "The split falls outside the retained source. It needs explicit structural targets."
+          invalid(
+            "retained_range_conflict",
+            "The split falls outside the retained source. It needs explicit structural targets.",
+            local
           );
         if (!["style", "audio"].includes(local.type)) continue;
         // A whole-clip grade/mix follows the retained clip. A specifically timed
@@ -100,16 +129,30 @@ export function assertAutonomousComposition(
         const wholeClip =
           local.start <= clip.start + EPSILON &&
           local.end >= clip.start + clip.duration - EPSILON;
+        const staticTreatment =
+          local.type === "audio" ||
+          (!local.parameters?.visual &&
+            !local.parameters?.fadeIn &&
+            !local.parameters?.fadeOut);
+        // A rounded global grade may end before a fractional source tail while
+        // still covering every retained frame. No motion clock is compressed.
+        const coversRetained =
+          staticTreatment &&
+          local.start <= trim.start + EPSILON &&
+          local.end >= trim.end - EPSILON;
         const start = Math.max(clip.start, local.start);
         const end = Math.min(clip.start + clip.duration, local.end);
         if (
           !wholeClip &&
+          !coversRetained &&
           (start < trim.start - EPSILON ||
             end > trim.end + EPSILON ||
             start >= end)
         )
-          throw new Error(
-            "The local treatment does not fit the retained source. It needs explicit structural targets."
+          invalid(
+            "retained_range_conflict",
+            "The local treatment does not fit the retained source. It needs explicit structural targets.",
+            local
           );
       }
     }
@@ -137,8 +180,10 @@ export function assertAutonomousComposition(
                   other.targetClipIds.includes(clip.id)))
           )
         )
-          throw new Error(
-            "A redundant move or speed operation cannot address locally split source pieces. Remove that operation before applying the treatment."
+          invalid(
+            "clock_conflict",
+            "A redundant move or speed operation cannot address locally split source pieces. Remove that operation before applying the treatment.",
+            structural
           );
         continue;
       }
@@ -181,8 +226,10 @@ export function assertAutonomousComposition(
                   overlaps(other.start, other.end, nextStart, nextEnd))))
         )
       )
-        throw new Error(
-          "A moved or speed-changed source with dependent timed edits needs a new plan on the resulting timeline. No edit was applied."
+        invalid(
+          "clock_conflict",
+          "A moved or speed-changed source with dependent timed edits needs a new plan on the resulting timeline. No edit was applied.",
+          structural
         );
     }
   }
@@ -200,14 +247,15 @@ export function assertAutonomousComposition(
         )
         .map(operation => operation.end)
     );
-    if (
-      operations.some(
-        operation =>
-          operation.type === "silence" && operation.end > retainedEnd + EPSILON
-      )
-    )
-      throw new Error(
-        "The ripple cut extends beyond the retained timeline. Choose a surviving interval."
+    const invalidRipple = operations.find(
+      operation =>
+        operation.type === "silence" && operation.end > retainedEnd + EPSILON
+    );
+    if (invalidRipple)
+      invalid(
+        "ripple_range_invalid",
+        "The ripple cut extends beyond the retained timeline. Choose a surviving interval.",
+        invalidRipple
       );
   }
 }

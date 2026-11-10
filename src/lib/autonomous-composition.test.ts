@@ -5,6 +5,7 @@ import {
   orderAutonomousOperations,
 } from "@contracts/autonomous-operation-order";
 import { normalizeGraphic } from "@contracts/motion-graphics";
+import { normalizeVisual } from "@contracts/clip-visual";
 import {
   buildEditPlanningContext,
   resolveEditPlanningReferences,
@@ -105,6 +106,75 @@ function fixture(repeated = false) {
 }
 
 describe("retained trims composed with local auto-edit treatments", () => {
+  it("applies a rounded global grade and mix over the entire retained fractional source without changing speech", () => {
+    const { project, assets } = fixture();
+    project.duration = 28.350708;
+    project.clips[0] = {
+      ...project.clips[0],
+      duration: project.duration,
+      outPoint: project.duration,
+    };
+    assets[0].duration = project.duration;
+    const original = structuredClone(project);
+    const result = executeAutonomousPlan(
+      project,
+      [
+        operation("look", "style", 0, 28, { contrast: 1.1 }),
+        operation("mix", "audio", 0, 28, { volume: 0.8 }),
+        operation("trim", "trim", 0, 25, { sourceIn: 0 }),
+      ],
+      assets
+    );
+    expect(result.clips).toHaveLength(1);
+    expect(result.clips[0]).toMatchObject({
+      start: 0,
+      duration: 25,
+      inPoint: 0,
+      outPoint: 25,
+      contrast: 1.1,
+      volume: 0.8,
+    });
+    expect(result.transcript).toEqual(original.transcript);
+    expect(result.sourceSpeech).toEqual(original.sourceSpeech);
+    expect(project).toEqual(original);
+  });
+
+  it.each([
+    operation("animated", "style", 0, 28, {
+      visual: normalizeVisual({
+        keyframes: [
+          { at: 0, scale: 1 },
+          { at: 1, scale: 1.1 },
+        ],
+      }),
+    }),
+    operation("local", "style", 24, 28, { contrast: 1.1 }),
+    operation("fade", "style", 0, 28, { fadeOut: 1 }),
+  ])(
+    "does not compress a timed treatment that crosses the removed tail: $id",
+    treatment => {
+      const { project } = fixture();
+      project.duration = 28.350708;
+      project.clips[0] = {
+        ...project.clips[0],
+        duration: project.duration,
+        outPoint: project.duration,
+      };
+      expect(() =>
+        assertAutonomousComposition(project, [
+          operation("trim", "trim", 0, 25, { sourceIn: 0 }),
+          treatment,
+        ])
+      ).toThrow(
+        expect.objectContaining({
+          reason: "retained_range_conflict",
+          operationIndex: 1,
+          operationType: "style",
+        })
+      );
+    }
+  );
+
   it("compiles and executes explicit linked AV peers together while rejecting arbitrary or malformed audio targets", () => {
     const { project, assets } = fixture();
     project.clips[0] = {

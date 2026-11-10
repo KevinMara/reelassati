@@ -5,6 +5,10 @@ import { sourceReviewFacts } from "./source-review";
 import { effectiveTimelineClips } from "./timeline-mixer";
 import { normalizeClipGroups } from "./clip-groups";
 import {
+  EditPlanValidationError,
+  type EditPlanValidationReason,
+} from "./edit-plan-validation";
+import {
   editorAudioCatalog,
   type EditorAudioCatalogEntry,
 } from "./editor-audio-catalog";
@@ -220,14 +224,34 @@ export function resolveEditPlanningReferences(
   selectedClipIds: string[] = []
 ): unknown[] {
   if (!Array.isArray(value))
-    throw new Error(
+    throw new EditPlanValidationError(
+      "changes_not_array",
       "The edit plan did not contain an executable changes list."
     );
   return value.map((candidate, index) => {
     const original = record(candidate);
     if (!original || !operationTypes.has(String(original.type)))
-      throw new Error(`Edit ${index + 1} uses an unsupported operation.`);
+      throw new EditPlanValidationError(
+        "unsupported_operation",
+        `Edit ${index + 1} uses an unsupported operation.`,
+        index
+      );
     const operation = { ...original };
+    const invalid: (
+      reason: EditPlanValidationReason,
+      message: string
+    ) => never = (reason, message) => {
+      throw new EditPlanValidationError(
+        reason,
+        message,
+        index,
+        operation.type as EditOperation["type"]
+      );
+    };
+    // K3's JSON-only response has no required non-null optional annotations.
+    // Null means no annotation; non-null malformed references still reject.
+    for (const key of ["cue", "mediaExcerptId", "targetClipIds"])
+      if (operation[key] === null) delete operation[key];
     if (operation.targetClipIds !== undefined) {
       if (
         !Array.isArray(operation.targetClipIds) ||
@@ -240,16 +264,22 @@ export function resolveEditPlanningReferences(
             )
         )
       )
-        throw new Error(
+        invalid(
+          "target_invalid",
           `Edit ${index + 1} references an unavailable or locked target.`
         );
     }
-    const parameters = { ...(record(operation.parameters) ?? {}) };
+    const parameters = Object.fromEntries(
+      Object.entries(record(operation.parameters) ?? {}).filter(
+        ([, value]) => value !== null
+      )
+    );
     const excerptId = operation.mediaExcerptId;
     if (excerptId !== undefined) {
       const excerpt = context.mediaExcerpts.find(row => row.id === excerptId);
       if (operation.type !== "broll" || !excerpt)
-        throw new Error(
+        invalid(
+          "reference_unavailable",
           `Edit ${index + 1} references an unavailable media excerpt.`
         );
       if (
@@ -259,7 +289,8 @@ export function resolveEditPlanningReferences(
           parameters.sourceIn !== excerpt.sourceIn) ||
         parameters.prompt !== undefined
       )
-        throw new Error(
+        invalid(
+          "reference_conflict",
           `Edit ${index + 1} conflicts with its selected media excerpt.`
         );
       parameters.assetId = excerpt.assetId;
@@ -267,16 +298,25 @@ export function resolveEditPlanningReferences(
       delete operation.mediaExcerptId;
     }
     if (operation.cue !== undefined) {
-      const cue = record(operation.cue);
+      const rawCue = record(operation.cue);
+      const cue = rawCue
+        ? Object.fromEntries(
+            Object.entries(rawCue).filter(([, value]) => value !== null)
+          )
+        : null;
       if (!cue || !cueTypes.has(String(operation.type)))
-        throw new Error(`Edit ${index + 1} cannot use an evidence cue.`);
+        invalid(
+          "cue_unsupported",
+          `Edit ${index + 1} cannot use an evidence cue.`
+        );
       if (
         Number(typeof cue.speechId === "string") +
           Number(typeof cue.sceneId === "string") !==
           1 ||
         (cue.edge !== undefined && cue.edge !== "start" && cue.edge !== "end")
       )
-        throw new Error(
+        invalid(
+          "cue_invalid",
           `Edit ${index + 1} needs one valid speech or scene cue.`
         );
       const speech = context.speechEvidence.find(
@@ -292,7 +332,8 @@ export function resolveEditPlanningReferences(
         (cue.wordIndex !== undefined && !word) ||
         (speech?.partial && !word)
       )
-        throw new Error(
+        invalid(
+          "cue_timing_unavailable",
           `Edit ${index + 1} references missing or incomplete timing evidence.`
         );
       const anchor = word ?? speech ?? scene!;
@@ -310,11 +351,13 @@ export function resolveEditPlanningReferences(
             cue.align !== "start" &&
             cue.align !== "peak")
         )
-          throw new Error(
+          invalid(
+            "sound_cue_invalid",
             `Edit ${index + 1} needs an available catalog cue and sound alignment.`
           );
         if (parameters.sourceIn !== undefined && parameters.sourceIn !== 0)
-          throw new Error(
+          invalid(
+            "source_offset_conflict",
             `Edit ${index + 1} cannot combine a sound cue with a source offset.`
           );
         start = time - (cue.align === "peak" ? sound.peakSeconds : 0);
@@ -324,11 +367,15 @@ export function resolveEditPlanningReferences(
         start = Math.max(0, start);
       } else {
         if (cue.align !== undefined)
-          throw new Error(
+          invalid(
+            "cue_invalid",
             `Edit ${index + 1}: waveform alignment is only supported for sound.`
           );
         if (!finite(cue.duration) || cue.duration <= 0)
-          throw new Error(`Edit ${index + 1} needs a positive cue duration.`);
+          invalid(
+            "duration_invalid",
+            `Edit ${index + 1} needs a positive cue duration.`
+          );
         end = start + cue.duration;
       }
       if (
@@ -338,15 +385,19 @@ export function resolveEditPlanningReferences(
         end > duration + 0.000001 ||
         end <= start
       )
-        throw new Error(`Edit ${index + 1} extends outside the edit.`);
+        invalid("range_invalid", `Edit ${index + 1} extends outside the edit.`);
       if (operation.type === "style" && scene && end > scene.end + 0.000001)
-        throw new Error(`Edit ${index + 1} extends beyond its observed scene.`);
+        invalid(
+          "range_invalid",
+          `Edit ${index + 1} extends beyond its observed scene.`
+        );
       if (
         (finite(operation.start) &&
           Math.abs(operation.start - start) > 0.000001) ||
         (finite(operation.end) && Math.abs(operation.end - end) > 0.000001)
       )
-        throw new Error(
+        invalid(
+          "timing_conflict",
           `Edit ${index + 1} conflicts with its selected timing cue.`
         );
       operation.start = round(start);
@@ -362,7 +413,8 @@ export function resolveEditPlanningReferences(
             clip => clip.id === speech.clipId && clip.picture && !clip.locked
           )
         )
-          throw new Error(
+          invalid(
+            "target_not_visual",
             `Edit ${index + 1} needs a visible footage target for its speech cue.`
           );
         operation.targetClipIds = speech
@@ -374,7 +426,10 @@ export function resolveEditPlanningReferences(
       delete operation.cue;
     }
     if (!finite(operation.start) || !finite(operation.end))
-      throw new Error(`Edit ${index + 1} has no measured timeline interval.`);
+      invalid(
+        "missing_timing",
+        `Edit ${index + 1} has no measured timeline interval.`
+      );
     // Make the executor's existing defaults explicit in the signed proposal.
     if (operation.type === "move" && parameters.destination === undefined)
       parameters.destination = operation.start;
@@ -388,13 +443,19 @@ export function resolveEditPlanningReferences(
         id => selectedClipIds.length && !selectedClipIds.includes(id)
       )
     )
-      throw new Error(`Edit ${index + 1} conflicts with the selected clips.`);
+      invalid(
+        "selection_conflict",
+        `Edit ${index + 1} conflicts with the selected clips.`
+      );
     if (operation.type === "style") {
       if (!targets.length) {
         // An empty scene target must not later expand to hidden/audio/locked
         // layers in the generic operation mapper.
-        if (original.cue !== undefined)
-          throw new Error(`Edit ${index + 1} has no visible footage target.`);
+        if (original.cue != null)
+          invalid(
+            "target_not_visual",
+            `Edit ${index + 1} has no visible footage target.`
+          );
         targets = context.clipTargets
           .filter(
             clip =>
@@ -424,7 +485,8 @@ export function resolveEditPlanningReferences(
             )
         )
       )
-        throw new Error(
+        invalid(
+          "target_not_visual",
           `Edit ${index + 1} needs visible footage targets for its visual controls.`
         );
       operation.targetClipIds = targets;
@@ -437,7 +499,8 @@ export function resolveEditPlanningReferences(
         operation.end <= operation.start ||
         operation.end - operation.start > excerpt.duration + 0.000001
       )
-        throw new Error(
+        invalid(
+          "range_invalid",
           `Edit ${index + 1} extends beyond the observed media excerpt.`
         );
     }
@@ -463,10 +526,13 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
     "contrast",
     "saturation",
   ] as const;
-  for (const operation of operations) {
+  for (const [index, operation] of operations.entries()) {
     const parameters = operation.parameters ?? {};
-    const fail = (detail: string): never => {
-      throw new Error(`${operation.label}: ${detail}`);
+    const fail = (
+      detail: string,
+      reason: EditPlanValidationReason = "missing_control"
+    ): never => {
+      throw new EditPlanValidationError(reason, detail, index, operation.type);
     };
     if (
       operation.type === "style" &&
@@ -488,7 +554,10 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
     if (operation.type === "graphic" && !parameters.graphic)
       fail("the proposed graphic has no supported editable design.");
     if (operation.type === "sound" && !parameters.assetId)
-      fail("the proposed sound has no available audio selection.");
+      fail(
+        "the proposed sound has no available audio selection.",
+        "missing_media"
+      );
     if (
       operation.type === "broll" &&
       !(
@@ -498,7 +567,8 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
       )
     )
       fail(
-        "the proposed supporting media has no source or generation specification."
+        "the proposed supporting media has no source or generation specification.",
+        "missing_media"
       );
     if (
       !["caption", "graphic", "broll", "sound", "silence"].includes(
@@ -506,7 +576,7 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
       ) &&
       !operation.targetClipIds.length
     )
-      fail("the proposed change has no available target.");
+      fail("the proposed change has no available target.", "missing_target");
   }
 }
 
@@ -565,4 +635,7 @@ For reviewed supporting video, mediaExcerptId selects one supplied mediaExcerpts
 and compiles its real assetId/sourceIn; keep the insertion within that excerpt's
 duration. Select it by its visualEvidence, not its name. This is original library
 footage, not generated or licensed stock. Ordinary assetId/sourceIn also remain valid.
+Optional planning annotations may be omitted or null. A numeric operation needs no
+cue or mediaExcerptId. For a scene cue, omit speechId/wordIndex; for a speech cue, omit
+sceneId. Non-null references must identify the supplied evidence exactly.
 `.trim();

@@ -3,7 +3,12 @@
 export function editorFailureMessage(error: unknown): string {
   const row =
     error && typeof error === "object"
-      ? (error as { message?: unknown; status?: number; name?: string })
+      ? (error as {
+          message?: unknown;
+          status?: number;
+          name?: string;
+          reason?: unknown;
+        })
       : undefined;
   const text =
     typeof error === "string"
@@ -29,5 +34,12 @@ export function editorFailureMessage(error: unknown): string {
     return "Your edit changed. Please try again with the current timeline.";
   if (/speech|transcri|word timing|decodable audio/i.test(text))
     return "Reel couldn't read the audio. Please try again.";
+  if (
+    row?.reason === "edit_plan_invalid" ||
+    /edit plan.*(?:executable timeline checks|incomplete)|AI edit needs correction/i.test(
+      text
+    )
+  )
+    return "Reel couldn't finish this edit. Please try again.";
   return "Reel is unavailable right now. Please try again.";
 }

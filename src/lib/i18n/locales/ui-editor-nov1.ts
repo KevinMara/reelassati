@@ -44,14 +44,46 @@ const rows: Partial<Record<InterfaceLanguage, string>> = {
   id: "Tambah media|Unggah berkas|Impor tautan video|Tautan video|Tempel tautan video atau media sosial|Video disimpan ke Pustaka.|Impor|Masuk kembali untuk melanjutkan.|Anda memerlukan lebih banyak kredit untuk melanjutkan.|Suntingan berubah. Coba lagi dengan linimasa saat ini.|Reel tidak dapat membaca audio. Coba lagi.|Reel tidak tersedia saat ini. Coba lagi.|Video ini tidak tersedia saat ini. Coba tautan lain atau unggah berkasnya.",
   th: "เพิ่มสื่อ|อัปโหลดไฟล์|นำเข้าลิงก์วิดีโอ|ลิงก์วิดีโอ|วางลิงก์วิดีโอหรือโซเชียล|บันทึกวิดีโอในคลังแล้ว|นำเข้า|เข้าสู่ระบบอีกครั้งเพื่อดำเนินการต่อ|ต้องมีเครดิตเพิ่มเพื่อดำเนินการต่อ|การตัดต่อเปลี่ยนไปแล้ว ลองอีกครั้งด้วยไทม์ไลน์ปัจจุบัน|Reel อ่านเสียงไม่ได้ โปรดลองอีกครั้ง|Reel ไม่พร้อมใช้งานในขณะนี้ โปรดลองอีกครั้ง|วิดีโอนี้ไม่พร้อมใช้งานในขณะนี้ ลองลิงก์อื่นหรืออัปโหลดไฟล์",
 };
+const planFailureText: Partial<Record<InterfaceLanguage, string>> = {
+  it: "Reel non è riuscito a completare questo montaggio. Riprova.",
+  es: "Reel no pudo terminar esta edición. Vuelve a intentarlo.",
+  fr: "Reel n’a pas pu terminer ce montage. Réessayez.",
+  de: "Reel konnte diesen Schnitt nicht fertigstellen. Versuche es erneut.",
+  pt: "O Reel não conseguiu concluir esta edição. Tente novamente.",
+  nl: "Reel kon deze montage niet afmaken. Probeer het opnieuw.",
+  pl: "Reel nie mógł ukończyć tego montażu. Spróbuj ponownie.",
+  ro: "Reel nu a putut finaliza acest montaj. Încearcă din nou.",
+  tr: "Reel bu düzenlemeyi tamamlayamadı. Lütfen tekrar deneyin.",
+  uk: "Reel не вдалося завершити цей монтаж. Спробуйте ще раз.",
+  ru: "Reel не удалось завершить этот монтаж. Попробуйте ещё раз.",
+  ar: "لم يتمكن Reel من إكمال هذا المونتاج. يُرجى المحاولة مجددًا.",
+  hi: "Reel यह संपादन पूरा नहीं कर सका। कृपया फिर से प्रयास करें।",
+  ja: "Reelはこの編集を完了できませんでした。もう一度お試しください。",
+  ko: "Reel이 이 편집을 완료하지 못했습니다. 다시 시도해 주세요.",
+  zh: "Reel 未能完成此次剪辑。请重试。",
+  vi: "Reel không thể hoàn thành bản dựng này. Vui lòng thử lại.",
+  da: "Reel kunne ikke færdiggøre denne redigering. Prøv igen.",
+  sv: "Reel kunde inte slutföra den här redigeringen. Försök igen.",
+  no: "Reel kunne ikke fullføre denne redigeringen. Prøv igjen.",
+  fi: "Reel ei voinut viimeistellä tätä muokkausta. Yritä uudelleen.",
+  cs: "Reel nemohl dokončit tento střih. Zkuste to znovu.",
+  hu: "A Reel nem tudta befejezni ezt a vágást. Próbáld újra.",
+  el: "Το Reel δεν μπόρεσε να ολοκληρώσει αυτό το μοντάζ. Δοκιμάστε ξανά.",
+  he: "Reel לא הצליח להשלים את העריכה הזו. נסו שוב.",
+  id: "Reel tidak dapat menyelesaikan suntingan ini. Coba lagi.",
+  th: "Reel ตัดต่อครั้งนี้ไม่สำเร็จ โปรดลองอีกครั้ง",
+};
 export const editorNov1Ui = Object.fromEntries(
   Object.entries(rows).map(([code, row]) => {
     const values = row.split("|");
     if (values.length !== keys.length)
       throw new Error(`Invalid editor copy for ${code}`);
-    return [
-      code,
-      Object.fromEntries(keys.map((key, index) => [key, values[index]])),
-    ];
+    const copy: Record<string, string> = Object.fromEntries(
+      keys.map((key, index) => [key, values[index]])
+    );
+    copy["Reel couldn't finish this edit. Please try again."] =
+      planFailureText[code as InterfaceLanguage] ??
+      "Reel couldn't finish this edit. Please try again.";
+    return [code, copy] as const;
   })
 ) as Record<InterfaceLanguage, Record<string, string>>;
