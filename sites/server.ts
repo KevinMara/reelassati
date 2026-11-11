@@ -9,6 +9,7 @@ import {
   EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION,
   editPlanQualityAssets,
   editPlanGraphicFeedback,
+  finalizeEditPlanGraphics,
   mergeGraphicRefinement,
   reviewEditPlanGraphics,
   type EditPlanQualityReview,
@@ -7056,6 +7057,17 @@ async function handleAi(
           if (changes.some(operation => operation.type === "graphic")) {
             validationStage = "graphic_preflight";
             graphicReview = reviewEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
+            if (graphicReview.omitted.length && !graphicRequest.trim()) {
+              // Resolve measured placement locally first. Unresolved graphics
+              // remain in the proposal for the single creative correction;
+              // this is not permission to silently drop a content objective.
+              const placed = finalizeEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
+              const replacements = new Map(placed.changes.map(operation => [operation.id, operation]));
+              changes = changes.map(operation => replacements.get(operation.id) ?? operation);
+              if (placed.qualityReview.repairedOperationIds.length)
+                qualityReview = { repairedOperationIds: placed.qualityReview.repairedOperationIds, withdrawn: [] };
+              graphicReview = reviewEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
+            }
           }
         } catch (error) {
           checkpoint();
@@ -7096,7 +7108,10 @@ async function handleAi(
             if (editorialCoverage)
               editorialCoverage = reconcileEditorialCoverage(editorialCoverage, changes);
             summary = repaired.summary;
-            qualityReview = repaired.qualityReview;
+            qualityReview = {
+              repairedOperationIds: [...new Set([...(qualityReview?.repairedOperationIds ?? []), ...repaired.qualityReview.repairedOperationIds])],
+              withdrawn: repaired.qualityReview.withdrawn,
+            };
             // Earlier notes may describe graphics that were just withdrawn.
             // Only the corrected proposal may provide notes for this result.
             editorialNotes = normalizeEditorialNotes(corrected.output.editorialNotes);
@@ -7104,9 +7119,23 @@ async function handleAi(
             assertExecutableEditPlan(changes);
             assertAutonomousTrimSemantics(project, changes);
             assertAutonomousComposition(project, changes);
-            const finalReview = reviewEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
-            if (finalReview.omitted.length)
-              throw new EditPlanValidationError("graphic_refinement_unsafe", "The corrected graphics still fail the actual timeline checks.");
+            const finalized = finalizeEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
+            changes = finalized.changes;
+            const withdrawn = [...qualityReview.withdrawn, ...finalized.qualityReview.withdrawn];
+            const withdrawnIds = new Set(withdrawn.map(item => item.operationId));
+            qualityReview = {
+              repairedOperationIds: [...new Set([...qualityReview.repairedOperationIds, ...finalized.qualityReview.repairedOperationIds])]
+                .filter(id => !withdrawnIds.has(id)),
+              withdrawn,
+            };
+            if (editorialCoverage)
+              editorialCoverage = reconcileEditorialCoverage(editorialCoverage, changes);
+            if (finalized.qualityReview.withdrawn.length) {
+              // The model's correction summary may still describe these
+              // overlays. The client renders an actual execution receipt and
+              // retains these explicit omissions in its review details.
+              summary = `Prepared ${changes.length} changes; ${withdrawn.length} overlays were left out after visual review.`;
+            }
           } catch (error) {
             checkpoint();
             return rejectPlan(error, changes);

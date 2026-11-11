@@ -11,6 +11,7 @@ import {
 import { protectedSourceBounds } from "./automatic-graphic-protection";
 import { normalizeSourceVisualEvidence } from "./source-visual-evidence";
 import { effectiveTimelineClips } from "./timeline-mixer";
+import { normalizeGraphic } from "./motion-graphics";
 
 export interface EditPlanQualityReview {
   repairedOperationIds: string[];
@@ -70,6 +71,134 @@ export function reviewEditPlanGraphics(
       "The composed edit cannot pass preflight."
     );
   }
+}
+
+/** Salvage valid work after the single model correction. Only automatic text
+ * cards may move; arrows/highlights retain their semantic attachment points.
+ * Every candidate uses the full renderer-aware source and motion checks. Text,
+ * size, duration, source timing and every unrelated operation stay untouched. */
+export function finalizeEditPlanGraphics(
+  project: EditProject,
+  changes: EditOperation[],
+  assets: Asset[],
+  request: string,
+  checkpoint: () => void
+): { changes: EditOperation[]; qualityReview: EditPlanQualityReview } {
+  const review = reviewEditPlanGraphics(
+    project,
+    changes,
+    assets,
+    request,
+    checkpoint
+  );
+  const rejected = new Map(
+    review.omitted.map(item => [item.operationId, item])
+  );
+  const accepted = new Map(
+    changes.filter(item => !rejected.has(item.id)).map(item => [item.id, item])
+  );
+  const repairedOperationIds: string[] = [];
+  for (const operation of changes) {
+    const decision = rejected.get(operation.id);
+    const graphic = normalizeGraphic(operation.parameters?.graphic);
+    if (
+      !decision ||
+      request.trim() ||
+      operation.parameters?.graphicMode === "update" ||
+      !graphic ||
+      !["text", "callout"].includes(graphic.kind) ||
+      decision.issues.some(
+        issue => !["source-overlap", "competing-text"].includes(issue.reason)
+      )
+    )
+      continue;
+    const positions = [...new Set([graphic.x, 25, 50, 75])]
+      .flatMap(x =>
+        [...new Set([graphic.y, 15, 30, 50, 70, 85])].map(y => ({ x, y }))
+      )
+      .sort(
+        (a, b) =>
+          Math.hypot(a.x - graphic.x, a.y - graphic.y) -
+          Math.hypot(b.x - graphic.x, b.y - graphic.y)
+      );
+    for (const position of positions) {
+      checkpoint();
+      const dx = position.x - graphic.x,
+        dy = position.y - graphic.y;
+      if (!dx && !dy) continue;
+      const motion = graphic.motion?.map(frame => ({
+        ...frame,
+        x: frame.x + dx,
+        y: frame.y + dy,
+      }));
+      // Do not clamp paths or change their motion to make a placement fit.
+      if (
+        motion?.some(
+          frame => frame.x < 0 || frame.x > 100 || frame.y < 0 || frame.y > 100
+        )
+      )
+        continue;
+      const candidate: EditOperation = {
+        ...operation,
+        parameters: {
+          ...operation.parameters,
+          graphic: { ...graphic, ...position, ...(motion ? { motion } : {}) },
+        },
+      };
+      const attempt = changes.flatMap(item =>
+        item.id === operation.id
+          ? [candidate]
+          : accepted.has(item.id)
+            ? [accepted.get(item.id)!]
+            : []
+      );
+      let checked: AutonomousGraphicReview;
+      try {
+        checked = reviewEditPlanGraphics(
+          project,
+          attempt,
+          assets,
+          request,
+          checkpoint
+        );
+      } catch (error) {
+        checkpoint();
+        // A new placement can fail the render-safe frame check. Only that
+        // candidate is rejected; source, execution and cancellation failures
+        // keep their normal failure path.
+        if (
+          error instanceof EditPlanValidationError &&
+          error.reason === "audit_graphic_readability"
+        )
+          continue;
+        throw error;
+      }
+      if (checked.omitted.length) continue;
+      accepted.set(operation.id, candidate);
+      rejected.delete(operation.id);
+      repairedOperationIds.push(operation.id);
+      break;
+    }
+  }
+  const result = changes.flatMap(item =>
+    accepted.has(item.id) ? [accepted.get(item.id)!] : []
+  );
+  const finalReview = reviewEditPlanGraphics(
+    project,
+    result,
+    assets,
+    request,
+    checkpoint
+  );
+  if (finalReview.omitted.length)
+    throw new EditPlanValidationError(
+      "graphic_refinement_unsafe",
+      "The final composed graphics changed after validation."
+    );
+  return {
+    changes: result,
+    qualityReview: { repairedOperationIds, withdrawn: [...rejected.values()] },
+  };
 }
 
 /** Source rectangles are normalized; these measured samples are in canvas %.

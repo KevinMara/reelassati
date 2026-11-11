@@ -114,7 +114,7 @@ def prepare(entry, bundle, output, work, group, label, design_id, timeout):
                     # exact alpha comparison below.
                     if target.stat().st_size > MAXIMUM:
                         encode[encode.index("realtime")]="good"
-                        encode[encode.index("-cpu-used")+1]="4"
+                        encode[encode.index("-cpu-used")+1]="1"
                         run([encode[0],"-y",*encode[1:]],timeout)
                     # MOV/WebM timebase rounding can make the same -ss seek
                     # choose adjacent frames. Compare the complete decoded

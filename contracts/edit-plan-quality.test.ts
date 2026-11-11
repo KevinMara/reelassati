@@ -5,6 +5,7 @@ import { visualFrame } from "./clip-visual";
 import {
   editPlanGraphicFeedback,
   editPlanQualityAssets,
+  finalizeEditPlanGraphics,
   mergeGraphicRefinement,
   reviewEditPlanGraphics,
 } from "./edit-plan-quality";
@@ -127,16 +128,169 @@ const checkpoint = () => undefined;
 const compile = (raw: unknown) => raw as EditOperation[];
 
 describe("bounded graphic quality correction", () => {
+  it("places a supported automatic card clear of the face without changing its content, timing or valid edits", () => {
+    const blocked = {
+      ...safe,
+      parameters: {
+        ...safe.parameters,
+        graphic: { ...safe.parameters.graphic!, y: 40 },
+      },
+    };
+    const before = structuredClone(blocked);
+    const result = finalizeEditPlanGraphics(
+      project,
+      [grade, blocked],
+      [asset],
+      "",
+      checkpoint
+    );
+    expect(result.qualityReview).toEqual({
+      repairedOperationIds: [blocked.id],
+      withdrawn: [],
+    });
+    expect(result.changes[0]).toBe(grade);
+    const moved = result.changes[1];
+    expect(moved).toMatchObject({
+      id: blocked.id,
+      start: blocked.start,
+      end: blocked.end,
+      targetClipIds: blocked.targetClipIds,
+    });
+    expect(moved.parameters?.graphic).toMatchObject({
+      text: "30 domande",
+      size: 4,
+      animation: "none",
+    });
+    expect(moved.parameters?.graphic?.y).not.toBe(40);
+    expect(blocked).toEqual(before);
+    expect(
+      reviewEditPlanGraphics(project, result.changes, [asset], "", checkpoint)
+        .omitted
+    ).toEqual([]);
+    const executed = executeAutonomousPlan(project, result.changes, [asset]);
+    expect(executed.sourceSpeech).toEqual(project.sourceSpeech);
+    expect(
+      executed.clips
+        .filter(clip => clip.assetId === asset.id)
+        .every(clip => clip.volume === 1)
+    ).toBe(true);
+  });
+
+  it("keeps valid work and records unsupported overlays instead of failing the entire edit", () => {
+    const result = finalizeEditPlanGraphics(
+      project,
+      [grade, bad],
+      [asset],
+      "",
+      checkpoint
+    );
+    expect(result.changes).toEqual([grade]);
+    expect(result.changes[0]).toBe(grade);
+    expect(result.qualityReview.repairedOperationIds).toEqual([]);
+    expect(result.qualityReview.withdrawn).toEqual(
+      reviewEditPlanGraphics(project, [grade, bad], [asset], "", checkpoint)
+        .omitted
+    );
+  });
+
+  it("never repositions an anchored highlight or a card with an explicit placement request", () => {
+    for (const [graphic, request] of [
+      [normalizeGraphic({ kind: "highlight", x: 50, y: 40, size: 15 }), ""],
+      [{ ...safe.parameters.graphic!, y: 40 }, "Put the card over the face"],
+    ] as const) {
+      const blocked = { ...safe, parameters: { ...safe.parameters, graphic } };
+      const result = finalizeEditPlanGraphics(
+        project,
+        [grade, blocked],
+        [asset],
+        request,
+        checkpoint
+      );
+      expect(result.changes).toEqual([grade]);
+      expect(result.qualityReview.repairedOperationIds).toEqual([]);
+      expect(
+        result.qualityReview.withdrawn.map(item => item.operationId)
+      ).toEqual([blocked.id]);
+    }
+  });
+
+  it("translates an entire animated path and rechecks every frame without clamping its geometry", () => {
+    const graphic = normalizeGraphic({
+      ...safe.parameters.graphic!,
+      y: 40,
+      motion: [
+        { at: 0, x: 48, y: 40, scale: 1, rotation: 0, easing: "ease-out" },
+        { at: 1, x: 52, y: 40, scale: 1, rotation: 0 },
+      ],
+    })!;
+    const blocked = { ...safe, parameters: { ...safe.parameters, graphic } };
+    const result = finalizeEditPlanGraphics(
+      project,
+      [grade, blocked],
+      [asset],
+      "",
+      checkpoint
+    );
+    expect(result.qualityReview.withdrawn).toEqual([]);
+    const moved = result.changes[1].parameters!.graphic!;
+    const dx = moved.x - graphic.x,
+      dy = moved.y - graphic.y;
+    expect(moved.motion).toEqual(
+      graphic.motion!.map(frame => ({
+        ...frame,
+        x: frame.x + dx,
+        y: frame.y + dy,
+      }))
+    );
+    expect(
+      reviewEditPlanGraphics(project, result.changes, [asset], "", checkpoint)
+        .omitted
+    ).toEqual([]);
+  });
+
+  it("preserves cancellation and source failures during finalization", () => {
+    const canceled = new DOMException("Canceled", "AbortError");
+    expect(() =>
+      finalizeEditPlanGraphics(project, [grade, bad], [asset], "", () => {
+        throw canceled;
+      })
+    ).toThrow(canceled);
+    expect(() =>
+      finalizeEditPlanGraphics(project, [grade, bad], [], "", checkpoint)
+    ).toThrow(expect.objectContaining({ reason: "audit_missing_media" }));
+  });
+
   it("preserves non-graphic execution failures and their original operation index", () => {
-    const withCaptions = { ...project, transcript: [{ id: "existing", start: 1, end: 4, text: "Already prepared" }] } as EditProject;
-    const caption = operation("duplicate", "caption", { text: "Different words" });
-    expect(() => reviewEditPlanGraphics(withCaptions, [grade, caption, safe], [asset], "", checkpoint))
-      .toThrow(expect.objectContaining({ reason: "execution_caption_overlap", operationIndex: 1, operationType: "caption" }));
+    const withCaptions = {
+      ...project,
+      transcript: [
+        { id: "existing", start: 1, end: 4, text: "Already prepared" },
+      ],
+    } as EditProject;
+    const caption = operation("duplicate", "caption", {
+      text: "Different words",
+    });
+    expect(() =>
+      reviewEditPlanGraphics(
+        withCaptions,
+        [grade, caption, safe],
+        [asset],
+        "",
+        checkpoint
+      )
+    ).toThrow(
+      expect.objectContaining({
+        reason: "execution_caption_overlap",
+        operationIndex: 1,
+        operationType: "caption",
+      })
+    );
   });
 
   it("distinguishes missing source inventory from a graphic placement rejection", () => {
-    expect(() => reviewEditPlanGraphics(project, [grade], [], "", checkpoint))
-      .toThrow(expect.objectContaining({ reason: "audit_missing_media" }));
+    expect(() =>
+      reviewEditPlanGraphics(project, [grade], [], "", checkpoint)
+    ).toThrow(expect.objectContaining({ reason: "audit_missing_media" }));
   });
 
   it("uses the same composed timeline and guard on client and server, then preserves voice and valid operation identity", () => {
