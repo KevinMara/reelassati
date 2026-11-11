@@ -15,6 +15,16 @@ media_index = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(media_index)
 MAXIMUM = 96 * 1024 * 1024
 
+
+def design_name(source_path):
+    path=Path(source_path)
+    name=re.sub(r'\b(?:4k|1080p|2160p|hd)\b','',path.stem,flags=re.I).strip()
+    # Aspect labels are prefixes only inside real aspect-export folders.
+    # "Square Frame" and "Scribble Story" can be the actual design name.
+    if any(re.fullmatch(r'(?:\d+\s*[x×]\s*\d+|story|vertical|square)',part,re.I) for part in path.parts[:-1]):
+        name=re.sub(r'^(?:story|feed|vertical|square)[ _-]+','',name,flags=re.I)
+    return name.strip().lower()
+
 def run(args, timeout=300):
     if args[0] == "ffmpeg":
         # One decoder/filter/encoder thread keeps deterministic foreground
@@ -31,6 +41,18 @@ def waveform(path):
     bins = [max((abs(v) for v in values[int(i * len(values) / 64):int((i + 1) * len(values) / 64)]), default=0) for i in range(64)]
     peak = max(bins, default=0)
     return [round(v / peak, 6) if peak else 0 for v in bins]
+
+
+def alpha_frame_sequence(path, timeout, webm=False):
+    args=["ffmpeg","-v","error","-nostdin"]
+    if webm: args += ["-c:v","libvpx-vp9"]
+    args += ["-i",str(path),"-map","0:v:0","-vf","alphaextract" if webm else "format=rgba,alphaextract","-fps_mode","passthrough","-f","framehash","-hash","sha256","-"]
+    lines=run(args,timeout).stdout.decode("utf-8").splitlines()
+    timing=[line for line in lines if line.startswith(("#tb ","#dimensions "))]
+    frames=[tuple(part.strip() for part in line.split(',')) for line in lines if line and not line.startswith('#')]
+    if not timing or not frames or any(len(frame)!=6 for frame in frames):
+        raise ValueError("The alpha frame sequence could not be verified")
+    return timing,frames
 
 def object_record(path, output, mime):
     digest = media_index.digest_file(path)
@@ -94,12 +116,13 @@ def prepare(entry, bundle, output, work, group, label, design_id, timeout):
                         encode[encode.index("realtime")]="good"
                         encode[encode.index("-cpu-used")+1]="4"
                         run([encode[0],"-y",*encode[1:]],timeout)
-                    # Every new alpha source is checked against its actual RGBA
-                    # reference at opening, middle and last-frame-adjacent times.
-                    for at in [0, technical["duration"]*.5, max(0,technical["duration"]-.1)]:
-                        original=run(["ffmpeg","-v","error","-ss",str(at),"-i",str(source),"-frames:v","1","-vf","format=rgba,alphaextract","-f","rawvideo","-"],timeout).stdout
-                        decoded=run(["ffmpeg","-v","error","-ss",str(at),"-c:v","libvpx-vp9","-i",str(target),"-frames:v","1","-vf","alphaextract","-f","rawvideo","-"],timeout).stdout
-                        if original != decoded: raise ValueError("Alpha derivative differs from source transparency")
+                    # MOV/WebM timebase rounding can make the same -ss seek
+                    # choose adjacent frames. Compare the complete decoded
+                    # sequence by frame identity and normalized output clocks.
+                    original=alpha_frame_sequence(source,timeout)
+                    decoded=alpha_frame_sequence(target,timeout,True)
+                    if original != decoded: raise ValueError("Alpha derivative differs from source transparency or frame timing")
+                    provenance["alphaVerification"]={"method":"Every decoded 8-bit alpha frame: timing,dimensions,size and SHA256 equality","frames":len(original[1]),"sequenceSha256":hashlib.sha256(json.dumps(original,separators=(',',':')).encode()).hexdigest()}
                     item["alpha"]=True
                 else:
                     target=work/"delivery.mp4"
@@ -143,8 +166,7 @@ def main():
             source_group=parts[1] if len(parts)>2 else "(root)"
             group=pack["groups"].get(source_group)
             if not group: continue
-            stem=Path(candidate["sourcePath"]).stem
-            design=re.sub(r'\b(?:4k|1080p|2160p|hd|story|vertical|square)\b','',stem,flags=re.I).strip().lower()
+            design=design_name(candidate["sourcePath"])
             design_labels.setdefault(group["name"],set()).add(design)
         design_labels={group:{design:index+1 for index,design in enumerate(sorted(values))} for group,values in design_labels.items()}
         with zipfile.ZipFile(archive) as bundle:
@@ -153,8 +175,7 @@ def main():
                 key=(index["source"]["archiveSha256"],entry["sourcePath"])
                 if not group or entry["kind"] not in kinds or key in done:continue
                 if any(re.search(pattern,entry["sourcePath"],re.I) for pattern in group.get("exclude",[])):continue
-                stem=Path(entry["sourcePath"]).stem
-                design=re.sub(r'\b(?:4k|1080p|2160p|hd|story|vertical|square)\b','',stem,flags=re.I).strip().lower()
+                design=design_name(entry["sourcePath"])
                 design_id="design-"+hashlib.sha256((group["name"]+design).encode()).hexdigest()[:24]
                 label=f'{group["name"]} {design_labels[group["name"]][design]:03d}'
                 if shutil.disk_usage(args.output).free < 1024**3 + entry["bytes"] * 2:

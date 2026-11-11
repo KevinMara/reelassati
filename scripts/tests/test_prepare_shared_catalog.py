@@ -11,6 +11,12 @@ spec.loader.exec_module(prepare)
 
 
 class SharedPreparationTests(unittest.TestCase):
+    def test_variant_labels_do_not_erase_actual_design_words(self):
+        self.assertEqual(prepare.design_name("Pack/Frames/1080p/Square Frame.mp4"), "square frame")
+        self.assertEqual(prepare.design_name("Pack/Frames/4K/4K Square Frame.mp4"), "square frame")
+        self.assertEqual(prepare.design_name("Pack/Frames/1080x1920/Story Scribble Story.mp4"), "scribble story")
+        self.assertEqual(prepare.design_name("Pack/Frames/1080x1080/Feed Scribble Story.mp4"), "scribble story")
+
     def test_sanitized_lut_keeps_every_numeric_sample_and_private_source_identity(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

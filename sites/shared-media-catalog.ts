@@ -1,11 +1,19 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
+import type { EditProject } from "../contracts/workspace";
+import { sourceReviewFacts } from "../contracts/source-review";
 import {
   normalizeSharedCatalogItem,
   type SharedMediaCatalogItem,
   type SharedMediaCatalogPage,
   type CatalogObject,
 } from "../contracts/shared-media-catalog";
+
+// R2 accepts only streams whose length the Workers runtime can identify.
+// A hashing TransformStream loses the request body's fixed-length identity.
+declare const FixedLengthStream: new (
+  length: number
+) => TransformStream<Uint8Array, Uint8Array>;
 
 type Statement = {
   bind(...values: unknown[]): Statement;
@@ -178,56 +186,145 @@ export async function searchSharedCatalog(
     groups: groups.results,
   };
 }
-/** A bounded, diverse candidate set; only actually published records are proposed. */
+export interface CatalogCandidateContext {
+  sourceText: string[];
+  styleText: string[];
+  aspectRatio: string;
+}
+
+/** Source observations rank candidates; they never establish events inside
+ * retrieved material. Editing boilerplate and recommendations are not facts. */
+export function catalogCandidateContext(
+  project: EditProject
+): CatalogCandidateContext {
+  return {
+    sourceText: [
+      ...(project.sourceReviews ?? []).flatMap(review => {
+        const facts = sourceReviewFacts(review);
+        return (facts.observations ?? []).flatMap(observation => [
+          observation.visualEvidence,
+          observation.audioEvidence,
+        ]);
+      }),
+      ...project.transcript.map(segment => segment.text),
+    ],
+    styleText: [
+      project.referenceStyleBrief ?? "",
+      project.editStyleTemplate?.name ?? "",
+      JSON.stringify(project.editStyleTemplate?.profile ?? {}),
+    ],
+    aspectRatio: project.aspectRatio,
+  };
+}
+
+// Generic direction must not turn "style" into forty Lifestyle looks.
+const retrievalStopWords = new Set(
+  "the and for with from this that these those into onto than then when where which what have has had are was were will would should could can not only also all any each every your their its our you they them use using used choose actual complete edit editing editor autonomous automatic style treatment footage source speech audience video image audio media clip clips sound color look looks motion visual visuals graphic graphics stock catalog supporting available existing supplied selected requested reference purpose result scene scenes beat beats timing timeline seconds content evidence observed request instruction parameters preserve keep make add apply build finish finished language name kind type true false null unknown none sourceIn sourceOut inPoint outPoint"
+    .toLowerCase()
+    .split(/\s+/)
+);
+
+function candidateTerms(prompt: string, context?: CatalogCandidateContext) {
+  const weights = new Map<string, number>();
+  const add = (text: string, weight: number) => {
+    for (const term of text
+      .normalize("NFKC")
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]{3,}/gu) ?? [])
+      if (
+        term.length <= 60 &&
+        !retrievalStopWords.has(term) &&
+        !/^\d+$/.test(term)
+      )
+        weights.set(term, Math.max(weight, weights.get(term) ?? 0));
+  };
+  for (const text of context?.styleText ?? []) add(text, 8);
+  for (const text of context?.sourceText ?? []) add(text, 4);
+  add(prompt, 1);
+  // Keep the SQL ranking payload bounded for long-form sources, after ranking
+  // source/style evidence above generic commands rather than truncating a prefix.
+  return [...weights]
+    .map(([term, weight]) => ({ term, weight }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 96);
+}
+
+/** One suitable variant per design, relevant groups first and diverse groups
+ * on ties. These are bounded planning candidates, never an edit shot quota. */
 async function sharedCatalogKindCandidates(
   env: CatalogEnvironment,
   prompt: string,
-  kind: "media" | "lut"
+  kind: "audio" | "image" | "video" | "lut",
+  context?: CatalogCandidateContext
 ) {
-  const catalog = await searchSharedCatalog(env, {
-    pageSize: 60,
-    kind,
-  });
-  const terms = [
-    ...new Set(prompt.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []),
-  ].slice(0, 12);
-  const conditions = terms.map(() => "instr(search_text, ?) > 0").join(" OR ");
-  const relevance = terms
-    .map(() => "CASE WHEN instr(search_text, ?) > 0 THEN 1 ELSE 0 END")
-    .join(" + ");
-  const kindCondition = kind === "lut" ? "kind = 'lut'" : "kind != 'lut'";
-  const matches = terms.length
-    ? await env.DB.prepare(
-        `SELECT payload FROM shared_media_catalog WHERE status = 'ready' AND ${kindCondition} AND (${conditions}) ORDER BY (${relevance}) DESC, name LIMIT 40`
-      )
-        .bind(...terms, ...terms)
-        .all<{ payload: string }>()
-    : { results: [] };
-  const grouped = await env.DB.prepare(
-    `SELECT payload FROM (SELECT payload, ROW_NUMBER() OVER (PARTITION BY group_name ORDER BY name, id) AS position FROM shared_media_catalog WHERE status = 'ready' AND ${kindCondition}) WHERE position <= 2 LIMIT 40`
-  ).all<{ payload: string }>();
-  return [
-    ...new Map(
-      [
-        ...matches.results,
-        ...grouped.results,
-        ...catalog.items.map(item => ({ payload: JSON.stringify(item) })),
-      ].map(row => {
-        const item = normalizeSharedCatalogItem(JSON.parse(row.payload));
-        return [item.id, item] as const;
-      })
-    ).values(),
-  ].slice(0, 60);
+  const [width, height] = (context?.aspectRatio ?? "16:9")
+    .split(":")
+    .map(Number);
+  const ratio = width > 0 && height > 0 ? width / height : 16 / 9;
+  const explicitText = [prompt, ...(context?.styleText ?? [])]
+    .join(" ")
+    .normalize("NFKC")
+    .toLowerCase();
+  const rows = await env.DB.prepare(
+    `
+    WITH scored AS (
+      SELECT *,
+        MAX(
+          (SELECT COALESCE(MAX(json_extract(value, '$.weight')), 0) FROM json_each(?)
+           WHERE instr(' ' || replace(replace(search_text, '-', ' '), '_', ' ') || ' ', ' ' || json_extract(value, '$.term') || ' ') > 0),
+          CASE WHEN (length(name) >= 4 AND instr(?, lower(name)) > 0) OR (length(group_name) >= 4 AND instr(?, lower(group_name)) > 0) THEN 16 ELSE 0 END
+        ) AS intent,
+        (SELECT COALESCE(SUM(json_extract(value, '$.weight')), 0) FROM json_each(?)
+         WHERE instr(' ' || replace(replace(search_text, '-', ' '), '_', ' ') || ' ', ' ' || json_extract(value, '$.term') || ' ') > 0)
+        + CASE WHEN length(name) >= 4 AND instr(?, lower(name)) > 0 THEN 200 ELSE 0 END
+        + CASE WHEN length(group_name) >= 4 AND instr(?, lower(group_name)) > 0 THEN 100 ELSE 0 END AS relevance
+      FROM shared_media_catalog WHERE status = 'ready' AND kind = ?
+    ), variants AS (
+      SELECT *, ROW_NUMBER() OVER (PARTITION BY design_id ORDER BY intent DESC, relevance DESC,
+        ABS(COALESCE(1.0 * json_extract(payload, '$.width') / NULLIF(json_extract(payload, '$.height'), 0), ?) - ?),
+        ABS(COALESCE(json_extract(payload, '$.width') * json_extract(payload, '$.height'), 2073600) - 2073600), id) AS variant_position
+      FROM scored
+    ), designs AS (
+      SELECT *, ROW_NUMBER() OVER (PARTITION BY group_name ORDER BY intent DESC, relevance DESC, name, id) AS group_position
+      FROM variants WHERE variant_position = 1
+    )
+    SELECT payload FROM designs
+    ORDER BY intent DESC, group_position, relevance DESC, group_name, name, id LIMIT 60
+  `
+  )
+    .bind(
+      JSON.stringify(candidateTerms(prompt, context)),
+      explicitText,
+      explicitText,
+      JSON.stringify(candidateTerms(prompt, context)),
+      explicitText,
+      explicitText,
+      kind,
+      ratio,
+      ratio
+    )
+    .all<{ payload: string }>();
+  return rows.results.map(row =>
+    normalizeSharedCatalogItem(JSON.parse(row.payload))
+  );
 }
 export async function sharedCatalogCandidates(
   env: CatalogEnvironment,
   prompt: string,
-  appliedLookIds: string[] = []
+  appliedLookIds: string[] = [],
+  context?: CatalogCandidateContext
 ) {
-  const [media, looks] = await Promise.all([
-    sharedCatalogKindCandidates(env, prompt, "media"),
-    sharedCatalogKindCandidates(env, prompt, "lut"),
+  const [videos, images, sounds, looks] = await Promise.all([
+    sharedCatalogKindCandidates(env, prompt, "video", context),
+    sharedCatalogKindCandidates(env, prompt, "image", context),
+    sharedCatalogKindCandidates(env, prompt, "audio", context),
+    sharedCatalogKindCandidates(env, prompt, "lut", context),
   ]);
+  // Balance available kinds, then spend spare capacity on nonempty pools.
+  const media: SharedMediaCatalogItem[] = [];
+  for (let index = 0; media.length < 60 && index < 60; index++)
+    for (const pool of [videos, images, sounds])
+      if (pool[index] && media.length < 60) media.push(pool[index]);
   const known = new Map([...media, ...looks].map(item => [item.id, item]));
   const missing = [...new Set(appliedLookIds)].filter(
     id => /^stock-[a-f0-9]{24}$/.test(id) && !known.has(id)
@@ -402,17 +499,19 @@ export async function handleCatalogAdmin(
     const temp = `shared-catalog-pending/${crypto.randomUUID()}`;
     const hash = sha256.create();
     let bytes = 0;
-    const verified = request.body.pipeThrough(
-      new TransformStream<Uint8Array, Uint8Array>({
-        transform(chunk, controller) {
-          bytes += chunk.byteLength;
-          if (bytes > object.bytes)
-            throw new Error("Catalog upload exceeds declared size.");
-          hash.update(chunk);
-          controller.enqueue(chunk);
-        },
-      })
-    );
+    const verified = request.body
+      .pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller) {
+            bytes += chunk.byteLength;
+            if (bytes > object.bytes)
+              throw new Error("Catalog upload exceeds declared size.");
+            hash.update(chunk);
+            controller.enqueue(chunk);
+          },
+        })
+      )
+      .pipeThrough(new FixedLengthStream(object.bytes));
     try {
       await env.BUCKET.put(temp, verified, {
         httpMetadata: { contentType: object.contentType },

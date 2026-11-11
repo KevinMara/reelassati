@@ -48,12 +48,36 @@ const item: SharedMediaCatalogItem = {
   credits: 0,
 };
 let sqlite: DatabaseSync, env: CatalogEnvironment;
-let worker: typeof import("./server")["default"];
+let worker: (typeof import("./server"))["default"];
 let objects: Map<
   string,
   { data: Uint8Array; metadata?: Record<string, string> }
 >;
 beforeEach(async () => {
+  // Node needs a length-enforcing stand-in. The separate workerd regression
+  // exercises the native FixedLengthStream brand required by the real R2 API.
+  vi.stubGlobal(
+    "FixedLengthStream",
+    class extends TransformStream<Uint8Array, Uint8Array> {
+      constructor(length: number) {
+        let received = 0;
+        super({
+          transform(chunk, controller) {
+            received += chunk.byteLength;
+            if (received > length)
+              throw new TypeError("Stream exceeds its declared length.");
+            controller.enqueue(chunk);
+          },
+          flush() {
+            if (received !== length)
+              throw new TypeError(
+                "Stream is shorter than its declared length."
+              );
+          },
+        });
+      }
+    }
+  );
   // Each fixture owns a fresh database; reset the worker's one-binding schema
   // initialization cache alongside it, as a new worker isolate would.
   vi.resetModules();
@@ -353,6 +377,172 @@ describe("shared catalog owner authorization", () => {
   });
 });
 describe("shared catalog verified publication", () => {
+  it("grounds a long automatic command in source evidence and balances media kinds across a large look library", async () => {
+    const seed = (
+      number: number,
+      kind: "audio" | "image" | "video" | "lut",
+      name: string,
+      group: string,
+      tags: string[],
+      designId = `design-${number}`,
+      width = 1920,
+      height = 1080
+    ) => {
+      const hash = digest(new TextEncoder().encode(String(number)));
+      const extension = {
+        audio: "wav",
+        image: "png",
+        video: "mp4",
+        lut: "cube",
+      }[kind];
+      const contentType = {
+        audio: "audio/wav",
+        image: "image/png",
+        video: "video/mp4",
+        lut: "application/x-cube",
+      }[kind];
+      const candidate = normalizeSharedCatalogItem({
+        id: `stock-${hash.slice(0, 24)}`,
+        name,
+        group,
+        tags,
+        designId,
+        variant: kind === "lut" ? "3D · 2" : "Measured variant",
+        kind,
+        duration: kind === "lut" ? 0 : 1,
+        media: {
+          file: `media/${hash}.${extension}`,
+          sha256: hash,
+          bytes: 8,
+          contentType,
+        },
+        ...(kind === "lut"
+          ? {
+              lut: {
+                dimension: 3,
+                size: 2,
+                domainMin: [0, 0, 0],
+                domainMax: [1, 1, 1],
+              },
+            }
+          : kind === "audio"
+            ? { waveform: Array.from({ length: 64 }, (_, i) => i % 2) }
+            : { width, height, blendMode: "normal", poster: item.poster }),
+        license: "platform-licensed",
+        credits: 0,
+      });
+      sqlite
+        .prepare(
+          "INSERT INTO shared_media_catalog (id,name,group_name,design_id,kind,search_text,payload,media_ready,poster_ready,status,created_at) VALUES (?,?,?,?,?,?,?,1,1,'ready','test')"
+        )
+        .run(
+          candidate.id,
+          name,
+          group,
+          designId,
+          kind,
+          [name, group, ...tags].join(" ").toLowerCase(),
+          JSON.stringify(candidate)
+        );
+      return candidate;
+    };
+    for (let i = 0; i < 1500; i++)
+      seed(i, "lut", `Lifestyle ${i}`, "Lifestyle color", ["lifestyle"]);
+    for (let i = 1500; i < 1650; i++)
+      seed(
+        i,
+        "video",
+        `CRT ${i}`,
+        "CRT graphics",
+        ["crt"],
+        `design-crt-${Math.floor(i / 3)}`
+      );
+    for (let i = 1650; i < 1680; i++)
+      seed(i, "image", `Still ${i}`, "Clean stills", ["clean"]);
+    for (let i = 1680; i < 1710; i++)
+      seed(i, "audio", `Cue ${i}`, "Soft cues", ["soft"]);
+    const sourceVideo = seed(
+      1800,
+      "video",
+      "Brain scan",
+      "Medical illustrations",
+      ["brain", "scan"],
+      "design-brain",
+      720,
+      1280
+    );
+    seed(
+      1801,
+      "video",
+      "Brain scan wide",
+      "Medical illustrations",
+      ["brain", "scan"],
+      "design-brain",
+      1920,
+      1080
+    );
+    const sourceImage = seed(
+      1802,
+      "image",
+      "Balloon diagram",
+      "Explanatory diagrams",
+      ["balloon"]
+    );
+    const sourceSound = seed(1803, "audio", "Balloon pop", "Object sounds", [
+      "balloon",
+      "pop",
+    ]);
+    const preferredLook = seed(
+      1804,
+      "lut",
+      "Warm editorial",
+      "Editorial color",
+      ["warm", "editorial"]
+    );
+    const candidates = await sharedCatalogCandidates(
+      env,
+      "Autonomous complete edit. Style: choose the treatment from actual footage speech audience. " +
+        "Preserve every complete scene and produce a professional edit. ".repeat(
+          30
+        ),
+      [],
+      {
+        sourceText: ["A balloon illustrates brain health scores."],
+        styleText: ["Warm editorial"],
+        aspectRatio: "9:16",
+      }
+    );
+    const ids = candidates.map(candidate => candidate.id);
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        sourceVideo.id,
+        sourceImage.id,
+        sourceSound.id,
+        preferredLook.id,
+      ])
+    );
+    expect(
+      candidates.filter(candidate => candidate.designId === "design-brain")
+    ).toEqual([sourceVideo]);
+    const mediaCandidates = candidates.filter(
+      candidate => candidate.kind !== "lut"
+    );
+    expect(
+      new Set(mediaCandidates.map(candidate => candidate.designId)).size
+    ).toBe(mediaCandidates.length);
+    expect(
+      mediaCandidates.filter(candidate => candidate.kind === "audio")
+    ).toHaveLength(20);
+    expect(
+      mediaCandidates.filter(candidate => candidate.kind === "image")
+    ).toHaveLength(20);
+    expect(
+      mediaCandidates.filter(candidate => candidate.kind === "video")
+    ).toHaveLength(20);
+    expect(candidates.find(candidate => candidate.kind === "lut")?.id).toBe(
+      preferredLook.id
+    );
+  });
   it("retains catalog identity after an import response without a client save, and retries reuse that owned asset", async () => {
     await publish();
     vi.stubGlobal(

@@ -2,7 +2,7 @@ import {
   EDIT_CUT_GUIDANCE,
   assertAutonomousTrimSemantics,
 } from "../contracts/edit-cut-semantics";
-import { handleCatalogAdmin, handleCatalogPublic, initializeSharedCatalog, sharedCatalogCandidates, copySharedCatalogMedia } from "./shared-media-catalog";
+import { handleCatalogAdmin, handleCatalogPublic, initializeSharedCatalog, sharedCatalogCandidates, catalogCandidateContext, copySharedCatalogMedia } from "./shared-media-catalog";
 import { normalizeSharedCatalogItem, sharedCatalogPlanningAssets } from "../contracts/shared-media-catalog";
 import { normalizeClipColorLut } from "../contracts/color-lut";
 import {
@@ -5868,7 +5868,7 @@ async function handleAi(
         : EDITOR_CHAT_SYSTEM_PROMPT;
     await initializeSharedCatalog(env);
     const context: EditorChatContext = {
-      sharedCatalog: await sharedCatalogCandidates(env, input.prompt, project.clips.flatMap(clip => clip.colorLut ? [clip.colorLut.id] : [])),
+      sharedCatalog: await sharedCatalogCandidates(env, input.prompt, project.clips.flatMap(clip => clip.colorLut ? [clip.colorLut.id] : []), catalogCandidateContext(project)),
       request: input,
       project,
       personalStyles: workspace.editorStyles,
@@ -6701,7 +6701,7 @@ async function handleAi(
     const presetWorkspace = await getWorkspace(env, user);
     const personalStyles = presetWorkspace.editorStyles ?? [];
     await initializeSharedCatalog(env);
-    const sharedCatalog = await sharedCatalogCandidates(env, stringValue(input.command), project.clips.flatMap(clip => clip.colorLut ? [clip.colorLut.id] : []));
+    const sharedCatalog = await sharedCatalogCandidates(env, stringValue(input.command), project.clips.flatMap(clip => clip.colorLut ? [clip.colorLut.id] : []), catalogCandidateContext(project));
     const planningContext = buildEditPlanningContext(
       project,
       presetWorkspace.assets,
