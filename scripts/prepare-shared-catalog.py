@@ -22,7 +22,7 @@ def run(args, timeout=300):
         args = list(args)
         for index in range(len(args) - 1):
             if args[index] == "-threads": args[index + 1] = "1"
-        args = [args[0], "-threads", "1", "-filter_threads", "1", "-filter_complex_threads", "1", *args[1:-1], "-threads", "1", args[-1]]
+        args = [args[0], "-xerror", "-threads", "1", "-filter_threads", "1", "-filter_complex_threads", "1", *args[1:-1], "-threads", "1", args[-1]]
     return subprocess.run(args, check=True, capture_output=True, timeout=timeout)
 
 def waveform(path):
@@ -84,7 +84,16 @@ def prepare(entry, bundle, output, work, group, label, design_id, timeout):
                 if stream.get("pix_fmt","").startswith(("argb","rgba","bgra","yuva","gbrap","abgr")):
                     target=work/"delivery.webm"
                     graph="[0:v]format=rgba,split[color][alpha];[alpha]alphaextract[mask];[color]format=yuv420p[color420];[color420][mask]alphamerge[out]"
-                    run(["ffmpeg","-v","error","-nostdin","-i",str(source),"-filter_complex",graph,"-map","[out]","-an","-c:v","libvpx-vp9","-pix_fmt","yuva420p","-lossless","1","-deadline","good","-cpu-used","4","-row-mt","1","-threads","2",str(target)],timeout)
+                    encode=["ffmpeg","-v","error","-nostdin","-i",str(source),"-filter_complex",graph,"-map","[out]","-an","-c:v","libvpx-vp9","-pix_fmt","yuva420p","-lossless","1","-deadline","realtime","-cpu-used","8","-row-mt","1","-threads","1",str(target)]
+                    run(encode,timeout)
+                    # Realtime changes compression effort, not lossless pixels.
+                    # Use the denser preset only if an object would exceed the
+                    # delivery bound; every final derivative still gets the
+                    # exact alpha comparison below.
+                    if target.stat().st_size > MAXIMUM:
+                        encode[encode.index("realtime")]="good"
+                        encode[encode.index("-cpu-used")+1]="4"
+                        run([encode[0],"-y",*encode[1:]],timeout)
                     # Every new alpha source is checked against its actual RGBA
                     # reference at opening, middle and last-frame-adjacent times.
                     for at in [0, technical["duration"]*.5, max(0,technical["duration"]-.1)]:

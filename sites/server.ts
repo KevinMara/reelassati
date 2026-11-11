@@ -374,6 +374,7 @@ type SitesEnvironment = {
   AI_INCIDENT_OPERATIONS_STATUS?: string;
   AI_PROVENANCE_LIFECYCLE_STATUS?: string;
   COMPLIANCE_OPERATOR_OWNER_EMAIL?: string;
+  SHARED_CATALOG_OWNER_EMAIL?: string;
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
   RESEND_API_KEY?: string;
@@ -689,6 +690,16 @@ function operatorOwnerEmail(env: SitesEnvironment): string | null {
   return normalizedConfiguredEmail(env.COMPLIANCE_OPERATOR_OWNER_EMAIL) || null;
 }
 
+function canAdministerSharedCatalog(
+  env: SitesEnvironment,
+  user: AuthenticatedUser
+): boolean {
+  const owner = normalizedConfiguredEmail(env.SHARED_CATALOG_OWNER_EMAIL);
+  return Boolean(
+    (owner && owner === user.email) || operatorOwnerEmail(env) === user.email
+  );
+}
+
 function capabilities(
   env: SitesEnvironment,
   user: AuthenticatedUser
@@ -709,6 +720,7 @@ function capabilities(
 
   return {
     operations: operatorOwnerEmail(env) === user.email,
+    sharedCatalogAdmin: canAdministerSharedCatalog(env, user),
     persistence: Boolean(env.DB),
     uploads: Boolean(env.BUCKET),
     ai:
@@ -13876,7 +13888,7 @@ async function handleApi(
   }
   if (url.pathname === "/api/brands") return handleBrands(request, env, user);
   if (url.pathname.startsWith("/api/catalog/admin/"))
-    return handleCatalogAdmin(request, env, url, operatorOwnerEmail(env) === user.email);
+    return handleCatalogAdmin(request, env, url, canAdministerSharedCatalog(env, user));
   if (url.pathname === "/api/catalog/import" && request.method === "POST") {
     await initializeSharedCatalog(env);
     const input = await parseJsonBody<{ id?: string }>(request);

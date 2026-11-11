@@ -432,7 +432,7 @@ function StudioStatus() {
   return (
     <div className="max-w-4xl mx-auto">
       {capabilities.operations && <OwnerOperations />}
-      {capabilities.operations && <SharedCatalogImport />}
+      {capabilities.sharedCatalogAdmin && <SharedCatalogImport />}
       <p className="mono-eyebrow text-primary mb-2">
         {ui("Production readiness")}
       </p>

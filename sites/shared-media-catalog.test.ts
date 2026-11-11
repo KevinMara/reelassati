@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import worker from "./server";
 import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
 import {
@@ -49,11 +48,16 @@ const item: SharedMediaCatalogItem = {
   credits: 0,
 };
 let sqlite: DatabaseSync, env: CatalogEnvironment;
+let worker: typeof import("./server")["default"];
 let objects: Map<
   string,
   { data: Uint8Array; metadata?: Record<string, string> }
 >;
 beforeEach(async () => {
+  // Each fixture owns a fresh database; reset the worker's one-binding schema
+  // initialization cache alongside it, as a new worker isolate would.
+  vi.resetModules();
+  worker = (await import("./server")).default;
   sqlite = new DatabaseSync(":memory:");
   objects = new Map();
   class Statement {
@@ -172,6 +176,182 @@ async function publish() {
     200
   );
 }
+describe("shared catalog owner authorization", () => {
+  const catalogOwner = "catalog@example.com";
+  const operatorOwner = "operator@example.com";
+  function setup(includeCatalogOwner = true) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (!String(url).startsWith("https://auth.test/auth/v1/user"))
+          throw new Error(
+            "Only the deterministic authentication stub is allowed"
+          );
+        return Response.json({
+          email: (
+            new Headers(init?.headers).get("Authorization") || ""
+          ).replace("Bearer ", ""),
+        });
+      })
+    );
+    const environment = {
+      ...env,
+      SUPABASE_URL: "https://auth.test",
+      SUPABASE_PUBLISHABLE_KEY: "test",
+      COMPLIANCE_OPERATOR_OWNER_EMAIL: operatorOwner,
+      ...(includeCatalogOwner
+        ? { SHARED_CATALOG_OWNER_EMAIL: `  ${catalogOwner.toUpperCase()}  ` }
+        : {}),
+      ASSETS: { fetch: async () => new Response("static") },
+    };
+    return (path: string, email: string | null, init: RequestInit = {}) =>
+      worker.fetch(
+        new Request(`https://studio.test${path}`, {
+          ...init,
+          headers: {
+            ...(email ? { Authorization: `Bearer ${email}` } : {}),
+            ...Object.fromEntries(new Headers(init.headers)),
+          },
+        }),
+        environment as never
+      );
+  }
+  it("allows the dedicated catalog owner to publish without granting compliance operations", async () => {
+    const request = setup();
+    const capability = await request("/api/capabilities", catalogOwner);
+    expect(capability.status).toBe(200);
+    expect(await capability.json()).toMatchObject({
+      capabilities: { sharedCatalogAdmin: true, operations: false },
+    });
+    expect(
+      (await request(`/api/catalog/admin/status?ids=${item.id}`, catalogOwner))
+        .status
+    ).toBe(200);
+    const manifest = await request(
+      "/api/catalog/admin/manifest",
+      catalogOwner,
+      {
+        method: "POST",
+        body: JSON.stringify({ schemaVersion: 1, items: [item] }),
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    expect(manifest.status).toBe(200);
+    expect(
+      (
+        await request(
+          `/api/catalog/admin/object/${item.id}/media`,
+          catalogOwner,
+          { method: "PUT", body: media }
+        )
+      ).status
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          `/api/catalog/admin/object/${item.id}/poster`,
+          catalogOwner,
+          { method: "PUT", body: poster }
+        )
+      ).status
+    ).toBe(200);
+    expect(
+      (await request(`/api/catalog/admin/status?ids=${item.id}`, catalogOwner))
+        .status
+    ).toBe(200);
+    expect((await request("/api/operations", catalogOwner)).status).toBe(403);
+    expect(
+      (
+        await request("/api/operations/services", catalogOwner, {
+          method: "POST",
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await request("/api/compliance/ai-literacy", catalogOwner, {
+          method: "POST",
+          body: JSON.stringify({ acknowledged: true }),
+          headers: { "Content-Type": "application/json" },
+        })
+      ).status
+    ).toBe(403);
+  });
+  it.each([true, false])(
+    "preserves the existing operator's catalog access with dedicated owner configured=%s",
+    async configured => {
+      const request = setup(configured);
+      const capability = await request("/api/capabilities", operatorOwner);
+      expect(await capability.json()).toMatchObject({
+        capabilities: { sharedCatalogAdmin: true, operations: true },
+      });
+      expect(
+        (
+          await request(
+            `/api/catalog/admin/status?ids=${item.id}`,
+            operatorOwner
+          )
+        ).status
+      ).toBe(200);
+      expect(
+        (
+          await request("/api/catalog/admin/manifest", operatorOwner, {
+            method: "POST",
+            body: JSON.stringify({ schemaVersion: 1, items: [item] }),
+          })
+        ).status
+      ).toBe(200);
+    }
+  );
+  it.each(["member@example.com", null])(
+    "denies catalog status and mutations to an ordinary or anonymous caller: %s",
+    async email => {
+      const request = setup();
+      const denied = email ? 403 : 401;
+      const capability = await request("/api/capabilities", email);
+      if (email)
+        expect(await capability.json()).toMatchObject({
+          capabilities: { sharedCatalogAdmin: false, operations: false },
+        });
+      else expect(capability.status).toBe(401);
+      expect(
+        (await request(`/api/catalog/admin/status?ids=${item.id}`, email))
+          .status
+      ).toBe(denied);
+      expect(
+        (
+          await request("/api/catalog/admin/manifest", email, {
+            method: "POST",
+            body: JSON.stringify({ schemaVersion: 1, items: [item] }),
+          })
+        ).status
+      ).toBe(denied);
+      expect(
+        (
+          await request(`/api/catalog/admin/object/${item.id}/media`, email, {
+            method: "PUT",
+            body: media,
+          })
+        ).status
+      ).toBe(denied);
+      expect(objects.size).toBe(0);
+      expect(
+        sqlite
+          .prepare("SELECT COUNT(*) AS count FROM shared_media_catalog")
+          .get()!.count
+      ).toBe(0);
+    }
+  );
+  it("uses the authenticated bearer identity rather than a claimed catalog-owner header", async () => {
+    const request = setup();
+    const response = await request(
+      `/api/catalog/admin/status?ids=${item.id}`,
+      "member@example.com",
+      { headers: { "oai-authenticated-user-email": catalogOwner } }
+    );
+    expect(response.status).toBe(403);
+  });
+});
 describe("shared catalog verified publication", () => {
   it("retains catalog identity after an import response without a client save, and retries reuse that owned asset", async () => {
     await publish();

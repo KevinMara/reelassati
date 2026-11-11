@@ -23,6 +23,8 @@ export type ChangeStatus = "proposed" | "accepted" | "rejected";
 
 export interface CapabilityState {
   operations?: boolean;
+  /** Shared stock publication only; does not grant compliance operations. */
+  sharedCatalogAdmin?: boolean;
   persistence: boolean;
   uploads: boolean;
   ai: boolean;
