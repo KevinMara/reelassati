@@ -14,6 +14,7 @@ import { guidedTourUi } from "./ui-guided-tour";
 import { librarySourceUi } from "./ui-library-sources";
 import { sharedCatalogUi } from "./ui-shared-catalog";
 import { catalogImportUi } from "./ui-catalog-import";
+import { exportRecoveryUi } from "./ui-export-recovery";
 import { editingTemplateUi } from "./ui-edit-templates";
 import { editingTraitUi } from "./ui-edit-template-traits";
 import { italianUi } from "./ui-it";
@@ -101,6 +102,9 @@ for (const [language, translation] of Object.entries(librarySourceUi)) {
   if (language !== "en") Object.assign(uiLocales[language], translation);
 }
 for (const [language, translation] of Object.entries(catalogImportUi)) {
+  if (language !== "en") Object.assign(uiLocales[language], translation);
+}
+for (const [language, translation] of Object.entries(exportRecoveryUi)) {
   if (language !== "en") Object.assign(uiLocales[language], translation);
 }
 for (const [language, translation] of Object.entries(sharedCatalogUi)) {

@@ -179,7 +179,11 @@ export async function recoverCatalogRequest<T>(
         );
       if (
         attempt >= 2 ||
-        !(network || [408, 500, 502, 503, 504].includes(Number(status)))
+        !(
+          network ||
+          (error instanceof DOMException && error.name === "TimeoutError") ||
+          [408, 500, 502, 503, 504].includes(Number(status))
+        )
       )
         throw error;
       await new Promise<void>((resolve, reject) => {
@@ -314,11 +318,11 @@ export async function runSharedCatalogImport(
       state.completedItems++;
       emit();
     };
-    // Four foreground streams overlap network latency while keeping hashing
+    // Eight foreground streams overlap network latency while keeping hashing
     // bounded. A failure stops dispatch; all in-flight work settles before the
     // panel becomes idle. Nothing is queued beyond this explicitly started run.
     await Promise.all(
-      Array.from({ length: Math.min(4, pending.length) }, async () => {
+      Array.from({ length: Math.min(8, pending.length) }, async () => {
         while (!failed && next < pending.length) {
           const item = pending[next++];
           try {

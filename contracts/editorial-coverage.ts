@@ -438,6 +438,10 @@ evidence and give a specific reason. Preserve is a first-class decision when the
 source already works; it needs no invented edit. An improvement decision must
 identify actual content-changing operations addressing that scene. Color, zoom,
 sound hits and splitting alone do not supply a missing explanation or demonstration.
+Use preserve even when adding color, camera motion or sound to a scene whose
+content already works. For example: an existing spoken hook plus a readable
+headline, with only grade and a push-in added, is preserve, not improve. This
+describes the content decision, not whether the image received any finishing.
 Shared catalog frames, transitions and textures are finishing treatments; inserting
 one as broll does not supply a missing subject demonstration or explanatory shot.
 They may finish a sound scene, whose content decision should then be preserve.

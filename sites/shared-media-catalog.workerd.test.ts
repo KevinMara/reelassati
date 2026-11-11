@@ -13,7 +13,8 @@ it("verifies catalog uploads and copies through native Workers R2 and D1", async
         import {sha256} from "@noble/hashes/sha2.js";
         import {bytesToHex} from "@noble/hashes/utils.js";
         export default {async fetch(request,env){
-          const bytes=Uint8Array.from({length:1048627},(_,i)=>i%251);
+          const chunkSize=16*1024*1024;
+          const bytes=Uint8Array.from({length:chunkSize+51},(_,i)=>i%251);
           const digest=bytesToHex(sha256(bytes));
           const item={id:'stock-'+digest.slice(0,24),name:'Verified overlay',group:'Film frames',designId:'design-film-frame',variant:'1080p',kind:'video',tags:['film','frame'],duration:1,width:1920,height:1080,blendMode:'screen',media:{file:'media/'+digest+'.mp4',sha256:digest,bytes:bytes.length,contentType:'video/mp4'},license:'platform-licensed',credits:0};
           const poster=new Uint8Array([1,2,3]);const posterHash=bytesToHex(sha256(poster));
@@ -29,7 +30,10 @@ it("verifies catalog uploads and copies through native Workers R2 and D1", async
           const bad=bytes.slice();bad[42]^=1;
           const rejected=await admin('object/'+item.id+'/media','PUT',bad);
           const before=await(await admin('status?ids='+item.id)).json();
-          const uploaded=await admin('object/'+item.id+'/media','PUT',bytes);
+          const part0=await admin('object/'+item.id+'/media/chunks/0','PUT',bytes.slice(0,chunkSize));
+          const part1=await admin('object/'+item.id+'/media/chunks/1','PUT',bytes.slice(chunkSize));
+          if(!part0.ok) return part0;if(!part1.ok)return part1;
+          const uploaded=await admin('object/'+item.id+'/media/complete','POST');
           if(!uploaded.ok) return uploaded;
           const posted=await admin('object/'+item.id+'/poster','PUT',poster);
           if(!posted.ok) return posted;
@@ -41,7 +45,8 @@ it("verifies catalog uploads and copies through native Workers R2 and D1", async
           const copy=await env.BUCKET.get('private-copy');
           const copyBytes=new Uint8Array(await copy.arrayBuffer());
           const pending=await env.BUCKET.list({prefix:'shared-catalog-pending/'});
-          return Response.json({oldError,staged:staged.status,rejected:rejected.status,before:before.items[0].status,uploaded:uploaded.status,after:after.items[0].status,rangeStatus:served.status,range:Array.from(servedBytes),copyHash:bytesToHex(sha256(copyBytes)),expectedHash:digest,pending:pending.objects.length});
+          const parts=await env.BUCKET.list({prefix:'shared-catalog-parts/'});
+          return Response.json({oldError,staged:staged.status,rejected:rejected.status,before:before.items[0].status,uploaded:uploaded.status,after:after.items[0].status,rangeStatus:served.status,range:Array.from(servedBytes),copyHash:bytesToHex(sha256(copyBytes)),expectedHash:digest,pending:pending.objects.length,parts:parts.objects.length});
         }};
       `,
       resolveDir: process.cwd(),
@@ -77,6 +82,7 @@ it("verifies catalog uploads and copies through native Workers R2 and D1", async
     expect(result.range).toEqual(Array.from({ length: 63 }, (_, i) => i + 42));
     expect(result.copyHash).toBe(result.expectedHash);
     expect(result.pending).toBe(0);
+    expect(result.parts).toBe(0);
   } finally {
     await runtime.dispose();
   }

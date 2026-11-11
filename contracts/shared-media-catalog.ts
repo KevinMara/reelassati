@@ -1,7 +1,22 @@
 import type { Asset, TimelineClip } from "./workspace";
 import { normalizeVisual, type ClipVisual } from "./clip-visual";
 
-export const CATALOG_OBJECT_MAX_BYTES = 96 * 1024 * 1024;
+export const CATALOG_SINGLE_REQUEST_MAX_BYTES = 96 * 1024 * 1024;
+export const CATALOG_CHUNK_BYTES = 16 * 1024 * 1024;
+export const CATALOG_OBJECT_MAX_BYTES = 1024 * 1024 * 1024;
+
+export function catalogChunkLength(bytes: number, index: number) {
+  if (
+    !Number.isSafeInteger(bytes) ||
+    bytes <= 0 ||
+    bytes > CATALOG_OBJECT_MAX_BYTES ||
+    !Number.isSafeInteger(index) ||
+    index < 0 ||
+    index >= Math.ceil(bytes / CATALOG_CHUNK_BYTES)
+  )
+    throw new Error("Invalid catalog chunk.");
+  return Math.min(CATALOG_CHUNK_BYTES, bytes - index * CATALOG_CHUNK_BYTES);
+}
 export interface CatalogObject {
   file: string;
   sha256: string;

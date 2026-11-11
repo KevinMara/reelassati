@@ -13,7 +13,7 @@ from pathlib import Path
 spec = importlib.util.spec_from_file_location("media_index", Path(__file__).with_name("licensed-media-index.py"))
 media_index = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(media_index)
-MAXIMUM = 96 * 1024 * 1024
+MAXIMUM = 1024 * 1024 * 1024
 
 
 def design_name(source_path):

@@ -25,6 +25,10 @@ import {
 import { useWorkspace } from "@/providers/workspace";
 import { CompactSelect } from "@/components/ui/compact-select";
 import {
+  isExportModuleUnavailable,
+  saveBeforeExportRefresh,
+} from "@/lib/export-recovery";
+import {
   exportDimensions,
   exportFrameRates,
   type ExportResolution,
@@ -66,6 +70,7 @@ export function RenderExportPanel({
   const [busy, setBusy] = useState(false);
   const [hasRender, setHasRender] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
   const [saved, setSaved] = useState<Asset | null>(null);
   const [download, setDownload] = useState<{
     url: string;
@@ -203,13 +208,39 @@ export function RenderExportPanel({
       setProgress(100);
       setStage(delivery.asset ? "Saved to Library" : "Ready to download");
     } catch (cause) {
+      const staleModule = isExportModuleUnavailable(cause);
+      setNeedsRefresh(staleModule);
       setError(
         abort.current.signal.aborted
           ? "Export canceled. Your project is saved."
-          : cause instanceof Error
-            ? cause.message
-            : "Export could not finish. Your project is saved."
+          : staleModule
+            ? ui("Refresh the editor to load the export engine.")
+            : cause instanceof Error
+              ? cause.message
+              : "Export could not finish. Your project is saved."
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshExport() {
+    setBusy(true);
+    try {
+      const refreshed = await saveBeforeExportRefresh(
+        () => updateWorkspace(current => current),
+        getWorkspaceSnapshot,
+        () => {
+          const url = new URL(window.location.href);
+          url.hash = `/dashboard/edit?project=${encodeURIComponent(project.id)}`;
+          window.history.replaceState(null, "", url);
+          window.location.reload();
+        }
+      );
+      if (!refreshed)
+        setError(ui("Your edit changed while saving. Try again."));
+    } catch {
+      setError(ui("Your edit could not be saved. Retry before refreshing."));
     } finally {
       setBusy(false);
     }
@@ -397,7 +428,7 @@ export function RenderExportPanel({
           <button
             type="button"
             disabled={busy}
-            onClick={() => void create()}
+            onClick={() => void (needsRefresh ? refreshExport() : create())}
             className="flex items-center justify-center gap-2 rounded-lg bg-primary p-3 font-medium text-primary-foreground disabled:opacity-60"
           >
             {busy ? (
@@ -407,11 +438,13 @@ export function RenderExportPanel({
             )}
             {busy
               ? ui("Exporting…")
-              : hasRender
-                ? ui("Retry saving to Library")
-                : ui("Create {{format}}", {
-                    format: format === "mp4" ? "MP4" : "WebM",
-                  })}
+              : needsRefresh
+                ? ui("Save and refresh")
+                : hasRender
+                  ? ui("Retry saving to Library")
+                  : ui("Create {{format}}", {
+                      format: format === "mp4" ? "MP4" : "WebM",
+                    })}
           </button>
         )}
         {busy && !hasRender && (

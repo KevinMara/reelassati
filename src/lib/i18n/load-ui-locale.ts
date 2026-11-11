@@ -20,6 +20,7 @@ import { guidedTourUi } from "./locales/ui-guided-tour";
 import { librarySourceUi } from "./locales/ui-library-sources";
 import { sharedCatalogUi } from "./locales/ui-shared-catalog";
 import { catalogImportUi } from "./locales/ui-catalog-import";
+import { exportRecoveryUi } from "./locales/ui-export-recovery";
 import type { InterfaceLanguage } from "@contracts/interface-language";
 
 type InterfaceCatalog = Record<string, string>;
@@ -149,6 +150,7 @@ export function loadUiLocale(
       ...guidedTourUi[code],
       ...librarySourceUi[code],
       ...catalogImportUi[code],
+      ...exportRecoveryUi[code],
       ...sharedCatalogUi[code],
       ...editorRedesignUi[code],
       ...editorInteractionUi[code],

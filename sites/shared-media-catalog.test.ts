@@ -8,10 +8,13 @@ import {
   searchSharedCatalog,
   sharedCatalogCandidates,
   copySharedCatalogMedia,
+  catalogChunkStream,
   type CatalogEnvironment,
 } from "./shared-media-catalog";
 import {
   normalizeSharedCatalogItem,
+  CATALOG_CHUNK_BYTES,
+  catalogChunkLength,
   sharedCatalogPlacement,
   type SharedMediaCatalogItem,
 } from "../contracts/shared-media-catalog";
@@ -200,6 +203,147 @@ async function publish() {
     200
   );
 }
+describe("verified chunked catalog import", () => {
+  it("keeps staged parts private and publishes only after full-file verification and poster completion", async () => {
+    await stage();
+    expect(
+      (await admin(`object/${item.id}/media/chunks/0`, "PUT", media)).status
+    ).toBe(200);
+    expect(objects.has(`shared-catalog/${item.media.file}`)).toBe(false);
+    expect(
+      sqlite
+        .prepare("SELECT status FROM shared_media_catalog WHERE id = ?")
+        .get(item.id)
+    ).toMatchObject({ status: "pending" });
+    expect(
+      (await admin(`object/${item.id}/media/complete`, "POST")).status
+    ).toBe(200);
+    expect(objects.get(`shared-catalog/${item.media.file}`)?.data).toEqual(
+      media
+    );
+    expect(
+      [...objects.keys()].some(key => key.startsWith("shared-catalog-parts/"))
+    ).toBe(false);
+    expect(
+      sqlite
+        .prepare("SELECT status FROM shared_media_catalog WHERE id = ?")
+        .get(item.id)
+    ).toMatchObject({ status: "pending" });
+    expect(
+      (await admin(`object/${item.id}/poster`, "PUT", poster)).status
+    ).toBe(200);
+    expect(
+      sqlite
+        .prepare("SELECT status FROM shared_media_catalog WHERE id = ?")
+        .get(item.id)
+    ).toMatchObject({ status: "ready" });
+    // A lost completion response can be retried after the parts were removed.
+    expect(
+      (await admin(`object/${item.id}/media/complete`, "POST")).status
+    ).toBe(200);
+  });
+
+  it("rejects missing, out-of-range and corrupt parts without marking the item ready", async () => {
+    await stage();
+    expect(
+      (await admin(`object/${item.id}/media/complete`, "POST")).status
+    ).toBe(409);
+    expect(
+      (await admin(`object/${item.id}/media/chunks/1`, "PUT", media)).status
+    ).toBe(422);
+    expect(
+      (
+        await admin(
+          `object/${item.id}/media/chunks/0`,
+          "PUT",
+          new Uint8Array(media.length)
+        )
+      ).status
+    ).toBe(200);
+    expect(
+      (await admin(`object/${item.id}/media/complete`, "POST")).status
+    ).toBe(422);
+    expect(objects.has(`shared-catalog/${item.media.file}`)).toBe(false);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT media_ready, status FROM shared_media_catalog WHERE id = ?"
+        )
+        .get(item.id)
+    ).toMatchObject({ media_ready: 0, status: "pending" });
+    expect(
+      (await admin(`object/${item.id}/media/chunks/0`, "PUT", media)).status
+    ).toBe(200);
+    expect(
+      (await admin(`object/${item.id}/media/complete`, "POST")).status
+    ).toBe(200);
+  });
+
+  it("assembles multiple parts in order with bounded reads and exact final length", async () => {
+    const bytes = CATALOG_CHUNK_BYTES * 2 + 3;
+    const staged = { ...item.media, bytes };
+    const read: number[] = [];
+    const streamingEnvironment = {
+      ...env,
+      BUCKET: {
+        ...env.BUCKET,
+        get: async (key: string) => {
+          const index = Number(key.split("/").pop());
+          read.push(index);
+          const data = new Uint8Array(catalogChunkLength(bytes, index)).fill(
+            index + 1
+          );
+          return {
+            body: new Blob([data]).stream(),
+            size: data.length,
+            httpEtag: "test",
+          };
+        },
+      },
+    };
+    const result = new Uint8Array(
+      await new Response(
+        catalogChunkStream(
+          streamingEnvironment,
+          staged,
+          new AbortController().signal
+        )
+      ).arrayBuffer()
+    );
+    expect(read).toEqual([0, 1, 2]);
+    expect(result.length).toBe(bytes);
+    expect([result[0], result[CATALOG_CHUNK_BYTES], result[bytes - 1]]).toEqual(
+      [1, 2, 3]
+    );
+  });
+
+  it("checks cancellation before reading another stored part", async () => {
+    const control = new AbortController();
+    control.abort(new DOMException("Stopped", "AbortError"));
+    const get = vi.spyOn(env.BUCKET, "get");
+    await expect(
+      new Response(
+        catalogChunkStream(env, item.media, control.signal)
+      ).arrayBuffer()
+    ).rejects.toThrow("Stopped");
+    expect(get).not.toHaveBeenCalled();
+    await stage();
+    expect(
+      (await admin(`object/${item.id}/media/chunks/0`, "PUT", media, false))
+        .status
+    ).toBe(403);
+    expect(
+      (
+        await admin(
+          `object/${item.id}/media/complete`,
+          "POST",
+          undefined,
+          false
+        )
+      ).status
+    ).toBe(403);
+  });
+});
 describe("shared catalog owner authorization", () => {
   const catalogOwner = "catalog@example.com";
   const operatorOwner = "operator@example.com";
@@ -646,10 +790,24 @@ describe("shared catalog verified publication", () => {
     await admin(`object/${item.id}/media`, "PUT", media);
     await admin(`object/${item.id}/poster`, "PUT", poster);
     const secondMedia = new Uint8Array([81, 82, 83]);
-    const pending = { ...item, id: `stock-${digest(secondMedia).slice(0, 24)}`, media: object(secondMedia, "mp4", "video/mp4") };
-    await admin("manifest", "POST", JSON.stringify({ schemaVersion: 1, items: [pending] }));
+    const pending = {
+      ...item,
+      id: `stock-${digest(secondMedia).slice(0, 24)}`,
+      media: object(secondMedia, "mp4", "video/mp4"),
+    };
+    await admin(
+      "manifest",
+      "POST",
+      JSON.stringify({ schemaVersion: 1, items: [pending] })
+    );
     const missing = "stock-" + "c".repeat(24);
-    expect(await (await admin(`status?ids=${pending.id},${missing},${item.id},${pending.id}`)).json()).toEqual({
+    expect(
+      await (
+        await admin(
+          `status?ids=${pending.id},${missing},${item.id},${pending.id}`
+        )
+      ).json()
+    ).toEqual({
       items: [
         { id: pending.id, status: "pending", missingObjects: ["media"] },
         { id: missing, status: "missing", missingObjects: ["media", "poster"] },

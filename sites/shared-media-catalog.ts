@@ -4,6 +4,9 @@ import type { EditProject } from "../contracts/workspace";
 import { sourceReviewFacts } from "../contracts/source-review";
 import {
   normalizeSharedCatalogItem,
+  CATALOG_CHUNK_BYTES,
+  CATALOG_SINGLE_REQUEST_MAX_BYTES,
+  catalogChunkLength,
   type SharedMediaCatalogItem,
   type SharedMediaCatalogPage,
   type CatalogObject,
@@ -61,6 +64,85 @@ function fail(message: string, status = 422): never {
   throw response({ error: message }, status);
 }
 const objectKey = (object: CatalogObject) => `shared-catalog/${object.file}`;
+const chunkKey = (object: CatalogObject, index: number) =>
+  `shared-catalog-parts/${object.sha256}/${index}`;
+
+/** Read one staged part at a time. Final publication still checks the full
+ * object SHA256; neither a part nor its metadata can make an item public. */
+export function catalogChunkStream(
+  env: CatalogEnvironment,
+  object: CatalogObject,
+  signal: AbortSignal
+): ReadableStream<Uint8Array> {
+  let index = 0;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let received = 0;
+  let activeController: ReadableStreamDefaultController<Uint8Array>;
+  const detach = () => signal.removeEventListener("abort", abort);
+  const abort = () => {
+    void reader?.cancel(signal.reason).catch(() => undefined);
+    detach();
+    activeController.error(signal.reason);
+  };
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      activeController = controller;
+      if (signal.aborted) abort();
+      else signal.addEventListener("abort", abort, { once: true });
+    },
+    async pull(controller) {
+      try {
+        while (true) {
+          signal.throwIfAborted();
+          if (!reader) {
+            if (index >= Math.ceil(object.bytes / CATALOG_CHUNK_BYTES)) {
+              detach();
+              controller.close();
+              return;
+            }
+            const part = await env.BUCKET.get(chunkKey(object, index));
+            if (
+              !part ||
+              part.size !== catalogChunkLength(object.bytes, index)
+            ) {
+              await part?.body.cancel();
+              fail(
+                "A catalog part is missing or incomplete. Resume the import.",
+                409
+              );
+            }
+            reader = part.body.getReader();
+            received = 0;
+          }
+          const next = await reader.read();
+          signal.throwIfAborted();
+          if (next.done) {
+            if (received !== catalogChunkLength(object.bytes, index))
+              fail("A catalog part is incomplete. Resume the import.", 409);
+            reader.releaseLock();
+            reader = undefined;
+            index++;
+          } else {
+            received += next.value.byteLength;
+            if (received > catalogChunkLength(object.bytes, index))
+              fail("Catalog part exceeds its declared size.");
+            controller.enqueue(next.value);
+            return;
+          }
+        }
+      } catch (error) {
+        detach();
+        await reader?.cancel(error).catch(() => undefined);
+        reader = undefined;
+        controller.error(error);
+      }
+    },
+    async cancel(reason) {
+      detach();
+      await reader?.cancel(reason);
+    },
+  });
+}
 const catalogInitializations = new WeakMap<
   CatalogEnvironment["DB"],
   Promise<void>
@@ -414,7 +496,13 @@ export async function handleCatalogAdmin(
     if (ids.length > 50 || ids.some(id => !/^stock-[a-f0-9]{24}$/.test(id)))
       fail("Choose up to 50 valid catalog IDs.");
     const rows = ids.length
-      ? (await env.DB.prepare(`SELECT id, status, media_ready, poster_ready FROM shared_media_catalog WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids).all<Row>()).results
+      ? (
+          await env.DB.prepare(
+            `SELECT id, status, media_ready, poster_ready FROM shared_media_catalog WHERE id IN (${ids.map(() => "?").join(",")})`
+          )
+            .bind(...ids)
+            .all<Row>()
+        ).results
       : [];
     const byId = new Map(rows.map(row => [row.id, row]));
     const items = ids.map(id => {
@@ -441,7 +529,9 @@ export async function handleCatalogAdmin(
       fail("Catalog IDs must be unique.");
     const storedRows = await env.DB.prepare(
       `SELECT id, payload FROM shared_media_catalog WHERE id IN (${items.map(() => "?").join(",")})`
-    ).bind(...items.map(item => item.id)).all<{ id: string; payload: string }>();
+    )
+      .bind(...items.map(item => item.id))
+      .all<{ id: string; payload: string }>();
     const storedById = new Map(storedRows.results.map(row => [row.id, row]));
     for (const item of items) {
       const existing = storedById.get(item.id);
@@ -459,14 +549,20 @@ export async function handleCatalogAdmin(
     // Batch database reads and overlap only three small object checks. A 50-item
     // import must not incur 150 sequential network round trips. Publication is
     // still one atomic DB batch, after all immutable metadata has been checked.
-    const readiness = new Map<string, { mediaReady: boolean; posterReady: boolean }>();
+    const readiness = new Map<
+      string,
+      { mediaReady: boolean; posterReady: boolean }
+    >();
     for (let offset = 0; offset < items.length; offset += 3) {
       request.signal.throwIfAborted();
-      await Promise.all(items.slice(offset, offset + 3).map(async item => {
-        const mediaReady = await verifyStoredObject(env, item.media);
-        const posterReady = !item.poster || await verifyStoredObject(env, item.poster);
-        readiness.set(item.id, { mediaReady, posterReady });
-      }));
+      await Promise.all(
+        items.slice(offset, offset + 3).map(async item => {
+          const mediaReady = await verifyStoredObject(env, item.media);
+          const posterReady =
+            !item.poster || (await verifyStoredObject(env, item.poster));
+          readiness.set(item.id, { mediaReady, posterReady });
+        })
+      );
     }
     request.signal.throwIfAborted();
     const statements = [];
@@ -496,20 +592,73 @@ export async function handleCatalogAdmin(
     return response({ accepted: items.length });
   }
   const match = url.pathname.match(
-    /^\/api\/catalog\/admin\/object\/(stock-[a-f0-9]{24})\/(media|poster)$/
+    /^\/api\/catalog\/admin\/object\/(stock-[a-f0-9]{24})\/(media|poster)(?:\/(chunks\/\d+|complete))?$/
   );
-  if (match && request.method === "PUT") {
+  if (
+    match &&
+    ((request.method === "PUT" && match[3] !== "complete") ||
+      (request.method === "POST" && match[3] === "complete"))
+  ) {
     const { item } = await readSharedCatalog(env, match[1], false);
     const role = match[2] as "media" | "poster",
       object = item[role];
-    if (!object || !request.body) fail("This catalog object is not expected.");
+    if (!object) fail("This catalog object is not expected.");
+    if (match[3]?.startsWith("chunks/")) {
+      const index = Number(match[3].slice(7));
+      let expected: number;
+      try {
+        expected = catalogChunkLength(object.bytes, index);
+      } catch {
+        fail("This catalog chunk is not expected.");
+      }
+      if (
+        !request.body ||
+        (request.headers.has("content-length") &&
+          Number(request.headers.get("content-length")) !== expected)
+      )
+        fail("Catalog part size does not match its manifest.");
+      // FixedLengthStream enforces the exact size while streaming into private
+      // staging. Publication requires the full-file hash in /complete.
+      await env.BUCKET.put(
+        chunkKey(object, index),
+        request.body.pipeThrough(new FixedLengthStream(expected))
+      );
+      request.signal.throwIfAborted();
+      return response({ id: item.id, role, part: index, staged: true });
+    }
+    const chunked = match[3] === "complete";
+    if (
+      !chunked &&
+      (!request.body || object.bytes > CATALOG_SINGLE_REQUEST_MAX_BYTES)
+    )
+      fail("Use chunked import for this catalog object.", 413);
+    if (await verifyStoredObject(env, object)) {
+      const column = role === "media" ? "media_ready" : "poster_ready";
+      await env.DB.prepare(
+        `UPDATE shared_media_catalog SET ${column} = 1 WHERE id = ?`
+      )
+        .bind(item.id)
+        .run();
+      await env.DB.prepare(
+        "UPDATE shared_media_catalog SET status = 'ready' WHERE id = ? AND media_ready = 1 AND poster_ready = 1"
+      )
+        .bind(item.id)
+        .run();
+      return response({ id: item.id, role, verified: true });
+    }
     const declared = Number(request.headers.get("content-length"));
-    if (request.headers.has("content-length") && declared !== object.bytes)
+    if (
+      !chunked &&
+      request.headers.has("content-length") &&
+      declared !== object.bytes
+    )
       fail("Catalog file size does not match its manifest.");
     const temp = `shared-catalog-pending/${crypto.randomUUID()}`;
     const hash = sha256.create();
     let bytes = 0;
-    const verified = request.body
+    const verified = (
+      chunked ? catalogChunkStream(env, object, request.signal) : request.body!
+    )
       .pipeThrough(
         new TransformStream<Uint8Array, Uint8Array>({
           transform(chunk, controller) {
@@ -548,6 +697,13 @@ export async function handleCatalogAdmin(
       )
         .bind(item.id)
         .run();
+      if (chunked)
+        for (
+          let index = 0;
+          index < Math.ceil(object.bytes / CATALOG_CHUNK_BYTES);
+          index++
+        )
+          await env.BUCKET.delete(chunkKey(object, index));
       return response({ id: item.id, role, verified: true });
     } finally {
       await env.BUCKET.delete(temp);

@@ -49,7 +49,10 @@ export function editorialConversationText(
 
 export const EDITORIAL_NOTES_GUIDANCE = `
 Return editorialNotes as a separate chat-only array with up to three objects
-{kind:decision|limitation|question,text:"..."}. Use it for concise, useful
+{kind:decision|limitation|question,text:"..."}. Prefer zero or one note. Each note
+should be one short sentence, normally under 160 characters, in the user's
+language. No geometry percentages, repair history, control descriptions, or
+repeating the visible edit summary. Use it for consequential, useful
 editorial reasoning: why the source supports a treatment, why an intentional
 pause/sequence is worth retaining, or what source limitation affects the result.
 Use the supplied evidence, not guessed defects. These are planning notes, never

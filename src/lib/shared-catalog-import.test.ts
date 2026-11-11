@@ -134,8 +134,8 @@ describe("foreground shared catalog import", () => {
       vi.useRealTimers();
     }
   });
-  it("overlaps four uploads and drains them before reporting a failure", async () => {
-    const entries = Array.from({ length: 8 }, (_, index) => fixture(index));
+  it("overlaps eight uploads and drains them before reporting a failure", async () => {
+    const entries = Array.from({ length: 12 }, (_, index) => fixture(index));
     const prepared = await prepareSharedCatalogImport(selected(entries));
     const { api } = server();
     const releases: Array<() => void> = [];
@@ -143,7 +143,7 @@ describe("foreground shared catalog import", () => {
       peak = 0,
       started = 0;
     let notifyStarted!: () => void;
-    const fourStarted = new Promise<void>(resolve => {
+    const eightStarted = new Promise<void>(resolve => {
       notifyStarted = resolve;
     });
     api.object = vi.fn(async () => {
@@ -152,7 +152,7 @@ describe("foreground shared catalog import", () => {
       peak = Math.max(peak, active);
       await new Promise<void>(resolve => {
         releases.push(resolve);
-        if (started === 4) notifyStarted();
+        if (started === 8) notifyStarted();
       });
       active--;
       if (ordinal === 0) throw new Error("interrupted upload");
@@ -166,17 +166,17 @@ describe("foreground shared catalog import", () => {
       .finally(() => {
         settled = true;
       });
-    await fourStarted;
-    expect(peak).toBe(4);
+    await eightStarted;
+    expect(peak).toBe(8);
     releases[0]();
     await Promise.resolve();
     await Promise.resolve();
     expect(settled).toBe(false);
-    expect(active).toBe(3);
+    expect(active).toBe(7);
     releases.slice(1).forEach(release => release());
     expect(await outcome).toMatchObject({ message: "interrupted upload" });
     expect(active).toBe(0);
-    expect(api.object).toHaveBeenCalledTimes(4);
+    expect(api.object).toHaveBeenCalledTimes(8);
   });
   it("reads only declared hashed files and rejects private manifest fields", async () => {
     const files = selected();
