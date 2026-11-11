@@ -9,6 +9,7 @@ import {
   prepareSharedCatalogImport,
   runSharedCatalogImport,
   verifyCatalogFile,
+  recoverCatalogRequest,
   type CatalogImportApi,
   type CatalogImportProgress,
 } from "./shared-catalog-import";
@@ -81,6 +82,58 @@ function server() {
 }
 
 describe("foreground shared catalog import", () => {
+  it("recovers a transient catalog connection, but never retries validation or authentication", async () => {
+    vi.useFakeTimers();
+    try {
+      const call = vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+        .mockResolvedValue("verified");
+      const result = recoverCatalogRequest(call, signal());
+      await vi.runAllTimersAsync();
+      expect(await result).toBe("verified");
+      expect(call).toHaveBeenCalledTimes(2);
+      for (const error of [
+        { status: 401 },
+        { status: 409 },
+        { status: 422 },
+        new TypeError("Undefined property"),
+      ]) {
+        const rejected = vi.fn().mockRejectedValue(error);
+        await expect(recoverCatalogRequest(rejected, signal())).rejects.toBe(
+          error
+        );
+        expect(rejected).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("stops pending recovery immediately on cancellation and bounds persistent failures", async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const call = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+      const stopped = recoverCatalogRequest(call, controller.signal).catch(
+        error => error
+      );
+      await Promise.resolve();
+      controller.abort();
+      await vi.runAllTimersAsync();
+      expect(await stopped).toMatchObject({ name: "AbortError" });
+      expect(call).toHaveBeenCalledTimes(1);
+      call.mockClear();
+      const failure = recoverCatalogRequest(call, signal()).catch(
+        error => error
+      );
+      await vi.runAllTimersAsync();
+      expect(await failure).toBeInstanceOf(TypeError);
+      expect(call).toHaveBeenCalledTimes(3);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("overlaps four uploads and drains them before reporting a failure", async () => {
     const entries = Array.from({ length: 8 }, (_, index) => fixture(index));
     const prepared = await prepareSharedCatalogImport(selected(entries));

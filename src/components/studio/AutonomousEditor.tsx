@@ -1108,7 +1108,7 @@ export function AutonomousEditor({
       if (!signal.aborted)
         console.warn(
           "[Reel edit diagnostic]",
-          editorRunDiagnostic(diagnosticStage, e)
+          JSON.stringify(editorRunDiagnostic(diagnosticStage, e))
         );
       if (signal.aborted) planCache.clear();
       if (!mounted.current || runController.current !== controller) return;

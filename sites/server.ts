@@ -14,6 +14,7 @@ import {
   type EditPlanQualityReview,
 } from "../contracts/edit-plan-quality";
 import type { AutonomousGraphicReview } from "../contracts/autonomous-execution";
+import { editPlanSoundRepairFeedback, mergeEditPlanSoundRepair, EDIT_PLAN_SOUND_REPAIR_DIRECTION } from "../contracts/edit-plan-sound-repair";
 import {
   EDITORIAL_COVERAGE_DIRECTION,
   reviewEditorialCoverage,
@@ -7022,6 +7023,29 @@ async function handleAi(
         // Human intent is separate from the generated editing command. Old
         // clients default to automatic protection, never inferred permission.
         const graphicRequest = stringValue(input.graphicRequest);
+        // An otherwise useful plan must not be discarded for one malformed cue.
+        // One scoped correction within this foreground reservation; never a
+        // transport retry or an open-ended model loop. Valid edits stay unchanged.
+        try {
+          const feedback = editPlanSoundRepairFeedback(output.changes, planningContext, duration, input.selectedClipIds);
+          if (feedback.length) {
+            checkpoint();
+            if (analysisControl.onCheck && !(await analysisControl.onCheck()))
+              throw new DOMException("The edit request was canceled.", "AbortError");
+            const corrected = await chatJson(env, user, "edit-planning",
+              EDIT_PLAN_SOUND_REPAIR_DIRECTION,
+              JSON.stringify({ failures: feedback, freeSounds: planningContext.freeSounds }),
+              requestedModel, true, 4000, false, undefined, analysisControl,
+              editReasoningEffort(input.effort));
+            invocation = corrected.invocation;
+            output.changes = mergeEditPlanSoundRepair(output.changes as unknown[], feedback,
+              corrected.output, planningContext, duration, input.selectedClipIds);
+          }
+        } catch (error) {
+          checkpoint();
+          if (!(error instanceof EditPlanValidationError)) throw error;
+          return rejectPlan(error, output.changes);
+        }
         try {
           changes = compileChanges(output.changes, true);
           if (input.contentReview === true)

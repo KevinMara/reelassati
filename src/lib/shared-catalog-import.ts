@@ -155,8 +155,55 @@ export async function verifyCatalogFile(
     throw new CatalogImportError("digest", object.file);
 }
 
-/** One explicitly started, foreground import. No retries, timers, model calls or
- * persistent queues. Each new run asks the server what is still missing. */
+/** Only idempotent catalog requests can recover from brief transport failures.
+ * Delays belong to the active, cancellable import; nothing survives the panel. */
+export async function recoverCatalogRequest<T>(
+  request: () => Promise<T>,
+  signal: AbortSignal,
+  checkActive: () => void = () => signal.throwIfAborted()
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    checkActive();
+    try {
+      return await request();
+    } catch (error) {
+      checkActive();
+      const status =
+        error && typeof error === "object" && "status" in error
+          ? error.status
+          : undefined;
+      const network =
+        error instanceof TypeError &&
+        /failed to fetch|networkerror|network request failed|load failed/i.test(
+          error.message
+        );
+      if (
+        attempt >= 2 ||
+        !(network || [408, 500, 502, 503, 504].includes(Number(status)))
+      )
+        throw error;
+      await new Promise<void>((resolve, reject) => {
+        const abort = () => {
+          clearTimeout(timer);
+          signal.removeEventListener("abort", abort);
+          reject(signal.reason);
+        };
+        const timer = setTimeout(
+          () => {
+            signal.removeEventListener("abort", abort);
+            resolve();
+          },
+          750 * 2 ** attempt
+        );
+        signal.addEventListener("abort", abort, { once: true });
+        if (signal.aborted) abort();
+      });
+    }
+  }
+}
+
+/** One explicitly started, foreground import. No model calls or persistent
+ * queues. Each new run asks the server what is still missing. */
 export async function runSharedCatalogImport(
   prepared: PreparedCatalogImport,
   api: CatalogImportApi,
@@ -175,7 +222,10 @@ export async function runSharedCatalogImport(
   const checked = new Set<string>();
   const statuses = async (items: SharedMediaCatalogItem[]) => {
     signal.throwIfAborted();
-    const response = await api.status(items.map(item => item.id));
+    const response = await recoverCatalogRequest(
+      () => api.status(items.map(item => item.id)),
+      signal
+    );
     signal.throwIfAborted();
     if (
       !response ||
@@ -212,7 +262,10 @@ export async function runSharedCatalogImport(
     emit();
     if (!pending.length) continue;
     signal.throwIfAborted();
-    await api.manifest({ schemaVersion: 1, items: pending });
+    await recoverCatalogRequest(
+      () => api.manifest({ schemaVersion: 1, items: pending }),
+      signal
+    );
     signal.throwIfAborted();
     const current = await statuses(pending);
     let next = 0;
@@ -244,7 +297,11 @@ export async function runSharedCatalogImport(
         checkActive();
         state.stage = "uploading";
         emit();
-        await api.object(item.id, role, file, object);
+        await recoverCatalogRequest(
+          () => api.object(item.id, role, file, object),
+          signal,
+          checkActive
+        );
         checkActive();
         state.uploadedObjects++;
         state.uploadedBytes += object.bytes;
