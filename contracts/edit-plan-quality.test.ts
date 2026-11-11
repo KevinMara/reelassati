@@ -127,6 +127,18 @@ const checkpoint = () => undefined;
 const compile = (raw: unknown) => raw as EditOperation[];
 
 describe("bounded graphic quality correction", () => {
+  it("preserves non-graphic execution failures and their original operation index", () => {
+    const withCaptions = { ...project, transcript: [{ id: "existing", start: 1, end: 4, text: "Already prepared" }] } as EditProject;
+    const caption = operation("duplicate", "caption", { text: "Different words" });
+    expect(() => reviewEditPlanGraphics(withCaptions, [grade, caption, safe], [asset], "", checkpoint))
+      .toThrow(expect.objectContaining({ reason: "execution_caption_overlap", operationIndex: 1, operationType: "caption" }));
+  });
+
+  it("distinguishes missing source inventory from a graphic placement rejection", () => {
+    expect(() => reviewEditPlanGraphics(project, [grade], [], "", checkpoint))
+      .toThrow(expect.objectContaining({ reason: "audit_missing_media" }));
+  });
+
   it("uses the same composed timeline and guard on client and server, then preserves voice and valid operation identity", () => {
     const assets = editPlanQualityAssets([asset], []);
     const original = [grade, bad];

@@ -413,14 +413,13 @@ export async function handleCatalogAdmin(
     ];
     if (ids.length > 50 || ids.some(id => !/^stock-[a-f0-9]{24}$/.test(id)))
       fail("Choose up to 50 valid catalog IDs.");
-    const items = [];
-    for (const id of ids) {
-      const row = await env.DB.prepare(
-        "SELECT * FROM shared_media_catalog WHERE id = ?"
-      )
-        .bind(id)
-        .first<Row>();
-      items.push({
+    const rows = ids.length
+      ? (await env.DB.prepare(`SELECT id, status, media_ready, poster_ready FROM shared_media_catalog WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids).all<Row>()).results
+      : [];
+    const byId = new Map(rows.map(row => [row.id, row]));
+    const items = ids.map(id => {
+      const row = byId.get(id);
+      return {
         id,
         status: row?.status || "missing",
         missingObjects: row
@@ -429,8 +428,8 @@ export async function handleCatalogAdmin(
               ...(row.poster_ready ? [] : ["poster"]),
             ]
           : ["media", "poster"],
-      });
-    }
+      };
+    });
     return response({ items });
   }
   if (
@@ -440,12 +439,12 @@ export async function handleCatalogAdmin(
     const items = await boundedManifest(request);
     if (new Set(items.map(item => item.id)).size !== items.length)
       fail("Catalog IDs must be unique.");
+    const storedRows = await env.DB.prepare(
+      `SELECT id, payload FROM shared_media_catalog WHERE id IN (${items.map(() => "?").join(",")})`
+    ).bind(...items.map(item => item.id)).all<{ id: string; payload: string }>();
+    const storedById = new Map(storedRows.results.map(row => [row.id, row]));
     for (const item of items) {
-      const existing = await env.DB.prepare(
-        "SELECT payload FROM shared_media_catalog WHERE id = ?"
-      )
-        .bind(item.id)
-        .first<{ payload: string }>();
+      const existing = storedById.get(item.id);
       if (
         existing &&
         JSON.stringify(
@@ -457,11 +456,22 @@ export async function handleCatalogAdmin(
           409
         );
     }
+    // Batch database reads and overlap only three small object checks. A 50-item
+    // import must not incur 150 sequential network round trips. Publication is
+    // still one atomic DB batch, after all immutable metadata has been checked.
+    const readiness = new Map<string, { mediaReady: boolean; posterReady: boolean }>();
+    for (let offset = 0; offset < items.length; offset += 3) {
+      request.signal.throwIfAborted();
+      await Promise.all(items.slice(offset, offset + 3).map(async item => {
+        const mediaReady = await verifyStoredObject(env, item.media);
+        const posterReady = !item.poster || await verifyStoredObject(env, item.poster);
+        readiness.set(item.id, { mediaReady, posterReady });
+      }));
+    }
+    request.signal.throwIfAborted();
     const statements = [];
     for (const item of items) {
-      const mediaReady = await verifyStoredObject(env, item.media),
-        posterReady =
-          !item.poster || (await verifyStoredObject(env, item.poster));
+      const { mediaReady, posterReady } = readiness.get(item.id)!;
       statements.push(
         env.DB.prepare(
           "INSERT INTO shared_media_catalog (id, name, group_name, design_id, kind, search_text, payload, media_ready, poster_ready, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET media_ready=excluded.media_ready, poster_ready=excluded.poster_ready, status=excluded.status"

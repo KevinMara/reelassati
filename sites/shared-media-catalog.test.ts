@@ -641,6 +641,23 @@ describe("shared catalog verified publication", () => {
       ).toBe(422);
     expect(objects.size).toBe(0);
   });
+  it("returns mixed ready, pending and missing batch entries in the requested order", async () => {
+    await stage();
+    await admin(`object/${item.id}/media`, "PUT", media);
+    await admin(`object/${item.id}/poster`, "PUT", poster);
+    const secondMedia = new Uint8Array([81, 82, 83]);
+    const pending = { ...item, id: `stock-${digest(secondMedia).slice(0, 24)}`, media: object(secondMedia, "mp4", "video/mp4") };
+    await admin("manifest", "POST", JSON.stringify({ schemaVersion: 1, items: [pending] }));
+    const missing = "stock-" + "c".repeat(24);
+    expect(await (await admin(`status?ids=${pending.id},${missing},${item.id},${pending.id}`)).json()).toEqual({
+      items: [
+        { id: pending.id, status: "pending", missingObjects: ["media"] },
+        { id: missing, status: "missing", missingObjects: ["media", "poster"] },
+        { id: item.id, status: "ready", missingObjects: [] },
+      ],
+    });
+    expect(await (await admin("status?ids=")).json()).toEqual({ items: [] });
+  });
   it("groups a valid design named constructor without inheriting object properties", async () => {
     const publicItem = { ...item, designId: "constructor" };
     expect(

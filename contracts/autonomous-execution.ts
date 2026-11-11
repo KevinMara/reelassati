@@ -9,6 +9,7 @@ import { assertSupportingMedia } from "./supporting-media";
 import { auditAutomatedEdit } from "./automated-edit-audit";
 import { assertAutonomousTrimSemantics } from "./edit-cut-semantics";
 import { orderAutonomousOperations } from "./autonomous-operation-order";
+import { EditPlanValidationError, type EditPlanValidationReason } from "./edit-plan-validation";
 import {
   automaticGraphicProblems,
   graphicRequestScope,
@@ -322,9 +323,12 @@ export function preflightAutonomousPlan(
     assets,
     checkpoint
   );
-  const problems = auditAutomatedEdit(project, draft, allAssets);
+  let auditReason: EditPlanValidationReason = "validation_failed";
+  const problems = auditAutomatedEdit(project, draft, allAssets, reason => {
+    if (auditReason === "validation_failed") auditReason = reason;
+  });
   if (problems.length)
-    throw new Error(
+    throw new EditPlanValidationError(auditReason,
       `The edit plan needs correction: ${problems.slice(0, 3).join("; ")}. No supporting media was generated.`
     );
   return omittedSounds.length ? { ...review, omittedSounds } : review;
@@ -350,8 +354,10 @@ export function executeAutonomousPlan(
   const ordered = orderAutonomousOperations(project, operations);
   for (const operation of ordered) {
     checkpoint();
+    const fail = (reason: EditPlanValidationReason, message: string) =>
+      new EditPlanValidationError(reason, message, operations.indexOf(operation), operation.type);
     if (seen.has(operation.id))
-      throw new Error("The edit plan repeats an operation.");
+      throw fail("execution_duplicate", "The edit plan repeats an operation.");
     seen.add(operation.id);
     const base = project.clips.filter(c =>
       operation.targetClipIds.includes(c.id)
@@ -359,7 +365,7 @@ export function executeAutonomousPlan(
     // A sound is inserted on its own lane. Referencing a locked picture as its
     // timing anchor does not grant permission to alter that picture.
     if (operation.type !== "sound" && base.some(c => c.locked))
-      throw new Error(`${operation.label}: a requested clip is locked.`);
+      throw fail("execution_locked", `${operation.label}: a requested clip is locked.`);
     let execution = operation;
     if (["style", "audio", "split", "delete"].includes(operation.type)) {
       const targetClipIds = working.clips
@@ -375,7 +381,7 @@ export function executeAutonomousPlan(
         )
         .map(c => c.id);
       if (!targetClipIds.length)
-        throw new Error(
+        throw fail("execution_interval_unavailable",
           `${operation.label}: its source interval is no longer available.`
         );
       execution = { ...operation, targetClipIds };
@@ -383,7 +389,7 @@ export function executeAutonomousPlan(
     if (operation.type === "caption") {
       const words = captionKey(operation.parameters?.text ?? "");
       if (!words)
-        throw new Error(`${operation.label}: caption words are missing.`);
+        throw fail("missing_control", `${operation.label}: caption words are missing.`);
       // Preparation already installs real captions. A planner repeating them is
       // not permission to put a second caption layer over the same speech.
       if (
@@ -410,7 +416,7 @@ export function executeAutonomousPlan(
           s => s.start < operation.end && s.end > operation.start
         )
       )
-        throw new Error(
+        throw fail("execution_caption_overlap",
           `${operation.label}: this would overlap existing captions.`
         );
     }
@@ -430,7 +436,7 @@ export function executeAutonomousPlan(
           operation.end - operation.start
         );
       } catch (error) {
-        throw new Error(`${operation.label}: ${(error as Error).message}`);
+        throw fail("execution_supporting_media", `${operation.label}: ${(error as Error).message}`);
       }
     }
     const before = working;
@@ -441,7 +447,7 @@ export function executeAutonomousPlan(
       if (operation.type === "sound")
         working.duration = Math.max(before.duration, working.duration);
     } catch (error) {
-      throw new Error(
+      throw fail("execution_apply_failed",
         `${operation.label}: ${error instanceof Error ? error.message : "the operation could not be applied."}`
       );
     }
@@ -467,7 +473,7 @@ export function executeAutonomousPlan(
           before.clips.filter(piece => roots.get(piece.id) === c.id).length > 1
       )
     )
-      throw new Error(
+      throw fail("execution_split_target",
         `${operation.label}: split source pieces need explicit structural targets.`
       );
     onStep?.(structuredClone(working), operation);
