@@ -1,4 +1,8 @@
 import { sharedCatalogPlanningAssets } from "@contracts/shared-media-catalog";
+import {
+  editorRunDiagnostic,
+  type EditorRunStage,
+} from "@/lib/editor-run-diagnostic";
 import { resolveSharedCatalogAsset } from "@/lib/shared-media-catalog";
 import {
   mergeCreditReceipt,
@@ -343,6 +347,7 @@ export function AutonomousEditor({
     const generatedAssets: Asset[] = [];
     const resolvedMedia = new Map<string, string>();
     let timelineSaveStarted = false;
+    let diagnosticStage: EditorRunStage = "activity-save";
     const messageId = createUuid();
     const inputMessage = {
       id: `${messageId}-input`,
@@ -459,12 +464,14 @@ export function AutonomousEditor({
     try {
       await saveActivity(ui("Building your edit"), "running");
       checkpoint();
+      diagnosticStage = "capabilities";
       if (!ready)
         throw new Error(
           ui(
             "The video review is incomplete. Please refresh before analyzing again."
           )
         );
+      diagnosticStage = "session";
       const scope = await captureUploadRequestScope();
       checkpoint();
       if (
@@ -477,6 +484,7 @@ export function AutonomousEditor({
           )
         );
       const requestOptions = { scope, signal, onCreditReceipt };
+      diagnosticStage = "source-metadata";
       const measuredSources = await resolveAutonomousSourceMetadata(
         project,
         workspace.assets,
@@ -550,6 +558,7 @@ export function AutonomousEditor({
           savedReports: workspace.analyzerReports,
           checkpoint,
           review: async asset => {
+            diagnosticStage = "source-review";
             setStage(ui("Review"));
             setStatus(`Reviewing ${asset.name}…`);
             const { analyzeMedia } = await import("@/lib/analyze-media");
@@ -599,6 +608,7 @@ export function AutonomousEditor({
             return review;
           },
           transcribe: async asset => {
+            diagnosticStage = "speech";
             setStage(ui("Captions"));
             setStatus(`Transcribing ${asset.name}…`);
             const { transcribeMediaLocally } =
@@ -617,6 +627,7 @@ export function AutonomousEditor({
         working = prepared.working;
         for (const { example, asset } of pendingStyleExamples) {
           checkpoint();
+          diagnosticStage = "style-review";
           setStage(ui("Style examples"));
           setStatus(`Reviewing ${asset.name}…`);
           const { analyzeMedia } = await import("@/lib/analyze-media");
@@ -688,6 +699,7 @@ export function AutonomousEditor({
           durationTarget,
           automaticDuration
         );
+        diagnosticStage = "planning";
         setStatus("Building the cut, pacing, captions, and visual treatment…");
         setStage(ui("Edit plan"));
         result = await platformApi.generateEditPlan(
@@ -1010,6 +1022,7 @@ export function AutonomousEditor({
         }
       }
       checkpoint();
+      diagnosticStage = "apply";
       setStatus("Applying the edit to your timeline…");
       setStage(ui("Timeline"));
       const allAssets = [...runWorkspace.assets, ...generatedAssets];
@@ -1092,6 +1105,11 @@ export function AutonomousEditor({
       setStatus(receipt.summary);
       onFinished(receipt.summary);
     } catch (e) {
+      if (!signal.aborted)
+        console.warn(
+          "[Reel edit diagnostic]",
+          editorRunDiagnostic(diagnosticStage, e)
+        );
       if (signal.aborted) planCache.clear();
       if (!mounted.current || runController.current !== controller) return;
       const failureText = signal.aborted
