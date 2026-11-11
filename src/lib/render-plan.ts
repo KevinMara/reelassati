@@ -1,4 +1,11 @@
 import { colorGradeFilter } from "./color-grade";
+import {
+  colorLutFilename,
+  colorLutFilter,
+  prepareColorLutExport,
+  projectColorLuts,
+} from "./color-lut";
+import { normalizeClipColorLut, type CubeLut } from "@contracts/color-lut";
 import { visualRenderFilter, visualCompositeFilters } from "./visual-rendering";
 import { captionAssStyle, captionAssEvents } from "./caption-rendering";
 import { compareTimelineLayers } from "@/lib/timeline-lanes";
@@ -27,8 +34,21 @@ export function buildRenderPlan(
   assets: Asset[],
   audioIds: Set<string>,
   options: ExportResolution | Partial<ExportSettings> = 720,
-  sourceMetadata: ReadonlyMap<string, RenderSourceMetadata> = new Map()
+  sourceMetadata: ReadonlyMap<string, RenderSourceMetadata> = new Map(),
+  colorLuts: ReadonlyMap<string, CubeLut> = new Map()
 ) {
+  const luts = projectColorLuts(project).map(reference => {
+    const lut = colorLuts.get(reference.sha256);
+    if (!lut)
+      throw new Error(
+        "A color look has not loaded. Resolve it before exporting."
+      );
+    return {
+      reference,
+      lut: prepareColorLutExport(reference, lut),
+      file: colorLutFilename(reference),
+    };
+  });
   const { resolution, frameRate, format } = resolveExportSettings(
     options,
     project.frameRate
@@ -100,6 +120,9 @@ export function buildRenderPlan(
       );
     if (asset.kind === "image")
       args.push("-loop", "1", "-framerate", String(frameRate));
+    // The shipped default VP9 decoder drops WebM alpha. The libvpx decoder
+    // preserves the validated catalog overlay's transparent pixels.
+    if (asset.catalog?.alpha === true) args.push("-c:v", "libvpx-vp9");
     args.push("-i", `input-${inputs.indexOf(asset)}`);
     const end = number(clip.inPoint + clip.duration * speed);
     const trim = `start=${number(clip.inPoint)}:end=${end}`;
@@ -118,6 +141,11 @@ export function buildRenderPlan(
           ? Math.min(max, Math.max(min, value!))
           : fallback;
       const grade = colorGradeFilter(clip, index);
+      const look = normalizeClipColorLut(clip.colorLut);
+      const lut =
+        look && look.amount > 0
+          ? colorLutFilter(look, colorLuts.get(look.sha256)!, index) + ","
+          : "";
       const terminalPadding =
         asset.kind === "image"
           ? ""
@@ -134,7 +162,7 @@ export function buildRenderPlan(
         .filter(Boolean)
         .join(",");
       filters.push(
-        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=${frameRate},${terminalPadding}${grade}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
+        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=${frameRate},${terminalPadding}${lut}${grade}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
       );
       filters.push(
         ...visualCompositeFilters(clip, visual, `v${index}`, `layer${index}`)
@@ -234,6 +262,7 @@ export function buildRenderPlan(
   return {
     args,
     inputs,
+    luts,
     ass,
     duration,
     width,

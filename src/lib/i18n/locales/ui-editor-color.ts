@@ -1,4 +1,5 @@
 import type { InterfaceLanguage } from "@contracts/interface-language";
+import { editorLutUi } from "./ui-editor-lut";
 
 const keys = [
   "Temperature",
@@ -269,6 +270,9 @@ const translations: Record<InterfaceLanguage, ColorTranslations> = {
 export const editorColorUi = Object.fromEntries(
   Object.entries(translations).map(([language, values]) => [
     language,
-    Object.fromEntries(keys.map((key, index) => [key, values[index]])),
+    {
+      ...Object.fromEntries(keys.map((key, index) => [key, values[index]])),
+      ...editorLutUi[language as InterfaceLanguage],
+    },
   ])
-) as Record<InterfaceLanguage, Record<(typeof keys)[number], string>>;
+) as unknown as Record<InterfaceLanguage, Record<string, string>>;

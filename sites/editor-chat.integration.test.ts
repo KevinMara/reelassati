@@ -8,7 +8,11 @@ import {
   EDIT_PLAN_DEADLINE_MS,
 } from "../contracts/analyzer-transport";
 import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
-import type { WorkspaceDocument } from "../contracts/workspace";
+import type { WorkspaceDocument, EditOperation } from "../contracts/workspace";
+import type { SharedMediaCatalogItem } from "../contracts/shared-media-catalog";
+import { applyEditOperation } from "../contracts/edit-timeline";
+import { replaceTimelineClip } from "../src/lib/editor-manual";
+import { initializeSharedCatalog } from "./shared-media-catalog";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "../contracts/video-analysis";
 import { HOOK_STORY_GUIDANCE } from "../contracts/storytelling-guidance";
 import {
@@ -565,6 +569,58 @@ describe("foreground K3 auto-edit planning", () => {
     command: "Adapt the edit to this footage without generated media",
     selectedClipIds: [] as string[],
   });
+  it("preserves the same catalog LUT through manual, Reel and auto-edit application and owned workspace reload", async () => {
+    const originalOutput = nextOutput;
+    const calls = providerCalls.length;
+    const originalWorkspace = (await (await request("/api/workspace")).json() as { workspace: WorkspaceDocument }).workspace;
+    const sourceProject = originalWorkspace.projects[0];
+    const sha256 = "e".repeat(64);
+    const item: SharedMediaCatalogItem = {
+      id: `stock-${sha256.slice(0, 24)}`, name: "Quiet film", group: "Color looks", designId: "design-quiet-film", variant: "3D CUBE", kind: "lut", tags: ["quiet", "film"], duration: 0,
+      lut: { dimension: 3, size: 2, domainMin: [0, 0, 0], domainMax: [1, 1, 1] },
+      media: { file: `media/${sha256}.cube`, sha256, bytes: 100, contentType: "application/x-cube" }, license: "platform-licensed", credits: 0,
+    };
+    await initializeSharedCatalog(env as never);
+    sqlite.prepare("INSERT INTO shared_media_catalog (id,name,group_name,design_id,kind,search_text,payload,media_ready,poster_ready,status,created_at) VALUES (?,?,?,?,?,?,?,1,1,'ready',?)")
+      .run(item.id, item.name, item.group, item.designId, item.kind, "quiet film", JSON.stringify(item), "2026-11-11");
+    const expected = { id: item.id, name: item.name, sha256, amount: 0.35 };
+    const raw = { type: "style", label: "Apply Quiet film", reason: "Requested color treatment", start: 0, end: 30, targetClipIds: ["clip"], parameters: { colorLut: { id: item.id, amount: 0.35 } } };
+    try {
+      nextOutput = { summary: "Selected the available color look", changes: [raw] };
+      const autoResponse = await request("/api/ai/edit-plan", { project: sourceProject, command: "Apply Quiet film at 35 percent", selectedClipIds: [] });
+      const auto = await autoResponse.json();
+      expect(autoResponse.status, JSON.stringify(auto)).toBe(200);
+      expect(auto.changes[0].parameters.colorLut).toEqual(expected);
+      expect(JSON.stringify(providerCalls.at(-1))).toContain("catalogColorLooks");
+      nextOutput = { message: "Apply the requested look", actions: [{ id: "look", kind: "edit", label: "Apply Quiet film", reason: "Requested treatment", scope: "requested", requestExcerpt: "Apply Quiet film", dependsOn: [], operation: raw }] };
+      const reelResponse = await request("/api/ai/editor-chat", chat("catalog-look-equivalence", { prompt: "Apply Quiet film at 35 percent" }));
+      const reel = await reelResponse.json();
+      expect(reelResponse.status, JSON.stringify(reel)).toBe(200);
+      expect(reel.blockedReasons).toEqual([]);
+      expect(reel.actions[0].operation.parameters.colorLut).toEqual(expected);
+      const manual = replaceTimelineClip(sourceProject, "clip", { ...sourceProject.clips[0], colorLut: expected }, originalWorkspace.assets);
+      for (const edited of [manual, applyEditOperation(sourceProject, reel.actions[0].operation as EditOperation), applyEditOperation(sourceProject, auto.changes[0] as EditOperation)]) {
+        const latest = (await (await request("/api/workspace")).json() as { workspace: WorkspaceDocument }).workspace;
+        const saved = await request("/api/workspace", { workspace: { ...latest, projects: [edited] } }, "owner@example.com", "PUT");
+        expect(saved.status).toBe(200);
+        const reopened = (await (await request("/api/workspace")).json() as { workspace: WorkspaceDocument }).workspace.projects[0];
+        expect(reopened.clips[0].colorLut).toEqual(expected);
+        expect(reopened.clips[0]).toMatchObject({ assetId: "source", start: 0, duration: 30, inPoint: 0, outPoint: 30 });
+      }
+      nextOutput = { summary: "Remove only the selected color look", changes: [{ ...raw, parameters: { colorLut: null } }] };
+      const resetResponse = await request("/api/ai/edit-plan", { project: manual, command: "Remove the color look", selectedClipIds: ["clip"] });
+      const reset = await resetResponse.json();
+      expect(resetResponse.status, JSON.stringify(reset)).toBe(200);
+      expect(reset.changes[0].parameters).toEqual({ colorLut: null });
+      expect(applyEditOperation(manual, reset.changes[0] as EditOperation).clips[0].colorLut).toBeNull();
+      expect(providerCalls.length).toBe(calls + 3);
+    } finally {
+      nextOutput = originalOutput;
+      sqlite.prepare("DELETE FROM shared_media_catalog WHERE id = ?").run(item.id);
+      const latest = (await (await request("/api/workspace")).json() as { workspace: WorkspaceDocument }).workspace;
+      await request("/api/workspace", { workspace: { ...originalWorkspace, revision: latest.revision } }, "owner@example.com", "PUT");
+    }
+  });
   it("advertises K3 and rejects legacy planning before charging or contacting a provider", async () => {
     const caps = await (await request("/api/capabilities")).json();
     expect(caps.capabilities).toMatchObject({
@@ -592,12 +648,22 @@ describe("foreground K3 auto-edit planning", () => {
     const original = nextOutput,
       before = balance(),
       calls = providerCalls.length;
-    nextOutput = { summary: "Preserve the measured sequence", changes: [] };
+    nextOutput = {
+      summary: "Preserve the measured sequence", changes: [],
+      editorialNotes: [
+        { kind: "decision", text: "The complete demonstrated sequence supports a continuous hold." },
+        { kind: "question", text: "Do you have a clean source for the existing title?", operation: { type: "graphic" } },
+      ],
+    };
     try {
       const response = await request("/api/ai/edit-plan", await input());
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
         summary: expect.stringContaining("Preserve"),
+        editorialNotes: [
+          { kind: "decision", text: "The complete demonstrated sequence supports a continuous hold." },
+          { kind: "question", text: "Do you have a clean source for the existing title?" },
+        ],
         changes: [],
       });
       expect(providerCalls.length).toBe(calls + 1);
@@ -612,6 +678,95 @@ describe("foreground K3 auto-edit planning", () => {
     } finally {
       nextOutput = original;
     }
+  });
+  it("retains stock search purposes through the existing refinement and omits an unverified excerpt without losing valid work", async () => {
+    const existingFetch = globalThis.fetch;
+    const calls = providerCalls.length;
+    let modelCalls = 0;
+    let stockCalls = 0;
+    let refinement: Record<string, unknown> | undefined;
+    const body = await input();
+    body.project.sourceReviews = [{
+      assetId: "source", reviewedAt: "2026-11-11", summary: "", captions: "absent", captionNote: "",
+      audio: "present", audioNote: "Measured speech", moments: [],
+      observations: [{ start: 0, end: 30, visualEvidence: "The speaker explains the prop but does not show the result.", audioEvidence: "The result is explained.", confidence: 0.9 }],
+    }];
+    vi.stubGlobal("fetch", vi.fn(async (url, init) => {
+      if (String(url).startsWith("https://commons.wikimedia.org/w/api.php")) {
+        stockCalls++;
+        return Response.json({ query: { pages: { "123": { pageid: 123, title: "File:Generic prop.webm", imageinfo: [{
+          url: "https://upload.wikimedia.org/wikipedia/commons/a/ab/Generic_prop.webm", mime: "video/webm", duration: 20, size: 2000, width: 640, height: 360,
+          extmetadata: { LicenseShortName: { value: "CC0" }, LicenseUrl: { value: "https://creativecommons.org/publicdomain/zero/1.0/" }, Artist: { value: "Test creator" } },
+        }] } } } });
+      }
+      return existingFetch(url, init);
+    }));
+    providerOutputFactory = payload => {
+      modelCalls++;
+      if (modelCalls === 1) return {
+        summary: "Find an illustration of the result", changes: [],
+        stockSearches: [{ kind: "video", query: "generic prop", sceneId: "scene:0", purpose: "Help the viewer identify the discussed object" }],
+      };
+      const content = (payload.messages as Array<{ content: Array<{ type: string; text?: string }> }>)[1].content;
+      refinement = JSON.parse(content.find(part => part.type === "text")!.text!);
+      return {
+        summary: "Added the precise result shot and refined the grade", editorialNotes: [{ kind: "decision", text: "Retain the speaker's explanation." }],
+        editorialCoverage: [{ sceneId: "scene:0", purpose: "Clarify the result", decision: "improve", reason: "The source does not show the result", evidence: { speechIds: [], observationIndexes: [0] }, operationIndexes: [0] }],
+        changes: [
+          { type: "broll", label: "Unverified source event", start: 2, end: 5, parameters: { assetId: "stock:commons:123", sourceIn: 5 } },
+          { type: "style", label: "Retained grade", start: 0, end: 30, targetClipIds: ["clip"], parameters: { contrast: 1.03 } },
+        ],
+      };
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", { ...body, stock: true, contentReview: true });
+      const result = await response.json();
+      expect(response.status, JSON.stringify(result)).toBe(200);
+      expect(result.changes).toHaveLength(1);
+      expect(result.changes[0].type).toBe("style");
+      expect(result.stockReview.omitted).toEqual([{ operationId: expect.any(String), reason: "unverified-excerpt" }]);
+      expect(result.stockMedia).toEqual([]);
+      expect(result.editorialCoverage.status).toBe("partial");
+      expect(result.editorialCoverage.scenes[0].issues).toContain("missing-operation");
+      expect(result.editorialCoverage.scenes[0].operationIds).toEqual([result.stockReview.omitted[0].operationId]);
+      expect(refinement).toMatchObject({
+        stockSearches: [{ query: "generic prop", purposes: [{ sceneId: "scene:0", start: 0, end: 30, purpose: "Help the viewer identify the discussed object" }], resultAssetIds: ["stock:commons:123"] }],
+        stockCandidates: [{ assetId: "stock:commons:123", searches: [{ query: "generic prop", purposes: [{ sceneId: "scene:0" }] }], verifiedSourceRanges: [] }],
+      });
+      expect(stockCalls).toBe(1);
+      expect(providerCalls.length).toBe(calls + 2);
+    } finally {
+      providerOutputFactory = undefined;
+      vi.stubGlobal("fetch", existingFetch);
+    }
+  });
+  it.each(["preserve", "improve"])("accounts for content decisions in the original K3 call: %s", async decision => {
+    const original = nextOutput, calls = providerCalls.length;
+    const body = await input();
+    body.project.sourceReviews = [{
+      assetId: "source", reviewedAt: "2026-11-11", summary: "", captions: "absent", captionNote: "",
+      audio: "present", audioNote: "Measured speech", moments: [],
+      observations: [{ start: 0, end: 30, visualEvidence: "The source shows the complete prop demonstration.", audioEvidence: "The speaker explains the demonstrated result.", confidence: 0.9 }],
+    }];
+    nextOutput = {
+      summary: "Content-led treatment", editorialNotes: [],
+      editorialCoverage: [{
+        sceneId: "scene:0", purpose: "Make the demonstration understandable", decision,
+        reason: decision === "preserve" ? "The visible prop demonstrates the explanation without needing another shot." : "The missing demonstration needs additional coverage.",
+        evidence: { speechIds: [], observationIndexes: [0] }, operationIndexes: decision === "improve" ? [0] : [],
+      }],
+      changes: [{ type: "style", label: "Polish", start: 0, end: 30, targetClipIds: ["clip"], parameters: { contrast: 1.03 } }],
+    };
+    try {
+      const response = await request("/api/ai/edit-plan", { ...body, contentReview: true });
+      const result = await response.json();
+      expect(response.status, JSON.stringify(result)).toBe(200);
+      expect(result.editorialCoverage.status).toBe(decision === "preserve" ? "accounted" : "partial");
+      expect(result.editorialCoverage.scenes[0].issues).toEqual(decision === "preserve" ? [] : ["cosmetic-only"]);
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(JSON.stringify(providerCalls.at(-1))).toContain("operationIndexes");
+      expect(JSON.stringify(providerCalls.at(-1))).toContain("Preserve is a first-class decision");
+    } finally { nextOutput = original; }
   });
   it("releases a failed stream without a second call or a completed plan", async () => {
     const before = balance(),
@@ -738,13 +893,17 @@ describe("foreground K3 auto-edit planning", () => {
     let feedback!: CorrectionFeedback;
     providerOutputFactory = payload => {
       const input = qualityInput(payload);
-      if (!input.feedback) return graphicDraft();
+      if (!input.feedback) return {
+        ...graphicDraft(),
+        editorialNotes: [{ kind: "decision", text: "Stale original graphic rationale." }],
+      };
       feedback = input.feedback;
       expect(input.graphicRequest).toBe("");
       expect(input.project.speechEvidence).toEqual(expect.any(Array));
       expect(feedback.geometry.protectedRegions.length).toBeGreaterThan(0);
       return {
         summary: "Grade, quiet music, and measured 30 domande emphasis",
+        editorialNotes: [{ kind: "decision", text: "The measured words support this brief emphasis." }],
         corrections: [
           {
             operationId: feedback.rejected[0].operationId,
@@ -773,6 +932,7 @@ describe("foreground K3 auto-edit planning", () => {
       expect(providerCalls.length).toBe(calls + 2);
       expect(balance()).toBe(before - 5);
       expect(result.changes).toHaveLength(3);
+      expect(result.editorialNotes).toEqual([{ kind: "decision", text: "The measured words support this brief emphasis." }]);
       for (const original of feedback.immutableChanges) {
         const retained = result.changes.find(
           (operation: { id: string }) => operation.id === original.id
@@ -823,10 +983,14 @@ describe("foreground K3 auto-edit planning", () => {
               },
             ],
           }
-        : graphicDraft();
+        : { ...graphicDraft(), editorialCoverage: [{
+            sceneId: "scene:0", purpose: "Explain the demonstrated number", decision: "improve",
+            reason: "The explanation requires the source-supported emphasis.",
+            evidence: { speechIds: ["speech:0"], observationIndexes: [] }, operationIndexes: [2],
+          }] };
     };
     try {
-      const response = await request("/api/ai/edit-plan", await graphicInput());
+      const response = await request("/api/ai/edit-plan", { ...await graphicInput(), contentReview: true });
       const result = await response.json();
       expect(response.status).toBe(200);
       expect(
@@ -835,6 +999,8 @@ describe("foreground K3 auto-edit planning", () => {
       expect(result.qualityReview.withdrawn).toMatchObject([
         { issues: [{ reason: "source-overlap" }] },
       ]);
+      expect(result.editorialCoverage.status).toBe("partial");
+      expect(result.editorialCoverage.scenes[0].issues).toContain("missing-operation");
       expect(providerCalls.length).toBe(calls + 2);
       expect(balance()).toBe(before - 5);
     } finally {
@@ -895,10 +1061,12 @@ describe("foreground K3 auto-edit planning", () => {
       }
       const draft = graphicDraft();
       draft.changes[2].parameters.graphic!.y = 80;
-      return draft;
+      return { ...draft, editorialNotes: [{ kind: "decision", text: "Stale note for the withdrawn card." }] };
     };
     try {
-      expect((await request("/api/ai/edit-plan", body)).status).toBe(200);
+      const response = await request("/api/ai/edit-plan", body);
+      expect(response.status).toBe(200);
+      expect((await response.json()).editorialNotes).toBeUndefined();
       expect(providerCalls.length).toBe(calls + 2);
     } finally {
       providerOutputFactory = undefined;

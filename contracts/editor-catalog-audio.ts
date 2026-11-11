@@ -11,7 +11,11 @@ export interface CatalogAudioPlacement {
 /** Only the bundled, audited catalog can supply a file. No model URL is accepted. */
 export function findCatalogAudio(catalogId: unknown): EditorAudioCatalogEntry {
   const entry = editorAudioCatalog.find(item => item.id === catalogId);
-  if (!entry || entry.license !== "CC0-1.0" || entry.creditCost !== 0)
+  if (
+    !entry ||
+    !["CC0-1.0", "platform-licensed"].includes(entry.license) ||
+    entry.creditCost !== 0
+  )
     throw new Error("Choose a sound from the available free audio catalog.");
   return entry;
 }

@@ -1,14 +1,20 @@
+import { sharedCatalogPlanningAssets } from "@contracts/shared-media-catalog";
+import { resolveSharedCatalogAsset } from "@/lib/shared-media-catalog";
 import {
   mergeCreditReceipt,
   type CreditReceipt,
 } from "@contracts/credit-receipt";
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 import { applyAutonomousCaptionTreatment } from "@contracts/editorial-captions";
+import { preflightEditColorLuts } from "@/lib/catalog-color-lut-preflight";
 import {
   resolveAutonomousSourceMetadata,
   mergeAutonomousSourceMetadata,
 } from "@/lib/autonomous-source-metadata";
-import { autonomousResultReceipt } from "@/lib/autonomous-result-receipt";
+import {
+  autonomousReceiptReview,
+  autonomousResultReceipt,
+} from "@/lib/autonomous-result-receipt";
 import {
   autonomousCreditEstimate,
   autonomousSourceReviewCost,
@@ -16,6 +22,11 @@ import {
 import { activeEditorProjects, editorRunKey } from "@/lib/editor-run-lock";
 import { ConciseResponse } from "./ConciseResponse";
 import { editPlanQualityAssets } from "@contracts/edit-plan-quality";
+import { buildEditPlanningContext } from "@contracts/edit-planning-context";
+import {
+  reviewAppliedEditorialCoverage,
+  type EditorialCoverageReview,
+} from "@contracts/editorial-coverage";
 import { resolveChatCatalogAudio } from "@/lib/editor-chat-catalog-audio";
 import { StudioSelect } from "@/components/ui/studio-select";
 import { getUiLocale, useUiText } from "@/lib/i18n/ui";
@@ -377,7 +388,10 @@ export function AutonomousEditor({
       state:
         "running" | "ready" | "completed" | "partial" | "failed" | "stopped",
       appliedTypes?: EditOperation["type"][],
-      planSummary?: string
+      planSummary?: string,
+      notices?: string[],
+      editorialNotes?: import("@contracts/editorial-notes").EditorialNote[],
+      editorialCoverage?: EditorialCoverageReview
     ) => {
       await updateWorkspace(current => {
         // Stop may abort the provider request, while its final visible status still needs saving.
@@ -413,6 +427,9 @@ export function AutonomousEditor({
                   ? { appliedTypes: [...new Set(appliedTypes)] }
                   : {}),
                 ...(planSummary ? { planSummary } : {}),
+                ...(notices?.length ? { notices } : {}),
+                ...(editorialNotes?.length ? { editorialNotes } : {}),
+                ...(editorialCoverage ? { editorialCoverage } : {}),
               },
               creditReceipts: receipts,
               creditReceiptsComplete:
@@ -680,6 +697,7 @@ export function AutonomousEditor({
             model,
             stock: true,
             captionStyling: captions,
+            contentReview: true,
             graphicRequest: style.startsWith("ANALYZER OPTIMIZATION BRIEF")
               ? ""
               : style,
@@ -697,19 +715,6 @@ export function AutonomousEditor({
         working = applyAutonomousCaptionTreatment(
           working,
           result.captionTreatment
-        );
-      if (result.qualityReview?.withdrawn.length)
-        savedSteps.push(
-          ...autonomousResultReceipt(
-            "",
-            [],
-            {
-              changes: [],
-              omitted: result.qualityReview.withdrawn,
-              warnings: [],
-            },
-            ui
-          ).details
         );
       const preparationCategories: Array<{ type: "trim" | "caption" }> = [];
       if (JSON.stringify(working.clips) !== JSON.stringify(project.clips))
@@ -744,7 +749,13 @@ export function AutonomousEditor({
       const graphicReview = preflightAutonomousPlan(
         working,
         changesToApply,
-        editPlanQualityAssets(runWorkspace.assets, result.stockMedia ?? []),
+        editPlanQualityAssets(
+          [
+            ...runWorkspace.assets,
+            ...sharedCatalogPlanningAssets(result.sharedCatalog ?? []),
+          ],
+          result.stockMedia ?? []
+        ),
         checkpoint,
         // Analyzer optimization contains generated recommendations, not a
         // verbatim human instruction to add or cover source text.
@@ -753,6 +764,22 @@ export function AutonomousEditor({
         }
       );
       changesToApply = graphicReview.changes;
+      await preflightEditColorLuts(changesToApply, signal);
+      checkpoint();
+      const editorialCoverage = reviewAppliedEditorialCoverage(
+        result.editorialCoverage,
+        working,
+        buildEditPlanningContext(working, runWorkspace.assets),
+        changesToApply,
+        [
+          ...runWorkspace.assets,
+          ...sharedCatalogPlanningAssets(result.sharedCatalog ?? []),
+        ]
+      );
+      const receiptReview = autonomousReceiptReview(
+        graphicReview,
+        result.qualityReview?.withdrawn
+      );
       // A fresh user-initiated run must not reuse a proposal that still failed
       // actual execution checks (including an older server response).
       if (graphicReview.omitted.length || graphicReview.omittedSounds?.length)
@@ -773,15 +800,24 @@ export function AutonomousEditor({
         const previewReceipt = autonomousResultReceipt(
           "",
           [],
-          graphicReview,
-          ui
+          receiptReview,
+          ui,
+          editorialCoverage,
+          result.stockReview
         );
-        savedSteps.push(...previewReceipt.details);
         const previewStatus =
           previewReceipt.status === "partial"
             ? previewReceipt.details.join(" ")
             : ui("Your edit plan is ready.");
-        await saveActivity(previewStatus, "ready", undefined, result.summary);
+        await saveActivity(
+          previewStatus,
+          "ready",
+          undefined,
+          result.summary,
+          previewReceipt.details,
+          result.editorialNotes,
+          editorialCoverage
+        );
         setStatus(previewStatus);
         return;
       }
@@ -814,6 +850,34 @@ export function AutonomousEditor({
         for (const op of changesToApply)
           if (op.parameters?.assetId === `stock:${item.provider}:${item.id}`)
             resolvedMedia.set(op.id, asset.id);
+        await updateWorkspace(w => {
+          checkpoint(w);
+          return {
+            ...w,
+            assets: [asset, ...w.assets.filter(a => a.id !== asset.id)],
+          };
+        });
+      }
+      for (const op of changesToApply) {
+        const id = op.parameters?.assetId;
+        if (!id?.startsWith("shared:")) continue;
+        const item = result.sharedCatalog?.find(
+          item => `shared:${item.id}` === id
+        );
+        if (!item)
+          throw new Error(
+            "This shared catalog selection is not available in the verified plan."
+          );
+        checkpoint();
+        setStatus(`Adding catalog media · ${item.name}`);
+        const asset = await resolveSharedCatalogAsset(
+          item.id,
+          [...runWorkspace.assets, ...generatedAssets],
+          signal
+        );
+        checkpoint();
+        generatedAssets.push(asset);
+        resolvedMedia.set(op.id, asset.id);
         await updateWorkspace(w => {
           checkpoint(w);
           return {
@@ -987,8 +1051,10 @@ export function AutonomousEditor({
       const receipt = autonomousResultReceipt(
         result.summary,
         [...appliedOperations, ...preparationCategories],
-        graphicReview,
-        ui
+        receiptReview,
+        ui,
+        editorialCoverage,
+        result.stockReview
       );
       steps.push({
         label:
@@ -1010,7 +1076,6 @@ export function AutonomousEditor({
       });
       checkpoint();
       planCache.clear();
-      savedSteps.push(...receipt.details);
       setCompletedSteps([...savedSteps]);
       await saveActivity(
         receipt.summary,
@@ -1018,7 +1083,10 @@ export function AutonomousEditor({
         [...appliedOperations, ...preparationCategories].map(
           operation => operation.type
         ),
-        receipt.planSummary
+        receipt.planSummary,
+        receipt.details,
+        result.editorialNotes,
+        editorialCoverage
       );
       setFinished(true);
       setStatus(receipt.summary);

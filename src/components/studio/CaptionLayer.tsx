@@ -10,18 +10,22 @@ export function CaptionLayer({
   time,
   appearance,
   frameRate = 30,
+  sample = false,
 }: {
   segments: readonly TranscriptSegment[];
   presetId?: string;
   time: number;
   frameRate?: number;
   appearance?: import("@contracts/editor-presets").CaptionAppearance;
+  /** Center the style specimen independently of its position in the video. */
+  sample?: boolean;
 }) {
   const p = getCaptionPreset(presetId, appearance);
-  const verticalAnchor =
-    p.animation === "motion" &&
-    p.motion?.verticalAnchor &&
-    p.motion.verticalAnchor !== "auto"
+  const verticalAnchor = sample
+    ? "center"
+    : p.animation === "motion" &&
+        p.motion?.verticalAnchor &&
+        p.motion.verticalAnchor !== "auto"
       ? p.motion.verticalAnchor
       : p.position;
   const active = segments.filter(

@@ -77,6 +77,8 @@ export interface BrandKit {
 }
 
 export interface Asset {
+  /** Verified shared-stock identity and compositing defaults. */
+  catalog?: import("./shared-media-catalog").SharedMediaCatalogItem;
   stock?: import("./stock-media").StockMedia;
   id: string;
   name: string;
@@ -151,6 +153,8 @@ export interface TimelineClip {
   brightness?: number;
   contrast?: number;
   saturation?: number;
+  /** Actual immutable CUBE look, applied before the editable color controls. */
+  colorLut?: import("./color-lut").ClipColorLut | null;
 }
 
 export interface TranscriptWord {
@@ -224,6 +228,8 @@ export interface EditOperation {
     brightness?: number;
     contrast?: number;
     saturation?: number;
+    /** Canonical immutable catalog look; null explicitly removes the look. */
+    colorLut?: import("./color-lut").ClipColorLut | null;
   };
 }
 

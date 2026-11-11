@@ -59,6 +59,28 @@ const project = {
 } as EditProject;
 
 describe("timeline rendering", () => {
+  it("selects the alpha-preserving VP9 input decoder only for catalog alpha media", () => {
+    const alphaAssets = assets.map(asset =>
+      asset.id === "video"
+        ? ({
+            ...asset,
+            contentType: "video/webm",
+            catalog: { alpha: true },
+          } as Asset)
+        : asset
+    );
+    const plan = buildRenderPlan(project, alphaAssets, new Set());
+    expect(plan.args.slice(3, 7)).toEqual([
+      "-c:v",
+      "libvpx-vp9",
+      "-i",
+      "input-0",
+    ]);
+    expect(plan.args.filter(value => value === "libvpx-vp9")).toHaveLength(2);
+    expect(buildRenderPlan(project, assets, new Set()).args).not.toContain(
+      "libvpx-vp9"
+    );
+  });
   it("rejects missing media and unsafe timelines instead of silently omitting clips", () => {
     expect(() => buildRenderPlan(project, [], new Set())).toThrow("missing");
     expect(() =>

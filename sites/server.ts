@@ -2,6 +2,9 @@ import {
   EDIT_CUT_GUIDANCE,
   assertAutonomousTrimSemantics,
 } from "../contracts/edit-cut-semantics";
+import { handleCatalogAdmin, handleCatalogPublic, initializeSharedCatalog, sharedCatalogCandidates, copySharedCatalogMedia } from "./shared-media-catalog";
+import { normalizeSharedCatalogItem, sharedCatalogPlanningAssets } from "../contracts/shared-media-catalog";
+import { normalizeClipColorLut } from "../contracts/color-lut";
 import {
   EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION,
   editPlanQualityAssets,
@@ -11,6 +14,12 @@ import {
   type EditPlanQualityReview,
 } from "../contracts/edit-plan-quality";
 import type { AutonomousGraphicReview } from "../contracts/autonomous-execution";
+import {
+  EDITORIAL_COVERAGE_DIRECTION,
+  reviewEditorialCoverage,
+  reconcileEditorialCoverage,
+  type EditorialCoverageReview,
+} from "../contracts/editorial-coverage";
 import { assertAutonomousComposition } from "../contracts/autonomous-operation-order";
 import {
   EditPlanValidationError,
@@ -26,6 +35,7 @@ import { normalizeTransitionPresets } from "../contracts/transition-presets";
 import { LOCAL_SPEECH_MODEL } from "../contracts/local-speech-model";
 import { parseLocalTranscriptSegments } from "../contracts/local-transcript";
 import type { StockMedia } from "../contracts/stock-media";
+import { editorialStockSearches, associateEditorialStock, reviewEditorialStockOperations, EDITORIAL_STOCK_SEARCH_DIRECTION, EDITORIAL_STOCK_REFINEMENT_DIRECTION, type EditorialStockCandidate, type EditorialStockReview } from "../contracts/editorial-stock";
 import { GRAPHIC_PRESETS, CLIP_LOOK_PRESETS } from "../contracts/editor-presets";
 import {
   buildEditPlanningContext,
@@ -101,6 +111,7 @@ import {
   EDITORIAL_DESIGN_GUIDANCE,
   EDITOR_GRAPHIC_GUIDANCE,
 } from "../contracts/editorial-design";
+import { EDITORIAL_NOTES_GUIDANCE, normalizeEditorialNotes } from "../contracts/editorial-notes";
 import {
   normalizeScriptWritingPack,
   SCRIPT_WRITING_PACK_GUIDANCE,
@@ -391,6 +402,7 @@ interface AssetRow {
   r2_key: string;
   created_at: string;
   stock_json?: string | null;
+  catalog_json?: string | null;
 }
 
 interface AssetUploadRow {
@@ -772,6 +784,7 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
             stock_json TEXT NOT NULL
           )
         `),
+      env.DB.prepare("CREATE TABLE IF NOT EXISTS asset_catalog_metadata (asset_id TEXT PRIMARY KEY NOT NULL REFERENCES assets(id) ON DELETE CASCADE, catalog_json TEXT NOT NULL)"),
       env.DB.prepare(`
           CREATE TABLE IF NOT EXISTS asset_uploads (
             asset_id TEXT PRIMARY KEY NOT NULL,
@@ -2159,6 +2172,7 @@ async function getWorkspace(
         ? { height: Math.max(1, Math.round(saved.height)) }
         : {}),
       ...(saved.variantGroupId ? { variantGroupId: saved.variantGroupId } : {}),
+      ...catalogAssetMetadata(asset.catalog),
       ...(!asset.stock && saved.stock ? { stock: saved.stock } : {}),
       ...(saved.parentAssetId ? { parentAssetId: saved.parentAssetId } : {}),
       favorite: saved.favorite === true,
@@ -3502,6 +3516,12 @@ function stockAssetMetadata(stock: StockMedia | undefined): Partial<Asset> {
     : {};
 }
 
+function catalogAssetMetadata(raw: unknown): Partial<Asset> {
+  if (!raw) return {};
+  const catalog = normalizeSharedCatalogItem(raw);
+  return { catalog, duration: catalog.duration, width: catalog.width, height: catalog.height, variantGroupId: `shared-catalog:${catalog.id}` };
+}
+
 function rowToAsset(row: AssetRow, provenance?: ProvenanceRow | null): Asset {
   let stock: StockMedia | undefined;
   if (row.stock_json) {
@@ -3529,6 +3549,7 @@ function rowToAsset(row: AssetRow, provenance?: ProvenanceRow | null): Asset {
     status: "ready",
     createdAt: row.created_at,
     ...stockAssetMetadata(stock),
+    ...catalogAssetMetadata(row.catalog_json ? JSON.parse(row.catalog_json) : undefined),
     ...(provenance ? { provenance: provenanceFromRow(provenance) } : {}),
   };
 }
@@ -3544,6 +3565,7 @@ async function insertAssetRecord(
     r2Key: string;
     id?: string;
     stock?: StockMedia;
+    catalog?: import("../contracts/shared-media-catalog").SharedMediaCatalogItem;
   }
 ): Promise<Asset> {
   const id = input.id || crypto.randomUUID();
@@ -3567,12 +3589,11 @@ async function insertAssetRecord(
   );
   // The media record and its license must become visible together. A workspace
   // save or client reconnect is not required to recover the attribution.
-  if (input.stock) {
+  if (input.stock || input.catalog) {
     await env.DB.batch([
       insert,
-      env.DB.prepare(
-        "INSERT INTO asset_stock_metadata (asset_id, stock_json) VALUES (?, ?)"
-      ).bind(id, JSON.stringify(input.stock)),
+      ...(input.stock ? [env.DB.prepare("INSERT INTO asset_stock_metadata (asset_id, stock_json) VALUES (?, ?)").bind(id, JSON.stringify(input.stock))] : []),
+      ...(input.catalog ? [env.DB.prepare("INSERT INTO asset_catalog_metadata (asset_id, catalog_json) VALUES (?, ?)").bind(id, JSON.stringify(normalizeSharedCatalogItem(input.catalog)))] : []),
     ]);
   } else await insert.run();
 
@@ -3586,6 +3607,7 @@ async function insertAssetRecord(
     status: "ready",
     createdAt,
     ...stockAssetMetadata(input.stock),
+    ...catalogAssetMetadata(input.catalog),
   };
 }
 
@@ -3634,7 +3656,8 @@ async function getAssetRow(
   await initializeSchema(env);
   return env.DB.prepare(
     `SELECT id, owner_email, name, kind, content_type, bytes, r2_key, created_at,
-     (SELECT stock_json FROM asset_stock_metadata WHERE asset_id = assets.id) AS stock_json
+     (SELECT stock_json FROM asset_stock_metadata WHERE asset_id = assets.id) AS stock_json,
+     (SELECT catalog_json FROM asset_catalog_metadata WHERE asset_id = assets.id) AS catalog_json
      FROM assets WHERE id = ? AND owner_email = ? AND brand_id = ?`
   )
     .bind(id, user.email, user.brandId || "default")
@@ -3648,7 +3671,8 @@ async function listOwnerAssets(
   await initializeSchema(env);
   const result = await env.DB.prepare(
     `SELECT id, owner_email, name, kind, content_type, bytes, r2_key, created_at,
-     (SELECT stock_json FROM asset_stock_metadata WHERE asset_id = assets.id) AS stock_json
+     (SELECT stock_json FROM asset_stock_metadata WHERE asset_id = assets.id) AS stock_json,
+     (SELECT catalog_json FROM asset_catalog_metadata WHERE asset_id = assets.id) AS catalog_json
      FROM assets WHERE owner_email = ? AND brand_id = ? ORDER BY created_at DESC`
   )
     .bind(user.email, user.brandId || "default")
@@ -4509,6 +4533,12 @@ function mapEditOperations(
               .map(clip => clip.id);
       const params = recordValue(typed.parameters) || {};
       const parameters: NonNullable<EditOperation["parameters"]> = {};
+      if (Object.hasOwn(params, "colorLut")) {
+        const colorLut = params.colorLut === null ? null : normalizeClipColorLut(params.colorLut);
+        if (type !== "style" || colorLut === undefined)
+          throw new EditPlanValidationError("reference_unavailable", "The catalog color look is invalid for this edit.", index, type);
+        parameters.colorLut = colorLut;
+      }
       if (type === "graphic") {
         if (
           params.graphicMode !== undefined &&
@@ -5824,7 +5854,9 @@ async function handleAi(
         ? EDITOR_CHAT_SYSTEM_PROMPT +
           "\nMARKER-ONLY TASK: Return exactly one story-beats action. Assign meaningful editorial sections from storyEvidence and cite their exact evidenceIds. Distinguish hook, body, proof, payoff, CTA only where supported; do not force every kind. No analysis, captions, edits, generated media, settings, replan or other actions. These are reference markers only. Use the user's prompt as requestExcerpt."
         : EDITOR_CHAT_SYSTEM_PROMPT;
+    await initializeSharedCatalog(env);
     const context: EditorChatContext = {
+      sharedCatalog: await sharedCatalogCandidates(env, input.prompt, project.clips.flatMap(clip => clip.colorLut ? [clip.colorLut.id] : [])),
       request: input,
       project,
       personalStyles: workspace.editorStyles,
@@ -6605,6 +6637,7 @@ async function handleAi(
       effort?: string;
       stock?: boolean;
       captionStyling?: boolean;
+      contentReview?: boolean;
       graphicRequest?: string;
     }>(request);
     if (
@@ -6655,10 +6688,13 @@ async function handleAi(
       input.project.sourceReviews?.map(sourceReviewFacts);
     const presetWorkspace = await getWorkspace(env, user);
     const personalStyles = presetWorkspace.editorStyles ?? [];
+    await initializeSharedCatalog(env);
+    const sharedCatalog = await sharedCatalogCandidates(env, stringValue(input.command), project.clips.flatMap(clip => clip.colorLut ? [clip.colorLut.id] : []));
     const planningContext = buildEditPlanningContext(
       project,
       presetWorkspace.assets,
-      presetWorkspace.projects
+      presetWorkspace.projects,
+      sharedCatalog
     );
     const presetCatalog = editorPresetCatalog(
       personalStyles,
@@ -6711,6 +6747,8 @@ async function handleAi(
         personalTransitions: [],
       },
       freeSounds: planningContext.freeSounds,
+      sharedCatalog: planningContext.sharedCatalog,
+      catalogColorLooks: planningContext.catalogColorLooks,
       localOnly: input.localOnly === true,
       editingStyle: normalizeEditStyleTemplate(project.editStyleTemplate)
         ?.profile,
@@ -6723,10 +6761,11 @@ async function handleAi(
       input.localOnly !== true &&
       !input.selectedClipIds?.length &&
       (!input.range || (input.range.start <= 0 && input.range.end >= duration));
-    const captionDirection = autonomousCaptionDirection(
-      project,
-      captionStyling
-    );
+    const captionDirection = [
+      autonomousCaptionDirection(project, captionStyling),
+      input.contentReview === true ? EDITORIAL_COVERAGE_DIRECTION : "",
+      input.stock === true ? EDITORIAL_STOCK_SEARCH_DIRECTION : "",
+    ].filter(Boolean).join("\n");
     return runPaidAiAction(
       env,
       user,
@@ -6755,7 +6794,7 @@ async function handleAi(
           env,
           user,
           "edit-planning",
-          `${EDIT_CUT_GUIDANCE} ${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, parameters, and either start/end or a supported evidence cue. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio adjusts existing target clips only using parameters.volume 0..2; adding a music bed or SFX requires type=sound with parameters.assetId; caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${EDITOR_PRESET_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Deliver the complete requested treatment. Judge each beat for coverage, clarity, framing, motion design, sound and finishing; implement every useful supported improvement, not just trims and color. Do not minimize the operation count or stop after the easiest changes. Preserve restraint only where it serves the actual source or selected style. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Choose as many high-impact operations as the story needs. A generated-media quota or operation quota must not determine the treatment. Explain the audience-retention reason concretely.`,
+          `${EDIT_CUT_GUIDANCE} ${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITORIAL_NOTES_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "editorialNotes":[], "editorialCoverage":[], "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image","sceneId":"scene:<index>","purpose":"what this picture explains for this beat"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, parameters, and either start/end or a supported evidence cue. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio adjusts existing target clips only using parameters.volume 0..2; adding a music bed or SFX requires type=sound with parameters.assetId; caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${EDITOR_PRESET_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> or shared:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Shared catalog visuals are real fixed overlays/frames, with supplied dimensions, duration and blendMode. When relevant to the brief, insert with type=broll and exact parameters.assetId=shared:<id>; sourceIn defaults to 0, duration must fit the actual video, and parameters.visual.blendMode must match the catalog. They are not generated media, editable text, source replacements, or scene evidence. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Deliver the complete requested treatment. Judge each beat for coverage, clarity, framing, motion design, sound and finishing; implement every useful supported improvement, not just trims and color. Do not minimize the operation count or stop after the easiest changes. Preserve restraint only where it serves the actual source or selected style. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Choose as many high-impact operations as the story needs. A generated-media quota or operation quota must not determine the treatment. Explain the audience-retention reason concretely.`,
           JSON.stringify({
             command: input.command,
             project: projectContext,
@@ -6769,28 +6808,15 @@ async function handleAi(
           editReasoningEffort(input.effort)
         );
         let stockMedia: StockMedia[] = [];
+        let stockCandidates: EditorialStockCandidate[] = [];
+        const stockReview: EditorialStockReview = { omitted: [] };
         if (
           input.stock === true &&
           Array.isArray(output.stockSearches) &&
           output.stockSearches.length
         ) {
-          const searches = [
-            ...new Map(
-              output.stockSearches.flatMap(value => {
-                const row = recordValue(value);
-                const kind = row?.kind,
-                  query = stringValue(row?.query).trim().slice(0, 120);
-                return query && (kind === "video" || kind === "image")
-                  ? [
-                      [
-                        `${kind}:${query.toLowerCase()}`,
-                        { kind, query },
-                      ] as const,
-                    ]
-                  : [];
-              })
-            ).values(),
-          ];
+          const searches = editorialStockSearches(output.stockSearches, planningContext);
+          const searchResults: Array<{ search: typeof searches[number]; media: StockMedia[] }> = [];
           // Bound concurrency, not the number of story beats that may use stock.
           for (let offset = 0; offset < searches.length; offset += 4) {
             analysisControl.signal.throwIfAborted();
@@ -6808,26 +6834,20 @@ async function handleAi(
                   )
                 )
             );
-            stockMedia.push(
-              ...found.flatMap(result =>
-                result.status === "fulfilled" ? result.value.slice(0, 4) : []
-              )
-            );
+            found.forEach((result, index) => searchResults.push({
+              search: searches[offset + index],
+              media: result.status === "fulfilled" ? result.value : [],
+            }));
           }
-          stockMedia = [
-            ...new Map(
-              stockMedia.map(item => [
-                `stock:${item.provider}:${item.id}`,
-                item,
-              ])
-            ).values(),
-          ];
+          stockCandidates = associateEditorialStock(searchResults, planningContext, presetWorkspace.assets);
+          stockMedia = stockCandidates.map(candidate => candidate.media);
           if (stockMedia.length) {
             const refined = await chatJson(
               env,
               user,
               "edit-planning",
-              `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} ${EDIT_CUT_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Choose the number of useful stock shots from the source and story; insert them as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Follow the generation authorization in the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,
+              EDITORIAL_STOCK_REFINEMENT_DIRECTION + "\n" +
+              `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITORIAL_NOTES_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} ${EDIT_CUT_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,editorialNotes,editorialCoverage,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Choose the number of useful stock shots from the source and story; insert them as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Follow the generation authorization in the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,
               [
                 {
                   type: "text",
@@ -6835,6 +6855,8 @@ async function handleAi(
                     command: input.command,
                     project: projectContext,
                     draft: output,
+                    stockSearches: searchResults.map(({ search, media }) => ({ ...search, resultAssetIds: media.map(item => `stock:${item.provider}:${item.id}`) })),
+                    stockCandidates: stockCandidates.map(candidate => ({ assetId: candidate.assetId, searches: candidate.searches, verifiedSourceRanges: candidate.verifiedSourceRanges })),
                     stock: stockMedia.map(item => ({
                       ...item,
                       assetId: `stock:${item.provider}:${item.id}`,
@@ -6863,6 +6885,7 @@ async function handleAi(
             invocation = refined.invocation;
           }
         }
+        let editorialNotes = normalizeEditorialNotes(output.editorialNotes);
         let summary = stringValue(
           output.summary,
           "Edit plan ready for review"
@@ -6874,7 +6897,8 @@ async function handleAi(
             )
           : undefined;
         let validationStage: EditPlanValidationStage = "references";
-        const compileChanges = (raw: unknown): EditOperation[] => {
+        let originalCompiledChanges: EditOperation[] = [];
+        const compileChanges = (raw: unknown, retainOriginalIndexes = false): EditOperation[] => {
           validationStage = "references";
           let changes: EditOperation[];
           const referencedChanges = resolveEditPlanningReferences(
@@ -6897,6 +6921,11 @@ async function handleAi(
             personalStyles,
             true
           );
+          if (retainOriginalIndexes) originalCompiledChanges = changes;
+          const checkedStock = reviewEditorialStockOperations(changes, stockCandidates, Array.isArray(styledChanges) ? styledChanges : undefined);
+          for (const omission of checkedStock.review.omitted)
+            if (!stockReview.omitted.some(item => item.operationId === omission.operationId)) stockReview.omitted.push(omission);
+          changes = checkedStock.changes;
           validationStage = "scope";
           if (input.localOnly === true) {
             const start = boundedNumber(input.range?.start, 0, 0, duration);
@@ -6973,7 +7002,8 @@ async function handleAi(
         let changes: EditOperation[];
         let graphicReview: AutonomousGraphicReview | undefined;
         let qualityReview: EditPlanQualityReview | undefined;
-        const qualityAssets = editPlanQualityAssets(presetWorkspace.assets, stockMedia);
+        let editorialCoverage: EditorialCoverageReview | undefined;
+        const qualityAssets = editPlanQualityAssets([...presetWorkspace.assets, ...sharedCatalogPlanningAssets(sharedCatalog)], stockMedia);
         const qualityProject = captionTreatment
           ? applyAutonomousCaptionTreatment(project, captionTreatment)
           : project;
@@ -6981,7 +7011,12 @@ async function handleAi(
         // clients default to automatic protection, never inferred permission.
         const graphicRequest = stringValue(input.graphicRequest);
         try {
-          changes = compileChanges(output.changes);
+          changes = compileChanges(output.changes, true);
+          if (input.contentReview === true)
+            editorialCoverage = reviewEditorialCoverage(
+              output.editorialCoverage, qualityProject, planningContext, originalCompiledChanges, qualityAssets
+            );
+          if (editorialCoverage) editorialCoverage = reconcileEditorialCoverage(editorialCoverage, changes);
           if (changes.some(operation => operation.type === "graphic")) {
             validationStage = "graphic_preflight";
             graphicReview = reviewEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
@@ -7008,9 +7043,9 @@ async function handleAi(
           // Provider/abort failures retain their normal failure path, not a
           // compiler error or an automatic retry. No new media is authorized.
           const corrected = await chatJson(env, user, "edit-planning",
-            `${EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION} ${EDIT_PLANNING_CAPABILITIES} ${EDITOR_GRAPHIC_GUIDANCE}`,
+            `${EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION} ${EDITORIAL_NOTES_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} ${EDITOR_GRAPHIC_GUIDANCE}`,
             JSON.stringify({ command: input.command, graphicRequest, project: projectContext,
-              captionTreatment, feedback }),
+              captionTreatment, editorialCoverage, feedback }),
             requestedModel, true, 24000, false, undefined, analysisControl,
             editReasoningEffort(input.effort));
           invocation = corrected.invocation;
@@ -7022,8 +7057,13 @@ async function handleAi(
               return compiled;
             });
             changes = repaired.changes;
+            if (editorialCoverage)
+              editorialCoverage = reconcileEditorialCoverage(editorialCoverage, changes);
             summary = repaired.summary;
             qualityReview = repaired.qualityReview;
+            // Earlier notes may describe graphics that were just withdrawn.
+            // Only the corrected proposal may provide notes for this result.
+            editorialNotes = normalizeEditorialNotes(corrected.output.editorialNotes);
             validationStage = "graphic_refinement";
             assertExecutableEditPlan(changes);
             assertAutonomousTrimSemantics(project, changes);
@@ -7039,6 +7079,9 @@ async function handleAi(
         checkpoint();
         const normalizedProjection = {
           summary,
+          ...(editorialCoverage ? { editorialCoverage } : {}),
+          ...(editorialNotes.length ? { editorialNotes } : {}),
+          ...(stockReview.omitted.length ? { stockReview } : {}),
           ...(captionTreatment ? { captionTreatment } : {}),
           ...(qualityReview ? { qualityReview } : {}),
           changes: changes.map(editOperationProvenanceProjection),
@@ -7069,8 +7112,12 @@ async function handleAi(
         });
         return json({
           summary,
+          ...(stockReview.omitted.length ? { stockReview } : {}),
+          ...(editorialCoverage ? { editorialCoverage } : {}),
+          ...(editorialNotes.length ? { editorialNotes } : {}),
           ...(captionTreatment ? { captionTreatment } : {}),
           ...(qualityReview ? { qualityReview } : {}),
+          sharedCatalog: sharedCatalog.filter(item => changes.some(change => change.parameters?.assetId === `shared:${item.id}`)),
           stockMedia: stockMedia.filter(item =>
             changes.some(
               change =>
@@ -13618,6 +13665,9 @@ async function handleApi(
     return json({ country });
   }
 
+  if (url.pathname === "/api/catalog/search" || url.pathname.startsWith("/api/catalog/items/") || url.pathname.startsWith("/api/catalog/media/"))
+    return handleCatalogPublic(request, env, url);
+
   if (url.pathname === "/api/publishing/callback" && request.method === "GET") {
     const platform =
       knownPlatform(url.searchParams.get("platform")) || "account";
@@ -13825,6 +13875,27 @@ async function handleApi(
     return errorResponse("Stock operation not found", 404);
   }
   if (url.pathname === "/api/brands") return handleBrands(request, env, user);
+  if (url.pathname.startsWith("/api/catalog/admin/"))
+    return handleCatalogAdmin(request, env, url, operatorOwnerEmail(env) === user.email);
+  if (url.pathname === "/api/catalog/import" && request.method === "POST") {
+    await initializeSharedCatalog(env);
+    const input = await parseJsonBody<{ id?: string }>(request);
+    const existing = await env.DB.prepare("SELECT assets.id FROM assets JOIN asset_catalog_metadata metadata ON metadata.asset_id = assets.id WHERE owner_email = ? AND brand_id = ? AND json_extract(metadata.catalog_json, '$.id') = ? LIMIT 1").bind(user.email, user.brandId || "default", input.id || "").first<{ id: string }>();
+    if (existing) {
+      const row = await getAssetRow(env, user, existing.id);
+      if (row) return json({ ...rowToAsset(row), url: await signedMediaUrl(env, row.id) });
+    }
+    const key = `users/${encodeURIComponent(user.email)}/catalog/${crypto.randomUUID()}`;
+    try {
+      const item = await copySharedCatalogMedia(env, input.id || "", key, request.signal);
+      request.signal.throwIfAborted();
+      const asset = await insertAssetRecord(env, user, { name: item.name, kind: item.kind, contentType: item.media.contentType, size: item.media.bytes, r2Key: key, catalog: item });
+      return json({ ...asset, catalog: item, duration: item.duration, width: item.width, height: item.height, variantGroupId: `shared-catalog:${item.id}` });
+    } catch (cause) {
+      await env.BUCKET.delete(key);
+      throw cause;
+    }
+  }
   if (url.pathname === "/api/operations")
     return handleOperations(request, env, user);
   if (url.pathname === "/api/operations/services") {

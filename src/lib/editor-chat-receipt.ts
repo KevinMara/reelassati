@@ -31,6 +31,18 @@ export function editorChatReceipt(
         return action.insert
           ? ui("Updated the sound.")
           : ui("Saved to Library");
+      if (action.kind === "shared-media")
+        return action.insert
+          ? ui(
+              action.catalog.kind === "audio"
+                ? "Updated the sound."
+                : "Updated the visual treatment."
+            )
+          : ui("Saved to Library");
+      if (action.kind === "catalog-effect")
+        return action.insert
+          ? ui("Updated the visual treatment.")
+          : ui("Saved to Library");
       if (action.kind === "transcribe") return ui("I transcribed the footage.");
       if (action.kind === "analyze") return ui("I reviewed the footage.");
       if (action.kind === "seek") return ui("I moved the playhead.");

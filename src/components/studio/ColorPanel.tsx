@@ -3,6 +3,7 @@ import { RotateCcw, Sparkles } from "lucide-react";
 import type { TimelineClip } from "@contracts/workspace";
 import { useUiText } from "@/lib/i18n/ui";
 import { CLIP_LOOK_PRESETS } from "@contracts/editor-presets";
+import { ColorLutPicker } from "./ColorLutPicker";
 
 export const COLOR_FIELDS = [
   ["exposure", "Exposure", -2, 2, 0, 0.05],
@@ -76,7 +77,10 @@ export function ColorPanel({
             const reset = Object.fromEntries(
               COLOR_FIELDS.map(([key, , , , value]) => [key, value])
             ) as Partial<TimelineClip>;
+            reset.brightness = 0;
+            reset.colorLut = null;
             setDraft(reset);
+            onPreview?.(reset);
             void save(reset);
           }}
           className="rounded-lg p-2 text-muted-foreground hover:text-foreground"
@@ -109,6 +113,12 @@ export function ColorPanel({
           </button>
         ))}
       </div>
+      <ColorLutPicker
+        clip={clip}
+        disabled={blocked}
+        onChange={onChange}
+        onPreview={onPreview}
+      />
       {COLOR_FIELDS.map(([key, , min, max, fallback, step]) => (
         <label key={key} className="block space-y-2 text-xs">
           <span className="flex justify-between gap-2">

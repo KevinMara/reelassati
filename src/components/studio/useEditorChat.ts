@@ -1,3 +1,8 @@
+import {
+  resolveSharedCatalogAsset,
+  applySharedCatalogAction,
+} from "@/lib/shared-media-catalog";
+import { preflightEditColorLuts } from "@/lib/catalog-color-lut-preflight";
 import { mergeCreditReceipt } from "@contracts/credit-receipt";
 import { translateUi } from "@/lib/i18n/ui";
 import {
@@ -8,6 +13,10 @@ import {
   applyChatCatalogAudio,
   resolveChatCatalogAudio,
 } from "@/lib/editor-chat-catalog-audio";
+import {
+  applyChatCatalogEffect,
+  resolveChatCatalogEffect,
+} from "@/lib/editor-chat-catalog-effect";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { chooseChatActions } from "@/lib/editor-chat-safety";
 import { v4 as uuid } from "uuid";
@@ -29,6 +38,7 @@ import {
   type EditorChatRequest,
 } from "@contracts/editor-chat";
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
+import { editorialConversationText } from "@contracts/editorial-notes";
 import {
   normalizeReview,
   normalizeSourceObservations,
@@ -294,6 +304,10 @@ export function useEditorChat(
         "story-beats",
       ].includes(action.kind)
     ) {
+      if (action.kind === "edit") {
+        await preflightEditColorLuts([action.operation], signal);
+        signal.throwIfAborted();
+      }
       await finishAction(
         messageId,
         action,
@@ -502,6 +516,90 @@ export function useEditorChat(
         action.insert
           ? "Free sound saved to Library and placed on the timeline · 0 audio credits"
           : "Free sound saved to Library · 0 audio credits"
+      );
+      return;
+    }
+    if (action.kind === "shared-media") {
+      await progress(messageId, action.id, "Preparing the catalog media…");
+      const asset = await resolveSharedCatalogAsset(
+        action.catalogId,
+        getWorkspaceSnapshot().assets,
+        signal
+      );
+      signal.throwIfAborted();
+      await save(w => ({
+        ...w,
+        assets: [asset, ...w.assets.filter(item => item.id !== asset.id)],
+      }));
+      await changeAction(messageId, action.id, a => ({
+        ...a,
+        runtime: { ...a.runtime, assetId: asset.id },
+      }));
+      if (
+        action.insert &&
+        getMessage(messageId).plan?.projectUpdatedAt !== getProject().updatedAt
+      ) {
+        await changeAction(messageId, action.id, a => ({
+          ...a,
+          status: "blocked",
+          error:
+            "The timeline changed while the media loaded. The file is saved in Library.",
+        }));
+        return;
+      }
+      await finishAction(
+        messageId,
+        action,
+        action.insert
+          ? p => applySharedCatalogAction(p, asset, action)
+          : undefined,
+        action.insert
+          ? "Catalog media saved to Library and placed on the timeline · 0 media credits"
+          : "Catalog media saved to Library · 0 media credits"
+      );
+      return;
+    }
+    if (action.kind === "catalog-effect") {
+      await progress(messageId, action.id, "Preparing the catalog effect…");
+      const asset = await resolveChatCatalogEffect(
+        action.catalogId,
+        getWorkspaceSnapshot().assets,
+        file =>
+          platformApi.uploadAsset(file, "video", undefined, undefined, {
+            signal,
+          }),
+        signal
+      );
+      signal.throwIfAborted();
+      await save(w => ({
+        ...w,
+        assets: [asset, ...w.assets.filter(item => item.id !== asset.id)],
+      }));
+      await changeAction(messageId, action.id, a => ({
+        ...a,
+        runtime: { ...a.runtime, assetId: asset.id },
+      }));
+      if (
+        action.insert &&
+        getMessage(messageId).plan?.projectUpdatedAt !== getProject().updatedAt
+      ) {
+        await changeAction(messageId, action.id, a => ({
+          ...a,
+          status: "blocked",
+          error:
+            "The timeline changed while the effect loaded. The file is saved in Library.",
+        }));
+        return;
+      }
+      await finishAction(
+        messageId,
+        action,
+        action.insert
+          ? p => applyChatCatalogEffect(p, asset, action)
+          : undefined,
+        action.insert
+          ? "Effect saved to Library and placed on the timeline · 0 media credits"
+          : "Effect saved to Library · 0 media credits"
       );
       return;
     }
@@ -760,7 +858,10 @@ export function useEditorChat(
             "story-beats",
             "adjacent-transition",
           ].includes(action.kind) ||
-            (action.kind === "catalog-audio" && action.insert)) &&
+            ((action.kind === "catalog-audio" ||
+              action.kind === "catalog-effect" ||
+              action.kind === "shared-media") &&
+              action.insert)) &&
           m.plan?.projectUpdatedAt !== getProject().updatedAt
         ) {
           await changeAction(messageId, action.id, a => ({
@@ -950,7 +1051,7 @@ export function useEditorChat(
       const history = settings.messages
         .filter(m => m.text)
         .slice(-12)
-        .map(m => ({ role: m.role, text: m.text.slice(0, 2000) }));
+        .map(m => ({ role: m.role, text: editorialConversationText(m) }));
       const request = {
         ...options,
         requestId: id,
@@ -1041,7 +1142,9 @@ export function useEditorChat(
       action => action.id === actionId
     );
     if (
-      freeSound?.kind === "catalog-audio" &&
+      (freeSound?.kind === "catalog-audio" ||
+        freeSound?.kind === "catalog-effect" ||
+        freeSound?.kind === "shared-media") &&
       ["failed", "interrupted"].includes(freeSound.status)
     ) {
       activeProjects.add(runKey);
@@ -1259,45 +1362,70 @@ export function useEditorChat(
   }
   async function reviewSavedSuggestion(operationId: string, accept: boolean) {
     if (busy || activeProjects.has(runKey)) return;
-    await save(w => ({
-      ...w,
-      projects: w.projects.map(p => {
-        if (p.id !== project.id) return p;
-        const operation = p.proposedChanges.find(
-          item => item.id === operationId && item.status === "proposed"
-        );
-        if (!operation) return p;
-        if (!accept)
-          return {
-            ...p,
-            proposedChanges: p.proposedChanges.map(item =>
-              item.id === operationId
-                ? {
-                    ...item,
-                    status: "rejected" as const,
-                    reviewedAt: new Date().toISOString(),
-                  }
-                : item
-            ),
-          };
-        return applyChatAction(
-          p,
-          {
-            id: `saved-${operation.id}`,
-            kind: "edit",
-            operation,
-            label: operation.label,
-            reason: operation.reason,
-            requestExcerpt: "Apply saved suggestion",
-            scope: "requested",
-            credits: 0,
-            dependsOn: [],
-            status: "pending",
-          },
-          w.assets
-        );
-      }),
-    }));
+    const expected = getProject().proposedChanges.find(
+      item => item.id === operationId && item.status === "proposed"
+    );
+    if (!expected) return;
+    const controller = new AbortController();
+    const mounted = mountedScope.current;
+    activeProjects.add(runKey);
+    setBusy(true);
+    mediaController.current = controller;
+    try {
+      if (accept) await preflightEditColorLuts([expected], controller.signal);
+      controller.signal.throwIfAborted();
+      if (mounted !== mountedScope.current)
+        throw new DOMException("The editor changed.", "AbortError");
+      await save(w => ({
+        ...w,
+        projects: w.projects.map(p => {
+          if (p.id !== project.id) return p;
+          const operation = p.proposedChanges.find(
+            item => item.id === operationId && item.status === "proposed"
+          );
+          if (!operation) return p;
+          controller.signal.throwIfAborted();
+          if (JSON.stringify(operation) !== JSON.stringify(expected))
+            throw new Error(
+              "This saved suggestion changed. Review it again before applying it."
+            );
+          if (!accept)
+            return {
+              ...p,
+              proposedChanges: p.proposedChanges.map(item =>
+                item.id === operationId
+                  ? {
+                      ...item,
+                      status: "rejected" as const,
+                      reviewedAt: new Date().toISOString(),
+                    }
+                  : item
+              ),
+            };
+          return applyChatAction(
+            p,
+            {
+              id: `saved-${operation.id}`,
+              kind: "edit",
+              operation,
+              label: operation.label,
+              reason: operation.reason,
+              requestExcerpt: "Apply saved suggestion",
+              scope: "requested",
+              credits: 0,
+              dependsOn: [],
+              status: "pending",
+            },
+            w.assets
+          );
+        }),
+      }));
+    } finally {
+      activeProjects.delete(runKey);
+      if (mediaController.current === controller)
+        mediaController.current = null;
+      setBusy(false);
+    }
   }
 
   async function attachFiles(files: File[]): Promise<EditorChatReference[]> {

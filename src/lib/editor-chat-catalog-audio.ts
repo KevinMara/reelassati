@@ -56,6 +56,17 @@ export async function resolveChatCatalogAudio(
       throw new Error(
         "The free sound file is empty or exceeds its supported size."
       );
+    if (entry.license === "platform-licensed") {
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        await blob.arrayBuffer()
+      );
+      const actual = Array.from(new Uint8Array(digest), byte =>
+        byte.toString(16).padStart(2, "0")
+      ).join("");
+      if (actual !== entry.sha256)
+        throw new Error("The catalog sound did not match its verified file.");
+    }
     const extension = entry.file.split(".").pop() || "mp3";
     const type =
       extension === "wav"

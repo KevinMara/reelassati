@@ -1,6 +1,8 @@
 import { Magnet } from "lucide-react";
 import { useUiText } from "@/lib/i18n/ui";
 import { colorGradeMatrix, colorToneTable } from "@/lib/color-grade";
+import { normalizeClipColorLut } from "@contracts/color-lut";
+import { LutPreview } from "./LutPreview";
 import { visualFrame } from "@contracts/clip-visual";
 import { graphicSelectionBounds } from "@contracts/graphic-selection";
 import { CaptionLayer } from "./CaptionLayer";
@@ -8,6 +10,7 @@ import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useId,
   useRef,
   useState,
@@ -37,6 +40,13 @@ import {
   effectiveTimelineClips,
   timelineTrackGain,
 } from "@contracts/timeline-mixer";
+import {
+  createPreviewMediaTransport,
+  previewMediaAt,
+  previewMediaRuns,
+  previewSourceTime,
+  previewEvaluationTime,
+} from "@/lib/preview-media";
 
 let previewAudioContext: AudioContext | undefined;
 
@@ -45,15 +55,26 @@ function MediaLayer({
   asset,
   time,
   playing,
+  active,
+  seekVersion,
   trackGain = 1,
 }: {
   clip: TimelineClip;
   asset: Asset;
   time: number;
   playing: boolean;
+  active: boolean;
+  seekVersion: number;
   trackGain?: number;
 }) {
   const ref = useRef<HTMLMediaElement | null>(null);
+  const pictureRef = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
+  const [lutReady, setLutReady] = useState(false);
+  const colorLut = normalizeClipColorLut(clip.colorLut);
+  const previousSeek = useRef(seekVersion);
+  const transportRef = useRef<
+    ReturnType<typeof createPreviewMediaTransport> | undefined
+  >(undefined);
   const gainRef = useRef<
     | {
         source: MediaElementAudioSourceNode;
@@ -63,8 +84,9 @@ function MediaLayer({
     | undefined
   >(undefined);
   const gradeId = useId().replace(/:/g, "");
-  useEffect(() => {
+  useLayoutEffect(() => {
     const media = ref.current;
+    if (media) transportRef.current = createPreviewMediaTransport(media);
     const nodes = gainRef.current;
     if (nodes && previewAudioContext) {
       nodes.source.connect(nodes.gain);
@@ -72,22 +94,21 @@ function MediaLayer({
       nodes.pan.connect(previewAudioContext.destination);
     }
     return () => {
-      media?.pause();
+      transportRef.current?.dispose();
+      transportRef.current = undefined;
       gainRef.current?.source.disconnect();
       gainRef.current?.gain.disconnect();
       gainRef.current?.pan.disconnect();
     };
   }, []);
   const elapsed = time - clip.start;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const media = ref.current;
     if (!media) return;
+    const forceSeek = previousSeek.current !== seekVersion;
+    previousSeek.current = seekVersion;
     const sync = () => {
-      const sourceTime =
-        clip.inPoint + Math.max(0, time - clip.start) * (clip.speed ?? 1);
-      if (Math.abs(media.currentTime - sourceTime) > (playing ? 0.25 : 0.015))
-        media.currentTime = sourceTime;
-      media.playbackRate = clip.speed ?? 1;
+      const sourceTime = previewSourceTime(clip, time);
       const mix = audioMixAt(clip, time, trackGain);
       if (playing && !gainRef.current && typeof AudioContext !== "undefined") {
         try {
@@ -117,14 +138,18 @@ function MediaLayer({
             gain.linearRampToValueAtTime(point.gain, now + point.after);
         if (playing) void previewAudioContext?.resume().catch(() => undefined);
       } else media.volume = Math.min(1, mix.gain);
-      media.muted = !!clip.muted;
-      if (playing) void media.play().catch(() => undefined);
-      else media.pause();
+      media.muted = !active || !!clip.muted;
+      transportRef.current?.sync(
+        sourceTime,
+        clip.speed ?? 1,
+        playing,
+        forceSeek
+      );
     };
     sync();
     media.addEventListener("loadedmetadata", sync);
     return () => media.removeEventListener("loadedmetadata", sync);
-  }, [clip, time, playing, trackGain]);
+  }, [clip, time, playing, active, seekVersion, trackGain, asset.url]);
   const opacity = Math.min(
     1,
     clip.fadeIn ? elapsed / clip.fadeIn : 1,
@@ -158,7 +183,7 @@ function MediaLayer({
       className="absolute inset-0"
       style={{
         ...revealStyle,
-        visibility: clip.hidden ? "hidden" : undefined,
+        visibility: !active || clip.hidden ? "hidden" : undefined,
         mixBlendMode: frame.visual.blendMode,
       }}
     >
@@ -202,14 +227,29 @@ function MediaLayer({
       </defs>
     </svg>
   );
+  const lut =
+    colorLut && colorLut.amount > 0 ? (
+      <LutPreview
+        key={colorLut.sha256}
+        sourceRef={pictureRef}
+        reference={colorLut}
+        playing={playing}
+        active={active}
+        style={style}
+        onReady={setLutReady}
+      />
+    ) : null;
   if (asset.kind === "audio" || clip.track === "audio")
     return (
       <audio
+        data-preview-clip={clip.id}
+        data-preview-state={active ? "active" : "preload"}
         crossOrigin="anonymous"
         ref={el => {
           ref.current = el;
         }}
         src={asset.url}
+        muted={!active || !!clip.muted}
         preload="auto"
       />
     );
@@ -218,13 +258,25 @@ function MediaLayer({
       <>
         {grade}
         {wrap(
-          <img
-            data-preview-asset={asset.id}
-            src={asset.url}
-            alt={asset.name}
-            className="absolute inset-0 h-full w-full"
-            style={style}
-          />
+          <>
+            <img
+              data-preview-asset={asset.id}
+              data-preview-clip={clip.id}
+              data-preview-state={active ? "active" : "preload"}
+              src={asset.url}
+              crossOrigin={colorLut ? "anonymous" : undefined}
+              ref={element => {
+                pictureRef.current = element;
+              }}
+              alt={asset.name}
+              className="absolute inset-0 h-full w-full"
+              style={{
+                ...style,
+                visibility: lut && lutReady ? "hidden" : undefined,
+              }}
+            />
+            {lut}
+          </>
         )}
       </>
     );
@@ -232,21 +284,31 @@ function MediaLayer({
     <>
       {grade}
       {wrap(
-        <video
-          data-preview-asset={asset.id}
-          crossOrigin="anonymous"
-          ref={el => {
-            ref.current = el;
-          }}
-          src={asset.url}
-          playsInline
-          preload="auto"
-          aria-label={asset.name}
-          className="absolute inset-0 h-full w-full"
-          style={style}
-        >
-          <track kind="captions" />
-        </video>
+        <>
+          <video
+            data-preview-asset={asset.id}
+            data-preview-clip={clip.id}
+            data-preview-state={active ? "active" : "preload"}
+            crossOrigin="anonymous"
+            ref={el => {
+              ref.current = el;
+              pictureRef.current = el;
+            }}
+            src={asset.url}
+            muted={!active || !!clip.muted}
+            playsInline
+            preload="auto"
+            aria-label={asset.name}
+            className="absolute inset-0 h-full w-full"
+            style={{
+              ...style,
+              visibility: lut && lutReady ? "hidden" : undefined,
+            }}
+          >
+            <track kind="captions" />
+          </video>
+          {lut}
+        </>
       )}
     </>
   );
@@ -255,8 +317,9 @@ function MediaLayer({
 export function TimelinePreview({
   project,
   assets,
-  time,
+  time: requestedTime,
   playing,
+  seekVersion = 0,
   zoom = 1,
   pan = { x: 0, y: 0 },
   selectedClipId,
@@ -271,6 +334,7 @@ export function TimelinePreview({
   assets: Asset[];
   time: number;
   playing: boolean;
+  seekVersion?: number;
   zoom?: number;
   pan?: { x: number; y: number };
   selectedClipId?: string | null;
@@ -286,6 +350,11 @@ export function TimelinePreview({
     action: "fit" | "fill" | "flip" | "rotate" | "reset"
   ): Promise<void>;
 }) {
+  const time = previewEvaluationTime(
+    requestedTime,
+    project.duration,
+    project.frameRate
+  );
   const ui = useUiText();
   const canvasRef = useRef<HTMLDivElement>(null);
   const stopGesture = useRef<(() => void) | undefined>(undefined);
@@ -336,7 +405,15 @@ export function TimelinePreview({
     return () => observer.disconnect();
   }, [aspect]);
   useEffect(() => () => stopGesture.current?.(), []);
-  const active = effectiveTimelineClips(project)
+  const effectiveClips = useMemo(
+    () => effectiveTimelineClips(project),
+    [project]
+  );
+  const mediaRuns = useMemo(
+    () => previewMediaRuns(effectiveClips),
+    [effectiveClips]
+  );
+  const active = effectiveClips
     .filter(
       c =>
         c.start <= time &&
@@ -345,6 +422,21 @@ export function TimelinePreview({
         !(c.graphic && c.hidden)
     )
     .sort(compareTimelineLayers);
+  const order = new Map(effectiveClips.map((clip, index) => [clip.id, index]));
+  const previewLayers = [
+    ...previewMediaAt(mediaRuns, time),
+    ...active
+      .filter(clip => clip.graphic)
+      .map(clip => ({
+        key: clip.id,
+        clip,
+        active: true,
+      })),
+  ].sort(
+    (a, b) =>
+      compareTimelineLayers(a.clip, b.clip) ||
+      order.get(a.clip.id)! - order.get(b.clip.id)!
+  );
   const selectionHeight = 1000 / aspect;
   const ids = selectedClipIds ?? (selectedClipId ? [selectedClipId] : []);
   const visible = active.filter(c => c.track !== "audio" && !c.hidden);
@@ -566,7 +658,7 @@ export function TimelinePreview({
             touchAction: "none",
           }}
         >
-          {active.map(original => {
+          {previewLayers.map(({ key, clip: original, active: mediaActive }) => {
             const clip = displayed(original);
             if (clip.graphic)
               return (
@@ -575,11 +667,13 @@ export function TimelinePreview({
             const asset = assets.find(a => a.id === clip.assetId);
             return asset ? (
               <MediaLayer
-                key={clip.id}
+                key={`${project.id}:${key}:${asset.url}:${asset.kind}`}
                 clip={clip}
                 asset={asset}
-                time={time}
-                playing={playing}
+                time={mediaActive ? time : clip.start}
+                playing={playing && mediaActive}
+                active={mediaActive}
+                seekVersion={seekVersion}
                 trackGain={timelineTrackGain(project, clip)}
               />
             ) : null;

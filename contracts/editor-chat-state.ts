@@ -3,6 +3,10 @@ import {
   findCatalogAudio,
 } from "./editor-catalog-audio";
 import { visualTransitions } from "./clip-visual";
+import {
+  normalizeSharedCatalogItem,
+  sharedCatalogPlacement,
+} from "./shared-media-catalog";
 import { readCreditReceipt } from "./credit-receipt";
 import { exportFrameRates, type ExportFrameRate } from "./export-settings";
 import type {
@@ -14,6 +18,12 @@ import type {
   EditorChatReference,
 } from "./editor-chat";
 import type { EditOperation } from "./workspace";
+import { normalizeEditorialNotes } from "./editorial-notes";
+import { normalizeEditorialCoverage } from "./editorial-coverage";
+import {
+  findCatalogEffect,
+  catalogEffectPlacement,
+} from "./editor-effect-catalog";
 
 const operationTypes = new Set<EditOperation["type"]>([
   "trim",
@@ -220,6 +230,37 @@ function actionValue(
     } catch {
       return undefined;
     }
+  } else if (kind === "catalog-effect") {
+    try {
+      const entry = findCatalogEffect(value.catalogId);
+      value.catalogId = entry.id;
+      value.credits = 0;
+      if (original.insert !== undefined)
+        value.insert = catalogEffectPlacement(
+          entry,
+          original.insert,
+          86400,
+          selectedRange
+        );
+    } catch {
+      return undefined;
+    }
+  } else if (kind === "shared-media") {
+    try {
+      const item = normalizeSharedCatalogItem(value.catalog);
+      if (item.id !== value.catalogId || item.kind === "lut") return undefined;
+      value.catalog = item;
+      value.credits = 0;
+      if (original.insert !== undefined)
+        value.insert = sharedCatalogPlacement(
+          item,
+          original.insert,
+          86400,
+          selectedRange
+        );
+    } catch {
+      return undefined;
+    }
   } else if (kind === "generate") {
     if (
       !["image", "video", "speech", "music", "sfx"].includes(
@@ -413,6 +454,37 @@ export function normalizeEditorChatState(
         ? {
             activity: {
               kind: "auto-edit" as const,
+              ...(normalizeEditorialCoverage(
+                record(row.activity)?.editorialCoverage
+              )
+                ? {
+                    editorialCoverage: normalizeEditorialCoverage(
+                      record(row.activity)?.editorialCoverage
+                    ),
+                  }
+                : {}),
+              ...(Array.isArray(record(row.activity)?.editorialNotes)
+                ? {
+                    editorialNotes: normalizeEditorialNotes(
+                      record(row.activity)!.editorialNotes
+                    ),
+                  }
+                : {}),
+              ...(Array.isArray(record(row.activity)?.notices)
+                ? {
+                    notices: [
+                      ...new Set(
+                        (record(row.activity)!.notices as unknown[])
+                          .filter(
+                            (notice): notice is string =>
+                              typeof notice === "string"
+                          )
+                          .map(notice => notice.trim().slice(0, 1000))
+                          .filter(Boolean)
+                      ),
+                    ].slice(0, 8),
+                  }
+                : {}),
               ...(typeof record(row.activity)?.planSummary === "string"
                 ? {
                     planSummary: string(
@@ -500,6 +572,10 @@ export function normalizeEditorChatState(
         .filter(Boolean);
       plan.assistant = "Reel";
       plan.message = string(plan.message, 3000);
+      if (originalPlan.editorialNotes !== undefined)
+        plan.editorialNotes = normalizeEditorialNotes(
+          originalPlan.editorialNotes
+        );
       plan.blockedReasons = Array.isArray(plan.blockedReasons)
         ? plan.blockedReasons
             .filter(reason => typeof reason === "string")

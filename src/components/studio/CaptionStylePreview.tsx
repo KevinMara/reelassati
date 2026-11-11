@@ -1,6 +1,10 @@
 import { useUiText } from "@/lib/i18n/ui";
 import { useEffect, useState } from "react";
-import type { CaptionAppearance } from "@contracts/editor-presets";
+import {
+  captionLines,
+  getCaptionPreset,
+  type CaptionAppearance,
+} from "@contracts/editor-presets";
 import { CaptionLayer } from "./CaptionLayer";
 
 const SAMPLE = {
@@ -29,6 +33,18 @@ export function CaptionStylePreview({
   compact?: boolean;
 }) {
   const ui = useUiText();
+  const specimen = compact
+    ? { ...appearance, size: 8, maxCharacters: 24 }
+    : appearance;
+  const preset = getCaptionPreset(presetId, specimen);
+  const rows = captionLines(SAMPLE.text, preset).split("\n").length;
+  // Reserve the full phrase throughout the animation, so word entrances never
+  // make the controls below jump. Width-based units match the actual renderer.
+  const textHeight = rows * preset.size * 1.2 + preset.outline * 2;
+  const motionRoom =
+    preset.animation === "motion"
+      ? preset.size * (preset.motion?.amount ?? 0.6) * 2
+      : preset.size * 0.6;
   const [time, setTime] = useState(1.15);
   useEffect(() => {
     if (
@@ -47,17 +63,20 @@ export function CaptionStylePreview({
   }, [animate, presetId, appearance]);
   return (
     <div
-      className={`relative overflow-hidden rounded-lg bg-[#252A32] ${compact ? "aspect-[1.8]" : "aspect-video"}`}
+      className="relative overflow-hidden rounded-lg bg-[#252A32]"
       style={{ containerType: "inline-size" }}
       aria-label={ui("Caption style sample")}
     >
+      <div
+        aria-hidden="true"
+        style={{
+          height: `calc(${textHeight + motionRoom}cqw + ${compact ? 24 : 32}px)`,
+        }}
+      />
       <CaptionLayer
         presetId={presetId}
-        appearance={
-          compact
-            ? { ...appearance, size: 8, margin: 26, maxCharacters: 24 }
-            : appearance
-        }
+        appearance={specimen}
+        sample
         time={time}
         segments={[SAMPLE]}
       />

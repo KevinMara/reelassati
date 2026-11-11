@@ -18,6 +18,8 @@ import { stylesWorkspaceUi } from "./locales/ui-styles-workspace";
 import { editorReceiptUi } from "./locales/ui-editor-receipts";
 import { guidedTourUi } from "./locales/ui-guided-tour";
 import { librarySourceUi } from "./locales/ui-library-sources";
+import { sharedCatalogUi } from "./locales/ui-shared-catalog";
+import { catalogImportUi } from "./locales/ui-catalog-import";
 import type { InterfaceLanguage } from "@contracts/interface-language";
 
 type InterfaceCatalog = Record<string, string>;
@@ -146,6 +148,8 @@ export function loadUiLocale(
       ...editorReceiptUi[code],
       ...guidedTourUi[code],
       ...librarySourceUi[code],
+      ...catalogImportUi[code],
+      ...sharedCatalogUi[code],
       ...editorRedesignUi[code],
       ...editorInteractionUi[code],
       "Automatic research is disabled.": automaticResearchDisabled[code],

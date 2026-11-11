@@ -119,9 +119,11 @@ import {
   type TimelineLane,
 } from "@/lib/timeline-lanes";
 import { TimelinePreview } from "@/components/studio/TimelinePreview";
+import { createTimelinePlaybackClock } from "@/lib/timeline-playback-clock";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -394,6 +396,7 @@ export default function EditorPage() {
     );
   const [rawPlayhead, setPlayhead] = useState(requestedProject?.playhead ?? 0);
   const [playing, setPlaying] = useState(false);
+  const [previewSeekVersion, setPreviewSeekVersion] = useState(0);
   const [timelineZoom, setTimelineZoom] = useState(100);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [findingSections, setFindingSections] = useState(false);
@@ -419,6 +422,30 @@ export default function EditorPage() {
     () => workspace.projects.find(item => item.id === selectedProjectId),
     [selectedProjectId, workspace.projects]
   );
+  const [playbackClock] = useState(() =>
+    createTimelinePlaybackClock(rawPlayhead, project?.duration ?? 0, {
+      now: () => performance.now(),
+      requestFrame: callback => requestAnimationFrame(callback),
+      cancelFrame: id => cancelAnimationFrame(id),
+      onTime: setPlayhead,
+      onEnd: () => setPlaying(false),
+    })
+  );
+  const [playbackProjectId, setPlaybackProjectId] = useState(project?.id);
+  if (playbackProjectId !== project?.id) {
+    setPlaybackProjectId(project?.id);
+    setPlaying(false);
+    setPlayhead(project?.playhead ?? 0);
+  }
+  const clockProjectId = useRef(project?.id);
+  useLayoutEffect(() => {
+    playbackClock.setDuration(project?.duration ?? 0);
+    if (clockProjectId.current !== project?.id) {
+      playbackClock.stop();
+      playbackClock.seek(project?.playhead ?? 0);
+      clockProjectId.current = project?.id;
+    }
+  }, [playbackClock, project?.id, project?.duration, project?.playhead]);
   const sectionsOwner = workspace.profile.email.toLowerCase();
   const sectionsBrand = selectedBrand(sectionsOwner);
   const styleSave = useStyleSaveProgress(
@@ -506,12 +533,18 @@ export default function EditorPage() {
     (nextTime: number) => {
       const duration = project?.duration ?? 0;
       const boundedTime = clamp(nextTime, 0, duration);
+      playbackClock.seek(boundedTime);
+      setPreviewSeekVersion(version => version + 1);
       setPlayhead(boundedTime);
     },
-    [project?.duration]
+    [playbackClock, project?.duration]
   );
 
   const openProject = (item: EditProject) => {
+    playbackClock.stop();
+    playbackClock.setDuration(item.duration);
+    playbackClock.seek(item.playhead);
+    setPlaying(false);
     localSpeechController.current?.abort();
     transcriptBase.current = {
       projectId: item.id,
@@ -560,19 +593,10 @@ export default function EditorPage() {
   }, [recentlyAddedAssetId]);
 
   useEffect(() => {
-    if (!playing || !project) return;
-    const interval = window.setInterval(() => {
-      setPlayhead(current => {
-        const next = current + 0.1;
-        if (next >= project.duration) {
-          setPlaying(false);
-          return project.duration;
-        }
-        return next;
-      });
-    }, 100);
-    return () => window.clearInterval(interval);
-  }, [playing, previewAsset?.kind, project]);
+    if (!playing || !playbackProjectId) return;
+    playbackClock.start();
+    return () => playbackClock.stop();
+  }, [playing, playbackProjectId, playbackClock]);
 
   const toggleTimelinePlayback = async () => {
     if (playing) {
@@ -3263,6 +3287,7 @@ export default function EditorPage() {
                 assets={workspace.assets}
                 time={playhead}
                 playing={playing}
+                seekVersion={previewSeekVersion}
                 zoom={previewZoom / 100}
                 pan={previewPan}
                 selectedClipId={selectedClipId}

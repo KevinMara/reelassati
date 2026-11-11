@@ -1,13 +1,181 @@
 import { describe, expect, it } from "vitest";
 import {
+  autonomousReceiptReview,
   autonomousResultReceipt,
   persistedAutonomousReceipt,
 } from "./autonomous-result-receipt";
 import type { EditOperation, EditProject } from "@contracts/workspace";
 import type { EditorChatMessage } from "@contracts/editor-chat";
 import { normalizeEditorChatState } from "@contracts/editor-chat-state";
+import type { EditorialCoverageReview } from "@contracts/editorial-coverage";
+
+const unresolvedCoverage: EditorialCoverageReview = {
+  version: 1,
+  status: "partial",
+  scenes: [
+    {
+      sceneId: "scene:0",
+      start: 0,
+      end: 5,
+      purpose: "Explain the missing step",
+      decision: "improve",
+      reason: "The current source skips the demonstration.",
+      speechIds: ["speech:0"],
+      observationIndexes: [],
+      operationIds: ["grade"],
+      issues: ["cosmetic-only"],
+    },
+  ],
+};
 
 describe("auto-edit execution receipt", () => {
+  it("persists an omitted stock insert as partial without claiming the proposed shot was added", () => {
+    const receipt = autonomousResultReceipt(
+      "Added the exact result shot",
+      [{ type: "style" }],
+      { changes: [], omitted: [], warnings: [] },
+      text => text,
+      undefined,
+      { omitted: [{ operationId: "stock-shot", reason: "unverified-excerpt" }] }
+    );
+    expect(receipt.status).toBe("partial");
+    expect(receipt.summary).toBe(
+      "Partial edit saved. Updated the visual treatment."
+    );
+    expect(receipt.details).toEqual([
+      "Supporting shots left out: 1. Their source timing or availability could not be verified.",
+    ]);
+    expect(receipt.summary).not.toContain("Added");
+    const state = normalizeEditorChatState({
+      messages: [
+        {
+          id: "stock-result",
+          role: "assistant",
+          createdAt: "2026-11-11T16:00:00Z",
+          status: receipt.status,
+          text: receipt.summary,
+          activity: {
+            kind: "auto-edit",
+            steps: [],
+            appliedTypes: ["style"],
+            notices: receipt.details,
+          },
+        },
+      ],
+    })!;
+    const reopened = normalizeEditorChatState(
+      JSON.parse(JSON.stringify(state))
+    )!;
+    expect(reopened.messages[0].activity?.notices).toEqual(receipt.details);
+    expect(
+      persistedAutonomousReceipt(
+        reopened.messages[0],
+        { editorChat: reopened } as EditProject,
+        text => text
+      )
+    ).toBe(receipt.summary);
+  });
+  it("keeps an unresolved content objective partial even when every cosmetic operation executes", () => {
+    const receipt = autonomousResultReceipt(
+      "Complete professional edit",
+      [{ type: "style" }, { type: "sound" }],
+      { changes: [], omitted: [], warnings: [] },
+      text => text,
+      unresolvedCoverage
+    );
+    expect(receipt.status).toBe("partial");
+    expect(receipt.summary).toBe(
+      "Partial edit saved. Updated the visual treatment. Updated the sound."
+    );
+    expect(receipt.details).toContain("Content decisions need review: 1.");
+  });
+  it("does not demand effects when source-linked preservation accounts for the content", () => {
+    const preserved: EditorialCoverageReview = {
+      ...unresolvedCoverage,
+      status: "accounted",
+      scenes: [
+        {
+          ...unresolvedCoverage.scenes[0],
+          decision: "preserve",
+          issues: [],
+          operationIds: [],
+        },
+      ],
+    };
+    expect(
+      autonomousResultReceipt(
+        "Retain the demonstrated story",
+        [],
+        { changes: [], omitted: [], warnings: [] },
+        text => text,
+        preserved
+      ).status
+    ).toBe("completed");
+  });
+  it("retains server withdrawals in the final receipt after remaining operations succeed", () => {
+    const review = autonomousReceiptReview(
+      { changes: [], omitted: [], warnings: [] },
+      [
+        {
+          operationId: "withdrawn-before-execution",
+          label: "Unrequested missing-range note",
+          issues: [
+            { reason: "unsupported-source-copy", detail: "Untrusted text" },
+          ],
+        },
+      ]
+    );
+    const receipt = autonomousResultReceipt(
+      "Grade and source-led graphics",
+      [{ type: "style" }, { type: "sound" }],
+      review,
+      text => text
+    );
+    expect(receipt.status).toBe("partial");
+    expect(receipt.summary).toBe(
+      "Partial edit saved. Updated the visual treatment. Updated the sound."
+    );
+    expect(receipt.details).toEqual([
+      "Skipped overlays: 1. Overlay adds unsupported text.",
+    ]);
+    expect(JSON.stringify(receipt)).not.toContain("Untrusted text");
+  });
+  it("merges server and execution checks without counting the same omission twice", () => {
+    const local = {
+      changes: [],
+      warnings: [],
+      omitted: [
+        {
+          operationId: "card",
+          label: "Card",
+          issues: [
+            { reason: "source-overlap" as const, detail: "Overlap" },
+            { reason: "unsupported-source-copy" as const, detail: "Copy" },
+          ],
+        },
+      ],
+      omittedSounds: [
+        { operationId: "sound", label: "Cue", reason: "Unavailable" },
+      ],
+    };
+    const review = autonomousReceiptReview(local, [
+      {
+        operationId: "card",
+        label: "Card",
+        issues: [{ reason: "unsupported-source-copy", detail: "Source copy" }],
+      },
+    ]);
+    expect(review.omitted).toHaveLength(1);
+    expect(review.omitted[0].issues).toHaveLength(2);
+    expect(review.omittedSounds).toEqual(local.omittedSounds);
+    expect(local.omitted[0].issues).toHaveLength(2);
+    expect(
+      autonomousResultReceipt("", [], review, text => text).details
+    ).toEqual([
+      "Skipped sound cues: 1.",
+      "Skipped overlays: 1. Overlay adds unsupported text. Overlay would cover source content.",
+    ]);
+  });
   it("reports unavailable sound omissions without claiming they were applied", () => {
     const receipt = autonomousResultReceipt(
       "Added three sound cues",
@@ -158,6 +326,38 @@ describe("auto-edit execution receipt", () => {
 });
 
 describe("display-only receipts for saved auto-edit messages", () => {
+  it("preserves content limitations on reopening even if an old completion flag is inconsistent", () => {
+    const state = normalizeEditorChatState({
+      messages: [
+        {
+          id: "coverage",
+          role: "assistant",
+          createdAt: "2026-11-11T16:00:00Z",
+          status: "completed",
+          text: "Complete edit",
+          activity: {
+            kind: "auto-edit",
+            steps: [],
+            appliedTypes: ["style"],
+            editorialCoverage: unresolvedCoverage,
+          },
+        },
+      ],
+    })!;
+    expect(state.messages[0].activity?.editorialCoverage).toEqual(
+      unresolvedCoverage
+    );
+    expect(
+      persistedAutonomousReceipt(
+        state.messages[0],
+        { editorChat: state } as EditProject,
+        text => text
+      )
+    ).toBe("Partial edit saved. Updated the visual treatment.");
+    expect(normalizeEditorChatState(JSON.parse(JSON.stringify(state)))).toEqual(
+      state
+    );
+  });
   it("persists partial completion and keeps the omission visible after reopening", () => {
     const state = normalizeEditorChatState({
       mode: "ask",

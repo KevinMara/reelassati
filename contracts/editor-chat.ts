@@ -108,6 +108,17 @@ export type EditorChatAction = EditorChatActionBase &
         catalogId: string;
         insert?: { start: number; duration: number };
       }
+    | {
+        kind: "catalog-effect";
+        catalogId: string;
+        insert?: { start: number; duration: number };
+      }
+    | {
+        kind: "shared-media";
+        catalogId: string;
+        catalog: import("./shared-media-catalog").SharedMediaCatalogItem;
+        insert?: { start: number; duration: number };
+      }
     | { kind: "insert"; assetId: string; start: number; duration?: number }
     | {
         kind: "settings";
@@ -128,6 +139,8 @@ export interface EditorChatResponse {
   requestId: string;
   projectId: string;
   message: string;
+  /** Editorial rationale/questions, not execution receipts or video copy. */
+  editorialNotes?: import("./editorial-notes").EditorialNote[];
   planCredits: number;
   totalCredits: number;
   maxCredits: number;
@@ -170,6 +183,10 @@ export interface EditorChatMessage {
     appliedTypes?: EditOperation["type"][];
     /** Original planning rationale, shown only in expandable details. */
     planSummary?: string;
+    /** Deterministic execution omissions/limitations, visible beside the receipt. */
+    notices?: string[];
+    editorialNotes?: import("./editorial-notes").EditorialNote[];
+    editorialCoverage?: import("./editorial-coverage").EditorialCoverageReview;
   };
   range?: { start: number; end: number };
   ranges?: { start: number; end: number }[];

@@ -1,5 +1,7 @@
 import { zenAudioCatalog } from "./editor-audio-zen";
-/** Bundled CC0 audio. Sources, changes and checksums are included with every file. */
+import { licensedAudioCatalog } from "./editor-audio-licensed";
+/** Real, zero-credit audio. Public-domain attribution stays public; purchased
+ * source provenance remains in the private ingestion records. */
 export interface EditorAudioCatalogEntry {
   id: string;
   name: string;
@@ -7,12 +9,12 @@ export interface EditorAudioCatalogEntry {
   type: "sfx" | "music";
   file: string;
   duration: number;
-  author: string;
-  source: string;
+  author?: string;
+  source?: string;
   tags: readonly string[];
-  originalFile: string;
-  license: "CC0-1.0";
-  licenseUrl: string;
+  originalFile?: string;
+  license: "CC0-1.0" | "platform-licensed";
+  licenseUrl?: string;
   creditCost: 0;
   sha256: string;
   originalSha256: string;
@@ -22,6 +24,7 @@ export interface EditorAudioCatalogEntry {
 
 export const editorAudioCatalog: readonly EditorAudioCatalogEntry[] = [
   ...zenAudioCatalog,
+  ...licensedAudioCatalog,
   {
     id: "swish-01",
     name: "Swish 01",

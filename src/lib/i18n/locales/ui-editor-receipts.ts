@@ -1,3 +1,6 @@
+import { editorCoverageUi } from "./ui-editor-coverage";
+import { editorialStockUi } from "./ui-editorial-stock";
+
 const usedCredits: Record<string, string> = {
   en: "Credits used",
   it: "Crediti utilizzati",
@@ -790,11 +793,45 @@ const skippedSounds: Record<string, string> = {
   th: "เอฟเฟกต์เสียงที่ข้าม: {count}",
 };
 
+const editorialNotesLabel: Record<string, string> = {
+  en: "Editorial notes",
+  it: "Note di montaggio",
+  es: "Notas de edición",
+  fr: "Notes de montage",
+  de: "Schnittnotizen",
+  pt: "Notas de edição",
+  nl: "Montagenotities",
+  pl: "Uwagi do montażu",
+  ro: "Note de montaj",
+  tr: "Kurgu notları",
+  uk: "Примітки до монтажу",
+  ru: "Заметки по монтажу",
+  ar: "ملاحظات المونتاج",
+  hi: "संपादन संबंधी नोट्स",
+  ja: "編集メモ",
+  ko: "편집 메모",
+  zh: "剪辑说明",
+  vi: "Ghi chú biên tập",
+  da: "Redigeringsnoter",
+  sv: "Redigeringsanteckningar",
+  no: "Redigeringsnotater",
+  fi: "Leikkausmuistiinpanot",
+  cs: "Poznámky ke střihu",
+  hu: "Vágási megjegyzések",
+  el: "Σημειώσεις μοντάζ",
+  he: "הערות עריכה",
+  id: "Catatan penyuntingan",
+  th: "หมายเหตุการตัดต่อ",
+};
+
 export const editorReceiptUi = Object.fromEntries(
   Object.entries(usedCredits).map(([language, translation]) => [
     language,
     {
+      ...editorCoverageUi[language],
+      ...editorialStockUi[language],
       "Credits used": translation,
+      "Editorial notes": editorialNotesLabel[language],
       "Skipped sound cues: {count}.": skippedSounds[language],
       "Show details": detailCopy[language][0],
       "Show less": detailCopy[language][1],

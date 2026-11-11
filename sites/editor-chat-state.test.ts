@@ -38,6 +38,68 @@ const message = {
 };
 
 describe("saved editing chat continuity", () => {
+  it("round-trips chat-only editorial notes for both direct and automatic edits", () => {
+    const note = {
+      kind: "limitation",
+      text: "The label is part of the imported source.",
+    };
+    const state = normalizeEditorChatState({
+      messages: [
+        { ...message, plan: { ...message.plan, editorialNotes: [note] } },
+        {
+          ...message,
+          id: "auto-notes",
+          activity: {
+            kind: "auto-edit",
+            steps: [],
+            editorialNotes: [
+              note,
+              { kind: "question", text: "Do you have the clean source?" },
+            ],
+          },
+        },
+      ],
+    })!;
+    expect(state.messages[0].plan?.editorialNotes).toEqual([note]);
+    expect(state.messages[0].plan?.actions).toHaveLength(1);
+    expect(state.messages[1].activity?.editorialNotes).toHaveLength(2);
+    expect(state.messages[1].activity?.steps).toEqual([]);
+    expect(normalizeEditorChatState(JSON.parse(JSON.stringify(state)))).toEqual(
+      state
+    );
+  });
+  it("preserves bounded execution notices separately from successful steps", () => {
+    const state = normalizeEditorChatState({
+      messages: [
+        {
+          ...message,
+          status: "partial",
+          activity: {
+            kind: "auto-edit",
+            steps: ["Grade applied"],
+            notices: [
+              null,
+              "",
+              " Skipped overlays: 2. ",
+              "Skipped overlays: 2.",
+              "x".repeat(1200),
+            ],
+          },
+        },
+      ],
+    })!;
+    expect(state.messages[0].activity?.notices).toEqual([
+      "Skipped overlays: 2.",
+      "x".repeat(1000),
+    ]);
+    expect(state.messages[0].activity?.steps).toEqual(["Grade applied"]);
+    expect(normalizeEditorChatState(JSON.parse(JSON.stringify(state)))).toEqual(
+      state
+    );
+    expect(
+      normalizeEditorChatState({ messages: [message] })!.messages[0].activity
+    ).toBeUndefined();
+  });
   it("round-trips the user's automatic-edit settings alongside the reply", () => {
     const input = {
       id: "auto-input",

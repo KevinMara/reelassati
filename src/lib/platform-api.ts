@@ -478,6 +478,19 @@ function supportRequestJson<T>(
 }
 
 export const platformApi = {
+  catalogImportStatus: (ids: string[], options?: UploadRequestOptions) =>
+    requestJson<import("./shared-catalog-import").CatalogAdminStatus>(
+      `/api/catalog/admin/status?ids=${encodeURIComponent(ids.join(","))}`,
+      { signal: options?.signal }, false, options?.scope
+    ),
+  catalogImportManifest: (manifest: import("@contracts/shared-media-catalog").SharedMediaCatalogManifest, options?: UploadRequestOptions) =>
+    requestJson<{ accepted: number }>("/api/catalog/admin/manifest", {
+      method: "POST", body: JSON.stringify(manifest), signal: options?.signal,
+    }, false, options?.scope),
+  catalogImportObject: (id: string, role: "media" | "poster", file: File, contentType: string, options?: UploadRequestOptions) =>
+    requestJson<{ id: string; role: "media" | "poster"; verified: true }>(`/api/catalog/admin/object/${encodeURIComponent(id)}/${role}`, {
+      method: "PUT", headers: { "Content-Type": contentType }, body: file, signal: options?.signal,
+    }, false, options?.scope),
   serviceDiagnostics: (options?: UploadRequestOptions) =>
     requestJson<import("@contracts/service-diagnostics").ServiceDiagnostics>(
       "/api/operations/services",
@@ -697,6 +710,10 @@ export const platformApi = {
       body: JSON.stringify({}),
     }),
 
+  searchSharedCatalog: (query: URLSearchParams, signal?: AbortSignal) =>
+    requestJson<import("@contracts/shared-media-catalog").SharedMediaCatalogPage>(`/api/catalog/search?${query}`, { signal }),
+  importSharedCatalog: (id: string, options?: { signal?: AbortSignal; scope?: UploadRequestScope }) =>
+    requestJson<Asset>("/api/catalog/import", { method: "POST", body: JSON.stringify({ id }), signal: options?.signal }, false, options?.scope),
   searchStock: (
     kind: import("@contracts/stock-media").StockKind,
     query: string,
@@ -1069,6 +1086,7 @@ export const platformApi = {
       effort?: import("@contracts/edit-model").EditEffort;
       stock?: boolean;
       captionStyling?: boolean;
+      contentReview?: boolean;
       graphicRequest?: string;
     },
     options?: UploadRequestOptions
@@ -1117,8 +1135,12 @@ export const platformApi = {
       return await requestJson<{
         changes: EditOperation[];
         stockMedia?: import("@contracts/stock-media").StockMedia[];
+        sharedCatalog?: import("@contracts/shared-media-catalog").SharedMediaCatalogItem[];
         captionTreatment?: import("@contracts/editorial-captions").AutonomousCaptionTreatment;
         qualityReview?: import("@contracts/edit-plan-quality").EditPlanQualityReview;
+        editorialNotes?: import("@contracts/editorial-notes").EditorialNote[];
+        editorialCoverage?: import("@contracts/editorial-coverage").EditorialCoverageReview;
+        stockReview?: import("@contracts/editorial-stock").EditorialStockReview;
         summary: string;
         provenance: ContentProvenance;
       }>(

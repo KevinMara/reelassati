@@ -6,6 +6,7 @@ import { platformApi } from "@/lib/platform-api";
 import { useWorkspace } from "@/providers/workspace";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { LibraryAssetCard } from "./LibraryAssetCard";
+import { resolveChatCatalogAudio } from "@/lib/editor-chat-catalog-audio";
 
 export function EditorSoundLibrary() {
   const ui = useUiText();
@@ -63,20 +64,10 @@ export function EditorSoundLibrary() {
     setSaving(entry.id);
     setMessage("");
     try {
-      const response = await fetch(editorAudioUrl(entry));
-      if (!response.ok)
-        throw new Error(ui("The sound file could not be downloaded."));
-      const blob = await response.blob();
-      const extension = entry.file.split(".").pop() || "mp3";
-      const type =
-        extension === "wav"
-          ? "audio/wav"
-          : extension === "ogg"
-            ? "audio/ogg"
-            : "audio/mpeg";
-      const asset = await platformApi.uploadAsset(
-        new File([blob], `${entry.name}.${extension}`, { type }),
-        "audio"
+      const asset = await resolveChatCatalogAudio(
+        entry.id,
+        workspace.assets,
+        file => platformApi.uploadAsset(file, "audio")
       );
       await updateWorkspace(w => ({
         ...w,
@@ -155,7 +146,12 @@ export function EditorSoundLibrary() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      aria-label={ui(playing === entry.id ? "Pause {{name}}" : "Preview {{name}}", { name: entry.name })}
+                      aria-label={ui(
+                        playing === entry.id
+                          ? "Pause {{name}}"
+                          : "Preview {{name}}",
+                        { name: entry.name }
+                      )}
                       onClick={() => preview(entry)}
                       className="rounded-full border border-primary/25 p-2 text-primary"
                     >
@@ -182,7 +178,9 @@ export function EditorSoundLibrary() {
                       onClick={() => void save(entry)}
                       aria-label={
                         saved
-                          ? ui("{{name}} saved to Library", { name: entry.name })
+                          ? ui("{{name}} saved to Library", {
+                              name: entry.name,
+                            })
                           : ui("Save {{name}} to Library", { name: entry.name })
                       }
                       title={
@@ -199,22 +197,24 @@ export function EditorSoundLibrary() {
                       )}
                     </button>
                   </div>
-                  <details className="mt-1 text-[10px] text-foreground/40">
-                    <summary className="cursor-pointer">
-                      {ui("Source & license")}
-                    </summary>
-                    <p className="mt-1">
-                      {entry.author} · {entry.license} ·{" "}
-                      <a
-                        href={entry.source}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline"
-                      >
-                        {ui("Source")}
-                      </a>
-                    </p>
-                  </details>
+                  {entry.license === "CC0-1.0" && (
+                    <details className="mt-1 text-[10px] text-foreground/40">
+                      <summary className="cursor-pointer">
+                        {ui("Source & license")}
+                      </summary>
+                      <p className="mt-1">
+                        {entry.author} · {entry.license} ·{" "}
+                        <a
+                          href={entry.source}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline"
+                        >
+                          {ui("Source")}
+                        </a>
+                      </p>
+                    </details>
+                  )}
                 </article>
               );
             })}

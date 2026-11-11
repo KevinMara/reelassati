@@ -1,3 +1,4 @@
+import { SharedCatalogLibrary } from "./SharedCatalogLibrary";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, Loader2, Search } from "lucide-react";
@@ -15,6 +16,7 @@ import {
 import { useUiText } from "@/lib/i18n/ui";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { EditorSoundLibrary } from "./EditorSoundLibrary";
+import { EditorEffectLibrary } from "./EditorEffectLibrary";
 
 export function StockLibrary() {
   const ui = useUiText();
@@ -303,7 +305,9 @@ export function StockLibrary() {
           {ui("Not endorsed or certified by Openverse.")}
         </p>
       )}
+      <SharedCatalogLibrary kind={kind} />
       {kind === "audio" && <EditorSoundLibrary />}
+      {kind === "video" && <EditorEffectLibrary />}
     </section>
   );
 }

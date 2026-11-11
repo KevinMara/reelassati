@@ -1,5 +1,10 @@
 import { isPrimaryFootage } from "@contracts/timeline-layers";
+import { sharedCatalogClipDefaults } from "@contracts/shared-media-catalog";
 import { assertSupportingMedia } from "@contracts/supporting-media";
+import {
+  catalogEffectForAsset,
+  catalogEffectClipDefaults,
+} from "@contracts/editor-effect-catalog";
 import { speechAutoZoom, cutSelectedOnBeats } from "./rhythm-editing";
 import { clipLaneKind } from "@contracts/timeline-layers";
 import { expandLinkedSelection } from "@contracts/clip-groups";
@@ -117,7 +122,10 @@ export function insertChatAsset(
       project.clips,
       audio ? "audio" : "video",
       start,
-      duration
+      duration,
+      catalogEffectForAsset(asset) || (asset.catalog && asset.kind !== "audio")
+        ? 2
+        : 1
     ),
     start,
     duration,
@@ -126,6 +134,8 @@ export function insertChatAsset(
     locked: false,
     color: audio ? "#157D98" : asset.kind === "image" ? "#A35A35" : "#6553BE",
     fit: "contain",
+    ...catalogEffectClipDefaults(asset),
+    ...sharedCatalogClipDefaults(asset),
   };
   const clips = [...project.clips, clip];
   return {

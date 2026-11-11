@@ -220,12 +220,26 @@ describe("durable chat follow-up recovery", () => {
       { ...base, id: "old", kind: "seek", time: 2 },
       { ...followup, runtime: { request: child } },
     ]);
+    message.plan!.editorialNotes = [
+      { kind: "question", text: "Stale question before source review?" },
+    ];
     const output = {
       ...response([{ ...base, id: "new", kind: "seek" as const, time: 4 }]),
       requestId: child.requestId,
       projectUpdatedAt: "2026-09-19T10:05:00.000Z",
     };
     const merged = mergeChatReplan(message, "replan", output);
+    expect(merged.plan!.editorialNotes).toBeUndefined();
+    expect(
+      mergeChatReplan(message, "replan", {
+        ...output,
+        editorialNotes: [
+          { kind: "decision", text: "Use the newly measured phrase timing." },
+        ],
+      }).plan!.editorialNotes
+    ).toEqual([
+      { kind: "decision", text: "Use the newly measured phrase timing." },
+    ]);
     expect(
       merged.plan!.actions.map(action => [action.id, action.status])
     ).toEqual([

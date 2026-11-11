@@ -1,6 +1,11 @@
 import type { Asset, EditProject, TimelineClip } from "@contracts/workspace";
+import { sharedCatalogClipDefaults } from "@contracts/shared-media-catalog";
 import { allocateTimelineLane, type TimelineLane } from "./timeline-lanes";
 import { contentDuration } from "./edit-timeline";
+import {
+  catalogEffectForAsset,
+  catalogEffectClipDefaults,
+} from "@contracts/editor-effect-catalog";
 
 /** Both direct insertion and drag/drop use the same measured source bounds. */
 export function placeLibraryAsset(
@@ -20,6 +25,8 @@ export function placeLibraryAsset(
   if (!Number.isFinite(at) || at < 0)
     throw new Error("Choose a valid timeline position.");
   const track = asset.kind === "audio" ? "audio" : "video";
+  const effect =
+    catalogEffectForAsset(asset) || (asset.catalog && asset.kind !== "audio");
   if (destination && destination.kind !== track)
     throw new Error("Choose a matching media track.");
   return {
@@ -31,7 +38,7 @@ export function placeLibraryAsset(
       track,
       at,
       duration,
-      destination?.number ?? 1
+      destination?.number ?? (effect ? 2 : 1)
     ),
     label: asset.name,
     start: at,
@@ -43,5 +50,7 @@ export function placeLibraryAsset(
     speed: 1,
     volume: 1,
     color: track === "audio" ? "#B45F7A" : "#6F5AD8",
+    ...catalogEffectClipDefaults(asset),
+    ...sharedCatalogClipDefaults(asset),
   };
 }

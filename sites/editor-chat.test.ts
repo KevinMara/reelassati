@@ -111,6 +111,35 @@ const operation = (patch: Partial<EditOperation> = {}): EditOperation => ({
 });
 
 describe("Reel authorization and actual cost planning", () => {
+  it("keeps editorial reasoning and a useful question separate from executable actions", () => {
+    const notes = [
+      { kind: "decision", text: "Keep the demonstrated sequence intact." },
+      {
+        kind: "question",
+        text: "Do you have a version without the burned-in title?",
+        operation: operation({ type: "graphic" }),
+      },
+    ];
+    const plan = normalizeEditorChatPlan(
+      {
+        message: "I can balance the sound.",
+        editorialNotes: notes,
+        actions: [{ ...base, kind: "edit", operation: operation() }],
+      },
+      context()
+    );
+    expect(plan.editorialNotes).toEqual([
+      { kind: "decision", text: "Keep the demonstrated sequence intact." },
+      {
+        kind: "question",
+        text: "Do you have a version without the burned-in title?",
+      },
+    ]);
+    expect(plan.actions).toHaveLength(1);
+    expect(plan.actions[0].kind).toBe("edit");
+    expect(plan.totalCredits).toBe(5);
+    expect(plan.blockedReasons).toEqual([]);
+  });
   it("resolves the selected style example instead of the base layer with the same index", () => {
     const baseline = captureEditBlueprint(project);
     baseline.clips[0].brightness = -0.2;

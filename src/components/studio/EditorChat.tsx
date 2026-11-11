@@ -1,6 +1,8 @@
 import { composerToken, rankComposerCommands } from "@/lib/composer-commands";
 import { creditReceiptTotal } from "@contracts/credit-receipt";
 import { ConciseResponse } from "./ConciseResponse";
+import { EditorialNotes } from "./EditorialNotes";
+import { EditorialCoverage } from "./EditorialCoverage";
 import { editorFailureMessage } from "@contracts/editor-errors";
 import { editorChatReceipt } from "@/lib/editor-chat-receipt";
 import { persistedAutonomousReceipt } from "@/lib/autonomous-result-receipt";
@@ -899,6 +901,29 @@ export function EditorChat({
                           {ui("Reading your request and project…")}
                         </div>
                       )}
+                      {!!message.activity?.notices?.length && (
+                        <div className="mt-3 space-y-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-relaxed text-foreground/70">
+                          {message.activity.notices.map(notice => (
+                            <p
+                              key={notice}
+                              className="whitespace-pre-wrap break-words"
+                            >
+                              {notice}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      <EditorialNotes
+                        label={ui("Editorial notes")}
+                        notes={
+                          message.activity?.editorialNotes ??
+                          message.plan?.editorialNotes
+                        }
+                      />
+                      <EditorialCoverage
+                        review={message.activity?.editorialCoverage}
+                        ui={ui}
+                      />
                       {!!message.plan?.actions.length && (
                         <div className="mt-3 space-y-2">
                           {message.plan.actions.filter(canChooseChatAction)
@@ -1818,6 +1843,7 @@ function ActionCard({
   const recoverable =
     ["interrupted", "failed"].includes(action.status) &&
     (action.kind === "catalog-audio" ||
+      action.kind === "catalog-effect" || action.kind === "shared-media" ||
       (action.kind === "generate" &&
         !!(action.runtime?.generationId || action.runtime?.jobId)) ||
       (action.kind === "replan" && !!action.runtime?.request) ||
@@ -1943,20 +1969,22 @@ function ActionCard({
           onClick={onRecover}
           className="mt-2 rounded-lg border border-border px-2.5 py-1.5 text-xs text-primary disabled:opacity-40"
         >
-          {action.kind === "catalog-audio"
-            ? ui("Retry free sound")
-            : ui("Check {{type}}", {
-                type:
-                  action.kind === "generate"
-                    ? action.media === "speech"
-                      ? ui("voiceover")
-                      : action.media === "sfx"
-                        ? ui("sound effect")
-                        : ui(action.media)
-                    : action.kind === "transcribe"
-                      ? ui("saved captions")
-                      : ui("saved plan"),
-              })}
+          {action.kind === "catalog-effect" || action.kind === "shared-media"
+            ? ui("Try again")
+            : action.kind === "catalog-audio"
+              ? ui("Retry free sound")
+              : ui("Check {{type}}", {
+                  type:
+                    action.kind === "generate"
+                      ? action.media === "speech"
+                        ? ui("voiceover")
+                        : action.media === "sfx"
+                          ? ui("sound effect")
+                          : ui(action.media)
+                      : action.kind === "transcribe"
+                        ? ui("saved captions")
+                        : ui("saved plan"),
+                })}
         </button>
       )}
       {action.status === "interrupted" && (

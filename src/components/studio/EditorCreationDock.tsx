@@ -1,3 +1,4 @@
+import { SharedCatalogLibrary } from "./SharedCatalogLibrary";
 import { useUiText } from "@/lib/i18n/ui";
 import {
   lazy,
@@ -44,6 +45,7 @@ import { EditorGenerationTray } from "./EditorGenerationTray";
 import { useEditorGenerations } from "./useEditorGenerations";
 import { VoiceSelector } from "./VoiceSelector";
 import { EditorSoundLibrary } from "./EditorSoundLibrary";
+import { EditorEffectLibrary } from "./EditorEffectLibrary";
 import { EditorPresetLibrary } from "./EditorPresetLibrary";
 import { PersonCutoutPanel } from "./PersonCutoutPanel";
 import { ImageDepthPanel } from "./ImageDepthPanel";
@@ -434,16 +436,25 @@ export function EditorCreationDock({
               />
             )}
             {graphicMode === "presets" && (
-              <EditorPresetLibrary
-                mode="graphics"
-                onGraphicPreset={preset => {
-                  setGraphicPreset(current => ({
-                    preset,
-                    revision: (current?.revision ?? 0) + 1,
-                  }));
-                  setGraphicMode("custom");
-                }}
-              />
+              <>
+                <EditorPresetLibrary
+                  mode="graphics"
+                  onGraphicPreset={preset => {
+                    setGraphicPreset(current => ({
+                      preset,
+                      revision: (current?.revision ?? 0) + 1,
+                    }));
+                    setGraphicMode("custom");
+                  }}
+                />
+                <SharedCatalogLibrary
+                  kind="visual"
+                  onInsert={asset => onInsert(asset, "playhead")}
+                />
+                <EditorEffectLibrary
+                  onInsert={asset => onInsert(asset, "playhead")}
+                />
+              </>
             )}
             {graphicMode === "model" && (
               <Suspense
@@ -509,6 +520,10 @@ export function EditorCreationDock({
                   })
                 )
               }
+            />
+            <SharedCatalogLibrary
+              kind="audio"
+              onInsert={asset => onInsert(asset, "playhead")}
             />
             <EditorSoundLibrary />
           </>

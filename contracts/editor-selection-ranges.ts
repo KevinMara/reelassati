@@ -47,7 +47,10 @@ export function assertActionWithinRanges(
       action.start + (action.duration ?? project.duration)
     );
   else if (
-    (action.kind === "generate" || action.kind === "catalog-audio") &&
+    (action.kind === "generate" ||
+      action.kind === "catalog-audio" ||
+      action.kind === "catalog-effect" ||
+      action.kind === "shared-media") &&
     action.insert
   )
     requireRange(

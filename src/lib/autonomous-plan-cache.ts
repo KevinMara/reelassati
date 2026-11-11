@@ -10,8 +10,12 @@ import type {
 export interface AutonomousPlanResult {
   changes: EditOperation[];
   stockMedia?: StockMedia[];
+  sharedCatalog?: import("@contracts/shared-media-catalog").SharedMediaCatalogItem[];
   captionTreatment?: AutonomousCaptionTreatment;
   qualityReview?: import("@contracts/edit-plan-quality").EditPlanQualityReview;
+  editorialNotes?: import("@contracts/editorial-notes").EditorialNote[];
+  editorialCoverage?: import("@contracts/editorial-coverage").EditorialCoverageReview;
+  stockReview?: import("@contracts/editorial-stock").EditorialStockReview;
   summary: string;
   provenance: ContentProvenance;
 }
@@ -33,7 +37,7 @@ export interface AutonomousPlanCacheInput {
 export function autonomousPlanCacheKey(input: AutonomousPlanCacheInput) {
   return JSON.stringify({
     ...input,
-    planningContract: "graphic-preflight-v1",
+    planningContract: "scene-stock-lut-v2",
     project: {
       ...input.project,
       playhead: undefined,

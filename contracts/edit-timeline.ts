@@ -7,6 +7,7 @@ import {
 import { normalizeGraphic } from "./motion-graphics";
 import { patchVisual, visualClock } from "./clip-visual";
 import { assertNoShotTransition } from "./adjacent-transition";
+import { normalizeClipColorLut } from "./color-lut";
 import {
   assertLinkedEditTargets,
   normalizeClipGroups,
@@ -228,12 +229,27 @@ export function applyEditOperation(
   op: EditOperation
 ): EditProject {
   const p = op.parameters ?? {};
+  const changesLook = op.type === "style" && p.colorLut !== undefined;
+  const colorLut =
+    p.colorLut === null ? null : normalizeClipColorLut(p.colorLut);
+  if (
+    changesLook &&
+    (colorLut === undefined ||
+      (p.colorLut !== null &&
+        (p.colorLut!.amount < 0 || p.colorLut!.amount > 1)))
+  )
+    throw new Error("Choose a valid catalog color look and strength.");
   if (op.type === "audio" && p.assetId != null)
     throw new Error(
       "An audio asset needs a sound insertion. Audio adjustments only change existing clip volume."
     );
   const targets = new Set(op.targetClipIds);
   const targeted = (c: TimelineClip) => targets.has(c.id) && !c.locked;
+  if (
+    changesLook &&
+    !project.clips.some(c => targeted(c) && c.track === "video")
+  )
+    throw new Error("Choose an unlocked picture clip for the color look.");
   if (
     ["trim", "split", "move", "delete", "pacing", "style"].includes(op.type) ||
     (op.type === "audio" &&
@@ -438,7 +454,8 @@ export function applyEditOperation(
       outPoint: sourceIn + op.end - op.start,
       locked: false,
       color: "#B98B4B",
-      fit: "cover",
+      fit: p.fit ?? "cover",
+      ...(p.visual ? { visual: normalizeVisual(p.visual) } : {}),
       muted: true,
     });
   } else if (op.type === "silence") {
@@ -496,6 +513,9 @@ export function applyEditOperation(
       if (op.type === "audio")
         return { ...c, volume: p.volume ?? 0.25, muted: false };
       if (op.type === "style") {
+        // Linked audio may need matching interval splits, but its sound and
+        // saved visual state do not change when a picture look is applied.
+        if (changesLook && c.track !== "video") return c;
         const visual = p.visual ? patchVisual(c, p.visual) : undefined;
         if (visual && p.visual?.keyframes !== undefined) {
           // Replacing pose animation must not restart an unrelated transition.
@@ -519,6 +539,7 @@ export function applyEditOperation(
           brightness: p.brightness ?? c.brightness,
           contrast: p.contrast ?? c.contrast,
           saturation: p.saturation ?? c.saturation,
+          ...(changesLook ? { colorLut } : {}),
           ...(visual && p.visual
             ? {
                 visual,
@@ -658,3 +679,4 @@ export function applyEditOperation(
   );
   return next;
 }
+import { normalizeVisual } from "./clip-visual";

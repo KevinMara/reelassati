@@ -12,6 +12,8 @@ import { stylesWorkspaceUi } from "./ui-styles-workspace";
 import { editorReceiptUi } from "./ui-editor-receipts";
 import { guidedTourUi } from "./ui-guided-tour";
 import { librarySourceUi } from "./ui-library-sources";
+import { sharedCatalogUi } from "./ui-shared-catalog";
+import { catalogImportUi } from "./ui-catalog-import";
 import { editingTemplateUi } from "./ui-edit-templates";
 import { editingTraitUi } from "./ui-edit-template-traits";
 import { italianUi } from "./ui-it";
@@ -96,6 +98,12 @@ for (const [language, translation] of Object.entries(guidedTourUi)) {
   if (language !== "en") Object.assign(uiLocales[language], translation);
 }
 for (const [language, translation] of Object.entries(librarySourceUi)) {
+  if (language !== "en") Object.assign(uiLocales[language], translation);
+}
+for (const [language, translation] of Object.entries(catalogImportUi)) {
+  if (language !== "en") Object.assign(uiLocales[language], translation);
+}
+for (const [language, translation] of Object.entries(sharedCatalogUi)) {
   if (language !== "en") Object.assign(uiLocales[language], translation);
 }
 

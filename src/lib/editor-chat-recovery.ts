@@ -135,6 +135,7 @@ export function mergeChatReplan(
     plan: {
       ...parent.plan,
       message: response.message,
+      editorialNotes: response.editorialNotes,
       actions,
       totalCredits,
       budgetExceeded: totalCredits > (parent.maxCredits ?? 200),

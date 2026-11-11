@@ -2,6 +2,7 @@ import { getUiLocale, translateUi, useUiText } from "@/lib/i18n/ui";
 import { WorkspaceMomentum } from "@/components/studio/WorkspaceMomentum";
 import { isWorkspaceInterfaceActivity } from "@contracts/workspace-activity-ui";
 import { OwnerOperations } from "@/components/studio/OwnerOperations";
+import { SharedCatalogImport } from "@/components/studio/SharedCatalogImport";
 import { CreationStart } from "@/components/studio/CreationStart";
 import { BrandSwitcher } from "@/components/studio/BrandSwitcher";
 import { useTranslation } from "react-i18next";
@@ -431,6 +432,7 @@ function StudioStatus() {
   return (
     <div className="max-w-4xl mx-auto">
       {capabilities.operations && <OwnerOperations />}
+      {capabilities.operations && <SharedCatalogImport />}
       <p className="mono-eyebrow text-primary mb-2">
         {ui("Production readiness")}
       </p>

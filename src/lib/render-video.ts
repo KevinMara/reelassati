@@ -13,6 +13,12 @@ import type {
   ExportFormat,
 } from "@contracts/export-settings";
 import { verifyExportContainer } from "./export-verification";
+import { loadColorLut, projectColorLuts } from "./color-lut";
+import {
+  serializeCubeLut,
+  type ClipColorLut,
+  type CubeLut,
+} from "@contracts/color-lut";
 
 export async function renderVideo(
   project: EditProject,
@@ -24,6 +30,10 @@ export async function renderVideo(
     signal: AbortSignal;
     onProgress: (percent: number, stage: string) => void;
     loadAsset?: (id: string, signal: AbortSignal) => Promise<Uint8Array>;
+    loadLut?: (
+      reference: ClipColorLut,
+      signal: AbortSignal
+    ) => Promise<CubeLut>;
   }
 ): Promise<{
   file: File;
@@ -39,11 +49,27 @@ export async function renderVideo(
   options.signal.addEventListener("abort", cancel, { once: true });
   let wasmUrl: string | undefined;
   try {
-    const firstPlan = buildRenderPlan(project, assets, new Set(), {
-      resolution: options.resolution,
-      frameRate: options.frameRate,
-      format: options.format,
-    });
+    const colorLuts = new Map<string, CubeLut>();
+    for (const reference of projectColorLuts(project)) {
+      if (colorLuts.has(reference.sha256)) continue;
+      options.onProgress(0, "Loading color looks");
+      colorLuts.set(
+        reference.sha256,
+        await (options.loadLut ?? loadColorLut)(reference, options.signal)
+      );
+    }
+    const firstPlan = buildRenderPlan(
+      project,
+      assets,
+      new Set(),
+      {
+        resolution: options.resolution,
+        frameRate: options.frameRate,
+        format: options.format,
+      },
+      new Map(),
+      colorLuts
+    );
     options.onProgress(0, "Preparing export");
     const core = await fetch("/vendor/render/core.bin", {
       signal: AbortSignal.any([options.signal, AbortSignal.timeout(60000)]),
@@ -116,8 +142,11 @@ export async function renderVideo(
         frameRate: options.frameRate,
         format: options.format,
       },
-      sourceMetadata
+      sourceMetadata,
+      colorLuts
     );
+    for (const look of plan.luts)
+      await ffmpeg.writeFile(look.file, serializeCubeLut(look.lut));
     await ffmpeg.writeFile("captions.ass", plan.ass);
     const renderProgress = ({ time }: { time: number }) =>
       options.onProgress(

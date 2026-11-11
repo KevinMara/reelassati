@@ -1,4 +1,13 @@
 import type { Asset, EditOperation, EditProject } from "./workspace";
+import {
+  catalogColorLutCandidates,
+  resolveCatalogColorLut,
+  CATALOG_COLOR_LUT_GUIDANCE,
+} from "./catalog-color-lut";
+import {
+  sharedCatalogPlanningAssets,
+  type SharedMediaCatalogItem,
+} from "./shared-media-catalog";
 import { buildEditorialSpeechEvidence } from "./editorial-evidence";
 import { editPlanningMedia } from "./edit-planning-media";
 import { sourceReviewFacts } from "./source-review";
@@ -36,7 +45,8 @@ export function catalogSoundPeakSeconds(entry: EditorAudioCatalogEntry) {
 export function buildEditPlanningContext(
   project: EditProject,
   assets: Asset[],
-  projects: Pick<EditProject, "sourceReviews">[] = []
+  projects: Pick<EditProject, "sourceReviews">[] = [],
+  sharedCatalog: SharedMediaCatalogItem[] = []
 ) {
   const speechEvidence = buildEditorialSpeechEvidence(project).map(
     (speech, index) => ({ ...speech, id: `speech:${index}` })
@@ -138,7 +148,10 @@ export function buildEditPlanningContext(
       },
     ];
   });
-  const libraryMedia = editPlanningMedia(assets, [...projects, project]);
+  const libraryMedia = editPlanningMedia(
+    [...assets, ...sharedCatalogPlanningAssets(sharedCatalog)],
+    [...projects, project]
+  );
   const mediaExcerpts = libraryMedia.flatMap(asset => {
     if (!["video", "export"].includes(asset.kind) || !finite(asset.duration))
       return [];
@@ -178,6 +191,7 @@ export function buildEditPlanningContext(
         locked: clip.locked,
         start: clip.start,
         end: clip.start + clip.duration,
+        colorLut: clip.colorLut,
         picture:
           clip.track !== "audio" &&
           clip.track !== "captions" &&
@@ -190,15 +204,61 @@ export function buildEditPlanningContext(
     scenes,
     libraryMedia,
     mediaExcerpts,
-    freeSounds: editorAudioCatalog.map(entry => ({
-      assetId: `catalog:${entry.id}`,
-      name: entry.name,
-      category: entry.category,
-      duration: entry.duration,
-      tags: entry.tags,
-      type: entry.type,
-      peakSeconds: catalogSoundPeakSeconds(entry),
-    })),
+    catalogColorLooks: catalogColorLutCandidates(sharedCatalog),
+    sharedCatalog: sharedCatalog
+      .filter(item => item.kind !== "lut")
+      .map(
+        ({
+          id,
+          name,
+          kind,
+          group,
+          variant,
+          tags,
+          duration,
+          width,
+          height,
+          blendMode,
+        }) => ({
+          assetId: `shared:${id}`,
+          name,
+          kind,
+          group,
+          variant,
+          tags,
+          duration,
+          width,
+          height,
+          blendMode,
+        })
+      ),
+    freeSounds: [
+      ...editorAudioCatalog.map(entry => ({
+        assetId: `catalog:${entry.id}`,
+        name: entry.name,
+        category: entry.category,
+        duration: entry.duration,
+        tags: entry.tags,
+        type: entry.type,
+        peakSeconds: catalogSoundPeakSeconds(entry),
+      })),
+      ...sharedCatalog
+        .filter(item => item.kind === "audio")
+        .map(item => ({
+          assetId: `shared:${item.id}`,
+          name: item.name,
+          category: item.group,
+          duration: item.duration,
+          tags: item.tags,
+          type: "sfx" as const,
+          peakSeconds: item.waveform
+            ? round(
+                (item.waveform.indexOf(Math.max(...item.waveform)) / 63) *
+                  item.duration
+              )
+            : 0,
+        })),
+    ],
   };
 }
 
@@ -260,9 +320,60 @@ export function resolveEditPlanningReferences(
       if (operation[key] === null) delete operation[key];
     const parameters = Object.fromEntries(
       Object.entries(record(operation.parameters) ?? {}).filter(
-        ([, value]) => value !== null
+        ([key, value]) => value !== null || key === "colorLut"
       )
     );
+    if (Object.hasOwn(parameters, "colorLut")) {
+      if (operation.type !== "style")
+        invalid(
+          "reference_conflict",
+          `Edit ${index + 1} applies a color look outside a style operation.`
+        );
+      try {
+        parameters.colorLut = resolveCatalogColorLut(
+          parameters.colorLut,
+          context.catalogColorLooks
+        );
+      } catch {
+        invalid(
+          "reference_unavailable",
+          `Edit ${index + 1} selects an unavailable color look or invalid intensity.`
+        );
+      }
+    }
+    if (
+      typeof parameters.assetId === "string" &&
+      parameters.assetId.startsWith("shared:")
+    ) {
+      const item = context.sharedCatalog.find(
+        item => item.assetId === parameters.assetId
+      );
+      if (
+        !item ||
+        item.kind === "lut" ||
+        !["sound", "audio", "broll"].includes(String(operation.type))
+      )
+        invalid(
+          "reference_unavailable",
+          `Edit ${index + 1} selects unavailable shared media.`
+        );
+      if (
+        (item.kind === "audio" && operation.type === "broll") ||
+        (item.kind !== "audio" && operation.type !== "broll")
+      )
+        invalid(
+          "reference_conflict",
+          `Edit ${index + 1} uses the wrong shared media kind.`
+        );
+      if (item.kind !== "audio") {
+        parameters.visual = {
+          ...record(parameters.visual),
+          blendMode: item.blendMode,
+        };
+        parameters.fit = "contain";
+        parameters.mediaKind = item.kind;
+      }
+    }
     if (operation.type === "audio" && parameters.assetId !== undefined) {
       // Existing-clip mixing and insertion are different executor operations.
       // An explicit new audio source must never be ignored while ducking voice.
@@ -596,6 +707,7 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
       !(
         styleNumbers.some(key => finite(parameters[key])) ||
         parameters.fit ||
+        parameters.colorLut !== undefined ||
         (parameters.visual && Object.keys(parameters.visual).length)
       )
     )
@@ -640,6 +752,7 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
 /** Keep this aligned with applyEditOperation, not the larger interactive chat
  * action vocabulary. Unsupported actions must not silently disappear. */
 export const EDIT_PLANNING_CAPABILITIES = `
+${CATALOG_COLOR_LUT_GUIDANCE}
 The scene map partitions actual timeline footage and observed events. Its sourceStart/
 sourceEnd values are source-media seconds; scene start/end and all operation intervals
 are current timeline seconds. Scenes describe evidence, not a required number of edits.
