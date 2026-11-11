@@ -215,7 +215,14 @@ export async function runSharedCatalogImport(
     await api.manifest({ schemaVersion: 1, items: pending });
     signal.throwIfAborted();
     const current = await statuses(pending);
-    for (const item of pending) {
+    let next = 0;
+    let failed = false;
+    let failure: unknown;
+    const checkActive = () => {
+      signal.throwIfAborted();
+      if (failed) throw failure;
+    };
+    const uploadItem = async (item: SharedMediaCatalogItem) => {
       signal.throwIfAborted();
       for (const role of current.get(item.id)!.missingObjects) {
         const object = role === "media" ? item.media : item.poster;
@@ -234,21 +241,42 @@ export async function runSharedCatalogImport(
           });
           checked.add(object.sha256);
         }
-        signal.throwIfAborted();
+        checkActive();
         state.stage = "uploading";
         emit();
         await api.object(item.id, role, file, object);
-        signal.throwIfAborted();
+        checkActive();
         state.uploadedObjects++;
         state.uploadedBytes += object.bytes;
         emit();
       }
+      checkActive();
       const verified = await statuses([item]);
       if (verified.get(item.id)!.status !== "ready")
         throw new CatalogImportError("server", item.name);
       state.completedItems++;
       emit();
-    }
+    };
+    // Four foreground streams overlap network latency while keeping hashing
+    // bounded. A failure stops dispatch; all in-flight work settles before the
+    // panel becomes idle. Nothing is queued beyond this explicitly started run.
+    await Promise.all(
+      Array.from({ length: Math.min(4, pending.length) }, async () => {
+        while (!failed && next < pending.length) {
+          const item = pending[next++];
+          try {
+            checkActive();
+            await uploadItem(item);
+          } catch (error) {
+            if (!failed) {
+              failed = true;
+              failure = error;
+            }
+          }
+        }
+      })
+    );
+    if (failed) throw failure;
   }
   state.stage = "complete";
   state.currentName = undefined;
