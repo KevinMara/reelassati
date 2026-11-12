@@ -123,6 +123,10 @@ export function buildRenderPlan(
     // The shipped default VP9 decoder drops WebM alpha. The libvpx decoder
     // preserves the validated catalog overlay's transparent pixels.
     if (asset.catalog?.alpha === true) args.push("-c:v", "libvpx-vp9");
+    // Keep decoded priming samples on their source clock. The shipped AAC
+    // decoder otherwise double-applies some MP4 edit-list skip samples.
+    // The explicit timestamp trim below removes negative priming safely.
+    if (audioIds.has(asset.id)) args.push("-flags2:a", "+skip_manual");
     args.push("-i", `input-${inputs.indexOf(asset)}`);
     const end = number(clip.inPoint + clip.duration * speed);
     const trim = `start=${number(clip.inPoint)}:end=${end}`;
@@ -179,7 +183,7 @@ export function buildRenderPlan(
               ? ""
               : `atempo=${speed}`;
       filters.push(
-        `[${index}:a]atrim=${trim},asetpts=PTS-STARTPTS,${tempo ? `${tempo},` : ""}${audioMixFilter(clip, timelineTrackGain(project, clip))},aresample=48000,adelay=${Math.round(clip.start * 1000)}:all=1[a${index}]`
+        `[${index}:a]atrim=${trim},asetpts=PTS-${number(clip.inPoint)}/TB,aresample=48000:async=1:first_pts=0,${tempo ? `${tempo},` : ""}${audioMixFilter(clip, timelineTrackGain(project, clip))},adelay=${Math.round(clip.start * 1000)}:all=1[a${index}]`
       );
       audio.push(`a${index}`);
     }
@@ -204,7 +208,7 @@ export function buildRenderPlan(
     visual = "video";
   }
   filters.push(
-    `${audio.map(a => `[${a}]`).join("")}amix=inputs=${audio.length}:normalize=0:duration=longest,alimiter=limit=0.95,atrim=duration=${number(duration)}[audio]`
+    `${audio.map(a => `[${a}]`).join("")}amix=inputs=${audio.length}:normalize=0:duration=longest,alimiter=limit=0.95:latency=1,atrim=duration=${number(duration)}[audio]`
   );
   const videoRate =
     resolution === 720
