@@ -83,16 +83,20 @@ export function colorGradeFilter(
       "format=gbrap,lutrgb=" + expressions.join(":") + colorToneFilter(clip)
     );
   }
+  const gentleTone =
+    (clip.shadows ?? 0) >= 0 &&
+    (clip.shadows ?? 0) <= 0.2 &&
+    (clip.highlights ?? 0) >= -0.2 &&
+    (clip.highlights ?? 0) <= 0 &&
+    (clip.whites ?? 0) >= -0.2 &&
+    (clip.whites ?? 0) <= 0 &&
+    (clip.blacks ?? 0) >= 0 &&
+    (clip.blacks ?? 0) <= 0.2;
   const basicGrade =
-    [
-      clip.exposure,
-      clip.temperature,
-      clip.tint,
-      clip.highlights,
-      clip.shadows,
-      clip.whites,
-      clip.blacks,
-    ].every(value => !value) &&
+    Math.abs(clip.exposure ?? 0) <= 0.25 &&
+    Math.abs(clip.temperature ?? 0) <= 0.2 &&
+    Math.abs(clip.tint ?? 0) <= 0.2 &&
+    gentleTone &&
     Math.abs(clip.brightness ?? 0) <= 0.1 &&
     (clip.contrast ?? 1) >= 0.85 &&
     (clip.contrast ?? 1) <= 1.15 &&
@@ -103,7 +107,8 @@ export function colorGradeFilter(
     // Keep the original alpha separately: only the temporary opaque alpha is
     // the constant used for ra/ga/ba. Native and shipped WASM output differs
     // from geq truncation by at most one 8-bit RGB level in this bounded range.
-    // Stronger grades and tone curves keep their original quantization path.
+    // These bounded, contrast-compressing tone curves cannot magnify a one-byte
+    // matrix rounding difference. Strong grades retain the exact geq path.
     const prefix = `grade${Number.isSafeInteger(scope) && scope >= 0 ? scope : 0}`;
     const channels = ["r", "g", "b"];
     const coefficients = channels.flatMap((channel, row) => [
@@ -113,7 +118,7 @@ export function colorGradeFilter(
       ),
       `${channel}a=${Number((matrix[row * 5 + 4] * 255).toFixed(8)) / 255}`,
     ]);
-    return `format=gbrap,split[${prefix}alphaIn][${prefix}rgbIn];[${prefix}alphaIn]alphaextract[${prefix}alpha];[${prefix}rgbIn]format=gbrap16le,lutrgb=a=65535,colorchannelmixer=${coefficients.join(":")},format=gbrp[${prefix}rgb];[${prefix}rgb][${prefix}alpha]alphamerge`;
+    return `format=gbrap,split[${prefix}alphaIn][${prefix}rgbIn];[${prefix}alphaIn]alphaextract[${prefix}alpha];[${prefix}rgbIn]format=gbrap16le,lutrgb=a=65535,colorchannelmixer=${coefficients.join(":")},format=gbrp[${prefix}rgb];[${prefix}rgb][${prefix}alpha]alphamerge${colorToneFilter(clip)}`;
   }
   const channels = ["r", "g", "b"];
   const expressions = channels.map((channel, row) => {

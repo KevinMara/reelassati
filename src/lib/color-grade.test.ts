@@ -9,9 +9,36 @@ import { buildRenderPlan } from "./render-plan";
 
 const basicGrades = [
   { brightness: 0.02, contrast: 1.06, saturation: 1.05 },
+  // Actual live edit: this formerly evaluated nine channel samples per pixel.
+  {
+    brightness: 0.02,
+    contrast: 1.05,
+    saturation: 1.04,
+    temperature: 0.12,
+    highlights: -0.1,
+    shadows: 0.08,
+  },
   ...[-0.1, 0.1].flatMap(brightness =>
     [0.85, 1.15].flatMap(contrast =>
       [0.85, 1.15].map(saturation => ({ brightness, contrast, saturation }))
+    )
+  ),
+  ...[-0.25, 0.25].flatMap(exposure =>
+    [-0.2, 0.2].flatMap(temperature =>
+      [-0.2, 0.2].flatMap(tint =>
+        [0.85, 1.15].map(saturation => ({
+          exposure,
+          temperature,
+          tint,
+          saturation,
+          brightness: temperature > 0 ? 0.1 : -0.1,
+          contrast: exposure > 0 ? 1.15 : 0.85,
+          highlights: -0.2,
+          shadows: 0.2,
+          whites: -0.2,
+          blacks: 0.2,
+        }))
+      )
     )
   ),
 ];

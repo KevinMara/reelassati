@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { CatalogEvidence } from "@contracts/catalog-evidence";
 import { captureUploadRequestScope, platformApi } from "@/lib/platform-api";
+import {
+  evidencePacket,
+  inspectEvidenceBundle,
+  readEvidenceBundle,
+} from "@/lib/catalog-evidence-bundle";
 
 /** Owner maintenance, visible foreground only. No automatic resume or retries. */
 export function CatalogEvidenceImport() {
@@ -8,6 +13,9 @@ export function CatalogEvidenceImport() {
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState("");
   const [error, setError] = useState("");
+  const [bundle, setBundle] = useState<File | null>(null);
+  const [bundleCount, setBundleCount] = useState(0);
+  const count = bundle ? bundleCount : files.length;
   const controller = useRef<AbortController | null>(null),
     mounted = useRef(false);
   useEffect(() => {
@@ -21,7 +29,7 @@ export function CatalogEvidenceImport() {
     };
   }, []);
   const run = async (review: boolean) => {
-    if (controller.current || !files.length) return;
+    if (controller.current || !count) return;
     const active = new AbortController();
     controller.current = active;
     setBusy(true);
@@ -33,22 +41,42 @@ export function CatalogEvidenceImport() {
       };
       let completed = 0;
       const soundIds: string[] = [];
-      for (let offset = 0; offset < files.length; offset += 20) {
+      async function* batches() {
+        if (bundle) {
+          let batch: CatalogEvidence[] = [];
+          for await (const packet of readEvidenceBundle(
+            bundle,
+            active.signal
+          )) {
+            batch.push(packet);
+            if (batch.length === 20) {
+              yield batch;
+              batch = [];
+            }
+          }
+          if (batch.length) yield batch;
+          return;
+        }
+        for (let offset = 0; offset < files.length; offset += 20) {
+          active.signal.throwIfAborted();
+          yield await Promise.all(
+            files.slice(offset, offset + 20).map(async file => {
+              if (file.size > 2 * 1024 * 1024)
+                throw new Error("An evidence file exceeds the size limit.");
+              const packet = evidencePacket(JSON.parse(await file.text()));
+              if (
+                packet.schemaVersion !== 1 ||
+                !/^stock-[a-f0-9]{24}$/.test(packet.catalogId) ||
+                file.name !== `${packet.catalogId}.json`
+              )
+                throw new Error("Choose the prepared evidence folder.");
+              return packet;
+            })
+          );
+        }
+      }
+      for await (const packets of batches()) {
         active.signal.throwIfAborted();
-        const packets = await Promise.all(
-          files.slice(offset, offset + 20).map(async file => {
-            if (file.size > 2 * 1024 * 1024)
-              throw new Error("An evidence file exceeds the size limit.");
-            const packet = JSON.parse(await file.text()) as CatalogEvidence;
-            if (
-              packet.schemaVersion !== 1 ||
-              !/^stock-[a-f0-9]{24}$/.test(packet.catalogId) ||
-              file.name !== `${packet.catalogId}.json`
-            )
-              throw new Error("Choose the prepared evidence folder.");
-            return packet;
-          })
-        );
         const status = await platformApi.catalogEvidenceStatus(
           packets.map(p => p.catalogId),
           options
@@ -76,7 +104,7 @@ export function CatalogEvidenceImport() {
         completed += packets.length;
         if (mounted.current)
           setProgress(
-            `${completed.toLocaleString()} / ${files.length.toLocaleString()} evidence records ready`
+            `${completed.toLocaleString()} / ${count.toLocaleString()} evidence records ready`
           );
       }
       if (review)
@@ -94,8 +122,8 @@ export function CatalogEvidenceImport() {
       if (mounted.current)
         setProgress(
           review
-            ? `Complete · ${files.length.toLocaleString()} evidence records, ${soundIds.length.toLocaleString()} new sound reviews`
-            : `Complete · ${files.length.toLocaleString()} evidence records ready`
+            ? `Complete · ${count.toLocaleString()} evidence records, ${soundIds.length.toLocaleString()} new sound reviews`
+            : `Complete · ${count.toLocaleString()} evidence records ready`
         );
     } catch (cause) {
       if (mounted.current)
@@ -129,6 +157,8 @@ export function CatalogEvidenceImport() {
         aria-label="Choose catalog evidence folder"
         disabled={busy}
         onChange={e => {
+          setBundle(null);
+          setBundleCount(0);
           setFiles(
             Array.from(e.target.files || []).filter(f =>
               /^stock-[a-f0-9]{24}\.json$/.test(f.name)
@@ -138,17 +168,52 @@ export function CatalogEvidenceImport() {
           setError("");
         }}
       />
+      <label className="mt-3 block text-xs text-muted-foreground">
+        Or use a single evidence bundle
+        <input
+          type="file"
+          accept=".jsonl,.gz"
+          aria-label="Choose catalog evidence bundle"
+          className="mt-1 block w-full text-xs"
+          disabled={busy}
+          onChange={async e => {
+            const selected = e.target.files?.[0];
+            if (!selected) return;
+            setError("");
+            setProgress("");
+            setFiles([]);
+            setBundle(null);
+            setBundleCount(0);
+            try {
+              if (selected.size > 512 * 1024 * 1024)
+                throw new Error("The evidence bundle exceeds 512 MB.");
+              const total = await inspectEvidenceBundle(selected);
+              if (mounted.current) {
+                setBundle(selected);
+                setBundleCount(total);
+              }
+            } catch (cause) {
+              if (mounted.current)
+                setError(
+                  cause instanceof Error
+                    ? cause.message
+                    : "Invalid evidence bundle."
+                );
+            }
+          }}
+        />
+      </label>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           className="rounded-lg border border-border px-3 py-2 text-xs"
-          disabled={busy || !files.length}
+          disabled={busy || !count}
           onClick={() => void run(false)}
         >
           Upload evidence
         </button>
         <button
           className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground"
-          disabled={busy || !files.length}
+          disabled={busy || !count}
           onClick={() => void run(true)}
         >
           Upload and review sounds
@@ -162,7 +227,7 @@ export function CatalogEvidenceImport() {
           </button>
         )}
         <span className="text-xs text-muted-foreground">
-          {files.length.toLocaleString()} records selected
+          {count.toLocaleString()} records selected
         </span>
       </div>
       <p role="status" className="mt-2 text-xs">

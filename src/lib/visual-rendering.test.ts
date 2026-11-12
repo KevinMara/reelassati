@@ -53,7 +53,8 @@ const zoomArgs = (c: TimelineClip, optimized: boolean, output = "pipe:1") => [
 function checkZoomFrames(
   actual: Uint8Array,
   reference: Uint8Array,
-  c: TimelineClip
+  c: TimelineClip,
+  tolerance = 4
 ) {
   const frameSize = zoomCanvas.width * zoomCanvas.height * 4;
   expect(actual.length).toBe(Math.round(c.duration * 10) * frameSize);
@@ -71,7 +72,7 @@ function checkZoomFrames(
   expect(minimumAlpha).toBe(255);
   // Whole-pixel scale rounding and swscale/geq interpolation may differ by a
   // few 8-bit levels; every frame must still follow the same source clock.
-  expect(maximumDifference).toBeLessThanOrEqual(4);
+  expect(maximumDifference).toBeLessThanOrEqual(tolerance);
   for (const frame of [
     0,
     Math.floor(c.duration * 5),
@@ -82,12 +83,21 @@ function checkZoomFrames(
       y = 20;
     const pixel = frame * frameSize + (y * zoomCanvas.width + x) * 4;
     const sourceX =
-      (x + 0.5 - zoomCanvas.width / 2) / pose.scale +
+      (x + 0.5 - zoomCanvas.width / 2 - (zoomCanvas.width * pose.x) / 100) /
+        pose.scale +
       zoomCanvas.width / 2 -
       0.5;
     expect(
       Math.abs(actual[pixel] - (255 * sourceX) / (zoomCanvas.width - 1))
-    ).toBeLessThanOrEqual(4);
+    ).toBeLessThanOrEqual(tolerance);
+    const sourceY =
+      (y + 0.5 - zoomCanvas.height / 2 - (zoomCanvas.height * pose.y) / 100) /
+        pose.scale +
+      zoomCanvas.height / 2 -
+      0.5;
+    expect(
+      Math.abs(actual[pixel + 1] - (255 * sourceY) / (zoomCanvas.height - 1))
+    ).toBeLessThanOrEqual(tolerance);
     expect(actual[pixel + 2]).toBe(frame * 8);
   }
 }
@@ -172,16 +182,40 @@ describe("footage transforms and visual transitions", () => {
     {
       keyframes: [
         { at: 0, scale: 1 },
-        { at: 1, scale: 1.06, x: 1 },
+        { at: 1, scale: 1.06, x: 5 },
       ],
     },
   ])(
-    "retains inverse sampling for non-centered or alpha-changing animation: %j",
+    "retains inverse sampling for uncovered or alpha-changing animation: %j",
     patch => {
       const c = zoomClip();
       c.visual = normalizeVisual({ ...c.visual, ...patch });
       expect(visualRenderFilter(c, zoomCanvas)).toContain("geq");
     }
+  );
+  it.each(["linear", "ease-in", "ease-out", "ease-in-out", "hold"])(
+    "matches a fully covering translated push-in with %s timing",
+    easing => {
+      const c = {
+        ...zoomClip(),
+        visual: normalizeVisual({
+          keyframes: [
+            { at: 0, x: 0, y: 0, scale: 1, easing },
+            { at: 0.5, x: -3, y: 3, scale: 1.08, easing },
+            { at: 1, x: 3, y: -3, scale: 1.08 },
+          ],
+        }),
+      };
+      expect(visualRenderFilter(c, zoomCanvas)).not.toContain("geq");
+      const options = { maxBuffer: 8_000_000, timeout: 15_000 };
+      checkZoomFrames(
+        execFileSync("ffmpeg", zoomArgs(c, true), options),
+        execFileSync("ffmpeg", zoomArgs(c, false), options),
+        c,
+        6
+      );
+    },
+    15000
   );
   it("retains inverse sampling when canvas parity cannot guarantee a centered whole-pixel crop", () => {
     for (const canvas of [
@@ -207,15 +241,26 @@ describe("footage transforms and visual transitions", () => {
         visualStart: 0,
         visualDuration: 4,
       };
-      const frames = [];
-      for (const optimized of [true, false]) {
-        core.exec(...zoomArgs(c, optimized, "zoom.rgba"));
-        expect(core.ret).toBe(0);
-        core.reset();
-        frames.push((core.FS.readFile("zoom.rgba") as Uint8Array).slice());
-        core.FS.unlink("zoom.rgba");
+      const translated = {
+        ...c,
+        visual: normalizeVisual({
+          keyframes: [
+            { at: 0, x: 0, y: 0, scale: 1, easing: "ease-out" },
+            { at: 1, x: -3, y: 3, scale: 1.08 },
+          ],
+        }),
+      };
+      for (const sample of [c, translated]) {
+        const frames = [];
+        for (const optimized of [true, false]) {
+          core.exec(...zoomArgs(sample, optimized, "zoom.rgba"));
+          expect(core.ret).toBe(0);
+          core.reset();
+          frames.push((core.FS.readFile("zoom.rgba") as Uint8Array).slice());
+          core.FS.unlink("zoom.rgba");
+        }
+        checkZoomFrames(frames[0], frames[1], sample, sample === c ? 4 : 6);
       }
-      checkZoomFrames(frames[0], frames[1], c);
     } finally {
       vi.unstubAllGlobals();
     }

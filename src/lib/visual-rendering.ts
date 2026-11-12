@@ -123,7 +123,7 @@ export function visualRenderFilter(
     v.entrance.kind === "none" &&
     v.exit.kind === "none";
   if (identity) return "";
-  const centeredZoom =
+  const coveringAnimation =
     canvas &&
     canvas.width > 0 &&
     canvas.height > 0 &&
@@ -132,9 +132,8 @@ export function visualRenderFilter(
     v.keyframes.length > 0 &&
     [v, ...v.keyframes].every(
       pose =>
-        pose.x === 0 &&
-        pose.y === 0 &&
-        pose.scale >= 1 &&
+        pose.scale >= 1 + (2 * Math.abs(pose.x)) / 100 &&
+        pose.scale >= 1 + (2 * Math.abs(pose.y)) / 100 &&
         pose.rotation === 0 &&
         pose.opacity === 1
     ) &&
@@ -144,16 +143,20 @@ export function visualRenderFilter(
     v.mask === "none" &&
     v.entrance.kind === "none" &&
     v.exit.kind === "none";
-  if (centeredZoom) {
+  if (coveringAnimation) {
     // scale evaluates the same source-clock/easing curve once per frame. Even
-    // dimensions keep the centered crop on whole pixels; the rounding error is
+    // dimensions keep the crop on whole pixels; the rounding error is
     // at most one output pixel per dimension. RGBA preserves source alpha.
     const zoom = scale.replace(/\bT\b/g, "t");
     const width = `2*round(${canvas!.width}*(${zoom})/2)`;
     const height = `2*round(${canvas!.height}*(${zoom})/2)`;
+    const shiftX = x.replace(/\bT\b/g, "t");
+    const shiftY = y.replace(/\bT\b/g, "t");
     // crop caches iw/ih from configuration even when scale resizes a later
     // frame. Derive its per-frame offsets from the same curve, not cached sizes.
-    return `format=rgba,scale=w='${width}':h='${height}':eval=frame:flags=bilinear,crop=${canvas!.width}:${canvas!.height}:x='(${width}-${canvas!.width})/2':y='(${height}-${canvas!.height})/2',setsar=1`;
+    // Each segment interpolates all pose components with the same easing.
+    // Coverage is a convex constraint, so covered endpoints cover every frame.
+    return `format=rgba,scale=w='${width}':h='${height}':eval=frame:flags=bilinear,crop=${canvas!.width}:${canvas!.height}:x='(${width}-${canvas!.width})/2-${canvas!.width}*(${shiftX})/100':y='(${height}-${canvas!.height})/2-${canvas!.height}*(${shiftY})/100',setsar=1`;
   }
   const plainGeometry =
     !v.keyframes.length &&
