@@ -169,7 +169,7 @@ describe("actual polygon masks and alpha-aware layer blending", () => {
       {
         keyframes: [
           { at: 0, scale: 1.5 },
-          { at: 1, scale: 2, x: 10 },
+          { at: 1, scale: 2, x: 80 },
         ],
       },
     ])

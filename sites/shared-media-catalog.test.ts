@@ -204,6 +204,72 @@ async function publish() {
   );
 }
 describe("verified chunked catalog import", () => {
+  it("keeps evidence readiness unpublished after an interrupted batch and resumes from stored objects", async () => {
+    await publish();
+    const second = {
+      ...item,
+      id: `stock-${"b".repeat(24)}`,
+      media: {
+        ...item.media,
+        sha256: "b".repeat(64),
+        file: `media/${"b".repeat(64)}.mp4`,
+      },
+    };
+    sqlite
+      .prepare(
+        "INSERT INTO shared_media_catalog(id,name,group_name,design_id,kind,search_text,payload,media_ready,poster_ready,status,created_at) SELECT ?,name,group_name,design_id,kind,search_text,?,1,1,'ready',created_at FROM shared_media_catalog WHERE id=?"
+      )
+      .run(second.id, JSON.stringify(second), item.id);
+    const jpg = Uint8Array.from([255, 216, 0, 0, 0, 0, 255, 217]);
+    const packets = [item, second].map(source => ({
+      schemaVersion: 1,
+      catalogId: source.id,
+      mediaSha256: source.media.sha256,
+      kind: "video",
+      duration: 1,
+      visual: {
+        data: Buffer.from(jpg).toString("base64"),
+        sha256: digest(jpg),
+        contentType: "image/jpeg",
+        bytes: jpg.length,
+        width: 240,
+        height: 180,
+        columns: 1,
+        frameTimes: [0, 0.2, 0.5, 0.9],
+        sourceWidth: 1920,
+        sourceHeight: 1080,
+        coverage: "sampled-motion",
+      },
+    }));
+    const put = env.BUCKET.put;
+    env.BUCKET.put = async (key, body, options) => {
+      if (key === `catalog-evidence/v1/${second.media.sha256}.json`)
+        throw new Error("storage unavailable");
+      return put(key, body, options);
+    };
+    await expect(
+      admin("evidence", "POST", JSON.stringify(packets))
+    ).rejects.toThrow("storage unavailable");
+    expect(objects.has(`catalog-evidence/v1/${item.media.sha256}.json`)).toBe(
+      true
+    );
+    expect(
+      sqlite
+        .prepare("SELECT COUNT(*) AS count FROM shared_catalog_evidence")
+        .get()?.count
+    ).toBe(0);
+    env.BUCKET.put = put;
+    expect(
+      (await admin("evidence", "POST", JSON.stringify(packets))).status
+    ).toBe(200);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT COUNT(*) AS count FROM shared_catalog_evidence WHERE evidence_ready=1"
+        )
+        .get()?.count
+    ).toBe(2);
+  });
   it("keeps evidence owner-only and checks published identity and media digests before storing", async () => {
     await publish();
     const jpg = Uint8Array.from([255, 216, 0, 0, 0, 0, 255, 217]);

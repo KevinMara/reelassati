@@ -9,6 +9,7 @@ import {
   readCatalogSound,
   normalizeCatalogSound,
   catalogSoundKey,
+  catalogContentSearchText,
 } from "./catalog-evidence";
 import { runtimeFailureDiagnostic } from "./runtime-diagnostics";
 import {
@@ -14312,6 +14313,10 @@ async function handleApi(
       return errorResponse("Choose up to eight catalog sounds.", 422);
     await initializeSharedCatalog(env);
     const inspected = [];
+    const soundItems = new Map<
+      string,
+      Awaited<ReturnType<typeof readSharedCatalog>>["item"]
+    >();
     const skipped: string[] = [];
     const leases: string[] = [];
     const leaseId = crypto.randomUUID();
@@ -14328,6 +14333,7 @@ async function handleApi(
       for (const id of input.ids) {
         analysisControl.signal.throwIfAborted();
         const { item } = await readSharedCatalog(env, id);
+        soundItems.set(id, item);
         if (item.kind !== "audio")
           return errorResponse("Choose audio catalog items.", 422);
         const packet = await readCatalogEvidence(
@@ -14419,11 +14425,20 @@ async function handleApi(
           new TextEncoder().encode(JSON.stringify(observation)),
           { httpMetadata: { contentType: "application/json" } }
         );
-        await env.DB.prepare(
-          "UPDATE shared_catalog_evidence SET sound_reviewed=1 WHERE id=? AND media_sha=? AND sample_sha=?"
-        )
-          .bind(packet.catalogId, packet.mediaSha256, packet.audio!.sha256)
-          .run();
+        await env.DB.batch([
+          env.DB.prepare(
+            "UPDATE shared_catalog_evidence SET sound_reviewed=1 WHERE id=? AND media_sha=? AND sample_sha=?"
+          ).bind(packet.catalogId, packet.mediaSha256, packet.audio!.sha256),
+          env.DB.prepare(
+            "UPDATE shared_media_catalog SET search_text=? WHERE id=?"
+          ).bind(
+            catalogContentSearchText(
+              soundItems.get(packet.catalogId)!,
+              observation
+            ),
+            packet.catalogId
+          ),
+        ]);
       }
       return json({ reviewed: results.map(r => r.packet.catalogId), skipped });
     } finally {

@@ -777,6 +777,13 @@ describe("foreground K3 auto-edit planning", () => {
       expect(sent).toContain("input_audio");
       expect(sent).toContain(bytes.toString("base64"));
       expect(sent).not.toContain(item.name);
+      const searchText = () =>
+        sqlite
+          .prepare("SELECT search_text FROM shared_media_catalog WHERE id=?")
+          .get(id)?.search_text as string;
+      expect(searchText()).toContain("one soft bell with a short decay");
+      expect(searchText()).toContain("quiet completion");
+      expect(searchText()).not.toContain("large impact");
       expect(
         await (
           await request("/api/catalog/admin/review-sounds", { ids: [id] })
@@ -817,6 +824,7 @@ describe("foreground K3 auto-edit planning", () => {
           )
           .get(id)?.sound_reviewed
       ).toBe(0);
+      expect(searchText()).not.toContain("one soft bell");
     } finally {
       nextOutput = originalOutput;
       sqlite.prepare("DELETE FROM shared_media_catalog WHERE id=?").run(id);

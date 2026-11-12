@@ -259,9 +259,20 @@ export function visualCompositeFilters(
   clip: TimelineClip,
   lower: string,
   upper: string,
-  output: string
+  output: string,
+  frameRate?: number
 ): string[] {
-  const enable = `gte(t,${n(clip.start)})*lt(t,${n(clip.start + clip.duration)})`;
+  // The constant-rate export canvas has an exact integer frame clock. Testing
+  // float seconds instead can disable both clips at a cut (399/30 is evaluated
+  // just below 13.3 by FFmpeg). Ceil preserves the half-open [start, end) interval;
+  // the tiny tolerance only removes arithmetic noise at integer frame edges.
+  // Derive the index from the canvas timestamp, not filter input count: a
+  // framesync filter can receive additional events from a fractional clip start.
+  const frame = (seconds: number) => Math.ceil(seconds * frameRate! - 1e-7);
+  const enable =
+    frameRate && Number.isFinite(frameRate) && frameRate > 0
+      ? `gte(round(t*${frameRate}),${frame(clip.start)})*lt(round(t*${frameRate}),${frame(clip.start + clip.duration)})`
+      : `gte(t,${n(clip.start)})*lt(t,${n(clip.start + clip.duration)})`;
   const mode = normalizeVisual(clip.visual).blendMode;
   const overlay = (a: string, b: string) =>
     `[${a}][${b}]overlay=eof_action=pass:repeatlast=0:enable='${enable}'[${output}]`;

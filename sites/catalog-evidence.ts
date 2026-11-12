@@ -13,6 +13,29 @@ export const catalogEvidenceKey = (sha: string) =>
   `catalog-evidence/v1/${sha}.json`;
 export const catalogSoundKey = (sha: string) =>
   `catalog-evidence/v1/${sha}.sound.json`;
+export function catalogContentSearchText(
+  item: SharedMediaCatalogItem,
+  sound?: CatalogSoundObservation
+) {
+  return [
+    item.name,
+    item.group,
+    item.variant,
+    ...item.tags,
+    ...(sound && sound.confidence >= 0.6
+      ? [
+          sound.character,
+          sound.role,
+          sound.intensity,
+          ...sound.audibleEvents,
+          ...sound.suitableUses,
+        ]
+      : []),
+  ]
+    .join(" ")
+    .normalize("NFKC")
+    .toLowerCase();
+}
 export function evidenceBytes(data: string) {
   return Uint8Array.from(atob(data), c => c.charCodeAt(0));
 }
@@ -221,30 +244,50 @@ export async function uploadCatalogEvidence(
       { status: 422 }
     );
   }
-  for (const packet of prepared) {
+  const statements = [];
+  for (let offset = 0; offset < prepared.length; offset += 3) {
     request.signal.throwIfAborted();
-    // Preserve a listening result only when it still describes these exact samples.
-    const sound = packet.audio
-      ? await readCatalogSound(env, packet, request.signal)
-      : undefined;
-    await env.BUCKET.put(
-      catalogEvidenceKey(packet.mediaSha256),
-      new TextEncoder().encode(JSON.stringify(packet)),
-      {
-        httpMetadata: { contentType: "application/json" },
-        customMetadata: { mediaSha256: packet.mediaSha256 },
-      }
+    // Only three object writes at once; publish readiness in one DB batch after
+    // every object succeeds. A partial upload remains safely resumable.
+    const results = await Promise.allSettled(
+      prepared.slice(offset, offset + 3).map(async packet => {
+        // Preserve a listening result only when it still describes these exact samples.
+        const sound = packet.audio
+          ? await readCatalogSound(env, packet, request.signal)
+          : undefined;
+        await env.BUCKET.put(
+          catalogEvidenceKey(packet.mediaSha256),
+          new TextEncoder().encode(JSON.stringify(packet)),
+          {
+            httpMetadata: { contentType: "application/json" },
+            customMetadata: { mediaSha256: packet.mediaSha256 },
+          }
+        );
+        request.signal.throwIfAborted();
+        return [
+          env.DB.prepare(
+            "INSERT INTO shared_catalog_evidence(id,media_sha,sample_sha,evidence_ready,sound_reviewed) VALUES(?,?,?,1,?) ON CONFLICT(id) DO UPDATE SET media_sha=excluded.media_sha,sample_sha=excluded.sample_sha,evidence_ready=1,sound_reviewed=excluded.sound_reviewed"
+          ).bind(
+            packet.catalogId,
+            packet.mediaSha256,
+            packet.audio?.sha256 || "",
+            sound ? 1 : 0
+          ),
+          env.DB.prepare(
+            "UPDATE shared_media_catalog SET search_text=? WHERE id=?"
+          ).bind(
+            catalogContentSearchText(items.get(packet.catalogId)!, sound),
+            packet.catalogId
+          ),
+        ];
+      })
     );
-    await env.DB.prepare(
-      "INSERT INTO shared_catalog_evidence(id,media_sha,sample_sha,evidence_ready,sound_reviewed) VALUES(?,?,?,1,?) ON CONFLICT(id) DO UPDATE SET media_sha=excluded.media_sha,sample_sha=excluded.sample_sha,evidence_ready=1,sound_reviewed=excluded.sound_reviewed"
-    )
-      .bind(
-        packet.catalogId,
-        packet.mediaSha256,
-        packet.audio?.sha256 || "",
-        sound ? 1 : 0
-      )
-      .run();
+    const failure = results.find(result => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+    for (const result of results)
+      if (result.status === "fulfilled") statements.push(...result.value);
   }
+  request.signal.throwIfAborted();
+  await env.DB.batch(statements);
   return Response.json({ saved: prepared.map(p => p.catalogId) });
 }

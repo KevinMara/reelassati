@@ -169,7 +169,13 @@ export function buildRenderPlan(
         `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=${frameRate},${terminalPadding}${lut}${grade}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
       );
       filters.push(
-        ...visualCompositeFilters(clip, visual, `v${index}`, `layer${index}`)
+        ...visualCompositeFilters(
+          clip,
+          visual,
+          `v${index}`,
+          `layer${index}`,
+          frameRate
+        )
       );
       visual = `layer${index}`;
     }
