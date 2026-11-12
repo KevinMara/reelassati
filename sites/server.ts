@@ -4,6 +4,7 @@ import {
   EDIT_CUT_REPAIR_DIRECTION,
 } from "../contracts/edit-cut-repair";
 import { catalogVisualEvidence } from "./catalog-visual-evidence";
+import { runtimeFailureDiagnostic } from "./runtime-diagnostics";
 import {
   EDIT_CUT_GUIDANCE,
   assertAutonomousTrimSemantics,
@@ -4194,6 +4195,7 @@ async function chatJson(
   // Editing has an explicit K3 selection, independent of legacy text defaults
   // and owner subscription experiments. Never silently route its text to K2.5.
   const editing = purpose === "edit-planning";
+  if (analysisControl) analysisControl.diagnosticStage = "provider-start";
   const useKimiSubscription = !editing && !model && isKimiTestOwner(env, user);
   const credential = useKimiSubscription
     ? env.KIMI_CODE_API_KEY
@@ -4246,6 +4248,7 @@ async function chatJson(
   try {
     await analysisControl?.onInvocation?.(invocation.id);
     analysisControl?.signal.throwIfAborted();
+    if (analysisControl) analysisControl.diagnosticStage = "provider-request";
     const response = await fetch(
       `${useKimiSubscription ? KIMI_CODE_BASE : OPENROUTER_BASE}/chat/completions`,
       {
@@ -4318,6 +4321,7 @@ async function chatJson(
         ? await readAnalysisCompletion(response, analysisControl.signal)
         : await response.json()
     );
+    if (analysisControl) analysisControl.diagnosticStage = "provider-response";
     analysisControl?.signal.throwIfAborted();
     if (!deferCompletion) await completeAiInvocation(env, invocation, output);
     return { output, invocation };
@@ -6722,6 +6726,7 @@ async function handleAi(
   }
 
   if (url.pathname === "/api/ai/edit-plan") {
+    if (analysisControl) analysisControl.diagnosticStage = "authorization";
     const input = await parseJsonBody<{
       requestId?: string;
       project?: WorkspaceDocument["projects"][number];
@@ -6782,9 +6787,12 @@ async function handleAi(
     const duration = boundedNumber(input.project.duration, 30, 0.2, 86400);
     const factualSourceReviews =
       input.project.sourceReviews?.map(sourceReviewFacts);
+    analysisControl.diagnosticStage = "workspace";
     const presetWorkspace = await getWorkspace(env, user);
     const personalStyles = presetWorkspace.editorStyles ?? [];
+    analysisControl.diagnosticStage = "catalog";
     await initializeSharedCatalog(env);
+    analysisControl.diagnosticStage = "catalog-visuals";
     const catalogEvidence = await catalogVisualEvidence(
       env,
       await sharedCatalogCandidates(
@@ -6798,6 +6806,7 @@ async function handleAi(
       analysisControl.signal
     );
     const sharedCatalog = catalogEvidence.items;
+    analysisControl.diagnosticStage = "context";
     const planningContext = buildEditPlanningContext(
       project,
       presetWorkspace.assets,
@@ -6864,6 +6873,7 @@ async function handleAi(
         ? editTemplateDirection(project.editStyleTemplate)
         : undefined,
     };
+    analysisControl.diagnosticStage = "credit-reservation";
     const captionStyling =
       input.captionStyling === true &&
       input.localOnly !== true &&
@@ -14579,7 +14589,8 @@ export default {
                 const reference = crypto.randomUUID();
                 console.error("REELassati foreground analysis failed", {
                   reference,
-                  errorType: cause instanceof Error ? cause.name : typeof cause,
+                  stage: control.diagnosticStage,
+                  ...runtimeFailureDiagnostic(cause),
                 });
                 return json(
                   {

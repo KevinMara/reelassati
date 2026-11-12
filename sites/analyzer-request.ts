@@ -9,6 +9,7 @@ import {
 
 /** Cleanup callbacks must contain database bookkeeping only, never inference. */
 export interface AnalysisControl {
+  diagnosticStage?: "authorization" | "workspace" | "catalog" | "catalog-visuals" | "context" | "credit-reservation" | "provider-start" | "provider-request" | "provider-response" | "compilation";
   purpose?: "video-analysis" | "edit-planning";
   signal: AbortSignal;
   deadlineAt: number;
