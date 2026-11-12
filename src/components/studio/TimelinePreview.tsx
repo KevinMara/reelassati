@@ -62,6 +62,7 @@ function MediaLayer({
   active,
   seekVersion,
   trackGain = 1,
+  waitingForMedia = false,
 }: {
   clip: TimelineClip;
   asset: Asset;
@@ -70,6 +71,7 @@ function MediaLayer({
   active: boolean;
   seekVersion: number;
   trackGain?: number;
+  waitingForMedia?: boolean;
 }) {
   const ref = useRef<HTMLMediaElement | null>(null);
   const pictureRef = useRef<HTMLVideoElement | HTMLImageElement | null>(null);
@@ -112,6 +114,12 @@ function MediaLayer({
     const forceSeek = previousSeek.current !== seekVersion;
     previousSeek.current = seekVersion;
     const sync = () => {
+      // Let the waiting decoder fill its queue. Pausing it at HAVE_CURRENT_DATA
+      // can prevent canplay from arriving. Other ready tracks wait silently.
+      const advance =
+        playing &&
+        !media.error &&
+        (!waitingForMedia || media.readyState < 3 || media.seeking);
       const sourceTime = previewSourceTime(clip, time);
       const mix = audioMixAt(clip, time, trackGain);
       if (playing && !gainRef.current && typeof AudioContext !== "undefined") {
@@ -142,18 +150,27 @@ function MediaLayer({
             gain.linearRampToValueAtTime(point.gain, now + point.after);
         if (playing) void previewAudioContext?.resume().catch(() => undefined);
       } else media.volume = Math.min(1, mix.gain);
-      media.muted = !active || !!clip.muted;
+      media.muted = !active || !!clip.muted || waitingForMedia;
       transportRef.current?.sync(
         sourceTime,
         clip.speed ?? 1,
-        playing,
+        advance,
         forceSeek
       );
     };
     sync();
     media.addEventListener("loadedmetadata", sync);
     return () => media.removeEventListener("loadedmetadata", sync);
-  }, [clip, time, playing, active, seekVersion, trackGain, asset.url]);
+  }, [
+    clip,
+    time,
+    playing,
+    active,
+    seekVersion,
+    trackGain,
+    asset.url,
+    waitingForMedia,
+  ]);
   const opacity = Math.min(
     1,
     clip.fadeIn ? elapsed / clip.fadeIn : 1,
@@ -364,15 +381,22 @@ export function TimelinePreview({
   const ui = useUiText();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [readiness, setReadiness] = useState<PreviewReadiness>("loading");
+  const playbackIntent = useRef(playing);
+  playbackIntent.current = playing;
   const readinessObserver = useRef<
     ReturnType<typeof observePreviewReadiness> | undefined
   >(undefined);
   useLayoutEffect(() => {
     if (!canvasRef.current) return;
-    const observer = observePreviewReadiness(canvasRef.current, state => {
-      setReadiness(current => (current === state ? current : state));
-      onBufferingChange?.(state !== "ready");
-    });
+    const observer = observePreviewReadiness(
+      canvasRef.current,
+      (state, paused) => {
+        setReadiness(current => (current === state ? current : state));
+        onBufferingChange?.(
+          state !== "ready" || (playbackIntent.current && paused)
+        );
+      }
+    );
     readinessObserver.current = observer;
     return () => {
       observer.dispose();
@@ -698,7 +722,8 @@ export function TimelinePreview({
                 clip={clip}
                 asset={asset}
                 time={mediaActive ? time : clip.start}
-                playing={playing && mediaActive && readiness === "ready"}
+                playing={playing && mediaActive}
+                waitingForMedia={readiness !== "ready"}
                 active={mediaActive}
                 seekVersion={seekVersion}
                 trackGain={timelineTrackGain(project, clip)}

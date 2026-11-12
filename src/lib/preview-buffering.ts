@@ -34,7 +34,7 @@ export function previewReadiness(
 /** Media events don't bubble consistently. Capture them on the preview canvas. */
 export function observePreviewReadiness(
   root: HTMLElement,
-  report: (state: PreviewReadiness) => void
+  report: (state: PreviewReadiness, paused: boolean) => void
 ) {
   let disposed = false;
   const refresh = () => {
@@ -62,6 +62,12 @@ export function observePreviewReadiness(
                 ended: element.ended,
               }
         )
+      ),
+      elements.some(
+        element =>
+          element instanceof HTMLMediaElement &&
+          element.paused &&
+          !element.ended
       )
     );
   };
@@ -77,6 +83,9 @@ export function observePreviewReadiness(
     "emptied",
     "error",
     "ended",
+    "play",
+    "playing",
+    "pause",
   ];
   for (const event of events) root.addEventListener(event, refresh, true);
   refresh();
