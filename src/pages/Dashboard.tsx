@@ -3,6 +3,7 @@ import { WorkspaceMomentum } from "@/components/studio/WorkspaceMomentum";
 import { isWorkspaceInterfaceActivity } from "@contracts/workspace-activity-ui";
 import { OwnerOperations } from "@/components/studio/OwnerOperations";
 import { SharedCatalogImport } from "@/components/studio/SharedCatalogImport";
+import { CatalogEvidenceImport } from "@/components/studio/CatalogEvidenceImport";
 import { CreationStart } from "@/components/studio/CreationStart";
 import { BrandSwitcher } from "@/components/studio/BrandSwitcher";
 import { useTranslation } from "react-i18next";
@@ -433,6 +434,7 @@ function StudioStatus() {
     <div className="max-w-4xl mx-auto">
       {capabilities.operations && <OwnerOperations />}
       {capabilities.sharedCatalogAdmin && <SharedCatalogImport />}
+      {capabilities.sharedCatalogAdmin && <CatalogEvidenceImport />}
       <p className="mono-eyebrow text-primary mb-2">
         {ui("Production readiness")}
       </p>

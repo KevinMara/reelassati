@@ -7,6 +7,7 @@ describe("native provider multimodal content", () => {
       { type: "text", text: "Inspect the supplied video" },
       { type: "video_url", video_url: { url: "data:video/mp4;base64,AAAA" } },
       { type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } },
+      { type: "input_audio", input_audio: { data: "SUQzAAAA", format: "mp3" } },
     ];
     const providerBody = JSON.parse(
       JSON.stringify({

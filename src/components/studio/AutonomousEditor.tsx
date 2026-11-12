@@ -444,13 +444,22 @@ export function AutonomousEditor({
               ...p,
               editorChat: {
                 ...chat,
-                messages: [
-                  ...chat.messages.filter(item => item.id !== messageId),
-                  ...(chat.messages.some(item => item.id === inputMessage.id)
-                    ? []
-                    : [inputMessage]),
-                  message,
-                ].slice(-60),
+                // Progress belongs to its original turn. Re-appending it puts
+                // the parent result below additions sent while it was working.
+                messages: (previous
+                  ? chat.messages.map(item =>
+                      item.id === messageId ? message : item
+                    )
+                  : [
+                      ...chat.messages,
+                      ...(chat.messages.some(
+                        item => item.id === inputMessage.id
+                      )
+                        ? []
+                        : [inputMessage]),
+                      message,
+                    ]
+                ).slice(-60),
               },
             };
           }),

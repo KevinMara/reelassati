@@ -12,6 +12,8 @@ const item = {
   name: "Untrusted name",
   width: 1080,
   height: 1920,
+  duration: 1,
+  media: { sha256: hash },
   poster: {
     file: `media/${hash}.png`,
     sha256: hash,
@@ -22,8 +24,10 @@ const item = {
 const environment = (data?: Uint8Array) =>
   ({
     BUCKET: {
-      get: async () =>
-        data ? { size: data.length, body: new Response(data).body } : null,
+      get: async (key: string) =>
+        data && key.startsWith("shared-catalog/")
+          ? { size: data.length, body: new Response(data).body }
+          : null,
     },
   }) as unknown as CatalogEnvironment;
 describe("actual catalog visual evidence", () => {
@@ -64,7 +68,7 @@ describe("actual catalog visual evidence", () => {
         [item, audio],
         new AbortController().signal
       );
-      expect(result.items).toEqual([audio]);
+      expect(result.items).toEqual([]);
       expect(result.parts).toEqual([]);
     }
   );

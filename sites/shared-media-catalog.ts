@@ -2,6 +2,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type { EditProject } from "../contracts/workspace";
 import { sourceReviewFacts } from "../contracts/source-review";
+import { uploadCatalogEvidence } from "./catalog-evidence";
 import {
   normalizeSharedCatalogItem,
   CATALOG_CHUNK_BYTES,
@@ -159,6 +160,12 @@ export function initializeSharedCatalog(env: CatalogEnvironment) {
     ),
     env.DB.prepare(
       "CREATE INDEX IF NOT EXISTS shared_catalog_candidate_scan ON shared_media_catalog(status, kind, id)"
+    ),
+    env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS shared_catalog_evidence (id TEXT PRIMARY KEY NOT NULL, media_sha TEXT NOT NULL, sample_sha TEXT NOT NULL DEFAULT '', evidence_ready INTEGER NOT NULL DEFAULT 0, sound_reviewed INTEGER NOT NULL DEFAULT 0)"
+    ),
+    env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS shared_catalog_sound_leases (id TEXT PRIMARY KEY NOT NULL, lease_id TEXT NOT NULL, expires_at INTEGER NOT NULL)"
     ),
   ])
     .then(() => undefined)
@@ -556,6 +563,44 @@ export async function handleCatalogAdmin(
       403
     );
   await initializeSharedCatalog(env);
+  if (
+    url.pathname === "/api/catalog/admin/evidence" &&
+    request.method === "POST"
+  )
+    return uploadCatalogEvidence(request, env);
+  if (
+    url.pathname === "/api/catalog/admin/evidence-status" &&
+    request.method === "GET"
+  ) {
+    const ids = [
+      ...new Set(
+        (url.searchParams.get("ids") || "").split(",").filter(Boolean)
+      ),
+    ];
+    if (ids.length > 50 || ids.some(id => !/^stock-[a-f0-9]{24}$/.test(id)))
+      fail("Choose up to 50 valid catalog IDs.");
+    const rows = ids.length
+      ? (
+          await env.DB.prepare(
+            `SELECT id,evidence_ready,sound_reviewed FROM shared_catalog_evidence WHERE id IN (${ids.map(() => "?").join(",")})`
+          )
+            .bind(...ids)
+            .all<{
+              id: string;
+              evidence_ready: number;
+              sound_reviewed: number;
+            }>()
+        ).results
+      : [];
+    const found = new Map(rows.map(r => [r.id, r]));
+    return response({
+      items: ids.map(id => ({
+        id,
+        ready: found.get(id)?.evidence_ready === 1,
+        soundReviewed: found.get(id)?.sound_reviewed === 1,
+      })),
+    });
+  }
   if (
     url.pathname === "/api/catalog/admin/status" &&
     request.method === "GET"

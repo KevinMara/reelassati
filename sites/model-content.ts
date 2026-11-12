@@ -1,7 +1,8 @@
 export type ModelContentPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } }
-  | { type: "video_url"; video_url: { url: string } };
+  | { type: "video_url"; video_url: { url: string } }
+  | { type: "input_audio"; input_audio: { data: string; format: "mp3" } };
 
 /** Native media parts must stay arrays. Stringifying them turns actual media into filenames/URL text. */
 export function modelUserContent(value: unknown): string | ModelContentPart[] {
@@ -13,6 +14,17 @@ export function modelUserContent(value: unknown): string | ModelContentPart[] {
       throw new Error("Invalid model content part.");
     if (part.type === "text" && typeof part.text === "string")
       return { type: "text", text: part.text };
+    if (
+      part.type === "input_audio" &&
+      part.input_audio?.format === "mp3" &&
+      typeof part.input_audio.data === "string" &&
+      part.input_audio.data.length <= 1500000 &&
+      /^[A-Za-z0-9+/]+={0,2}$/.test(part.input_audio.data)
+    )
+      return {
+        type: "input_audio",
+        input_audio: { data: part.input_audio.data, format: "mp3" },
+      };
     for (const type of ["image_url", "video_url"] as const) {
       if (
         part.type === type &&

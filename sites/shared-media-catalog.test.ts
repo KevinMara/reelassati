@@ -204,6 +204,69 @@ async function publish() {
   );
 }
 describe("verified chunked catalog import", () => {
+  it("keeps evidence owner-only and checks published identity and media digests before storing", async () => {
+    await publish();
+    const jpg = Uint8Array.from([255, 216, 0, 0, 0, 0, 255, 217]);
+    const packet = {
+      schemaVersion: 1,
+      catalogId: item.id,
+      mediaSha256: item.media.sha256,
+      kind: "video",
+      duration: 1,
+      visual: {
+        data: Buffer.from(jpg).toString("base64"),
+        sha256: digest(jpg),
+        contentType: "image/jpeg",
+        bytes: jpg.length,
+        width: 240,
+        height: 180,
+        columns: 1,
+        frameTimes: [0, 0.2, 0.5, 0.9],
+        sourceWidth: 1920,
+        sourceHeight: 1080,
+        coverage: "sampled-motion",
+      },
+    };
+    expect(
+      (await admin("evidence", "POST", JSON.stringify([packet]), false)).status
+    ).toBe(403);
+    expect(
+      (
+        await admin(
+          "evidence",
+          "POST",
+          JSON.stringify([{ ...packet, mediaSha256: "b".repeat(64) }])
+        )
+      ).status
+    ).toBe(422);
+    expect(objects.has(`catalog-evidence/v1/${item.media.sha256}.json`)).toBe(
+      false
+    );
+    expect(
+      (await admin("evidence", "POST", JSON.stringify([packet]))).status
+    ).toBe(200);
+    expect((await admin(`evidence-status?ids=${item.id}`)).status).toBe(200);
+    expect(
+      await (await admin(`evidence-status?ids=${item.id}`)).json()
+    ).toEqual({ items: [{ id: item.id, ready: true, soundReviewed: false }] });
+    expect(
+      (
+        await admin(
+          "evidence",
+          "POST",
+          JSON.stringify([
+            {
+              ...packet,
+              visual: {
+                ...packet.visual,
+                data: Buffer.alloc(8).toString("base64"),
+              },
+            },
+          ])
+        )
+      ).status
+    ).toBe(422);
+  });
   it("keeps staged parts private and publishes only after full-file verification and poster completion", async () => {
     await stage();
     expect(

@@ -80,6 +80,9 @@ const objects = new Map<string, Uint8Array>();
 const env = {
   DB,
   BUCKET: {
+    async put(key: string, body: BodyInit) {
+      objects.set(key, new Uint8Array(await new Response(body).arrayBuffer()));
+    },
     async get(
       key: string,
       options?: { range?: { offset: number; length: number } }
@@ -107,6 +110,7 @@ const env = {
   OPENROUTER_API_KEY: "test-only-provider",
   OPENROUTER_TEXT_MODEL: "moonshotai/kimi-k2.5",
   AI_CREDIT_ACCESS_EMAIL: "owner@example.com",
+  SHARED_CATALOG_OWNER_EMAIL: "owner@example.com",
   AI_PROVENANCE_SIGNING_KEY:
     "test-only-provenance-signing-key-at-least-32-characters",
   ASSETS: { fetch: () => new Response("static") },
@@ -182,14 +186,22 @@ async function request(
         headers: {
           Authorization: `Bearer ${owner}`,
           "Content-Type": "application/json",
-          ...(["/api/ai/analyze", "/api/ai/edit-plan"].includes(path)
+          ...([
+            "/api/ai/analyze",
+            "/api/ai/edit-plan",
+            "/api/catalog/admin/review-sounds",
+          ].includes(path)
             ? { Accept: ANALYZER_STREAM_TYPE }
             : {}),
         },
         ...(body
           ? {
               body: JSON.stringify(
-                ["/api/ai/analyze", "/api/ai/edit-plan"].includes(path)
+                [
+                  "/api/ai/analyze",
+                  "/api/ai/edit-plan",
+                  "/api/catalog/admin/review-sounds",
+                ].includes(path)
                   ? { requestId: crypto.randomUUID(), ...(body as object) }
                   : body
               ),
@@ -659,6 +671,160 @@ describe("foreground K3 auto-edit planning", () => {
       log.mockRestore();
     }
   });
+  it("listens to actual audio parts once, preserves cached reviews and invalidates changed samples", async () => {
+    const originalOutput = nextOutput;
+    const sha256 = "d".repeat(64),
+      id = `stock-${sha256.slice(0, 24)}`;
+    const bytes = Buffer.from([73, 68, 51, 0, 0, 0, 0, 0]);
+    const sampleSha = createHash("sha256").update(bytes).digest("hex");
+    const item = {
+      id,
+      name: "Name must not steer listening",
+      group: "Sounds",
+      designId: "design-sound-test",
+      variant: "Audio",
+      kind: "audio",
+      waveform: Array(64).fill(0.1),
+      tags: [],
+      duration: 2,
+      media: {
+        file: `media/${sha256}.wav`,
+        sha256,
+        bytes: 100,
+        contentType: "audio/wav",
+      },
+      license: "platform-licensed",
+      credits: 0,
+    };
+    const packet = {
+      schemaVersion: 1,
+      catalogId: id,
+      mediaSha256: sha256,
+      kind: "audio",
+      duration: 2,
+      audio: {
+        data: bytes.toString("base64"),
+        sha256: sampleSha,
+        bytes: bytes.length,
+        contentType: "audio/mpeg",
+        coverage: "complete-audio",
+        segments: [{ sourceStart: 0, sourceEnd: 2, sampleStart: 0 }],
+        measured: {
+          duration: 2,
+          peakDb: -1,
+          rmsDb: -12,
+          activeStart: 0,
+          activeEnd: 2,
+          onsets: [0],
+          envelope: Array(64).fill(0.1),
+        },
+      },
+    };
+    await initializeSharedCatalog(env as never);
+    sqlite
+      .prepare(
+        "INSERT INTO shared_media_catalog (id,name,group_name,design_id,kind,search_text,payload,media_ready,poster_ready,status,created_at) VALUES (?,?,?,?,?,?,?,1,1,'ready',?)"
+      )
+      .run(
+        id,
+        item.name,
+        item.group,
+        item.designId,
+        item.kind,
+        "sound",
+        JSON.stringify(item),
+        "2026-11-12"
+      );
+    expect(
+      (await request("/api/catalog/admin/evidence", [packet])).status
+    ).toBe(200);
+    const calls = providerCalls.length;
+    try {
+      expect(
+        (
+          await request(
+            "/api/catalog/admin/review-sounds",
+            { ids: [id] },
+            "stranger@example.com"
+          )
+        ).status
+      ).toBe(403);
+      expect(providerCalls).toHaveLength(calls);
+      nextOutput = {
+        sounds: [
+          {
+            id,
+            character: "One soft bell with a short decay",
+            role: "effect",
+            audibleEvents: ["One bell"],
+            suitableUses: ["Quiet completion"],
+            avoidUses: ["Large impact"],
+            containsSpeech: false,
+            intensity: "subtle",
+            confidence: 0.9,
+          },
+        ],
+      };
+      const response = await request("/api/catalog/admin/review-sounds", {
+        ids: [id],
+      });
+      const reviewed = await response.json();
+      expect(response.status, JSON.stringify(reviewed)).toBe(200);
+      expect(reviewed.reviewed).toEqual([id]);
+      expect(providerCalls).toHaveLength(calls + 1);
+      expect(providerCalls.at(-1)?.model).toBe("google/gemini-2.5-flash");
+      const sent = JSON.stringify(providerCalls.at(-1));
+      expect(sent).toContain("input_audio");
+      expect(sent).toContain(bytes.toString("base64"));
+      expect(sent).not.toContain(item.name);
+      expect(
+        await (
+          await request("/api/catalog/admin/review-sounds", { ids: [id] })
+        ).json()
+      ).toMatchObject({ reviewed: [], skipped: [id] });
+      expect(providerCalls).toHaveLength(calls + 1);
+      expect(
+        sqlite
+          .prepare("SELECT COUNT(*) AS count FROM shared_catalog_sound_leases")
+          .get()?.count
+      ).toBe(0);
+      expect(
+        (await request("/api/catalog/admin/evidence", [packet])).status
+      ).toBe(200);
+      expect(
+        sqlite
+          .prepare(
+            "SELECT sound_reviewed FROM shared_catalog_evidence WHERE id=?"
+          )
+          .get(id)?.sound_reviewed
+      ).toBe(1);
+      const changed = Buffer.from([73, 68, 51, 0, 0, 0, 0, 1]);
+      const changedPacket = {
+        ...packet,
+        audio: {
+          ...packet.audio,
+          data: changed.toString("base64"),
+          sha256: createHash("sha256").update(changed).digest("hex"),
+        },
+      };
+      expect(
+        (await request("/api/catalog/admin/evidence", [changedPacket])).status
+      ).toBe(200);
+      expect(
+        sqlite
+          .prepare(
+            "SELECT sound_reviewed FROM shared_catalog_evidence WHERE id=?"
+          )
+          .get(id)?.sound_reviewed
+      ).toBe(0);
+    } finally {
+      nextOutput = originalOutput;
+      sqlite.prepare("DELETE FROM shared_media_catalog WHERE id=?").run(id);
+      sqlite.prepare("DELETE FROM shared_catalog_evidence WHERE id=?").run(id);
+      objects.delete(`catalog-evidence/v1/${sha256}.json`);
+      objects.delete(`catalog-evidence/v1/${sha256}.sound.json`);
+    }
+  });
   it("preserves the same catalog LUT through manual, Reel and auto-edit application and owned workspace reload", async () => {
     const originalOutput = nextOutput;
     const calls = providerCalls.length;
@@ -709,6 +875,35 @@ describe("foreground K3 auto-edit planning", () => {
         "2026-11-11"
       );
     const expected = { id: item.id, name: item.name, sha256, amount: 0.35 };
+    // Automatic selection requires measured source evidence, not the look's name.
+    objects.set(
+      `catalog-evidence/v1/${sha256}.json`,
+      new TextEncoder().encode(
+        JSON.stringify({
+          schemaVersion: 1,
+          catalogId: item.id,
+          mediaSha256: sha256,
+          kind: "lut",
+          duration: 0,
+          lut: {
+            coverage: "measured-lut",
+            domainMin: [0, 0, 0],
+            domainMax: [1, 1, 1],
+            gridSamples: 8,
+            clippedSamples: 0,
+            neutralCurve: Array.from({ length: 17 }, (_, i) => [
+              i / 16,
+              i / 16,
+              i / 16,
+            ]),
+            colorSamples: Array.from({ length: 9 }, (_, i) => ({
+              input: [i / 8, i / 8, i / 8],
+              output: [i / 8, i / 8, i / 8],
+            })),
+          },
+        })
+      )
+    );
     const raw = {
       type: "style",
       label: "Apply Quiet film",

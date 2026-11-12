@@ -479,34 +479,128 @@ function supportRequestJson<T>(
 }
 
 export const platformApi = {
+  catalogEvidenceStatus: (ids: string[], options: UploadRequestOptions) =>
+    requestJson<{
+      items: { id: string; ready: boolean; soundReviewed: boolean }[];
+    }>(
+      `/api/catalog/admin/evidence-status?ids=${encodeURIComponent(ids.join(","))}`,
+      { signal: options.signal },
+      false,
+      options.scope
+    ),
+  catalogEvidenceUpload: (
+    items: import("@contracts/catalog-evidence").CatalogEvidence[],
+    options: UploadRequestOptions
+  ) =>
+    requestJson<{ saved: string[] }>(
+      "/api/catalog/admin/evidence",
+      { method: "POST", body: JSON.stringify(items), signal: options.signal },
+      false,
+      options.scope
+    ),
+  catalogReviewSounds: (ids: string[], options: UploadRequestOptions) =>
+    requestJson<{ reviewed: string[]; skipped: string[] }>(
+      "/api/catalog/admin/review-sounds",
+      {
+        method: "POST",
+        headers: { Accept: ANALYZER_STREAM_TYPE },
+        body: JSON.stringify({ ids }),
+        signal: options.signal,
+      },
+      false,
+      options.scope
+    ),
   catalogImportStatus: (ids: string[], options?: UploadRequestOptions) =>
-    catalogRequest(signal => requestJson<import("./shared-catalog-import").CatalogAdminStatus>(
-      `/api/catalog/admin/status?ids=${encodeURIComponent(ids.join(","))}`,
-      { signal }, false, options?.scope
-    ), options?.signal),
-  catalogImportManifest: (manifest: import("@contracts/shared-media-catalog").SharedMediaCatalogManifest, options?: UploadRequestOptions) =>
-    catalogRequest(signal => requestJson<{ accepted: number }>("/api/catalog/admin/manifest", {
-      method: "POST", body: JSON.stringify(manifest), signal,
-    }, false, options?.scope), options?.signal),
-  catalogImportObject: async (id: string, role: "media" | "poster", file: File, contentType: string, options?: UploadRequestOptions) => {
-    const { CATALOG_SINGLE_REQUEST_MAX_BYTES, CATALOG_CHUNK_BYTES } = await import("@contracts/shared-media-catalog");
+    catalogRequest(
+      signal =>
+        requestJson<import("./shared-catalog-import").CatalogAdminStatus>(
+          `/api/catalog/admin/status?ids=${encodeURIComponent(ids.join(","))}`,
+          { signal },
+          false,
+          options?.scope
+        ),
+      options?.signal
+    ),
+  catalogImportManifest: (
+    manifest: import("@contracts/shared-media-catalog").SharedMediaCatalogManifest,
+    options?: UploadRequestOptions
+  ) =>
+    catalogRequest(
+      signal =>
+        requestJson<{ accepted: number }>(
+          "/api/catalog/admin/manifest",
+          {
+            method: "POST",
+            body: JSON.stringify(manifest),
+            signal,
+          },
+          false,
+          options?.scope
+        ),
+      options?.signal
+    ),
+  catalogImportObject: async (
+    id: string,
+    role: "media" | "poster",
+    file: File,
+    contentType: string,
+    options?: UploadRequestOptions
+  ) => {
+    const { CATALOG_SINGLE_REQUEST_MAX_BYTES, CATALOG_CHUNK_BYTES } =
+      await import("@contracts/shared-media-catalog");
     const path = `/api/catalog/admin/object/${encodeURIComponent(id)}/${role}`;
     if (file.size > CATALOG_SINGLE_REQUEST_MAX_BYTES) {
       for (let offset = 0; offset < file.size; offset += CATALOG_CHUNK_BYTES) {
         options?.signal?.throwIfAborted();
         const chunk = file.slice(offset, offset + CATALOG_CHUNK_BYTES);
-        await catalogRequest(signal => requestJson(`${path}/chunks/${offset / CATALOG_CHUNK_BYTES}`, {
-          method: "PUT", headers: { "Content-Type": "application/octet-stream" },
-          body: chunk, signal,
-        }, false, options?.scope), options?.signal, chunk.size);
+        await catalogRequest(
+          signal =>
+            requestJson(
+              `${path}/chunks/${offset / CATALOG_CHUNK_BYTES}`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/octet-stream" },
+                body: chunk,
+                signal,
+              },
+              false,
+              options?.scope
+            ),
+          options?.signal,
+          chunk.size
+        );
       }
-      return catalogRequest(signal => requestJson<{ id: string; role: "media" | "poster"; verified: true }>(`${path}/complete`, {
-        method: "POST", signal,
-      }, false, options?.scope), options?.signal, file.size);
+      return catalogRequest(
+        signal =>
+          requestJson<{ id: string; role: "media" | "poster"; verified: true }>(
+            `${path}/complete`,
+            {
+              method: "POST",
+              signal,
+            },
+            false,
+            options?.scope
+          ),
+        options?.signal,
+        file.size
+      );
     }
-    return catalogRequest(signal => requestJson<{ id: string; role: "media" | "poster"; verified: true }>(path, {
-      method: "PUT", headers: { "Content-Type": contentType }, body: file, signal,
-    }, false, options?.scope), options?.signal, file.size);
+    return catalogRequest(
+      signal =>
+        requestJson<{ id: string; role: "media" | "poster"; verified: true }>(
+          path,
+          {
+            method: "PUT",
+            headers: { "Content-Type": contentType },
+            body: file,
+            signal,
+          },
+          false,
+          options?.scope
+        ),
+      options?.signal,
+      file.size
+    );
   },
   serviceDiagnostics: (options?: UploadRequestOptions) =>
     requestJson<import("@contracts/service-diagnostics").ServiceDiagnostics>(
@@ -728,9 +822,19 @@ export const platformApi = {
     }),
 
   searchSharedCatalog: (query: URLSearchParams, signal?: AbortSignal) =>
-    requestJson<import("@contracts/shared-media-catalog").SharedMediaCatalogPage>(`/api/catalog/search?${query}`, { signal }),
-  importSharedCatalog: (id: string, options?: { signal?: AbortSignal; scope?: UploadRequestScope }) =>
-    requestJson<Asset>("/api/catalog/import", { method: "POST", body: JSON.stringify({ id }), signal: options?.signal }, false, options?.scope),
+    requestJson<
+      import("@contracts/shared-media-catalog").SharedMediaCatalogPage
+    >(`/api/catalog/search?${query}`, { signal }),
+  importSharedCatalog: (
+    id: string,
+    options?: { signal?: AbortSignal; scope?: UploadRequestScope }
+  ) =>
+    requestJson<Asset>(
+      "/api/catalog/import",
+      { method: "POST", body: JSON.stringify({ id }), signal: options?.signal },
+      false,
+      options?.scope
+    ),
   searchStock: (
     kind: import("@contracts/stock-media").StockKind,
     query: string,
