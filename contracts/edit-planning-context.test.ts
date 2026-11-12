@@ -178,7 +178,11 @@ describe("evidence-backed auto-edit planning", () => {
       buildEditPlanningContext(project, assets),
       duration
     ) as EditOperation[];
-    expect(compiled).toEqual({ ...proposed, type: "sound" });
+    expect(compiled).toEqual({
+      ...proposed,
+      type: "sound",
+      parameters: { ...proposed.parameters, fadeIn: 0.25, fadeOut: 0.75 },
+    });
     expect(() => assertExecutableEditPlan([compiled])).not.toThrow();
     const result = executeAutonomousPlan(
       project,
@@ -583,6 +587,60 @@ describe("evidence-backed auto-edit planning", () => {
         parameters: { assetId: "detail", sourceIn: 5 },
       },
     ]);
+  });
+
+  it("finishes a music bed without turning a short sound cue into a slow fade", () => {
+    const { context, project } = fixture();
+    const raw = [
+      {
+        type: "sound",
+        start: 0,
+        end: 12,
+        parameters: { assetId: "catalog:chill-lofi" },
+      },
+      {
+        type: "sound",
+        start: 1,
+        end: 1.2,
+        parameters: { assetId: "catalog:zen-check" },
+      },
+      {
+        type: "sound",
+        start: 0,
+        end: 0.2,
+        parameters: { assetId: "catalog:chill-lofi" },
+      },
+      {
+        type: "sound",
+        start: 0,
+        end: 12,
+        parameters: { assetId: "catalog:chill-lofi", fadeIn: 0, fadeOut: 0.4 },
+      },
+    ];
+    const before = structuredClone(raw);
+    const resolved = resolveEditPlanningReferences(
+      raw,
+      context,
+      12
+    ) as EditOperation[];
+    const clips = resolved.map((operation, index) =>
+      applyEditOperation(project, {
+        ...operation,
+        id: `sound-${index}`,
+        label: "Sound",
+      }).clips.find(clip => clip.id === `sound-${index}`)!
+    );
+    expect(clips.map(clip => [clip.fadeIn, clip.fadeOut])).toEqual([
+      [0.25, 0.75],
+      [0.015, 0.04],
+      [0.1, 0.1],
+      [0, 0.4],
+    ]);
+    expect(resolved[0].parameters).toMatchObject({
+      fadeIn: 0.25,
+      fadeOut: 0.75,
+    });
+    expect(raw).toEqual(before);
   });
 
   it("aligns the real catalog waveform peak to the chosen word and preserves it through a ripple cut", () => {

@@ -598,6 +598,22 @@ export function resolveEditPlanningReferences(
       parameters.destination = operation.start;
     if (operation.type === "audio" && parameters.volume === undefined)
       parameters.volume = 0.25;
+    if (
+      operation.type === "sound" &&
+      context.freeSounds.some(
+        sound => sound.assetId === parameters.assetId && sound.type === "music"
+      )
+    ) {
+      // A music bed can end midway through its source phrase. The executor's
+      // click-prevention fades suit one-shot SFX, not that musical ending.
+      // Sign these defaults into the proposal, preserving explicit zero fades.
+      const halfDuration = Math.max(
+        0,
+        ((operation.end as number) - (operation.start as number)) / 2
+      );
+      parameters.fadeIn ??= Math.min(0.25, halfDuration);
+      parameters.fadeOut ??= Math.min(0.75, halfDuration);
+    }
     let targets = Array.isArray(operation.targetClipIds)
       ? (operation.targetClipIds as string[])
       : [];
@@ -803,6 +819,9 @@ type=sound with parameters.assetId, even for a full-length music bed. For exampl
 adds a quiet music lane and preserves source speech volume. To duck existing music,
 target its actual audio clip with type=audio; never target the speaking video merely
 because the new bed should be quiet. sourceIn selects the audio-file offset in seconds.
+Music beds default to a 0.25-second entrance and a 0.75-second ending fade (shortened
+for very short clips). Set fadeIn/fadeOut explicitly for a deliberate hard start,
+musical resolution or other authored envelope; SFX retain their short natural tails.
 For a catalog sound cue, use cue:{speechId,wordIndex,edge:start,align:peak|start} or
 cue:{sceneId,edge:start,align:peak|start}; omit duration/start/end and sourceIn. The
 compiler aligns the measured waveform peak estimate or file onset, preserves natural
