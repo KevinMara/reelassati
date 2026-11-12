@@ -521,7 +521,7 @@ describe("saved paid review reuse", () => {
     ).toThrow("could not be saved");
     expect(saved).toHaveLength(3);
   });
-  it("transcribes dialogue but never a built-in check sound or generated music during auto-edit", async () => {
+  it("transcribes dialogue but never built-in/catalog sound or generated music during auto-edit", async () => {
     const input = fixture();
     const effect = {
       ...source,
@@ -536,12 +536,17 @@ describe("saved paid review reuse", () => {
       kind: "audio",
       provenance: { operation: "audio-generation" },
     } as Asset;
-    input.sources = [effect, music, source];
+    const catalogSound = {
+      ...effect,
+      id: "catalog-sound",
+      variantGroupId: "shared-catalog:stock-123456789012345678901234",
+    };
+    input.sources = [effect, music, catalogSound, source];
     input.project = {
       ...project,
       clips: [
         ...project.clips,
-        ...[effect, music].map(asset => ({
+        ...[effect, music, catalogSound].map(asset => ({
           ...project.clips[0],
           id: asset.id,
           assetId: asset.id,

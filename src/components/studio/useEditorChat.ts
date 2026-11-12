@@ -4,6 +4,7 @@ import {
 } from "@/lib/shared-media-catalog";
 import { preflightEditColorLuts } from "@/lib/catalog-color-lut-preflight";
 import { mergeCreditReceipt } from "@contracts/credit-receipt";
+import { nextReelAddition, type ReelAddition } from "@/lib/reel-additions";
 import { translateUi } from "@/lib/i18n/ui";
 import {
   activeEditorProjects as activeProjects,
@@ -88,7 +89,10 @@ const DEFAULT_CHAT: EditorChatState = {
 
 export function useEditorChat(
   project: EditProject,
-  { onSeek }: { onSeek: (time: number) => void }
+  {
+    onSeek,
+    externalBusy = false,
+  }: { onSeek: (time: number) => void; externalBusy?: boolean }
 ) {
   const { workspace, updateWorkspace, getWorkspaceSnapshot } = useWorkspace();
   const owner = workspace.profile.email.toLowerCase();
@@ -99,6 +103,8 @@ export function useEditorChat(
   const mediaController = useRef<AbortController | null>(null);
   const attachmentController = useRef<AbortController | null>(null);
   const queuedMessages = useRef(new Set<string>());
+  const additions = useRef<ReelAddition[]>([]);
+  const [additionRevision, setAdditionRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const state = useMemo(
@@ -155,7 +161,13 @@ export function useEditorChat(
   ) {
     return changeChat(s => ({
       ...s,
-      messages: s.messages.map(m => (m.id === id ? transform(m) : m)),
+      messages: s.messages.map(m => {
+        if (m.id !== id) return m;
+        const updated = transform(m);
+        return updated.status === "stopped"
+          ? updated
+          : { ...updated, pendingAddition: undefined };
+      }),
     }));
   }
   async function changeAction(
@@ -185,14 +197,74 @@ export function useEditorChat(
     stopRequested.current = false;
     mountedScope.current += 1;
     const queue = queuedMessages.current;
+    const pendingAdditions = additions.current;
     return () => {
       stopRequested.current = true;
       mountedScope.current += 1;
       mediaController.current?.abort();
       attachmentController.current?.abort();
       queue.clear();
+      pendingAdditions.splice(0);
     };
   }, [project.id, owner, brand]);
+
+  useEffect(() => {
+    if (
+      externalBusy ||
+      busy ||
+      activeProjects.has(runKey) ||
+      stopRequested.current
+    )
+      return;
+    const pending = additions.current[0];
+    const parent = state.messages.find(
+      message => message.id === pending?.parentId
+    );
+    if (
+      pending &&
+      parent &&
+      ["failed", "stopped", "partial"].includes(parent.status ?? "")
+    ) {
+      const ids = new Set(
+        additions.current.splice(0).map(addition => `${addition.id}-reel`)
+      );
+      void changeChat(s => ({
+        ...s,
+        messages: s.messages.map(message =>
+          ids.has(message.id)
+            ? {
+                ...message,
+                text: "Your addition is saved. Resume it when you're ready.",
+              }
+            : message
+        ),
+      })).catch(() => undefined);
+      return;
+    }
+    const next = nextReelAddition(additions.current, state.messages);
+    if (!next) return;
+    const request = state.messages.find(
+      message => message.id === `${next.id}-reel`
+    )?.request;
+    if (!request) return;
+    // Later additions depend on this one, too. A failed addition must not launch
+    // the rest using assumptions that were never applied.
+    for (const addition of additions.current)
+      addition.parentId = `${next.id}-reel`;
+    void send(
+      request.prompt,
+      request.references,
+      request.range,
+      request.selectedClipIds,
+      request,
+      next.id
+    )
+      .then(accepted => {
+        if (!accepted && !stopRequested.current)
+          additions.current.unshift(next);
+      })
+      .catch(cause => setError(String(cause)));
+  }, [externalBusy, busy, runKey, state.messages, additionRevision]);
 
   // A re-opened tab reads saved results; it never silently repeats a paid request.
   useEffect(() => {
@@ -201,6 +273,7 @@ export function useEditorChat(
       m =>
         m.status === "planning" ||
         m.status === "running" ||
+        m.pendingAddition ||
         m.plan?.actions.some(a => a.status === "running")
     );
     if (!interrupted) return;
@@ -216,8 +289,9 @@ export function useEditorChat(
         status: ["planning", "running"].includes(m.status ?? "")
           ? "stopped"
           : m.status,
-        text:
-          m.activity && m.status === "running"
+        text: m.pendingAddition
+          ? "Your addition is saved. Resume it when you're ready."
+          : m.activity && m.status === "running"
             ? translateUi("Edit paused")
             : m.status === "planning"
               ? "Planning was interrupted. Resume to check the same saved request; it will not start a second paid plan."
@@ -1034,22 +1108,93 @@ export function useEditorChat(
     options: Pick<
       EditorChatRequest,
       "executionMode" | "taskPreset" | "effort" | "ranges"
-    > = {}
+    > = {},
+    existingId?: string
   ) {
-    if (!prompt.trim() || activeProjects.has(runKey)) return false;
+    if (!prompt.trim()) return false;
+    if (activeProjects.has(runKey) || externalBusy) {
+      if (existingId) return false;
+      const id = uuid();
+      const settings =
+        normalizeEditorChatState(getProject().editorChat) ?? DEFAULT_CHAT;
+      const parent = [...settings.messages]
+        .reverse()
+        .find(
+          message =>
+            message.role === "assistant" &&
+            ["running", "planning"].includes(message.status ?? "")
+        );
+      const request: EditorChatRequest = {
+        ...options,
+        requestId: id,
+        projectId: project.id,
+        prompt: prompt.trim(),
+        mode: settings.mode,
+        maxCredits: settings.maxCredits,
+        references,
+        range,
+        selectedClipIds,
+      };
+      // Save first: a failed save leaves the user's composer intact. The inbox is
+      // scoped to this mounted editor and is consumed only after the active run.
+      const scopeVersion = mountedScope.current;
+      await changeChat(s => ({
+        ...s,
+        messages: [
+          ...s.messages,
+          {
+            id,
+            requestId: id,
+            role: "user",
+            text: prompt.trim(),
+            createdAt: new Date().toISOString(),
+            references,
+            request,
+          },
+          {
+            id: `${id}-reel`,
+            requestId: id,
+            role: "assistant",
+            text: "Added to this edit. I'll include it after the current step.",
+            createdAt: new Date().toISOString(),
+            status: "stopped",
+            pendingAddition: true,
+            mode: settings.mode,
+            maxCredits: settings.maxCredits,
+            usedCredits: 0,
+            creditReceipts: [],
+            creditReceiptsComplete: true,
+            request,
+          },
+        ].slice(-60) as EditorChatMessage[],
+      }));
+      if (mountedScope.current === scopeVersion && !stopRequested.current) {
+        additions.current.push({ id, parentId: parent?.id });
+        setAdditionRevision(value => value + 1);
+      }
+      return true;
+    }
     activeProjects.add(runKey);
     const scopeVersion = mountedScope.current;
     setBusy(true);
     setError("");
     mediaController.current = new AbortController();
     stopRequested.current = false;
-    const id = uuid();
+    const id = existingId ?? uuid();
     const assistantId = `${id}-reel`;
     try {
       const settings =
         normalizeEditorChatState(getProject().editorChat) ?? DEFAULT_CHAT;
       const history = settings.messages
-        .filter(m => m.text)
+        .filter(
+          m =>
+            m.text &&
+            m.id !== id &&
+            m.id !== assistantId &&
+            !additions.current.some(
+              addition => m.id === addition.id || m.id === `${addition.id}-reel`
+            )
+        )
         .slice(-12)
         .map(m => ({ role: m.role, text: editorialConversationText(m) }));
       const request = {
@@ -1064,10 +1209,8 @@ export function useEditorChat(
         range,
         selectedClipIds,
       };
-      await changeChat(s => ({
-        ...s,
-        messages: [
-          ...s.messages,
+      await changeChat(s => {
+        const started: EditorChatMessage[] = [
           {
             id,
             requestId: id,
@@ -1094,8 +1237,23 @@ export function useEditorChat(
             references,
             request,
           },
-        ].slice(-60) as EditorChatMessage[],
-      }));
+        ];
+        return {
+          ...s,
+          messages: existingId
+            ? s.messages.map(message =>
+                started.find(replacement => replacement.id === message.id)
+                  ? {
+                      ...started.find(
+                        replacement => replacement.id === message.id
+                      )!,
+                      createdAt: message.createdAt,
+                    }
+                  : message
+              )
+            : [...s.messages, ...started].slice(-60),
+        };
+      });
       const response = await platformApi.editorChat(
         request,
         receiptOptions(assistantId)
@@ -1109,11 +1267,15 @@ export function useEditorChat(
     } catch (cause) {
       const detail =
         cause instanceof Error ? cause.message : "Planning could not finish.";
-      setError(detail);
+      const stopped =
+        stopRequested.current ||
+        (cause instanceof Error && cause.name === "AbortError");
+      setError(stopped ? "" : detail);
       await changeMessage(assistantId, m => ({
         ...m,
-        text: detail,
-        status: "failed",
+        text: stopped ? "Edit stopped. Your instructions are saved." : detail,
+        status: stopped ? "stopped" : "failed",
+        creditReceiptsComplete: stopped ? false : m.creditReceiptsComplete,
       })).catch(() => undefined);
     } finally {
       activeProjects.delete(runKey);
@@ -1510,6 +1672,21 @@ export function useEditorChat(
       stopRequested.current = true;
       mediaController.current?.abort();
       queuedMessages.current.clear();
+      const pending = new Set(
+        additions.current.splice(0).map(addition => `${addition.id}-reel`)
+      );
+      if (pending.size)
+        void changeChat(s => ({
+          ...s,
+          messages: s.messages.map(message =>
+            pending.has(message.id)
+              ? {
+                  ...message,
+                  text: "Your addition is saved. Resume it when you're ready.",
+                }
+              : message
+          ),
+        })).catch(() => undefined);
     },
     setPreferences: async (
       patch: Partial<Pick<EditorChatState, "mode" | "maxCredits">>

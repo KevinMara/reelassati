@@ -1,9 +1,25 @@
 import {
+  cutRepairScope,
+  mergeCutRepair,
+  EDIT_CUT_REPAIR_DIRECTION,
+} from "../contracts/edit-cut-repair";
+import { catalogVisualEvidence } from "./catalog-visual-evidence";
+import {
   EDIT_CUT_GUIDANCE,
   assertAutonomousTrimSemantics,
 } from "../contracts/edit-cut-semantics";
-import { handleCatalogAdmin, handleCatalogPublic, initializeSharedCatalog, sharedCatalogCandidates, catalogCandidateContext, copySharedCatalogMedia } from "./shared-media-catalog";
-import { normalizeSharedCatalogItem, sharedCatalogPlanningAssets } from "../contracts/shared-media-catalog";
+import {
+  handleCatalogAdmin,
+  handleCatalogPublic,
+  initializeSharedCatalog,
+  sharedCatalogCandidates,
+  catalogCandidateContext,
+  copySharedCatalogMedia,
+} from "./shared-media-catalog";
+import {
+  normalizeSharedCatalogItem,
+  sharedCatalogPlanningAssets,
+} from "../contracts/shared-media-catalog";
 import { normalizeClipColorLut } from "../contracts/color-lut";
 import {
   EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION,
@@ -15,7 +31,11 @@ import {
   type EditPlanQualityReview,
 } from "../contracts/edit-plan-quality";
 import type { AutonomousGraphicReview } from "../contracts/autonomous-execution";
-import { editPlanSoundRepairFeedback, mergeEditPlanSoundRepair, EDIT_PLAN_SOUND_REPAIR_DIRECTION } from "../contracts/edit-plan-sound-repair";
+import {
+  editPlanSoundRepairFeedback,
+  mergeEditPlanSoundRepair,
+  EDIT_PLAN_SOUND_REPAIR_DIRECTION,
+} from "../contracts/edit-plan-sound-repair";
 import {
   EDITORIAL_COVERAGE_DIRECTION,
   reviewEditorialCoverage,
@@ -37,8 +57,19 @@ import { normalizeTransitionPresets } from "../contracts/transition-presets";
 import { LOCAL_SPEECH_MODEL } from "../contracts/local-speech-model";
 import { parseLocalTranscriptSegments } from "../contracts/local-transcript";
 import type { StockMedia } from "../contracts/stock-media";
-import { editorialStockSearches, associateEditorialStock, reviewEditorialStockOperations, EDITORIAL_STOCK_SEARCH_DIRECTION, EDITORIAL_STOCK_REFINEMENT_DIRECTION, type EditorialStockCandidate, type EditorialStockReview } from "../contracts/editorial-stock";
-import { GRAPHIC_PRESETS, CLIP_LOOK_PRESETS } from "../contracts/editor-presets";
+import {
+  editorialStockSearches,
+  associateEditorialStock,
+  reviewEditorialStockOperations,
+  EDITORIAL_STOCK_SEARCH_DIRECTION,
+  EDITORIAL_STOCK_REFINEMENT_DIRECTION,
+  type EditorialStockCandidate,
+  type EditorialStockReview,
+} from "../contracts/editorial-stock";
+import {
+  GRAPHIC_PRESETS,
+  CLIP_LOOK_PRESETS,
+} from "../contracts/editor-presets";
 import {
   buildEditPlanningContext,
   resolveEditPlanningReferences,
@@ -51,7 +82,12 @@ import {
   socialVideoSource,
 } from "../contracts/social-video";
 import { editModel, editReasoningEffort } from "../contracts/edit-model";
-import { searchStock, searchStockPage, resolveStock, downloadStock } from "./stock-media";
+import {
+  searchStock,
+  searchStockPage,
+  resolveStock,
+  downloadStock,
+} from "./stock-media";
 import { normalizeSavedAnalyzerReports } from "../contracts/analyzer-report";
 import {
   runPaidMediaRequest,
@@ -113,7 +149,10 @@ import {
   EDITORIAL_DESIGN_GUIDANCE,
   EDITOR_GRAPHIC_GUIDANCE,
 } from "../contracts/editorial-design";
-import { EDITORIAL_NOTES_GUIDANCE, normalizeEditorialNotes } from "../contracts/editorial-notes";
+import {
+  EDITORIAL_NOTES_GUIDANCE,
+  normalizeEditorialNotes,
+} from "../contracts/editorial-notes";
 import {
   normalizeScriptWritingPack,
   SCRIPT_WRITING_PACK_GUIDANCE,
@@ -798,7 +837,9 @@ async function initializeSchema(env: SitesEnvironment): Promise<void> {
             stock_json TEXT NOT NULL
           )
         `),
-      env.DB.prepare("CREATE TABLE IF NOT EXISTS asset_catalog_metadata (asset_id TEXT PRIMARY KEY NOT NULL REFERENCES assets(id) ON DELETE CASCADE, catalog_json TEXT NOT NULL)"),
+      env.DB.prepare(
+        "CREATE TABLE IF NOT EXISTS asset_catalog_metadata (asset_id TEXT PRIMARY KEY NOT NULL REFERENCES assets(id) ON DELETE CASCADE, catalog_json TEXT NOT NULL)"
+      ),
       env.DB.prepare(`
           CREATE TABLE IF NOT EXISTS asset_uploads (
             asset_id TEXT PRIMARY KEY NOT NULL,
@@ -3533,7 +3574,13 @@ function stockAssetMetadata(stock: StockMedia | undefined): Partial<Asset> {
 function catalogAssetMetadata(raw: unknown): Partial<Asset> {
   if (!raw) return {};
   const catalog = normalizeSharedCatalogItem(raw);
-  return { catalog, duration: catalog.duration, width: catalog.width, height: catalog.height, variantGroupId: `shared-catalog:${catalog.id}` };
+  return {
+    catalog,
+    duration: catalog.duration,
+    width: catalog.width,
+    height: catalog.height,
+    variantGroupId: `shared-catalog:${catalog.id}`,
+  };
 }
 
 function rowToAsset(row: AssetRow, provenance?: ProvenanceRow | null): Asset {
@@ -3563,7 +3610,9 @@ function rowToAsset(row: AssetRow, provenance?: ProvenanceRow | null): Asset {
     status: "ready",
     createdAt: row.created_at,
     ...stockAssetMetadata(stock),
-    ...catalogAssetMetadata(row.catalog_json ? JSON.parse(row.catalog_json) : undefined),
+    ...catalogAssetMetadata(
+      row.catalog_json ? JSON.parse(row.catalog_json) : undefined
+    ),
     ...(provenance ? { provenance: provenanceFromRow(provenance) } : {}),
   };
 }
@@ -3606,8 +3655,23 @@ async function insertAssetRecord(
   if (input.stock || input.catalog) {
     await env.DB.batch([
       insert,
-      ...(input.stock ? [env.DB.prepare("INSERT INTO asset_stock_metadata (asset_id, stock_json) VALUES (?, ?)").bind(id, JSON.stringify(input.stock))] : []),
-      ...(input.catalog ? [env.DB.prepare("INSERT INTO asset_catalog_metadata (asset_id, catalog_json) VALUES (?, ?)").bind(id, JSON.stringify(normalizeSharedCatalogItem(input.catalog)))] : []),
+      ...(input.stock
+        ? [
+            env.DB.prepare(
+              "INSERT INTO asset_stock_metadata (asset_id, stock_json) VALUES (?, ?)"
+            ).bind(id, JSON.stringify(input.stock)),
+          ]
+        : []),
+      ...(input.catalog
+        ? [
+            env.DB.prepare(
+              "INSERT INTO asset_catalog_metadata (asset_id, catalog_json) VALUES (?, ?)"
+            ).bind(
+              id,
+              JSON.stringify(normalizeSharedCatalogItem(input.catalog))
+            ),
+          ]
+        : []),
     ]);
   } else await insert.run();
 
@@ -4548,9 +4612,17 @@ function mapEditOperations(
       const params = recordValue(typed.parameters) || {};
       const parameters: NonNullable<EditOperation["parameters"]> = {};
       if (Object.hasOwn(params, "colorLut")) {
-        const colorLut = params.colorLut === null ? null : normalizeClipColorLut(params.colorLut);
+        const colorLut =
+          params.colorLut === null
+            ? null
+            : normalizeClipColorLut(params.colorLut);
         if (type !== "style" || colorLut === undefined)
-          throw new EditPlanValidationError("reference_unavailable", "The catalog color look is invalid for this edit.", index, type);
+          throw new EditPlanValidationError(
+            "reference_unavailable",
+            "The catalog color look is invalid for this edit.",
+            index,
+            type
+          );
         parameters.colorLut = colorLut;
       }
       if (type === "graphic") {
@@ -5869,8 +5941,20 @@ async function handleAi(
           "\nMARKER-ONLY TASK: Return exactly one story-beats action. Assign meaningful editorial sections from storyEvidence and cite their exact evidenceIds. Distinguish hook, body, proof, payoff, CTA only where supported; do not force every kind. No analysis, captions, edits, generated media, settings, replan or other actions. These are reference markers only. Use the user's prompt as requestExcerpt."
         : EDITOR_CHAT_SYSTEM_PROMPT;
     await initializeSharedCatalog(env);
+    const catalogEvidence = await catalogVisualEvidence(
+      env,
+      await sharedCatalogCandidates(
+        env,
+        input.prompt,
+        project.clips.flatMap(clip =>
+          clip.colorLut ? [clip.colorLut.id] : []
+        ),
+        catalogCandidateContext(project)
+      ),
+      request.signal
+    );
     const context: EditorChatContext = {
-      sharedCatalog: await sharedCatalogCandidates(env, input.prompt, project.clips.flatMap(clip => clip.colorLut ? [clip.colorLut.id] : []), catalogCandidateContext(project)),
+      sharedCatalog: catalogEvidence.items,
       request: input,
       project,
       personalStyles: workspace.editorStyles,
@@ -6010,7 +6094,7 @@ async function handleAi(
       async () => {
         await assertAllowedCreativeUse(env, user, input.prompt, project.id);
         // R2 is read only after ownership verification and the durable claim; retries replay the result.
-        const mediaParts: ModelContentPart[] = [];
+        const mediaParts: ModelContentPart[] = [...catalogEvidence.parts];
         let totalImageBytes = 0;
         for (const assetId of imageReferenceIds) {
           const row = await getAssetRow(env, user, assetId);
@@ -6071,9 +6155,7 @@ async function handleAi(
                     ...mediaParts,
                   ]
                 : JSON.stringify(modelContext),
-              mediaParts.length
-                ? env.OPENROUTER_ANALYSIS_MODEL || DEFAULT_ANALYSIS_MODEL
-                : undefined,
+              editModel(undefined),
               true,
               16000,
               false,
@@ -6703,7 +6785,19 @@ async function handleAi(
     const presetWorkspace = await getWorkspace(env, user);
     const personalStyles = presetWorkspace.editorStyles ?? [];
     await initializeSharedCatalog(env);
-    const sharedCatalog = await sharedCatalogCandidates(env, stringValue(input.command), project.clips.flatMap(clip => clip.colorLut ? [clip.colorLut.id] : []), catalogCandidateContext(project));
+    const catalogEvidence = await catalogVisualEvidence(
+      env,
+      await sharedCatalogCandidates(
+        env,
+        stringValue(input.command),
+        project.clips.flatMap(clip =>
+          clip.colorLut ? [clip.colorLut.id] : []
+        ),
+        catalogCandidateContext(project)
+      ),
+      analysisControl.signal
+    );
+    const sharedCatalog = catalogEvidence.items;
     const planningContext = buildEditPlanningContext(
       project,
       presetWorkspace.assets,
@@ -6779,7 +6873,9 @@ async function handleAi(
       autonomousCaptionDirection(project, captionStyling),
       input.contentReview === true ? EDITORIAL_COVERAGE_DIRECTION : "",
       input.stock === true ? EDITORIAL_STOCK_SEARCH_DIRECTION : "",
-    ].filter(Boolean).join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
     return runPaidAiAction(
       env,
       user,
@@ -6809,10 +6905,21 @@ async function handleAi(
           user,
           "edit-planning",
           `${EDIT_CUT_GUIDANCE} ${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITORIAL_NOTES_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "editorialNotes":[], "editorialCoverage":[], "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image","sceneId":"scene:<index>","purpose":"what this picture explains for this beat"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, parameters, and either start/end or a supported evidence cue. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio adjusts existing target clips only using parameters.volume 0..2; adding a music bed or SFX requires type=sound with parameters.assetId; caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${EDITOR_PRESET_GUIDANCE} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> or shared:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Shared catalog visuals are real fixed overlays/frames, with supplied dimensions, duration and blendMode. When relevant to the brief, insert with type=broll and exact parameters.assetId=shared:<id>; sourceIn defaults to 0, duration must fit the actual video, and parameters.visual.blendMode must match the catalog. They are not generated media, editable text, source replacements, or scene evidence. Allowed types: trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Deliver the complete requested treatment. Judge each beat for coverage, clarity, framing, motion design, sound and finishing; implement every useful supported improvement, not just trims and color. Do not minimize the operation count or stop after the easiest changes. Preserve restraint only where it serves the actual source or selected style. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Choose as many high-impact operations as the story needs. A generated-media quota or operation quota must not determine the treatment. Explain the audience-retention reason concretely.`,
-          JSON.stringify({
-            command: input.command,
-            project: projectContext,
-          }),
+          catalogEvidence.parts.length
+            ? [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    command: input.command,
+                    project: projectContext,
+                  }),
+                },
+                ...catalogEvidence.parts,
+              ]
+            : JSON.stringify({
+                command: input.command,
+                project: projectContext,
+              }),
           requestedModel,
           true,
           24000,
@@ -6829,8 +6936,14 @@ async function handleAi(
           Array.isArray(output.stockSearches) &&
           output.stockSearches.length
         ) {
-          const searches = editorialStockSearches(output.stockSearches, planningContext);
-          const searchResults: Array<{ search: typeof searches[number]; media: StockMedia[] }> = [];
+          const searches = editorialStockSearches(
+            output.stockSearches,
+            planningContext
+          );
+          const searchResults: Array<{
+            search: (typeof searches)[number];
+            media: StockMedia[];
+          }> = [];
           // Bound concurrency, not the number of story beats that may use stock.
           for (let offset = 0; offset < searches.length; offset += 4) {
             analysisControl.signal.throwIfAborted();
@@ -6848,20 +6961,27 @@ async function handleAi(
                   )
                 )
             );
-            found.forEach((result, index) => searchResults.push({
-              search: searches[offset + index],
-              media: result.status === "fulfilled" ? result.value : [],
-            }));
+            found.forEach((result, index) =>
+              searchResults.push({
+                search: searches[offset + index],
+                media: result.status === "fulfilled" ? result.value : [],
+              })
+            );
           }
-          stockCandidates = associateEditorialStock(searchResults, planningContext, presetWorkspace.assets);
+          stockCandidates = associateEditorialStock(
+            searchResults,
+            planningContext,
+            presetWorkspace.assets
+          );
           stockMedia = stockCandidates.map(candidate => candidate.media);
           if (stockMedia.length) {
             const refined = await chatJson(
               env,
               user,
               "edit-planning",
-              EDITORIAL_STOCK_REFINEMENT_DIRECTION + "\n" +
-              `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITORIAL_NOTES_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} ${EDIT_CUT_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,editorialNotes,editorialCoverage,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Choose the number of useful stock shots from the source and story; insert them as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Follow the generation authorization in the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,
+              EDITORIAL_STOCK_REFINEMENT_DIRECTION +
+                "\n" +
+                `${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITORIAL_NOTES_GUIDANCE} ${EDITOR_GRAPHIC_GUIDANCE} ${captionDirection} ${EDIT_CUT_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} Finish the complete executable edit using the supplied source speech clocks, footage evidence, free sound catalog, and candidate stock. Return JSON {summary,editorialNotes,editorialCoverage,changes}. The draft is a proposal, not applied work. Select stock only if its actual thumbnail and description clearly serve a specific beat. Omit unrelated, ambiguous, clinical-case-specific or unusable material. A medical image illustrates the spoken subject; it never proves a general health claim. Choose the number of useful stock shots from the source and story; insert them as broll with parameters.assetId=stock:<provider>:<id>, sourceIn in source seconds, and intervals no longer than the available source. Do not put source captions on top of burned captions, cover faces, or cut words. Only use supported operations trim,split,move,delete,caption,silence,pacing,broll,audio,style,graphic,sound with the same schema as the draft. Sound operations use an exact catalog:<id> and their actual duration with quiet volume. Follow the generation authorization in the command; free stock never authorizes extra paid generation. Keep every operation inside the edit and preserve locked clips. Include concrete reasons.`,
               [
                 {
                   type: "text",
@@ -6869,8 +6989,17 @@ async function handleAi(
                     command: input.command,
                     project: projectContext,
                     draft: output,
-                    stockSearches: searchResults.map(({ search, media }) => ({ ...search, resultAssetIds: media.map(item => `stock:${item.provider}:${item.id}`) })),
-                    stockCandidates: stockCandidates.map(candidate => ({ assetId: candidate.assetId, searches: candidate.searches, verifiedSourceRanges: candidate.verifiedSourceRanges })),
+                    stockSearches: searchResults.map(({ search, media }) => ({
+                      ...search,
+                      resultAssetIds: media.map(
+                        item => `stock:${item.provider}:${item.id}`
+                      ),
+                    })),
+                    stockCandidates: stockCandidates.map(candidate => ({
+                      assetId: candidate.assetId,
+                      searches: candidate.searches,
+                      verifiedSourceRanges: candidate.verifiedSourceRanges,
+                    })),
                     stock: stockMedia.map(item => ({
                       ...item,
                       assetId: `stock:${item.provider}:${item.id}`,
@@ -6900,10 +7029,7 @@ async function handleAi(
           }
         }
         let editorialNotes = normalizeEditorialNotes(output.editorialNotes);
-        let summary = stringValue(
-          output.summary,
-          "Edit plan ready for review"
-        );
+        let summary = stringValue(output.summary, "Edit plan ready for review");
         const captionTreatment = captionStyling
           ? normalizeAutonomousCaptionTreatment(
               project,
@@ -6912,7 +7038,10 @@ async function handleAi(
           : undefined;
         let validationStage: EditPlanValidationStage = "references";
         let originalCompiledChanges: EditOperation[] = [];
-        const compileChanges = (raw: unknown, retainOriginalIndexes = false): EditOperation[] => {
+        const compileChanges = (
+          raw: unknown,
+          retainOriginalIndexes = false
+        ): EditOperation[] => {
           validationStage = "references";
           let changes: EditOperation[];
           const referencedChanges = resolveEditPlanningReferences(
@@ -6936,9 +7065,18 @@ async function handleAi(
             true
           );
           if (retainOriginalIndexes) originalCompiledChanges = changes;
-          const checkedStock = reviewEditorialStockOperations(changes, stockCandidates, Array.isArray(styledChanges) ? styledChanges : undefined);
+          const checkedStock = reviewEditorialStockOperations(
+            changes,
+            stockCandidates,
+            Array.isArray(styledChanges) ? styledChanges : undefined
+          );
           for (const omission of checkedStock.review.omitted)
-            if (!stockReview.omitted.some(item => item.operationId === omission.operationId)) stockReview.omitted.push(omission);
+            if (
+              !stockReview.omitted.some(
+                item => item.operationId === omission.operationId
+              )
+            )
+              stockReview.omitted.push(omission);
           changes = checkedStock.changes;
           validationStage = "scope";
           if (input.localOnly === true) {
@@ -7011,13 +7149,22 @@ async function handleAi(
         const checkpoint = () => {
           analysisControl.signal.throwIfAborted();
           if (Date.now() >= analysisControl.deadlineAt)
-            throw new DOMException("The edit planning deadline elapsed.", "TimeoutError");
+            throw new DOMException(
+              "The edit planning deadline elapsed.",
+              "TimeoutError"
+            );
         };
         let changes: EditOperation[];
         let graphicReview: AutonomousGraphicReview | undefined;
         let qualityReview: EditPlanQualityReview | undefined;
         let editorialCoverage: EditorialCoverageReview | undefined;
-        const qualityAssets = editPlanQualityAssets([...presetWorkspace.assets, ...sharedCatalogPlanningAssets(sharedCatalog)], stockMedia);
+        const qualityAssets = editPlanQualityAssets(
+          [
+            ...presetWorkspace.assets,
+            ...sharedCatalogPlanningAssets(sharedCatalog),
+          ],
+          stockMedia
+        );
         const qualityProject = captionTreatment
           ? applyAutonomousCaptionTreatment(project, captionTreatment)
           : project;
@@ -7028,108 +7175,280 @@ async function handleAi(
         // One scoped correction within this foreground reservation; never a
         // transport retry or an open-ended model loop. Valid edits stay unchanged.
         try {
-          const feedback = editPlanSoundRepairFeedback(output.changes, planningContext, duration, input.selectedClipIds);
+          const feedback = editPlanSoundRepairFeedback(
+            output.changes,
+            planningContext,
+            duration,
+            input.selectedClipIds
+          );
           if (feedback.length) {
             checkpoint();
             if (analysisControl.onCheck && !(await analysisControl.onCheck()))
-              throw new DOMException("The edit request was canceled.", "AbortError");
-            const corrected = await chatJson(env, user, "edit-planning",
+              throw new DOMException(
+                "The edit request was canceled.",
+                "AbortError"
+              );
+            const corrected = await chatJson(
+              env,
+              user,
+              "edit-planning",
               EDIT_PLAN_SOUND_REPAIR_DIRECTION,
-              JSON.stringify({ failures: feedback, freeSounds: planningContext.freeSounds }),
-              requestedModel, true, 4000, false, undefined, analysisControl,
-              editReasoningEffort(input.effort));
+              JSON.stringify({
+                failures: feedback,
+                freeSounds: planningContext.freeSounds,
+              }),
+              requestedModel,
+              true,
+              4000,
+              false,
+              undefined,
+              analysisControl,
+              editReasoningEffort(input.effort)
+            );
             invocation = corrected.invocation;
-            output.changes = mergeEditPlanSoundRepair(output.changes as unknown[], feedback,
-              corrected.output, planningContext, duration, input.selectedClipIds);
+            output.changes = mergeEditPlanSoundRepair(
+              output.changes as unknown[],
+              feedback,
+              corrected.output,
+              planningContext,
+              duration,
+              input.selectedClipIds
+            );
           }
         } catch (error) {
           checkpoint();
           if (!(error instanceof EditPlanValidationError)) throw error;
           return rejectPlan(error, output.changes);
         }
+        let cutCorrectionProviderPending = false;
         try {
-          changes = compileChanges(output.changes, true);
+          try {
+            changes = compileChanges(output.changes, true);
+          } catch (error) {
+            const indices = cutRepairScope(error, output.changes);
+            if (!indices) throw error;
+            checkpoint();
+            if (analysisControl.onCheck && !(await analysisControl.onCheck()))
+              throw new DOMException(
+                "The edit request was canceled.",
+                "AbortError"
+              );
+            // A compiler correction in this foreground request, under the same
+            // credit reservation. Never retry transport failures or apply an
+            // ambiguous cut. Revalidate the complete resulting composition.
+            cutCorrectionProviderPending = true;
+            const corrected = await chatJson(
+              env,
+              user,
+              "edit-planning",
+              `${EDIT_CUT_REPAIR_DIRECTION} ${EDIT_CUT_GUIDANCE}`,
+              JSON.stringify({
+                command: input.command,
+                project: projectContext,
+                draft: output.changes,
+                repairIndices: indices,
+                failure: editPlanValidationDiagnostic(
+                  error,
+                  validationStage,
+                  Array.isArray(output.changes) ? output.changes.length : 0
+                ),
+              }),
+              requestedModel,
+              true,
+              12000,
+              false,
+              undefined,
+              analysisControl,
+              editReasoningEffort(input.effort)
+            );
+            cutCorrectionProviderPending = false;
+            invocation = corrected.invocation;
+            const repaired = mergeCutRepair(
+              output.changes as unknown[],
+              indices,
+              corrected.output,
+              output.editorialCoverage
+            );
+            output.changes = repaired.changes;
+            output.editorialCoverage = repaired.editorialCoverage;
+            changes = compileChanges(output.changes, true);
+          }
           if (input.contentReview === true)
             editorialCoverage = reviewEditorialCoverage(
-              output.editorialCoverage, qualityProject, planningContext, originalCompiledChanges, qualityAssets
+              output.editorialCoverage,
+              qualityProject,
+              planningContext,
+              originalCompiledChanges,
+              qualityAssets
             );
-          if (editorialCoverage) editorialCoverage = reconcileEditorialCoverage(editorialCoverage, changes);
+          if (editorialCoverage)
+            editorialCoverage = reconcileEditorialCoverage(
+              editorialCoverage,
+              changes
+            );
           if (changes.some(operation => operation.type === "graphic")) {
             validationStage = "graphic_preflight";
-            graphicReview = reviewEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
+            graphicReview = reviewEditPlanGraphics(
+              qualityProject,
+              changes,
+              qualityAssets,
+              graphicRequest,
+              checkpoint
+            );
             if (graphicReview.omitted.length && !graphicRequest.trim()) {
               // Resolve measured placement locally first. Unresolved graphics
               // remain in the proposal for the single creative correction;
               // this is not permission to silently drop a content objective.
-              const placed = finalizeEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
-              const replacements = new Map(placed.changes.map(operation => [operation.id, operation]));
-              changes = changes.map(operation => replacements.get(operation.id) ?? operation);
+              const placed = finalizeEditPlanGraphics(
+                qualityProject,
+                changes,
+                qualityAssets,
+                graphicRequest,
+                checkpoint
+              );
+              const replacements = new Map(
+                placed.changes.map(operation => [operation.id, operation])
+              );
+              changes = changes.map(
+                operation => replacements.get(operation.id) ?? operation
+              );
               if (placed.qualityReview.repairedOperationIds.length)
-                qualityReview = { repairedOperationIds: placed.qualityReview.repairedOperationIds, withdrawn: [] };
-              graphicReview = reviewEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
+                qualityReview = {
+                  repairedOperationIds:
+                    placed.qualityReview.repairedOperationIds,
+                  withdrawn: [],
+                };
+              graphicReview = reviewEditPlanGraphics(
+                qualityProject,
+                changes,
+                qualityAssets,
+                graphicRequest,
+                checkpoint
+              );
             }
           }
         } catch (error) {
           checkpoint();
+          if (cutCorrectionProviderPending) throw error;
           return rejectPlan(error, output.changes);
         }
         if (graphicReview?.omitted.length) {
           let feedback: ReturnType<typeof editPlanGraphicFeedback>;
           try {
-            feedback = editPlanGraphicFeedback(qualityProject,
-              changes.filter(operation => !graphicReview!.omittedSounds?.some(item => item.operationId === operation.id)),
-              qualityAssets, graphicReview, checkpoint);
+            feedback = editPlanGraphicFeedback(
+              qualityProject,
+              changes.filter(
+                operation =>
+                  !graphicReview!.omittedSounds?.some(
+                    item => item.operationId === operation.id
+                  )
+              ),
+              qualityAssets,
+              graphicReview,
+              checkpoint
+            );
           } catch (error) {
             checkpoint();
             return rejectPlan(error, changes);
           }
           checkpoint();
           if (analysisControl.onCheck && !(await analysisControl.onCheck()))
-            throw new DOMException("The edit request was canceled.", "AbortError");
+            throw new DOMException(
+              "The edit request was canceled.",
+              "AbortError"
+            );
           checkpoint();
           // Exactly one correction inside this same foreground reservation.
           // Provider/abort failures retain their normal failure path, not a
           // compiler error or an automatic retry. No new media is authorized.
-          const corrected = await chatJson(env, user, "edit-planning",
+          const corrected = await chatJson(
+            env,
+            user,
+            "edit-planning",
             `${EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION} ${EDITORIAL_NOTES_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} ${EDITOR_GRAPHIC_GUIDANCE}`,
-            JSON.stringify({ command: input.command, graphicRequest, project: projectContext,
-              captionTreatment, editorialCoverage, feedback }),
-            requestedModel, true, 24000, false, undefined, analysisControl,
-            editReasoningEffort(input.effort));
+            JSON.stringify({
+              command: input.command,
+              graphicRequest,
+              project: projectContext,
+              captionTreatment,
+              editorialCoverage,
+              feedback,
+            }),
+            requestedModel,
+            true,
+            24000,
+            false,
+            undefined,
+            analysisControl,
+            editReasoningEffort(input.effort)
+          );
           invocation = corrected.invocation;
           try {
             validationStage = "graphic_refinement";
-            const repaired = mergeGraphicRefinement(changes, graphicReview.omitted, corrected.output, raw => {
-              const compiled = compileChanges(raw);
-              validationStage = "graphic_refinement";
-              return compiled;
-            });
+            const repaired = mergeGraphicRefinement(
+              changes,
+              graphicReview.omitted,
+              corrected.output,
+              raw => {
+                const compiled = compileChanges(raw);
+                validationStage = "graphic_refinement";
+                return compiled;
+              }
+            );
             changes = repaired.changes;
             if (editorialCoverage)
-              editorialCoverage = reconcileEditorialCoverage(editorialCoverage, changes);
+              editorialCoverage = reconcileEditorialCoverage(
+                editorialCoverage,
+                changes
+              );
             summary = repaired.summary;
             qualityReview = {
-              repairedOperationIds: [...new Set([...(qualityReview?.repairedOperationIds ?? []), ...repaired.qualityReview.repairedOperationIds])],
+              repairedOperationIds: [
+                ...new Set([
+                  ...(qualityReview?.repairedOperationIds ?? []),
+                  ...repaired.qualityReview.repairedOperationIds,
+                ]),
+              ],
               withdrawn: repaired.qualityReview.withdrawn,
             };
             // Earlier notes may describe graphics that were just withdrawn.
             // Only the corrected proposal may provide notes for this result.
-            editorialNotes = normalizeEditorialNotes(corrected.output.editorialNotes);
+            editorialNotes = normalizeEditorialNotes(
+              corrected.output.editorialNotes
+            );
             validationStage = "graphic_refinement";
             assertExecutableEditPlan(changes);
             assertAutonomousTrimSemantics(project, changes);
             assertAutonomousComposition(project, changes);
-            const finalized = finalizeEditPlanGraphics(qualityProject, changes, qualityAssets, graphicRequest, checkpoint);
+            const finalized = finalizeEditPlanGraphics(
+              qualityProject,
+              changes,
+              qualityAssets,
+              graphicRequest,
+              checkpoint
+            );
             changes = finalized.changes;
-            const withdrawn = [...qualityReview.withdrawn, ...finalized.qualityReview.withdrawn];
-            const withdrawnIds = new Set(withdrawn.map(item => item.operationId));
+            const withdrawn = [
+              ...qualityReview.withdrawn,
+              ...finalized.qualityReview.withdrawn,
+            ];
+            const withdrawnIds = new Set(
+              withdrawn.map(item => item.operationId)
+            );
             qualityReview = {
-              repairedOperationIds: [...new Set([...qualityReview.repairedOperationIds, ...finalized.qualityReview.repairedOperationIds])]
-                .filter(id => !withdrawnIds.has(id)),
+              repairedOperationIds: [
+                ...new Set([
+                  ...qualityReview.repairedOperationIds,
+                  ...finalized.qualityReview.repairedOperationIds,
+                ]),
+              ].filter(id => !withdrawnIds.has(id)),
               withdrawn,
             };
             if (editorialCoverage)
-              editorialCoverage = reconcileEditorialCoverage(editorialCoverage, changes);
+              editorialCoverage = reconcileEditorialCoverage(
+                editorialCoverage,
+                changes
+              );
             if (finalized.qualityReview.withdrawn.length) {
               // The model's correction summary may still describe these
               // overlays. The client renders an actual execution receipt and
@@ -7182,7 +7501,11 @@ async function handleAi(
           ...(editorialNotes.length ? { editorialNotes } : {}),
           ...(captionTreatment ? { captionTreatment } : {}),
           ...(qualityReview ? { qualityReview } : {}),
-          sharedCatalog: sharedCatalog.filter(item => changes.some(change => change.parameters?.assetId === `shared:${item.id}`)),
+          sharedCatalog: sharedCatalog.filter(item =>
+            changes.some(
+              change => change.parameters?.assetId === `shared:${item.id}`
+            )
+          ),
           stockMedia: stockMedia.filter(item =>
             changes.some(
               change =>
@@ -13730,7 +14053,11 @@ async function handleApi(
     return json({ country });
   }
 
-  if (url.pathname === "/api/catalog/search" || url.pathname.startsWith("/api/catalog/items/") || url.pathname.startsWith("/api/catalog/media/"))
+  if (
+    url.pathname === "/api/catalog/search" ||
+    url.pathname.startsWith("/api/catalog/items/") ||
+    url.pathname.startsWith("/api/catalog/media/")
+  )
     return handleCatalogPublic(request, env, url);
 
   if (url.pathname === "/api/publishing/callback" && request.method === "GET") {
@@ -13882,17 +14209,21 @@ async function handleApi(
         query = stringValue(url.searchParams.get("q")).trim();
       if (!["audio", "video", "image"].includes(kind || "") || !query)
         return errorResponse("Choose a media type and search term.", 422);
-      return json(await searchStockPage(
+      return json(
+        await searchStockPage(
           kind as "audio" | "video" | "image",
           query,
           signal,
           {
             page: Number(url.searchParams.get("page") || 1),
-            category: ["music", "sound_effect"].includes(url.searchParams.get("category") || "")
-              ? url.searchParams.get("category") as "music" | "sound_effect"
+            category: ["music", "sound_effect"].includes(
+              url.searchParams.get("category") || ""
+            )
+              ? (url.searchParams.get("category") as "music" | "sound_effect")
               : "all",
           }
-        ));
+        )
+      );
     }
     if (url.pathname === "/api/stock/import" && request.method === "POST") {
       const input = await parseJsonBody<{
@@ -13941,21 +14272,53 @@ async function handleApi(
   }
   if (url.pathname === "/api/brands") return handleBrands(request, env, user);
   if (url.pathname.startsWith("/api/catalog/admin/"))
-    return handleCatalogAdmin(request, env, url, canAdministerSharedCatalog(env, user));
+    return handleCatalogAdmin(
+      request,
+      env,
+      url,
+      canAdministerSharedCatalog(env, user)
+    );
   if (url.pathname === "/api/catalog/import" && request.method === "POST") {
     await initializeSharedCatalog(env);
     const input = await parseJsonBody<{ id?: string }>(request);
-    const existing = await env.DB.prepare("SELECT assets.id FROM assets JOIN asset_catalog_metadata metadata ON metadata.asset_id = assets.id WHERE owner_email = ? AND brand_id = ? AND json_extract(metadata.catalog_json, '$.id') = ? LIMIT 1").bind(user.email, user.brandId || "default", input.id || "").first<{ id: string }>();
+    const existing = await env.DB.prepare(
+      "SELECT assets.id FROM assets JOIN asset_catalog_metadata metadata ON metadata.asset_id = assets.id WHERE owner_email = ? AND brand_id = ? AND json_extract(metadata.catalog_json, '$.id') = ? LIMIT 1"
+    )
+      .bind(user.email, user.brandId || "default", input.id || "")
+      .first<{ id: string }>();
     if (existing) {
       const row = await getAssetRow(env, user, existing.id);
-      if (row) return json({ ...rowToAsset(row), url: await signedMediaUrl(env, row.id) });
+      if (row)
+        return json({
+          ...rowToAsset(row),
+          url: await signedMediaUrl(env, row.id),
+        });
     }
     const key = `users/${encodeURIComponent(user.email)}/catalog/${crypto.randomUUID()}`;
     try {
-      const item = await copySharedCatalogMedia(env, input.id || "", key, request.signal);
+      const item = await copySharedCatalogMedia(
+        env,
+        input.id || "",
+        key,
+        request.signal
+      );
       request.signal.throwIfAborted();
-      const asset = await insertAssetRecord(env, user, { name: item.name, kind: item.kind, contentType: item.media.contentType, size: item.media.bytes, r2Key: key, catalog: item });
-      return json({ ...asset, catalog: item, duration: item.duration, width: item.width, height: item.height, variantGroupId: `shared-catalog:${item.id}` });
+      const asset = await insertAssetRecord(env, user, {
+        name: item.name,
+        kind: item.kind,
+        contentType: item.media.contentType,
+        size: item.media.bytes,
+        r2Key: key,
+        catalog: item,
+      });
+      return json({
+        ...asset,
+        catalog: item,
+        duration: item.duration,
+        width: item.width,
+        height: item.height,
+        variantGroupId: `shared-catalog:${item.id}`,
+      });
     } catch (cause) {
       await env.BUCKET.delete(key);
       throw cause;

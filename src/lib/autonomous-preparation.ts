@@ -20,6 +20,7 @@ export function isAutonomousSpeechSource(asset: Asset) {
   return (
     (asset.kind === "video" || asset.kind === "audio") &&
     !asset.variantGroupId?.startsWith("builtin-audio:") &&
+    !asset.variantGroupId?.startsWith("shared-catalog:") &&
     asset.provenance?.operation !== "audio-generation"
   );
 }

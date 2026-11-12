@@ -194,6 +194,8 @@ export interface EditorChatMessage {
   request?: EditorChatRequest;
   /** Separate from optional-extra approvals: a plan must be explicitly applied. */
   planApproved?: boolean;
+  /** Saved user addition, never an authorization to resume after leaving the editor. */
+  pendingAddition?: boolean;
 }
 
 export interface EditorChatState {

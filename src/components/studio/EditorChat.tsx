@@ -191,7 +191,7 @@ export function EditorChat({
   findingSections,
 }: Props) {
   const ui = useUiText();
-  const chat = useEditorChat(project, { onSeek });
+  const chat = useEditorChat(project, { onSeek, externalBusy });
   useEffect(() => {
     onBusyChange?.(chat.busy);
   }, [chat.busy, onBusyChange]);
@@ -405,8 +405,7 @@ export function EditorChat({
   async function send(event?: FormEvent) {
     event?.preventDefault();
     const text = prompt.trim();
-    if (!text || externalBusy || chat.busy || attachBusy || workingChoice)
-      return;
+    if (!text || attachBusy || workingChoice) return;
     if (references.length > 8) {
       setLocalError(
         ui("Attach up to 8 references per message. Remove one to make room.")
@@ -507,12 +506,7 @@ export function EditorChat({
           })),
         ];
   const commands =
-    token &&
-    tokenKey !== dismissedToken &&
-    !externalBusy &&
-    !attachBusy &&
-    !chat.busy &&
-    !findingSections
+    token && tokenKey !== dismissedToken && !attachBusy && !findingSections
       ? rankComposerCommands(commandChoices, token.query)
       : [];
   const activeCommand = Math.min(
@@ -1412,7 +1406,7 @@ export function EditorChat({
                   ref={referenceTrigger}
                   type="button"
                   aria-label={ui("Add a reference or time range")}
-                  disabled={attachBusy || externalBusy}
+                  disabled={attachBusy}
                   className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground/60 hover:bg-foreground/5 disabled:opacity-40 "
                 >
                   {attachBusy ? (
@@ -1763,7 +1757,7 @@ export function EditorChat({
               </PopoverContent>
             </Popover>
             <span className="ml-auto" />
-            {chat.busy ? (
+            {chat.busy && (
               <button
                 type="button"
                 onClick={chat.stop}
@@ -1773,10 +1767,16 @@ export function EditorChat({
               >
                 <Square className="size-3 fill-current" />
               </button>
-            ) : (
+            )}
+            {(!chat.busy || prompt.trim()) && (
               <button
                 type="submit"
-                disabled={!prompt.trim() || attachBusy || busyChoice}
+                disabled={
+                  !prompt.trim() ||
+                  attachBusy ||
+                  !!workingChoice ||
+                  findingSections
+                }
                 aria-label={ui("Send to Reel")}
                 title={ui("Send to Reel")}
                 className="ai-magic flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:cursor-not-allowed disabled:opacity-35"
@@ -1843,7 +1843,8 @@ function ActionCard({
   const recoverable =
     ["interrupted", "failed"].includes(action.status) &&
     (action.kind === "catalog-audio" ||
-      action.kind === "catalog-effect" || action.kind === "shared-media" ||
+      action.kind === "catalog-effect" ||
+      action.kind === "shared-media" ||
       (action.kind === "generate" &&
         !!(action.runtime?.generationId || action.runtime?.jobId)) ||
       (action.kind === "replan" && !!action.runtime?.request) ||
@@ -2007,6 +2008,7 @@ function RunControls({
 }) {
   const ui = useUiText();
   const plan = message.plan;
+  if (message.pendingAddition && busy) return null;
   if (!plan)
     return message.request && message.status !== "planning" ? (
       <button
@@ -2015,7 +2017,9 @@ function RunControls({
         onClick={() => onResume()}
         className="mt-3 rounded-lg border border-border px-3 py-2 text-sm text-primary disabled:opacity-40"
       >
-        {ui("Recover saved plan")}
+        {ui(
+          message.pendingAddition ? "Continue addition" : "Recover saved plan"
+        )}
       </button>
     ) : null;
   const budget = message.maxCredits ?? plan.maxCredits;

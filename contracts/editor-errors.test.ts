@@ -22,6 +22,20 @@ describe("editor failure copy", () => {
       )
     ).toContain("current timeline");
   });
+  it.each([
+    { status: 401 },
+    { status: 402 },
+    new Error("The timeline changed"),
+    new Error("Invalid speech timing"),
+    { reason: "edit_plan_invalid" },
+    new Error("upstream unavailable"),
+  ])(
+    "preserves public error meaning when saved history is rendered again",
+    error => {
+      const publicText = editorFailureMessage(error);
+      expect(editorFailureMessage(publicText)).toBe(publicText);
+    }
+  );
   it("distinguishes a rejected plan from a service outage without diagnostics", () => {
     const expected = "Reel couldn't finish this edit. Please try again.";
     expect(

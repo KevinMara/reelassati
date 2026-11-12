@@ -16,6 +16,17 @@ export function editorFailureMessage(error: unknown): string {
       : typeof row?.message === "string"
         ? row.message
         : "";
+  // Messages are sanitized when saved and again when old chat history renders.
+  // Keep that projection idempotent; an edit failure is not a service outage.
+  const publicMessages = [
+    "Please sign in again to continue.",
+    "You need more credits to continue.",
+    "Your edit changed. Please try again with the current timeline.",
+    "Reel couldn't read the audio. Please try again.",
+    "Reel couldn't finish this edit. Please try again.",
+    "Reel is unavailable right now. Please try again.",
+  ];
+  if (publicMessages.includes(text)) return text;
   if (
     row?.status === 401 ||
     /sign in|session.*expired|not authenticated/i.test(text)

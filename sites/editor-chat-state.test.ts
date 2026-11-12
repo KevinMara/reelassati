@@ -38,6 +38,30 @@ const message = {
 };
 
 describe("saved editing chat continuity", () => {
+  it("preserves a saved addition without converting it into an active run", () => {
+    const state = normalizeEditorChatState({
+      messages: [
+        {
+          ...message,
+          pendingAddition: true,
+          status: "stopped",
+          plan: undefined,
+          text: "Your addition is saved. Resume it when you're ready.",
+        },
+      ],
+    })!;
+    expect(state.messages[0].pendingAddition).toBe(true);
+    expect(state.messages[0].status).toBe("stopped");
+    expect(state.messages[0].plan).toBeUndefined();
+    expect(normalizeEditorChatState(JSON.parse(JSON.stringify(state)))).toEqual(
+      state
+    );
+    expect(
+      normalizeEditorChatState({
+        messages: [{ ...message, pendingAddition: "true" }],
+      })!.messages[0].pendingAddition
+    ).toBeUndefined();
+  });
   it("round-trips chat-only editorial notes for both direct and automatic edits", () => {
     const note = {
       kind: "limitation",

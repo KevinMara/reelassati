@@ -519,6 +519,7 @@ export function normalizeEditorChatState(
           }
         : {}),
       ...(row.planApproved === true ? { planApproved: true } : {}),
+      ...(row.pendingAddition === true ? { pendingAddition: true } : {}),
       ...(string(row.requestId) ? { requestId: string(row.requestId) } : {}),
       ...(Array.isArray(row.references)
         ? { references: references(row.references) }
