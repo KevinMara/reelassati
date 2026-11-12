@@ -1,4 +1,8 @@
 import { Magnet } from "lucide-react";
+import {
+  observePreviewReadiness,
+  type PreviewReadiness,
+} from "@/lib/preview-buffering";
 import { useUiText } from "@/lib/i18n/ui";
 import { colorGradeMatrix, colorToneTable } from "@/lib/color-grade";
 import { normalizeClipColorLut } from "@contracts/color-lut";
@@ -329,11 +333,13 @@ export function TimelinePreview({
   onTransform,
   onInspectClip,
   onClipAction,
+  onBufferingChange,
 }: {
   project: EditProject;
   assets: Asset[];
   time: number;
   playing: boolean;
+  onBufferingChange?(blocked: boolean): void;
   seekVersion?: number;
   zoom?: number;
   pan?: { x: number; y: number };
@@ -357,6 +363,26 @@ export function TimelinePreview({
   );
   const ui = useUiText();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [readiness, setReadiness] = useState<PreviewReadiness>("loading");
+  const readinessObserver = useRef<
+    ReturnType<typeof observePreviewReadiness> | undefined
+  >(undefined);
+  useLayoutEffect(() => {
+    if (!canvasRef.current) return;
+    const observer = observePreviewReadiness(canvasRef.current, state => {
+      setReadiness(current => (current === state ? current : state));
+      onBufferingChange?.(state !== "ready");
+    });
+    readinessObserver.current = observer;
+    return () => {
+      observer.dispose();
+      readinessObserver.current = undefined;
+    };
+  }, [project.id, onBufferingChange]);
+  // Run after the child transports cue newly active sources, including source jumps.
+  useLayoutEffect(() => {
+    readinessObserver.current?.refresh();
+  });
   const stopGesture = useRef<(() => void) | undefined>(undefined);
   const [fit, setFit] = useState<{ width: number; height: number }>();
   const [moving, setMoving] =
@@ -639,6 +665,7 @@ export function TimelinePreview({
         <div
           ref={canvasRef}
           data-preview-canvas
+          data-preview-readiness={readiness}
           onLoadCapture={event => rememberMediaSize(event.target)}
           onLoadedMetadataCapture={event => rememberMediaSize(event.target)}
           className="relative mx-auto shrink-0 overflow-hidden bg-black"
@@ -671,13 +698,48 @@ export function TimelinePreview({
                 clip={clip}
                 asset={asset}
                 time={mediaActive ? time : clip.start}
-                playing={playing && mediaActive}
+                playing={playing && mediaActive && readiness === "ready"}
                 active={mediaActive}
                 seekVersion={seekVersion}
                 trackGain={timelineTrackGain(project, clip)}
               />
             ) : null;
           })}
+          {readiness !== "ready" && (playing || readiness === "error") && (
+            <div
+              role="status"
+              className="absolute inset-0 z-40 flex items-center justify-center bg-black/20"
+            >
+              <div className="rounded-lg border border-white/10 bg-black/80 px-3 py-2 text-center text-xs text-white/90">
+                {readiness === "loading"
+                  ? ui("Loading preview…")
+                  : ui("Preview couldn't load.")}
+                {readiness === "error" && (
+                  <button
+                    type="button"
+                    className="pointer-events-auto ml-2 text-primary underline"
+                    onPointerDown={event => event.stopPropagation()}
+                    onClick={() => {
+                      canvasRef.current
+                        ?.querySelectorAll<HTMLMediaElement>("video,audio")
+                        .forEach(media => {
+                          if (media.error) media.load();
+                        });
+                      canvasRef.current
+                        ?.querySelectorAll<HTMLImageElement>("img")
+                        .forEach(image => {
+                          if (image.complete && !image.naturalWidth)
+                            image.src = image.src;
+                        });
+                      readinessObserver.current?.refresh();
+                    }}
+                  >
+                    {ui("Retry")}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {!active.length && (
             <p className="absolute inset-0 flex items-center justify-center p-8 text-center text-sm text-white/50">
               {project.clips.length

@@ -3287,6 +3287,7 @@ export default function EditorPage() {
                 assets={workspace.assets}
                 time={playhead}
                 playing={playing}
+                onBufferingChange={playbackClock.setBlocked}
                 seekVersion={previewSeekVersion}
                 zoom={previewZoom / 100}
                 pan={previewPan}

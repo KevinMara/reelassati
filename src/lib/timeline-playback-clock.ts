@@ -18,6 +18,7 @@ export function createTimelinePlaybackClock(
   let anchorTime = time;
   let anchorNow = 0;
   let running = false;
+  let blocked = false;
   let generation = 0;
   let pending: number | undefined;
   const sample = (now: number) =>
@@ -27,14 +28,15 @@ export function createTimelinePlaybackClock(
     pending = undefined;
   };
   const frame = (now: number, token: number) => {
-    if (!running || token !== generation) return;
+    if (!running || blocked || token !== generation) return;
     pending = undefined;
     time = sample(now);
     scheduler.onTime(time);
     if (time >= duration) {
       running = false;
       scheduler.onEnd();
-    } else pending = scheduler.requestFrame(now => frame(now, token));
+    } else if (running && !blocked && token === generation)
+      pending = scheduler.requestFrame(now => frame(now, token));
   };
   return {
     start() {
@@ -43,13 +45,26 @@ export function createTimelinePlaybackClock(
       anchorTime = time;
       anchorNow = scheduler.now();
       const token = ++generation;
-      pending = scheduler.requestFrame(now => frame(now, token));
+      if (!blocked) pending = scheduler.requestFrame(now => frame(now, token));
     },
     stop() {
-      if (running) time = sample(scheduler.now());
+      if (running && !blocked) time = sample(scheduler.now());
       running = false;
       generation++;
       cancel();
+    },
+    /** Freeze at the last displayed sample. Loading time must never become a seek. */
+    setBlocked(next: boolean) {
+      if (next === blocked) return;
+      blocked = next;
+      generation++;
+      cancel();
+      anchorTime = time;
+      anchorNow = scheduler.now();
+      if (running && !blocked) {
+        const token = generation;
+        pending = scheduler.requestFrame(now => frame(now, token));
+      }
     },
     seek(nextTime: number) {
       time = bounded(nextTime);

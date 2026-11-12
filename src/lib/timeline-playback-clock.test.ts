@@ -34,6 +34,48 @@ function setup(time = 0, duration = 20) {
 }
 
 describe("timeline playback clock", () => {
+  it("holds an unloaded preview and all elapsed loading time before starting", () => {
+    const { clock, advance, onTime, frames } = setup(4);
+    clock.setBlocked(true);
+    clock.start();
+    advance(30000);
+    expect(onTime).not.toHaveBeenCalled();
+    expect(frames.size).toBe(0);
+    clock.setBlocked(false);
+    advance(20);
+    expect(onTime).toHaveBeenLastCalledWith(4.02);
+  });
+
+  it("freezes a buffering cut, permits seeking while blocked, and ignores stale frames", () => {
+    const { clock, advance, onTime, frames } = setup(4);
+    clock.start();
+    advance(200);
+    const stale = [...frames.values()][0];
+    clock.setBlocked(true);
+    stale(90000);
+    advance(30000);
+    expect(onTime).toHaveBeenLastCalledWith(4.2);
+    clock.seek(12);
+    clock.setBlocked(false);
+    advance(20);
+    expect(onTime).toHaveBeenLastCalledWith(12.02);
+  });
+
+  it("does not restart playback when media finishes loading after the user pauses", () => {
+    const { clock, advance, onTime, frames } = setup(4);
+    clock.start();
+    advance(100);
+    clock.setBlocked(true);
+    advance(5000);
+    clock.stop();
+    clock.setBlocked(false);
+    advance(1000);
+    expect(frames.size).toBe(0);
+    expect(onTime).toHaveBeenCalledTimes(1);
+    clock.start();
+    advance(100);
+    expect(onTime.mock.lastCall?.[0]).toBeCloseTo(4.2, 9);
+  });
   it("updates at animation-frame cadence without losing elapsed time on slow frames", () => {
     const { clock, advance, onTime, frames } = setup(4);
     clock.start();
