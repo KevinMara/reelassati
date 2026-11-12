@@ -5953,7 +5953,8 @@ async function handleAi(
         project.clips.flatMap(clip =>
           clip.colorLut ? [clip.colorLut.id] : []
         ),
-        catalogCandidateContext(project)
+        catalogCandidateContext(project),
+        request.signal
       ),
       request.signal
     );
@@ -6801,7 +6802,8 @@ async function handleAi(
         project.clips.flatMap(clip =>
           clip.colorLut ? [clip.colorLut.id] : []
         ),
-        catalogCandidateContext(project)
+        catalogCandidateContext(project),
+        analysisControl.signal
       ),
       analysisControl.signal
     );

@@ -157,6 +157,9 @@ export function initializeSharedCatalog(env: CatalogEnvironment) {
     env.DB.prepare(
       "CREATE INDEX IF NOT EXISTS shared_catalog_search ON shared_media_catalog(status, kind, group_name, name, id)"
     ),
+    env.DB.prepare(
+      "CREATE INDEX IF NOT EXISTS shared_catalog_candidate_scan ON shared_media_catalog(status, kind, id)"
+    ),
   ])
     .then(() => undefined)
     .catch(error => {
@@ -337,7 +340,8 @@ async function sharedCatalogKindCandidates(
   env: CatalogEnvironment,
   prompt: string,
   kind: "audio" | "image" | "video" | "lut",
-  context?: CatalogCandidateContext
+  context?: CatalogCandidateContext,
+  signal?: AbortSignal
 ) {
   const [width, height] = (context?.aspectRatio ?? "16:9")
     .split(":")
@@ -347,60 +351,128 @@ async function sharedCatalogKindCandidates(
     .join(" ")
     .normalize("NFKC")
     .toLowerCase();
-  const rows = await env.DB.prepare(
-    `
-    WITH scored AS (
-      SELECT *,
-        MAX(
-          (SELECT COALESCE(MAX(json_extract(value, '$.weight')), 0) FROM json_each(?)
-           WHERE instr(' ' || replace(replace(search_text, '-', ' '), '_', ' ') || ' ', ' ' || json_extract(value, '$.term') || ' ') > 0),
-          CASE WHEN (length(name) >= 4 AND instr(?, lower(name)) > 0) OR (length(group_name) >= 4 AND instr(?, lower(group_name)) > 0) THEN 16 ELSE 0 END
-        ) AS intent,
-        (SELECT COALESCE(SUM(json_extract(value, '$.weight')), 0) FROM json_each(?)
-         WHERE instr(' ' || replace(replace(search_text, '-', ' '), '_', ' ') || ' ', ' ' || json_extract(value, '$.term') || ' ') > 0)
-        + CASE WHEN length(name) >= 4 AND instr(?, lower(name)) > 0 THEN 200 ELSE 0 END
-        + CASE WHEN length(group_name) >= 4 AND instr(?, lower(group_name)) > 0 THEN 100 ELSE 0 END AS relevance
-      FROM shared_media_catalog WHERE status = 'ready' AND kind = ?
-    ), variants AS (
-      SELECT *, ROW_NUMBER() OVER (PARTITION BY design_id ORDER BY intent DESC, relevance DESC,
-        ABS(COALESCE(1.0 * json_extract(payload, '$.width') / NULLIF(json_extract(payload, '$.height'), 0), ?) - ?),
-        ABS(COALESCE(json_extract(payload, '$.width') * json_extract(payload, '$.height'), 2073600) - 2073600), id) AS variant_position
-      FROM scored
-    ), designs AS (
-      SELECT *, ROW_NUMBER() OVER (PARTITION BY group_name ORDER BY intent DESC, relevance DESC, name, id) AS group_position
-      FROM variants WHERE variant_position = 1
+  // D1 must not evaluate correlated JSON subqueries for every catalog row
+  // through several window functions. At full catalog size that path fails
+  // before planning. Read indexed keyset pages and rank compact records once.
+  type Candidate = {
+    id: string;
+    name: string;
+    group_name: string;
+    design_id: string;
+    search_text: string;
+    width: number | null;
+    height: number | null;
+    intent: number;
+    relevance: number;
+    groupPosition: number;
+  };
+  const terms = new Map(
+    candidateTerms(prompt, context).map(({ term, weight }) => [term, weight])
+  );
+  const designs = new Map<string, Candidate>();
+  const lexical = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const relevanceOrder = (a: Candidate, b: Candidate) =>
+    b.intent - a.intent || b.relevance - a.relevance;
+  const aspectDistance = (row: Candidate) =>
+    Math.abs(
+      (row.width && row.height ? row.width / row.height : ratio) - ratio
+    );
+  const sizeDistance = (row: Candidate) =>
+    Math.abs(
+      (row.width && row.height ? row.width * row.height : 2073600) - 2073600
+    );
+  const variantOrder = (a: Candidate, b: Candidate) =>
+    relevanceOrder(a, b) ||
+    aspectDistance(a) - aspectDistance(b) ||
+    sizeDistance(a) - sizeDistance(b) ||
+    lexical(a.id, b.id);
+  let after = "";
+  for (;;) {
+    signal?.throwIfAborted();
+    const page = await env.DB.prepare(
+      `SELECT id,name,group_name,design_id,search_text,
+      json_extract(payload, '$.width') AS width, json_extract(payload, '$.height') AS height
+      FROM shared_media_catalog WHERE status = 'ready' AND kind = ? AND id > ? ORDER BY id LIMIT 500`
     )
-    SELECT payload FROM designs
-    ORDER BY intent DESC, group_position, relevance DESC, group_name, name, id LIMIT 60
-  `
-  )
-    .bind(
-      JSON.stringify(candidateTerms(prompt, context)),
-      explicitText,
-      explicitText,
-      JSON.stringify(candidateTerms(prompt, context)),
-      explicitText,
-      explicitText,
-      kind,
-      ratio,
-      ratio
+      .bind(kind, after)
+      .all<Candidate>();
+    for (const row of page.results) {
+      let maximum = 0,
+        sum = 0;
+      for (const token of new Set(
+        row.search_text
+          .normalize("NFKC")
+          .toLowerCase()
+          .match(/[\p{L}\p{N}]{3,}/gu) ?? []
+      )) {
+        const weight = terms.get(token) ?? 0;
+        maximum = Math.max(maximum, weight);
+        sum += weight;
+      }
+      const named =
+        row.name.length >= 4 && explicitText.includes(row.name.toLowerCase());
+      const grouped =
+        row.group_name.length >= 4 &&
+        explicitText.includes(row.group_name.toLowerCase());
+      row.intent = Math.max(maximum, named || grouped ? 16 : 0);
+      row.relevance = sum + (named ? 200 : 0) + (grouped ? 100 : 0);
+      const existing = designs.get(row.design_id);
+      if (!existing || variantOrder(row, existing) < 0)
+        designs.set(row.design_id, row);
+    }
+    if (page.results.length < 500) break;
+    after = page.results[page.results.length - 1].id;
+  }
+  const ranked = [...designs.values()].sort(
+    (a, b) =>
+      relevanceOrder(a, b) || lexical(a.name, b.name) || lexical(a.id, b.id)
+  );
+  const positions = new Map<string, number>();
+  for (const row of ranked) {
+    row.groupPosition = (positions.get(row.group_name) ?? 0) + 1;
+    positions.set(row.group_name, row.groupPosition);
+  }
+  const selected = ranked
+    .sort(
+      (a, b) =>
+        b.intent - a.intent ||
+        a.groupPosition - b.groupPosition ||
+        b.relevance - a.relevance ||
+        lexical(a.group_name, b.group_name) ||
+        lexical(a.name, b.name) ||
+        lexical(a.id, b.id)
     )
-    .all<{ payload: string }>();
-  return rows.results.map(row =>
-    normalizeSharedCatalogItem(JSON.parse(row.payload))
+    .slice(0, 60);
+  const records = new Map<string, SharedMediaCatalogItem>();
+  for (let offset = 0; offset < selected.length; offset += 50) {
+    signal?.throwIfAborted();
+    const ids = selected.slice(offset, offset + 50).map(row => row.id);
+    const batch = await env.DB.prepare(
+      `SELECT payload FROM shared_media_catalog WHERE status = 'ready' AND id IN (${ids.map(() => "?").join(",")})`
+    )
+      .bind(...ids)
+      .all<{ payload: string }>();
+    for (const row of batch.results) {
+      const item = normalizeSharedCatalogItem(JSON.parse(row.payload));
+      records.set(item.id, item);
+    }
+  }
+  return selected.flatMap(row =>
+    records.has(row.id) ? [records.get(row.id)!] : []
   );
 }
 export async function sharedCatalogCandidates(
   env: CatalogEnvironment,
   prompt: string,
   appliedLookIds: string[] = [],
-  context?: CatalogCandidateContext
+  context?: CatalogCandidateContext,
+  signal?: AbortSignal
 ) {
   const [videos, images, sounds, looks] = await Promise.all([
-    sharedCatalogKindCandidates(env, prompt, "video", context),
-    sharedCatalogKindCandidates(env, prompt, "image", context),
-    sharedCatalogKindCandidates(env, prompt, "audio", context),
-    sharedCatalogKindCandidates(env, prompt, "lut", context),
+    sharedCatalogKindCandidates(env, prompt, "video", context, signal),
+    sharedCatalogKindCandidates(env, prompt, "image", context, signal),
+    sharedCatalogKindCandidates(env, prompt, "audio", context, signal),
+    sharedCatalogKindCandidates(env, prompt, "lut", context, signal),
   ]);
   // Balance available kinds, then spend spare capacity on nonempty pools.
   const media: SharedMediaCatalogItem[] = [];
