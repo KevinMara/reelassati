@@ -21,6 +21,7 @@ export function runtimeFailureDiagnostic(cause: unknown) {
     "Visual evidence changed during review.": "visual-sample-changed",
     "Incomplete sound observations.": "sound-count",
     "Duplicate sound observations.": "sound-identities",
+    "Sound observation identities do not match.": "sound-identities",
     "Invalid sound observation.": "sound-text",
     "Invalid sound observations.": "sound-list",
     "Sound observation does not match its sample.": "sound-metadata",

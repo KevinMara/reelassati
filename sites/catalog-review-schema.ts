@@ -20,7 +20,7 @@ export function catalogReviewSchema(kind: "sound" | "visual", ids: string[]) {
           avoidUses: list,
           containsSpeech: { type: "boolean" },
           intensity: { type: "string", enum: ["subtle", "moderate", "strong"] },
-          confidence: { type: "number" },
+          confidence: { type: "number", minimum: 0, maximum: 1 },
         }
       : {
           id: { type: "string" },
@@ -31,7 +31,7 @@ export function catalogReviewSchema(kind: "sound" | "visual", ids: string[]) {
           suitableUses: list,
           avoidUses: list,
           visibleText: list,
-          confidence: { type: "number" },
+          confidence: { type: "number", minimum: 0, maximum: 1 },
         };
   const key = kind === "sound" ? "sounds" : "visuals";
   return {
