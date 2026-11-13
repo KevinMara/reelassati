@@ -38,12 +38,82 @@ const message = {
 };
 
 describe("saved editing chat continuity", () => {
+  it.each(["running", "completed", "failed", "stopped", "partial"])(
+    "preserves pending additions, their inputs, and their %s parent beyond the history limit",
+    status => {
+      const rows = [
+        { ...message, id: "parent-input", role: "user", plan: undefined },
+        { ...message, id: "parent", status },
+        ...Array.from({ length: 35 }, (_, index) => {
+          const id = `addition-000000000${index}`;
+          return [
+            {
+              ...message,
+              id,
+              role: "user",
+              requestId: id,
+              plan: undefined,
+              text: `Input ${index}`,
+            },
+            {
+              ...message,
+              id: `${id}-reel`,
+              requestId: id,
+              pendingAddition: true,
+              plan: undefined,
+            },
+          ];
+        }).flat(),
+      ];
+      const state = normalizeEditorChatState({ messages: rows })!;
+      expect(state.messages.map(row => row.id)).toEqual(
+        rows.map(row => row.id)
+      );
+      expect(
+        normalizeEditorChatState(JSON.parse(JSON.stringify(state)))
+      ).toEqual(state);
+    }
+  );
+
+  it("prunes completed history before an accepted addition even at the byte limit", () => {
+    const addition = {
+      ...message,
+      id: "pending",
+      pendingAddition: true,
+      plan: undefined,
+      requestId: "pending-user",
+    };
+    const state = normalizeEditorChatState({
+      messages: [
+        { ...message, id: "pending-user", role: "user", plan: undefined },
+        addition,
+        ...Array.from({ length: 65 }, (_, index) => ({
+          ...message,
+          id: `finished-${index}`,
+          status: "completed",
+          text: "x".repeat(6000),
+          inputDetails: [
+            { label: "Completed brief", value: "y".repeat(12000) },
+          ],
+          plan: { ...message.plan, actions: [] },
+        })),
+      ],
+    })!;
+    expect(state.messages.map(row => row.id)).toContain("pending-user");
+    expect(state.messages.map(row => row.id)).toContain("pending");
+    expect(state.messages.length).toBeLessThanOrEqual(60);
+    expect(
+      new TextEncoder().encode(JSON.stringify(state.messages)).byteLength
+    ).toBeLessThanOrEqual(400000);
+  });
+
   it("preserves a saved addition without converting it into an active run", () => {
     const state = normalizeEditorChatState({
       messages: [
         {
           ...message,
           pendingAddition: true,
+          planningAttempted: false,
           status: "stopped",
           plan: undefined,
           text: "Your addition is saved. Resume it when you're ready.",
@@ -51,6 +121,7 @@ describe("saved editing chat continuity", () => {
       ],
     })!;
     expect(state.messages[0].pendingAddition).toBe(true);
+    expect(state.messages[0].planningAttempted).toBe(false);
     expect(state.messages[0].status).toBe("stopped");
     expect(state.messages[0].plan).toBeUndefined();
     expect(normalizeEditorChatState(JSON.parse(JSON.stringify(state)))).toEqual(

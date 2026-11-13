@@ -1,6 +1,7 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type { SharedMediaCatalogItem } from "../contracts/shared-media-catalog";
+import type { CatalogSoundPlanningObservation } from "../contracts/catalog-evidence";
 import type { CatalogEnvironment } from "./shared-media-catalog";
 import type { ModelContentPart } from "./model-content";
 import {
@@ -16,9 +17,14 @@ export async function catalogVisualEvidence(
   env: CatalogEnvironment,
   candidates: SharedMediaCatalogItem[],
   signal: AbortSignal
-): Promise<{ items: SharedMediaCatalogItem[]; parts: ModelContentPart[] }> {
+): Promise<{
+  items: SharedMediaCatalogItem[];
+  parts: ModelContentPart[];
+  soundObservations: Record<string, CatalogSoundPlanningObservation>;
+}> {
   const verified = new Set<string>();
   const parts: ModelContentPart[] = [];
+  const soundObservations: Record<string, CatalogSoundPlanningObservation> = {};
   const visuals = candidates;
   for (let offset = 0; offset < visuals.length; offset += 4) {
     signal.throwIfAborted();
@@ -42,6 +48,15 @@ export async function catalogVisualEvidence(
           if (!packet?.audio) return;
           const observation = await readCatalogSound(env, packet, signal);
           if (!observation || observation.confidence < 0.6) return;
+          // Keep verified listening facts structured through compilation; the
+          // immutable public catalog itself must not acquire inferred metadata.
+          soundObservations[item.id] = {
+            ...observation,
+            sourceRanges: packet.audio.segments.map(segment => ({
+              start: segment.sourceStart,
+              end: segment.sourceEnd,
+            })),
+          };
           return {
             item,
             description: `Listening-grounded sound observation: ${JSON.stringify(observation)}. Actual full-file measurements: ${JSON.stringify(packet.audio.measured)}. Heard source segments: ${JSON.stringify(packet.audio.segments)}. Use only where the audible character supports a specific scene event; keep speech dominant. Do not infer unheard portions of sampled tracks.`,
@@ -102,5 +117,6 @@ export async function catalogVisualEvidence(
   return {
     items: candidates.filter(item => verified.has(item.id)),
     parts,
+    soundObservations,
   };
 }

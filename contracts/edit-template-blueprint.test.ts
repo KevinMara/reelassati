@@ -10,7 +10,9 @@ import {
   normalizeEditStyleTemplate,
   editTemplateDirection,
 } from "./edit-style-template";
-import type { EditProject } from "./workspace";
+import type { EditOperation, EditProject } from "./workspace";
+import { normalizeVisual, visualFrame } from "./clip-visual";
+import { executeAutonomousPlan } from "./autonomous-execution";
 const project = {
   aspectRatio: "9:16",
   duration: 10,
@@ -169,6 +171,93 @@ describe("exact editing template archive", () => {
       },
     });
   });
+  it.each([1, 2])(
+    "reanchors a saved source transition at 20 seconds to the target 0..6 range at speed %s",
+    speed => {
+      const archived = captureEditBlueprint({
+        ...project,
+        duration: 6,
+        clips: [
+          {
+            ...project.clips[0],
+            duration: 6,
+            inPoint: 20,
+            outPoint: 26,
+            visual: normalizeVisual({
+              entrance: {
+                kind: "dissolve",
+                duration: 1,
+                at: 20,
+                sourceDuration: 6,
+              },
+              exit: {
+                kind: "dissolve",
+                duration: 1,
+                at: 26,
+                sourceDuration: 6,
+              },
+              keyframes: [
+                { at: 0, scale: 1 },
+                { at: 1, scale: 1.1 },
+              ],
+            }),
+          },
+        ],
+      });
+      const original = structuredClone(archived);
+      const target: EditProject = {
+        ...project,
+        duration: 6,
+        clips: [
+          {
+            ...project.clips[0],
+            id: "target",
+            assetId: "target-source",
+            duration: 6,
+            inPoint: 0,
+            outPoint: 6 * speed,
+            speed,
+            visual: undefined,
+          },
+        ],
+        transcript: [],
+        proposedChanges: [],
+      };
+      const operations = resolveBlueprintOperations(
+        [
+          {
+            id: "template-look",
+            type: "style",
+            label: "Saved design",
+            reason: "Apply the chosen template",
+            start: 0,
+            end: 6,
+            confidence: 1,
+            intensity: "balanced",
+            targetClipIds: ["target"],
+            status: "proposed",
+            parameters: { templateClipId: "layer-0" },
+          },
+        ],
+        archived
+      ) as EditOperation[];
+      const after = executeAutonomousPlan(target, operations, []);
+      const clip = after.clips[0];
+      expect(visualFrame(clip, 0.5).opacity).toBeCloseTo(0.5);
+      expect(visualFrame(clip, 3).opacity).toBe(1);
+      expect(visualFrame(clip, 5.5).opacity).toBeCloseTo(0.5);
+      expect(clip.visual?.entrance.at).toBe(0);
+      expect(clip.visual?.exit.at).toBe(6 * speed);
+      expect(clip.visual?.entrance.sourceDuration).toBe(6 * speed);
+      expect(clip.visual?.keyframes).toEqual(
+        archived.clips[0].visual?.keyframes
+      );
+      const design = blueprintDesign(archived).layers[0].visual!;
+      expect(design.entrance).toEqual({ kind: "dissolve", duration: 1 });
+      expect(design.exit).toEqual({ kind: "dissolve", duration: 1 });
+      expect(archived).toEqual(original);
+    }
+  );
   it("rejects malformed archives instead of silently claiming a full save", () => {
     expect(
       normalizeEditBlueprint({

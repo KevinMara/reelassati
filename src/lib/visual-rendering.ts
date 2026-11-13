@@ -1,6 +1,7 @@
 import {
   normalizeVisual,
   visualClock,
+  visualTransitionDuration,
   type VisualPose,
   type VisualEasing,
 } from "@contracts/clip-visual";
@@ -69,7 +70,7 @@ export function visualRenderFilter(
     ],
   ] as const) {
     const q = clamp(
-      `${distance}*${n(span / Math.min(effect.duration, span / 2))}`
+      `${distance}*${n(span / visualTransitionDuration(effect, clock.duration, speed))}`
     );
     if (effect.kind === "dissolve" || effect.kind === "zoom")
       opacity = `(${opacity}*${q})`;
@@ -234,7 +235,7 @@ export function visualRenderFilter(
       ["out", v.exit],
     ] as const) {
       if (effect.kind === "none") continue;
-      const duration = Math.min(effect.duration, span / 2);
+      const duration = visualTransitionDuration(effect, clock.duration, speed);
       const anchor =
         type === "in"
           ? (effect.at ?? clock.start)

@@ -1,12 +1,11 @@
-import { colorGradeFilter } from "./color-grade";
+import { visualLayerSourceFilter } from "./visual-layer-rendering";
 import {
   colorLutFilename,
-  colorLutFilter,
   prepareColorLutExport,
   projectColorLuts,
 } from "./color-lut";
-import { normalizeClipColorLut, type CubeLut } from "@contracts/color-lut";
-import { visualRenderFilter, visualCompositeFilters } from "./visual-rendering";
+import type { CubeLut } from "@contracts/color-lut";
+import { visualCompositeFilters } from "./visual-rendering";
 import { captionAssStyle, captionAssEvents } from "./caption-rendering";
 import { compareTimelineLayers } from "@/lib/timeline-lanes";
 import type { Asset, EditProject } from "@contracts/workspace";
@@ -22,10 +21,7 @@ import {
   type ExportSettings,
 } from "@contracts/export-settings";
 import { effectiveTimelineClips } from "@contracts/timeline-mixer";
-import {
-  terminalVideoPadding,
-  type RenderSourceMetadata,
-} from "./render-source-probe";
+import { type RenderSourceMetadata } from "./render-source-probe";
 
 const number = (n: number) => Number(n.toFixed(4));
 /** Pure, deterministic FFmpeg plan, also exercised against native FFmpeg. */
@@ -131,42 +127,8 @@ export function buildRenderPlan(
     const end = number(clip.inPoint + clip.duration * speed);
     const trim = `start=${number(clip.inPoint)}:end=${end}`;
     if (!clip.hidden && clip.track !== "audio" && asset.kind !== "audio") {
-      const fit =
-        clip.fit === "cover"
-          ? `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`
-          : `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0`;
-      const bounded = (
-        value: number | undefined,
-        fallback: number,
-        min: number,
-        max: number
-      ) =>
-        Number.isFinite(value)
-          ? Math.min(max, Math.max(min, value!))
-          : fallback;
-      const grade = colorGradeFilter(clip, index);
-      const look = normalizeClipColorLut(clip.colorLut);
-      const lut =
-        look && look.amount > 0
-          ? colorLutFilter(look, colorLuts.get(look.sha256)!, index) + ","
-          : "";
-      const terminalPadding =
-        asset.kind === "image"
-          ? ""
-          : terminalVideoPadding(clip, sourceMetadata.get(asset.id), frameRate);
-      const transform = visualRenderFilter(clip, { width, height });
-      const fades = [
-        clip.fadeIn
-          ? `fade=t=in:st=0:d=${number(Math.min(clip.duration, bounded(clip.fadeIn, 0, 0, 5)))}:alpha=1`
-          : "",
-        clip.fadeOut
-          ? `fade=t=out:st=${number(Math.max(0, clip.duration - bounded(clip.fadeOut, 0, 0, 5)))}:d=${number(Math.min(clip.duration, bounded(clip.fadeOut, 0, 0, 5)))}:alpha=1`
-          : "",
-      ]
-        .filter(Boolean)
-        .join(",");
       filters.push(
-        `[${index}:v]trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=${frameRate},${terminalPadding}${lut}${grade}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB[v${index}]`
+        `[${index}:v]${visualLayerSourceFilter(clip, { width, height, frameRate }, { scope: index, still: asset.kind === "image", metadata: sourceMetadata.get(asset.id), colorLuts })}[v${index}]`
       );
       filters.push(
         ...visualCompositeFilters(

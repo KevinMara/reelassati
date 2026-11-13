@@ -157,8 +157,6 @@ export function applyAdjacentTransition(
       c =>
         c.shotTransition &&
         (c.shotTransition.outgoingId === outgoingId ||
-          c.shotTransition.incomingId === outgoingId ||
-          c.shotTransition.outgoingId === incomingId ||
           c.shotTransition.incomingId === incomingId) &&
         (c.shotTransition.outgoingId !== outgoingId ||
           c.shotTransition.incomingId !== incomingId)
@@ -253,10 +251,29 @@ export function applyAdjacentTransition(
       c.id !== ids.incoming &&
       c.id !== ids.outgoing
   );
+  // A valid transition at this incoming shot's other edge may already exist.
+  // Its incoming handle can overlap the tail of this shot, but must remain
+  // completely outside the transition being authored here.
+  const downstreamHandles = new Set(
+    project.clips.flatMap(c => {
+      const pair = c.shotTransition;
+      if (!pair || pair.outgoingId !== incoming.id) return [];
+      const handles = adjacentTransitionHandleIds(
+        pair.outgoingId,
+        pair.incomingId
+      );
+      return [handles.incoming, handles.outgoing];
+    })
+  );
   if (
     unrelated.some(
       c =>
         video(c) &&
+        !(
+          c.transitionHandle &&
+          downstreamHandles.has(c.id) &&
+          c.start >= cut + half - 0.000001
+        ) &&
         c.start < incoming.start + incoming.duration &&
         c.start + c.duration > cut - half
     )

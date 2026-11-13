@@ -1,4 +1,12 @@
 import type { Asset, EditOperation, EditProject } from "./workspace";
+import type { CatalogSoundPlanningObservation } from "./catalog-evidence";
+import type { TransitionPreset } from "./transition-presets";
+import {
+  AUTONOMOUS_TRANSITION_GUIDANCE,
+  autonomousTransitionTargets,
+  buildAutonomousTransitionContext,
+  normalizeAutonomousTransition,
+} from "./autonomous-transition";
 import {
   catalogColorLutCandidates,
   resolveCatalogColorLut,
@@ -46,7 +54,11 @@ export function buildEditPlanningContext(
   project: EditProject,
   assets: Asset[],
   projects: Pick<EditProject, "sourceReviews">[] = [],
-  sharedCatalog: SharedMediaCatalogItem[] = []
+  sharedCatalog: SharedMediaCatalogItem[] = [],
+  soundObservations: Readonly<
+    Record<string, CatalogSoundPlanningObservation>
+  > = {},
+  personalTransitions: TransitionPreset[] = []
 ) {
   const speechEvidence = buildEditorialSpeechEvidence(project).map(
     (speech, index) => ({ ...speech, id: `speech:${index}` })
@@ -177,6 +189,7 @@ export function buildEditPlanningContext(
   });
   return {
     clock: "current-timeline-seconds" as const,
+    ...buildAutonomousTransitionContext(project, assets, personalTransitions),
     clipTargets: effectiveTimelineClips(normalizeClipGroups(project)).map(
       clip => ({
         id: clip.id,
@@ -241,6 +254,7 @@ export function buildEditPlanningContext(
         tags: entry.tags,
         type: entry.type,
         peakSeconds: catalogSoundPeakSeconds(entry),
+        sourceRanges: [{ start: 0, end: entry.duration }],
       })),
       ...sharedCatalog
         .filter(item => item.kind === "audio")
@@ -250,7 +264,21 @@ export function buildEditPlanningContext(
           category: item.group,
           duration: item.duration,
           tags: item.tags,
-          type: "sfx" as const,
+          // Only a source-bound listening review can establish this role.
+          // In particular, music must not inherit one-shot peak alignment.
+          type:
+            soundObservations[item.id]?.mediaSha256 === item.media.sha256 &&
+            soundObservations[item.id].confidence >= 0.6
+              ? soundObservations[item.id].role === "effect"
+                ? "sfx"
+                : soundObservations[item.id].role
+              : "unclear",
+          containsSpeech: soundObservations[item.id]?.containsSpeech,
+          sourceRanges:
+            soundObservations[item.id]?.mediaSha256 === item.media.sha256 &&
+            soundObservations[item.id].confidence >= 0.6
+              ? soundObservations[item.id].sourceRanges
+              : [],
           peakSeconds: item.waveform
             ? round(
                 (item.waveform.indexOf(Math.max(...item.waveform)) / 63) *
@@ -275,6 +303,7 @@ const operationTypes = new Set([
   "broll",
   "audio",
   "style",
+  "transition",
   "graphic",
   "sound",
 ]);
@@ -323,6 +352,79 @@ export function resolveEditPlanningReferences(
         ([key, value]) => value !== null || key === "colorLut"
       )
     );
+    if (operation.type === "transition") {
+      const transition = normalizeAutonomousTransition(
+        parameters.transition,
+        context.transitionPresets
+      );
+      if (
+        !transition ||
+        Object.keys(parameters).some(key => key !== "transition")
+      )
+        invalid(
+          "missing_control",
+          `Edit ${index + 1} needs a supported adjacent-shot transition and explicit cut time.`
+        );
+      const targets = autonomousTransitionTargets(transition);
+      const existing =
+        transition.kind === "none"
+          ? context.existingTransitions.find(
+              pair =>
+                pair.outgoingId === transition.outgoingId &&
+                pair.incomingId === transition.incomingId &&
+                Math.abs(pair.cutTime - transition.cutTime) <= 0.000001
+            )
+          : undefined;
+      if (
+        transition.kind === "none"
+          ? !existing || existing.locked
+          : targets.some(
+              id =>
+                !context.transitionSources.some(
+                  source => source.clipId === id && !source.locked
+                )
+            )
+      )
+        invalid(
+          "reference_unavailable",
+          `Edit ${index + 1} needs unlocked video sources with measured durations.`
+        );
+      if (
+        operation.targetClipIds !== undefined &&
+        (!Array.isArray(operation.targetClipIds) ||
+          operation.targetClipIds.length !== targets.length ||
+          targets.some(
+            id => !(operation.targetClipIds as unknown[]).includes(id)
+          ))
+      )
+        invalid(
+          "target_invalid",
+          `Edit ${index + 1} must target its exact transition sources.`
+        );
+      const start =
+        existing?.start ?? transition.cutTime - transition.duration / 2;
+      const end = existing?.end ?? transition.cutTime + transition.duration / 2;
+      if (start < 0 || end > duration)
+        invalid(
+          "range_invalid",
+          `Edit ${index + 1} has transition handles outside the edit.`
+        );
+      if (
+        (operation.start !== undefined &&
+          (!finite(operation.start) ||
+            Math.abs(operation.start - start) > 0.000001)) ||
+        (operation.end !== undefined &&
+          (!finite(operation.end) || Math.abs(operation.end - end) > 0.000001))
+      )
+        invalid(
+          "timing_conflict",
+          `Edit ${index + 1} must surround its original transition cut.`
+        );
+      operation.start = round(start);
+      operation.end = round(end);
+      operation.targetClipIds = targets;
+      parameters.transition = transition;
+    }
     if (Object.hasOwn(parameters, "colorLut")) {
       if (operation.type !== "style")
         invalid(
@@ -600,8 +702,43 @@ export function resolveEditPlanningReferences(
       parameters.volume = 0.25;
     if (
       operation.type === "sound" &&
+      typeof parameters.assetId === "string" &&
+      parameters.assetId.startsWith("shared:")
+    ) {
+      const sound = context.freeSounds.find(
+        row => row.assetId === parameters.assetId
+      );
+      const sourceIn = parameters.sourceIn ?? 0;
+      const sourceEnd = Math.min(
+        sound?.duration ?? 0,
+        Number(sourceIn) +
+          (operation.end as number) -
+          (operation.start as number)
+      );
+      // A track's sampled review cannot authorize playback of the unheard gaps.
+      // Keep the proposed timing unchanged; ask for a valid plan instead of
+      // silently substituting another excerpt or extending sparse observations.
+      if (
+        !sound ||
+        !finite(sourceIn) ||
+        sourceEnd <= sourceIn ||
+        !sound.sourceRanges.some(
+          range =>
+            sourceIn >= range.start - 0.000001 &&
+            sourceEnd <= range.end + 0.000001
+        )
+      )
+        invalid(
+          "sound_cue_invalid",
+          `Edit ${index + 1} needs a sound interval inside a supplied heard source range.`
+        );
+    }
+    if (
+      operation.type === "sound" &&
       context.freeSounds.some(
-        sound => sound.assetId === parameters.assetId && sound.type === "music"
+        sound =>
+          sound.assetId === parameters.assetId &&
+          (sound.type === "music" || sound.type === "ambience")
       )
     ) {
       // A music bed can end midway through its source phrase. The executor's
@@ -713,6 +850,44 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
     ): never => {
       throw new EditPlanValidationError(reason, detail, index, operation.type);
     };
+    if (operation.type === "transition") {
+      const transition = normalizeAutonomousTransition(parameters.transition);
+      if (
+        !transition ||
+        Object.keys(parameters).some(key => key !== "transition")
+      )
+        return fail(
+          "the proposed shot transition has no supported cut and source handles."
+        );
+      const targets = autonomousTransitionTargets(transition);
+      if (
+        operation.targetClipIds.length !== targets.length ||
+        targets.some(id => !operation.targetClipIds.includes(id))
+      )
+        fail(
+          "the shot transition must target its exact source pair.",
+          "target_invalid"
+        );
+      if (
+        !finite(operation.start) ||
+        !finite(operation.end) ||
+        operation.start < 0 ||
+        operation.end <= operation.start ||
+        (transition.kind === "none"
+          ? operation.start >= transition.cutTime ||
+            operation.end <= transition.cutTime
+          : Math.abs(
+              operation.start - (transition.cutTime - transition.duration / 2)
+            ) > 0.001 ||
+            Math.abs(
+              operation.end - (transition.cutTime + transition.duration / 2)
+            ) > 0.001)
+      )
+        fail(
+          "the shot transition interval conflicts with its original cut.",
+          "timing_conflict"
+        );
+    }
     if (operation.type === "audio" && parameters.assetId != null)
       fail(
         "an audio asset requires a sound insertion, not an existing-clip volume adjustment.",
@@ -769,6 +944,7 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
  * action vocabulary. Unsupported actions must not silently disappear. */
 export const EDIT_PLANNING_CAPABILITIES = `
 ${CATALOG_COLOR_LUT_GUIDANCE}
+${AUTONOMOUS_TRANSITION_GUIDANCE}
 The scene map partitions actual timeline footage and observed events. Its sourceStart/
 sourceEnd values are source-media seconds; scene start/end and all operation intervals
 are current timeline seconds. Scenes describe evidence, not a required number of edits.
@@ -789,8 +965,8 @@ at:0 is its start, at:0.5 is 2.1 seconds into it, and at:1 is its end.
 preserve existing animation when not changing it. A subtle emphasis needs a settled
 hold, not constant oscillation. Reframe only when known source detail remains visible.
 An entrance/exit affects one clip's picture and leaves speech intact; it is not a
-cross-dissolve between adjacent shots. This auto-edit operation format does NOT support
-adjacent-transition, arbitrary plugins, tracking, time remapping or procedural 3D files.
+cross-dissolve between adjacent shots. Use the distinct transition operation above for
+that purpose. Arbitrary plugins, tracking, time remapping and procedural 3D files are unsupported.
 Do not emit unsupported operations or disguise them as a style change.
 
 For precisely timed local style, graphic, broll or sound operations, you may replace
@@ -826,8 +1002,11 @@ For a catalog sound cue, use cue:{speechId,wordIndex,edge:start,align:peak|start
 cue:{sceneId,edge:start,align:peak|start}; omit duration/start/end and sourceIn. The
 compiler aligns the measured waveform peak estimate or file onset, preserves natural
 source length, and crops only at edit boundaries. Peak is amplitude evidence, not beat
-detection; align:peak is only for SFX, while music uses align:start. Choose a matching
-category/tags for the actual action, keep volume quiet,
+detection; align:peak is only for SFX, while music uses align:start. Shared sounds
+include sourceRanges actually heard in their review. Select sourceIn and duration
+inside one of those ranges; never cross an unheard gap. Use explicit start/end and
+sourceIn for sampled excerpts instead of a full-file cue. A music/ambience bed keeps
+its gentler fades. Choose the heard character for the actual action, keep volume quiet,
 and omit sounds when they compete with existing music or meaningful source audio.
 For reviewed supporting video, mediaExcerptId selects one supplied mediaExcerpts entry
 and compiles its real assetId/sourceIn; keep the insertion within that excerpt's

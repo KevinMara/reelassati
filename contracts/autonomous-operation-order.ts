@@ -270,16 +270,24 @@ export function orderAutonomousOperations(
 ) {
   assertAutonomousComposition(project, operations);
   const phase = (operation: EditOperation) =>
-    operation.type === "sound"
-      ? 0
-      : additive(operation)
-        ? 1
-        : trimPreservesTimelineClock(project, operation)
-          ? 2
-          : ["style", "audio", "split", "graphic"].includes(operation.type)
-            ? 3
-            : 4;
+    operation.type === "transition"
+      ? operation.parameters?.transition?.kind === "none"
+        ? -1
+        : 5
+      : operation.type === "sound"
+        ? 0
+        : additive(operation)
+          ? 1
+          : trimPreservesTimelineClock(project, operation)
+            ? 2
+            : ["style", "audio", "split", "graphic"].includes(operation.type)
+              ? 3
+              : 4;
   return [...operations].sort(
-    (a, b) => phase(a) - phase(b) || b.start - a.start
+    (a, b) =>
+      phase(a) - phase(b) ||
+      (a.type === "transition" && b.type === "transition"
+        ? a.start - b.start
+        : b.start - a.start)
   );
 }

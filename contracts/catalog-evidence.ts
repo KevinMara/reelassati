@@ -58,6 +58,10 @@ export interface CatalogSoundObservation {
   confidence: number;
   coverage: "complete-audio" | "sampled-audio";
 }
+/** Verified server-side planning sidecar; never stored in public asset metadata. */
+export interface CatalogSoundPlanningObservation extends CatalogSoundObservation {
+  sourceRanges: { start: number; end: number }[];
+}
 export interface CatalogVisualObservation {
   schemaVersion: 1;
   mediaSha256: string;

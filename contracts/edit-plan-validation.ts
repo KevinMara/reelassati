@@ -76,6 +76,7 @@ const operationTypes = new Set<EditOperation["type"]>([
   "broll",
   "audio",
   "style",
+  "transition",
   "graphic",
   "sound",
 ]);

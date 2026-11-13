@@ -43,11 +43,13 @@ export interface ClipVisual extends VisualPose {
     kind: VisualTransition;
     duration: number;
     /** Source clock anchor; independent of pose animation. */ at?: number;
+    /** Authored range in source seconds; preserves duration limits through cuts. */ sourceDuration?: number;
   };
   exit: {
     kind: VisualTransition;
     duration: number;
     /** Source clock anchor; independent of pose animation. */ at?: number;
+    /** Authored range in source seconds; independent of pose animation. */ sourceDuration?: number;
   };
 }
 export const visualTransitions: { value: VisualTransition; label: string }[] = [
@@ -87,6 +89,13 @@ export function normalizeVisual(value?: unknown): ClipVisual {
       duration: bounded(entry.duration, 0.5, 0.05, 5),
       ...(typeof entry.at === "number" && Number.isFinite(entry.at)
         ? { at: bounded(entry.at, 0, 0, 100000) }
+        : {}),
+      ...(typeof entry.sourceDuration === "number" &&
+      Number.isFinite(entry.sourceDuration) &&
+      entry.sourceDuration > 0
+        ? {
+            sourceDuration: bounded(entry.sourceDuration, 0.001, 0.001, 400000),
+          }
         : {}),
     };
   };
@@ -146,12 +155,10 @@ export function normalizeVisual(value?: unknown): ClipVisual {
             typeof record(p).y === "number" &&
             Number.isFinite(record(p).y)
         )
-        ? v.polygon
-            .slice(0, 12)
-            .map(p => ({
-              x: bounded(record(p).x, 0, 0, 100),
-              y: bounded(record(p).y, 0, 0, 100),
-            }))
+        ? v.polygon.slice(0, 12).map(p => ({
+            x: bounded(record(p).x, 0, 0, 100),
+            y: bounded(record(p).y, 0, 0, 100),
+          }))
         : [
             { x: 0, y: 0 },
             { x: 100, y: 0 },
@@ -182,6 +189,18 @@ export function visualProgress(clip: TimelineClip, time: number) {
       (clip.inPoint + (time - clip.start) * (clip.speed ?? 1) - clock.start) /
         clock.duration
     )
+  );
+}
+
+/** Legacy transitions retain their pose-clock limit until explicitly edited. */
+export function visualTransitionDuration(
+  effect: ClipVisual["entrance"],
+  fallbackSourceDuration: number,
+  speed: number
+) {
+  return Math.min(
+    effect.duration,
+    (effect.sourceDuration ?? fallbackSourceDuration) / (2 * speed)
   );
 }
 export function visualEase(p: number, easing: VisualEasing) {
@@ -223,7 +242,6 @@ export function visualFrame(clip: TimelineClip, time: number) {
   const pose = { ...visualPose(v, p) };
   const reveal = { top: 0, right: 0, bottom: 0, left: 0 };
   const speed = clip.speed ?? 1;
-  const span = clock.duration / speed;
   const sourceTime = clip.inPoint + (time - clip.start) * speed;
   for (const [effect, distance] of [
     [v.entrance, (sourceTime - (v.entrance.at ?? clock.start)) / speed],
@@ -234,7 +252,10 @@ export function visualFrame(clip: TimelineClip, time: number) {
   ] as const) {
     const q = Math.max(
       0,
-      Math.min(1, distance / Math.min(effect.duration, span / 2))
+      Math.min(
+        1,
+        distance / visualTransitionDuration(effect, clock.duration, speed)
+      )
     );
     if (effect.kind === "dissolve" || effect.kind === "zoom") pose.opacity *= q;
     if (effect.kind === "zoom") pose.scale *= 0.8 + q * 0.2;
@@ -265,8 +286,16 @@ export function patchVisual(
     entrance: { ...v.entrance, ...patch.entrance },
     exit: { ...v.exit, ...patch.exit },
   });
-  if (patch.entrance) next.entrance.at = patch.entrance.at ?? clip.inPoint;
-  if (patch.exit) next.exit.at = patch.exit.at ?? clip.outPoint;
+  if (patch.entrance) {
+    next.entrance.at = patch.entrance.at ?? clip.inPoint;
+    next.entrance.sourceDuration =
+      patch.entrance.sourceDuration ?? clip.outPoint - clip.inPoint;
+  }
+  if (patch.exit) {
+    next.exit.at = patch.exit.at ?? clip.outPoint;
+    next.exit.sourceDuration =
+      patch.exit.sourceDuration ?? clip.outPoint - clip.inPoint;
+  }
   if (patch.keyframes === undefined && v.keyframes.length) {
     next.keyframes = v.keyframes.map(k => ({
       ...k,

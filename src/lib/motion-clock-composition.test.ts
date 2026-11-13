@@ -111,6 +111,210 @@ const push = (id: string, start: number, end: number, scale = 1.06) =>
   });
 
 describe("motion clocks through composed source edits", () => {
+  it.each([1, 2])(
+    "keeps a new transition on its authored range through local grade splits at speed %s",
+    speed => {
+      const before = {
+        ...project([
+          {
+            ...source,
+            duration: 10,
+            inPoint: 10,
+            outPoint: 10 + 10 * speed,
+            speed,
+          },
+        ]),
+        transcript: [],
+        sourceSpeech: [],
+      };
+      const transition = operation("transition", "style", 2, 8, {
+        visual: {
+          entrance: { kind: "dissolve", duration: 1 },
+          exit: { kind: "dissolve", duration: 1 },
+        },
+      });
+      const grades = [
+        operation("early-grade", "style", 2.2, 2.4, { contrast: 1.1 }),
+        operation("middle-grade", "style", 4, 6, { contrast: 1.1 }),
+        operation("late-grade", "style", 7.6, 7.8, { contrast: 1.1 }),
+      ];
+      const measured = { ...asset, duration: 40 };
+      const reference = executeAutonomousPlan(before, [transition], [measured]);
+      const composed = executeAutonomousPlan(
+        before,
+        [...grades, transition],
+        [measured]
+      );
+      const at = (value: EditProject, time: number) =>
+        value.clips.find(c => c.start <= time && c.start + c.duration > time)!;
+      for (const time of [2.1, 2.3, 2.5, 3.5, 4.1, 5.5, 6.1, 7.5, 7.7, 7.9]) {
+        const clip = at(composed, time);
+        expect(visualFrame(clip, time).opacity).toBeCloseTo(
+          visualFrame(at(reference, time), time).opacity
+        );
+        expect(clip.visual?.entrance.at).toBeCloseTo(10 + 2 * speed);
+        expect(clip.visual?.exit.at).toBeCloseTo(10 + 8 * speed);
+      }
+      const cut = rippleRemove(composed, 5, 5.2);
+      expect(visualFrame(at(cut, 5.3), 5.3).opacity).toBe(1);
+      expect(visualFrame(at(cut, 7.5), 7.5).opacity).toBeCloseTo(0.3);
+    }
+  );
+
+  it("retains explicit transition source anchors without retiming an existing pose", () => {
+    const before = {
+      ...project([
+        {
+          ...source,
+          duration: 10,
+          inPoint: 10,
+          outPoint: 30,
+          speed: 2,
+          visualStart: 10,
+          visualDuration: 2,
+          visual: normalizeVisual({
+            keyframes: [
+              { at: 0, scale: 1 },
+              { at: 1, scale: 1.2 },
+            ],
+          }),
+        },
+      ]),
+      transcript: [],
+      sourceSpeech: [],
+    };
+    const after = executeAutonomousPlan(
+      before,
+      [
+        operation("transition", "style", 2, 8, {
+          visual: {
+            entrance: { kind: "dissolve", duration: 2, at: 15 },
+            exit: { kind: "dissolve", duration: 2, at: 25 },
+          },
+        }),
+      ],
+      [{ ...asset, duration: 40 }]
+    );
+    const clip = after.clips.find(c => c.start === 2)!;
+    expect(clip.visualStart).toBe(10);
+    expect(clip.visualDuration).toBe(2);
+    expect(clip.visual?.entrance.at).toBe(15);
+    expect(clip.visual?.exit.at).toBe(25);
+    expect(visualFrame(clip, 3).opacity).toBeCloseTo(0.25);
+    expect(visualFrame(clip, 7).opacity).toBeCloseTo(0.25);
+    expect(visualFrame(clip, 3).scale).toBe(1.2);
+  });
+
+  it.each([false, true])(
+    "renders the authored dissolve across a tiny split using the actual FFmpeg path (animated pose: %s)",
+    animated => {
+      const before = {
+        ...project([
+          {
+            ...source,
+            duration: 10,
+            inPoint: 10,
+            outPoint: 30,
+            speed: 2,
+            ...(animated
+              ? {
+                  visualStart: 10,
+                  visualDuration: 2,
+                  visual: normalizeVisual({
+                    keyframes: [
+                      { at: 0, scale: 1 },
+                      { at: 1, scale: 1 },
+                    ],
+                  }),
+                }
+              : {}),
+          },
+        ]),
+        transcript: [],
+        sourceSpeech: [],
+      };
+      const transition = operation("transition", "style", 2, 8, {
+        visual: { entrance: { kind: "dissolve", duration: 1 } },
+      });
+      const assets = [{ ...asset, duration: 40 }];
+      const reference = executeAutonomousPlan(
+        before,
+        [transition],
+        assets
+      ).clips.find(c => c.start === 2)!;
+      const after = executeAutonomousPlan(
+        before,
+        [operation("grade", "style", 2.2, 2.4, { contrast: 1.1 }), transition],
+        assets
+      );
+      const piece = after.clips.find(c => Math.abs(c.start - 2.2) < 0.000001)!;
+      const render = (clip: TimelineClip, frame: number) =>
+        execFileSync(
+          "ffmpeg",
+          [
+            "-v",
+            "error",
+            "-filter_complex_threads",
+            "1",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=white:s=16x16:r=30:d=1,format=rgba",
+            "-vf",
+            `${visualRenderFilter(clip)},select='eq(n,${frame})',format=rgba`,
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+          ],
+          { timeout: 10000, maxBuffer: 100000 }
+        );
+      const expected = render(reference, 9);
+      const actual = render(piece, 3);
+      expect(actual.length).toBe(16 * 16 * 4);
+      expect(actual).toEqual(expected);
+      expect(actual[3] / 255).toBeCloseTo(visualFrame(piece, 2.3).opacity, 2);
+    }
+  );
+
+  it("round-trips transition spans while retaining legacy bounds and rejecting invalid spans", () => {
+    const normalized = normalizeVisual({
+      entrance: { kind: "dissolve", duration: 2, at: 10, sourceDuration: 12 },
+      exit: { kind: "dissolve", duration: 2, at: 22, sourceDuration: 12 },
+    });
+    expect(normalizeVisual(JSON.parse(JSON.stringify(normalized)))).toEqual(
+      normalized
+    );
+    for (const sourceDuration of [0, -1, Infinity, "12"])
+      expect(
+        normalizeVisual({ entrance: { sourceDuration } }).entrance
+          .sourceDuration
+      ).toBeUndefined();
+    const legacy = {
+      ...source,
+      duration: 2,
+      outPoint: 2,
+      visual: normalizeVisual({ entrance: { kind: "dissolve", duration: 5 } }),
+    };
+    expect(visualFrame(legacy, 0.5).opacity).toBe(0.5);
+  });
+
+  it("keeps a legacy dissolve duration when a new pose uses a shorter clock", () => {
+    const original = {
+      ...source,
+      visual: normalizeVisual({ entrance: { kind: "dissolve", duration: 2 } }),
+    };
+    const before = { ...project([original]), transcript: [], sourceSpeech: [] };
+    const after = applyEditOperation(before, push("short-pose", 0, 1, 1.1));
+    const animated = after.clips.find(c => c.start === 0)!;
+    expect(animated.visualDuration).toBe(1);
+    expect(visualFrame(animated, 0.5).opacity).toBeCloseTo(
+      visualFrame(original, 0.5).opacity
+    );
+    expect(visualFrame(animated, 0.5).opacity).toBe(0.25);
+  });
+
   it.each([false, true])(
     "preserves the real three-pause/two-push-in ranges independently of proposal order (reversed:%s)",
     reverse => {

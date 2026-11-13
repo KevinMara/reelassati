@@ -99,6 +99,7 @@ export function autonomousResultReceipt(
     silence: ui("Refined the pacing and cuts."),
     pacing: ui("Refined the pacing and cuts."),
     style: ui("Updated the visual treatment."),
+    transition: ui("Updated the visual treatment."),
     audio: ui("Updated the sound."),
     sound: ui("Updated the sound."),
     caption: ui("Updated the captions."),

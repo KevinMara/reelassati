@@ -208,35 +208,42 @@ describe("platform API transport", () => {
       expect(String(fetchMock.mock.calls[0][0])).toContain("/api/capabilities");
     }
   );
-  it("consumes a streamed plan exactly once", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(planCapabilities())
-      .mockResolvedValueOnce(
-        new Response(
-          '{"type":"pending"}\n' +
-            JSON.stringify({
-              type: "result",
-              status: 200,
-              body: JSON.stringify({ summary: "Complete plan", changes: [] }),
-            }) +
-            "\n",
-          { headers: { "Content-Type": ANALYZER_STREAM_TYPE } }
-        )
-      );
-    vi.stubGlobal("fetch", fetchMock);
-    await expect(
-      platformApi.generateEditPlan({
-        project: {} as never,
-        command: "Edit",
-        selectedClipIds: [],
-      })
-    ).resolves.toMatchObject({ summary: "Complete plan", changes: [] });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1][1].headers).toMatchObject({
-      Accept: ANALYZER_STREAM_TYPE,
-    });
-  });
+  it.each([undefined, true] as const)(
+    "consumes a streamed plan once and forwards only explicit transition support (%s)",
+    async transitionPlanning => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(planCapabilities())
+        .mockResolvedValueOnce(
+          new Response(
+            '{"type":"pending"}\n' +
+              JSON.stringify({
+                type: "result",
+                status: 200,
+                body: JSON.stringify({ summary: "Complete plan", changes: [] }),
+              }) +
+              "\n",
+            { headers: { "Content-Type": ANALYZER_STREAM_TYPE } }
+          )
+        );
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(
+        platformApi.generateEditPlan({
+          project: {} as never,
+          command: "Edit",
+          selectedClipIds: [],
+          transitionPlanning,
+        })
+      ).resolves.toMatchObject({ summary: "Complete plan", changes: [] });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[1][1].headers).toMatchObject({
+        Accept: ANALYZER_STREAM_TYPE,
+      });
+      const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+      if (transitionPlanning) expect(body.transitionPlanning).toBe(true);
+      else expect(body).not.toHaveProperty("transitionPlanning");
+    }
+  );
   it("cancels a truncated paid plan using the same request ID, without resubmitting it", async () => {
     const fetchMock = vi
       .fn()

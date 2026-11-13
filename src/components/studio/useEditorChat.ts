@@ -5,6 +5,7 @@ import {
 import { preflightEditColorLuts } from "@/lib/catalog-color-lut-preflight";
 import { mergeCreditReceipt } from "@contracts/credit-receipt";
 import { nextReelAddition, type ReelAddition } from "@/lib/reel-additions";
+import { timelineFingerprint } from "@/lib/autonomous-live-publish";
 import { translateUi } from "@/lib/i18n/ui";
 import {
   activeEditorProjects as activeProjects,
@@ -38,7 +39,10 @@ import {
   editorChatCanExecute,
   type EditorChatRequest,
 } from "@contracts/editor-chat";
-import { normalizeEditorChatState } from "@contracts/editor-chat-state";
+import {
+  normalizeEditorChatState,
+  retainEditorChatMessages,
+} from "@contracts/editor-chat-state";
 import { editorialConversationText } from "@contracts/editorial-notes";
 import {
   normalizeReview,
@@ -169,6 +173,44 @@ export function useEditorChat(
           : { ...updated, pendingAddition: undefined };
       }),
     }));
+  }
+  function appendRequestMessages(
+    current: EditorChatMessage[],
+    incoming: EditorChatMessage[]
+  ) {
+    const messages = retainEditorChatMessages([...current, ...incoming]);
+    if (new TextEncoder().encode(JSON.stringify(messages)).byteLength > 400000)
+      throw new Error(
+        "These instructions exceed the saved chat limit. Keep this draft until the current additions finish, or shorten its references."
+      );
+    return messages;
+  }
+  function requestHistory(
+    messages: EditorChatMessage[],
+    requestId: string,
+    assistantId: string
+  ) {
+    const pendingIds = new Set(
+      messages
+        .filter(message => message.pendingAddition)
+        .flatMap(message => [
+          message.id,
+          message.requestId ?? message.request?.requestId,
+        ])
+    );
+    return messages
+      .filter(
+        message =>
+          message.text &&
+          message.id !== requestId &&
+          message.id !== assistantId &&
+          !pendingIds.has(message.id)
+      )
+      .slice(-12)
+      .map(message => ({
+        role: message.role,
+        text: editorialConversationText(message),
+      }));
   }
   async function changeAction(
     messageId: string,
@@ -359,6 +401,120 @@ export function useEditorChat(
       })).catch(cause => setError(String(cause)));
     },
   });
+
+  async function finishCatalogOverlayAction(
+    messageId: string,
+    action: EditorChatAction,
+    apply: (current: EditProject) => EditProject,
+    signal: AbortSignal,
+    detail: string
+  ) {
+    const unavailable =
+      "This overlay could not be checked against the source content. The file is saved in Library; choose a different overlay or placement.";
+    const stale =
+      "The timeline changed while the overlay was checked. The file is saved in Library; ask Reel where to place it in your latest edit.";
+    const block = (error: string) =>
+      changeAction(messageId, action.id, current => ({
+        ...current,
+        status: "blocked",
+        error,
+        runtime: {
+          ...current.runtime,
+          detail: "File saved to Library. The timeline was kept.",
+        },
+      }));
+    const guard = await import("@/lib/catalog-overlay-preflight").catch(
+      () => undefined
+    );
+    signal.throwIfAborted();
+    if (!guard) {
+      await block(unavailable);
+      return;
+    }
+    await progress(
+      messageId,
+      action.id,
+      "Checking overlay placement against source content…"
+    );
+    signal.throwIfAborted();
+    const snapshot = getWorkspaceSnapshot();
+    const before = getProject();
+    if (getMessage(messageId).plan?.projectUpdatedAt !== before.updatedAt) {
+      await block(stale);
+      return;
+    }
+    const identity = (current: EditProject) =>
+      JSON.stringify([
+        current.updatedAt,
+        timelineFingerprint(current),
+        current.revisionIndex,
+        current.revisions.map(revision => revision.id),
+      ]);
+    const expectedProject = identity(before);
+    const draft = apply(before);
+    const operationClipIds = {
+      [action.id]: draft.clips
+        .filter(clip => clip.id === `chat-clip-${action.id}`)
+        .map(clip => clip.id),
+    };
+    const options = {
+      project: draft,
+      assets: snapshot.assets,
+      operationClipIds,
+      signal,
+    };
+    const expectedBinding = guard.catalogOverlayDraftBinding(options);
+    let checked: Awaited<ReturnType<typeof guard.preflightCatalogOverlays>>;
+    try {
+      checked = await guard.preflightCatalogOverlays(options);
+    } catch {
+      signal.throwIfAborted();
+      await block(unavailable);
+      return;
+    }
+    signal.throwIfAborted();
+    if (checked.blockedOperationIds.includes(action.id)) {
+      await block(
+        "This overlay would cover important source content. The file is saved in Library; choose a different overlay or placement."
+      );
+      return;
+    }
+    if (
+      checked.unverifiedOperationIds.includes(action.id) ||
+      !checked.checkedOperationIds.includes(action.id) ||
+      checked.draftBinding !== expectedBinding
+    ) {
+      await block(unavailable);
+      return;
+    }
+    const checkedDraft = (
+      current: EditProject,
+      workspace: WorkspaceDocument
+    ) => {
+      signal.throwIfAborted();
+      if (identity(current) !== expectedProject) throw new Error(stale);
+      const next = apply(current);
+      if (
+        guard.catalogOverlayDraftBinding({
+          ...options,
+          project: next,
+          assets: workspace.assets,
+        }) !== expectedBinding
+      )
+        throw new Error(stale);
+      return next;
+    };
+    try {
+      checkedDraft(getProject(), getWorkspaceSnapshot());
+    } catch {
+      signal.throwIfAborted();
+      await block(stale);
+      return;
+    }
+    // Check again inside the canonical mutation: its save can be delayed after
+    // the async pixel inspection and must never apply to a different timeline.
+    await finishAction(messageId, action, checkedDraft, detail);
+  }
 
   async function execute(
     messageId: string,
@@ -621,6 +777,16 @@ export function useEditorChat(
         }));
         return;
       }
+      if (action.insert && (asset.kind === "image" || asset.kind === "video")) {
+        await finishCatalogOverlayAction(
+          messageId,
+          action,
+          current => applySharedCatalogAction(current, asset, action),
+          signal,
+          "Catalog media saved to Library and placed on the timeline · 0 media credits"
+        );
+        return;
+      }
       await finishAction(
         messageId,
         action,
@@ -663,6 +829,16 @@ export function useEditorChat(
           error:
             "The timeline changed while the effect loaded. The file is saved in Library.",
         }));
+        return;
+      }
+      if (action.insert) {
+        await finishCatalogOverlayAction(
+          messageId,
+          action,
+          current => applyChatCatalogEffect(current, asset, action),
+          signal,
+          "Effect saved to Library and placed on the timeline · 0 media credits"
+        );
         return;
       }
       await finishAction(
@@ -1140,8 +1316,7 @@ export function useEditorChat(
       const scopeVersion = mountedScope.current;
       await changeChat(s => ({
         ...s,
-        messages: [
-          ...s.messages,
+        messages: appendRequestMessages(s.messages, [
           {
             id,
             requestId: id,
@@ -1159,6 +1334,7 @@ export function useEditorChat(
             createdAt: new Date().toISOString(),
             status: "stopped",
             pendingAddition: true,
+            planningAttempted: false,
             mode: settings.mode,
             maxCredits: settings.maxCredits,
             usedCredits: 0,
@@ -1166,7 +1342,7 @@ export function useEditorChat(
             creditReceiptsComplete: true,
             request,
           },
-        ].slice(-60) as EditorChatMessage[],
+        ]),
       }));
       if (mountedScope.current === scopeVersion && !stopRequested.current) {
         additions.current.push({ id, parentId: parent?.id });
@@ -1182,21 +1358,11 @@ export function useEditorChat(
     stopRequested.current = false;
     const id = existingId ?? uuid();
     const assistantId = `${id}-reel`;
+    let requestSaved = false;
     try {
       const settings =
         normalizeEditorChatState(getProject().editorChat) ?? DEFAULT_CHAT;
-      const history = settings.messages
-        .filter(
-          m =>
-            m.text &&
-            m.id !== id &&
-            m.id !== assistantId &&
-            !additions.current.some(
-              addition => m.id === addition.id || m.id === `${addition.id}-reel`
-            )
-        )
-        .slice(-12)
-        .map(m => ({ role: m.role, text: editorialConversationText(m) }));
+      const history = requestHistory(settings.messages, id, assistantId);
       const request = {
         ...options,
         requestId: id,
@@ -1227,6 +1393,7 @@ export function useEditorChat(
             text: "Reading your project and planning the requested changes…",
             createdAt: new Date().toISOString(),
             status: "planning",
+            planningAttempted: true,
             mode: settings.mode,
             maxCredits: settings.maxCredits,
             usedCredits: AI_CREDIT_COSTS.editPlan,
@@ -1251,9 +1418,10 @@ export function useEditorChat(
                     }
                   : message
               )
-            : [...s.messages, ...started].slice(-60),
+            : appendRequestMessages(s.messages, started),
         };
       });
+      requestSaved = true;
       const response = await platformApi.editorChat(
         request,
         receiptOptions(assistantId)
@@ -1265,6 +1433,9 @@ export function useEditorChat(
         status: "ready",
       }));
     } catch (cause) {
+      // The composer may only discard a submission after its request is durable.
+      // A failed initial save must propagate to its input-restoration handler.
+      if (!requestSaved) throw cause;
       const detail =
         cause instanceof Error ? cause.message : "Planning could not finish.";
       const stopped =
@@ -1482,8 +1653,40 @@ export function useEditorChat(
       mediaController.current = new AbortController();
       setBusy(true);
       try {
+        // Only an explicit false marker proves this ID has never reached the
+        // provider. Legacy or attempted requests must keep their exact body.
+        const request =
+          m.pendingAddition && m.planningAttempted === false
+            ? {
+                ...m.request,
+                history: requestHistory(
+                  getProject().editorChat?.messages ?? [],
+                  m.request.requestId,
+                  messageId
+                ),
+              }
+            : m.request;
+        // An addition can be resumed after Stop or a reload before it has ever
+        // planned. Rehydrate the same scope as send(), and count that first plan
+        // against its cap without changing the idempotent saved request body.
+        await changeMessage(messageId, item => ({
+          ...item,
+          request,
+          status: "planning",
+          planningAttempted: true,
+          range: request.range,
+          selectedClipIds: request.selectedClipIds,
+          references: request.references,
+          usedCredits: Math.max(
+            AI_CREDIT_COSTS.editPlan,
+            item.usedCredits ?? AI_CREDIT_COSTS.editPlan
+          ),
+        }));
+        if (mountedScope.current !== scopeVersion || stopRequested.current)
+          throw new DOMException("The edit was stopped.", "AbortError");
+        mediaController.current.signal.throwIfAborted();
         const response = await platformApi.editorChat(
-          m.request,
+          request,
           receiptOptions(messageId)
         );
         await changeMessage(messageId, item => ({
@@ -1493,11 +1696,20 @@ export function useEditorChat(
           status: "ready",
         }));
       } catch (cause) {
-        setError(
+        const stopped =
+          stopRequested.current ||
+          mountedScope.current !== scopeVersion ||
+          (cause instanceof Error && cause.name === "AbortError");
+        const detail =
           cause instanceof Error
             ? cause.message
-            : "The saved plan is unavailable."
-        );
+            : "The saved plan is unavailable.";
+        setError(stopped ? "" : detail);
+        await changeMessage(messageId, item => ({
+          ...item,
+          status: stopped ? "stopped" : "failed",
+          text: stopped ? "Edit stopped. Your instructions are saved." : detail,
+        })).catch(() => undefined);
         return;
       } finally {
         activeProjects.delete(runKey);

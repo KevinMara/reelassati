@@ -436,6 +436,16 @@ export function EditorChat({
     setReferences([]);
     setTimeTarget(undefined);
     setTaskPreset(undefined);
+    const restoreDraft = () => {
+      // A save can fail after the user has already typed their next addition.
+      // Keep both instructions, with the rejected one first, for explicit retry.
+      setPrompt(current =>
+        !current || current === text ? text : `${text}\n\n${current}`
+      );
+      addReferences(sentAttachments);
+      setTimeTarget(current => current ?? sentTarget);
+      setTaskPreset(current => current ?? sentPreset);
+    };
     try {
       const submitted = await chat.send(
         text,
@@ -450,16 +460,10 @@ export function EditorChat({
         }
       );
       if (!submitted) {
-        setPrompt(current => current || text);
-        addReferences(sentAttachments);
-        setTimeTarget(sentTarget);
-        setTaskPreset(sentPreset);
+        restoreDraft();
       }
     } catch (error) {
-      setPrompt(current => current || text);
-      addReferences(sentAttachments);
-      setTimeTarget(sentTarget);
-      setTaskPreset(sentPreset);
+      restoreDraft();
       setLocalError(
         error instanceof Error
           ? error.message

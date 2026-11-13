@@ -11,6 +11,7 @@ import { unwrapAnalyzerResponse } from "../src/lib/analyzer-response";
 import type { WorkspaceDocument, EditOperation } from "../contracts/workspace";
 import type { SharedMediaCatalogItem } from "../contracts/shared-media-catalog";
 import { applyEditOperation } from "../contracts/edit-timeline";
+import { executeAutonomousPlan } from "../contracts/autonomous-execution";
 import { replaceTimelineClip } from "../src/lib/editor-manual";
 import { initializeSharedCatalog } from "./shared-media-catalog";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "../contracts/video-analysis";
@@ -581,6 +582,136 @@ describe("foreground K3 auto-edit planning", () => {
     command: "Adapt the edit to this footage without generated media",
     selectedClipIds: [] as string[],
   });
+  it.each([
+    "valid",
+    "missing-handles",
+    "locked",
+    "old-client",
+    "old-client-sound",
+  ])("signs only executable adjacent-shot transitions: %s", async scenario => {
+    const original = nextOutput,
+      before = balance(),
+      calls = providerCalls.length;
+    const body = {
+      ...(await input()),
+      transitionPlanning: !scenario.startsWith("old-client"),
+    };
+    const source = body.project.clips[0];
+    body.project.clips = [
+      {
+        ...source,
+        id: "left-shot",
+        start: 0,
+        duration: 15,
+        inPoint: 0,
+        outPoint: 15,
+      },
+      {
+        ...source,
+        id: "right-shot",
+        start: 15,
+        duration: 15,
+        inPoint: scenario === "missing-handles" ? 0 : 15,
+        outPoint: scenario === "missing-handles" ? 15 : 30,
+        locked: scenario === "locked",
+      },
+    ];
+    nextOutput = {
+      summary: "Connect the two shots",
+      changes: [
+        {
+          type: "transition",
+          label: "Connect the demonstration",
+          start: 14.75,
+          end: 15.25,
+          targetClipIds: ["left-shot", "right-shot"],
+          parameters: {
+            transition: {
+              outgoingId: "left-shot",
+              incomingId: "right-shot",
+              cutTime: 15,
+              kind: "dissolve",
+              duration: 0.5,
+            },
+          },
+        },
+      ],
+    };
+    if (scenario === "old-client")
+      nextOutput.changes.push({
+        type: "style",
+        label: "Incomplete style",
+        start: 0,
+        end: 15,
+        targetClipIds: ["left-shot"],
+        parameters: {},
+      });
+    if (scenario === "old-client-sound")
+      nextOutput.changes.push({
+        type: "sound",
+        label: "Repairable missing sound",
+        start: 0,
+        end: 0.4,
+        targetClipIds: [],
+        parameters: { assetId: "catalog:missing", volume: 0.1 },
+      });
+    try {
+      const response = await request("/api/ai/edit-plan", body);
+      const result = await response.json();
+      expect(response.status, JSON.stringify(result)).toBe(
+        scenario === "valid" ? 200 : 422
+      );
+      expect(providerCalls.length).toBe(calls + 1);
+      if (scenario !== "valid") {
+        expect(result).not.toHaveProperty("changes");
+        expect(result.creditReceipt).toMatchObject({
+          status: "released",
+          credits: 0,
+        });
+        expect(balance()).toBe(before);
+        if (scenario.startsWith("old-client")) {
+          const sent = JSON.stringify(providerCalls.at(-1));
+          expect(sent).not.toContain("transitionSources");
+          expect(sent).not.toContain("transitionCuts");
+        }
+        return;
+      }
+      expect(result.changes).toHaveLength(1);
+      expect(result.changes[0]).toMatchObject({
+        type: "transition",
+        targetClipIds: ["left-shot", "right-shot"],
+        parameters: {
+          transition: {
+            outgoingId: "left-shot",
+            incomingId: "right-shot",
+            cutTime: 15,
+            kind: "dissolve",
+            duration: 0.5,
+          },
+        },
+        provenance: expect.any(Object),
+      });
+      const workspace = (await (await request("/api/workspace")).json())
+        .workspace as WorkspaceDocument;
+      const actual = executeAutonomousPlan(
+        body.project,
+        result.changes,
+        workspace.assets
+      );
+      expect(actual.duration).toBe(30);
+      expect(actual.clips.some(clip => clip.transitionHandle)).toBe(true);
+      expect(
+        actual.clips.find(clip => clip.id === "right-shot")?.visual?.entrance
+          ?.kind
+      ).toBe("dissolve");
+      expect(before - balance()).toBe(5);
+      const sent = JSON.stringify(providerCalls.at(-1));
+      expect(sent).toContain("transitionSources");
+      expect(sent).toContain("cutTime");
+    } finally {
+      nextOutput = original;
+    }
+  });
   it("corrects duplicate trims inside one reservation and preserves the other proposed treatment", async () => {
     const before = balance(),
       calls = providerCalls.length;
@@ -753,7 +884,7 @@ describe("foreground K3 auto-edit planning", () => {
       nextOutput = {
         sounds: [
           {
-            id,
+            id: "asset-1",
             character: "One soft bell with a short decay",
             role: "effect",
             audibleEvents: ["One bell"],
@@ -782,11 +913,9 @@ describe("foreground K3 auto-edit planning", () => {
             additionalProperties: false,
             properties: {
               sounds: {
-                minItems: 1,
-                maxItems: 1,
                 items: {
                   additionalProperties: false,
-                  properties: { id: { enum: [id] } },
+                  properties: { id: { type: "string" } },
                 },
               },
             },
@@ -797,6 +926,7 @@ describe("foreground K3 auto-edit planning", () => {
       expect(sent).toContain("input_audio");
       expect(sent).toContain(bytes.toString("base64"));
       expect(sent).not.toContain(item.name);
+      expect(sent).not.toContain(id);
       const searchText = () =>
         sqlite
           .prepare("SELECT search_text FROM shared_media_catalog WHERE id=?")
@@ -1234,9 +1364,10 @@ describe("foreground K3 auto-edit planning", () => {
           content: Array<{ type: string; text?: string }>;
         }>
       )[1].content;
-      refinement = JSON.parse(
-        content.find(part => part.type === "text")!.text!
-      );
+      if (modelCalls === 2)
+        refinement = JSON.parse(
+          content.find(part => part.type === "text")!.text!
+        );
       return {
         summary: "Added the precise result shot and refined the grade",
         editorialNotes: [
@@ -1318,7 +1449,7 @@ describe("foreground K3 auto-edit planning", () => {
         ],
       });
       expect(stockCalls).toBe(1);
-      expect(providerCalls.length).toBe(calls + 2);
+      expect(providerCalls.length).toBe(calls + 3);
     } finally {
       providerOutputFactory = undefined;
       vi.stubGlobal("fetch", existingFetch);
@@ -1392,7 +1523,9 @@ describe("foreground K3 auto-edit planning", () => {
         expect(result.editorialCoverage.scenes[0].issues).toEqual(
           decision === "preserve" ? [] : ["cosmetic-only"]
         );
-        expect(providerCalls.length).toBe(calls + 1);
+        expect(providerCalls.length).toBe(
+          calls + (decision === "improve" ? 2 : 1)
+        );
         expect(JSON.stringify(providerCalls.at(-1))).toContain(
           "operationIndexes"
         );
@@ -1992,7 +2125,12 @@ describe("foreground K3 auto-edit planning", () => {
         content: string;
       }>;
       expect(messages[0].content).toContain("parameters.visual");
-      expect(messages[0].content).toContain("does NOT support");
+      expect(messages[0].content).toContain(
+        "Arbitrary plugins, tracking, time remapping and procedural 3D files are unsupported."
+      );
+      expect(messages[0].content).toContain(
+        "Adjacent-shot transitions are unavailable in this client."
+      );
       expect(messages[0].content).toContain(
         "keyframe at is normalized progress, not seconds"
       );
@@ -2064,13 +2202,13 @@ describe("foreground K3 auto-edit planning", () => {
       expect(JSON.stringify(failure)).not.toContain("Retry once");
       expect(JSON.stringify(failure)).not.toMatch(/PRIVATE|private.example/);
       expect(failure.validation).not.toHaveProperty("operationType");
-      expect(warningLog).toHaveBeenCalledWith("REELassati edit plan rejected", {
+      expect(errorLog).toHaveBeenCalledWith("REELassati edit plan rejected", {
         reference: failure.reference,
         ...failure.validation,
       });
-      expect(JSON.stringify(warningLog.mock.calls)).not.toMatch(
-        /PRIVATE|private.example/
-      );
+      expect(
+        JSON.stringify([...warningLog.mock.calls, ...errorLog.mock.calls])
+      ).not.toMatch(/PRIVATE|private.example/);
       expect(balance()).toBe(before);
       expect(providerCalls.length).toBe(calls + 1);
       const ledger = sqlite
@@ -2217,7 +2355,7 @@ describe("foreground K3 auto-edit planning", () => {
       nextOutput = original;
     }
   });
-  it("retains an actionable normalization code for an unavailable preset without exposing its identifier", async () => {
+  it("rejects an unavailable preset during reference resolution without exposing its identifier", async () => {
     const original = nextOutput,
       before = balance(),
       calls = providerCalls.length;
@@ -2241,7 +2379,7 @@ describe("foreground K3 auto-edit planning", () => {
         reason: "edit_plan_invalid",
         validation: {
           version: 1,
-          stage: "normalization",
+          stage: "references",
           reason: "preset_unavailable",
           operationCount: 1,
           operationIndex: 0,

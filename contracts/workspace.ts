@@ -189,6 +189,7 @@ export interface EditOperation {
     | "broll"
     | "audio"
     | "style"
+    | "transition"
     | "graphic";
   label: string;
   reason: string;
@@ -201,6 +202,7 @@ export interface EditOperation {
   provenance?: ContentProvenance;
   reviewedAt?: string;
   parameters?: {
+    transition?: import("./autonomous-transition").AutonomousTransition;
     visual?: Partial<import("./clip-visual").ClipVisual>;
     graphicMode?: "create" | "update";
     graphic?: import("./motion-graphics").MotionGraphic;

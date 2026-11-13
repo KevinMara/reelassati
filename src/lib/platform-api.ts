@@ -1226,6 +1226,7 @@ export const platformApi = {
       captionStyling?: boolean;
       contentReview?: boolean;
       graphicRequest?: string;
+      transitionPlanning?: true;
     },
     options?: UploadRequestOptions
   ) => {

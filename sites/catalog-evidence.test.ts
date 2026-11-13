@@ -10,6 +10,11 @@ import {
   readCatalogEvidence,
 } from "./catalog-evidence";
 import { catalogVisualEvidence } from "./catalog-visual-evidence";
+import {
+  buildEditPlanningContext,
+  resolveEditPlanningReferences,
+} from "../contracts/edit-planning-context";
+import type { Asset, EditOperation, EditProject } from "../contracts/workspace";
 import type { SharedMediaCatalogItem } from "../contracts/shared-media-catalog";
 import type { CatalogEnvironment } from "./shared-media-catalog";
 const sha = "a".repeat(64),
@@ -74,6 +79,105 @@ const env = (records: Record<string, unknown>) =>
   }) as CatalogEnvironment;
 const signal = () => new AbortController().signal;
 describe("content-grounded catalog evidence", () => {
+  it("carries a heard music role into planning, fades and cue alignment without relabeling the catalog", async () => {
+    const result = await catalogVisualEvidence(
+      env({
+        [`catalog-evidence/v1/${sha}.json`]: packet,
+        [`catalog-evidence/v1/${sha}.sound.json`]: {
+          ...observation,
+          role: "music",
+        },
+      }),
+      [audioItem],
+      signal()
+    );
+    const project = {
+      id: "project",
+      duration: 2,
+      clips: [
+        {
+          id: "clip",
+          assetId: "source",
+          track: "video",
+          start: 0,
+          duration: 2,
+          inPoint: 0,
+          outPoint: 2,
+        },
+      ],
+      transcript: [],
+      sourceSpeech: [],
+      sourceReviews: [],
+      aspectRatio: "9:16",
+    } as unknown as EditProject;
+    const assets = [
+      { id: "source", kind: "video", duration: 2, status: "ready" },
+    ] as Asset[];
+    const context = buildEditPlanningContext(
+      project,
+      assets,
+      [],
+      result.items,
+      result.soundObservations
+    );
+    expect(context.scenes[0].id).toBe("scene:0");
+    expect(
+      context.freeSounds.find(
+        sound => sound.assetId === `shared:${audioItem.id}`
+      )?.type
+    ).toBe("music");
+    const [operation] = resolveEditPlanningReferences(
+      [
+        {
+          type: "sound",
+          start: 0,
+          end: 2,
+          parameters: { assetId: `shared:${audioItem.id}` },
+        },
+      ],
+      context,
+      2
+    ) as EditOperation[];
+    expect(operation.parameters).toMatchObject({ fadeIn: 0.25, fadeOut: 0.75 });
+    expect(() =>
+      resolveEditPlanningReferences(
+        [
+          {
+            type: "sound",
+            cue: { sceneId: "scene:0", align: "peak" },
+            parameters: { assetId: `shared:${audioItem.id}` },
+          },
+        ],
+        context,
+        2
+      )
+    ).toThrow("sound alignment");
+    const [explicit] = resolveEditPlanningReferences(
+      [
+        {
+          type: "sound",
+          start: 0,
+          end: 2,
+          parameters: {
+            assetId: `shared:${audioItem.id}`,
+            fadeIn: 0,
+            fadeOut: 0.1,
+          },
+        },
+      ],
+      context,
+      2
+    ) as EditOperation[];
+    expect(explicit.parameters).toMatchObject({ fadeIn: 0, fadeOut: 0.1 });
+    const unknown = buildEditPlanningContext(project, assets, [], result.items);
+    expect(
+      unknown.freeSounds.find(
+        sound => sound.assetId === `shared:${audioItem.id}`
+      )?.type
+    ).toBe("unclear");
+    expect(result.items).toEqual([audioItem]);
+    expect(result.items[0]).not.toHaveProperty("role");
+  });
   it("binds measured audio to immutable source bytes and verifies sampled bytes", () => {
     expect(normalizeCatalogEvidence(packet, audioItem)).toEqual(packet);
     expect(() => verifyEvidenceBlobs(packet)).not.toThrow();
@@ -95,6 +199,63 @@ describe("content-grounded catalog evidence", () => {
         audio: { ...packet.audio!, data: Buffer.alloc(8).toString("base64") },
       })
     ).toThrow("verification");
+  });
+  it("rejects unheard portions of a sampled sound without changing the requested excerpt", async () => {
+    const sampled = {
+      ...packet,
+      audio: {
+        ...packet.audio!,
+        coverage: "sampled-audio",
+        segments: [
+          { sourceStart: 0, sourceEnd: 0.5, sampleStart: 0 },
+          { sourceStart: 1.5, sourceEnd: 2, sampleStart: 0.5 },
+        ],
+      },
+    };
+    const result = await catalogVisualEvidence(
+      env({
+        [`catalog-evidence/v1/${sha}.json`]: sampled,
+        [`catalog-evidence/v1/${sha}.sound.json`]: {
+          ...observation,
+          coverage: "sampled-audio",
+        },
+      }),
+      [audioItem],
+      signal()
+    );
+    const project = {
+      id: "p",
+      duration: 2,
+      clips: [],
+      transcript: [],
+      aspectRatio: "9:16",
+    } as unknown as EditProject;
+    const context = buildEditPlanningContext(
+      project,
+      [],
+      [],
+      result.items,
+      result.soundObservations
+    );
+    const request = (sourceIn: number, end: number) => ({
+      type: "sound",
+      start: 0,
+      end,
+      parameters: { assetId: `shared:${audioItem.id}`, sourceIn },
+    });
+    expect(
+      resolveEditPlanningReferences([request(1.5, 0.5)], context, 2)[0]
+    ).toMatchObject({
+      start: 0,
+      end: 0.5,
+      parameters: { sourceIn: 1.5 },
+    });
+    expect(() =>
+      resolveEditPlanningReferences([request(0.5, 0.5)], context, 2)
+    ).toThrow("heard source range");
+    expect(() =>
+      resolveEditPlanningReferences([request(0, 2)], context, 2)
+    ).toThrow("heard source range");
   });
   it("rejects false whole-track coverage, overlapping segments and oversize envelopes", () => {
     const variant = (patch: any) => ({
@@ -172,10 +333,16 @@ describe("content-grounded catalog evidence", () => {
     // Provider schemas deliberately leave decoder-expensive bounds to this
     // publication gate. Oversized content must never reach the shared index.
     expect(() =>
-      normalizeCatalogSound({ ...observation, character: "x".repeat(601) }, packet)
+      normalizeCatalogSound(
+        { ...observation, character: "x".repeat(601) },
+        packet
+      )
     ).toThrow();
     expect(() =>
-      normalizeCatalogSound({ ...observation, audibleEvents: Array(9).fill("Bell") }, packet)
+      normalizeCatalogSound(
+        { ...observation, audibleEvents: Array(9).fill("Bell") },
+        packet
+      )
     ).toThrow();
   });
   it("does not accept stale source identities or canceled evidence reads", async () => {

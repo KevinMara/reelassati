@@ -196,6 +196,8 @@ export interface EditorChatMessage {
   planApproved?: boolean;
   /** Saved user addition, never an authorization to resume after leaving the editor. */
   pendingAddition?: boolean;
+  /** False proves a queued request has never been submitted; absent is legacy/unknown. */
+  planningAttempted?: boolean;
 }
 
 export interface EditorChatState {

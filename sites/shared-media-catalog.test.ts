@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
+import { catalogVisualEvidence } from "./catalog-visual-evidence";
+import { catalogEvidenceKey, catalogSoundKey } from "./catalog-evidence";
 import {
   handleCatalogAdmin,
   handleCatalogPublic,
@@ -659,6 +661,139 @@ describe("shared catalog owner authorization", () => {
   });
 });
 describe("shared catalog verified publication", () => {
+  it("reserves candidate slots for current reviewed sounds before design and group balancing", async () => {
+    const seed = (index: number, name: string, designId = `sound-${index}`) => {
+      const hash = digest(new TextEncoder().encode(`sound-${index}`));
+      const candidate = normalizeSharedCatalogItem({
+        id: `stock-${hash.slice(0, 24)}`,
+        name,
+        group: "Signals",
+        tags: ["bell"],
+        designId,
+        variant: "Original",
+        kind: "audio",
+        duration: 20,
+        waveform: Array(64).fill(0.5),
+        media: {
+          file: `media/${hash}.wav`,
+          sha256: hash,
+          bytes: 16,
+          contentType: "audio/wav",
+        },
+        license: "platform-licensed",
+        credits: 0,
+      });
+      sqlite
+        .prepare(
+          "INSERT INTO shared_media_catalog (id,name,group_name,design_id,kind,search_text,payload,media_ready,poster_ready,status,created_at) VALUES (?,?,?,?,?,?,?,1,1,'ready','test')"
+        )
+        .run(
+          candidate.id,
+          name,
+          candidate.group,
+          designId,
+          "audio",
+          "bell",
+          JSON.stringify(candidate)
+        );
+      return candidate;
+    };
+    // These rank ahead of the usable sound by name and previously fill all
+    // sixty slots before the later evidence gate drops them without refill.
+    for (let index = 0; index < 60; index++)
+      seed(index, `A unreviewed ${index}`);
+    const unavailableVariant = seed(
+      60,
+      "A unreviewed variant",
+      "reviewed-design"
+    );
+    const usable = seed(61, "Z reviewed bell", "reviewed-design");
+    const sample = new Uint8Array([73, 68, 51, 0, 0, 0, 0, 0]);
+    const sampleSha = digest(sample);
+    const putIndex = (
+      candidate: SharedMediaCatalogItem,
+      mediaSha = candidate.media.sha256,
+      sampleHash = sampleSha,
+      evidenceReady = 1,
+      soundReviewed = 1
+    ) =>
+      sqlite
+        .prepare(
+          "INSERT INTO shared_catalog_evidence(id,media_sha,sample_sha,evidence_ready,sound_reviewed) VALUES(?,?,?,?,?)"
+        )
+        .run(candidate.id, mediaSha, sampleHash, evidenceReady, soundReviewed);
+    putIndex(usable);
+    putIndex(
+      unavailableVariant,
+      unavailableVariant.media.sha256,
+      sampleSha,
+      1,
+      0
+    );
+    putIndex(seed(62, "A stale source"), "f".repeat(64));
+    putIndex(seed(63, "A missing sample"), undefined, "");
+    putIndex(seed(64, "A unfinished evidence"), undefined, undefined, 0);
+    const audio = {
+      data: Buffer.from(sample).toString("base64"),
+      sha256: sampleSha,
+      bytes: sample.length,
+      contentType: "audio/mpeg",
+      segments: [{ sourceStart: 0, sourceEnd: 20, sampleStart: 0 }],
+      coverage: "complete-audio",
+      measured: {
+        duration: 20,
+        peakDb: -3,
+        rmsDb: -12,
+        activeStart: 0,
+        activeEnd: 20,
+        onsets: [0],
+        envelope: Array(64).fill(0.5),
+      },
+    };
+    const save = (key: string, value: unknown) =>
+      objects.set(key, {
+        data: new TextEncoder().encode(JSON.stringify(value)),
+      });
+    save(catalogEvidenceKey(usable.media.sha256), {
+      schemaVersion: 1,
+      catalogId: usable.id,
+      mediaSha256: usable.media.sha256,
+      kind: "audio",
+      duration: 20,
+      audio,
+    });
+    save(catalogSoundKey(usable.media.sha256), {
+      schemaVersion: 1,
+      mediaSha256: usable.media.sha256,
+      sampleSha256: sampleSha,
+      character: "Soft bell",
+      role: "effect",
+      audibleEvents: ["Bell ring"],
+      suitableUses: ["A quiet reveal"],
+      avoidUses: [],
+      containsSpeech: false,
+      intensity: "subtle",
+      confidence: 0.95,
+      coverage: "complete-audio",
+    });
+    const readObject = vi.spyOn(env.BUCKET, "get");
+    const candidates = await sharedCatalogCandidates(env, "bell");
+    expect(readObject).not.toHaveBeenCalled();
+    expect(candidates.map(candidate => candidate.id)).toEqual([usable.id]);
+    const verified = await catalogVisualEvidence(
+      env,
+      candidates,
+      new AbortController().signal
+    );
+    expect(verified.items).toEqual([usable]);
+    // Eligibility is automatic-planning policy, never a manual library filter.
+    const browse = await searchSharedCatalog(env, { kind: "audio" });
+    expect(browse.total).toBe(64);
+    expect(
+      browse.items.some(candidate => candidate.name.startsWith("A unreviewed"))
+    ).toBe(true);
+  });
+
   it("grounds a long automatic command in source evidence and balances media kinds across a large look library", async () => {
     const seed = (
       number: number,
@@ -726,6 +861,12 @@ describe("shared catalog verified publication", () => {
           [name, group, ...tags].join(" ").toLowerCase(),
           JSON.stringify(candidate)
         );
+      if (kind === "audio")
+        sqlite
+          .prepare(
+            "INSERT INTO shared_catalog_evidence(id,media_sha,sample_sha,evidence_ready,sound_reviewed) VALUES(?,?,?,1,1)"
+          )
+          .run(candidate.id, hash, "a".repeat(64));
       return candidate;
     };
     for (let i = 0; i < 1500; i++)

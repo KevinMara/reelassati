@@ -33,6 +33,7 @@ const operationTypes = new Set<EditOperation["type"]>([
   "silence",
   "pacing",
   "style",
+  "transition",
   "audio",
   "sound",
   "caption",
@@ -393,6 +394,63 @@ function references(raw: unknown): EditorChatReference[] {
     });
 }
 
+/** Bound finished history without discarding an accepted instruction or its run. */
+export function retainEditorChatMessages(
+  messages: EditorChatMessage[]
+): EditorChatMessage[] {
+  const protectedIds = new Set<string>();
+  const protect = (message: EditorChatMessage) => {
+    protectedIds.add(message.id);
+    protectedIds.add(`${message.id}-input`);
+    if (message.requestId) protectedIds.add(message.requestId);
+    if (message.request?.requestId) protectedIds.add(message.request.requestId);
+  };
+  let previousRun: EditorChatMessage | undefined;
+  for (const message of messages) {
+    if (message.role !== "assistant") continue;
+    // Keep the predecessor's final status until its additions are consumed.
+    // Otherwise pruning a failed parent would make the queue treat it as absent.
+    if (message.pendingAddition && previousRun) protect(previousRun);
+    if (!message.pendingAddition) previousRun = message;
+    if (!(
+      message.pendingAddition ||
+      ["planning", "running", "ready"].includes(message.status ?? "") ||
+      (message.request && !message.plan && message.status !== "completed") ||
+      message.plan?.actions.some(action =>
+        ["pending", "running", "awaiting-approval", "interrupted"].includes(
+          action.status
+        )
+      )
+    ))
+      continue;
+    protect(message);
+  }
+  const protectedCount = messages.filter(message =>
+    protectedIds.has(message.id)
+  ).length;
+  const historyCount = Math.max(0, 60 - protectedCount);
+  const history = messages.filter(message => !protectedIds.has(message.id));
+  const historyIds = new Set(
+    (historyCount ? history.slice(-historyCount) : []).map(
+      message => message.id
+    )
+  );
+  const retained = messages.filter(
+    message => protectedIds.has(message.id) || historyIds.has(message.id)
+  );
+  while (
+    retained.length > 1 &&
+    new TextEncoder().encode(JSON.stringify(retained)).byteLength > 400000
+  ) {
+    const completed = retained.findIndex(
+      message => !protectedIds.has(message.id)
+    );
+    if (completed < 0) break;
+    retained.splice(completed, 1);
+  }
+  return retained;
+}
+
 /** Workspace projection limits; this does not confer execution, asset ownership or billing authority. */
 export function normalizeEditorChatState(
   raw: unknown
@@ -400,9 +458,7 @@ export function normalizeEditorChatState(
   const value = record(raw);
   if (!value) return undefined;
   const messages: EditorChatMessage[] = [];
-  for (const candidate of Array.isArray(value.messages)
-    ? value.messages.slice(-60)
-    : []) {
+  for (const candidate of Array.isArray(value.messages) ? value.messages : []) {
     const row = record(candidate);
     if (
       !row ||
@@ -520,6 +576,9 @@ export function normalizeEditorChatState(
         : {}),
       ...(row.planApproved === true ? { planApproved: true } : {}),
       ...(row.pendingAddition === true ? { pendingAddition: true } : {}),
+      ...(typeof row.planningAttempted === "boolean"
+        ? { planningAttempted: row.planningAttempted }
+        : {}),
       ...(string(row.requestId) ? { requestId: string(row.requestId) } : {}),
       ...(Array.isArray(row.references)
         ? { references: references(row.references) }
@@ -610,15 +669,6 @@ export function normalizeEditorChatState(
     }
     messages.push(message);
   }
-  const measure = () =>
-    new TextEncoder().encode(JSON.stringify(messages)).byteLength;
-  while (messages.length > 1 && measure() > 400000) {
-    const terminal = messages.findIndex(
-      message =>
-        !["planning", "running", "ready"].includes(message.status || "")
-    );
-    messages.splice(terminal >= 0 ? terminal : 0, 1);
-  }
   return {
     mode: value.mode === "auto" ? "auto" : "ask",
     preferencesVersion: 2,
@@ -628,6 +678,6 @@ export function normalizeEditorChatState(
         : finite(value.maxCredits)
           ? Math.max(5, Math.min(100000, Math.floor(value.maxCredits)))
           : 200,
-    messages,
+    messages: retainEditorChatMessages(messages),
   };
 }

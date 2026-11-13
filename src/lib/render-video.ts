@@ -1,4 +1,5 @@
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
+import { withFfmpegLease } from "./ffmpeg-lease";
 import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "./platform-api";
 import { buildRenderPlan } from "./render-plan";
@@ -20,7 +21,17 @@ import {
   type CubeLut,
 } from "@contracts/color-lut";
 
-export async function renderVideo(
+export function renderVideo(
+  project: EditProject,
+  assets: Asset[],
+  options: Parameters<typeof renderVideoWithLease>[2]
+) {
+  return withFfmpegLease(options.signal, () =>
+    renderVideoWithLease(project, assets, options)
+  );
+}
+
+async function renderVideoWithLease(
   project: EditProject,
   assets: Asset[],
   options: {

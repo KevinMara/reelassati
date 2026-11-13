@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import * as catalogEvidenceModule from "./catalog-visual-evidence";
 import { execFileSync } from "node:child_process";
 import {
   extractTextProvenanceToken,
@@ -555,6 +556,7 @@ const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  vi.restoreAllMocks();
 });
 
 const authHeaders = {
@@ -2016,6 +2018,137 @@ describe("provenance integrity boundaries", () => {
     ).toBeUndefined();
   });
 
+  it("keeps actual catalog evidence available when external stock refines the whole edit", async () => {
+    const DB = createIntegrityD1(),
+      BUCKET = createMemoryBucket();
+    persistRenderProject(DB);
+    const workspace = JSON.parse(
+      String(DB.state.workspaces[0].document)
+    ) as ReturnType<typeof createEmptyWorkspace>;
+    const project = {
+      ...workspace.projects[0],
+      duration: 10,
+      clips: [
+        {
+          id: "source-clip",
+          assetId: "owned-video",
+          label: "Source",
+          track: "video" as const,
+          start: 0,
+          duration: 10,
+          inPoint: 0,
+          outPoint: 10,
+          locked: false,
+          color: "#808080",
+        },
+      ],
+    };
+    const evidence = [
+      {
+        type: "text" as const,
+        text: "Catalog evidence shared:verified. Actual measured color transform and listening observations.",
+      },
+      {
+        type: "image_url" as const,
+        image_url: { url: "data:image/png;base64,iVBORw0KGgo=" },
+      },
+    ];
+    vi.spyOn(catalogEvidenceModule, "catalogVisualEvidence").mockResolvedValue({
+      items: [],
+      parts: evidence,
+      soundObservations: {},
+    });
+    const requests: Array<{ messages: Array<{ content: unknown }> }> = [];
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.startsWith("https://api.openverse.org/"))
+        return Response.json({ results: [] });
+      if (url.startsWith("https://commons.wikimedia.org/w/api.php"))
+        return Response.json({
+          query: {
+            pages: {
+              1: {
+                pageid: 1,
+                title: "File:Tree.jpg",
+                imageinfo: [
+                  {
+                    url: "https://upload.wikimedia.org/wikipedia/commons/a/ab/Tree.jpg",
+                    mime: "image/jpeg",
+                    width: 1920,
+                    height: 1080,
+                    size: 3,
+                    extmetadata: {
+                      LicenseShortName: { value: "CC BY 4.0" },
+                      LicenseUrl: {
+                        value: "https://creativecommons.org/licenses/by/4.0/",
+                      },
+                      Artist: { value: "Test creator" },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        });
+      requests.push(JSON.parse(String(init?.body)));
+      const output = {
+        summary: "Polish the source",
+        changes: [
+          {
+            type: "style",
+            label: "Grade",
+            start: 0,
+            end: 10,
+            targetClipIds: ["source-clip"],
+            parameters: { brightness: 0.01 },
+          },
+        ],
+        ...(requests.length === 1
+          ? {
+              stockSearches: [
+                {
+                  kind: "image",
+                  query: "tree",
+                  sceneId: "scene:0",
+                  purpose: "Explain the observed subject",
+                },
+              ],
+            }
+          : {}),
+      };
+      return new Response(
+        `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: JSON.stringify(output) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+        { headers: { "content-type": "text/event-stream" } }
+      );
+    };
+    const response = await unwrapAnalyzerResponse(
+      await worker.fetch(
+        new Request("https://studio.example/api/ai/edit-plan", {
+          method: "POST",
+          headers: { ...authHeaders, Accept: ANALYZER_STREAM_TYPE },
+          body: JSON.stringify({
+            project,
+            command: "Use relevant free stock",
+            stock: true,
+            requestId: crypto.randomUUID(),
+            localOnly: true,
+          }),
+        }),
+        testEnv(DB, BUCKET) as never
+      )
+    );
+    expect(response.status).toBe(200);
+    expect(requests).toHaveLength(2);
+    const result = await response.json() as { changes: EditOperation[] };
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0]).toMatchObject({ type: "style", start: 0, end: 10 });
+    for (const request of requests) {
+      expect(request.messages[1].content).toEqual(
+        expect.arrayContaining(evidence)
+      );
+    }
+  });
+
   it("keeps ranged sound and supporting-media source clocks intact on the explicit Pro route", async () => {
     const DB = createIntegrityD1(),
       BUCKET = createMemoryBucket();
@@ -2026,11 +2159,20 @@ describe("provenance integrity boundaries", () => {
     const project = {
       ...workspace.projects[0],
       duration: 10,
-      clips: [{
-        id: "source-clip", assetId: "owned-video", label: "Actual target",
-        track: "video" as const, start: 0, duration: 10, inPoint: 0,
-        outPoint: 10, locked: false, color: "#808080",
-      }],
+      clips: [
+        {
+          id: "source-clip",
+          assetId: "owned-video",
+          label: "Actual target",
+          track: "video" as const,
+          start: 0,
+          duration: 10,
+          inPoint: 0,
+          outPoint: 10,
+          locked: false,
+          color: "#808080",
+        },
+      ],
     };
     let providerBody: Record<string, unknown> | undefined;
     globalThis.fetch = async (_url, init) => {
@@ -2049,12 +2191,20 @@ describe("provenance integrity boundaries", () => {
           start: 2.2,
           end: 4,
           parameters: {
-            assetId: "owned-image", sourceIn: 0, fit: "contain",
+            assetId: "owned-image",
+            sourceIn: 0,
+            fit: "contain",
             visual: {
-              blendMode: "screen", opacity: 0.45, scale: 0.75, x: 12,
+              blendMode: "screen",
+              opacity: 0.45,
+              scale: 0.75,
+              x: 12,
               crop: { left: 4 },
               entrance: { kind: "dissolve", duration: 0.2 },
-              keyframes: [{ at: 0, scale: 0.75 }, { at: 1, scale: 0.8 }],
+              keyframes: [
+                { at: 0, scale: 0.75 },
+                { at: 1, scale: 0.8 },
+              ],
             },
           },
         },
@@ -2119,34 +2269,55 @@ describe("provenance integrity boundaries", () => {
       start: 2.2,
       end: 4,
       parameters: {
-        sourceIn: 0, fit: "contain",
+        sourceIn: 0,
+        fit: "contain",
         visual: {
-          blendMode: "screen", opacity: 0.45, scale: 0.75, x: 12,
+          blendMode: "screen",
+          opacity: 0.45,
+          scale: 0.75,
+          x: 12,
           crop: { left: 4 },
           entrance: { kind: "dissolve", duration: 0.2 },
-          keyframes: [{ at: 0, scale: 0.75 }, { at: 1, scale: 0.8 }],
+          keyframes: [
+            { at: 0, scale: 0.75 },
+            { at: 1, scale: 0.8 },
+          ],
         },
       },
     });
     // Exercise the returned API plan, not a hand-built operation. Losing the
     // blend setting here makes a black-backed overlay cover the source image.
     const overlay = plan.changes[1];
-    const executed = executeAutonomousPlan(project, [overlay], [{
-      id: "owned-image", name: "Light texture", kind: "image", status: "ready",
-      contentType: "image/png", url: "https://media.example/light.png",
-      size: 128, createdAt: "2026-11-13",
-    }]);
+    const executed = executeAutonomousPlan(
+      project,
+      [overlay],
+      [
+        {
+          id: "owned-image",
+          name: "Light texture",
+          kind: "image",
+          status: "ready",
+          contentType: "image/png",
+          url: "https://media.example/light.png",
+          size: 128,
+          createdAt: "2026-11-13",
+        },
+      ]
+    );
     expect(executed.clips[0]).toEqual(project.clips[0]);
     const inserted = executed.clips.find(clip => clip.id === overlay.id)!;
     expect(inserted).toMatchObject({
-      assetId: "owned-image", start: 2.2, muted: true,
+      assetId: "owned-image",
+      start: 2.2,
+      muted: true,
       fit: "contain",
       visual: { blendMode: "screen", opacity: 0.45, x: 12, crop: { left: 4 } },
     });
     expect(inserted.duration).toBeCloseTo(1.8, 8);
     expect(inserted.visual?.keyframes).toHaveLength(2);
-    expect(visualCompositeFilters(inserted, "source", "texture", "out", 30).join(";"))
-      .toContain("blend=all_mode=screen");
+    expect(
+      visualCompositeFilters(inserted, "source", "texture", "out", 30).join(";")
+    ).toContain("blend=all_mode=screen");
     expect(plan.changes[2]).toMatchObject({ start: 2, end: 3 });
     expect(providerBody).toMatchObject({
       model: "moonshotai/kimi-k3",

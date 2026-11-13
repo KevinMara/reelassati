@@ -129,6 +129,17 @@ function graphicDesign(clip: TimelineClip) {
     )
   );
 }
+/** A saved design reuses transition treatment, never its old media clock. */
+function visualDesign(clip: TimelineClip) {
+  if (!clip.visual) return;
+  const design = structuredClone(clip.visual);
+  for (const effect of [design.entrance, design.exit]) {
+    if (!effect) continue;
+    delete effect.at;
+    delete effect.sourceDuration;
+  }
+  return design;
+}
 /** Only design data enters the model. Source dialogue, facts, names and asset identifiers stay in the archive. */
 export function blueprintDesign(blueprint: EditTemplateBlueprint) {
   return {
@@ -145,7 +156,7 @@ export function blueprintDesign(blueprint: EditTemplateBlueprint) {
       start: clip.start,
       duration: clip.duration,
       speed: clip.speed,
-      visual: clip.visual,
+      visual: visualDesign(clip),
       graphicDuration: clip.graphicDuration,
       ...(clip.graphic ? { graphic: graphicDesign(clip) } : {}),
       audioMix: clip.audioMix,
@@ -197,7 +208,7 @@ export function resolveBlueprintOperations(
           ...(clip.visual
             ? {
                 visual: {
-                  ...clip.visual,
+                  ...visualDesign(clip),
                   ...Object.fromEntries(
                     ["x", "y", "scale", "crop"]
                       .filter(k => framing[k] !== undefined)

@@ -399,13 +399,27 @@ async function sharedCatalogKindCandidates(
     aspectDistance(a) - aspectDistance(b) ||
     sizeDistance(a) - sizeDistance(b) ||
     lexical(a.id, b.id);
+  // Unreviewed audio cannot pass the actual listening-evidence gate. Exclude
+  // it before choosing variants and spending the bounded candidate slots,
+  // otherwise unavailable sounds can hide every usable sound in a group.
+  // This indexed source/sample check is only a retrieval prefilter: planning
+  // still loads and verifies the real sidecars, including review confidence.
+  const soundEligibility =
+    kind === "audio"
+      ? ` AND EXISTS (
+          SELECT 1 FROM shared_catalog_evidence e
+          WHERE e.id = shared_media_catalog.id
+            AND e.media_sha = json_extract(shared_media_catalog.payload, '$.media.sha256')
+            AND e.sample_sha != '' AND e.evidence_ready = 1 AND e.sound_reviewed = 1
+        )`
+      : "";
   let after = "";
   for (;;) {
     signal?.throwIfAborted();
     const page = await env.DB.prepare(
       `SELECT id,name,group_name,design_id,search_text,
       json_extract(payload, '$.width') AS width, json_extract(payload, '$.height') AS height
-      FROM shared_media_catalog WHERE status = 'ready' AND kind = ? AND id > ? ORDER BY id LIMIT 500`
+      FROM shared_media_catalog WHERE status = 'ready' AND kind = ? AND id > ?${soundEligibility} ORDER BY id LIMIT 500`
     )
       .bind(kind, after)
       .all<Candidate>();

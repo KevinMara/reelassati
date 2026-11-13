@@ -229,6 +229,10 @@ export function applyEditOperation(
   op: EditOperation
 ): EditProject {
   const p = op.parameters ?? {};
+  if (op.type === "transition")
+    throw new Error(
+      "A shot transition requires the complete plan executor and measured source handles."
+    );
   const changesLook = op.type === "style" && p.colorLut !== undefined;
   const colorLut =
     p.colorLut === null ? null : normalizeClipColorLut(p.colorLut);
@@ -516,13 +520,52 @@ export function applyEditOperation(
         // Linked audio may need matching interval splits, but its sound and
         // saved visual state do not change when a picture look is applied.
         if (changesLook && c.track !== "video") return c;
-        const visual = p.visual ? patchVisual(c, p.visual) : undefined;
+        // One authored entrance/exit spans the complete operation even when a
+        // prior local treatment split its targets. Keep its clock separate
+        // from pose keyframes, whose existing timing must remain unchanged.
+        const speed = c.speed ?? 1;
+        const visual = p.visual
+          ? patchVisual(c, {
+              ...p.visual,
+              ...(p.visual.entrance
+                ? {
+                    entrance: {
+                      ...p.visual.entrance,
+                      at:
+                        p.visual.entrance.at ??
+                        c.inPoint + (op.start - c.start) * speed,
+                      sourceDuration:
+                        p.visual.entrance.sourceDuration ??
+                        (op.end - op.start) * speed,
+                    },
+                  }
+                : {}),
+              ...(p.visual.exit
+                ? {
+                    exit: {
+                      ...p.visual.exit,
+                      at:
+                        p.visual.exit.at ??
+                        c.inPoint + (op.end - c.start) * speed,
+                      sourceDuration:
+                        p.visual.exit.sourceDuration ??
+                        (op.end - op.start) * speed,
+                    },
+                  }
+                : {}),
+            })
+          : undefined;
         if (visual && p.visual?.keyframes !== undefined) {
           // Replacing pose animation must not restart an unrelated transition.
           const previousClock = visualClock(c);
-          if (!p.visual.entrance) visual.entrance.at ??= previousClock.start;
-          if (!p.visual.exit)
+          if (!p.visual.entrance) {
+            visual.entrance.at ??= previousClock.start;
+            visual.entrance.sourceDuration ??= previousClock.duration;
+          }
+          if (!p.visual.exit) {
             visual.exit.at ??= previousClock.start + previousClock.duration;
+            visual.exit.sourceDuration ??= previousClock.duration;
+          }
         }
         return {
           ...c,

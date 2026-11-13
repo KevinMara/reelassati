@@ -8,9 +8,13 @@ import {
   mergeCreditReceipt,
   type CreditReceipt,
 } from "@contracts/credit-receipt";
-import { normalizeEditorChatState } from "@contracts/editor-chat-state";
+import {
+  normalizeEditorChatState,
+  retainEditorChatMessages,
+} from "@contracts/editor-chat-state";
 import { applyAutonomousCaptionTreatment } from "@contracts/editorial-captions";
 import { preflightEditColorLuts } from "@/lib/catalog-color-lut-preflight";
+import { preflightAutonomousCatalogMedia } from "@/lib/autonomous-catalog-preflight";
 import {
   resolveAutonomousSourceMetadata,
   mergeAutonomousSourceMetadata,
@@ -446,20 +450,21 @@ export function AutonomousEditor({
                 ...chat,
                 // Progress belongs to its original turn. Re-appending it puts
                 // the parent result below additions sent while it was working.
-                messages: (previous
-                  ? chat.messages.map(item =>
-                      item.id === messageId ? message : item
-                    )
-                  : [
-                      ...chat.messages,
-                      ...(chat.messages.some(
-                        item => item.id === inputMessage.id
+                messages: retainEditorChatMessages(
+                  previous
+                    ? chat.messages.map(item =>
+                        item.id === messageId ? message : item
                       )
-                        ? []
-                        : [inputMessage]),
-                      message,
-                    ]
-                ).slice(-60),
+                    : [
+                        ...chat.messages,
+                        ...(chat.messages.some(
+                          item => item.id === inputMessage.id
+                        )
+                          ? []
+                          : [inputMessage]),
+                        message,
+                      ]
+                ),
               },
             };
           }),
@@ -719,6 +724,7 @@ export function AutonomousEditor({
             stock: true,
             captionStyling: captions,
             contentReview: true,
+            transitionPlanning: true,
             graphicRequest: style.startsWith("ANALYZER OPTIMIZATION BRIEF")
               ? ""
               : style,
@@ -787,7 +793,7 @@ export function AutonomousEditor({
       changesToApply = graphicReview.changes;
       await preflightEditColorLuts(changesToApply, signal);
       checkpoint();
-      const editorialCoverage = reviewAppliedEditorialCoverage(
+      let editorialCoverage = reviewAppliedEditorialCoverage(
         result.editorialCoverage,
         working,
         buildEditPlanningContext(working, runWorkspace.assets),
@@ -797,7 +803,7 @@ export function AutonomousEditor({
           ...sharedCatalogPlanningAssets(result.sharedCatalog ?? []),
         ]
       );
-      const receiptReview = autonomousReceiptReview(
+      let receiptReview = autonomousReceiptReview(
         graphicReview,
         result.qualityReview?.withdrawn
       );
@@ -1035,7 +1041,7 @@ export function AutonomousEditor({
       setStatus("Applying the edit to your timeline…");
       setStage(ui("Timeline"));
       const allAssets = [...runWorkspace.assets, ...generatedAssets];
-      const executable = changesToApply.map(op =>
+      let executable = changesToApply.map(op =>
         resolvedMedia.has(op.id)
           ? {
               ...op,
@@ -1046,6 +1052,29 @@ export function AutonomousEditor({
             }
           : op
       );
+      const catalogReview = await preflightAutonomousCatalogMedia({
+        project: working,
+        changes: executable,
+        assets: allAssets,
+        signal,
+        checkpoint,
+        onProgress: setStatus,
+      });
+      checkpoint();
+      executable = catalogReview.changes;
+      if (catalogReview.omitted.length) {
+        receiptReview = autonomousReceiptReview(
+          receiptReview,
+          catalogReview.omitted
+        );
+        editorialCoverage = reviewAppliedEditorialCoverage(
+          result.editorialCoverage,
+          working,
+          buildEditPlanningContext(working, allAssets),
+          executable,
+          allAssets
+        );
+      }
       const steps: Array<{ label: string; project: EditProject }> = [];
       const appliedOperations: Array<Pick<EditOperation, "type">> = [];
       working = executeAutonomousPlan(
