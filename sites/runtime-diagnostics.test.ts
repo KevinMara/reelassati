@@ -16,4 +16,11 @@ describe("runtime diagnostics", () => {
       errorType: "Error",
     });
   });
+  it("identifies a catalog validation gate without exposing asset content", () => {
+    expect(runtimeFailureDiagnostic(new Error("A still image cannot establish motion."))).toEqual({
+      category: "catalog-observation", catalogCheck: "still-motion", errorType: "Error",
+    });
+    const unknown = runtimeFailureDiagnostic(new Error("Invalid visual observation. PRIVATE_SOURCE_COPY"));
+    expect(unknown).toEqual({ category: "unclassified", errorType: "Error" });
+  });
 });

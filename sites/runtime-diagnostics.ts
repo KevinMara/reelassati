@@ -1,6 +1,21 @@
 /** Fixed categories only. Never log exception text, SQL, URLs or request data. */
 export function runtimeFailureDiagnostic(cause: unknown) {
   const message = cause instanceof Error ? cause.message.slice(0, 4096) : "";
+  const catalogChecks: Record<string, string> = {
+    "Incomplete visual observations.": "visual-count",
+    "Visual observation identities do not match.": "visual-identities",
+    "Invalid visual observation.": "visual-text",
+    "Invalid visual observations.": "visual-list",
+    "Visual observation does not match its frames.": "visual-metadata",
+    "A still image cannot establish motion.": "still-motion",
+    "Visual evidence changed during review.": "visual-sample-changed",
+    "Incomplete sound observations.": "sound-count",
+    "Duplicate sound observations.": "sound-identities",
+    "Invalid sound observation.": "sound-text",
+    "Invalid sound observations.": "sound-list",
+    "Sound observation does not match its sample.": "sound-metadata",
+    "Sound evidence changed during review.": "sound-sample-changed",
+  };
   const patterns = [
     ["database-deadline", /D1.*(?:timed out|timeout|time limit|overloaded|busy)|SQLITE_BUSY/i],
     ["database-instructions", /too many (?:instructions|SQL variables)|SQLITE_TOOBIG/i],
@@ -35,8 +50,10 @@ export function runtimeFailureDiagnostic(cause: unknown) {
   ] as const;
   return {
     category:
+      (catalogChecks[message] ? "catalog-observation" : undefined) ??
       patterns.find(([, pattern]) => pattern.test(message))?.[0] ??
       "unclassified",
+    ...(catalogChecks[message] ? { catalogCheck: catalogChecks[message] } : {}),
     errorType:
       cause instanceof TypeError
         ? "TypeError"
