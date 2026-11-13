@@ -4737,7 +4737,10 @@ function mapEditOperations(
         parameters.optional = params.optional;
       if (params.fit === "cover" || params.fit === "contain")
         parameters.fit = params.fit;
-      if (type === "style" && recordValue(params.visual)) {
+      // Supporting layers use the same compositor as existing footage. Keep
+      // their selected blend/pose/motion in the signed plan, including the
+      // catalog blend mode resolved before this mapper runs.
+      if ((type === "style" || type === "broll") && recordValue(params.visual)) {
         const patch = recordValue(params.visual)!;
         const normalized = normalizeVisual(patch);
         parameters.visual = Object.fromEntries(

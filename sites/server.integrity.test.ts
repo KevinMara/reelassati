@@ -17,6 +17,8 @@ import { normalizeEditorSavedStyles } from "../contracts/editor-style-library";
 import { captureEditStyle } from "../contracts/edit-style-template";
 import { HOOK_STORY_GUIDANCE } from "../contracts/storytelling-guidance";
 import { normalizeVisual } from "../contracts/clip-visual";
+import { executeAutonomousPlan } from "../contracts/autonomous-execution";
+import { visualCompositeFilters } from "../src/lib/visual-rendering";
 import {
   buildAnalyzerOptimization,
   parseAudienceResponse,
@@ -2046,7 +2048,15 @@ describe("provenance integrity boundaries", () => {
           label: "Contained visual",
           start: 2.2,
           end: 4,
-          parameters: { assetId: "owned-image", sourceIn: 0 },
+          parameters: {
+            assetId: "owned-image", sourceIn: 0, fit: "contain",
+            visual: {
+              blendMode: "screen", opacity: 0.45, scale: 0.75, x: 12,
+              crop: { left: 4 },
+              entrance: { kind: "dissolve", duration: 0.2 },
+              keyframes: [{ at: 0, scale: 0.75 }, { at: 1, scale: 0.8 }],
+            },
+          },
         },
         {
           type: "sound",
@@ -2108,8 +2118,35 @@ describe("provenance integrity boundaries", () => {
     expect(plan.changes[1]).toMatchObject({
       start: 2.2,
       end: 4,
-      parameters: { sourceIn: 0 },
+      parameters: {
+        sourceIn: 0, fit: "contain",
+        visual: {
+          blendMode: "screen", opacity: 0.45, scale: 0.75, x: 12,
+          crop: { left: 4 },
+          entrance: { kind: "dissolve", duration: 0.2 },
+          keyframes: [{ at: 0, scale: 0.75 }, { at: 1, scale: 0.8 }],
+        },
+      },
     });
+    // Exercise the returned API plan, not a hand-built operation. Losing the
+    // blend setting here makes a black-backed overlay cover the source image.
+    const overlay = plan.changes[1];
+    const executed = executeAutonomousPlan(project, [overlay], [{
+      id: "owned-image", name: "Light texture", kind: "image", status: "ready",
+      contentType: "image/png", url: "https://media.example/light.png",
+      size: 128, createdAt: "2026-11-13",
+    }]);
+    expect(executed.clips[0]).toEqual(project.clips[0]);
+    const inserted = executed.clips.find(clip => clip.id === overlay.id)!;
+    expect(inserted).toMatchObject({
+      assetId: "owned-image", start: 2.2, muted: true,
+      fit: "contain",
+      visual: { blendMode: "screen", opacity: 0.45, x: 12, crop: { left: 4 } },
+    });
+    expect(inserted.duration).toBeCloseTo(1.8, 8);
+    expect(inserted.visual?.keyframes).toHaveLength(2);
+    expect(visualCompositeFilters(inserted, "source", "texture", "out", 30).join(";"))
+      .toContain("blend=all_mode=screen");
     expect(plan.changes[2]).toMatchObject({ start: 2, end: 3 });
     expect(providerBody).toMatchObject({
       model: "moonshotai/kimi-k3",
