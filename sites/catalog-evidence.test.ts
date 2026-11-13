@@ -169,6 +169,14 @@ describe("content-grounded catalog evidence", () => {
     expect(() =>
       normalizeCatalogSound({ ...observation, confidence: 3 }, packet)
     ).toThrow();
+    // Provider schemas deliberately leave decoder-expensive bounds to this
+    // publication gate. Oversized content must never reach the shared index.
+    expect(() =>
+      normalizeCatalogSound({ ...observation, character: "x".repeat(601) }, packet)
+    ).toThrow();
+    expect(() =>
+      normalizeCatalogSound({ ...observation, audibleEvents: Array(9).fill("Bell") }, packet)
+    ).toThrow();
   });
   it("does not accept stale source identities or canceled evidence reads", async () => {
     expect(

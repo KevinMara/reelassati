@@ -1,12 +1,15 @@
 /** Keep catalog observation generation structured at the provider boundary.
  * Runtime validators still verify identity, source samples and semantics. */
 export function catalogReviewSchema(kind: "sound" | "visual", ids: string[]) {
-  const text = { type: "string", minLength: 1, maxLength: 600 };
-  const list = { type: "array", maxItems: 8, items: text };
+  // Gemini's constrained decoder can reject nested array-length limits with a
+  // bare INVALID_ARGUMENT. Keep provider constraints structural; exact IDs,
+  // counts, string lengths and list bounds are checked before publication.
+  const text = { type: "string" };
+  const list = { type: "array", items: text };
   const properties =
     kind === "sound"
       ? {
-          id: { type: "string", enum: ids },
+          id: { type: "string" },
           character: text,
           role: {
             type: "string",
@@ -17,10 +20,10 @@ export function catalogReviewSchema(kind: "sound" | "visual", ids: string[]) {
           avoidUses: list,
           containsSpeech: { type: "boolean" },
           intensity: { type: "string", enum: ["subtle", "moderate", "strong"] },
-          confidence: { type: "number", minimum: 0, maximum: 1 },
+          confidence: { type: "number" },
         }
       : {
-          id: { type: "string", enum: ids },
+          id: { type: "string" },
           description: text,
           visibleElements: list,
           sampledChanges: list,
@@ -28,7 +31,7 @@ export function catalogReviewSchema(kind: "sound" | "visual", ids: string[]) {
           suitableUses: list,
           avoidUses: list,
           visibleText: list,
-          confidence: { type: "number", minimum: 0, maximum: 1 },
+          confidence: { type: "number" },
         };
   const key = kind === "sound" ? "sounds" : "visuals";
   return {
@@ -38,8 +41,7 @@ export function catalogReviewSchema(kind: "sound" | "visual", ids: string[]) {
     properties: {
       [key]: {
         type: "array",
-        minItems: ids.length,
-        maxItems: ids.length,
+        description: `One observation for each of the ${ids.length} supplied assets, with its exact id.`,
         items: {
           type: "object",
           additionalProperties: false,
