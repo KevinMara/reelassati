@@ -314,7 +314,16 @@ describe("verified chunked catalog import", () => {
     expect((await admin(`evidence-status?ids=${item.id}`)).status).toBe(200);
     expect(
       await (await admin(`evidence-status?ids=${item.id}`)).json()
-    ).toEqual({ items: [{ id: item.id, ready: true, soundReviewed: false }] });
+    ).toEqual({
+      items: [
+        {
+          id: item.id,
+          ready: true,
+          soundReviewed: false,
+          visualReviewed: false,
+        },
+      ],
+    });
     expect(
       (
         await admin(

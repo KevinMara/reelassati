@@ -773,6 +773,26 @@ describe("foreground K3 auto-edit planning", () => {
       expect(reviewed.reviewed).toEqual([id]);
       expect(providerCalls).toHaveLength(calls + 1);
       expect(providerCalls.at(-1)?.model).toBe("google/gemini-2.5-flash");
+      expect(providerCalls.at(-1)?.response_format).toMatchObject({
+        type: "json_schema",
+        json_schema: {
+          strict: true,
+          schema: {
+            required: ["sounds"],
+            additionalProperties: false,
+            properties: {
+              sounds: {
+                minItems: 1,
+                maxItems: 1,
+                items: {
+                  additionalProperties: false,
+                  properties: { id: { enum: [id] } },
+                },
+              },
+            },
+          },
+        },
+      });
       const sent = JSON.stringify(providerCalls.at(-1));
       expect(sent).toContain("input_audio");
       expect(sent).toContain(bytes.toString("base64"));
@@ -784,11 +804,30 @@ describe("foreground K3 auto-edit planning", () => {
       expect(searchText()).toContain("one soft bell with a short decay");
       expect(searchText()).toContain("quiet completion");
       expect(searchText()).not.toContain("large impact");
+      // The observation may have reached object storage before its index commit.
+      sqlite
+        .prepare(
+          "UPDATE shared_catalog_evidence SET sound_reviewed=0 WHERE id=?"
+        )
+        .run(id);
+      sqlite
+        .prepare(
+          "UPDATE shared_media_catalog SET search_text='sound' WHERE id=?"
+        )
+        .run(id);
       expect(
         await (
           await request("/api/catalog/admin/review-sounds", { ids: [id] })
         ).json()
       ).toMatchObject({ reviewed: [], skipped: [id] });
+      expect(searchText()).toContain("quiet completion");
+      expect(
+        sqlite
+          .prepare(
+            "SELECT sound_reviewed FROM shared_catalog_evidence WHERE id=?"
+          )
+          .get(id)?.sound_reviewed
+      ).toBe(1);
       expect(providerCalls).toHaveLength(calls + 1);
       expect(
         sqlite

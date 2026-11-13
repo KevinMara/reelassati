@@ -4,6 +4,7 @@ import {
   normalizeCatalogEvidence,
   type CatalogEvidence,
   type CatalogSoundObservation,
+  type CatalogVisualObservation,
 } from "../contracts/catalog-evidence";
 import type { SharedMediaCatalogItem } from "../contracts/shared-media-catalog";
 import { normalizeSharedCatalogItem } from "../contracts/shared-media-catalog";
@@ -13,9 +14,12 @@ export const catalogEvidenceKey = (sha: string) =>
   `catalog-evidence/v1/${sha}.json`;
 export const catalogSoundKey = (sha: string) =>
   `catalog-evidence/v1/${sha}.sound.json`;
+export const catalogVisualKey = (sha: string) =>
+  `catalog-evidence/v1/${sha}.visual.json`;
 export function catalogContentSearchText(
   item: SharedMediaCatalogItem,
-  sound?: CatalogSoundObservation
+  sound?: CatalogSoundObservation,
+  visual?: CatalogVisualObservation
 ) {
   return [
     item.name,
@@ -31,10 +35,43 @@ export function catalogContentSearchText(
           ...sound.suitableUses,
         ]
       : []),
+    ...(visual && visual.confidence >= 0.6
+      ? [
+          visual.description,
+          visual.composition,
+          ...visual.visibleElements,
+          ...visual.sampledChanges,
+          ...visual.suitableUses,
+          ...visual.visibleText,
+        ]
+      : []),
   ]
     .join(" ")
     .normalize("NFKC")
     .toLowerCase();
+}
+export async function publishCatalogSound(
+  env: CatalogEnvironment,
+  item: SharedMediaCatalogItem,
+  packet: CatalogEvidence,
+  observation: CatalogSoundObservation
+) {
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE shared_catalog_evidence SET sound_reviewed=1 WHERE id=? AND media_sha=? AND sample_sha=?"
+    ).bind(item.id, packet.mediaSha256, packet.audio!.sha256),
+    env.DB.prepare(
+      "UPDATE shared_media_catalog SET search_text=? WHERE id=? AND EXISTS (SELECT 1 FROM shared_catalog_evidence e WHERE e.id=? AND e.media_sha=? AND e.sample_sha=?)"
+    ).bind(
+      catalogContentSearchText(item, observation),
+      item.id,
+      item.id,
+      packet.mediaSha256,
+      packet.audio!.sha256
+    ),
+  ]);
+  if (!Array.isArray(results) || !results[0]?.meta?.changes)
+    throw new Error("Sound evidence changed during review.");
 }
 export function evidenceBytes(data: string) {
   return Uint8Array.from(atob(data), c => c.charCodeAt(0));
@@ -162,6 +199,78 @@ export function normalizeCatalogSound(
     coverage: v.coverage,
   };
 }
+export function normalizeCatalogVisual(
+  value: unknown,
+  packet: CatalogEvidence
+): CatalogVisualObservation {
+  const v = value as CatalogVisualObservation;
+  const text = (s: unknown) => {
+    if (
+      typeof s !== "string" ||
+      !s.trim() ||
+      s.length > 600 ||
+      /[\u0000-\u001f]/.test(s)
+    )
+      throw new Error("Invalid visual observation.");
+    return s.trim();
+  };
+  const texts = (s: unknown) => {
+    if (!Array.isArray(s) || s.length > 8)
+      throw new Error("Invalid visual observations.");
+    return s.map(text);
+  };
+  if (
+    !v ||
+    !packet.visual ||
+    v.schemaVersion !== 1 ||
+    v.mediaSha256 !== packet.mediaSha256 ||
+    v.sampleSha256 !== packet.visual.sha256 ||
+    v.coverage !== packet.visual.coverage ||
+    !Number.isFinite(v.confidence) ||
+    v.confidence < 0 ||
+    v.confidence > 1
+  )
+    throw new Error("Visual observation does not match its frames.");
+  const sampledChanges = texts(v.sampledChanges);
+  if (packet.visual.coverage === "complete-image" && sampledChanges.length)
+    throw new Error("A still image cannot establish motion.");
+  return {
+    schemaVersion: 1,
+    mediaSha256: v.mediaSha256,
+    sampleSha256: v.sampleSha256,
+    description: text(v.description),
+    visibleElements: texts(v.visibleElements),
+    sampledChanges,
+    composition: text(v.composition),
+    suitableUses: texts(v.suitableUses),
+    avoidUses: texts(v.avoidUses),
+    visibleText: texts(v.visibleText),
+    confidence: v.confidence,
+    coverage: v.coverage,
+  };
+}
+export async function readCatalogVisual(
+  env: CatalogEnvironment,
+  packet: CatalogEvidence,
+  signal: AbortSignal
+) {
+  signal.throwIfAborted();
+  if (!packet.visual) return;
+  const stored = await env.BUCKET.get(catalogVisualKey(packet.mediaSha256));
+  if (!stored) return;
+  if (stored.size > 32000) {
+    await stored.body.cancel();
+    return;
+  }
+  try {
+    const value = await new Response(stored.body).json();
+    signal.throwIfAborted();
+    return normalizeCatalogVisual(value, packet);
+  } catch {
+    signal.throwIfAborted();
+    return;
+  }
+}
 /** Owner route only; immutable source identity is verified against published DB rows. */
 export async function uploadCatalogEvidence(
   request: Request,
@@ -255,6 +364,9 @@ export async function uploadCatalogEvidence(
         const sound = packet.audio
           ? await readCatalogSound(env, packet, request.signal)
           : undefined;
+        const visual = packet.visual
+          ? await readCatalogVisual(env, packet, request.signal)
+          : undefined;
         await env.BUCKET.put(
           catalogEvidenceKey(packet.mediaSha256),
           new TextEncoder().encode(JSON.stringify(packet)),
@@ -270,15 +382,26 @@ export async function uploadCatalogEvidence(
           ).bind(
             packet.catalogId,
             packet.mediaSha256,
-            packet.audio?.sha256 || "",
+            packet.audio?.sha256 || packet.visual?.sha256 || "",
             sound ? 1 : 0
           ),
           env.DB.prepare(
             "UPDATE shared_media_catalog SET search_text=? WHERE id=?"
           ).bind(
-            catalogContentSearchText(items.get(packet.catalogId)!, sound),
+            catalogContentSearchText(
+              items.get(packet.catalogId)!,
+              sound,
+              visual
+            ),
             packet.catalogId
           ),
+          ...(!visual
+            ? [
+                env.DB.prepare(
+                  "DELETE FROM shared_catalog_visual_reviews WHERE id=?"
+                ).bind(packet.catalogId),
+              ]
+            : []),
         ];
       })
     );

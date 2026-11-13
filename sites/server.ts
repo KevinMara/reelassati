@@ -4,12 +4,14 @@ import {
   EDIT_CUT_REPAIR_DIRECTION,
 } from "../contracts/edit-cut-repair";
 import { catalogVisualEvidence } from "./catalog-visual-evidence";
+import { reviewCatalogVisuals } from "./catalog-visual-review";
+import { catalogReviewSchema } from "./catalog-review-schema";
 import {
   readCatalogEvidence,
   readCatalogSound,
   normalizeCatalogSound,
   catalogSoundKey,
-  catalogContentSearchText,
+  publishCatalogSound,
 } from "./catalog-evidence";
 import { runtimeFailureDiagnostic } from "./runtime-diagnostics";
 import {
@@ -14343,7 +14345,9 @@ async function handleApi(
         );
         if (!packet?.audio)
           return errorResponse("Upload verified sound evidence first.", 409);
-        if (await readCatalogSound(env, packet, analysisControl.signal)) {
+        const existing = await readCatalogSound(env, packet, analysisControl.signal);
+        if (existing) {
+          await publishCatalogSound(env, item, packet, existing);
           skipped.push(id);
           continue;
         }
@@ -14386,7 +14390,7 @@ async function handleApi(
         true,
         6000,
         false,
-        undefined,
+        catalogReviewSchema("sound", inspected.map(p => p.catalogId)),
         analysisControl,
         "low"
       );
@@ -14425,25 +14429,24 @@ async function handleApi(
           new TextEncoder().encode(JSON.stringify(observation)),
           { httpMetadata: { contentType: "application/json" } }
         );
-        await env.DB.batch([
-          env.DB.prepare(
-            "UPDATE shared_catalog_evidence SET sound_reviewed=1 WHERE id=? AND media_sha=? AND sample_sha=?"
-          ).bind(packet.catalogId, packet.mediaSha256, packet.audio!.sha256),
-          env.DB.prepare(
-            "UPDATE shared_media_catalog SET search_text=? WHERE id=?"
-          ).bind(
-            catalogContentSearchText(
-              soundItems.get(packet.catalogId)!,
-              observation
-            ),
-            packet.catalogId
-          ),
-        ]);
+        analysisControl.signal.throwIfAborted();
+        await publishCatalogSound(env, soundItems.get(packet.catalogId)!, packet, observation);
       }
       return json({ reviewed: results.map(r => r.packet.catalogId), skipped });
     } finally {
       await release();
     }
+  }
+  if (url.pathname === "/api/catalog/admin/review-visuals" && request.method === "POST") {
+    if (!canAdministerSharedCatalog(env, user))
+      return errorResponse("Only the studio owner can review shared media.", 403);
+    if (!analysisControl) return errorResponse("Use the foreground visual review.", 409);
+    const input = await parseJsonBody<{ ids?: string[] }>(request);
+    return json(await reviewCatalogVisuals(env, input.ids, analysisControl, async (direction, parts, ids) => {
+      const { output } = await chatJson(env, user, "video-analysis", direction, parts,
+        "google/gemini-2.5-flash", true, 8000, false, catalogReviewSchema("visual", ids), analysisControl, "low");
+      return output;
+    }));
   }
   if (url.pathname.startsWith("/api/catalog/admin/"))
     return handleCatalogAdmin(
@@ -14739,6 +14742,7 @@ export default {
           "/api/ai/analyze",
           "/api/ai/edit-plan",
           "/api/catalog/admin/review-sounds",
+          "/api/catalog/admin/review-visuals",
         ].includes(url.pathname) &&
         request.headers.get("Accept")?.includes(ANALYZER_STREAM_TYPE)
       ) {

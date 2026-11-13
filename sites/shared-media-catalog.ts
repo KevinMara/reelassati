@@ -167,6 +167,12 @@ export function initializeSharedCatalog(env: CatalogEnvironment) {
     env.DB.prepare(
       "CREATE TABLE IF NOT EXISTS shared_catalog_sound_leases (id TEXT PRIMARY KEY NOT NULL, lease_id TEXT NOT NULL, expires_at INTEGER NOT NULL)"
     ),
+    env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS shared_catalog_visual_reviews (id TEXT PRIMARY KEY NOT NULL, media_sha TEXT NOT NULL, sample_sha TEXT NOT NULL)"
+    ),
+    env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS shared_catalog_visual_leases (id TEXT PRIMARY KEY NOT NULL, lease_id TEXT NOT NULL, expires_at INTEGER NOT NULL)"
+    ),
   ])
     .then(() => undefined)
     .catch(error => {
@@ -582,13 +588,18 @@ export async function handleCatalogAdmin(
     const rows = ids.length
       ? (
           await env.DB.prepare(
-            `SELECT id,evidence_ready,sound_reviewed FROM shared_catalog_evidence WHERE id IN (${ids.map(() => "?").join(",")})`
+            `SELECT e.id,e.evidence_ready,e.sound_reviewed,
+              CASE WHEN v.id IS NOT NULL THEN 1 ELSE 0 END AS visual_reviewed
+              FROM shared_catalog_evidence e LEFT JOIN shared_catalog_visual_reviews v
+              ON v.id=e.id AND v.media_sha=e.media_sha AND v.sample_sha=e.sample_sha
+              WHERE e.id IN (${ids.map(() => "?").join(",")})`
           )
             .bind(...ids)
             .all<{
               id: string;
               evidence_ready: number;
               sound_reviewed: number;
+              visual_reviewed: number;
             }>()
         ).results
       : [];
@@ -598,6 +609,7 @@ export async function handleCatalogAdmin(
         id,
         ready: found.get(id)?.evidence_ready === 1,
         soundReviewed: found.get(id)?.sound_reviewed === 1,
+        visualReviewed: found.get(id)?.visual_reviewed === 1,
       })),
     });
   }

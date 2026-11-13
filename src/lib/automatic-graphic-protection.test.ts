@@ -504,6 +504,76 @@ describe("source-aware automatic graphic placement", () => {
     expect(reasons(project(), note)).toContain("reading-time");
   });
 
+  it.each([
+    ["queste 30 domande,", "30 domande", true],
+    ["ECCO: 9–12 segnali", "9-12", true],
+    ["40 domande", "4", false],
+    ["brisk movement", "risk", false],
+  ])(
+    "checks complete phrases inside visible source captions: %s",
+    (caption, label, repeated) => {
+      const p = project(
+        evidence({
+          observedText: [
+            {
+              id: "caption",
+              start: 1,
+              end: 4,
+              text: caption,
+              confidence: 0.95,
+            },
+          ],
+        })
+      );
+      const g = graphic({
+        graphic: normalizeGraphic({ ...graphic().graphic, text: label })!,
+      });
+      expect(reasons(p, g).includes("repeated-source-text")).toBe(repeated);
+      // An explicit human request may deliberately emphasize existing copy.
+      expect(
+        automaticGraphicProblems(p, g, [asset], "requested").map(x => x.reason)
+      ).not.toContain("repeated-source-text");
+    }
+  );
+
+  it("does not treat earlier source captions or speech-only phrases as visible duplicates", () => {
+    const p = project(
+      evidence({
+        observedText: [
+          {
+            id: "past-caption",
+            start: 0,
+            end: 1,
+            text: "A Short title here",
+            confidence: 0.95,
+          },
+        ],
+      })
+    );
+    expect(reasons(p)).not.toContain("repeated-source-text");
+    expect(reasons(project())).not.toContain("repeated-source-text");
+  });
+
+  it("compares visible source copy on its trimmed, speed-adjusted clock", () => {
+    const p = project(
+      evidence({
+        observedText: [
+          {
+            id: "caption",
+            start: 6,
+            end: 7,
+            text: "A Short title here",
+            confidence: 0.95,
+          },
+        ],
+      })
+    );
+    p.clips = [
+      { ...source, start: 1, inPoint: 5, outPoint: 9, duration: 2, speed: 2 },
+    ];
+    expect(reasons(p)).toContain("repeated-source-text");
+  });
+
   it("omits invented commentary by source grounding rather than a topic blacklist", () => {
     const p = project(
       evidence({

@@ -28,7 +28,7 @@ export function CatalogEvidenceImport() {
       window.removeEventListener("pagehide", stop);
     };
   }, []);
-  const run = async (review: boolean) => {
+  const run = async (review: false | "sound" | "visual") => {
     if (controller.current || !count) return;
     const active = new AbortController();
     controller.current = active;
@@ -41,6 +41,7 @@ export function CatalogEvidenceImport() {
       };
       let completed = 0;
       const soundIds: string[] = [];
+      const visualIds: string[] = [];
       async function* batches() {
         if (bundle) {
           let batch: CatalogEvidence[] = [];
@@ -101,13 +102,18 @@ export function CatalogEvidenceImport() {
         for (const p of packets)
           if (p.kind === "audio" && !byId.get(p.catalogId)?.soundReviewed)
             soundIds.push(p.catalogId);
+          else if (
+            (p.kind === "image" || p.kind === "video") &&
+            !byId.get(p.catalogId)?.visualReviewed
+          )
+            visualIds.push(p.catalogId);
         completed += packets.length;
         if (mounted.current)
           setProgress(
             `${completed.toLocaleString()} / ${count.toLocaleString()} evidence records ready`
           );
       }
-      if (review)
+      if (review === "sound")
         for (let offset = 0; offset < soundIds.length; offset += 8) {
           active.signal.throwIfAborted();
           if (mounted.current)
@@ -119,10 +125,22 @@ export function CatalogEvidenceImport() {
             options
           );
         }
+      if (review === "visual")
+        for (let offset = 0; offset < visualIds.length; offset += 8) {
+          active.signal.throwIfAborted();
+          if (mounted.current)
+            setProgress(
+              `Inspecting visuals · ${offset.toLocaleString()} / ${visualIds.length.toLocaleString()} reviewed`
+            );
+          await platformApi.catalogReviewVisuals(
+            visualIds.slice(offset, offset + 8),
+            options
+          );
+        }
       if (mounted.current)
         setProgress(
           review
-            ? `Complete · ${count.toLocaleString()} evidence records, ${soundIds.length.toLocaleString()} new sound reviews`
+            ? `Complete · ${count.toLocaleString()} evidence records, ${(review === "sound" ? soundIds : visualIds).length.toLocaleString()} ${review} reviews`
             : `Complete · ${count.toLocaleString()} evidence records ready`
         );
     } catch (cause) {
@@ -130,9 +148,11 @@ export function CatalogEvidenceImport() {
         setError(
           active.signal.aborted
             ? "Stopped. Completed records are saved."
-            : cause instanceof Error
-              ? cause.message
-              : "Evidence import failed."
+            : review
+              ? `${review === "sound" ? "Sound" : "Visual"} review paused. Completed records are saved. Start again to continue with the remaining items.`
+              : cause instanceof Error
+                ? cause.message
+                : "Evidence import failed."
         );
     } finally {
       if (controller.current === active) controller.current = null;
@@ -145,9 +165,9 @@ export function CatalogEvidenceImport() {
         Catalog content evidence
       </summary>
       <p className="mt-2 text-xs text-muted-foreground">
-        Upload measured visual, motion, audio and color evidence. Sound review
-        listens through the connected model and uses provider credits. It runs
-        only while this page remains open.
+        Upload measured visual, motion, audio and color evidence. Content review
+        inspects the actual samples through the connected model and uses
+        provider credits. It runs only while this page remains open.
       </p>
       <input
         className="mt-3 block w-full text-xs"
@@ -214,9 +234,17 @@ export function CatalogEvidenceImport() {
         <button
           className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground"
           disabled={busy || !count}
-          onClick={() => void run(true)}
+          onClick={() => void run("sound")}
         >
           Upload and review sounds
+        </button>
+        <button
+          type="button"
+          disabled={busy || !count}
+          onClick={() => void run("visual")}
+          className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary disabled:opacity-50"
+        >
+          Upload and review visuals
         </button>
         {busy && (
           <button

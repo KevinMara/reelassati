@@ -777,14 +777,19 @@ export function automaticGraphicProblems(
           });
       }
       if (intent === "automatic" && graphic.text.trim()) {
-        const key = copyKey(graphic.text);
+        // OCR often includes the entire caption line ("queste 30 domande")
+        // while the added label repeats only its subject ("30 domande").
+        // Compare complete tokens, not whole lines or raw substrings: 4 is
+        // not 40, and "risk" is not "brisk". Only currently visible source
+        // text is relevant; speech alone does not imply a visible duplicate.
+        const key = copyKey(frame.text);
         if (
           key &&
           evidence.observedText.some(
             text =>
               sourceTime >= text.start &&
               sourceTime < text.end &&
-              copyKey(text.text) === key
+              ` ${copyKey(text.text)} `.includes(` ${key} `)
           )
         )
           record({

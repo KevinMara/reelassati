@@ -481,7 +481,12 @@ function supportRequestJson<T>(
 export const platformApi = {
   catalogEvidenceStatus: (ids: string[], options: UploadRequestOptions) =>
     requestJson<{
-      items: { id: string; ready: boolean; soundReviewed: boolean }[];
+      items: {
+        id: string;
+        ready: boolean;
+        soundReviewed: boolean;
+        visualReviewed: boolean;
+      }[];
     }>(
       `/api/catalog/admin/evidence-status?ids=${encodeURIComponent(ids.join(","))}`,
       { signal: options.signal },
@@ -501,6 +506,18 @@ export const platformApi = {
   catalogReviewSounds: (ids: string[], options: UploadRequestOptions) =>
     requestJson<{ reviewed: string[]; skipped: string[] }>(
       "/api/catalog/admin/review-sounds",
+      {
+        method: "POST",
+        headers: { Accept: ANALYZER_STREAM_TYPE },
+        body: JSON.stringify({ ids }),
+        signal: options.signal,
+      },
+      false,
+      options.scope
+    ),
+  catalogReviewVisuals: (ids: string[], options: UploadRequestOptions) =>
+    requestJson<{ reviewed: string[]; skipped: string[] }>(
+      "/api/catalog/admin/review-visuals",
       {
         method: "POST",
         headers: { Accept: ANALYZER_STREAM_TYPE },

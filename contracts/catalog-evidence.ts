@@ -58,6 +58,20 @@ export interface CatalogSoundObservation {
   confidence: number;
   coverage: "complete-audio" | "sampled-audio";
 }
+export interface CatalogVisualObservation {
+  schemaVersion: 1;
+  mediaSha256: string;
+  sampleSha256: string;
+  description: string;
+  visibleElements: string[];
+  sampledChanges: string[];
+  composition: string;
+  suitableUses: string[];
+  avoidUses: string[];
+  visibleText: string[];
+  confidence: number;
+  coverage: "complete-image" | "sampled-motion";
+}
 const object = (v: unknown): Record<string, any> => {
   if (!v || typeof v !== "object" || Array.isArray(v))
     throw new Error("Invalid catalog evidence.");
