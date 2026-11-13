@@ -134,11 +134,14 @@ describe("reusable free presets", () => {
         type: "graphic",
         start: 0,
         end: 4,
-        parameters: { presetId: "motion:statistic:0" },
+        parameters: {
+          presetId: "motion:statistic:0",
+          kitTitle: "Actual result",
+        },
       })
     ).toThrow(/measured/);
   });
-  it("resolves owned personal presets without exposing their geometry in model context", () => {
+  it("shares personal design settings while replacing previous source copy", () => {
     const style = {
       id: "personal-1",
       name: "Custom",
@@ -146,10 +149,11 @@ describe("reusable free presets", () => {
       graphic: GRAPHIC_PRESETS[0].graphic,
       graphicDuration: 3,
     };
-    expect(editorPresetCatalog([style]).personal[0]).toEqual({
+    expect(editorPresetCatalog([style]).personal[0]).toMatchObject({
       id: style.id,
       name: style.name,
       type: style.type,
+      design: { layout: { x: style.graphic.x, y: style.graphic.y } },
     });
     const resolved = resolveEditorPresetOperation(
       {
@@ -161,6 +165,9 @@ describe("reusable free presets", () => {
     expect(resolved.parameters.graphic).toMatchObject({
       ...style.graphic,
       text: "New text",
+      secondaryText: "",
+      prefix: "",
+      suffix: "",
     });
     expect(() =>
       resolveEditorPresetOperation(
@@ -202,6 +209,9 @@ describe("reusable free presets", () => {
     expect(op.parameters.graphic).toEqual({
       ...preset.graphic,
       text: "Actual user text",
+      secondaryText: "",
+      prefix: "",
+      suffix: "",
     });
     expect(op.parameters.presetId).toBeUndefined();
   });

@@ -41,6 +41,7 @@ export const EDIT_PLAN_VALIDATION_REASONS = [
   "ripple_range_invalid",
   "style_example_excluded",
   "preset_unavailable",
+  "preset_content_missing",
   "graphic_mode_invalid",
   "graphic_refinement_invalid",
   "graphic_refinement_scope",

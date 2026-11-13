@@ -72,6 +72,7 @@ import {
   EDITOR_PRESET_GUIDANCE,
   resolveEditorPresetOperation,
 } from "../contracts/editor-preset-catalog";
+import { PresetContentError } from "../contracts/graphic-design-evidence";
 import { normalizeTransitionPresets } from "../contracts/transition-presets";
 import { LOCAL_SPEECH_MODEL } from "../contracts/local-speech-model";
 import { parseLocalTranscriptSegments } from "../contracts/local-transcript";
@@ -85,10 +86,6 @@ import {
   type EditorialStockCandidate,
   type EditorialStockReview,
 } from "../contracts/editorial-stock";
-import {
-  GRAPHIC_PRESETS,
-  CLIP_LOOK_PRESETS,
-} from "../contracts/editor-presets";
 import {
   buildEditPlanningContext,
   resolveEditPlanningReferences,
@@ -4591,11 +4588,11 @@ function mapEditOperations(
           item && typeof item === "object" ? item : {},
           personalStyles
         );
-      } catch {
+      } catch (error) {
         // The preceding filter restricts item.type to our operation enum.
         throw new EditPlanValidationError(
-          "preset_unavailable",
-          "The selected preset cannot be used for this operation.",
+          error instanceof PresetContentError ? "preset_content_missing" : "preset_unavailable",
+          error instanceof PresetContentError ? "Supply the source-grounded content required by the preset." : "The selected preset cannot be used for this operation.",
           index,
           item.type as EditOperation["type"]
         );
@@ -6909,21 +6906,6 @@ async function handleAi(
       presetCatalog: {
         ...presetCatalog,
         ...(!transitionPlanning ? { transitions: [], personalTransitions: [] } : {}),
-        graphics: GRAPHIC_PRESETS.map(preset => ({
-          id: preset.id,
-          name: preset.name,
-          description: preset.description,
-          duration: preset.duration,
-          kind: preset.graphic.kind,
-          composition: preset.graphic.composition,
-          animation: preset.graphic.animation,
-        })),
-        looks: CLIP_LOOK_PRESETS.map(preset => ({
-          id: preset.id,
-          name: preset.name,
-          description: preset.description,
-          settings: preset.settings,
-        })),
       },
       freeSounds: planningContext.freeSounds,
       sharedCatalog: planningContext.sharedCatalog,

@@ -2154,6 +2154,20 @@ describe("foreground K3 auto-edit planning", () => {
       });
       expect(context.freeSounds[0]).toHaveProperty("peakSeconds");
       expect(context.presetCatalog.graphics[0]).toHaveProperty("description");
+      expect(context.presetCatalog.graphics[0].design).toMatchObject({
+        kind: "callout",
+        composition: "lower-third",
+        layout: { x: 50, y: 75, size: 4.2 },
+        palette: { accent: "#7AF5CF" },
+        content: { text: "supply", secondaryText: "optional" },
+      });
+      expect(JSON.stringify(context.presetCatalog)).not.toContain("ALEX MORGAN");
+      expect(context.presetCatalog.graphics.find((preset: any) => preset.design.motion).design.motion.poses).toHaveLength(5);
+      expect(context.presetCatalog.motionKits.find((kit: any) => kit.id === "statistic").layers[1]).toMatchObject({
+        presetId: "motion:statistic:1",
+        includeWhen: "kitSubtitle is nonempty",
+        contentBindings: { text: "kitSubtitle" },
+      });
       expect(context.presetCatalog.transitions).toEqual([]);
     } finally {
       nextOutput = original;
@@ -2394,6 +2408,22 @@ describe("foreground K3 auto-edit planning", () => {
     } finally {
       nextOutput = original;
       warningLog.mockRestore();
+    }
+  });
+  it.each(["nameplate", "stat-proof", "motion:speaker:0"])("releases an incomplete %s preset without inserting example content", async presetId => {
+    const original = nextOutput;
+    const before = balance();
+    const calls = providerCalls.length;
+    nextOutput = { summary: "Apply a preset", changes: [{ type: "graphic", start: 0, end: 4, parameters: { presetId } }] };
+    try {
+      const response = await request("/api/ai/edit-plan", await input());
+      expect(response.status).toBe(422);
+      const failure = await response.json();
+      expect(failure).toMatchObject({ validation: { reason: "preset_content_missing", operationType: "graphic" }, creditReceipt: { status: "released", credits: 0 } });
+      expect(providerCalls.length).toBe(calls + 1);
+      expect(balance()).toBe(before);
+    } finally {
+      nextOutput = original;
     }
   });
   it("preserves explicit verified linked audio peers in a local visual treatment", async () => {

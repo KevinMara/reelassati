@@ -184,6 +184,9 @@ export function motionKitClips(
     color: draft.accent,
   };
   const layers: TimelineClip[] = [];
+  // Graphic identities are recipe slots, not positions in the emitted array.
+  // Optional content and a logo must never renumber another layer.
+  let graphicSlot = 0;
   const add = (
     name: string,
     settings: Partial<MotionGraphic>,
@@ -206,7 +209,7 @@ export function motionKitClips(
     );
     layers.push({
       ...base,
-      id: `${identity}-${layers.length}`,
+      id: `${identity}-${graphicSlot++}`,
       label: name,
       graphic,
       graphicDuration: draft.seconds,
@@ -395,6 +398,7 @@ export function motionKitClips(
         { text: draft.subtitle.trim(), secondaryText: "", size: 3, y: 68 },
         "fade"
       );
+    else graphicSlot++;
   } else
     add(
       "Heading and supporting text",
