@@ -215,7 +215,9 @@ export function normalizeCatalogVisual(
     return s.trim();
   };
   const texts = (s: unknown) => {
-    if (!Array.isArray(s) || s.length > 8)
+    // A contact sheet can contain 30 frames. Retain complete observations
+    // instead of rejecting valid per-frame descriptions at eight entries.
+    if (!Array.isArray(s) || s.length > 32)
       throw new Error("Invalid visual observations.");
     return s.map(text);
   };
@@ -234,7 +236,7 @@ export function normalizeCatalogVisual(
   const sampledChanges = texts(v.sampledChanges);
   if (packet.visual.coverage === "complete-image" && sampledChanges.length)
     throw new Error("A still image cannot establish motion.");
-  return {
+  const observation: CatalogVisualObservation = {
     schemaVersion: 1,
     mediaSha256: v.mediaSha256,
     sampleSha256: v.sampleSha256,
@@ -248,6 +250,9 @@ export function normalizeCatalogVisual(
     confidence: v.confidence,
     coverage: v.coverage,
   };
+  if (new TextEncoder().encode(JSON.stringify(observation)).byteLength > 32000)
+    throw new Error("Invalid visual observations.");
+  return observation;
 }
 export async function readCatalogVisual(
   env: CatalogEnvironment,

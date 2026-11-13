@@ -21,6 +21,7 @@ import {
 } from "@/lib/platform-api";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { WorkspaceSaveLifecycle } from "@/lib/workspace-save-lifecycle";
+import { nextMediaLinkRefresh, renewWorkspaceMediaLinks } from "@/lib/workspace-media-links";
 import { reconcileAcknowledgedWorkspace } from "@/lib/workspace-save-reconcile";
 import { workspaceSaveError } from "@/lib/workspace-save-error";
 import { translateUi } from "@/lib/i18n/ui";
@@ -91,12 +92,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     writeId: string;
     epoch: number;
   } | null>(null);
+  const mediaRefreshInFlight = useRef(false);
+  const mediaRefreshAfter = useRef(0);
+  const mediaRefreshContext = useRef(0);
 
   // Every mutation below writes this ref before publishing React state. Never
   // mirror an older render back into it: in-flight editing reads the latest ref.
   const getWorkspaceSnapshot = useCallback(() => currentRef.current, []);
 
   const refresh = useCallback(async () => {
+    mediaRefreshContext.current += 1;
     const epoch = saveLifecycle.current.reset();
     uncertainSave.current = null;
     readyRef.current = false;
@@ -144,10 +149,54 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const lifecycle = saveLifecycle.current;
     return () => {
       active = false;
+      mediaRefreshContext.current += 1;
       lifecycle.reset();
       readyRef.current = false;
     };
   }, [authLoading, user?.id, refresh]);
+
+  useEffect(() => {
+    if (!ready) return;
+    let active = true;
+    const renewLinks = async () => {
+      if (!active || !readyRef.current || document.visibilityState === "hidden" ||
+          mediaRefreshInFlight.current || Date.now() < mediaRefreshAfter.current ||
+          nextMediaLinkRefresh(currentRef.current.assets) !== 0) return;
+      mediaRefreshInFlight.current = true;
+      const context = mediaRefreshContext.current;
+      // This is an authenticated storage read, never an inference request.
+      // Failed reads wait for a later focus/online event instead of retrying.
+      mediaRefreshAfter.current = Date.now() + 60_000;
+      try {
+        const scope = await captureUploadRequestScope();
+        const result = await platformApi.workspace(scope);
+        if (context !== mediaRefreshContext.current || !readyRef.current ||
+            currentRef.current.profile.email.toLowerCase() !== scope.ownerEmail ||
+            selectedBrand(scope.ownerEmail) !== scope.brandId) return;
+        const renewed = renewWorkspaceMediaLinks(currentRef.current, result.workspace.assets);
+        if (renewed !== currentRef.current) {
+          currentRef.current = renewed;
+          setWorkspace(renewed);
+        }
+      } catch {
+        // Do not turn a temporary preview refresh failure into a save failure.
+      } finally { mediaRefreshInFlight.current = false; }
+    };
+    const onActivity = () => { void renewLinks(); };
+    const delay = nextMediaLinkRefresh(workspace.assets);
+    const timer = delay === null ? undefined : window.setTimeout(onActivity,
+      Math.max(delay, mediaRefreshAfter.current - Date.now(), 0));
+    window.addEventListener("focus", onActivity);
+    window.addEventListener("online", onActivity);
+    document.addEventListener("visibilitychange", onActivity);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", onActivity);
+      window.removeEventListener("online", onActivity);
+      document.removeEventListener("visibilitychange", onActivity);
+    };
+  }, [ready, workspace.assets, user?.id]);
 
   const updateWorkspace = useCallback(
     async (
@@ -272,6 +321,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   const adoptWorkspace = useCallback((next: WorkspaceDocument) => {
+    mediaRefreshContext.current += 1;
     saveLifecycle.current.reset();
     uncertainSave.current = null;
     setSaving(false);

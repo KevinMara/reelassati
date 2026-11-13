@@ -317,6 +317,17 @@ describe("content-grounded visual catalog review", () => {
       )
     ).toThrow("frames");
   });
+  it("retains per-frame observations beyond eight entries with bounded record size", () => {
+    const stored = {
+      ...observation, schemaVersion: 1, mediaSha256: sourceSha,
+      sampleSha256: packet.visual!.sha256, coverage: packet.visual!.coverage,
+      sampledChanges: Array.from({ length: 30 }, (_, i) => `Frame ${i}: particles move toward the edge.`),
+    };
+    expect(normalizeCatalogVisual(stored, packet).sampledChanges).toEqual(stored.sampledChanges);
+    expect(() => normalizeCatalogVisual({ ...stored, visibleElements: Array(33).fill("Shape") }, packet)).toThrow("Invalid visual observations");
+    expect(() => normalizeCatalogVisual({ ...stored, visibleElements: [42] }, packet)).toThrow("Invalid visual observation");
+    expect(() => normalizeCatalogVisual({ ...stored, visibleElements: Array(32).fill("形".repeat(600)) }, packet)).toThrow("Invalid visual observations");
+  });
   it("cannot mark a replacement sample reviewed if it arrives during publication", async () => {
     const originalPut = env.BUCKET.put;
     env.BUCKET.put = async (key, body, options) => {
