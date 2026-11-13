@@ -6,6 +6,7 @@ import {
   ANALYZER_STREAM_TYPE,
   type AnalyzerFrame,
 } from "../contracts/analyzer-transport";
+import { ProviderStreamFailure } from "./provider-diagnostics";
 
 /** Cleanup callbacks must contain database bookkeeping only, never inference. */
 export interface AnalysisControl {
@@ -195,7 +196,7 @@ export async function readAnalysisCompletion(
     }
     if (doneEvent) throw new Error("Unexpected data after analysis completion");
     const payload = JSON.parse(data);
-    if (payload.error) throw new Error("Analysis provider stream failed");
+    if (payload.error) throw new ProviderStreamFailure(payload, response.headers);
     const choice =
       payload.choices?.find((item: { index?: number }) => item.index === 0) ??
       payload.choices?.[0];

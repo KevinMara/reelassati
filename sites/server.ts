@@ -154,6 +154,7 @@ import { modelUserContent, type ModelContentPart } from "./model-content";
 import { publicProviderFailure } from "./provider-failure";
 import {
   openRouterErrorDiagnostics,
+  ProviderStreamFailure,
   type ProviderDiagnostics,
 } from "./provider-diagnostics";
 import {
@@ -4351,6 +4352,17 @@ async function chatJson(
           ? "provider_invalid_json"
           : "provider_or_parse_failure"
     );
+    if (cause instanceof ProviderStreamFailure) {
+      const reference = logProviderFailure(providerName, "provider-stream", {
+        status: cause.status,
+        diagnostics: cause.diagnostics,
+        invocation: { id: invocation.id, model: selectedModel, purpose },
+      });
+      const publicFailure = publicProviderFailure(providerName, cause.status, reference, null);
+      const failure = json(publicFailure.body, publicFailure.status);
+      providerFailureMetadata.set(failure, { provider: providerName, status: cause.status, reference });
+      throw failure;
+    }
     if (
       (purpose === "video-analysis" || purpose === "edit-planning") &&
       cause instanceof SyntaxError

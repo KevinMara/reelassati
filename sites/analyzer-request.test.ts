@@ -171,6 +171,27 @@ function source(text: string, width = 7) {
   );
 }
 describe("OpenRouter analysis stream", () => {
+  it("retains the rate-limit category without retaining failed stream data", async () => {
+    const result = readAnalysisCompletion(source(event({
+      id: "gen-1794562296-abcdefgh1234",
+      error: { code: 429, message: "Rate limit for private@example.com token=secret" },
+    })), new AbortController().signal);
+    let failure: unknown;
+    try { await result; } catch (cause) { failure = cause; }
+    expect(failure).toMatchObject({name: "ProviderStreamFailure", status: 429,
+      diagnostics: { upstreamCode: "429", reportedIssue: "rate-limit" }});
+    expect(JSON.stringify(failure)).not.toMatch(/private|secret|example/);
+    expect(String(failure)).toBe("ProviderStreamFailure: Analysis provider stream failed");
+  });
+  it("maps a provider resource-exhausted error while discarding partial output", async () => {
+    const result = readAnalysisCompletion(source(event(chunk('{"partial":')) + event({
+      error: { code: 502, metadata: { raw: JSON.stringify({ error: {
+        status: "RESOURCE_EXHAUSTED", message: "quota details private" }
+      }) } }
+    })), new AbortController().signal);
+    await expect(result).rejects.toMatchObject({status: 429,
+      diagnostics: {upstreamCode: "RESOURCE_EXHAUSTED", reportedIssue: "rate-limit"}});
+  });
   it("handles fragmented Unicode, comments, reasoning and the repeated usage finish event", async () => {
     const report = JSON.stringify({ summary: "Caffè 🎬" });
     const response = source(

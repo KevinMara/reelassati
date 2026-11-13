@@ -12,6 +12,27 @@ export type ProviderDiagnostics = {
   reportedField?: string;
 };
 
+/** A failed SSE response has already returned HTTP 200. Preserve only the
+ * allowlisted failure metadata so it follows the same recovery path as HTTP
+ * errors; never retain the stream payload or an upstream free-form message. */
+export class ProviderStreamFailure extends Error {
+  readonly status: number;
+  readonly diagnostics: ProviderDiagnostics;
+  constructor(payload: unknown, headers: Headers) {
+    super("Analysis provider stream failed");
+    this.name = "ProviderStreamFailure";
+    this.diagnostics = openRouterErrorDiagnostics(payload, headers);
+    const statuses: Record<string, number> = {
+      INVALID_ARGUMENT: 400, RESOURCE_EXHAUSTED: 429, UNAUTHENTICATED: 401,
+      PERMISSION_DENIED: 403, NOT_FOUND: 404, INTERNAL: 502,
+      UNAVAILABLE: 503, DEADLINE_EXCEEDED: 504, FAILED_PRECONDITION: 412,
+      OUT_OF_RANGE: 422,
+    };
+    const code = statuses[this.diagnostics.upstreamCode ?? ""] ?? Number(this.diagnostics.upstreamCode);
+    this.status = Number.isInteger(code) && code >= 400 && code <= 599 ? code : 502;
+  }
+}
+
 const object = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
