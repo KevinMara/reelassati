@@ -15,6 +15,7 @@ import {
   publishCatalogSound,
 } from "./catalog-evidence";
 import { runtimeFailureDiagnostic } from "./runtime-diagnostics";
+import { missingStyleControls, mergeStyleControlRepair, EDIT_STYLE_REPAIR_DIRECTION } from "../contracts/edit-style-repair";
 import {
   EDIT_CUT_GUIDANCE,
   assertAutonomousTrimSemantics,
@@ -7160,7 +7161,7 @@ async function handleAi(
             validationStage,
             Array.isArray(raw) ? raw.length : 0
           );
-          console.warn("REELassati edit plan rejected", {
+          console.error("REELassati edit plan rejected", {
             reference: invocation.id,
             ...validation,
           });
@@ -7261,7 +7262,31 @@ async function handleAi(
           return rejectPlan(error, output.changes);
         }
         let cutCorrectionProviderPending = false;
+        let styleCorrectionProviderPending = false;
         try {
+          // Check style controls before stock/local filtering can shift indexes.
+          // One foreground correction; no transport retry or new media call.
+          const rawStyleDraft = Array.isArray(output.changes) ? output.changes : [];
+          const referencedDraft = resolveEditPlanningReferences(output.changes, planningContext, duration,
+            Array.isArray(input.selectedClipIds) ? input.selectedClipIds : []);
+          const compiledDraft = mapEditOperations(resolveEditStyleOperations(referencedDraft, project.editStyleTemplate),
+            duration, project.clips, input.selectedClipIds ?? [], personalStyles, true);
+          const styleIndices = missingStyleControls(output.changes, compiledDraft);
+          if (styleIndices.length) {
+            validationStage = "executable";
+            checkpoint();
+            if (analysisControl.onCheck && !(await analysisControl.onCheck()))
+              throw new DOMException("The edit request was canceled.", "AbortError");
+            styleCorrectionProviderPending = true;
+            const corrected = await chatJson(env, user, "edit-planning",
+              `${EDIT_STYLE_REPAIR_DIRECTION} ${EDIT_PLANNING_CAPABILITIES}`,
+              JSON.stringify({ command: input.command, project: projectContext,
+                styles: styleIndices.map(operationIndex => ({ operationIndex, operation: rawStyleDraft[operationIndex] })) }),
+              requestedModel, true, 4000, false, undefined, analysisControl, editReasoningEffort(input.effort));
+            invocation = corrected.invocation;
+            styleCorrectionProviderPending = false;
+            output.changes = mergeStyleControlRepair(rawStyleDraft, styleIndices, corrected.output);
+          }
           try {
             changes = compileChanges(output.changes, true);
           } catch (error) {
@@ -7418,7 +7443,7 @@ async function handleAi(
           }
         } catch (error) {
           checkpoint();
-          if (cutCorrectionProviderPending) throw error;
+          if (cutCorrectionProviderPending || styleCorrectionProviderPending) throw error;
           return rejectPlan(error, output.changes);
         }
         if (graphicReview?.omitted.length) {
