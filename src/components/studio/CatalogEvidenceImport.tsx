@@ -126,14 +126,17 @@ export function CatalogEvidenceImport() {
           );
         }
       if (review === "visual")
-        for (let offset = 0; offset < visualIds.length; offset += 8) {
+        // Each video carries a multi-frame contact sheet. Two independent
+        // designs keep constrained multimodal output within reliable latency;
+        // eight repeatedly failed mid-stream in production. Never retry a batch.
+        for (let offset = 0; offset < visualIds.length; offset += 2) {
           active.signal.throwIfAborted();
           if (mounted.current)
             setProgress(
               `Inspecting visuals · ${offset.toLocaleString()} / ${visualIds.length.toLocaleString()} reviewed`
             );
           await platformApi.catalogReviewVisuals(
-            visualIds.slice(offset, offset + 8),
+            visualIds.slice(offset, offset + 2),
             options
           );
         }
