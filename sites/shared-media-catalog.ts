@@ -921,17 +921,32 @@ export async function handleCatalogPublic(
   });
   if (partial)
     headers.set("Content-Range", `bytes ${start}-${end}/${object.bytes}`);
-  if (request.method === "HEAD")
-    return new Response(null, { status: partial ? 206 : 200, headers });
+  const headOnly = request.method === "HEAD";
   const stored = await env.BUCKET.get(
     objectKey(object),
-    partial ? { range: { offset: start, length: end - start + 1 } } : undefined
+    headOnly
+      ? { range: { offset: 0, length: 1 } }
+      : partial
+        ? { range: { offset: start, length: end - start + 1 } }
+        : undefined
   );
-  if (!stored)
+  // A ready database row does not prove that its immutable object still exists.
+  // R2's size describes the complete object even for a one-byte/range read.
+  if (
+    !stored ||
+    stored.size !== object.bytes ||
+    stored.customMetadata?.sha256 !== object.sha256
+  ) {
+    await stored?.body.cancel().catch(() => undefined);
     return response(
       { error: "Catalog object is temporarily unavailable." },
       503
     );
+  }
+  if (headOnly) {
+    await stored.body.cancel().catch(() => undefined);
+    return new Response(null, { status: partial ? 206 : 200, headers });
+  }
   return new Response(stored.body, { status: partial ? 206 : 200, headers });
 }
 export async function copySharedCatalogMedia(
@@ -944,8 +959,14 @@ export async function copySharedCatalogMedia(
   if (item.kind === "lut")
     fail("Apply this color LUT through the color controls.");
   const source = await env.BUCKET.get(objectKey(item.media));
-  if (!source || source.customMetadata?.sha256 !== item.media.sha256)
+  if (
+    !source ||
+    source.size !== item.media.bytes ||
+    source.customMetadata?.sha256 !== item.media.sha256
+  ) {
+    await source?.body.cancel().catch(() => undefined);
     fail("Catalog object is temporarily unavailable.", 503);
+  }
   signal.throwIfAborted();
   await env.BUCKET.put(key, source.body, {
     httpMetadata: { contentType: item.media.contentType },

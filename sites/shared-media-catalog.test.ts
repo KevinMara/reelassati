@@ -1201,6 +1201,83 @@ describe("shared catalog verified publication", () => {
     expect(imported.id).toBe(item.id);
     expect(objects.get("users/member/catalog/copy")!.data).toEqual(media);
   });
+  it.each(["HEAD", "GET"])(
+    "does not advertise unavailable or mismatched stored media via %s",
+    async method => {
+      await publish();
+      const key = `shared-catalog/${item.media.file}`;
+      const original = objects.get(key)!;
+      const request = new Request(
+        `https://studio.test/api/catalog/media/${item.id}/media`,
+        { method }
+      );
+      objects.delete(key);
+      expect(
+        (await handleCatalogPublic(request, env, new URL(request.url))).status
+      ).toBe(503);
+      objects.set(key, { ...original, data: original.data.slice(1) });
+      expect(
+        (await handleCatalogPublic(request, env, new URL(request.url))).status
+      ).toBe(503);
+      objects.set(key, { ...original, metadata: { sha256: "f".repeat(64) } });
+      expect(
+        (await handleCatalogPublic(request, env, new URL(request.url))).status
+      ).toBe(503);
+      objects.set(key, original);
+      const restored = await handleCatalogPublic(
+        request,
+        env,
+        new URL(request.url)
+      );
+      expect(restored.status).toBe(200);
+      expect(restored.headers.get("Content-Length")).toBe(String(media.length));
+      expect(restored.headers.get("ETag")).toBe(`"${item.media.sha256}"`);
+      expect((await restored.arrayBuffer()).byteLength).toBe(
+        method === "HEAD" ? 0 : media.length
+      );
+    }
+  );
+  it("does not copy a truncated source into a user project", async () => {
+    await publish();
+    const key = `shared-catalog/${item.media.file}`;
+    const original = objects.get(key)!;
+    objects.set(key, { ...original, data: original.data.slice(1) });
+    await expect(
+      copySharedCatalogMedia(
+        env,
+        item.id,
+        "users/member/catalog/truncated",
+        new AbortController().signal
+      )
+    ).rejects.toMatchObject({ status: 503 });
+    expect(objects.has("users/member/catalog/truncated")).toBe(false);
+  });
+  it("checks storage for HEAD without reading the full media and closes the unused stream", async () => {
+    await publish();
+    const cancel = vi.fn();
+    const get = vi.spyOn(env.BUCKET, "get").mockResolvedValue({
+      body: new ReadableStream({ cancel }),
+      size: media.length,
+      httpEtag: '"test"',
+      customMetadata: { sha256: item.media.sha256 },
+    });
+    const request = new Request(
+      `https://studio.test/api/catalog/media/${item.id}/media`,
+      { method: "HEAD", headers: { Range: "bytes=2-4" } }
+    );
+    const result = await handleCatalogPublic(
+      request,
+      env,
+      new URL(request.url)
+    );
+    expect(result.status).toBe(206);
+    expect(result.headers.get("Content-Range")).toBe("bytes 2-4/8");
+    expect(get).toHaveBeenCalledWith(`shared-catalog/${item.media.file}`, {
+      range: { offset: 0, length: 1 },
+    });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect((await result.arrayBuffer()).byteLength).toBe(0);
+  });
   it("keeps source and selected-range placement bounded, while still frames may be held", () => {
     expect(
       sharedCatalogPlacement(item, { start: 3 }, 10, { start: 3, end: 6 })
