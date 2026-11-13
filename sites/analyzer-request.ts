@@ -7,6 +7,7 @@ import {
   type AnalyzerFrame,
 } from "../contracts/analyzer-transport";
 import { ProviderStreamFailure } from "./provider-diagnostics";
+import { parseProviderFrame } from "./model-json";
 
 /** Cleanup callbacks must contain database bookkeeping only, never inference. */
 export interface AnalysisControl {
@@ -195,7 +196,10 @@ export async function readAnalysisCompletion(
       return;
     }
     if (doneEvent) throw new Error("Unexpected data after analysis completion");
-    const payload = JSON.parse(data);
+    const payload = parseProviderFrame(data) as {
+      error?: unknown;
+      choices?: Array<{index?: number; finish_reason?: string | null; delta?: {content?: unknown}}>;
+    };
     if (payload.error) throw new ProviderStreamFailure(payload, response.headers);
     const choice =
       payload.choices?.find((item: { index?: number }) => item.index === 0) ??

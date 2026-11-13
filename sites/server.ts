@@ -1,3 +1,4 @@
+import { ModelJsonError, parseModelObject } from "./model-json";
 import {
   cutRepairScope,
   mergeCutRepair,
@@ -4179,15 +4180,7 @@ function extractTextContent(payload: unknown): string {
 }
 
 function parseModelJson(payload: unknown): Record<string, unknown> {
-  const content = extractTextContent(payload)
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/, "");
-  if (!content) throw new Error("The model returned an empty response");
-  const result: unknown = JSON.parse(content);
-  if (!result || typeof result !== "object" || Array.isArray(result))
-    throw new SyntaxError("The model response is not a JSON object");
-  return result as Record<string, unknown>;
+  return parseModelObject(extractTextContent(payload));
 }
 
 async function chatJson(
@@ -4374,6 +4367,9 @@ async function chatJson(
         reference: invocation.id,
         purpose,
         provider: providerName,
+        diagnostic: cause instanceof ModelJsonError ? cause.diagnostic : {stage: "provider-envelope"},
+        maxOutputTokens,
+        effort,
       });
       throw json(
         {
