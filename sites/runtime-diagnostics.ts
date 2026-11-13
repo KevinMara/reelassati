@@ -1,6 +1,16 @@
 /** Fixed categories only. Never log exception text, SQL, URLs or request data. */
 export function runtimeFailureDiagnostic(cause: unknown) {
   const message = cause instanceof Error ? cause.message.slice(0, 4096) : "";
+  const providerChecks: Record<string, string> = {
+    "Analysis provider output limit reached": "output-limit",
+    "Analysis provider response was filtered": "filtered",
+    "Analysis provider stream failed": "upstream-error",
+    "Analysis provider did not complete its report": "finish-reason",
+    "Analysis provider response is empty": "empty-body",
+    "Analysis provider response is incomplete": "incomplete-stream",
+    "Analysis provider response is too large": "response-size",
+    "Analysis provider frame is too large": "frame-size",
+  };
   const catalogChecks: Record<string, string> = {
     "Incomplete visual observations.": "visual-count",
     "Visual observation identities do not match.": "visual-identities",
@@ -50,10 +60,12 @@ export function runtimeFailureDiagnostic(cause: unknown) {
   ] as const;
   return {
     category:
+      (providerChecks[message] ? "provider-stream" : undefined) ??
       (catalogChecks[message] ? "catalog-observation" : undefined) ??
       patterns.find(([, pattern]) => pattern.test(message))?.[0] ??
       "unclassified",
     ...(catalogChecks[message] ? { catalogCheck: catalogChecks[message] } : {}),
+    ...(providerChecks[message] ? { providerCheck: providerChecks[message] } : {}),
     errorType:
       cause instanceof TypeError
         ? "TypeError"

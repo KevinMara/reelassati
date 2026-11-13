@@ -200,6 +200,10 @@ export async function readAnalysisCompletion(
       payload.choices?.find((item: { index?: number }) => item.index === 0) ??
       payload.choices?.[0];
     if (!choice) return; // usage-only events
+    if (choice.finish_reason === "length")
+      throw new Error("Analysis provider output limit reached");
+    if (choice.finish_reason === "content_filter")
+      throw new Error("Analysis provider response was filtered");
     if (choice.finish_reason && choice.finish_reason !== "stop")
       throw new Error("Analysis provider did not complete its report");
     const text = choice.delta?.content;

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { runtimeFailureDiagnostic } from "./runtime-diagnostics";
 describe("runtime diagnostics", () => {
+  it("distinguishes a truncated completion from a broken stream with fixed values only", () => {
+    expect(runtimeFailureDiagnostic(new Error("Analysis provider output limit reached"))).toEqual({
+      category: "provider-stream", providerCheck: "output-limit", errorType: "Error",
+    });
+    expect(runtimeFailureDiagnostic(new Error("Analysis provider response is incomplete"))).toEqual({
+      category: "provider-stream", providerCheck: "incomplete-stream", errorType: "Error",
+    });
+    expect(JSON.stringify(runtimeFailureDiagnostic(new Error("Analysis provider stream failed SECRET")))).not.toContain("SECRET");
+  });
   it("classifies infrastructure failures without retaining their sensitive text", () => {
     const value = runtimeFailureDiagnostic(
       new Error("D1_ERROR: query PRIVATE_EMAIL no such column: SECRET_TOKEN")

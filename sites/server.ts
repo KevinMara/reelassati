@@ -53,6 +53,11 @@ import {
   reconcileEditorialCoverage,
   type EditorialCoverageReview,
 } from "../contracts/editorial-coverage";
+import {
+  editorialCoverageRepairScope,
+  mergeEditorialCoverageRepair,
+  EDITORIAL_COVERAGE_REPAIR_DIRECTION,
+} from "../contracts/editorial-coverage-repair";
 import { assertAutonomousComposition } from "../contracts/autonomous-operation-order";
 import {
   EditPlanValidationError,
@@ -7308,6 +7313,55 @@ async function handleAi(
               editorialCoverage,
               changes
             );
+          if (editorialCoverage && editorialCoverageRepairScope(editorialCoverage).length) {
+            // One correction in this foreground request and credit reservation.
+            // Existing operations cannot be rewritten. Provider failure leaves
+            // the safe original plan partial; cancellation still stops the run.
+            checkpoint();
+            const original = {
+              changes,
+              compiled: originalCompiledChanges,
+              omissions: [...stockReview.omitted],
+            };
+            try {
+              if (analysisControl.onCheck && !(await analysisControl.onCheck()))
+                throw new DOMException("The edit request was canceled.", "AbortError");
+              const corrected = await chatJson(
+                env, user, "edit-planning",
+                `${EDITORIAL_COVERAGE_REPAIR_DIRECTION} ${EDITORIAL_COVERAGE_DIRECTION} ${EDITORIAL_DESIGN_GUIDANCE} ${EDIT_CUT_GUIDANCE} ${EDIT_PLANNING_CAPABILITIES} ${EDITOR_GRAPHIC_GUIDANCE}`,
+                JSON.stringify({command: input.command, project: projectContext,
+                  draft: output.changes, flaggedScenes: editorialCoverageRepairScope(editorialCoverage)}),
+                requestedModel, true, 16000, false, undefined, analysisControl,
+                editReasoningEffort(input.effort)
+              );
+              invocation = corrected.invocation;
+              const candidate = mergeEditorialCoverageRepair(
+                output.changes, output.editorialCoverage, editorialCoverage, corrected.output
+              );
+              const candidateChanges = compileChanges(candidate.changes, true);
+              const candidateReview = reconcileEditorialCoverage(reviewEditorialCoverage(
+                candidate.editorialCoverage, qualityProject, planningContext, originalCompiledChanges, qualityAssets
+              ), candidateChanges);
+              // A correction must not create a new failure on an accounted beat.
+              if (candidateReview.scenes.some(scene => scene.issues.some(issue =>
+                issue !== "unresolved-source" &&
+                !editorialCoverage!.scenes.find(old => old.sceneId === scene.sceneId)?.issues.includes(issue)
+              ))) throw new Error("Editorial correction introduced a new content failure.");
+              output.changes = candidate.changes;
+              output.editorialCoverage = candidate.editorialCoverage;
+              changes = candidateChanges;
+              editorialCoverage = candidateReview;
+            } catch (error) {
+              checkpoint();
+              if (error instanceof DOMException && error.name === "AbortError") throw error;
+              changes = original.changes;
+              originalCompiledChanges = original.compiled;
+              stockReview.omitted = original.omissions;
+              console.warn("REELassati editorial correction unavailable", {
+                reference: invocation.id, ...runtimeFailureDiagnostic(error),
+              });
+            }
+          }
           if (changes.some(operation => operation.type === "graphic")) {
             validationStage = "graphic_preflight";
             graphicReview = reviewEditPlanGraphics(
@@ -14444,7 +14498,7 @@ async function handleApi(
     const input = await parseJsonBody<{ ids?: string[] }>(request);
     return json(await reviewCatalogVisuals(env, input.ids, analysisControl, async (direction, parts, ids) => {
       const { output } = await chatJson(env, user, "video-analysis", direction, parts,
-        "google/gemini-2.5-flash", true, 8000, false, catalogReviewSchema("visual", ids), analysisControl, "low");
+        "google/gemini-2.5-flash", true, 24000, false, catalogReviewSchema("visual", ids), analysisControl, "low");
       return output;
     }));
   }
