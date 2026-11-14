@@ -58,6 +58,7 @@ export function visualRenderFilter(
     opacity = curve("opacity");
   const angle = `(${curve("rotation")}*PI/180)`;
   const reveals: string[] = [];
+  const activeReveals: string[] = [];
   const span = clock.duration / speed;
   for (const [effect, distance] of [
     [
@@ -72,6 +73,7 @@ export function visualRenderFilter(
     const q = clamp(
       `${distance}*${n(span / visualTransitionDuration(effect, clock.duration, speed))}`
     );
+    if (effect.kind !== "none") activeReveals.push(`lt(${q},1)`);
     if (effect.kind === "dissolve" || effect.kind === "zoom")
       opacity = `(${opacity}*${q})`;
     if (effect.kind === "zoom") scale = `(${scale}*(0.8+0.2*${q}))`;
@@ -251,7 +253,24 @@ export function visualRenderFilter(
     }
     return filters.join(",");
   }
-  return `format=gbrap,geq=r='${coords}r(ld(0)-0.5,ld(1)-0.5)':g='${coords}g(ld(0)-0.5,ld(1)-0.5)':b='${coords}b(ld(0)-0.5,ld(1)-0.5)':a='${coords}alpha(ld(0)-0.5,ld(1)-0.5)*(${opacity})*(${crop})*(${mask})${reveals.length ? `*${reveals.join("*")}` : ""}',format=rgba`;
+  const transitionEnable =
+    plainGeometry && v.opacity === 1
+      ? `:enable='${activeReveals.join("+").replace(/\bT\b/g, "t") || "0"}'`
+      : "";
+  if (
+    plainGeometry &&
+    [v.entrance.kind, v.exit.kind].every(
+      kind => kind === "none" || kind === "dissolve" || kind.startsWith("wipe-")
+    )
+  ) {
+    // A wipe changes alpha, not source coordinates. Avoid evaluating inverse
+    // affine transforms for four channels of every pixel, including all frames
+    // after a short entrance has finished. Keep the general sampler for poses,
+    // masks, flips and moving transitions. The same source-clock expressions
+    // govern the alpha and the per-frame bypass, including split handles.
+    return `format=gbrap,geq=interpolation=nearest:r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${opacity})${reveals.length ? `*${reveals.join("*")}` : ""}'${transitionEnable},format=rgba`;
+  }
+  return `format=gbrap,geq=r='${coords}r(ld(0)-0.5,ld(1)-0.5)':g='${coords}g(ld(0)-0.5,ld(1)-0.5)':b='${coords}b(ld(0)-0.5,ld(1)-0.5)':a='${coords}alpha(ld(0)-0.5,ld(1)-0.5)*(${opacity})*(${crop})*(${mask})${reveals.length ? `*${reveals.join("*")}` : ""}'${transitionEnable},format=rgba`;
 }
 
 /** Blend RGB in sRGB, then restore the transformed upper alpha before compositing.
