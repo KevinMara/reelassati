@@ -102,6 +102,35 @@ const partialEditText: Partial<Record<InterfaceLanguage, string>> = {
   id: "Suntingan sebagian disimpan.",
   th: "บันทึกการตัดต่อบางส่วนแล้ว",
 };
+const serviceBillingText: Partial<Record<InterfaceLanguage, string>> = {
+  it: "Reel è sospeso per un problema di fatturazione del servizio. Contatta l'assistenza.",
+  es: "Reel está en pausa por un problema de facturación del servicio. Contacta con soporte.",
+  fr: "Reel est suspendu en raison d’un problème de facturation du service. Contactez l’assistance.",
+  de: "Reel ist wegen eines Abrechnungsproblems des Dienstes pausiert. Bitte kontaktiere den Support.",
+  pt: "O Reel está suspenso devido a um problema de faturação do serviço. Contacte o suporte.",
+  nl: "Reel is gepauzeerd door een factureringsprobleem bij de dienst. Neem contact op met support.",
+  pl: "Reel jest wstrzymany z powodu problemu z rozliczeniem usługi. Skontaktuj się z pomocą.",
+  ro: "Reel este suspendat din cauza unei probleme de facturare a serviciului. Contactează asistența.",
+  tr: "Reel, hizmetin faturalandırma sorunu nedeniyle duraklatıldı. Lütfen destekle iletişime geçin.",
+  uk: "Reel призупинено через проблему з оплатою сервісу. Зверніться до підтримки.",
+  ru: "Reel приостановлен из-за проблемы с оплатой сервиса. Обратитесь в поддержку.",
+  ar: "تم إيقاف Reel مؤقتًا بسبب مشكلة في فوترة الخدمة. يُرجى التواصل مع الدعم.",
+  hi: "सेवा की बिलिंग समस्या के कारण Reel रुका हुआ है। कृपया सहायता से संपर्क करें।",
+  ja: "サービスの請求に関する問題により、Reelは一時停止しています。サポートにお問い合わせください。",
+  ko: "서비스 결제 문제로 Reel이 일시 중지되었습니다. 지원팀에 문의해 주세요.",
+  zh: "服务计费出现问题，Reel 已暂停。请联系支持团队。",
+  vi: "Reel đang tạm dừng do sự cố thanh toán của dịch vụ. Vui lòng liên hệ hỗ trợ.",
+  da: "Reel er sat på pause på grund af et faktureringsproblem hos tjenesten. Kontakt support.",
+  sv: "Reel är pausat på grund av ett faktureringsproblem hos tjänsten. Kontakta supporten.",
+  no: "Reel er satt på pause på grunn av et faktureringsproblem hos tjenesten. Kontakt kundestøtte.",
+  fi: "Reel on keskeytetty palvelun laskutusongelman vuoksi. Ota yhteyttä tukeen.",
+  cs: "Reel je pozastaven kvůli problému s fakturací služby. Kontaktujte podporu.",
+  hu: "A Reel a szolgáltatás számlázási problémája miatt szünetel. Fordulj az ügyfélszolgálathoz.",
+  el: "Το Reel έχει τεθεί σε παύση λόγω προβλήματος χρέωσης της υπηρεσίας. Επικοινωνήστε με την υποστήριξη.",
+  he: "Reel מושהה עקב בעיית חיוב של השירות. פנו לתמיכה.",
+  id: "Reel dijeda karena masalah penagihan layanan. Hubungi dukungan.",
+  th: "Reel หยุดชั่วคราวเนื่องจากปัญหาการเรียกเก็บเงินของบริการ โปรดติดต่อฝ่ายสนับสนุน",
+};
 export const editorNov1Ui = Object.fromEntries(
   Object.entries(rows).map(([code, row]) => {
     const values = row.split("|");
@@ -115,6 +144,9 @@ export const editorNov1Ui = Object.fromEntries(
       "Reel couldn't finish this edit. Please try again.";
     copy["Partial edit saved."] =
       partialEditText[code as InterfaceLanguage] ?? "Partial edit saved.";
+    copy["Reel is paused by a service billing issue. Please contact support."] =
+      serviceBillingText[code as InterfaceLanguage] ??
+      "Reel is paused by a service billing issue. Please contact support.";
     return [code, copy] as const;
   })
 ) as Record<InterfaceLanguage, Record<string, string>>;

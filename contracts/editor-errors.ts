@@ -25,8 +25,16 @@ export function editorFailureMessage(error: unknown): string {
     "Reel couldn't read the audio. Please try again.",
     "Reel couldn't finish this edit. Please try again.",
     "Reel is unavailable right now. Please try again.",
+    "Reel is paused by a service billing issue. Please contact support.",
   ];
   if (publicMessages.includes(text)) return text;
+  // Provider credit belongs to the service, not the customer's Reel balance.
+  // Preserve the actionable category through saving and rendering chat history.
+  if (
+    row?.reason === "provider_billing_unavailable" ||
+    /service billing issue/i.test(text)
+  )
+    return "Reel is paused by a service billing issue. Please contact support.";
   if (
     row?.status === 401 ||
     /sign in|session.*expired|not authenticated/i.test(text)

@@ -45,6 +45,10 @@ describe("public provider failures", () => {
       const failure = publicProviderFailure(provider, 402, reference);
       expect(failure.status).toBe(503);
       expect(failure.body.reference).toBe(reference);
+      expect(failure.body).toHaveProperty(
+        "reason",
+        "provider_billing_unavailable"
+      );
       expect(failure.body.error).toContain("service billing issue");
       expect(failure.body.error).toContain(reference);
       expect(failure.body.error).not.toMatch(

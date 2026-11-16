@@ -7,6 +7,8 @@ import {
 } from "./platform-api";
 import { supabase } from "@/lib/supabase/client";
 import { ANALYZER_STREAM_TYPE } from "@contracts/analyzer-transport";
+import { editorFailureMessage } from "@contracts/editor-errors";
+import { publicProviderFailure } from "../../sites/provider-failure";
 const planCapabilities = () =>
   Response.json({
     capabilities: {
@@ -35,24 +37,66 @@ afterEach(() => {
 });
 
 describe("platform API transport", () => {
-  it.each(["chat", "story-sections"])(
-    "keeps the %s result on foreground transport without repeating the paid request",
-    async kind => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
+  it.each([false, true])(
+    "preserves the service billing failure through HTTP/foreground transport (%s), without retrying",
+    async streamed => {
+      const failure = publicProviderFailure(
+        "OpenRouter",
+        402,
+        "billing-reference"
+      );
+      const response = streamed
+        ? new Response(
             JSON.stringify({ type: "pending" }) +
               "\n" +
               JSON.stringify({
                 type: "result",
-                status: 200,
-                body: JSON.stringify({ message: "Ready", actions: [] }),
+                status: failure.status,
+                body: JSON.stringify(failure.body),
               }) +
               "\n",
             { headers: { "Content-Type": ANALYZER_STREAM_TYPE } }
           )
-        );
+        : Response.json(failure.body, { status: failure.status });
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(planCapabilities())
+        .mockResolvedValueOnce(response);
+      vi.stubGlobal("fetch", fetchMock);
+      const failureResult = await platformApi
+        .generateEditPlan({
+          project: {} as never,
+          command: "Edit",
+          selectedClipIds: [],
+        })
+        .catch(error => error);
+      expect(failureResult).toMatchObject({
+        status: 503,
+        reason: "provider_billing_unavailable",
+        reference: "billing-reference",
+      });
+      expect(editorFailureMessage(failureResult)).toBe(
+        "Reel is paused by a service billing issue. Please contact support."
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    }
+  );
+  it.each(["chat", "story-sections"])(
+    "keeps the %s result on foreground transport without repeating the paid request",
+    async kind => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ type: "pending" }) +
+            "\n" +
+            JSON.stringify({
+              type: "result",
+              status: 200,
+              body: JSON.stringify({ message: "Ready", actions: [] }),
+            }) +
+            "\n",
+          { headers: { "Content-Type": ANALYZER_STREAM_TYPE } }
+        )
+      );
       vi.stubGlobal("fetch", fetchMock);
       const abort = new AbortController();
       const result =

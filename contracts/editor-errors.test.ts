@@ -22,6 +22,26 @@ describe("editor failure copy", () => {
       )
     ).toContain("current timeline");
   });
+  it("does not tell customers to buy credits or retry a service billing failure", () => {
+    const expected =
+      "Reel is paused by a service billing issue. Please contact support.";
+    for (const error of [
+      {
+        status: 503,
+        reason: "provider_billing_unavailable",
+        message: "private upstream detail",
+      },
+      new Error(
+        "The AI service is temporarily unavailable due to a service billing issue. Contact support with reference private-reference."
+      ),
+      expected,
+    ]) {
+      const copy = editorFailureMessage(error);
+      expect(copy).toBe(expected);
+      expect(copy).not.toMatch(/private|credits|try again/i);
+      expect(editorFailureMessage(copy)).toBe(expected);
+    }
+  });
   it.each([
     { status: 401 },
     { status: 402 },

@@ -22,6 +22,7 @@ export function publicProviderFailure(
           ? `The service is temporarily rate-limited. ${retryAfterSeconds !== undefined ? `Wait at least ${retryAfterSeconds} seconds before starting another request.` : "Please wait before starting another request."} No automatic retry was made.`
           : "REELassati could not complete this request. Retry once; if it continues, contact support.",
       reference,
+      ...(aiBillingFailure ? { reason: "provider_billing_unavailable" } : {}),
       ...(rateLimited ? { code: "provider_rate_limited" } : {}),
       ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
     },

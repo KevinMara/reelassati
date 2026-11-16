@@ -232,13 +232,16 @@ async function requestJson<T>(
           /^[\w-]{1,100}$/.test(body.reference)
           ? body.reference
           : undefined,
-        path === "/api/ai/analyze" &&
-          response.status === 422 &&
-          body.analysisIncomplete === true &&
-          typeof body.reason === "string" &&
-          videoReviewFailureMessage(body.reason)
+        body.reason === "provider_billing_unavailable" &&
+          response.status === 503
           ? body.reason
-          : undefined
+          : path === "/api/ai/analyze" &&
+              response.status === 422 &&
+              body.analysisIncomplete === true &&
+              typeof body.reason === "string" &&
+              videoReviewFailureMessage(body.reason)
+            ? body.reason
+            : undefined
       );
     }
 
