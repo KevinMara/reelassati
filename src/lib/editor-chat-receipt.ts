@@ -31,6 +31,20 @@ export function editorChatReceipt(
           return ui("Added supporting shots.");
         if (action.operation.type === "style")
           return ui("Updated the visual treatment.");
+        if (
+          targets?.length &&
+          targets.every(
+            id => clips?.find(clip => clip.id === id)?.graphic != null
+          )
+        )
+          return ui("Updated the graphics.");
+        // Deleted targets no longer exist in the saved timeline. Without
+        // evidence of their media kind, never claim that picture cuts changed.
+        if (
+          action.operation.type === "delete" &&
+          targets?.some(id => !clips?.some(clip => clip.id === id))
+        )
+          return ui("Edit saved.");
         return ui("Refined the pacing and cuts.");
       }
       if (action.kind === "generate")
@@ -60,7 +74,12 @@ export function editorChatReceipt(
         return ui("I organized the story sections.");
       return ui("Edit saved.");
     });
-    const summary = [...new Set(categories)].slice(0, 2).join(" ");
+    const specific = categories.filter(
+      category => category !== ui("Edit saved.")
+    );
+    const summary = [...new Set(specific.length ? specific : categories)]
+      .slice(0, 2)
+      .join(" ");
     if (
       actions.some(action =>
         ["failed", "blocked", "interrupted"].includes(action.status)
@@ -69,6 +88,11 @@ export function editorChatReceipt(
       return `${summary} ${ui("Some steps could not finish; see the details below.")}`;
     if (actions.some(action => action.status === "awaiting-approval"))
       return `${summary} ${ui("Would you like me to add the suggested extras too?")}`;
+    if (
+      message.status === "running" &&
+      actions.some(action => ["running", "pending"].includes(action.status))
+    )
+      return `${ui("I'm working on your edit…")} ${summary}`;
     return summary;
   }
   if (actions.some(action => action.status === "running"))
