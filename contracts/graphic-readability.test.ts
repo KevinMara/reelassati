@@ -27,6 +27,17 @@ const clip = {
 } as TimelineClip;
 
 describe("deterministic generated graphic checks", () => {
+  it("preserves usable edge-area anchors while checking the whole painted card", () => {
+    const topGraphic = normalizeGraphic({
+      ...clip.graphic!, text: "3 fasce", secondaryText: "", y: 6, size: 4,
+      padding: 0.8, animation: "none",
+    })!;
+    expect(topGraphic.y).toBe(6);
+    expect(graphicReadabilityProblems({ ...clip, graphic: topGraphic }, "9:16")).toEqual([]);
+    const clippedGraphic = normalizeGraphic({ ...topGraphic, y: 0 })!;
+    expect(graphicReadabilityProblems({ ...clip, graphic: clippedGraphic }, "9:16"))
+      .toContain("Graphic text never fits fully inside the frame: Score");
+  });
   it("checks actual primary and secondary colors against a filled card", () => {
     expect(solidColorContrast("#000000", "#FFFFFF")).toBeCloseTo(21);
     expect(solidColorContrast("#FFFFFF", "#FFFFFF")).toBe(1);

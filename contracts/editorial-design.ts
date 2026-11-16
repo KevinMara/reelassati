@@ -101,7 +101,7 @@ geometry and keyframes below before requesting raster video generation.
 Graphics use type=graphic with parameters.graphic. Supported kind values are
 text,callout,counter,countdown,arrow,highlight,rectangle,ellipse,star,line,
 spatial-title,spatial-cube,spatial-orbit. Shared fields: text,color:#RRGGBB,
-background:#RRGGBB,x/y:10..90,size:2..16 (percent of canvas width),
+background:#RRGGBB,x/y:0..100 (canvas-percent anchor),size:2..16 (percent of canvas width),
 animation:none|fade|pop|slide,rotation:-720..720. Compositions:
 composition:plain|lower-third|chapter|quote|statistic|progress,
 secondaryText (up to120 characters),accent:#RRGGBB,padding/cornerRadius:0..6,

@@ -109,8 +109,8 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
       const at = bounded(raw.at, 0, 0, 1);
       motion.set(at, {
         at,
-        x: bounded(raw.x, bounded(v.x, 50, 10, 90), 0, 100),
-        y: bounded(raw.y, bounded(v.y, 30, 10, 90), 0, 100),
+        x: bounded(raw.x, bounded(v.x, 50, 0, 100), 0, 100),
+        y: bounded(raw.y, bounded(v.y, 30, 0, 100), 0, 100),
         scale: bounded(raw.scale, 1, 0.1, 4),
         rotation: bounded(raw.rotation, 0, -720, 720),
         ...(typeof raw.opacity === "number"
@@ -126,8 +126,8 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
     text: text(v.text, 180),
     color: color(v.color, "#FFFFFF"),
     background: color(v.background, "#6F5AD8"),
-    x: bounded(v.x, 50, 10, 90),
-    y: bounded(v.y, 30, 10, 90),
+    x: bounded(v.x, 50, 0, 100),
+    y: bounded(v.y, 30, 0, 100),
     size: bounded(v.size, 7, 2, 16),
     animation: ["none", "fade", "pop", "slide"].includes(String(v.animation))
       ? (v.animation as MotionGraphic["animation"])

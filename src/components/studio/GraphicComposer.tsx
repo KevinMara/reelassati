@@ -321,8 +321,8 @@ export function GraphicComposer({
       </div>
       {(
         [
-          ["x", ui("Horizontal position"), 10, 90],
-          ["y", ui("Vertical position"), 10, 90],
+          ["x", ui("Horizontal position"), 0, 100],
+          ["y", ui("Vertical position"), 0, 100],
           [
             "size",
             isSpatialGraphic(g) ? ui("Object size") : ui("Text size"),
