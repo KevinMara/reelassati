@@ -3,6 +3,7 @@
 export type ProviderDiagnostics = {
   upstreamRequestId?: string;
   upstreamCode?: string;
+  errorType?: string;
   reportedIssue?:
     | "response-schema"
     | "media-input"
@@ -50,6 +51,17 @@ const knownCodes = new Set([
   "DEADLINE_EXCEEDED",
   "FAILED_PRECONDITION",
   "OUT_OF_RANGE",
+]);
+// OpenRouter's documented canonical categories. Never retain an arbitrary
+// provider code or message: those fields can contain user input or credentials.
+const errorTypes = new Set([
+  "context_length_exceeded", "max_tokens_exceeded", "token_limit_exceeded",
+  "string_too_long", "authentication", "permission_denied", "payment_required",
+  "rate_limit_exceeded", "provider_overloaded", "provider_unavailable",
+  "invalid_request", "invalid_prompt", "not_found", "precondition_failed",
+  "payload_too_large", "unprocessable", "content_policy_violation", "refusal",
+  "invalid_image", "image_too_large", "image_too_small", "unsupported_image_format",
+  "image_not_found", "image_download_failed", "server", "timeout", "unmapped",
 ]);
 const fieldNames = new Set([
   "generation_config",
@@ -120,6 +132,8 @@ export function openRouterErrorDiagnostics(
   const root = object(payload),
     error = object(root.error),
     metadata = object(error.metadata);
+  const errorType = typeof metadata.error_type === "string" && errorTypes.has(metadata.error_type)
+    ? metadata.error_type : undefined;
   const rawText =
     typeof metadata.raw === "string" && metadata.raw.length <= 32768
       ? metadata.raw
@@ -171,7 +185,7 @@ export function openRouterErrorDiagnostics(
     diagnosticField(
       /(?:at|field) ['"]([^'"\n]{1,240})['"]/i.exec(message)?.[1]
     );
-  const upstreamCode = [upstream.status, upstream.code, error.code].find(
+  const upstreamCode = [upstream.status, upstream.code, metadata.provider_code, error.code].find(
     value =>
       typeof value === "string"
         ? knownCodes.has(value)
@@ -191,6 +205,7 @@ export function openRouterErrorDiagnostics(
       /^gen-\d{8,16}-[A-Za-z0-9]{8,64}$/.test(value)
   );
   return {
+    ...(errorType ? { errorType } : {}),
     ...(upstreamRequestId
       ? { upstreamRequestId: String(upstreamRequestId) }
       : {}),

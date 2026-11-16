@@ -6,6 +6,17 @@ const field =
   "generation_config.response_schema.properties[changes].items.properties[parameters].properties[fit].enum[2]";
 
 describe("bounded provider error diagnostics", () => {
+  it("retains canonical streamed errors without leaking unknown metadata", () => {
+    expect(openRouterErrorDiagnostics({error: {code: 502, metadata: {
+      error_type: "provider_unavailable", provider_code: "UNAVAILABLE",
+      raw: "PRIVATE SOURCE TEXT", provider_name: "PRIVATE PROVIDER VALUE",
+    }}}, new Headers())).toEqual({
+      errorType: "provider_unavailable", upstreamCode: "UNAVAILABLE",
+    });
+    expect(openRouterErrorDiagnostics({error: {metadata: {
+      error_type: "PRIVATE SOURCE TEXT", provider_code: "PRIVATE_API_KEY",
+    }}}, new Headers())).toEqual({});
+  });
   it("retains schema location and correlation without retaining raw provider messages", () => {
     const result = openRouterErrorDiagnostics(
       {
