@@ -13,38 +13,83 @@ import {
 afterEach(() => vi.useRealTimers());
 
 describe("foreground analyzer transport", () => {
-  it("reserves a fixed three-phase edit deadline while retaining Analyze's five-minute bound", async () => {
-    vi.useFakeTimers();
-    const startedAt = Date.now();
-    let control!: AnalysisControl;
-    const run = vi.fn((_, active: AnalysisControl) => {
-      control = active;
-      return new Promise<Response>((_, reject) =>
-        active.signal.addEventListener(
-          "abort",
-          () => reject(active.signal.reason),
-          { once: true }
-        )
-      );
-    });
-    const result = unwrapAnalyzerResponse(
+  it("preserves only the replay marker across the streamed result", async () => {
+    const result = await unwrapAnalyzerResponse(
       foregroundAnalysisResponse(
-        new Request("https://test/api/ai/edit-plan"),
-        run
+        new Request("https://test/api/ai/editor-chat"),
+        async () =>
+          Response.json(
+            { actions: [] },
+            {
+              headers: {
+                "X-REELassati-Replayed": "true",
+                "X-Private": "secret",
+              },
+            }
+          )
       )
     );
-    expect(control.deadlineAt).toBe(startedAt + EDIT_PLAN_DEADLINE_MS);
-    await vi.advanceTimersByTimeAsync(ANALYZER_DEADLINE_MS);
-    expect(control.signal.aborted).toBe(false);
-    await vi.advanceTimersByTimeAsync(
-      EDIT_PLAN_DEADLINE_MS - ANALYZER_DEADLINE_MS
-    );
-    expect(control.signal.aborted).toBe(true);
-    expect((await result).status).toBe(504);
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(vi.getTimerCount()).toBe(0);
+    expect(result.headers.get("X-REELassati-Replayed")).toBe("true");
+    expect(result.headers.get("X-Private")).toBeNull();
+    expect(await result.json()).toEqual({ actions: [] });
   });
-  it.each(["analyze", "edit-plan"])(
+  it.each([
+    ['{"type":"pending"}\n', "incomplete"],
+    [
+      '{"type":"result","status":200,"body":"{}"}\n{"type":"pending"}\n',
+      "invalid",
+    ],
+    ["null\n", "invalid"],
+    ["PRIVATE_MALFORMED_BODY\n", "invalid"],
+  ])(
+    "classifies a failed delivery without exposing its body",
+    async (body, code) => {
+      await expect(
+        unwrapAnalyzerResponse(
+          new Response(body, {
+            headers: {
+              "Content-Type": "application/x-reelassati-analysis+ndjson",
+            },
+          })
+        )
+      ).rejects.toMatchObject({ name: "AnalyzerTransportError", code });
+    }
+  );
+  it.each(["edit-plan", "editor-chat"])(
+    "reserves the edit deadline for %s while retaining Analyze's five-minute bound",
+    async route => {
+      vi.useFakeTimers();
+      const startedAt = Date.now();
+      let control!: AnalysisControl;
+      const run = vi.fn((_, active: AnalysisControl) => {
+        control = active;
+        return new Promise<Response>((_, reject) =>
+          active.signal.addEventListener(
+            "abort",
+            () => reject(active.signal.reason),
+            { once: true }
+          )
+        );
+      });
+      const result = unwrapAnalyzerResponse(
+        foregroundAnalysisResponse(
+          new Request(`https://test/api/ai/${route}`),
+          run
+        )
+      );
+      expect(control.deadlineAt).toBe(startedAt + EDIT_PLAN_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(ANALYZER_DEADLINE_MS);
+      expect(control.signal.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(
+        EDIT_PLAN_DEADLINE_MS - ANALYZER_DEADLINE_MS
+      );
+      expect(control.signal.aborted).toBe(true);
+      expect((await result).status).toBe(504);
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
+  it.each(["analyze", "edit-plan", "editor-chat"])(
     "keeps a slow %s request readable past the observed 65-second cancellation without returning partial output",
     async route => {
       vi.useFakeTimers();
@@ -172,25 +217,61 @@ function source(text: string, width = 7) {
 }
 describe("OpenRouter analysis stream", () => {
   it("retains the rate-limit category without retaining failed stream data", async () => {
-    const result = readAnalysisCompletion(source(event({
-      id: "gen-1794562296-abcdefgh1234",
-      error: { code: 429, message: "Rate limit for private@example.com token=secret" },
-    })), new AbortController().signal);
+    const result = readAnalysisCompletion(
+      source(
+        event({
+          id: "gen-1794562296-abcdefgh1234",
+          error: {
+            code: 429,
+            message: "Rate limit for private@example.com token=secret",
+          },
+        })
+      ),
+      new AbortController().signal
+    );
     let failure: unknown;
-    try { await result; } catch (cause) { failure = cause; }
-    expect(failure).toMatchObject({name: "ProviderStreamFailure", status: 429,
-      diagnostics: { upstreamCode: "429", reportedIssue: "rate-limit" }});
+    try {
+      await result;
+    } catch (cause) {
+      failure = cause;
+    }
+    expect(failure).toMatchObject({
+      name: "ProviderStreamFailure",
+      status: 429,
+      diagnostics: { upstreamCode: "429", reportedIssue: "rate-limit" },
+    });
     expect(JSON.stringify(failure)).not.toMatch(/private|secret|example/);
-    expect(String(failure)).toBe("ProviderStreamFailure: Analysis provider stream failed");
+    expect(String(failure)).toBe(
+      "ProviderStreamFailure: Analysis provider stream failed"
+    );
   });
   it("maps a provider resource-exhausted error while discarding partial output", async () => {
-    const result = readAnalysisCompletion(source(event(chunk('{"partial":')) + event({
-      error: { code: 502, metadata: { raw: JSON.stringify({ error: {
-        status: "RESOURCE_EXHAUSTED", message: "quota details private" }
-      }) } }
-    })), new AbortController().signal);
-    await expect(result).rejects.toMatchObject({status: 429,
-      diagnostics: {upstreamCode: "RESOURCE_EXHAUSTED", reportedIssue: "rate-limit"}});
+    const result = readAnalysisCompletion(
+      source(
+        event(chunk('{"partial":')) +
+          event({
+            error: {
+              code: 502,
+              metadata: {
+                raw: JSON.stringify({
+                  error: {
+                    status: "RESOURCE_EXHAUSTED",
+                    message: "quota details private",
+                  },
+                }),
+              },
+            },
+          })
+      ),
+      new AbortController().signal
+    );
+    await expect(result).rejects.toMatchObject({
+      status: 429,
+      diagnostics: {
+        upstreamCode: "RESOURCE_EXHAUSTED",
+        reportedIssue: "rate-limit",
+      },
+    });
   });
   it("handles fragmented Unicode, comments, reasoning and the repeated usage finish event", async () => {
     const report = JSON.stringify({ summary: "Caffè 🎬" });

@@ -35,6 +35,53 @@ afterEach(() => {
 });
 
 describe("platform API transport", () => {
+  it.each(["chat", "story-sections"])(
+    "keeps the %s result on foreground transport without repeating the paid request",
+    async kind => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ type: "pending" }) +
+              "\n" +
+              JSON.stringify({
+                type: "result",
+                status: 200,
+                body: JSON.stringify({ message: "Ready", actions: [] }),
+              }) +
+              "\n",
+            { headers: { "Content-Type": ANALYZER_STREAM_TYPE } }
+          )
+        );
+      vi.stubGlobal("fetch", fetchMock);
+      const abort = new AbortController();
+      const result =
+        kind === "chat"
+          ? platformApi.editorChat(
+              {
+                projectId: "project",
+                requestId: "request",
+                prompt: "Adjust audio",
+                mode: "ask",
+                executionMode: "plan",
+                maxCredits: 5,
+              },
+              { signal: abort.signal }
+            )
+          : platformApi.findStorySections("project", "request", {
+              signal: abort.signal,
+            });
+      await expect(result).resolves.toMatchObject({
+        message: "Ready",
+        actions: [],
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
+        Accept: ANALYZER_STREAM_TYPE,
+      });
+      expect(fetchMock.mock.calls[0][1].signal).toBe(abort.signal);
+    }
+  );
   it("retries a disconnected workspace save once with the identical write receipt", async () => {
     const workspace = createEmptyWorkspace("creator@example.com");
     const fetchMock = vi

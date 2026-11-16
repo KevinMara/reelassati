@@ -190,6 +190,7 @@ async function request(
           ...([
             "/api/ai/analyze",
             "/api/ai/edit-plan",
+            "/api/ai/editor-chat",
             "/api/catalog/admin/review-sounds",
           ].includes(path)
             ? { Accept: ANALYZER_STREAM_TYPE }
@@ -903,7 +904,7 @@ describe("foreground K3 auto-edit planning", () => {
       expect(response.status, JSON.stringify(reviewed)).toBe(200);
       expect(reviewed.reviewed).toEqual([id]);
       expect(providerCalls).toHaveLength(calls + 1);
-      expect(providerCalls.at(-1)?.model).toBe("google/gemini-2.5-flash");
+      expect(providerCalls.at(-1)?.model).toBe("google/gemini-3-flash-preview");
       expect(providerCalls.at(-1)?.response_format).toMatchObject({
         type: "json_schema",
         json_schema: {
@@ -2161,9 +2162,19 @@ describe("foreground K3 auto-edit planning", () => {
         palette: { accent: "#7AF5CF" },
         content: { text: "supply", secondaryText: "optional" },
       });
-      expect(JSON.stringify(context.presetCatalog)).not.toContain("ALEX MORGAN");
-      expect(context.presetCatalog.graphics.find((preset: any) => preset.design.motion).design.motion.poses).toHaveLength(5);
-      expect(context.presetCatalog.motionKits.find((kit: any) => kit.id === "statistic").layers[1]).toMatchObject({
+      expect(JSON.stringify(context.presetCatalog)).not.toContain(
+        "ALEX MORGAN"
+      );
+      expect(
+        context.presetCatalog.graphics.find(
+          (preset: any) => preset.design.motion
+        ).design.motion.poses
+      ).toHaveLength(5);
+      expect(
+        context.presetCatalog.motionKits.find(
+          (kit: any) => kit.id === "statistic"
+        ).layers[1]
+      ).toMatchObject({
         presetId: "motion:statistic:1",
         includeWhen: "kitSubtitle is nonempty",
         contentBindings: { text: "kitSubtitle" },
@@ -2410,22 +2421,36 @@ describe("foreground K3 auto-edit planning", () => {
       warningLog.mockRestore();
     }
   });
-  it.each(["nameplate", "stat-proof", "motion:speaker:0"])("releases an incomplete %s preset without inserting example content", async presetId => {
-    const original = nextOutput;
-    const before = balance();
-    const calls = providerCalls.length;
-    nextOutput = { summary: "Apply a preset", changes: [{ type: "graphic", start: 0, end: 4, parameters: { presetId } }] };
-    try {
-      const response = await request("/api/ai/edit-plan", await input());
-      expect(response.status).toBe(422);
-      const failure = await response.json();
-      expect(failure).toMatchObject({ validation: { reason: "preset_content_missing", operationType: "graphic" }, creditReceipt: { status: "released", credits: 0 } });
-      expect(providerCalls.length).toBe(calls + 1);
-      expect(balance()).toBe(before);
-    } finally {
-      nextOutput = original;
+  it.each(["nameplate", "stat-proof", "motion:speaker:0"])(
+    "releases an incomplete %s preset without inserting example content",
+    async presetId => {
+      const original = nextOutput;
+      const before = balance();
+      const calls = providerCalls.length;
+      nextOutput = {
+        summary: "Apply a preset",
+        changes: [
+          { type: "graphic", start: 0, end: 4, parameters: { presetId } },
+        ],
+      };
+      try {
+        const response = await request("/api/ai/edit-plan", await input());
+        expect(response.status).toBe(422);
+        const failure = await response.json();
+        expect(failure).toMatchObject({
+          validation: {
+            reason: "preset_content_missing",
+            operationType: "graphic",
+          },
+          creditReceipt: { status: "released", credits: 0 },
+        });
+        expect(providerCalls.length).toBe(calls + 1);
+        expect(balance()).toBe(before);
+      } finally {
+        nextOutput = original;
+      }
     }
-  });
+  );
   it("preserves explicit verified linked audio peers in a local visual treatment", async () => {
     const original = nextOutput;
     const body = await input();
@@ -2674,6 +2699,64 @@ describe("publication copy field selection", () => {
 });
 
 describe("authenticated paid editing chat route", () => {
+  it("disconnects the chat provider and releases its single hold without retrying or leaving a running request", async () => {
+    const before = balance(),
+      calls = providerCalls.length;
+    const body = chat("chat-disconnected-foreground");
+    let release!: () => void;
+    providerGate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const retained: Promise<unknown>[] = [];
+    try {
+      const response = await worker.fetch(
+        new Request("https://studio.example/api/ai/editor-chat", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer owner@example.com",
+            "Content-Type": "application/json",
+            Accept: ANALYZER_STREAM_TYPE,
+          },
+          body: JSON.stringify(body),
+        }),
+        env,
+        { waitUntil: task => retained.push(task) }
+      );
+      expect(response.headers.get("Content-Type")).toContain(
+        ANALYZER_STREAM_TYPE
+      );
+      await vi.waitFor(() => expect(providerCalls.length).toBe(calls + 1));
+      expect(balance()).toBe(before - 5);
+      await response.body!.cancel();
+      await Promise.all(retained);
+      await vi.waitFor(() => {
+        expect(balance()).toBe(before);
+        expect(
+          sqlite
+            .prepare(
+              "SELECT status FROM editor_chat_requests WHERE request_id=?"
+            )
+            .get(body.requestId)?.status
+        ).toBe("failed");
+      });
+      expect(
+        sqlite
+          .prepare(
+            "SELECT status,error_code FROM ai_invocations ORDER BY rowid DESC LIMIT 1"
+          )
+          .get()
+      ).toMatchObject({
+        status: "failed",
+        error_code: "edit_request_canceled",
+      });
+      const replay = await request("/api/ai/editor-chat", body);
+      expect(replay.status).toBe(409);
+      expect(providerCalls.length).toBe(calls + 1);
+    } finally {
+      release();
+      providerGate = undefined;
+    }
+  });
   it("releases all planning credits on upstream billing failure and replays the sanitized failure without another provider call", async () => {
     const originalAccount = sqlite
       .prepare(
@@ -2906,7 +2989,7 @@ describe("authenticated paid editing chat route", () => {
     failFinalCacheWrite = true;
     const body = chat("route-request-000006");
     const first = await request("/api/ai/editor-chat", body);
-    expect(first.status).toBe(500);
+    expect(first.status).toBe(502);
     expect(balance()).toBe(before - 5);
     const replay = await request("/api/ai/editor-chat", body);
     expect(replay.status).toBe(200);

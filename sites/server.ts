@@ -16,7 +16,11 @@ import {
   publishCatalogSound,
 } from "./catalog-evidence";
 import { runtimeFailureDiagnostic } from "./runtime-diagnostics";
-import { missingStyleControls, mergeStyleControlRepair, EDIT_STYLE_REPAIR_DIRECTION } from "../contracts/edit-style-repair";
+import {
+  missingStyleControls,
+  mergeStyleControlRepair,
+  EDIT_STYLE_REPAIR_DIRECTION,
+} from "../contracts/edit-style-repair";
 import {
   EDIT_CUT_GUIDANCE,
   assertAutonomousTrimSemantics,
@@ -92,7 +96,10 @@ import {
   assertExecutableEditPlan,
   EDIT_PLANNING_CAPABILITIES,
 } from "../contracts/edit-planning-context";
-import { AUTONOMOUS_TRANSITION_GUIDANCE, normalizeAutonomousTransition } from "../contracts/autonomous-transition";
+import {
+  AUTONOMOUS_TRANSITION_GUIDANCE,
+  normalizeAutonomousTransition,
+} from "../contracts/autonomous-transition";
 import { preflightAutonomousPlan } from "../contracts/autonomous-execution";
 import { fetchSocialVideo } from "./social-video";
 import {
@@ -4353,7 +4360,11 @@ async function chatJson(
       });
       const publicFailure = publicProviderFailure(providerName, cause.status, reference, null);
       const failure = json(publicFailure.body, publicFailure.status);
-      providerFailureMetadata.set(failure, { provider: providerName, status: cause.status, reference });
+      providerFailureMetadata.set(failure, {
+        provider: providerName,
+        status: cause.status,
+        reference,
+      });
       throw failure;
     }
     if (
@@ -4628,17 +4639,21 @@ function mapEditOperations(
               clips.some(c => c.id === id && (!c.locked || type === "sound"))
           )
         : [];
-      const targetClipIds = type === "transition" ? requestedIds : validSelectedIds.size
-        ? preserveExplicitTargets && requestedIds.length
+      const targetClipIds =
+        type === "transition"
           ? requestedIds
-          : Array.from(validSelectedIds)
-        : requestedIds.length
-          ? requestedIds
-          : clips
-              .filter(
-                clip => clip.start < end && clip.start + clip.duration > start
-              )
-              .map(clip => clip.id);
+          : validSelectedIds.size
+            ? preserveExplicitTargets && requestedIds.length
+              ? requestedIds
+              : Array.from(validSelectedIds)
+            : requestedIds.length
+              ? requestedIds
+              : clips
+                  .filter(
+                    clip =>
+                      clip.start < end && clip.start + clip.duration > start
+                  )
+                  .map(clip => clip.id);
       const params = recordValue(typed.parameters) || {};
       const parameters: NonNullable<EditOperation["parameters"]> = {};
       if (type === "transition") {
@@ -6182,10 +6197,18 @@ async function handleAi(
             category: "edit-plan",
             description: "Reel editing chat",
             referenceId: project.id,
+            analysisControl,
             metadata: {
               projectId: project.id,
               requestId: input.requestId,
               maxCredits: input.maxCredits,
+              ...(analysisControl
+                ? {
+                    analyzerTransport: "foreground-v1",
+                    analyzerDeadlineAt: analysisControl.deadlineAt,
+                    analyzerAttempt: crypto.randomUUID(),
+                  }
+                : {}),
             },
           },
           async () => {
@@ -6205,7 +6228,7 @@ async function handleAi(
               16000,
               false,
               undefined,
-              undefined,
+              analysisControl,
               editReasoningEffort(input.effort)
             );
             let plan = normalizeEditorChatPlan(output, context);
@@ -6250,14 +6273,12 @@ async function handleAi(
                       draft: output,
                       validation: plan.blockedReasons,
                     }),
-                mediaParts.length
-                  ? env.OPENROUTER_ANALYSIS_MODEL || DEFAULT_ANALYSIS_MODEL
-                  : undefined,
+                editModel(undefined),
                 true,
                 16000,
                 false,
                 undefined,
-                undefined,
+                analysisControl,
                 editReasoningEffort(input.effort)
               );
               output = repaired.output;
@@ -7267,10 +7288,13 @@ async function handleAi(
               "edit-planning",
               EDIT_PLAN_SOUND_REPAIR_DIRECTION,
               [
-                { type: "text", text: JSON.stringify({
-                  failures: feedback,
-                  freeSounds: planningContext.freeSounds,
-                }) },
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    failures: feedback,
+                    freeSounds: planningContext.freeSounds,
+                  }),
+                },
                 ...catalogEvidence.parts,
               ],
               requestedModel,
@@ -7316,9 +7340,22 @@ async function handleAi(
             styleCorrectionProviderPending = true;
             const corrected = await chatJson(env, user, "edit-planning",
               `${EDIT_STYLE_REPAIR_DIRECTION} ${planningCapabilities}`,
-              JSON.stringify({ command: input.command, project: projectContext,
-                styles: styleIndices.map(operationIndex => ({ operationIndex, operation: rawStyleDraft[operationIndex] })) }),
-              requestedModel, true, 4000, false, undefined, analysisControl, editReasoningEffort(input.effort));
+              JSON.stringify({
+                command: input.command,
+                project: projectContext,
+                styles: styleIndices.map(operationIndex => ({
+                  operationIndex,
+                  operation: rawStyleDraft[operationIndex],
+                })),
+              }),
+              requestedModel,
+              true,
+              4000,
+              false,
+              undefined,
+              analysisControl,
+              editReasoningEffort(input.effort)
+            );
             invocation = corrected.invocation;
             styleCorrectionProviderPending = false;
             output.changes = mergeStyleControlRepair(rawStyleDraft, styleIndices, corrected.output);
@@ -7404,11 +7441,16 @@ async function handleAi(
                 env, user, "edit-planning",
                 `${EDITORIAL_COVERAGE_REPAIR_DIRECTION} ${EDITORIAL_COVERAGE_DIRECTION} ${EDITORIAL_DESIGN_GUIDANCE} ${EDIT_CUT_GUIDANCE} ${planningCapabilities} ${EDITOR_GRAPHIC_GUIDANCE}`,
                 [
-                  { type: "text", text: JSON.stringify({
-                    command: input.command, project: projectContext,
-                    draft: output.changes,
-                    flaggedScenes: editorialCoverageRepairScope(editorialCoverage),
-                  }) },
+                  {
+                    type: "text",
+                    text: JSON.stringify({
+                      command: input.command,
+                      project: projectContext,
+                      draft: output.changes,
+                      flaggedScenes:
+                        editorialCoverageRepairScope(editorialCoverage),
+                    }),
+                  },
                   ...catalogEvidence.parts,
                 ],
                 requestedModel, true, 16000, false, undefined, analysisControl,
@@ -14891,6 +14933,7 @@ export default {
         [
           "/api/ai/analyze",
           "/api/ai/edit-plan",
+          "/api/ai/editor-chat",
           "/api/catalog/admin/review-sounds",
           "/api/catalog/admin/review-visuals",
         ].includes(url.pathname) &&
@@ -14900,10 +14943,12 @@ export default {
           foregroundAnalysisResponse(
             request,
             async (scopedRequest, control) => {
-              control.purpose =
-                url.pathname === "/api/ai/edit-plan"
-                  ? "edit-planning"
-                  : "video-analysis";
+              control.purpose = [
+                "/api/ai/edit-plan",
+                "/api/ai/editor-chat",
+              ].includes(url.pathname)
+                ? "edit-planning"
+                : "video-analysis";
               try {
                 return await handleApi(scopedRequest, env, url, control);
               } catch (cause) {
@@ -14925,7 +14970,7 @@ export default {
               }
             },
             cleanup => ctx?.waitUntil(cleanup),
-            url.pathname === "/api/ai/edit-plan"
+            ["/api/ai/edit-plan", "/api/ai/editor-chat"].includes(url.pathname)
               ? {
                   error: "The edit plan is incomplete. No edit was applied.",
                   analysisIncomplete: false,

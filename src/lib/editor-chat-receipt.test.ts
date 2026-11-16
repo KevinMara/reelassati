@@ -33,6 +33,11 @@ it("does not describe pending work as completed", () => {
     )
   ).toBe("I'm working on your edit…");
 });
+it("reports repositioned audio cues as sound work, without claiming picture cuts", () => {
+  expect(editorChatReceipt(message([{
+    kind: "edit", status: "completed", operation: { type: "move", targetClipIds: ["cue"] },
+  } as EditorChatAction]), ui, [{ id: "cue", track: "audio" }] as never)).toBe("Updated the sound.");
+});
 it("discloses a partial result and asks only for pending extras", () => {
   const done = { kind: "transcribe", status: "completed" } as const;
   expect(

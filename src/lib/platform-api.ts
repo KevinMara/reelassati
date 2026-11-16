@@ -1182,7 +1182,12 @@ export const platformApi = {
   ) =>
     requestJson<import("@contracts/editor-chat").EditorChatResponse>(
       "/api/ai/editor-chat",
-      { method: "POST", body: JSON.stringify(input), signal: options?.signal },
+      {
+        method: "POST",
+        headers: { Accept: ANALYZER_STREAM_TYPE },
+        body: JSON.stringify(input),
+        signal: options?.signal,
+      },
       false,
       options?.scope,
       options?.onCreditReceipt
@@ -1197,6 +1202,7 @@ export const platformApi = {
       "/api/ai/editor-chat",
       {
         method: "POST",
+        headers: { Accept: ANALYZER_STREAM_TYPE },
         signal: options?.signal,
         body: JSON.stringify({
           projectId,

@@ -870,7 +870,7 @@ export function EditorChat({
                                   project,
                                   ui
                                 ) ??
-                                editorChatReceipt(message, ui) ??
+                                editorChatReceipt(message, ui, project.clips) ??
                                 message.text)
                           }
                           detailsText={
@@ -884,7 +884,7 @@ export function EditorChat({
                                   : message.activity.appliedTypes === undefined
                                     ? `${ui("Plan")}: ${message.text}`
                                     : undefined
-                                : editorChatReceipt(message, ui)
+                                : editorChatReceipt(message, ui, project.clips)
                                   ? `${ui("Plan")}: ${message.text}`
                                   : undefined
                           }

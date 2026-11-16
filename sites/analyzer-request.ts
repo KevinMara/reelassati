@@ -11,7 +11,17 @@ import { parseProviderFrame } from "./model-json";
 
 /** Cleanup callbacks must contain database bookkeeping only, never inference. */
 export interface AnalysisControl {
-  diagnosticStage?: "authorization" | "workspace" | "catalog" | "catalog-visuals" | "context" | "credit-reservation" | "provider-start" | "provider-request" | "provider-response" | "compilation";
+  diagnosticStage?:
+    | "authorization"
+    | "workspace"
+    | "catalog"
+    | "catalog-visuals"
+    | "context"
+    | "credit-reservation"
+    | "provider-start"
+    | "provider-request"
+    | "provider-response"
+    | "compilation";
   purpose?: "video-analysis" | "edit-planning";
   signal: AbortSignal;
   deadlineAt: number;
@@ -31,10 +41,11 @@ export function foregroundAnalysisResponse(
     analysisIncomplete: true,
   }
 ): Response {
-  const deadlineMs =
-    new URL(request.url).pathname === "/api/ai/edit-plan"
-      ? EDIT_PLAN_DEADLINE_MS
-      : ANALYZER_DEADLINE_MS;
+  const deadlineMs = ["/api/ai/edit-plan", "/api/ai/editor-chat"].includes(
+    new URL(request.url).pathname
+  )
+    ? EDIT_PLAN_DEADLINE_MS
+    : ANALYZER_DEADLINE_MS;
   const abort = new AbortController();
   const cleanups = new Set<() => Promise<unknown>>();
   let closed = false;
@@ -93,9 +104,14 @@ export function foregroundAnalysisResponse(
         if (!closed)
           controller.enqueue(encoder.encode(`${JSON.stringify(frame)}\n`));
       };
-      const finish = (status: number, body: string) => {
+      const finish = (status: number, body: string, replayed = false) => {
         if (closed) return;
-        write({ type: "result", status, body });
+        write({
+          type: "result",
+          status,
+          body,
+          ...(replayed ? { replayed: true as const } : {}),
+        });
         closed = true;
         stopTimers();
         cleanups.clear();
@@ -150,7 +166,11 @@ export function foregroundAnalysisResponse(
           const body = await response.text();
           if (encoder.encode(body).byteLength > ANALYZER_MAX_RESULT_BYTES)
             throw new Error("Analysis response exceeds transport limit");
-          finish(response.status, body);
+          finish(
+            response.status,
+            body,
+            response.headers.get("X-REELassati-Replayed") === "true"
+          );
         } catch {
           if (!abort.signal.aborted)
             cancel(new DOMException("Analysis response failed", "AbortError"));
@@ -198,9 +218,14 @@ export async function readAnalysisCompletion(
     if (doneEvent) throw new Error("Unexpected data after analysis completion");
     const payload = parseProviderFrame(data) as {
       error?: unknown;
-      choices?: Array<{index?: number; finish_reason?: string | null; delta?: {content?: unknown}}>;
+      choices?: Array<{
+        index?: number;
+        finish_reason?: string | null;
+        delta?: { content?: unknown };
+      }>;
     };
-    if (payload.error) throw new ProviderStreamFailure(payload, response.headers);
+    if (payload.error)
+      throw new ProviderStreamFailure(payload, response.headers);
     const choice =
       payload.choices?.find((item: { index?: number }) => item.index === 0) ??
       payload.choices?.[0];

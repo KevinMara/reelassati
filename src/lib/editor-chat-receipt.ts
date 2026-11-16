@@ -1,9 +1,11 @@
 import type { EditorChatMessage } from "@contracts/editor-chat";
+import type { EditProject } from "@contracts/workspace";
 
 /** Execution state owns the headline; planning prose stays in the details. */
 export function editorChatReceipt(
   message: EditorChatMessage,
-  ui: (text: string) => string
+  ui: (text: string) => string,
+  clips?: EditProject["clips"]
 ): string | undefined {
   if (message.activity || !message.plan?.actions.length) return;
   const actions = message.plan.actions;
@@ -11,6 +13,14 @@ export function editorChatReceipt(
   if (done.length) {
     const categories = done.map(action => {
       if (action.kind === "edit") {
+        const targets = action.operation.targetClipIds;
+        if (
+          targets?.length &&
+          targets.every(
+            id => clips?.find(clip => clip.id === id)?.track === "audio"
+          )
+        )
+          return ui("Updated the sound.");
         if (action.operation.type === "graphic")
           return ui("Updated the graphics.");
         if (action.operation.type === "caption")
