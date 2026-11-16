@@ -2885,6 +2885,58 @@ describe("authenticated paid editing chat route", () => {
     }
   });
 
+  it.each(["valid", "invalid"] as const)(
+    "corrects a completed but malformed edit envelope once, with a %s correction",
+    async correction => {
+      const before = balance(),
+        calls = providerCalls.length;
+      const beforeWorkspace = sqlite
+        .prepare("SELECT document FROM workspace_state WHERE owner_email = ?")
+        .get("owner@example.com");
+      const body = chat(`route-syntax-correction-${correction}`);
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      let attempts = 0;
+      providerOutputFactory = () => {
+        attempts++;
+        providerContentOverride =
+          attempts === 1 || correction === "invalid"
+            ? '{"message":"private broken source fragment'
+            : undefined;
+        return nextOutput;
+      };
+      try {
+        const response = await request("/api/ai/editor-chat", body);
+        const result = await response.json();
+        expect(response.status).toBe(correction === "valid" ? 200 : 502);
+        expect(providerCalls.length).toBe(calls + 2);
+        expect(balance()).toBe(before - (correction === "valid" ? 5 : 0));
+        expect(result.creditReceipt).toMatchObject({
+          credits: correction === "valid" ? 5 : 0,
+          status: correction === "valid" ? "settled" : "released",
+        });
+        expect(JSON.stringify(result)).not.toContain("private broken source");
+        expect(JSON.stringify(providerCalls[calls + 1])).not.toContain(
+          "private broken source"
+        );
+        expect(
+          sqlite
+            .prepare(
+              "SELECT document FROM workspace_state WHERE owner_email = ?"
+            )
+            .get("owner@example.com")
+        ).toEqual(beforeWorkspace);
+        const replay = await request("/api/ai/editor-chat", body);
+        expect(replay.status).toBe(response.status);
+        expect(await replay.json()).toEqual(result);
+        expect(providerCalls.length).toBe(calls + 2);
+      } finally {
+        providerOutputFactory = undefined;
+        providerContentOverride = undefined;
+        log.mockRestore();
+      }
+    }
+  );
+
   it("uses the saved owner project and replays a normalized plan without another debit or provider call", async () => {
     const before = balance();
     const calls = providerCalls.length;

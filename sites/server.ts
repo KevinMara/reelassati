@@ -4201,7 +4201,8 @@ async function chatJson(
   deferCompletion = false,
   responseSchema?: Record<string, unknown>,
   analysisControl?: AnalysisControl,
-  effort: "low" | "high" = "low"
+  effort: "low" | "high" = "low",
+  allowEnvelopeCorrection = false
 ): Promise<{
   output: Record<string, unknown>;
   invocation: AiInvocationContext;
@@ -4333,11 +4334,28 @@ async function chatJson(
         purpose,
       });
     }
-    const output = parseModelJson(
-      analysisControl
-        ? await readAnalysisCompletion(response, analysisControl.signal)
-        : await response.json()
-    );
+    const payload = analysisControl
+      ? await readAnalysisCompletion(response, analysisControl.signal)
+      : await response.json();
+    let output: Record<string, unknown>;
+    try {
+      output = parseModelJson(payload);
+    } catch (cause) {
+      if (
+        allowEnvelopeCorrection &&
+        editing &&
+        cause instanceof ModelJsonError &&
+        cause.diagnostic.stage === "model-output" &&
+        cause.diagnostic.characters > 0
+      ) {
+        // A completed provider stream can contain unfinished JSON. Route this
+        // through the same single envelope correction as invalid action shapes.
+        // Never salvage partial operations or retain the private broken output.
+        await failAiInvocation(env, invocation, "provider_invalid_json");
+        return { output: { syntaxFailure: cause.diagnostic }, invocation };
+      }
+      throw cause;
+    }
     if (analysisControl) analysisControl.diagnosticStage = "provider-response";
     analysisControl?.signal.throwIfAborted();
     if (!deferCompletion) await completeAiInvocation(env, invocation, output);
@@ -4358,7 +4376,12 @@ async function chatJson(
         diagnostics: cause.diagnostics,
         invocation: { id: invocation.id, model: selectedModel, purpose },
       });
-      const publicFailure = publicProviderFailure(providerName, cause.status, reference, null);
+      const publicFailure = publicProviderFailure(
+        providerName,
+        cause.status,
+        reference,
+        null
+      );
       const failure = json(publicFailure.body, publicFailure.status);
       providerFailureMetadata.set(failure, {
         provider: providerName,
@@ -4377,7 +4400,10 @@ async function chatJson(
         reference: invocation.id,
         purpose,
         provider: providerName,
-        diagnostic: cause instanceof ModelJsonError ? cause.diagnostic : {stage: "provider-envelope"},
+        diagnostic:
+          cause instanceof ModelJsonError
+            ? cause.diagnostic
+            : { stage: "provider-envelope" },
         maxOutputTokens,
         effort,
       });
@@ -4602,8 +4628,12 @@ function mapEditOperations(
       } catch (error) {
         // The preceding filter restricts item.type to our operation enum.
         throw new EditPlanValidationError(
-          error instanceof PresetContentError ? "preset_content_missing" : "preset_unavailable",
-          error instanceof PresetContentError ? "Supply the source-grounded content required by the preset." : "The selected preset cannot be used for this operation.",
+          error instanceof PresetContentError
+            ? "preset_content_missing"
+            : "preset_unavailable",
+          error instanceof PresetContentError
+            ? "Supply the source-grounded content required by the preset."
+            : "The selected preset cannot be used for this operation.",
           index,
           item.type as EditOperation["type"]
         );
@@ -4767,7 +4797,10 @@ function mapEditOperations(
       // Supporting layers use the same compositor as existing footage. Keep
       // their selected blend/pose/motion in the signed plan, including the
       // catalog blend mode resolved before this mapper runs.
-      if ((type === "style" || type === "broll") && recordValue(params.visual)) {
+      if (
+        (type === "style" || type === "broll") &&
+        recordValue(params.visual)
+      ) {
         const patch = recordValue(params.visual)!;
         const normalized = normalizeVisual(patch);
         parameters.visual = Object.fromEntries(
@@ -6229,7 +6262,8 @@ async function handleAi(
               false,
               undefined,
               analysisControl,
-              editReasoningEffort(input.effort)
+              editReasoningEffort(input.effort),
+              true
             );
             let plan = normalizeEditorChatPlan(output, context);
             const malformed = (p: typeof plan) =>
@@ -6255,7 +6289,7 @@ async function handleAi(
                 user,
                 "edit-planning",
                 systemPrompt +
-                  "\nRepair the invalid instruction envelope in the supplied draft. Preserve the original requested intent, exact valid targets, scope and timing. Use nested operation objects. Never invent replacement targets or widen the selected range. Keep action IDs stable and preserve every requested step; if a step cannot be represented safely, leave it in the draft so validation can reject the whole attempted repair. Return the entire corrected JSON plan.",
+                  "\nRepair the invalid instruction envelope in the supplied draft. If the draft contains syntaxFailure, no partial actions were accepted: reconstruct the complete proposal from the original request and current project evidence. Preserve the original requested intent, exact valid targets, scope and timing. Use nested operation objects. Never invent replacement targets or widen the selected range. Keep action IDs stable and preserve every requested step; if a step cannot be represented safely, leave it in the draft so validation can reject the whole attempted repair. Return the entire corrected JSON plan.",
                 mediaParts.length
                   ? [
                       {
@@ -6873,14 +6907,22 @@ async function handleAi(
     const transitionPlanning = input.transitionPlanning === true;
     const planningCapabilities = transitionPlanning
       ? EDIT_PLANNING_CAPABILITIES
-      : EDIT_PLANNING_CAPABILITIES.replace(AUTONOMOUS_TRANSITION_GUIDANCE, "")
-          .replace("Use the distinct transition operation above for\nthat purpose.", "Adjacent-shot transitions are unavailable in this client.");
-    const allowedPlanTypes = "trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound" +
+      : EDIT_PLANNING_CAPABILITIES.replace(
+          AUTONOMOUS_TRANSITION_GUIDANCE,
+          ""
+        ).replace(
+          "Use the distinct transition operation above for\nthat purpose.",
+          "Adjacent-shot transitions are unavailable in this client."
+        );
+    const allowedPlanTypes =
+      "trim, split, move, delete, caption, silence, pacing, broll, audio, style, graphic, sound" +
       (transitionPlanning ? ", transition" : "");
-    const presetGuidance = transitionPlanning ? EDITOR_PRESET_GUIDANCE : EDITOR_PRESET_GUIDANCE.replace(
-      "Use catalog transitions only at valid adjacent cuts with source handles.",
-      "Adjacent-shot transitions are unavailable in this client."
-    );
+    const presetGuidance = transitionPlanning
+      ? EDITOR_PRESET_GUIDANCE
+      : EDITOR_PRESET_GUIDANCE.replace(
+          "Use catalog transitions only at valid adjacent cuts with source handles.",
+          "Adjacent-shot transitions are unavailable in this client."
+        );
     analysisControl.diagnosticStage = "context";
     const planningContext = buildEditPlanningContext(
       project,
@@ -6904,12 +6946,14 @@ async function handleAi(
       speechEvidence: planningContext.speechEvidence,
       scenes: planningContext.scenes,
       planningClock: planningContext.clock,
-      ...(transitionPlanning ? {
-        transitionSources: planningContext.transitionSources,
-        transitionCuts: planningContext.transitionCuts,
-        transitionPresets: planningContext.transitionPresets,
-        existingTransitions: planningContext.existingTransitions,
-      } : {}),
+      ...(transitionPlanning
+        ? {
+            transitionSources: planningContext.transitionSources,
+            transitionCuts: planningContext.transitionCuts,
+            transitionPresets: planningContext.transitionPresets,
+            existingTransitions: planningContext.existingTransitions,
+          }
+        : {}),
       captionStyle: input.project.captionStyle,
       captionAppearance: input.project.captionAppearance,
       sourceReviews: factualSourceReviews,
@@ -6926,7 +6970,9 @@ async function handleAi(
       selectedRange: input.range,
       presetCatalog: {
         ...presetCatalog,
-        ...(!transitionPlanning ? { transitions: [], personalTransitions: [] } : {}),
+        ...(!transitionPlanning
+          ? { transitions: [], personalTransitions: [] }
+          : {}),
       },
       freeSounds: planningContext.freeSounds,
       sharedCatalog: planningContext.sharedCatalog,
@@ -7006,10 +7052,15 @@ async function handleAi(
         let validationStage: EditPlanValidationStage = "references";
         const assertClientOperations = (raw: unknown) => {
           if (!transitionPlanning && Array.isArray(raw)) {
-            const index = raw.findIndex(operation => recordValue(operation)?.type === "transition");
+            const index = raw.findIndex(
+              operation => recordValue(operation)?.type === "transition"
+            );
             if (index >= 0)
               throw new EditPlanValidationError(
-                "unsupported_operation", "Refresh the Studio to apply shot transitions.", index, "transition"
+                "unsupported_operation",
+                "Refresh the Studio to apply shot transitions.",
+                index,
+                "transition"
               );
           }
         };
@@ -7045,8 +7096,11 @@ async function handleAi(
             422
           );
         };
-        try { assertClientOperations(output.changes); }
-        catch (error) { return rejectPlan(error, output.changes); }
+        try {
+          assertClientOperations(output.changes);
+        } catch (error) {
+          return rejectPlan(error, output.changes);
+        }
         let stockMedia: StockMedia[] = [];
         let stockCandidates: EditorialStockCandidate[] = [];
         const stockReview: EditorialStockReview = { omitted: [] };
@@ -7148,8 +7202,11 @@ async function handleAi(
             );
             output = refined.output;
             invocation = refined.invocation;
-            try { assertClientOperations(output.changes); }
-            catch (error) { return rejectPlan(error, output.changes); }
+            try {
+              assertClientOperations(output.changes);
+            } catch (error) {
+              return rejectPlan(error, output.changes);
+            }
           }
         }
         let editorialNotes = normalizeEditorialNotes(output.editorialNotes);
@@ -7205,7 +7262,12 @@ async function handleAi(
           validationStage = "scope";
           if (input.localOnly === true) {
             const start = boundedNumber(input.range?.start, 0, 0, duration);
-            const end = boundedNumber(input.range?.end, duration, start, duration);
+            const end = boundedNumber(
+              input.range?.end,
+              duration,
+              start,
+              duration
+            );
             changes = changes
               .filter(
                 change =>
@@ -7325,20 +7387,44 @@ async function handleAi(
         try {
           // Check style controls before stock/local filtering can shift indexes.
           // One foreground correction; no transport retry or new media call.
-          const rawStyleDraft = Array.isArray(output.changes) ? output.changes : [];
+          const rawStyleDraft = Array.isArray(output.changes)
+            ? output.changes
+            : [];
           assertClientOperations(rawStyleDraft);
-          const referencedDraft = resolveEditPlanningReferences(output.changes, planningContext, duration,
-            Array.isArray(input.selectedClipIds) ? input.selectedClipIds : []);
-          const compiledDraft = mapEditOperations(resolveEditStyleOperations(referencedDraft, project.editStyleTemplate),
-            duration, project.clips, input.selectedClipIds ?? [], personalStyles, true);
-          const styleIndices = missingStyleControls(output.changes, compiledDraft);
+          const referencedDraft = resolveEditPlanningReferences(
+            output.changes,
+            planningContext,
+            duration,
+            Array.isArray(input.selectedClipIds) ? input.selectedClipIds : []
+          );
+          const compiledDraft = mapEditOperations(
+            resolveEditStyleOperations(
+              referencedDraft,
+              project.editStyleTemplate
+            ),
+            duration,
+            project.clips,
+            input.selectedClipIds ?? [],
+            personalStyles,
+            true
+          );
+          const styleIndices = missingStyleControls(
+            output.changes,
+            compiledDraft
+          );
           if (styleIndices.length) {
             validationStage = "executable";
             checkpoint();
             if (analysisControl.onCheck && !(await analysisControl.onCheck()))
-              throw new DOMException("The edit request was canceled.", "AbortError");
+              throw new DOMException(
+                "The edit request was canceled.",
+                "AbortError"
+              );
             styleCorrectionProviderPending = true;
-            const corrected = await chatJson(env, user, "edit-planning",
+            const corrected = await chatJson(
+              env,
+              user,
+              "edit-planning",
               `${EDIT_STYLE_REPAIR_DIRECTION} ${planningCapabilities}`,
               JSON.stringify({
                 command: input.command,
@@ -7358,7 +7444,11 @@ async function handleAi(
             );
             invocation = corrected.invocation;
             styleCorrectionProviderPending = false;
-            output.changes = mergeStyleControlRepair(rawStyleDraft, styleIndices, corrected.output);
+            output.changes = mergeStyleControlRepair(
+              rawStyleDraft,
+              styleIndices,
+              corrected.output
+            );
           }
           try {
             changes = compileChanges(output.changes, true);
@@ -7424,7 +7514,10 @@ async function handleAi(
               editorialCoverage,
               changes
             );
-          if (editorialCoverage && editorialCoverageRepairScope(editorialCoverage).length) {
+          if (
+            editorialCoverage &&
+            editorialCoverageRepairScope(editorialCoverage).length
+          ) {
             // One correction in this foreground request and credit reservation.
             // Existing operations cannot be rewritten. Provider failure leaves
             // the safe original plan partial; cancellation still stops the run.
@@ -7436,9 +7529,14 @@ async function handleAi(
             };
             try {
               if (analysisControl.onCheck && !(await analysisControl.onCheck()))
-                throw new DOMException("The edit request was canceled.", "AbortError");
+                throw new DOMException(
+                  "The edit request was canceled.",
+                  "AbortError"
+                );
               const corrected = await chatJson(
-                env, user, "edit-planning",
+                env,
+                user,
+                "edit-planning",
                 `${EDITORIAL_COVERAGE_REPAIR_DIRECTION} ${EDITORIAL_COVERAGE_DIRECTION} ${EDITORIAL_DESIGN_GUIDANCE} ${EDIT_CUT_GUIDANCE} ${planningCapabilities} ${EDITOR_GRAPHIC_GUIDANCE}`,
                 [
                   {
@@ -7453,34 +7551,61 @@ async function handleAi(
                   },
                   ...catalogEvidence.parts,
                 ],
-                requestedModel, true, 16000, false, undefined, analysisControl,
+                requestedModel,
+                true,
+                16000,
+                false,
+                undefined,
+                analysisControl,
                 editReasoningEffort(input.effort)
               );
               invocation = corrected.invocation;
               const candidate = mergeEditorialCoverageRepair(
-                output.changes, output.editorialCoverage, editorialCoverage, corrected.output
+                output.changes,
+                output.editorialCoverage,
+                editorialCoverage,
+                corrected.output
               );
               const candidateChanges = compileChanges(candidate.changes, true);
-              const candidateReview = reconcileEditorialCoverage(reviewEditorialCoverage(
-                candidate.editorialCoverage, qualityProject, planningContext, originalCompiledChanges, qualityAssets
-              ), candidateChanges);
+              const candidateReview = reconcileEditorialCoverage(
+                reviewEditorialCoverage(
+                  candidate.editorialCoverage,
+                  qualityProject,
+                  planningContext,
+                  originalCompiledChanges,
+                  qualityAssets
+                ),
+                candidateChanges
+              );
               // A correction must not create a new failure on an accounted beat.
-              if (candidateReview.scenes.some(scene => scene.issues.some(issue =>
-                issue !== "unresolved-source" &&
-                !editorialCoverage!.scenes.find(old => old.sceneId === scene.sceneId)?.issues.includes(issue)
-              ))) throw new Error("Editorial correction introduced a new content failure.");
+              if (
+                candidateReview.scenes.some(scene =>
+                  scene.issues.some(
+                    issue =>
+                      issue !== "unresolved-source" &&
+                      !editorialCoverage!.scenes
+                        .find(old => old.sceneId === scene.sceneId)
+                        ?.issues.includes(issue)
+                  )
+                )
+              )
+                throw new Error(
+                  "Editorial correction introduced a new content failure."
+                );
               output.changes = candidate.changes;
               output.editorialCoverage = candidate.editorialCoverage;
               changes = candidateChanges;
               editorialCoverage = candidateReview;
             } catch (error) {
               checkpoint();
-              if (error instanceof DOMException && error.name === "AbortError") throw error;
+              if (error instanceof DOMException && error.name === "AbortError")
+                throw error;
               changes = original.changes;
               originalCompiledChanges = original.compiled;
               stockReview.omitted = original.omissions;
               console.warn("REELassati editorial correction unavailable", {
-                reference: invocation.id, ...runtimeFailureDiagnostic(error),
+                reference: invocation.id,
+                ...runtimeFailureDiagnostic(error),
               });
             }
           }
@@ -7527,7 +7652,8 @@ async function handleAi(
           }
         } catch (error) {
           checkpoint();
-          if (cutCorrectionProviderPending || styleCorrectionProviderPending) throw error;
+          if (cutCorrectionProviderPending || styleCorrectionProviderPending)
+            throw error;
           return rejectPlan(error, output.changes);
         }
         if (graphicReview?.omitted.length) {
@@ -7665,8 +7791,13 @@ async function handleAi(
         if (changes.some(operation => operation.type === "transition")) {
           try {
             validationStage = "composition";
-            preflightAutonomousPlan(qualityProject, changes, qualityAssets, checkpoint,
-              { request: graphicRequest });
+            preflightAutonomousPlan(
+              qualityProject,
+              changes,
+              qualityAssets,
+              checkpoint,
+              { request: graphicRequest }
+            );
           } catch (error) {
             checkpoint();
             return rejectPlan(error, changes);
@@ -14534,7 +14665,11 @@ async function handleApi(
         );
         if (!packet?.audio)
           return errorResponse("Upload verified sound evidence first.", 409);
-        const existing = await readCatalogSound(env, packet, analysisControl.signal);
+        const existing = await readCatalogSound(
+          env,
+          packet,
+          analysisControl.signal
+        );
         if (existing) {
           await publishCatalogSound(env, item, packet, existing);
           skipped.push(id);
@@ -14569,7 +14704,11 @@ async function handleApi(
           }
         );
       }
-      const reviewRequest = catalogReviewIdentity("sound", inspected.map(p => p.catalogId), parts);
+      const reviewRequest = catalogReviewIdentity(
+        "sound",
+        inspected.map(p => p.catalogId),
+        parts
+      );
       const completion = await chatJson(
         env,
         user,
@@ -14621,24 +14760,55 @@ async function handleApi(
           { httpMetadata: { contentType: "application/json" } }
         );
         analysisControl.signal.throwIfAborted();
-        await publishCatalogSound(env, soundItems.get(packet.catalogId)!, packet, observation);
+        await publishCatalogSound(
+          env,
+          soundItems.get(packet.catalogId)!,
+          packet,
+          observation
+        );
       }
       return json({ reviewed: results.map(r => r.packet.catalogId), skipped });
     } finally {
       await release();
     }
   }
-  if (url.pathname === "/api/catalog/admin/review-visuals" && request.method === "POST") {
+  if (
+    url.pathname === "/api/catalog/admin/review-visuals" &&
+    request.method === "POST"
+  ) {
     if (!canAdministerSharedCatalog(env, user))
-      return errorResponse("Only the studio owner can review shared media.", 403);
-    if (!analysisControl) return errorResponse("Use the foreground visual review.", 409);
+      return errorResponse(
+        "Only the studio owner can review shared media.",
+        403
+      );
+    if (!analysisControl)
+      return errorResponse("Use the foreground visual review.", 409);
     const input = await parseJsonBody<{ ids?: string[] }>(request);
-    return json(await reviewCatalogVisuals(env, input.ids, analysisControl, async (direction, parts, ids) => {
-      const reviewRequest = catalogReviewIdentity("visual", ids, parts);
-      const { output } = await chatJson(env, user, "video-analysis", direction, reviewRequest.parts,
-        "google/gemini-3-flash-preview", true, 24000, false, catalogReviewSchema("visual", reviewRequest.ids), analysisControl, "low");
-      return reviewRequest.bind(output);
-    }));
+    return json(
+      await reviewCatalogVisuals(
+        env,
+        input.ids,
+        analysisControl,
+        async (direction, parts, ids) => {
+          const reviewRequest = catalogReviewIdentity("visual", ids, parts);
+          const { output } = await chatJson(
+            env,
+            user,
+            "video-analysis",
+            direction,
+            reviewRequest.parts,
+            "google/gemini-3-flash-preview",
+            true,
+            24000,
+            false,
+            catalogReviewSchema("visual", reviewRequest.ids),
+            analysisControl,
+            "low"
+          );
+          return reviewRequest.bind(output);
+        }
+      )
+    );
   }
   if (url.pathname.startsWith("/api/catalog/admin/"))
     return handleCatalogAdmin(
