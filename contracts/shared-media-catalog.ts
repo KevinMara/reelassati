@@ -267,12 +267,22 @@ export function normalizeSharedCatalogItem(v: unknown): SharedMediaCatalogItem {
   }
   return item;
 }
+export interface SharedCatalogPlacement {
+  start: number;
+  duration: number;
+  /** Offset into the measured source, never a timeline offset. */
+  sourceIn?: number;
+  /** Linear audio gain. Omitted values preserve existing saved actions. */
+  volume?: number;
+  fadeIn?: number;
+  fadeOut?: number;
+}
 export function sharedCatalogPlacement(
   item: SharedMediaCatalogItem,
   raw: unknown,
   duration: number,
   range?: { start: number; end: number }
-) {
+): SharedCatalogPlacement | undefined {
   if (raw === undefined) return undefined;
   if (item.kind === "lut")
     throw new Error("Apply a LUT through color controls.");
@@ -287,13 +297,39 @@ export function sharedCatalogPlacement(
     start >= upper
   )
     throw new Error("The catalog placement starts outside the selected edit.");
+  const sourceIn = row.sourceIn ?? 0;
+  if (
+    typeof sourceIn !== "number" ||
+    !Number.isFinite(sourceIn) ||
+    sourceIn < 0 ||
+    (item.kind === "image" ? sourceIn !== 0 : sourceIn >= item.duration)
+  )
+    throw new Error("The catalog excerpt starts outside its source.");
   const seconds = positive(
-    row.duration ?? Math.min(item.duration, upper - start),
-    item.kind === "image" ? 86400 : item.duration
+    row.duration ?? Math.min(item.duration - sourceIn, upper - start),
+    item.kind === "image" ? 86400 : item.duration - sourceIn
   );
   if (start + seconds > upper + 0.000001)
     throw new Error("The catalog placement extends outside the selected edit.");
-  return { start, duration: seconds };
+  const placement: SharedCatalogPlacement = {
+    start,
+    duration: seconds,
+    ...(row.sourceIn !== undefined ? { sourceIn } : {}),
+  };
+  for (const key of ["volume", "fadeIn", "fadeOut"] as const) {
+    const value = row[key];
+    if (value === undefined) continue;
+    if (
+      item.kind !== "audio" ||
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value < 0 ||
+      value > (key === "volume" ? 2 : seconds)
+    )
+      throw new Error("Invalid catalog sound mix.");
+    placement[key] = value;
+  }
+  return placement;
 }
 export const sharedCatalogMediaPath = (
   id: string,

@@ -247,6 +247,7 @@ export function parseEditorChatRequest(raw: unknown): EditorChatRequest {
 
 export interface EditorChatContext {
   sharedCatalog?: import("../contracts/shared-media-catalog").SharedMediaCatalogItem[];
+  sharedSoundObservations?: Record<string, import("../contracts/catalog-evidence").CatalogSoundPlanningObservation>;
   request: EditorChatRequest;
   personalStyles?: import("../contracts/editor-style-library").EditorSavedStyle[];
   personalTransitions?: import("../contracts/transition-presets").TransitionPreset[];
@@ -513,7 +514,7 @@ Graphic creation versus revision: use operation.type="graphic" and parameters.gr
 - transcribe: assetIds of source video/audio files, optional language, replace:boolean. Produces timed captions from actual audio, mapped to the timeline by the executor. One action may include multiple sources. If no source speech asset exists, explain and emit no action; never generate dummy captions.
 - analyze: assetId of an owned video with measured duration, focus. A public or social link is only reference data: have the user import the final CORS-readable video file to private Library or upload the original, then select the owned video and review its measured analysis quote. Never emit publicUrl analysis or claim a link was watched. Actual media analysis happens during execution, not this planning call. If an edit depends on new observations, emit analyze followed by replan dependent on it instead of guessing.
 - generate: media:image|video|speech|music|sfx,prompt,name,seconds for video/music/sfx,voice for speech from supplied voiceIds, optional language. Image is 1K; video 720p with no generated audio, 3–15 integer seconds. Music 5–30 seconds; SFX 0.5–30 seconds. Speech prompt is the exact words to speak, not directions; preserve the language. Output goes to Library by default. Only include insert:{start,duration?} if the command explicitly asks to place/add it in this edit; do not automatically insert assets merely requested for generation. Do not use a real-person voice likeness or claim reference identity.
-- shared-media: catalogId from supplied sharedMediaCatalog; optional insert:{start,duration?}. Uses the exact available licensed audio, image frame or video overlay with zero media-generation credits. Preserve the supplied source duration, dimensions and compositing mode. These are real fixed assets, not editable template text or generated images; do not invent behavior. Use only relevant requested treatments and preserve meaningful faces and text. Omit insert for a Library-only request. Never exceed the source duration (still images may be held) or selected range.
+- shared-media: catalogId from supplied sharedMediaCatalog; optional insert:{start,duration?,sourceIn?,volume?,fadeIn?,fadeOut?}. sourceIn selects an excerpt in source seconds; sourceIn+duration must fit the actual source. For audio, choose volume as a linear gain from 0 to 2 and fade lengths in seconds within the excerpt: a subtle accent under speech usually needs a low gain and a short tail fade, not unity gain or an abrupt cutoff. Base excerpt and mix on the actual listening review, event timing and dialogue, never the filename alone. The mix travels with the insertion. Uses the exact available licensed audio, image frame or video overlay with zero media-generation credits. Preserve the supplied dimensions and compositing mode. These are real fixed assets, not editable template text or generated images; do not invent behavior. Use only relevant requested treatments and preserve meaningful faces and text. Omit insert for a Library-only request. Never exceed the source duration (still images may be held) or selected range.
 - catalog-effect: catalogId from supplied freeEffectCatalog; optional insert:{start,duration?}. Uses the exact licensed video overlay with zero media-generation credits. These are short, silent portrait paint accents composited with screen blend; not transparent video, editable text, source replacements, or a true transition between two shots. Use measured names/tags/duration and do not invent colors or behavior. Add only when the user requests this treatment or accepts it as an optional extra; preserve meaningful source faces and text. Omit insert for Library-only requests. Placement cannot exceed actual source duration or the selected range.
 - catalog-audio: catalogId from supplied freeAudioCatalog; optional insert:{start,duration?}. Uses an existing verified CC0 or platform-licensed sound/music file, with zero action credits and no audio-generation provider. Prefer this for a whoosh, impact, transition sound, or music bed when a catalog entry fits; never label it newly generated. Use available names/tags to choose, not invented sonic details. Omit insert when only asked to save/find a sound: it goes to Library. Include insert only when asked to add/place sound in the edit. Default duration is bounded by source length and remaining edit/selected range; never stretch or silently loop it. Explicitly requested original/custom generation still uses generate, subject to provider availability. Optional extra sound placements retain extra scope and approval.
 - insert: owned assetId,start,duration?; only actual image/video/audio assets. Reuses the real asset without generation cost.
@@ -1096,6 +1097,13 @@ export function normalizeEditorChatPlan(
           project.duration,
           request.range
         );
+        if (item.kind === "audio" && insert && context.sharedSoundObservations) {
+          const heard = context.sharedSoundObservations[item.id];
+          const sourceIn = insert.sourceIn ?? 0;
+          if (!heard || heard.confidence < 0.6 || !heard.sourceRanges.some(range =>
+            sourceIn >= range.start - 0.000001 && sourceIn + insert.duration <= range.end + 0.000001
+          )) throw new Error("Choose a sound excerpt within its listening-reviewed source range.");
+        }
         action = {
           ...base,
           kind: "shared-media",

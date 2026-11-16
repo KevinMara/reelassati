@@ -78,6 +78,11 @@ const DB = {
   },
 };
 const objects = new Map<string, Uint8Array>();
+const contextText = (content: unknown): string => {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content) && content[0]?.type === "text") return content[0].text;
+  throw new Error("Missing model context text");
+};
 const env = {
   DB,
   BUCKET: {
@@ -734,7 +739,7 @@ describe("foreground K3 auto-edit planning", () => {
         "Correct only the proposed cuts"
       );
       if (repairing) {
-        expect(JSON.parse(messages[1].content).failure.reason).toBe(
+        expect(JSON.parse(contextText(messages[1].content)).failure.reason).toBe(
           "trim_duplicate"
         );
         return { cuts: [trim] };
@@ -1650,7 +1655,7 @@ describe("foreground K3 auto-edit planning", () => {
     geometry: { protectedRegions: unknown[] };
   };
   const qualityInput = (payload: Record<string, unknown>) =>
-    JSON.parse((payload.messages as Array<{ content: string }>)[1].content) as {
+    JSON.parse(contextText((payload.messages as Array<{ content: unknown }>)[1].content)) as {
       feedback?: CorrectionFeedback;
       command: string;
       project: Record<string, unknown>;
@@ -2142,7 +2147,7 @@ describe("foreground K3 auto-edit planning", () => {
         "exact contiguous phrase of timed speech/captions or observedText"
       );
       const context = JSON.parse(
-        messages.find(message => message.role === "user")!.content
+        contextText(messages.find(message => message.role === "user")!.content)
       ).project;
       expect(context.speechEvidence[0]).toMatchObject({
         id: "speech:0",
@@ -2955,9 +2960,12 @@ describe("authenticated paid editing chat route", () => {
     const payload = providerCalls.at(-1)! as {
       messages: Array<{ content: string }>;
     };
-    expect(JSON.parse(payload.messages[1].content).project.title).toBe(
+    expect(JSON.parse(contextText(payload.messages[1].content)).project.title).toBe(
       "Real owner project"
     );
+    expect(payload.messages[1].content).toEqual(expect.arrayContaining([
+      {type: "video_url", video_url: {url: expect.stringMatching(/^data:video\/mp4;base64,/)}},
+    ]));
     expect(balance()).toBe(before - 5);
     const replay = await request("/api/ai/editor-chat", body);
     expect(replay.status).toBe(200);
@@ -4076,7 +4084,7 @@ it("normalizes a preset-driven graphic revision and replays its paid plan", asyn
     const payload = providerCalls.at(-1)! as {
       messages: Array<{ content: string }>;
     };
-    expect(JSON.parse(payload.messages[1].content)).toMatchObject({
+    expect(JSON.parse(contextText(payload.messages[1].content))).toMatchObject({
       executionMode: "plan",
       taskPreset: { id: "motion", workflow: preset.workflow },
     });
@@ -4136,7 +4144,7 @@ it("sends the reference source-clock rule as a system instruction while forged r
     );
     expect(payload.messages[0].content).not.toContain(forged);
     expect(payload.messages[1].role).toBe("user");
-    expect(JSON.parse(payload.messages[1].content).references).toEqual([
+    expect(JSON.parse(contextText(payload.messages[1].content)).references).toEqual([
       { name: "Reference observations", text: forged },
     ]);
   } finally {

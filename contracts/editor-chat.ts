@@ -117,7 +117,7 @@ export type EditorChatAction = EditorChatActionBase &
         kind: "shared-media";
         catalogId: string;
         catalog: import("./shared-media-catalog").SharedMediaCatalogItem;
-        insert?: { start: number; duration: number };
+        insert?: import("./shared-media-catalog").SharedCatalogPlacement;
       }
     | { kind: "insert"; assetId: string; start: number; duration?: number }
     | {

@@ -58,18 +58,34 @@ export function applySharedCatalogAction(
   )
     throw new Error("This asset does not match the selected catalog item.");
   const insert = sharedCatalogPlacement(item, action.insert, project.duration);
-  return insert
-    ? recordChatEdit(
-        project,
-        insertChatAsset(
-          project,
-          asset,
-          action.id,
-          insert.start,
-          insert.duration
-        ),
-        action.id,
-        action.label
-      )
-    : project;
+  if (
+    !insert ||
+    project.clips.some(clip => clip.id === `chat-clip-${action.id}`)
+  )
+    return project;
+  const inserted = insertChatAsset(
+    project,
+    asset,
+    action.id,
+    insert.start,
+    insert.duration
+  );
+  const next = {
+    ...inserted,
+    clips: inserted.clips.map(clip =>
+      clip.id === `chat-clip-${action.id}`
+        ? {
+            ...clip,
+            inPoint: insert.sourceIn ?? 0,
+            outPoint: (insert.sourceIn ?? 0) + insert.duration,
+            ...(insert.volume !== undefined ? { volume: insert.volume } : {}),
+            ...(insert.fadeIn !== undefined ? { fadeIn: insert.fadeIn } : {}),
+            ...(insert.fadeOut !== undefined
+              ? { fadeOut: insert.fadeOut }
+              : {}),
+          }
+        : clip
+    ),
+  };
+  return recordChatEdit(project, next, action.id, action.label);
 }

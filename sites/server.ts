@@ -5,6 +5,7 @@ import {
   EDIT_CUT_REPAIR_DIRECTION,
 } from "../contracts/edit-cut-repair";
 import { catalogVisualEvidence } from "./catalog-visual-evidence";
+import { editorSourceMedia } from "./editor-source-media";
 import { reviewCatalogVisuals } from "./catalog-visual-review";
 import { catalogReviewSchema } from "./catalog-review-schema";
 import { catalogReviewIdentity } from "./catalog-review-identity";
@@ -6048,6 +6049,7 @@ async function handleAi(
     );
     const context: EditorChatContext = {
       sharedCatalog: catalogEvidence.items,
+      sharedSoundObservations: catalogEvidence.soundObservations,
       request: input,
       project,
       personalStyles: workspace.editorStyles,
@@ -6187,7 +6189,16 @@ async function handleAi(
       async () => {
         await assertAllowedCreativeUse(env, user, input.prompt, project.id);
         // R2 is read only after ownership verification and the durable claim; retries replay the result.
-        const mediaParts: ModelContentPart[] = [...catalogEvidence.parts];
+        const mediaParts: ModelContentPart[] = [
+          ...(input.task === "story-sections" ? [] : await editorSourceMedia(
+            project,
+            { owned: id => getAssetRow(env, user, id), read: key => env.BUCKET.get(key) },
+            request.signal,
+            input.selectedClipIds,
+            input.range,
+          )),
+          ...catalogEvidence.parts,
+        ];
         let totalImageBytes = 0;
         for (const assetId of imageReferenceIds) {
           const row = await getAssetRow(env, user, assetId);
@@ -7021,12 +7032,22 @@ async function handleAi(
         analysisControl,
       },
       async reservation => {
+        const planningMediaParts: ModelContentPart[] = [
+          ...await editorSourceMedia(
+            project,
+            { owned: id => getAssetRow(env, user, id), read: key => env.BUCKET.get(key) },
+            analysisControl.signal,
+            input.selectedClipIds,
+            input.range,
+          ),
+          ...catalogEvidence.parts,
+        ];
         let { output, invocation } = await chatJson(
           env,
           user,
           "edit-planning",
           `${EDIT_CUT_GUIDANCE} ${SHORT_FORM_STORY_GUIDANCE} ${EDITORIAL_DESIGN_GUIDANCE} ${EDITORIAL_NOTES_GUIDANCE} ${planningCapabilities} You are the accountable AI edit planner inside a professional short-form timeline. Return JSON only: {"summary":"...", "editorialNotes":[], "editorialCoverage":[], "changes":[...], "stockSearches":[{"query":"specific generic visual subject in English","kind":"video or image","sceneId":"scene:<index>","purpose":"what this picture explains for this beat"}]}. ${input.stock === true ? "Request stock searches for the actual coverage gaps in this edit. Choose the number from the story, not a fixed shot quota. Each search should find a distinct useful visual. Use generic topic nouns without personal names or private details. Return a complete fallback edit using available footage too. Stock is illustrative material, never evidence of a medical claim or a particular patient. No stock is required when original footage communicates better." : "Do not request stock searches."} Each change must contain type, label, reason, confidence (0..1), intensity (light|balanced|aggressive), targetClipIds, parameters, and either start/end or a supported evidence cue. Changes must be executable: trim parameters.sourceIn is a source-media offset; move parameters.destination is an absolute timeline time; pacing parameters.speed is 0.25..4; audio adjusts existing target clips only using parameters.volume 0..2; adding a music bed or SFX requires type=sound with parameters.assetId; caption parameters.text contains exact supplied transcript words; broll uses parameters.assetId for existing library media or parameters.prompt and parameters.mediaKind=image|video for new media only when the brief allows that expense. Style uses parameters.exposure=-2..2 stops, temperature/tint/highlights/shadows/whites/blacks=-1..1 (neutral 0); use subtle adjustments from observed footage, never arbitrary values. parameters.fit=cover|contain, fadeIn/fadeOut=0..3 seconds, brightness=-0.5..0.5, contrast=0.5..2, saturation=0..2. Delete targets whole clips; silence removes the specified interval across unlocked tracks. Only propose silence when supported by transcript/analysis evidence. Do not infer silence from a missing transcript. Do not claim to inspect video pixels from filenames. ${EDITOR_GRAPHIC_GUIDANCE} ${presetGuidance} ${captionDirection} Use sound operations to insert motivated free catalog cues: parameters.assetId is the exact catalog:<id> or shared:<id> from freeSounds, parameters.volume normally 0.08..0.25, start/end must fit the actual sound duration. Keep cues below speech, never add a whoosh to every cut. Shared catalog visuals are real fixed overlays/frames, with supplied dimensions, duration and blendMode. When relevant to the brief, insert with type=broll and exact parameters.assetId=shared:<id>; sourceIn defaults to 0, duration must fit the actual video, and parameters.visual.blendMode must match the catalog. They are not generated media, editable text, source replacements, or scene evidence. Allowed types: ${allowedPlanTypes}. Before returning, check complete-word boundaries, timeline/source timestamp mapping, visual continuity, end-of-content, audio overlap, and locked clips. Deliver the complete requested treatment. Judge each beat for coverage, clarity, framing, motion design, sound and finishing; implement every useful supported improvement, not just trims and color. Do not minimize the operation count or stop after the easiest changes. Preserve restraint only where it serves the actual source or selected style. When timing evidence is absent, preserve the source rather than guessing. Plan only—never claim changes are already applied. Respect locked clips and stay inside 0..${duration}s. Choose as many high-impact operations as the story needs. A generated-media quota or operation quota must not determine the treatment. Explain the audience-retention reason concretely.`,
-          catalogEvidence.parts.length
+          planningMediaParts.length
             ? [
                 {
                   type: "text",
@@ -7035,7 +7056,7 @@ async function handleAi(
                     project: projectContext,
                   }),
                 },
-                ...catalogEvidence.parts,
+                ...planningMediaParts,
               ]
             : JSON.stringify({
                 command: input.command,
@@ -7181,7 +7202,7 @@ async function handleAi(
                 },
                 // Refinement replaces the entire draft, so its choices need
                 // the same actual catalog frames/listening/color evidence.
-                ...catalogEvidence.parts,
+                ...planningMediaParts,
                 ...stockMedia
                   .filter(item => item.thumbnail)
                   .flatMap(item => [
@@ -7357,7 +7378,7 @@ async function handleAi(
                     freeSounds: planningContext.freeSounds,
                   }),
                 },
-                ...catalogEvidence.parts,
+                ...planningMediaParts,
               ],
               requestedModel,
               true,
@@ -7549,7 +7570,7 @@ async function handleAi(
                         editorialCoverageRepairScope(editorialCoverage),
                     }),
                   },
-                  ...catalogEvidence.parts,
+                  ...planningMediaParts,
                 ],
                 requestedModel,
                 true,

@@ -253,4 +253,110 @@ describe("shared stock planning and execution", () => {
         normalizeSharedCatalogItem({ ...lut, lut: { ...lut.lut, ...value } })
       ).toThrow();
   });
+  it("carries a reviewed sound excerpt and mix through planning, reload and reversible execution", () => {
+    const sound = normalizeSharedCatalogItem({
+      ...item,
+      kind: "audio",
+      waveform: Array(64).fill(0.2),
+      width: undefined,
+      height: undefined,
+      blendMode: undefined,
+      poster: undefined,
+      media: {
+        ...item.media,
+        file: `media/${hash}.wav`,
+        contentType: "audio/wav",
+      },
+    });
+    const ctx = {
+      ...context(),
+      sharedCatalog: [sound],
+      sharedSoundObservations: {
+        [sound.id]: {
+          schemaVersion: 1 as const,
+          mediaSha256: sound.media.sha256,
+          sampleSha256: "b".repeat(64),
+          character: "A short soft impact",
+          role: "effect" as const,
+          audibleEvents: ["soft impact"],
+          suitableUses: ["brief emphasis"],
+          avoidUses: ["continuous music"],
+          containsSpeech: false,
+          intensity: "subtle" as const,
+          confidence: 0.9,
+          coverage: "sampled-audio" as const,
+          sourceRanges: [{ start: 0.5, end: 1.2 }],
+        },
+      },
+    };
+    const insert = {
+      start: 2,
+      duration: 0.4,
+      sourceIn: 0.7,
+      volume: 0.12,
+      fadeIn: 0.01,
+      fadeOut: 0.08,
+    };
+    const plan = normalizeEditorChatPlan(
+      { actions: [{ ...draft, insert }] },
+      ctx
+    );
+    const state = normalizeEditorChatState({
+      messages: [
+        {
+          id: "sound-reply",
+          role: "assistant",
+          text: "Ready",
+          createdAt: "2026-11-16T00:00:00Z",
+          plan,
+        },
+      ],
+    })!;
+    const restored = normalizeEditorChatState(
+      JSON.parse(JSON.stringify(state))
+    )!.messages[0].plan!.actions[0];
+    if (restored.kind !== "shared-media")
+      throw new Error("Missing sound insertion");
+    expect(restored.insert).toEqual(insert);
+    const owned = {
+      ...sharedCatalogPlanningAssets([sound])[0],
+      id: "sound",
+      url: "/api/assets/sound",
+    };
+    const edited = applySharedCatalogAction(project, owned, restored);
+    expect(edited.clips[0]).toMatchObject({
+      track: "audio",
+      start: 2,
+      duration: 0.4,
+      inPoint: 0.7,
+      outPoint: 1.1,
+      volume: 0.12,
+      fadeIn: 0.01,
+      fadeOut: 0.08,
+    });
+    expect(edited.revisions.at(-1)!.clips[0]).toEqual(edited.clips[0]);
+    expect(applySharedCatalogAction(edited, owned, restored)).toBe(edited);
+    for (const patch of [
+      { sourceIn: 1.8 },
+      { sourceIn: 0 },
+      { sourceIn: 1.1 },
+      { sourceIn: -0.1 },
+      { sourceIn: NaN },
+      { volume: 3 },
+      { volume: -1 },
+      { fadeOut: 0.5 },
+      { fadeIn: Infinity },
+    ]) {
+      expect(
+        normalizeEditorChatPlan(
+          { actions: [{ ...draft, insert: { ...insert, ...patch } }] },
+          ctx
+        ).actions
+      ).toEqual([]);
+    }
+    expect(
+      normalizeEditorChatPlan({ actions: [{ ...draft, insert }] }, context())
+        .actions
+    ).toEqual([]);
+  });
 });
