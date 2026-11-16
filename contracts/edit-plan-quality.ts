@@ -12,6 +12,7 @@ import { protectedSourceBounds } from "./automatic-graphic-protection";
 import { normalizeSourceVisualEvidence } from "./source-visual-evidence";
 import { effectiveTimelineClips } from "./timeline-mixer";
 import { normalizeGraphic } from "./motion-graphics";
+import { graphicLayoutSpace } from "./graphic-layout-space";
 
 export interface EditPlanQualityReview {
   repairedOperationIds: string[];
@@ -271,6 +272,15 @@ export function editPlanGraphicFeedback(
       operation: changes.find(
         operation => operation.id === decision.operationId
       ),
+      layoutCandidates: (() => {
+        if (decision.issues.some(issue => issue.reason === "unknown-source-layout")) return [];
+        const operation = changes.find(item => item.id === decision.operationId);
+        if (!operation) return [];
+        const regions = protectedRegions.filter(region => region.start < operation.end && region.end > operation.start);
+        if (regions.some(region => region.samples.some(sample => !sample.canvasPercent))) return [];
+        return graphicLayoutSpace(regions.flatMap(region => region.samples.flatMap(sample =>
+          sample.canvasPercent ? [sample.canvasPercent] : [])));
+      })(),
     })),
     immutableChanges: changes.filter(
       operation =>
@@ -285,7 +295,7 @@ export function editPlanGraphicFeedback(
       composedClips: draft.clips,
       protectedRegions,
       sampleNote:
-        "Illustrative boundary/midpoint samples only. Final validation checks every rendered frame and animation states; do not infer safety between these samples.",
+        "Illustrative boundary/midpoint samples only. layoutCandidates are unobstructed rectangles across those samples with a 2% clearance, not guaranteed safe positions. Use them to fit the entire painted composition, not only its center; choose a common area across comparison beats. A lower-third is not automatically clear. Final validation checks every rendered frame and animation states; do not infer safety between these samples.",
     },
   };
 }
