@@ -152,7 +152,7 @@ export function CatalogEvidenceImport() {
           active.signal.aborted
             ? "Stopped. Completed records are saved."
             : review
-              ? `${review === "sound" ? "Sound" : "Visual"} review paused. Completed records are saved.${cause instanceof PlatformApiError ? ` ${cause.message} (HTTP ${cause.status}${cause.reference ? ` · Reference ${cause.reference}` : ""})` : ""} Start again to continue with the remaining items.`
+              ? `${review === "sound" ? "Sound" : "Visual"} review paused. Completed records are saved.${cause instanceof PlatformApiError ? ` ${cause.message} (HTTP ${cause.status}${cause.reference ? ` · Reference ${cause.reference}` : ""})` : cause instanceof Error ? ` ${cause.message.slice(0, 400)}` : ""} Start again to continue with the remaining items.`
               : cause instanceof Error
                 ? cause.message
                 : "Evidence import failed."
