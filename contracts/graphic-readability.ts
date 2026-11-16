@@ -58,7 +58,12 @@ export function graphicReadabilityProblems(
   const step = clip.duration / samples;
   let hold = 0,
     longestHold = 0,
-    inFrame = false;
+    inFrame = false,
+    primaryReadable = !g.text,
+    secondaryReadable = !g.secondaryText;
+  // At a 360px short edge this is a 12px floor. Check secondary copy too:
+  // its default 60% scale must not make a crucial score illegible on a phone.
+  const minimumSize = Math.min(100, height) / 30;
   for (let i = 0; i < samples; i++) {
     const elapsed = clip.inPoint + i * step * (clip.speed ?? 1);
     const frame = graphicFrame(g, elapsed, graphicDuration);
@@ -84,8 +89,14 @@ export function graphicReadabilityProblems(
     );
     if (frame.opacity >= 0.75 && fits) {
       inFrame = true;
-      hold += step;
-      longestHold = Math.max(longestHold, hold);
+      const readablePrimary = !g.text || g.size * Math.abs(frame.scale) >= minimumSize;
+      const readableSecondary = !g.secondaryText || g.size * 0.6 * Math.abs(frame.scale) >= minimumSize;
+      primaryReadable ||= readablePrimary;
+      secondaryReadable ||= readableSecondary;
+      if (readablePrimary && readableSecondary) {
+        hold += step;
+        longestHold = Math.max(longestHold, hold);
+      } else hold = 0;
     } else hold = 0;
   }
   // A deliberately permissive floor, not a recommended reading rate. It catches
@@ -98,7 +109,10 @@ export function graphicReadabilityProblems(
     problems.push(
       `Graphic text never fits fully inside the frame: ${clip.label}`
     );
-  else if (longestHold + 1 / 30 < minimumHold)
+  else if (!primaryReadable || !secondaryReadable) {
+    if (!primaryReadable) problems.push(`Graphic text is too small for mobile delivery: ${clip.label}`);
+    if (!secondaryReadable) problems.push(`Graphic secondary text is too small for mobile delivery: ${clip.label}`);
+  } else if (longestHold + 1 / 30 < minimumHold)
     problems.push(
       `Graphic text has too little visible reading time: ${clip.label}`
     );

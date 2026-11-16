@@ -48,6 +48,7 @@ export function autonomousResultReceipt(
     "unsupported-source-copy": ui("Overlay adds unsupported text."),
     "competing-text": ui("Overlays overlap."),
     "reading-time": ui("Not enough reading time."),
+    "text-readability": ui("Overlay text is not readable."),
   };
   const skipped = ui("Skipped overlays: {count}.").replace(
     "{count}",

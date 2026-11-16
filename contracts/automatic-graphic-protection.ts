@@ -23,6 +23,7 @@ import {
 import { captionMotion, captionRuns } from "./caption-runs";
 import { captionMotionFrame } from "./caption-motion";
 import { normalizeTranscriptWords } from "./transcript-timing";
+import { graphicReadabilityProblems } from "./graphic-readability";
 
 export type AutomaticGraphicIntent = "automatic" | "requested" | "replace";
 export type AutomaticGraphicPolicy =
@@ -33,6 +34,7 @@ export type GraphicProtectionReason =
   | "repeated-source-text"
   | "competing-text"
   | "reading-time"
+  | "text-readability"
   | "unsupported-source-copy";
 export interface GraphicProtectionIssue {
   reason: GraphicProtectionReason;
@@ -605,6 +607,8 @@ export function automaticGraphicProblems(
   const record = (issue: GraphicProtectionIssue) => {
     if (!problems.has(issue.reason)) problems.set(issue.reason, issue);
   };
+  const readability = graphicReadabilityProblems(graphicClip, project.aspectRatio);
+  if (readability.length) record({ reason: "text-readability", detail: readability.join("; ") });
   if (intent === "automatic") {
     const sourceCopy = timedSpeechPhrases(
       project.transcript,

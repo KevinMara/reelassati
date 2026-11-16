@@ -121,6 +121,11 @@ and height control shapes, not text wrapping or a fixed callout box. A callout
 sizes to its real main and secondary lines plus padding. Keep its entire rendered
 box within the frame and away from platform UI, not merely its x/y anchor.
 For mobile, prefer brief copy at size 4..7; secondary copy is 60% of that size.
+Every visible text line must reach at least 3.34% of the canvas short edge during
+its settled hold (12px at a 360px viewing size). On portrait or square video,
+secondary copy therefore needs main size at least 5.6. Put the crucial comparison
+values in the primary hierarchy, not a tiny secondary score. Prefer a concise
+numeric label and meaningful geometry over repeating the spoken caption as a card.
 Shorten or omit secondary text before shrinking it into an unreadable footnote.
 Allow enough settled reading time (roughly four words per second, plus entry/exit)
 and a clear hold after entrance. Do not continuously drift or rotate information

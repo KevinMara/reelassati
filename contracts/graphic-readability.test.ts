@@ -27,6 +27,12 @@ const clip = {
 } as TimelineClip;
 
 describe("deterministic generated graphic checks", () => {
+  it("rejects tiny score copy even when its card fits and has strong contrast", () => {
+    const card = { ...clip, graphic: normalizeGraphic({ ...clip.graphic!, text: "rischio elevato", secondaryText: "1-4", size: 4, animation: "none" })! };
+    expect(graphicReadabilityProblems(card, "9:16")).toEqual(["Graphic secondary text is too small for mobile delivery: Score"]);
+    expect(graphicReadabilityProblems({ ...card, graphic: { ...card.graphic, text: "1-4", secondaryText: "", size: 5 } }, "9:16")).toEqual([]);
+    expect(graphicReadabilityProblems(card, "16:9")).toEqual([]);
+  });
   it("preserves usable edge-area anchors while checking the whole painted card", () => {
     const topGraphic = normalizeGraphic({
       ...clip.graphic!, text: "3 fasce", secondaryText: "", y: 6, size: 4,

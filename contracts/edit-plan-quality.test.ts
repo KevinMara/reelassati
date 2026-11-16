@@ -128,6 +128,33 @@ const checkpoint = () => undefined;
 const compile = (raw: unknown) => raw as EditOperation[];
 
 describe("bounded graphic quality correction", () => {
+  it("routes phone-illegible secondary copy through bounded repair while preserving the accepted grade", () => {
+    const small = {
+      ...safe,
+      parameters: {
+        ...safe.parameters,
+        graphic: normalizeGraphic({
+          ...safe.parameters.graphic!,
+          text: "30",
+          secondaryText: "domande",
+          size: 4,
+        }),
+      },
+    };
+    const original = [grade, small];
+    const review = reviewEditPlanGraphics(project, original, [asset], "", checkpoint);
+    expect(review.omitted).toHaveLength(1);
+    expect(review.omitted[0].issues.map(issue => issue.reason)).toContain("text-readability");
+    const feedback = editPlanGraphicFeedback(project, original, [asset], review, checkpoint);
+    expect(JSON.stringify(feedback)).toContain("too small for mobile delivery");
+    const repaired = mergeGraphicRefinement(original, review.omitted, {
+      summary: "Readable source-supported emphasis",
+      corrections: [{ operationId: small.id, operation: safe }],
+    }, compile);
+    expect(repaired.changes[0]).toBe(grade);
+    expect(reviewEditPlanGraphics(project, repaired.changes, [asset], "", checkpoint).omitted).toEqual([]);
+  });
+
   it("places a supported automatic card clear of the face without changing its content, timing or valid edits", () => {
     const blocked = {
       ...safe,
