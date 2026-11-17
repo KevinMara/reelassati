@@ -3,6 +3,7 @@ import {
   findCatalogAudio,
 } from "./editor-catalog-audio";
 import { visualTransitions } from "./clip-visual";
+import { isNativeTransitionKind } from "./native-transitions";
 import {
   normalizeSharedCatalogItem,
   sharedCatalogPlacement,
@@ -194,7 +195,10 @@ function actionValue(
       !finite(value.duration) ||
       value.duration < 0.05 ||
       value.duration > 5 ||
-      !visualTransitions.some(t => t.value === value.transition) ||
+      !(
+        isNativeTransitionKind(value.transition) ||
+        visualTransitions.some(t => t.value === value.transition)
+      ) ||
       value.credits !== 0
     )
       return undefined;

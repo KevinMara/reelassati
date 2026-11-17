@@ -23,6 +23,7 @@ import {
   type EditorChatContext,
 } from "../../sites/editor-chat";
 import { applyChatAction } from "./editor-chat-execution";
+import { normalizeEditorChatState } from "@contracts/editor-chat-state";
 import { automaticGraphicProblems } from "@contracts/automatic-graphic-protection";
 import { normalizeGraphic } from "@contracts/motion-graphics";
 
@@ -65,50 +66,77 @@ const apply = (p = source()) =>
   applyNativeAdjacentTransition(p, assets, "a", "b", "native-stretch", 0.4);
 
 describe("native transitions on real source handles", () => {
-  it("executes the same saved recipe from validated Reel chat actions", () => {
-    const p = source(),
-      context: EditorChatContext = {
-        request: {
-          requestId: "native-request",
-          projectId: p.id,
-          prompt: "Use elastic stretch between these shots",
-          mode: "ask",
-          maxCredits: 200,
+  it.each(["native-stretch", "native-slide"] as const)(
+    "persists and executes the %s action through the actual chat-state boundary",
+    transition => {
+      const p = source(),
+        context: EditorChatContext = {
+          request: {
+            requestId: "native-request",
+            projectId: p.id,
+            prompt: "Use elastic stretch between these shots",
+            mode: "ask",
+            maxCredits: 200,
+          },
+          project: p,
+          assets,
+          makeId: () => "native-action",
+          normalizeOperations: () => [],
+          quoteAudio: () => 0,
+          capability: () => true,
+        };
+      const plan = normalizeEditorChatPlan(
+        {
+          actions: [
+            {
+              id: "n",
+              kind: "adjacent-transition",
+              label: "Elastic stretch",
+              scope: "requested",
+              requestExcerpt: "Use elastic stretch between these shots",
+              dependsOn: [],
+              outgoingId: "a",
+              incomingId: "b",
+              transition,
+              duration: 0.4,
+            },
+          ],
         },
-        project: p,
-        assets,
-        makeId: () => "native-action",
-        normalizeOperations: () => [],
-        quoteAudio: () => 0,
-        capability: () => true,
-      };
-    const plan = normalizeEditorChatPlan(
-      {
-        actions: [
+        context
+      );
+      expect(plan.blockedReasons).toEqual([]);
+      expect(plan.actions).toHaveLength(1);
+      const state = normalizeEditorChatState({
+        messages: [
           {
-            id: "n",
-            kind: "adjacent-transition",
-            label: "Elastic stretch",
-            scope: "requested",
-            requestExcerpt: "Use elastic stretch between these shots",
-            dependsOn: [],
-            outgoingId: "a",
-            incomingId: "b",
-            transition: "native-stretch",
-            duration: 0.4,
+            id: "native-message",
+            role: "assistant",
+            text: "Preparing the transition",
+            createdAt: "2026-11-17T19:00:00.000Z",
+            status: "running",
+            plan,
           },
         ],
-      },
-      context
-    );
-    expect(plan.blockedReasons).toEqual([]);
-    expect(plan.actions).toHaveLength(1);
-    const edited = applyChatAction(p, plan.actions[0], assets);
-    expect(nativeTransitionRecipes(edited)[0].reference).toMatchObject({
-      id: "stretch",
-      duration: 0.4,
-    });
-  });
+      })!;
+      const persisted = normalizeEditorChatState(
+        JSON.parse(JSON.stringify(state))
+      )!;
+      const retained = persisted.messages[0].plan!.actions;
+      expect(retained).toHaveLength(1);
+      expect(retained[0]).toMatchObject({
+        kind: "adjacent-transition",
+        transition,
+        duration: 0.4,
+        status: "pending",
+        credits: 0,
+      });
+      const edited = applyChatAction(p, retained[0], assets);
+      expect(nativeTransitionRecipes(edited)[0].reference).toMatchObject({
+        id: transition === "native-stretch" ? "stretch" : "slide",
+        duration: 0.4,
+      });
+    }
+  );
   it("does not claim static free space for a new graphic over moving native picture", () => {
     const p = apply();
     const graphic: TimelineClip = {
