@@ -1,0 +1,311 @@
+import {
+  nativeSampleAt,
+  type NativeFrameProgram,
+} from "@contracts/native-frame-program";
+
+export type NativeImageInput =
+  TexImageSource | { width: number; height: number; pixels: Float32Array };
+const vertex = `#version 300 es
+in vec2 position;
+void main(){gl_Position=vec4(position,0.,1.);}`;
+const fragment = `#version 300 es
+precision highp float;
+precision highp int;
+uniform sampler2D imageA;
+uniform sampler2D imageB;
+uniform vec2 size;
+uniform int operation;
+uniform float weight;
+uniform vec2 center;
+uniform vec2 pivot;
+uniform vec2 scales;
+uniform float angle;
+uniform int edges;
+out vec4 result;
+int modulo(int p,int n){return ((p%n)+n)%n;}
+ivec2 mapped(ivec2 p){
+  ivec2 n=ivec2(size);
+  if(edges==1)return ivec2(modulo(p.x,n.x),modulo(p.y,n.y));
+  if(edges==3){ivec2 q=ivec2(modulo(p.x,2*n.x),modulo(p.y,2*n.y));return min(q,2*n-q-1);}
+  return clamp(p,ivec2(0),n-1);
+}
+vec4 pixel(ivec2 p){
+  if(edges==0&&(p.x<0||p.y<0||p.x>=int(size.x)||p.y>=int(size.y)))return vec4(0.);
+  return texelFetch(imageA,mapped(p),0);
+}
+float cubic(float x){
+  x=abs(x);
+  if(x<=1.)return (1.5*x-2.5)*x*x+1.;
+  if(x<2.)return ((-.5*x+2.5)*x-4.)*x+2.;
+  return 0.;
+}
+vec4 sampleImage(vec2 p){
+  ivec2 base=ivec2(floor(p));vec2 f=fract(p);vec4 sum=vec4(0.);
+  for(int y=-1;y<=2;y++)for(int x=-1;x<=2;x++)
+    sum+=pixel(base+ivec2(x,y))*cubic(float(x)-f.x)*cubic(float(y)-f.y);
+  return sum;
+}
+void main(){
+  ivec2 p=ivec2(gl_FragCoord.xy);
+  if(operation==0){result=texelFetch(imageA,ivec2(p.x,int(size.y)-1-p.y),0);return;}
+  if(operation==1){result=mix(texelFetch(imageA,p,0),texelFetch(imageB,p,0),weight);return;}
+  if(abs(scales.x)<1e-8||abs(scales.y)<1e-8){result=vec4(0.);return;}
+  // Textures retain top-down source rows. Native positive angles turn counter-clockwise.
+  vec2 d=gl_FragCoord.xy-vec2(center.x,1.-center.y)*size;
+  float c=cos(angle),s=sin(angle);
+  vec2 source=vec2((c*d.x-s*d.y)/scales.x,(s*d.x+c*d.y)/scales.y)
+    +vec2(pivot.x,1.-pivot.y)*size-.5;
+  result=sampleImage(source);
+}`;
+/** Shared browser/export frame renderer. Float intermediates preserve native
+ * overshoot and dissolve math; only the displayed/encoded frame is clamped.
+ * Input/output RGBA is premultiplied; transparent edges remain transparent. */
+export function createNativeFrameRenderer(
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  width: number,
+  height: number
+) {
+  if (![width, height].every(n => Number.isInteger(n) && n > 0 && n <= 8192))
+    throw new Error("Invalid native render dimensions");
+  canvas.width = width;
+  canvas.height = height;
+  const gl = canvas.getContext("webgl2", {
+    alpha: true,
+    premultipliedAlpha: true,
+    antialias: false,
+    preserveDrawingBuffer: true,
+  }) as WebGL2RenderingContext | null;
+  if (!gl || !gl.getExtension("EXT_color_buffer_float"))
+    throw new Error("This browser cannot render floating-point effects");
+  if (
+    width > gl.getParameter(gl.MAX_TEXTURE_SIZE) ||
+    height > gl.getParameter(gl.MAX_TEXTURE_SIZE)
+  )
+    throw new Error("Native effect exceeds GPU texture size");
+  const shader = (kind: number, source: string) => {
+    const s = gl.createShader(kind)!;
+    gl.shaderSource(s, source);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      const error = gl.getShaderInfoLog(s);
+      gl.deleteShader(s);
+      throw new Error(`Native renderer shader failed: ${error}`);
+    }
+    return s;
+  };
+  const vs = shader(gl.VERTEX_SHADER, vertex),
+    fs = shader(gl.FRAGMENT_SHADER, fragment);
+  const pipeline = gl.createProgram()!;
+  gl.attachShader(pipeline, vs);
+  gl.attachShader(pipeline, fs);
+  gl.linkProgram(pipeline);
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+  if (!gl.getProgramParameter(pipeline, gl.LINK_STATUS))
+    throw new Error("Native renderer shader could not link");
+  gl.useProgram(pipeline);
+  const buffer = gl.createBuffer()!;
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 3, -1, -1, 3]),
+    gl.STATIC_DRAW
+  );
+  const position = gl.getAttribLocation(pipeline, "position");
+  gl.enableVertexAttribArray(position);
+  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+  const uniforms = Object.fromEntries(
+    [
+      "imageA",
+      "imageB",
+      "size",
+      "operation",
+      "weight",
+      "center",
+      "pivot",
+      "scales",
+      "angle",
+      "edges",
+    ].map(n => [n, gl.getUniformLocation(pipeline, n)])
+  );
+  gl.uniform1i(uniforms.imageA, 0);
+  gl.uniform1i(uniforms.imageB, 1);
+  gl.uniform2f(uniforms.size, width, height);
+  gl.disable(gl.BLEND);
+  gl.disable(gl.DEPTH_TEST);
+  gl.viewport(0, 0, width, height);
+  const textures = new Map<string, WebGLTexture>(),
+    framebuffers = new Map<string, WebGLFramebuffer>();
+  let disposed = false,
+    output: string | undefined;
+  const texture = (id: string) => {
+    let t = textures.get(id);
+    if (t) return t;
+    t = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA32F,
+      width,
+      height,
+      0,
+      gl.RGBA,
+      gl.FLOAT,
+      null
+    );
+    textures.set(id, t);
+    return t;
+  };
+  const framebuffer = (id: string) => {
+    let f = framebuffers.get(id);
+    if (f) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      return f;
+    }
+    f = gl.createFramebuffer()!;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      texture(id),
+      0
+    );
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+      throw new Error("Native effect framebuffer is incomplete");
+    framebuffers.set(id, f);
+    return f;
+  };
+  const bind = (id: string, unit: number) => {
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, texture(id));
+  };
+  return {
+    render(
+      program: NativeFrameProgram,
+      inputs: [NativeImageInput, NativeImageInput],
+      frame: number
+    ) {
+      if (disposed || gl.isContextLost())
+        throw new Error("Native effect renderer is unavailable");
+      if (width * height * (program.nodes.length + 2) > 64_000_000)
+        throw new Error("Native effect exceeds this renderer's memory limit");
+      const needed = new Set([
+        ...program.inputs,
+        ...program.nodes.map(n => n.id),
+      ]);
+      for (const [id, t] of textures)
+        if (!needed.has(id)) {
+          gl.deleteTexture(t);
+          textures.delete(id);
+          const f = framebuffers.get(id);
+          if (f) gl.deleteFramebuffer(f);
+          framebuffers.delete(id);
+        }
+      gl.useProgram(pipeline);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      inputs.forEach((input, index) => {
+        bind(`input-${index}`, 0);
+        if ("pixels" in input) {
+          if (
+            input.width !== width ||
+            input.height !== height ||
+            input.pixels.length !== width * height * 4
+          )
+            throw new Error("Native input dimensions do not match");
+          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+          gl.texSubImage2D(
+            gl.TEXTURE_2D,
+            0,
+            0,
+            0,
+            width,
+            height,
+            gl.RGBA,
+            gl.FLOAT,
+            input.pixels
+          );
+        } else {
+          const w =
+            "videoWidth" in input
+              ? input.videoWidth
+              : "naturalWidth" in input
+                ? input.naturalWidth
+                : "displayWidth" in input
+                  ? input.displayWidth
+                  : input.width;
+          const h =
+            "videoHeight" in input
+              ? input.videoHeight
+              : "naturalHeight" in input
+                ? input.naturalHeight
+                : "displayHeight" in input
+                  ? input.displayHeight
+                  : input.height;
+          if (w !== width || h !== height)
+            throw new Error(
+              "Native input must be composed at the output size first"
+            );
+          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.FLOAT, input);
+        }
+      });
+      for (const node of program.nodes) {
+        framebuffer(node.id);
+        if (node.kind === "mix") {
+          bind(node.a, 0);
+          bind(node.b, 1);
+          gl.uniform1i(uniforms.operation, 1);
+          gl.uniform1f(
+            uniforms.weight,
+            nativeSampleAt(node.samples, frame).mix
+          );
+        } else {
+          const s = nativeSampleAt(node.samples, frame);
+          bind(node.input, 0);
+          bind(node.input, 1);
+          gl.uniform1i(uniforms.operation, 2);
+          gl.uniform2f(uniforms.center, ...s.center);
+          gl.uniform2f(uniforms.pivot, ...s.pivot);
+          gl.uniform2f(uniforms.scales, s.scaleX, s.scaleY);
+          gl.uniform1f(uniforms.angle, (s.angle * Math.PI) / 180);
+          gl.uniform1i(uniforms.edges, s.edges);
+        }
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+      output = program.output;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      bind(output, 0);
+      gl.uniform1i(uniforms.operation, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      const error = gl.getError();
+      if (error !== gl.NO_ERROR)
+        throw new Error(`Native effect GPU failed (${error})`);
+    },
+    readFloatFrame() {
+      if (disposed || !output) throw new Error("No native frame has rendered");
+      framebuffer(output);
+      const pixels = new Float32Array(width * height * 4);
+      gl.readPixels(0, 0, width, height, gl.RGBA, gl.FLOAT, pixels);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      return pixels;
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      for (const t of textures.values()) gl.deleteTexture(t);
+      for (const f of framebuffers.values()) gl.deleteFramebuffer(f);
+      gl.deleteBuffer(buffer);
+      gl.deleteProgram(pipeline);
+      textures.clear();
+      framebuffers.clear();
+    },
+  };
+}

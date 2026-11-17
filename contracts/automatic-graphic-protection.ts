@@ -573,6 +573,23 @@ export function automaticGraphicProblems(
       ),
     ];
   const effective = effectiveTimelineClips(project);
+  if (
+    effective.some(c => {
+      const native = c.shotTransition?.native;
+      return (
+        native &&
+        !c.hidden &&
+        c.start - native.duration / 2 <
+          graphicClip.start + graphicClip.duration &&
+        c.start + native.duration / 2 > graphicClip.start
+      );
+    })
+  )
+    return [
+      unknown(
+        "Place the graphic outside the shot transition; source layout moves during this whole-frame effect."
+      ),
+    ];
   const sources = effective
     .filter(
       clip =>

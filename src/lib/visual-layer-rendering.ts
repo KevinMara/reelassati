@@ -20,11 +20,33 @@ export function visualLayerSourceFilter(
     still: boolean;
     metadata?: RenderSourceMetadata;
     colorLuts?: ReadonlyMap<string, CubeLut>;
+    /** Select from one continuous FPS clock before expensive visual treatment.
+     * PTS is retained so motion curves keep their original phase. */
+    frameWindow?: { start: number; count: number };
   }
 ) {
   const { width, height, frameRate } = canvas;
+  const window = options.frameWindow;
+  if (
+    window &&
+    (!Number.isSafeInteger(window.start) ||
+      window.start < 0 ||
+      !Number.isSafeInteger(window.count) ||
+      window.count < 1)
+  )
+    throw new Error("Invalid source frame window");
+  const frameSelection = window
+    ? `:start_time=0:eof_action=pass,trim=start_frame=${window.start}:end_frame=${window.start + window.count}`
+    : "";
   const speed = clip.speed ?? 1;
   const trim = `start=${number(clip.inPoint)}:end=${number(clip.inPoint + clip.duration * speed)}`;
+  // Native batches retain absolute source PTS (including decoder preroll).
+  // FPS chooses frames on one source-relative clock, then frame indexes bound
+  // the effect. Resetting STARTPTS or trimming each input batch loses phase at
+  // fractional seeks and slow motion, and can omit valid terminal frames.
+  const clock = window
+    ? `setpts=(PTS-${number(clip.inPoint)}/TB)/${speed}`
+    : `trim=${trim},setpts=(PTS-STARTPTS)/${speed}`;
   const fit =
     clip.fit === "cover"
       ? `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`
@@ -57,5 +79,5 @@ export function visualLayerSourceFilter(
   ]
     .filter(Boolean)
     .join(",");
-  return `trim=${trim},setpts=(PTS-STARTPTS)/${speed},format=rgba,${fit},setsar=1,fps=${frameRate},${padding}${lut}${colorGradeFilter(clip, options.scope)}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB`;
+  return `${clock},format=rgba,${fit},setsar=1,fps=${frameRate}${frameSelection},${padding}${lut}${colorGradeFilter(clip, options.scope)}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB`;
 }

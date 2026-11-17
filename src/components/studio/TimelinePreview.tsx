@@ -1,4 +1,5 @@
 import { Magnet } from "lucide-react";
+import { useNativeTransitionPreviews } from "./useNativeTransitionPreviews";
 import {
   observePreviewReadiness,
   type PreviewReadiness,
@@ -336,8 +337,8 @@ function MediaLayer({
 }
 
 export function TimelinePreview({
-  project,
-  assets,
+  project: sourceProject,
+  assets: sourceAssets,
   time: requestedTime,
   playing,
   seekVersion = 0,
@@ -373,6 +374,12 @@ export function TimelinePreview({
     action: "fit" | "fill" | "flip" | "rotate" | "reset"
   ): Promise<void>;
 }) {
+  const nativePreview = useNativeTransitionPreviews(
+    sourceProject,
+    sourceAssets,
+    requestedTime
+  );
+  const { project, assets } = nativePreview;
   const time = previewEvaluationTime(
     requestedTime,
     project.duration,
@@ -381,6 +388,13 @@ export function TimelinePreview({
   const ui = useUiText();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [readiness, setReadiness] = useState<PreviewReadiness>("loading");
+  const nativeBlocked = useRef(nativePreview.blocked);
+  nativeBlocked.current = nativePreview.blocked;
+  const shownReadiness: PreviewReadiness = nativePreview.error
+    ? "error"
+    : nativePreview.blocked
+      ? "loading"
+      : readiness;
   const playbackIntent = useRef(playing);
   playbackIntent.current = playing;
   const readinessObserver = useRef<
@@ -393,7 +407,9 @@ export function TimelinePreview({
       (state, paused) => {
         setReadiness(current => (current === state ? current : state));
         onBufferingChange?.(
-          state !== "ready" || (playbackIntent.current && paused)
+          state !== "ready" ||
+            nativeBlocked.current ||
+            (playbackIntent.current && paused)
         );
       }
     );
@@ -489,7 +505,9 @@ export function TimelinePreview({
   );
   const selectionHeight = 1000 / aspect;
   const ids = selectedClipIds ?? (selectedClipId ? [selectedClipId] : []);
-  const visible = active.filter(c => c.track !== "audio" && !c.hidden);
+  const visible = active.filter(
+    c => c.track !== "audio" && !c.hidden && !nativePreview.renderIds.has(c.id)
+  );
   const selectedItems = visible.filter(c => ids.includes(c.id));
   const selected =
     selectedItems.find(c => c.id === selectedClipId) ?? selectedItems[0];
@@ -515,14 +533,17 @@ export function TimelinePreview({
       .filter((b): b is PreviewBounds => !!b)
   );
   const canTransform =
-    selectedItems.length > 0 && selectedItems.every(c => !c.locked);
+    !nativePreview.active &&
+    selectedItems.length > 0 &&
+    selectedItems.every(c => !c.locked);
   function begin(event: PointerEvent, resize = false) {
     if (
       event.button !== 0 ||
       event.altKey ||
       !onSelectClip ||
       !onTransform ||
-      playing
+      playing ||
+      nativePreview.active
     )
       return;
     const element = canvasRef.current!;
@@ -689,7 +710,7 @@ export function TimelinePreview({
         <div
           ref={canvasRef}
           data-preview-canvas
-          data-preview-readiness={readiness}
+          data-preview-readiness={shownReadiness}
           onLoadCapture={event => rememberMediaSize(event.target)}
           onLoadedMetadataCapture={event => rememberMediaSize(event.target)}
           className="relative mx-auto shrink-0 overflow-hidden bg-black"
@@ -722,49 +743,58 @@ export function TimelinePreview({
                 clip={clip}
                 asset={asset}
                 time={mediaActive ? time : clip.start}
-                playing={playing && mediaActive}
-                waitingForMedia={readiness !== "ready"}
+                playing={playing && mediaActive && !nativePreview.blocked}
+                waitingForMedia={shownReadiness !== "ready"}
                 active={mediaActive}
                 seekVersion={seekVersion}
                 trackGain={timelineTrackGain(project, clip)}
               />
             ) : null;
           })}
-          {readiness !== "ready" && (playing || readiness === "error") && (
-            <div
-              role="status"
-              className="absolute inset-0 z-40 flex items-center justify-center bg-black/20"
-            >
-              <div className="rounded-lg border border-white/10 bg-black/80 px-3 py-2 text-center text-xs text-white/90">
-                {readiness === "loading"
-                  ? ui("Loading preview…")
-                  : ui("Preview couldn't load.")}
-                {readiness === "error" && (
-                  <button
-                    type="button"
-                    className="pointer-events-auto ml-2 text-primary underline"
-                    onPointerDown={event => event.stopPropagation()}
-                    onClick={() => {
-                      canvasRef.current
-                        ?.querySelectorAll<HTMLMediaElement>("video,audio")
-                        .forEach(media => {
-                          if (media.error) media.load();
-                        });
-                      canvasRef.current
-                        ?.querySelectorAll<HTMLImageElement>("img")
-                        .forEach(image => {
-                          if (image.complete && !image.naturalWidth)
-                            image.src = image.src;
-                        });
-                      readinessObserver.current?.refresh();
-                    }}
-                  >
-                    {ui("Retry")}
-                  </button>
-                )}
+          {shownReadiness !== "ready" &&
+            (playing ||
+              shownReadiness === "error" ||
+              nativePreview.blocked) && (
+              <div
+                role="status"
+                className="absolute inset-0 z-40 flex items-center justify-center bg-black/20"
+              >
+                <div className="rounded-lg border border-white/10 bg-black/80 px-3 py-2 text-center text-xs text-white/90">
+                  {nativePreview.error ||
+                    (shownReadiness === "loading"
+                      ? ui(
+                          nativePreview.blocked
+                            ? "Preparing transition…"
+                            : "Loading preview…"
+                        )
+                      : ui("Preview couldn't load."))}
+                  {shownReadiness === "error" && (
+                    <button
+                      type="button"
+                      className="pointer-events-auto ml-2 text-primary underline"
+                      onPointerDown={event => event.stopPropagation()}
+                      onClick={() => {
+                        if (nativePreview.error) nativePreview.retry();
+                        canvasRef.current
+                          ?.querySelectorAll<HTMLMediaElement>("video,audio")
+                          .forEach(media => {
+                            if (media.error) media.load();
+                          });
+                        canvasRef.current
+                          ?.querySelectorAll<HTMLImageElement>("img")
+                          .forEach(image => {
+                            if (image.complete && !image.naturalWidth)
+                              image.src = image.src;
+                          });
+                        readinessObserver.current?.refresh();
+                      }}
+                    >
+                      {ui("Retry")}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
           {!active.length && (
             <p className="absolute inset-0 flex items-center justify-center p-8 text-center text-sm text-white/50">
               {project.clips.length

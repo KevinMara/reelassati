@@ -1,4 +1,5 @@
 import { isPrimaryFootage } from "@contracts/timeline-layers";
+import { applyShotTransition } from "@contracts/shot-transition";
 import { sharedCatalogClipDefaults } from "@contracts/shared-media-catalog";
 import { assertSupportingMedia } from "@contracts/supporting-media";
 import {
@@ -10,10 +11,7 @@ import { clipLaneKind } from "@contracts/timeline-layers";
 import { expandLinkedSelection } from "@contracts/clip-groups";
 import { mapTranscriptTime } from "@contracts/transcript-timing";
 import { projectSplitCaptions } from "./editor-manual";
-import {
-  applyAdjacentTransition,
-  assertNoShotTransition,
-} from "@contracts/adjacent-transition";
+import { assertNoShotTransition } from "@contracts/adjacent-transition";
 import type {
   Asset,
   EditProject,
@@ -232,7 +230,7 @@ export function applyChatAction(
       action.replacePath
     );
   } else if (action.kind === "adjacent-transition") {
-    next = applyAdjacentTransition(
+    next = applyShotTransition(
       project,
       assets,
       action.outgoingId,

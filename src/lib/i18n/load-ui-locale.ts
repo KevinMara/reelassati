@@ -1,4 +1,5 @@
 import { studioPolishUi } from "./locales/ui-studio-polish";
+import { nativeTransitionUi } from "./locales/ui-native-transitions";
 import { momentumCalendarUi } from "./locales/ui-momentum-calendar";
 import { captionMotionUi } from "./locales/ui-caption-motion";
 import { stockExpansionUi } from "./locales/ui-stock-expansion";
@@ -171,6 +172,7 @@ export function loadUiLocale(
       ...editorOct31Ui[code],
       ...editorNov1Ui[code],
       ...editorNov7Ui[code],
+      ...nativeTransitionUi[code],
     }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {

@@ -110,6 +110,15 @@ export function graphicPlanningSpace(
       clip.track !== "captions"
   );
   return intervals.map(interval => {
+    const movingLayout = project.clips.some(clip => {
+      const native = clip.shotTransition?.native;
+      return (
+        native &&
+        !clip.hidden &&
+        clip.start - native.duration / 2 < interval.end &&
+        clip.start + native.duration / 2 > interval.start
+      );
+    });
     const visible = footage.filter(
       clip =>
         clip.start < interval.end && clip.start + clip.duration > interval.start
@@ -122,6 +131,7 @@ export function graphicPlanningSpace(
       interval.end
     );
     const known =
+      !movingLayout &&
       interval.end > interval.start &&
       timelineCovered &&
       visible.length > 0 &&

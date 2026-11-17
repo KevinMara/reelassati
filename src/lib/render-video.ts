@@ -3,6 +3,8 @@ import { withFfmpegLease } from "./ffmpeg-lease";
 import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "./platform-api";
 import { buildRenderPlan } from "./render-plan";
+import { nativeTransitionRecipes } from "@contracts/native-transitions";
+import { materializeNativeTransition } from "@contracts/native-transition-materialize";
 import { probeExportMetadata } from "./export-probe";
 import {
   probeRenderSource,
@@ -40,6 +42,8 @@ async function renderVideoWithLease(
     format?: ExportFormat;
     signal: AbortSignal;
     onProgress: (percent: number, stage: string) => void;
+    /** Internal silent transition preview; uses the same native export path. */
+    nativePreviewOnly?: string;
     loadAsset?: (id: string, signal: AbortSignal) => Promise<Uint8Array>;
     loadLut?: (
       reference: ClipColorLut,
@@ -144,9 +148,106 @@ async function renderVideoWithLease(
       sourceMetadata.set(asset.id, metadata);
       if (metadata.hasAudio) audioIds.add(asset.id);
     }
+    for (const look of firstPlan.luts)
+      await ffmpeg.writeFile(look.file, serializeCubeLut(look.lut));
+    let renderProject = project,
+      renderAssets = assets;
+    const filenames = new Map(
+      firstPlan.inputs.map((asset, i) => [asset.id, `/sources/input-${i}`])
+    );
+    const nativeRecipes = nativeTransitionRecipes(project);
+    const renderingStart = nativeRecipes.length ? 35 : 15;
+    if (
+      options.nativePreviewOnly &&
+      !nativeRecipes.some(recipe => recipe.key === options.nativePreviewOnly)
+    )
+      throw new Error(
+        "The native transition changed before its preview was rendered"
+      );
+    for (const [index, recipe] of nativeRecipes.entries()) {
+      if (options.nativePreviewOnly && recipe.key !== options.nativePreviewOnly)
+        continue;
+      options.signal.throwIfAborted();
+      options.onProgress(
+        15 + Math.round((index / nativeRecipes.length) * 20),
+        "Preparing transition"
+      );
+      const { renderNativeTransition } =
+        await import("./render-native-transition");
+      const rendered = await renderNativeTransition(ffmpeg, recipe, {
+        assets,
+        filenames,
+        colorLuts,
+        width: firstPlan.width,
+        height: firstPlan.height,
+        frameRate: firstPlan.frameRate,
+        prefix: `native-${index}`,
+        signal: options.signal,
+        onProgress: (frame, total) =>
+          options.onProgress(
+            15 +
+              Math.round(((index + frame / total) / nativeRecipes.length) * 20),
+            "Rendering shot transition"
+          ),
+      });
+      if (options.nativePreviewOnly) {
+        const code = await ffmpeg.exec([
+          "-v",
+          "error",
+          "-y",
+          "-i",
+          rendered.filename,
+          "-an",
+          "-c:v",
+          "libx264",
+          "-preset",
+          "ultrafast",
+          "-crf",
+          "18",
+          "-pix_fmt",
+          "yuv420p",
+          "-movflags",
+          "+faststart",
+          "native-preview.mp4",
+        ]);
+        options.signal.throwIfAborted();
+        if (code !== 0)
+          throw new Error("The shot transition preview could not be encoded");
+        const verified = await probeExportMetadata(ffmpeg, {
+          filename: "native-preview.mp4",
+          width: rendered.width,
+          height: rendered.height,
+          duration: rendered.duration,
+          frameRate: firstPlan.frameRate,
+          format: "mp4",
+        });
+        const bytes = await ffmpeg.readFile("native-preview.mp4");
+        if (typeof bytes === "string")
+          throw new Error("The shot transition preview is empty");
+        verifyExportContainer(bytes, "mp4");
+        return {
+          file: new File(
+            [new Uint8Array(bytes).buffer],
+            "shot-transition.mp4",
+            { type: "video/mp4" }
+          ),
+          ...verified,
+          frameRate: firstPlan.frameRate,
+          format: "mp4" as const,
+        };
+      }
+      const materialized = materializeNativeTransition(renderProject, recipe, {
+        ...rendered,
+        url: "",
+      });
+      renderProject = materialized.project;
+      renderAssets = [...renderAssets, materialized.asset];
+      filenames.set(materialized.asset.id, rendered.filename);
+      sourceMetadata.set(materialized.asset.id, { hasAudio: false });
+    }
     const plan = buildRenderPlan(
-      project,
-      assets,
+      renderProject,
+      renderAssets,
       audioIds,
       {
         resolution: options.resolution,
@@ -156,20 +257,30 @@ async function renderVideoWithLease(
       sourceMetadata,
       colorLuts
     );
-    for (const look of plan.luts)
-      await ffmpeg.writeFile(look.file, serializeCubeLut(look.lut));
     await ffmpeg.writeFile("captions.ass", plan.ass);
     const renderProgress = ({ time }: { time: number }) =>
       options.onProgress(
         Math.max(
-          15,
-          Math.min(95, 15 + Math.round((time / 1_000_000 / plan.duration) * 80))
+          renderingStart,
+          Math.min(
+            95,
+            renderingStart +
+              Math.round(
+                (time / 1_000_000 / plan.duration) * (95 - renderingStart)
+              )
+          )
         ),
         "Rendering your video"
       );
     ffmpeg.on("progress", renderProgress);
     const code = await ffmpeg.exec(
-      plan.args.map(arg => (/^input-\d+$/.test(arg) ? `/sources/${arg}` : arg))
+      plan.args.map(arg => {
+        const match = /^input-(\d+)$/.exec(arg);
+        if (!match) return arg;
+        const filename = filenames.get(plan.inputs[Number(match[1])].id);
+        if (!filename) throw new Error("An export source is not mounted");
+        return filename;
+      })
     );
     options.signal.throwIfAborted();
     if (code !== 0)

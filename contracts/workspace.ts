@@ -124,6 +124,7 @@ export interface TimelineClip {
   transitionHandle?: boolean;
   /** Reversible generated transition; timing edits require removing it first. */
   shotTransition?: {
+    native?: import("./native-transitions").NativeTransitionReference;
     outgoingId: string;
     incomingId: string;
     incomingEntrance: import("./clip-visual").ClipVisual["entrance"];

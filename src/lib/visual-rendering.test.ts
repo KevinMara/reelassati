@@ -101,6 +101,47 @@ function checkZoomFrames(
     expect(actual[pixel + 2]).toBe(frame * 8);
   }
 }
+function checkPanFrames(
+  actual: Uint8Array,
+  reference: Uint8Array,
+  c: TimelineClip
+) {
+  const { width, height } = zoomCanvas,
+    stride = width * height * 4;
+  expect(actual.length).toBe(Math.round(c.duration * 10) * stride);
+  expect(actual.length).toBe(reference.length);
+  let maxColorDifference = 0,
+    maxEdgeDisplacement = 0;
+  for (let frame = 0; frame < actual.length / stride; frame++) {
+    const pose = visualFrame(c, c.start + frame / 10);
+    const left = width * (0.5 + pose.x / 100 - pose.scale / 2),
+      right = left + width * pose.scale,
+      top = height * (0.5 + pose.y / 100 - pose.scale / 2),
+      bottom = top + height * pose.scale;
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const i = frame * stride + (y * width + x) * 4;
+        if (actual[i + 3] !== reference[i + 3])
+          maxEdgeDisplacement = Math.max(
+            maxEdgeDisplacement,
+            Math.min(
+              Math.abs(x + 0.5 - left),
+              Math.abs(x + 0.5 - right),
+              Math.abs(y + 0.5 - top),
+              Math.abs(y + 0.5 - bottom)
+            )
+          );
+        if (actual[i + 3] === 255 && reference[i + 3] === 255)
+          for (let channel = 0; channel < 3; channel++)
+            maxColorDifference = Math.max(
+              maxColorDifference,
+              Math.abs(actual[i + channel] - reference[i + channel])
+            );
+      }
+  }
+  expect(maxEdgeDisplacement).toBeLessThanOrEqual(1.5);
+  expect(maxColorDifference).toBeLessThanOrEqual(8);
+}
 function pixel(c: TimelineClip, time: number, x: number, y: number) {
   const output = execFileSync(
     "ffmpeg",
@@ -168,9 +209,6 @@ describe("footage transforms and visual transitions", () => {
     );
   }, 15000);
   it.each([
-    { x: 1 },
-    { y: 1 },
-    { scale: 0.99 },
     { rotation: 1 },
     { opacity: 0.99 },
     { crop: { left: 1 } },
@@ -179,19 +217,40 @@ describe("footage transforms and visual transitions", () => {
     { flipY: true },
     { entrance: { kind: "dissolve" } },
     { exit: { kind: "zoom" } },
-    {
-      keyframes: [
-        { at: 0, scale: 1 },
-        { at: 1, scale: 1.06, x: 5 },
-      ],
-    },
   ])(
-    "retains inverse sampling for uncovered or alpha-changing animation: %j",
+    "retains inverse sampling for masked, rotated or alpha-changing animation: %j",
     patch => {
       const c = zoomClip();
       c.visual = normalizeVisual({ ...c.visual, ...patch });
       expect(visualRenderFilter(c, zoomCanvas)).toContain("geq");
     }
+  );
+  it.each(["linear", "ease-in-out", "hold"])(
+    "preserves exposed edges and source phase for an animated %s pan",
+    easing => {
+      const c = {
+        ...clip,
+        inPoint: 1.2,
+        outPoint: 2.2,
+        duration: 2,
+        speed: 0.5,
+        visualStart: 1,
+        visualDuration: 1.2,
+        visual: normalizeVisual({
+          keyframes: [
+            { at: 0, x: -5, y: 3, scale: 0.7, easing },
+            { at: 1, x: 5, y: -3, scale: 1.05 },
+          ],
+        }),
+      };
+      expect(visualRenderFilter(c, zoomCanvas)).not.toContain("geq");
+      checkPanFrames(
+        execFileSync("ffmpeg", zoomArgs(c, true), { maxBuffer: 8_000_000 }),
+        execFileSync("ffmpeg", zoomArgs(c, false), { maxBuffer: 8_000_000 }),
+        c
+      );
+    },
+    15000
   );
   it.each(["linear", "ease-in", "ease-out", "ease-in-out", "hold"])(
     "matches a fully covering translated push-in with %s timing",
@@ -224,7 +283,7 @@ describe("footage transforms and visual transitions", () => {
     ])
       expect(visualRenderFilter(zoomClip(), canvas)).toContain("geq");
   });
-  it("runs the same centered zoom and retained clock in the installed browser WASM core", async () => {
+  it("runs centered zooms and exposed-edge pans on the retained clock in the installed browser WASM core", async () => {
     vi.stubGlobal("self", { location: { href: "file:///ffmpeg-core.js" } });
     try {
       const require = createRequire(import.meta.url);
@@ -261,10 +320,28 @@ describe("footage transforms and visual transitions", () => {
         }
         checkZoomFrames(frames[0], frames[1], sample, sample === c ? 4 : 6);
       }
+      const pan = {
+        ...c,
+        visual: normalizeVisual({
+          keyframes: [
+            { at: 0, x: 0, scale: 1 },
+            { at: 1, x: 5, scale: 1.05 },
+          ],
+        }),
+      };
+      const frames = [];
+      for (const optimized of [true, false]) {
+        core.exec(...zoomArgs(pan, optimized, "pan.rgba"));
+        expect(core.ret).toBe(0);
+        core.reset();
+        frames.push((core.FS.readFile("pan.rgba") as Uint8Array).slice());
+        core.FS.unlink("pan.rgba");
+      }
+      checkPanFrames(frames[0], frames[1], pan);
     } finally {
       vi.unstubAllGlobals();
     }
-  }, 15000);
+  }, 30000);
   it("starts centered dissolves at half alpha for fractional-frame durations", () => {
     for (const duration of [0.05, 0.15, 0.35]) {
       const c = {

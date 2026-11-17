@@ -42,6 +42,7 @@ import { CaptionFileTools } from "@/components/studio/CaptionFileTools";
 import { ClipInspector } from "@/components/studio/ClipInspector";
 import { ObjectTrackingPanel } from "@/components/studio/ObjectTrackingPanel";
 import { ShotTransitionPanel } from "@/components/studio/ShotTransitionPanel";
+import { applyShotTransition } from "@contracts/shot-transition";
 import { TimelineMixer } from "@/components/studio/TimelineMixer";
 import { RhythmTools } from "@/components/studio/RhythmTools";
 import { ClipTimingTools } from "@/components/studio/ClipTimingTools";
@@ -78,7 +79,6 @@ import {
   reorderTimelineTrack,
 } from "@contracts/timeline-mixer";
 import {
-  applyAdjacentTransition,
   removeAdjacentTransition,
   transitionFreeClip,
 } from "@contracts/adjacent-transition";
@@ -2377,7 +2377,7 @@ export default function EditorPage() {
         onApply={async (incomingId, kind, duration) => {
           if (!selectedClip) return;
           await commitProject(`Applied ${kind} between shots`, p =>
-            applyAdjacentTransition(
+            applyShotTransition(
               p,
               workspace.assets,
               selectedClip.id,

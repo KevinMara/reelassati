@@ -8,24 +8,25 @@ import {
   adjacentTransitionHandleIds,
   applyAdjacentTransition,
 } from "./adjacent-transition";
-import {
-  visualClock,
-  visualTransitions,
-  type VisualTransition,
-} from "./clip-visual";
+import { visualClock, visualTransitions } from "./clip-visual";
 import { effectiveTimelineClips } from "./timeline-mixer";
 import {
   normalizeTransitionPresets,
   TRANSITION_PRESETS,
   type TransitionPreset,
 } from "./transition-presets";
+import { isNativeTransitionKind } from "./native-transitions";
+import {
+  applyShotTransition,
+  type ShotTransitionKind,
+} from "./shot-transition";
 
 export interface AutonomousTransition {
   outgoingId: string;
   incomingId: string;
   /** The intended boundary on the proposal's original timeline, before cuts. */
   cutTime: number;
-  kind: VisualTransition;
+  kind: ShotTransitionKind;
   /** Canonical zero for removal; the planner may omit duration when kind=none. */
   duration: number;
 }
@@ -89,7 +90,10 @@ export function normalizeAutonomousTransition(
     row.incomingId.length > 160 ||
     !finite(row.cutTime) ||
     row.cutTime <= 0 ||
-    !visualTransitions.some(t => t.value === kind) ||
+    !(
+      isNativeTransitionKind(kind) ||
+      visualTransitions.some(t => t.value === kind)
+    ) ||
     !finite(duration) ||
     (kind === "none"
       ? duration !== 0 || row.outgoingId === row.incomingId
@@ -173,8 +177,10 @@ export function buildAutonomousTransitionContext(
         cutTime: incoming.start,
         start: outgoing.start,
         end: incoming.start + incoming.duration,
-        kind: incoming.visual?.entrance.kind,
-        duration: incoming.visual?.entrance.duration,
+        kind: pair.native
+          ? `native-${pair.native.id}`
+          : incoming.visual?.entrance.kind,
+        duration: pair.native?.duration ?? incoming.visual?.entrance.duration,
         locked:
           outgoing.locked ||
           incoming.locked ||
@@ -375,7 +381,7 @@ export function applyAutonomousTransition(
       "The original transition cut does not identify one surviving adjacent shot pair."
     );
   const { left, right } = pairs[0];
-  const next = applyAdjacentTransition(
+  const next = applyShotTransition(
     working,
     assets,
     left.id,
@@ -386,4 +392,4 @@ export function applyAutonomousTransition(
   return accepted(next);
 }
 
-export const AUTONOMOUS_TRANSITION_GUIDANCE = `A genuine adjacent-shot transition uses type=transition and parameters.transition:{outgoingId,incomingId,cutTime,kind,duration}. cutTime is the intended cut on the ORIGINAL timeline; use the supplied transitionCuts and transitionSources. targetClipIds must be exactly those source IDs (one ID when both are the same). For creation, start/end are cutTime-duration/2 and cutTime+duration/2, or omit both for the compiler to supply them. kind is dissolve|wipe-left|wipe-right|wipe-up|wipe-down|slide-left|slide-right|zoom; duration is 0.05..5 seconds and must fit measured source handles and both surviving shot bodies. Instead of kind/duration, parameters.transition.presetId may select an exact transitionPresets ID; do not invent presets. A transition is applied after cuts and local treatments, with silent source handles, unchanged speech/caption timing and unchanged total length. A same-source cut requires the same outgoingId/incomingId plus an explicit cutTime and a separate evidenced split or ripple cut that creates that boundary. No boundary is created by the transition itself. Existing transitions are listed in existingTransitions. Before changing their shots' timing, splitting or restyling, explicitly remove that exact pair with type=transition, parameters.transition:{outgoingId,incomingId,cutTime,kind:none}; omit duration (canonical zero). Removal uses the supplied existing pair's full start/end range, or omit both for compilation. Removal executes first; a separate creation operation may recreate the transition after the new cut. Never silently remove a transition or target only part of its shots for removal. Missing handles, locked shots/handles, overlapping picture layers, conflicting source-audio fades or an ambiguous surviving cut are unsupported; retain a straight cut and explain the limitation instead. Source handles contain real footage, never frozen or fabricated frames. Transitions may connect a sequence when their handles do not overlap. Use only motivated transitions; no transition quota or effect on every cut. Single-clip visual entrance/exit controls are not adjacent-shot crossfades.`;
+export const AUTONOMOUS_TRANSITION_GUIDANCE = `A genuine adjacent-shot transition uses type=transition and parameters.transition:{outgoingId,incomingId,cutTime,kind,duration}. cutTime is the intended cut on the ORIGINAL timeline; use the supplied transitionCuts and transitionSources. targetClipIds must be exactly those source IDs (one ID when both are the same). For creation, start/end are cutTime-duration/2 and cutTime+duration/2, or omit both for the compiler to supply them. kind is dissolve|wipe-left|wipe-right|wipe-up|wipe-down|slide-left|slide-right|zoom|native-stretch|native-slide; duration is 0.05..5 seconds and must fit measured source handles and both surviving shot bodies. Instead of kind/duration, parameters.transition.presetId may select an exact transitionPresets ID; do not invent presets. A transition is applied after cuts and local treatments, with silent source handles, unchanged speech/caption timing and unchanged total length. A same-source cut requires the same outgoingId/incomingId plus an explicit cutTime and a separate evidenced split or ripple cut that creates that boundary. No boundary is created by the transition itself. Existing transitions are listed in existingTransitions. Before changing their shots' timing, splitting or restyling, explicitly remove that exact pair with type=transition, parameters.transition:{outgoingId,incomingId,cutTime,kind:none}; omit duration (canonical zero). Removal uses the supplied existing pair's full start/end range, or omit both for compilation. Removal executes first; a separate creation operation may recreate the transition after the new cut. Never silently remove a transition or target only part of its shots for removal. Missing handles, locked shots/handles, overlapping picture layers, conflicting source-audio fades or an ambiguous surviving cut are unsupported; retain a straight cut and explain the limitation instead. Source handles contain real footage, never frozen or fabricated frames. Transitions may connect a sequence when their handles do not overlap. Native-stretch is an authored horizontal elastic stretch and dissolve; native-slide moves both shots through an intentional black midpoint. Use native-slide only when a dip through black serves the brief; never for uninterrupted picture. Keep new explanatory graphics outside these moving-frame windows. Native effects render locally from actual source footage, with no additional model or video service. Use only motivated transitions; no transition quota or effect on every cut. Single-clip visual entrance/exit controls are not adjacent-shot crossfades.`;

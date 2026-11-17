@@ -161,6 +161,51 @@ export function visualRenderFilter(
     // Coverage is a convex constraint, so covered endpoints cover every frame.
     return `format=rgba,scale=w='${width}':h='${height}':eval=frame:flags=bilinear,crop=${canvas!.width}:${canvas!.height}:x='(${width}-${canvas!.width})/2-${canvas!.width}*(${shiftX})/100':y='(${height}-${canvas!.height})/2-${canvas!.height}*(${shiftY})/100',setsar=1`;
   }
+  // Plain animated pans can expose canvas edges. A fixed transparent work
+  // surface keeps those edges without evaluating the affine curve for every
+  // channel of every pixel. Bound its area; large poses keep inverse sampling.
+  const poses = [v, ...v.keyframes];
+  const paddedWidth = canvas
+    ? 2 *
+      Math.ceil(
+        (canvas.width * Math.max(1, ...poses.map(p => p.scale)) +
+          (2 * canvas.width * Math.max(...poses.map(p => Math.abs(p.x)))) /
+            100 +
+          4) /
+          2
+      )
+    : 0;
+  const paddedHeight = canvas
+    ? 2 *
+      Math.ceil(
+        (canvas.height * Math.max(1, ...poses.map(p => p.scale)) +
+          (2 * canvas.height * Math.max(...poses.map(p => Math.abs(p.y)))) /
+            100 +
+          4) /
+          2
+      )
+    : 0;
+  if (
+    canvas &&
+    canvas.width > 0 &&
+    canvas.height > 0 &&
+    canvas.width % 2 === 0 &&
+    canvas.height % 2 === 0 &&
+    v.keyframes.length > 0 &&
+    poses.every(p => p.rotation === 0 && p.opacity === 1) &&
+    !v.flipX &&
+    !v.flipY &&
+    !Object.values(v.crop).some(Boolean) &&
+    v.mask === "none" &&
+    v.entrance.kind === "none" &&
+    v.exit.kind === "none" &&
+    paddedWidth * paddedHeight <= canvas.width * canvas.height * 4
+  ) {
+    const zoom = scale.replace(/\bT\b/g, "t"),
+      shiftX = x.replace(/\bT\b/g, "t"),
+      shiftY = y.replace(/\bT\b/g, "t");
+    return `format=rgba,scale=w='max(2,2*round(${canvas.width}*(${zoom})/2))':h='max(2,2*round(${canvas.height}*(${zoom})/2))':eval=frame:flags=bilinear,pad=${paddedWidth}:${paddedHeight}:(ow-iw)/2:(oh-ih)/2:color=black@0:eval=frame,crop=${canvas.width}:${canvas.height}:x='(${paddedWidth}-${canvas.width})/2-${canvas.width}*(${shiftX})/100':y='(${paddedHeight}-${canvas.height})/2-${canvas.height}*(${shiftY})/100',setsar=1`;
+  }
   const plainGeometry =
     !v.keyframes.length &&
     v.x === 0 &&

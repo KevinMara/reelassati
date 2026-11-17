@@ -2,17 +2,17 @@ import { useWorkspace } from "@/providers/workspace";
 import {
   TRANSITION_PRESETS,
   normalizeTransitionPresets,
+  shotTransitions,
 } from "@contracts/transition-presets";
+import type { ShotTransitionKind } from "@contracts/shot-transition";
+import { isNativeTransitionKind } from "@contracts/native-transitions";
+import { NativeTransitionPreview } from "./NativeTransitionPreview";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { Download, Upload } from "lucide-react";
 import { useUiText } from "@/lib/i18n/ui";
 import { useRef, useState } from "react";
 import { CompactSelect } from "@/components/ui/compact-select";
 import { PresetPreview } from "./PresetPreview";
-import {
-  visualTransitions,
-  type VisualTransition,
-} from "@contracts/clip-visual";
 import type { EditProject, TimelineClip } from "@contracts/workspace";
 
 export function ShotTransitionPanel({
@@ -27,7 +27,7 @@ export function ShotTransitionPanel({
   disabled: boolean;
   onApply: (
     incomingId: string,
-    kind: Exclude<VisualTransition, "none">,
+    kind: Exclude<ShotTransitionKind, "none">,
     duration: number
   ) => Promise<void>;
   onRemove: (outgoingId: string, incomingId: string) => Promise<void>;
@@ -40,7 +40,7 @@ export function ShotTransitionPanel({
   const importInput = useRef<HTMLInputElement>(null);
   const personal = normalizeTransitionPresets(workspace.transitionPresets);
   const [kind, setKind] =
-    useState<Exclude<VisualTransition, "none">>("dissolve");
+    useState<Exclude<ShotTransitionKind, "none">>("dissolve");
   const [seconds, setSeconds] = useState(0.4),
     [error, setError] = useState("");
   const pair = project.clips.find(
@@ -82,11 +82,18 @@ export function ShotTransitionPanel({
             key={p.id}
             className="min-w-0 rounded-lg border border-border p-1.5"
           >
-            <PresetPreview
-              name={`${ui(p.name)} · ${p.duration}s`}
-              transition={p.kind}
-              seconds={p.duration}
-            />
+            {isNativeTransitionKind(p.kind) ? (
+              <NativeTransitionPreview
+                id={p.kind === "native-stretch" ? "stretch" : "slide"}
+                seconds={p.duration}
+              />
+            ) : (
+              <PresetPreview
+                name={`${ui(p.name)} · ${p.duration}s`}
+                transition={p.kind}
+                seconds={p.duration}
+              />
+            )}
             <button
               key={p.id}
               type="button"
@@ -275,9 +282,16 @@ export function ShotTransitionPanel({
         aria-label={ui("Transition between shots")}
         value={kind}
         onValueChange={v => setKind(v as typeof kind)}
-        options={visualTransitions.filter(v => v.value !== "none")}
+        options={shotTransitions}
         disabled={disabled || saving}
       />
+      {isNativeTransitionKind(kind) && (
+        <p className="text-xs text-foreground/65">
+          {kind === "native-stretch"
+            ? ui("Stretches and blends both shots.")
+            : ui("Slides through an intentional black midpoint.")}
+        </p>
+      )}
       <label className="block text-xs">
         {ui("Duration")}{" "}
         <input

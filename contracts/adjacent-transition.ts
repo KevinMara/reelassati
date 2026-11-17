@@ -300,12 +300,14 @@ export function applyAdjacentTransition(
     primaryFootage: isPrimaryFootage(incoming),
     transitionHandle: false,
     lane: Math.max(clipLaneNumber(outgoing) + 1, clipLaneNumber(incoming)),
-    shotTransition: incoming.shotTransition ?? {
-      outgoingId,
-      incomingId,
-      incomingEntrance: normalizeVisual(incoming.visual).entrance,
-      outgoingExit: normalizeVisual(outgoing.visual).exit,
-    },
+    shotTransition: incoming.shotTransition
+      ? { ...incoming.shotTransition, native: undefined }
+      : {
+          outgoingId,
+          incomingId,
+          incomingEntrance: normalizeVisual(incoming.visual).entrance,
+          outgoingExit: normalizeVisual(outgoing.visual).exit,
+        },
     visual: normalizeVisual({
       ...normalizeVisual(incoming.visual),
       entrance: { kind, duration, at: incoming.inPoint - half * si },

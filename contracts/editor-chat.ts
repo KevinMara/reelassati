@@ -82,7 +82,7 @@ export type EditorChatAction = EditorChatActionBase &
         kind: "adjacent-transition";
         outgoingId: string;
         incomingId: string;
-        transition: import("./clip-visual").VisualTransition;
+        transition: import("./shot-transition").ShotTransitionKind;
         duration: number;
       }
     | {
