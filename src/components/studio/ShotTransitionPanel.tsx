@@ -15,13 +15,7 @@ import { CompactSelect } from "@/components/ui/compact-select";
 import { PresetPreview } from "./PresetPreview";
 import type { EditProject, TimelineClip } from "@contracts/workspace";
 
-export function ShotTransitionPanel({
-  clip,
-  project,
-  disabled,
-  onApply,
-  onRemove,
-}: {
+type ShotTransitionPanelProps = {
   clip?: TimelineClip;
   project: EditProject;
   disabled: boolean;
@@ -31,6 +25,53 @@ export function ShotTransitionPanel({
     duration: number
   ) => Promise<void>;
   onRemove: (outgoingId: string, incomingId: string) => Promise<void>;
+};
+
+export function ShotTransitionPanel(props: ShotTransitionPanelProps) {
+  const incoming = props.project.clips.find(
+    c =>
+      c.shotTransition &&
+      (c.shotTransition.outgoingId === props.clip?.id ||
+        c.shotTransition.incomingId === props.clip?.id)
+  );
+  const pair = incoming?.shotTransition;
+  const savedKind: ShotTransitionKind | undefined = pair?.native
+    ? `native-${pair.native.id}`
+    : incoming?.visual?.entrance.kind;
+  const initialKind =
+    savedKind && savedKind !== "none" ? savedKind : "dissolve";
+  const initialSeconds =
+    pair?.native?.duration ?? incoming?.visual?.entrance.duration ?? 0.4;
+  // Reset the editable draft only when the selected pair or its saved effect changes.
+  // Ordinary project saves must not discard a user's un-applied control changes.
+  const key = [
+    props.clip?.id,
+    pair?.outgoingId,
+    pair?.incomingId,
+    initialKind,
+    initialSeconds,
+  ].join(":");
+  return (
+    <ShotTransitionControls
+      key={key}
+      {...props}
+      initialKind={initialKind}
+      initialSeconds={initialSeconds}
+    />
+  );
+}
+
+function ShotTransitionControls({
+  clip,
+  project,
+  disabled,
+  onApply,
+  onRemove,
+  initialKind,
+  initialSeconds,
+}: ShotTransitionPanelProps & {
+  initialKind: Exclude<ShotTransitionKind, "none">;
+  initialSeconds: number;
 }) {
   const ui = useUiText();
   const { workspace, updateWorkspace } = useWorkspace();
@@ -40,8 +81,8 @@ export function ShotTransitionPanel({
   const importInput = useRef<HTMLInputElement>(null);
   const personal = normalizeTransitionPresets(workspace.transitionPresets);
   const [kind, setKind] =
-    useState<Exclude<ShotTransitionKind, "none">>("dissolve");
-  const [seconds, setSeconds] = useState(0.4),
+    useState<Exclude<ShotTransitionKind, "none">>(initialKind);
+  const [seconds, setSeconds] = useState(initialSeconds),
     [error, setError] = useState("");
   const pair = project.clips.find(
     c =>
