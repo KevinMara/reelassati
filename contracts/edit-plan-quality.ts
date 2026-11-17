@@ -1,3 +1,4 @@
+import { projectedSourceRegions } from "./graphic-planning-space";
 import type { Asset, EditOperation, EditProject } from "./workspace";
 import type { StockMedia } from "./stock-media";
 import { editorAudioCatalog } from "./editor-audio-catalog";
@@ -8,9 +9,6 @@ import {
   type AutonomousGraphicDecision,
   type AutonomousGraphicReview,
 } from "./autonomous-execution";
-import { protectedSourceBounds } from "./automatic-graphic-protection";
-import { normalizeSourceVisualEvidence } from "./source-visual-evidence";
-import { effectiveTimelineClips } from "./timeline-mixer";
 import { normalizeGraphic } from "./motion-graphics";
 import { graphicLayoutSpace } from "./graphic-layout-space";
 
@@ -212,60 +210,7 @@ export function editPlanGraphicFeedback(
   checkpoint: () => void
 ) {
   const { draft } = draftAutonomousPlan(project, changes, assets, checkpoint);
-  const [width, height] = draft.aspectRatio.split(":").map(Number);
-  const canvas = { width: 1000, height: (1000 * height) / width };
-  const protectedRegions = effectiveTimelineClips(draft).flatMap(clip => {
-    checkpoint();
-    const asset = assets.find(item => item.id === clip.assetId);
-    if (!asset?.width || !asset.height) return [];
-    const evidence = normalizeSourceVisualEvidence(
-      draft.sourceReviews?.find(item => item.assetId === clip.assetId)
-        ?.visualProtection,
-      asset.duration
-    );
-    return (evidence?.regions ?? []).flatMap(region => {
-      const start = Math.max(
-        clip.start,
-        clip.start + (region.start - clip.inPoint) / (clip.speed ?? 1)
-      );
-      const end = Math.min(
-        clip.start + clip.duration,
-        clip.start + (region.end - clip.inPoint) / (clip.speed ?? 1)
-      );
-      if (end <= start) return [];
-      return [
-        {
-          sourceClipId: clip.id,
-          assetId: asset.id,
-          regionId: region.id,
-          kind: region.kind,
-          start,
-          end,
-          sourceRect: region.rect,
-          samples: [start, (start + end) / 2, Math.max(start, end - 0.001)].map(
-            time => {
-              const rect = protectedSourceBounds(
-                clip,
-                time,
-                region.rect,
-                { width: asset.width!, height: asset.height! },
-                canvas
-              );
-              return {
-                time,
-                canvasPercent: rect && {
-                  x: (rect.x / canvas.width) * 100,
-                  y: (rect.y / canvas.height) * 100,
-                  width: (rect.width / canvas.width) * 100,
-                  height: (rect.height / canvas.height) * 100,
-                },
-              };
-            }
-          ),
-        },
-      ];
-    });
-  });
+  const protectedRegions = projectedSourceRegions(draft, assets, checkpoint);
   return {
     rejected: review.omitted.map(decision => ({
       ...decision,
@@ -273,13 +218,32 @@ export function editPlanGraphicFeedback(
         operation => operation.id === decision.operationId
       ),
       layoutCandidates: (() => {
-        if (decision.issues.some(issue => issue.reason === "unknown-source-layout")) return [];
-        const operation = changes.find(item => item.id === decision.operationId);
+        if (
+          decision.issues.some(
+            issue => issue.reason === "unknown-source-layout"
+          )
+        )
+          return [];
+        const operation = changes.find(
+          item => item.id === decision.operationId
+        );
         if (!operation) return [];
-        const regions = protectedRegions.filter(region => region.start < operation.end && region.end > operation.start);
-        if (regions.some(region => region.samples.some(sample => !sample.canvasPercent))) return [];
-        return graphicLayoutSpace(regions.flatMap(region => region.samples.flatMap(sample =>
-          sample.canvasPercent ? [sample.canvasPercent] : [])));
+        const regions = protectedRegions.filter(
+          region => region.start < operation.end && region.end > operation.start
+        );
+        if (
+          regions.some(region =>
+            region.samples.some(sample => !sample.canvasPercent)
+          )
+        )
+          return [];
+        return graphicLayoutSpace(
+          regions.flatMap(region =>
+            region.samples.flatMap(sample =>
+              sample.canvasPercent ? [sample.canvasPercent] : []
+            )
+          )
+        );
       })(),
     })),
     immutableChanges: changes.filter(

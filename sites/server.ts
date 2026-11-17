@@ -6190,13 +6190,18 @@ async function handleAi(
         await assertAllowedCreativeUse(env, user, input.prompt, project.id);
         // R2 is read only after ownership verification and the durable claim; retries replay the result.
         const mediaParts: ModelContentPart[] = [
-          ...(input.task === "story-sections" ? [] : await editorSourceMedia(
-            project,
-            { owned: id => getAssetRow(env, user, id), read: key => env.BUCKET.get(key) },
-            request.signal,
-            input.selectedClipIds,
-            input.range,
-          )),
+          ...(input.task === "story-sections"
+            ? []
+            : await editorSourceMedia(
+                project,
+                {
+                  owned: id => getAssetRow(env, user, id),
+                  read: key => env.BUCKET.get(key),
+                },
+                request.signal,
+                input.selectedClipIds,
+                input.range
+              )),
           ...catalogEvidence.parts,
         ];
         let totalImageBytes = 0;
@@ -6956,6 +6961,7 @@ async function handleAi(
       transcript: input.project.transcript,
       speechEvidence: planningContext.speechEvidence,
       scenes: planningContext.scenes,
+      graphicLayout: planningContext.graphicLayout,
       planningClock: planningContext.clock,
       ...(transitionPlanning
         ? {
@@ -7033,13 +7039,16 @@ async function handleAi(
       },
       async reservation => {
         const planningMediaParts: ModelContentPart[] = [
-          ...await editorSourceMedia(
+          ...(await editorSourceMedia(
             project,
-            { owned: id => getAssetRow(env, user, id), read: key => env.BUCKET.get(key) },
+            {
+              owned: id => getAssetRow(env, user, id),
+              read: key => env.BUCKET.get(key),
+            },
             analysisControl.signal,
             input.selectedClipIds,
-            input.range,
-          ),
+            input.range
+          )),
           ...catalogEvidence.parts,
         ];
         let { output, invocation } = await chatJson(

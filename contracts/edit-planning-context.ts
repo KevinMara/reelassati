@@ -20,6 +20,10 @@ import { buildEditorialSpeechEvidence } from "./editorial-evidence";
 import { editPlanningMedia } from "./edit-planning-media";
 import { sourceReviewFacts } from "./source-review";
 import { effectiveTimelineClips } from "./timeline-mixer";
+import {
+  graphicPlanningSpace,
+  GRAPHIC_PLANNING_SPACE_DIRECTION,
+} from "./graphic-planning-space";
 import { normalizeClipGroups } from "./clip-groups";
 import {
   EditPlanValidationError,
@@ -215,6 +219,7 @@ export function buildEditPlanningContext(
     ),
     speechEvidence,
     scenes,
+    graphicLayout: graphicPlanningSpace(project, assets, scenes),
     libraryMedia,
     mediaExcerpts,
     catalogColorLooks: catalogColorLutCandidates(sharedCatalog),
@@ -943,6 +948,7 @@ export function assertExecutableEditPlan(operations: EditOperation[]) {
 /** Keep this aligned with applyEditOperation, not the larger interactive chat
  * action vocabulary. Unsupported actions must not silently disappear. */
 export const EDIT_PLANNING_CAPABILITIES = `
+${GRAPHIC_PLANNING_SPACE_DIRECTION}
 ${CATALOG_COLOR_LUT_GUIDANCE}
 ${AUTONOMOUS_TRANSITION_GUIDANCE}
 The scene map partitions actual timeline footage and observed events. Its sourceStart/
