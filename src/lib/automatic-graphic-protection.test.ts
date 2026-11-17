@@ -881,6 +881,102 @@ describe("source-aware automatic graphic placement", () => {
 });
 
 describe("bounded auto-edit graphic decisions", () => {
+  const motionDesignBrief =
+    "Create a polished, contemporary short from this footage. Make the comparison easy to follow with purposeful editable motion graphics and subtle sound where it helps. Keep the original Italian speech, existing captions and complete ending intact. Use our existing library when relevant; do not generate or buy new media. Tell me editorial concerns in chat.";
+
+  it.each(["callout", "text", "highlight", "arrow", "rectangle"] as const)(
+    "recognizes a broad motion design request for %s without authorizing invented copy",
+    kind => {
+      expect(
+        automaticGraphicIntent(motionDesignBrief, normalizeGraphic({ kind })!)
+      ).toBe("source-design");
+    }
+  );
+
+  it.each([
+    "Add motion graphics",
+    "Design editable graphics for the comparison",
+    "Crea grafiche animate per il confronto",
+  ])("recognizes an explicit source design request %j", request => {
+    expect(automaticGraphicIntent(request)).toBe("source-design");
+  });
+
+  it("keeps grounded source words when the human explicitly asks for motion design", () => {
+    const p = project(
+      evidence({
+        regions: [region()],
+        observedText: [
+          {
+            id: "range",
+            start: 0,
+            end: 10,
+            text: "Short title",
+            regionId: "prop",
+            confidence: 1,
+          },
+        ],
+      })
+    );
+    const g = graphic({
+      graphic: normalizeGraphic({ ...graphic().graphic, y: 15 })!,
+    });
+    const policy = { request: motionDesignBrief };
+    expect(
+      filterAutonomousGraphics(
+        p,
+        [operation(g)],
+        [asset]
+      ).omitted[0].issues.map(issue => issue.reason)
+    ).toContain("repeated-source-text");
+    expect(
+      filterAutonomousGraphics(p, [operation(g)], [asset], policy).changes
+    ).toHaveLength(1);
+
+    g.graphic!.text = "Clinically proven";
+    expect(
+      filterAutonomousGraphics(
+        p,
+        [operation(g)],
+        [asset],
+        policy
+      ).omitted[0].issues.map(issue => issue.reason)
+    ).toContain("unsupported-source-copy");
+  });
+
+  it("does not relax layout, coverage or reading time for a broad design request", () => {
+    const policy = { request: motionDesignBrief };
+    const overlap = filterAutonomousGraphics(
+      project(evidence({ regions: [region()] })),
+      [operation(graphic())],
+      [asset],
+      policy
+    );
+    expect(overlap.omitted[0].issues.map(issue => issue.reason)).toContain(
+      "source-overlap"
+    );
+    const unknown = project();
+    unknown.sourceReviews![0].visualProtection = undefined;
+    const unreviewed = filterAutonomousGraphics(
+      unknown,
+      [operation(graphic())],
+      [asset],
+      policy
+    );
+    expect(unreviewed.changes).toHaveLength(0);
+    expect(unreviewed.warnings).toHaveLength(0);
+    expect(unreviewed.omitted[0].issues.map(issue => issue.reason)).toContain(
+      "unknown-source-layout"
+    );
+    expect(
+      automaticGraphicProblems(
+        project(),
+        graphic({ duration: 0.1, outPoint: 0.1 }),
+        [asset],
+        "source-design"
+      ).map(issue => issue.reason)
+    ).toContain("reading-time");
+  });
+
   it.each([
     "",
     "cinematic",
@@ -888,6 +984,9 @@ describe("bounded auto-edit graphic decisions", () => {
     "Non aggiungere testo",
     "Do not add a title",
     "Keep existing text clear",
+    "Do not add motion graphics",
+    "Make the cut without graphics",
+    "Non usare grafiche",
   ])("does not invent a graphic request from %j", request => {
     expect(automaticGraphicIntent(request)).toBe("automatic");
   });

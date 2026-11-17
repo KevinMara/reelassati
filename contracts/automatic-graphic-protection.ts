@@ -25,7 +25,8 @@ import { captionMotionFrame } from "./caption-motion";
 import { normalizeTranscriptWords } from "./transcript-timing";
 import { graphicReadabilityProblems } from "./graphic-readability";
 
-export type AutomaticGraphicIntent = "automatic" | "requested" | "replace";
+export type AutomaticGraphicIntent =
+  "automatic" | "source-design" | "requested" | "replace";
 export type AutomaticGraphicPolicy =
   AutomaticGraphicIntent | { request: string };
 export type GraphicProtectionReason =
@@ -207,21 +208,21 @@ export function automaticGraphicIntent(
     /\b(?:overlay|graphic|graphics|grafic[aohe]+|graphique|grafico|grafik)\b/u;
   const graphic = candidate
     ? (names[candidate.kind === "spatial-title" ? "text" : candidate.kind] ??
-      general)
+      /(?!)/u)
     : new RegExp(
         `${Object.values(names)
           .map(pattern => pattern.source)
-          .join("|")}|${general.source}`,
+          .join("|")}`,
         "u"
       );
   const actions =
-    /\b(?:add|insert|put|place|create|show|write|replace|cover|hide|aggiungi|inserisci|metti|posiziona|crea|mostra|scrivi|sostituisci|copri|nascondi|ajoute|ajoutez|insere|ecris|remplace|anade|agrega|inserta|pon|escribe|reemplaza|fuge|hinzufugen|erstelle|schreibe|ersetze|adicione|insira)\b/u;
+    /\b(?:add|insert|put|place|create|make|design|use|show|write|replace|cover|hide|aggiungi|inserisci|metti|posiziona|crea|usa|realizza|mostra|scrivi|sostituisci|copri|nascondi|ajoute|ajoutez|insere|cree|utilise|ecris|remplace|anade|agrega|inserta|pon|crea|usa|escribe|reemplaza|fuge|hinzufugen|erstelle|gestalte|verwende|schreibe|ersetze|adicione|insira)\b/u;
   const sentences = text
     .split(/[.!?;\n]/u)
     .filter(
       part =>
         actions.test(part) &&
-        graphic.test(part) &&
+        (graphic.test(part) || general.test(part)) &&
         !/\b(?:no|not|never|without|avoid|non|senza|evita|nessun[ao]|pas|sans|sin|nunca|kein|keine|ohne|nao)\b/u.test(
           part
         )
@@ -266,7 +267,12 @@ export function automaticGraphicIntent(
     )
   )
     return "replace";
-  return "requested";
+  // A broad request to design graphics authorizes repeating grounded source
+  // wording as part of the design, not inventing copy or assuming empty space.
+  // Keep specific human titles/arrows and explicit replacement scoped above.
+  return sentences.some(part => graphic.test(part))
+    ? "requested"
+    : "source-design";
 }
 
 /** Raw requests scope exceptions per kind; requesting an arrow cannot authorize
@@ -607,9 +613,13 @@ export function automaticGraphicProblems(
   const record = (issue: GraphicProtectionIssue) => {
     if (!problems.has(issue.reason)) problems.set(issue.reason, issue);
   };
-  const readability = graphicReadabilityProblems(graphicClip, project.aspectRatio);
-  if (readability.length) record({ reason: "text-readability", detail: readability.join("; ") });
-  if (intent === "automatic") {
+  const readability = graphicReadabilityProblems(
+    graphicClip,
+    project.aspectRatio
+  );
+  if (readability.length)
+    record({ reason: "text-readability", detail: readability.join("; ") });
+  if (intent === "automatic" || intent === "source-design") {
     const sourceCopy = timedSpeechPhrases(
       project.transcript,
       graphicClip.start,
@@ -909,7 +919,10 @@ export function automaticGraphicProblems(
         });
     }
   }
-  if (intent === "automatic" && ["text", "callout"].includes(graphic.kind)) {
+  if (
+    (intent === "automatic" || intent === "source-design") &&
+    ["text", "callout"].includes(graphic.kind)
+  ) {
     const words = `${graphic.text} ${graphic.secondaryText ?? ""}`
       .trim()
       .split(/\s+/u)

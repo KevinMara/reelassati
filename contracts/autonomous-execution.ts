@@ -247,7 +247,7 @@ export function filterAutonomousGraphics(
       if (issues.length)
         decisions.set(operationId, {
           issues: [...(decisions.get(operationId)?.issues ?? []), ...issues],
-          requested: intent !== "automatic",
+          requested: intent === "requested" || intent === "replace",
         });
     }
     const rejected: AutonomousGraphicDecision[] = [],
