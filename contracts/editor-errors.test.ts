@@ -22,6 +22,17 @@ describe("editor failure copy", () => {
       )
     ).toContain("current timeline");
   });
+  it("preserves a capacity failure through saved chat history without billing claims", () => {
+    const expected = "Reel is temporarily busy. Wait before sending your request again.";
+    for (const error of [
+      { status: 429, message: "PRIVATE upstream body" },
+      new Error("The service is temporarily rate-limited. Wait at least 90 seconds before starting another request. No automatic retry was made."),
+      expected,
+    ]) {
+      expect(editorFailureMessage(error)).toBe(expected);
+      expect(editorFailureMessage(editorFailureMessage(error))).toBe(expected);
+    }
+  });
   it("does not tell customers to buy credits or retry a service billing failure", () => {
     const expected =
       "Reel is paused by a service billing issue. Please contact support.";

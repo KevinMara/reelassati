@@ -25,6 +25,7 @@ export function editorFailureMessage(error: unknown): string {
     "Reel couldn't read the audio. Please try again.",
     "Reel couldn't finish this edit. Please try again.",
     "Reel is unavailable right now. Please try again.",
+    "Reel is temporarily busy. Wait before sending your request again.",
     "Reel is paused by a service billing issue. Please contact support.",
   ];
   if (publicMessages.includes(text)) return text;
@@ -35,6 +36,8 @@ export function editorFailureMessage(error: unknown): string {
     /service billing issue/i.test(text)
   )
     return "Reel is paused by a service billing issue. Please contact support.";
+  if (row?.status === 429 || /temporarily rate-limited/i.test(text))
+    return "Reel is temporarily busy. Wait before sending your request again.";
   if (
     row?.status === 401 ||
     /sign in|session.*expired|not authenticated/i.test(text)

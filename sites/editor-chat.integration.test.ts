@@ -136,10 +136,15 @@ const authorEndpoint = JSON.parse(
 function expectAuthorCompatibleK3(payload: Record<string, unknown>) {
   expect(payload.model).toBe(authorEndpoint.model);
   expect(payload.provider).toEqual({
-    order: ["moonshotai"],
     require_parameters: true,
     allow_fallbacks: false,
+    data_collection: "deny",
+    max_price: { prompt: 3, completion: 15 },
   });
+  // Do not bypass capacity-aware primary selection or select another model.
+  expect(payload.provider).not.toHaveProperty("order");
+  expect(payload.provider).not.toHaveProperty("sort");
+  expect(payload).not.toHaveProperty("models");
   expect(payload).not.toHaveProperty("temperature");
   const parameters = Object.keys(payload).filter(
     key => !["model", "messages", "provider", "stream"].includes(key)

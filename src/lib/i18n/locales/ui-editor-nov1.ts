@@ -131,6 +131,35 @@ const serviceBillingText: Partial<Record<InterfaceLanguage, string>> = {
   id: "Reel dijeda karena masalah penagihan layanan. Hubungi dukungan.",
   th: "Reel หยุดชั่วคราวเนื่องจากปัญหาการเรียกเก็บเงินของบริการ โปรดติดต่อฝ่ายสนับสนุน",
 };
+const busyText: Partial<Record<InterfaceLanguage, string>> = {
+  it: "Reel è temporaneamente occupato. Attendi prima di inviare di nuovo la richiesta.",
+  es: "Reel está temporalmente ocupado. Espera antes de volver a enviar tu solicitud.",
+  fr: "Reel est temporairement occupé. Patientez avant de renvoyer votre demande.",
+  de: "Reel ist vorübergehend ausgelastet. Warte, bevor du deine Anfrage erneut sendest.",
+  pt: "O Reel está temporariamente ocupado. Aguarde antes de enviar o pedido novamente.",
+  nl: "Reel is tijdelijk druk. Wacht voordat je je verzoek opnieuw verstuurt.",
+  pl: "Reel jest chwilowo zajęty. Poczekaj przed ponownym wysłaniem prośby.",
+  ro: "Reel este ocupat temporar. Așteaptă înainte de a trimite din nou cererea.",
+  tr: "Reel geçici olarak meşgul. İsteğinizi yeniden göndermeden önce bekleyin.",
+  uk: "Reel тимчасово зайнятий. Зачекайте, перш ніж надсилати запит знову.",
+  ru: "Reel временно занят. Подождите, прежде чем отправлять запрос снова.",
+  ar: "Reel مشغول مؤقتًا. انتظر قبل إرسال طلبك مجددًا.",
+  hi: "Reel अभी व्यस्त है। अनुरोध दोबारा भेजने से पहले प्रतीक्षा करें।",
+  ja: "Reelは一時的に混み合っています。しばらく待ってから再送してください。",
+  ko: "Reel이 일시적으로 사용량이 많습니다. 잠시 기다린 후 요청을 다시 보내 주세요.",
+  zh: "Reel 暂时繁忙。请稍等后再发送请求。",
+  vi: "Reel đang tạm thời bận. Hãy chờ trước khi gửi lại yêu cầu.",
+  da: "Reel er midlertidigt optaget. Vent, før du sender din anmodning igen.",
+  sv: "Reel är tillfälligt upptaget. Vänta innan du skickar din begäran igen.",
+  no: "Reel er midlertidig opptatt. Vent før du sender forespørselen på nytt.",
+  fi: "Reel on tilapäisesti ruuhkautunut. Odota ennen kuin lähetät pyynnön uudelleen.",
+  cs: "Reel je dočasně vytížený. Před opětovným odesláním požadavku počkejte.",
+  hu: "A Reel átmenetileg túlterhelt. Várj a kérés újbóli elküldése előtt.",
+  el: "Το Reel είναι προσωρινά απασχολημένο. Περιμένετε πριν στείλετε ξανά το αίτημά σας.",
+  he: "Reel עמוס זמנית. המתינו לפני שליחת הבקשה שוב.",
+  id: "Reel sedang sibuk sementara. Tunggu sebelum mengirim ulang permintaan.",
+  th: "Reel มีการใช้งานหนาแน่นชั่วคราว โปรดรอก่อนส่งคำขออีกครั้ง",
+};
 export const editorNov1Ui = Object.fromEntries(
   Object.entries(rows).map(([code, row]) => {
     const values = row.split("|");
@@ -147,6 +176,9 @@ export const editorNov1Ui = Object.fromEntries(
     copy["Reel is paused by a service billing issue. Please contact support."] =
       serviceBillingText[code as InterfaceLanguage] ??
       "Reel is paused by a service billing issue. Please contact support.";
+    copy["Reel is temporarily busy. Wait before sending your request again."] =
+      busyText[code as InterfaceLanguage] ??
+      "Reel is temporarily busy. Wait before sending your request again.";
     return [code, copy] as const;
   })
 ) as Record<InterfaceLanguage, Record<string, string>>;

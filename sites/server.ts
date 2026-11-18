@@ -4305,16 +4305,24 @@ async function chatJson(
             : requireJsonMode
               ? { response_format: { type: "json_object" } }
               : {}),
-          // Use the model author's K3 endpoint rather than price-balanced
-          // reseller capacity. Its published supported_parameters omits
-          // temperature: requiring that optional knob silently excludes it.
-          // No backup attempt or model substitution is permitted.
+          // A fixed K3 endpoint bypasses OpenRouter's capacity-aware primary
+          // selection and kept returning 429 while other K3 hosts were healthy.
+          // Choose one compatible, non-logging K3 host at no higher listed
+          // token price than the original route. No retry or model substitution.
+          // Keep temperature omitted: the author's endpoint does not support it.
           ...(analysisControl || (editing && foregroundK3)
             ? {
                 provider: {
                   require_parameters: true,
                   allow_fallbacks: false,
-                  ...(foregroundK3 ? { order: ["moonshotai"] } : {}),
+                  ...(selectedModel === DEFAULT_ANALYSIS_MODEL
+                    ? {
+                        data_collection: "deny",
+                        max_price: { prompt: 3, completion: 15 },
+                      }
+                    : foregroundK3
+                      ? { order: ["moonshotai"] }
+                      : {}),
                 },
               }
             : {}),

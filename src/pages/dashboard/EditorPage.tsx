@@ -1570,6 +1570,7 @@ export default function EditorPage() {
   };
 
   const openLibrary = () => {
+    setMediaHidden(false);
     setLeftTool("library");
     requestAnimationFrame(() =>
       document
