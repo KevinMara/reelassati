@@ -341,7 +341,16 @@ function ShotTransitionControls({
                   ? ui(
                       "Pulls back into mirrored tiles, then returns to full frame."
                     )
-                  : ui("Pushes one shot into the next with eased motion.")}
+                  : kind === "native-scale-exchange"
+                    ? ui(
+                        "Exchanges centered pictures with an intentional black surround."
+                      )
+                    : kind === "native-box-from-right" ||
+                        kind === "native-box-from-left"
+                      ? ui(
+                          "Slides in a small picture, then expands it to fill the frame."
+                        )
+                      : ui("Pushes one shot into the next with eased motion.")}
         </p>
       )}
       <label className="block text-xs">

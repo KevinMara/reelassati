@@ -1,0 +1,9 @@
+Source: https://befonts.com/hanson-bold-font.html
+Archive SHA256: 91152a3fd9677602cfd058e6a14fe6095f6d950d190b867f7f86a151189e4b65
+Member: hanson-bold.ttf
+
+--- Befonts-License.txt ---
+License: Personal Use Only
+Link: https://befonts.com/hanson-bold-font.html
+
+Creative Commons / Please give credits to author

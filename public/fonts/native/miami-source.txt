@@ -1,0 +1,4 @@
+Source: https://www.dafont.com/miami.font
+Archive SHA256: 78eb1f390e864c31520cfb56d4ff977a9a1b22f819b49ef666a01a97df3bbfd9
+Member: Miami.ttf
+Copyright (c) 2013 by Alex Chopjian. 

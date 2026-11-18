@@ -1,3 +1,4 @@
+import { nativeRevealUi } from "./ui-native-reveal";
 import { nativeZoomUi } from "./ui-native-zoom";
 import { nativePushUi } from "./ui-native-push";
 import { editorFontUi } from "./ui-editor-fonts";
@@ -173,6 +174,10 @@ for (const [code, entries] of Object.entries(editorFontUi))
   Object.assign(uiLocales[code], entries);
 
 for (const [code, entries] of Object.entries(nativeZoomUi).map(
-  ([code, entries]) => [code, { ...entries, ...nativePushUi[code] }] as const
+  ([code, entries]) =>
+    [
+      code,
+      { ...entries, ...nativePushUi[code], ...nativeRevealUi[code] },
+    ] as const
 ))
   Object.assign(uiLocales[code], entries);

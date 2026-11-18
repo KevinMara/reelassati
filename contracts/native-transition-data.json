@@ -3880,5 +3880,1362 @@
         }
       }
     }
+  },
+  "box-from-right": {
+    "tag": null,
+    "entries": {
+      "Tools": {
+        "tag": "ordered",
+        "entries": {
+          "FW_BoxSlide": {
+            "tag": "GroupOperator",
+            "entries": {
+              "CtrlWZoom": false,
+              "NameSet": true,
+              "Inputs": {
+                "tag": "ordered",
+                "entries": {
+                  "Input1": {
+                    "tag": "InstanceInput",
+                    "entries": {
+                      "SourceOp": "Transform1",
+                      "Source": "Input"
+                    }
+                  },
+                  "Input2": {
+                    "tag": "InstanceInput",
+                    "entries": {
+                      "SourceOp": "Merge1",
+                      "Source": "Background"
+                    }
+                  }
+                }
+              },
+              "Outputs": {
+                "tag": null,
+                "entries": {
+                  "Output1": {
+                    "tag": "InstanceOutput",
+                    "entries": {
+                      "SourceOp": "Merge1",
+                      "Source": "Output"
+                    }
+                  }
+                }
+              },
+              "ViewInfo": {
+                "tag": "GroupInfo",
+                "entries": {
+                  "Pos": {
+                    "tag": null,
+                    "entries": {
+                      "1": 384.992,
+                      "2": 46.8633
+                    }
+                  },
+                  "Flags": {
+                    "tag": null,
+                    "entries": {
+                      "AllowPan": false,
+                      "AutoSnap": true,
+                      "RemoveRouters": true
+                    }
+                  },
+                  "Size": {
+                    "tag": null,
+                    "entries": {
+                      "1": 137.314,
+                      "2": 117.366,
+                      "3": 68.6568,
+                      "4": 24.2424
+                    }
+                  },
+                  "Direction": "Horizontal",
+                  "PipeStyle": "Direct",
+                  "Scale": 1,
+                  "Offset": {
+                    "tag": null,
+                    "entries": {
+                      "1": -385.934,
+                      "2": -46.8633
+                    }
+                  }
+                }
+              },
+              "Tools": {
+                "tag": "ordered",
+                "entries": {
+                  "Merge1": {
+                    "tag": "Merge",
+                    "entries": {
+                      "Inputs": {
+                        "tag": null,
+                        "entries": {
+                          "Background": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "MediaIn1",
+                              "Source": "Output"
+                            }
+                          },
+                          "Foreground": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "Transform1",
+                              "Source": "Output"
+                            }
+                          },
+                          "PerformDepthMerge": {
+                            "tag": "Input",
+                            "entries": {
+                              "Value": 0
+                            }
+                          }
+                        }
+                      },
+                      "ViewInfo": {
+                        "tag": "OperatorInfo",
+                        "entries": {
+                          "Pos": {
+                            "tag": null,
+                            "entries": {
+                              "1": 391.591,
+                              "2": 106.502
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Transform1": {
+                    "tag": "Transform",
+                    "entries": {
+                      "Inputs": {
+                        "tag": null,
+                        "entries": {
+                          "Center": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "Vector1",
+                              "Source": "Position"
+                            }
+                          },
+                          "Size": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "AnimCurves1",
+                              "Source": "Value"
+                            }
+                          },
+                          "Input": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "MediaIn2",
+                              "Source": "Output"
+                            }
+                          }
+                        }
+                      },
+                      "ViewInfo": {
+                        "tag": "OperatorInfo",
+                        "entries": {
+                          "Pos": {
+                            "tag": null,
+                            "entries": {
+                              "1": 380.277,
+                              "2": 55.4997
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "Vector1": {
+            "tag": "Vector",
+            "entries": {
+              "Inputs": {
+                "tag": null,
+                "entries": {
+                  "Distance": {
+                    "tag": "Input",
+                    "entries": {
+                      "SourceOp": "AnimCurves2",
+                      "Source": "Value"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "AnimCurves2": {
+            "tag": "LUTLookup",
+            "entries": {
+              "Inputs": {
+                "tag": null,
+                "entries": {
+                  "Curve": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Easing"
+                        }
+                      }
+                    }
+                  },
+                  "EaseIn": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Expo"
+                        }
+                      }
+                    }
+                  },
+                  "EaseOut": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Expo"
+                        }
+                      }
+                    }
+                  },
+                  "Lookup": {
+                    "tag": "Input",
+                    "entries": {
+                      "SourceOp": "AnimCurves2Lookup",
+                      "Source": "Value"
+                    }
+                  },
+                  "Invert": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "AnimCurves2Lookup": {
+            "tag": "LUTBezier",
+            "entries": {
+              "KeyColorSplines": {
+                "tag": null,
+                "entries": {
+                  "0": {
+                    "tag": null,
+                    "entries": {
+                      "0": {
+                        "tag": null,
+                        "entries": {
+                          "1": 0,
+                          "RH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.333333333333333,
+                              "2": 0.333333333333333
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      },
+                      "1": {
+                        "tag": null,
+                        "entries": {
+                          "1": 1,
+                          "LH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.666666666666667,
+                              "2": 0.666666666666667
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "SplineColor": {
+                "tag": null,
+                "entries": {
+                  "Red": 255,
+                  "Green": 255,
+                  "Blue": 255
+                }
+              },
+              "NameSet": true
+            }
+          },
+          "AnimCurves1": {
+            "tag": "LUTLookup",
+            "entries": {
+              "CtrlWZoom": false,
+              "Inputs": {
+                "tag": null,
+                "entries": {
+                  "Curve": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Easing"
+                        }
+                      }
+                    }
+                  },
+                  "EaseIn": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Expo"
+                        }
+                      }
+                    }
+                  },
+                  "EaseOut": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Quad"
+                        }
+                      }
+                    }
+                  },
+                  "Lookup": {
+                    "tag": "Input",
+                    "entries": {
+                      "SourceOp": "AnimCurves1Lookup",
+                      "Source": "Value"
+                    }
+                  },
+                  "Scale": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 0.5996
+                    }
+                  },
+                  "Offset": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 0.4
+                    }
+                  },
+                  "TimeScale": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 5.294
+                    }
+                  },
+                  "TimeOffset": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 0.776
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "AnimCurves1Lookup": {
+            "tag": "LUTBezier",
+            "entries": {
+              "KeyColorSplines": {
+                "tag": null,
+                "entries": {
+                  "0": {
+                    "tag": null,
+                    "entries": {
+                      "0": {
+                        "tag": null,
+                        "entries": {
+                          "1": 0,
+                          "RH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.333333333333333,
+                              "2": 0.333333333333333
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      },
+                      "1": {
+                        "tag": null,
+                        "entries": {
+                          "1": 1,
+                          "LH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.666666666666667,
+                              "2": 0.666666666666667
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "SplineColor": {
+                "tag": null,
+                "entries": {
+                  "Red": 255,
+                  "Green": 255,
+                  "Blue": 255
+                }
+              },
+              "NameSet": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "box-from-left": {
+    "tag": null,
+    "entries": {
+      "Tools": {
+        "tag": "ordered",
+        "entries": {
+          "FW_BoxSlideLeft": {
+            "tag": "GroupOperator",
+            "entries": {
+              "CtrlWZoom": false,
+              "NameSet": true,
+              "Inputs": {
+                "tag": "ordered",
+                "entries": {
+                  "Input1": {
+                    "tag": "InstanceInput",
+                    "entries": {
+                      "SourceOp": "Transform1",
+                      "Source": "Input"
+                    }
+                  },
+                  "Input2": {
+                    "tag": "InstanceInput",
+                    "entries": {
+                      "SourceOp": "Merge1",
+                      "Source": "Background"
+                    }
+                  }
+                }
+              },
+              "Outputs": {
+                "tag": null,
+                "entries": {
+                  "Output1": {
+                    "tag": "InstanceOutput",
+                    "entries": {
+                      "SourceOp": "Merge1",
+                      "Source": "Output"
+                    }
+                  }
+                }
+              },
+              "ViewInfo": {
+                "tag": "GroupInfo",
+                "entries": {
+                  "Pos": {
+                    "tag": null,
+                    "entries": {
+                      "1": 602.78,
+                      "2": 95.3599
+                    }
+                  },
+                  "Flags": {
+                    "tag": null,
+                    "entries": {
+                      "AllowPan": false,
+                      "AutoSnap": true,
+                      "RemoveRouters": true
+                    }
+                  },
+                  "Size": {
+                    "tag": null,
+                    "entries": {
+                      "1": 137.314,
+                      "2": 117.366,
+                      "3": 68.6568,
+                      "4": 24.2424
+                    }
+                  },
+                  "Direction": "Horizontal",
+                  "PipeStyle": "Direct",
+                  "Scale": 1,
+                  "Offset": {
+                    "tag": null,
+                    "entries": {
+                      "1": -385.934,
+                      "2": -46.8633
+                    }
+                  }
+                }
+              },
+              "Tools": {
+                "tag": "ordered",
+                "entries": {
+                  "Merge1": {
+                    "tag": "Merge",
+                    "entries": {
+                      "CtrlWShown": false,
+                      "Inputs": {
+                        "tag": null,
+                        "entries": {
+                          "Background": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "MediaIn1",
+                              "Source": "Output"
+                            }
+                          },
+                          "Foreground": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "Transform1",
+                              "Source": "Output"
+                            }
+                          },
+                          "PerformDepthMerge": {
+                            "tag": "Input",
+                            "entries": {
+                              "Value": 0
+                            }
+                          }
+                        }
+                      },
+                      "ViewInfo": {
+                        "tag": "OperatorInfo",
+                        "entries": {
+                          "Pos": {
+                            "tag": null,
+                            "entries": {
+                              "1": 391.591,
+                              "2": 106.502
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Transform1": {
+                    "tag": "Transform",
+                    "entries": {
+                      "Inputs": {
+                        "tag": null,
+                        "entries": {
+                          "Center": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "Vector1",
+                              "Source": "Position"
+                            }
+                          },
+                          "Size": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "AnimCurves1",
+                              "Source": "Value"
+                            }
+                          },
+                          "Input": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "MediaIn2",
+                              "Source": "Output"
+                            }
+                          }
+                        }
+                      },
+                      "ViewInfo": {
+                        "tag": "OperatorInfo",
+                        "entries": {
+                          "Pos": {
+                            "tag": null,
+                            "entries": {
+                              "1": 380.277,
+                              "2": 55.4997
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "Vector1": {
+            "tag": "Vector",
+            "entries": {
+              "Inputs": {
+                "tag": null,
+                "entries": {
+                  "Distance": {
+                    "tag": "Input",
+                    "entries": {
+                      "SourceOp": "AnimCurves2",
+                      "Source": "Value"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "AnimCurves2": {
+            "tag": "LUTLookup",
+            "entries": {
+              "CtrlWZoom": false,
+              "Inputs": {
+                "tag": null,
+                "entries": {
+                  "Curve": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Easing"
+                        }
+                      }
+                    }
+                  },
+                  "EaseIn": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Expo"
+                        }
+                      }
+                    }
+                  },
+                  "EaseOut": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Expo"
+                        }
+                      }
+                    }
+                  },
+                  "Lookup": {
+                    "tag": "Input",
+                    "entries": {
+                      "SourceOp": "AnimCurves2Lookup",
+                      "Source": "Value"
+                    }
+                  },
+                  "Invert": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 1
+                    }
+                  },
+                  "Scale": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": -1.003
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "AnimCurves2Lookup": {
+            "tag": "LUTBezier",
+            "entries": {
+              "KeyColorSplines": {
+                "tag": null,
+                "entries": {
+                  "0": {
+                    "tag": null,
+                    "entries": {
+                      "0": {
+                        "tag": null,
+                        "entries": {
+                          "1": 0,
+                          "RH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.333333333333333,
+                              "2": 0.333333333333333
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      },
+                      "1": {
+                        "tag": null,
+                        "entries": {
+                          "1": 1,
+                          "LH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.666666666666667,
+                              "2": 0.666666666666667
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "SplineColor": {
+                "tag": null,
+                "entries": {
+                  "Red": 255,
+                  "Green": 255,
+                  "Blue": 255
+                }
+              }
+            }
+          },
+          "AnimCurves1": {
+            "tag": "LUTLookup",
+            "entries": {
+              "Inputs": {
+                "tag": null,
+                "entries": {
+                  "Curve": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Easing"
+                        }
+                      }
+                    }
+                  },
+                  "EaseIn": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Expo"
+                        }
+                      }
+                    }
+                  },
+                  "EaseOut": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Quad"
+                        }
+                      }
+                    }
+                  },
+                  "Lookup": {
+                    "tag": "Input",
+                    "entries": {
+                      "SourceOp": "AnimCurves1Lookup",
+                      "Source": "Value"
+                    }
+                  },
+                  "Scale": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 0.5996
+                    }
+                  },
+                  "Offset": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 0.4
+                    }
+                  },
+                  "TimeScale": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 5.294
+                    }
+                  },
+                  "TimeOffset": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 0.776
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "AnimCurves1Lookup": {
+            "tag": "LUTBezier",
+            "entries": {
+              "KeyColorSplines": {
+                "tag": null,
+                "entries": {
+                  "0": {
+                    "tag": null,
+                    "entries": {
+                      "0": {
+                        "tag": null,
+                        "entries": {
+                          "1": 0,
+                          "RH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.333333333333333,
+                              "2": 0.333333333333333
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      },
+                      "1": {
+                        "tag": null,
+                        "entries": {
+                          "1": 1,
+                          "LH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.666666666666667,
+                              "2": 0.666666666666667
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "SplineColor": {
+                "tag": null,
+                "entries": {
+                  "Red": 255,
+                  "Green": 255,
+                  "Blue": 255
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "scale-exchange": {
+    "tag": null,
+    "entries": {
+      "Tools": {
+        "tag": "ordered",
+        "entries": {
+          "Group1": {
+            "tag": "GroupOperator",
+            "entries": {
+              "CtrlWZoom": false,
+              "Inputs": {
+                "tag": "ordered",
+                "entries": {
+                  "Input1": {
+                    "tag": "InstanceInput",
+                    "entries": {
+                      "SourceOp": "Transform1_1",
+                      "Source": "Input"
+                    }
+                  },
+                  "Input2": {
+                    "tag": "InstanceInput",
+                    "entries": {
+                      "SourceOp": "Transform1",
+                      "Source": "Input"
+                    }
+                  }
+                }
+              },
+              "Outputs": {
+                "tag": null,
+                "entries": {
+                  "Output1": {
+                    "tag": "InstanceOutput",
+                    "entries": {
+                      "SourceOp": "Merge1",
+                      "Source": "Output"
+                    }
+                  }
+                }
+              },
+              "ViewInfo": {
+                "tag": "GroupInfo",
+                "entries": {
+                  "Pos": {
+                    "tag": null,
+                    "entries": {
+                      "1": 533.44,
+                      "2": 73.4943
+                    }
+                  },
+                  "Flags": {
+                    "tag": null,
+                    "entries": {
+                      "AllowPan": false,
+                      "AutoSnap": true,
+                      "RemoveRouters": true
+                    }
+                  },
+                  "Size": {
+                    "tag": null,
+                    "entries": {
+                      "1": 550.618,
+                      "2": 198.224,
+                      "3": 253.309,
+                      "4": 69.0909
+                    }
+                  },
+                  "Direction": "Horizontal",
+                  "PipeStyle": "Direct",
+                  "Scale": 1,
+                  "Offset": {
+                    "tag": null,
+                    "entries": {
+                      "1": -533.44,
+                      "2": -73.4943
+                    }
+                  }
+                }
+              },
+              "Tools": {
+                "tag": "ordered",
+                "entries": {
+                  "Merge1": {
+                    "tag": "Merge",
+                    "entries": {
+                      "Inputs": {
+                        "tag": null,
+                        "entries": {
+                          "Background": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "Transform1",
+                              "Source": "Output"
+                            }
+                          },
+                          "Foreground": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "Transform1_1",
+                              "Source": "Output"
+                            }
+                          },
+                          "PerformDepthMerge": {
+                            "tag": "Input",
+                            "entries": {
+                              "Value": 0
+                            }
+                          }
+                        }
+                      },
+                      "ViewInfo": {
+                        "tag": "OperatorInfo",
+                        "entries": {
+                          "Pos": {
+                            "tag": null,
+                            "entries": {
+                              "1": 559.082,
+                              "2": 142.476
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Transform1": {
+                    "tag": "Transform",
+                    "entries": {
+                      "Inputs": {
+                        "tag": null,
+                        "entries": {
+                          "Size": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "AnimCurves1",
+                              "Source": "Value"
+                            }
+                          },
+                          "Input": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "MediaIn1",
+                              "Source": "Output"
+                            }
+                          }
+                        }
+                      },
+                      "ViewInfo": {
+                        "tag": "OperatorInfo",
+                        "entries": {
+                          "Pos": {
+                            "tag": null,
+                            "entries": {
+                              "1": 365.082,
+                              "2": 157.021
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Transform1_1": {
+                    "tag": "Transform",
+                    "entries": {
+                      "Inputs": {
+                        "tag": null,
+                        "entries": {
+                          "Size": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "AnimCurves1_1",
+                              "Source": "Value"
+                            }
+                          },
+                          "Input": {
+                            "tag": "Input",
+                            "entries": {
+                              "SourceOp": "MediaIn2",
+                              "Source": "Output"
+                            }
+                          }
+                        }
+                      },
+                      "ViewInfo": {
+                        "tag": "OperatorInfo",
+                        "entries": {
+                          "Pos": {
+                            "tag": null,
+                            "entries": {
+                              "1": 380.464,
+                              "2": 90.6155
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "AnimCurves1": {
+            "tag": "LUTLookup",
+            "entries": {
+              "CtrlWZoom": false,
+              "Inputs": {
+                "tag": null,
+                "entries": {
+                  "Curve": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Easing"
+                        }
+                      }
+                    }
+                  },
+                  "EaseIn": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Expo"
+                        }
+                      }
+                    }
+                  },
+                  "EaseOut": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Quad"
+                        }
+                      }
+                    }
+                  },
+                  "Lookup": {
+                    "tag": "Input",
+                    "entries": {
+                      "SourceOp": "AnimCurves1Lookup",
+                      "Source": "Value"
+                    }
+                  },
+                  "Scale": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": -0.433
+                    }
+                  },
+                  "Offset": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "AnimCurves1Lookup": {
+            "tag": "LUTBezier",
+            "entries": {
+              "KeyColorSplines": {
+                "tag": null,
+                "entries": {
+                  "0": {
+                    "tag": null,
+                    "entries": {
+                      "0": {
+                        "tag": null,
+                        "entries": {
+                          "1": 0,
+                          "RH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.333333333333333,
+                              "2": 0.333333333333333
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      },
+                      "1": {
+                        "tag": null,
+                        "entries": {
+                          "1": 1,
+                          "LH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.666666666666667,
+                              "2": 0.666666666666667
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "SplineColor": {
+                "tag": null,
+                "entries": {
+                  "Red": 255,
+                  "Green": 255,
+                  "Blue": 255
+                }
+              },
+              "NameSet": true
+            }
+          },
+          "AnimCurves1_1": {
+            "tag": "LUTLookup",
+            "entries": {
+              "CtrlWZoom": false,
+              "Inputs": {
+                "tag": null,
+                "entries": {
+                  "Curve": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Easing"
+                        }
+                      }
+                    }
+                  },
+                  "EaseIn": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Expo"
+                        }
+                      }
+                    }
+                  },
+                  "EaseOut": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": {
+                        "tag": "FuID",
+                        "entries": {
+                          "1": "Quad"
+                        }
+                      }
+                    }
+                  },
+                  "Lookup": {
+                    "tag": "Input",
+                    "entries": {
+                      "SourceOp": "AnimCurves1Lookup_1",
+                      "Source": "Value"
+                    }
+                  },
+                  "Scale": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": 1.0081
+                    }
+                  },
+                  "Offset": {
+                    "tag": "Input",
+                    "entries": {
+                      "Value": -0.008
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "AnimCurves1Lookup_1": {
+            "tag": "LUTBezier",
+            "entries": {
+              "KeyColorSplines": {
+                "tag": null,
+                "entries": {
+                  "0": {
+                    "tag": null,
+                    "entries": {
+                      "0": {
+                        "tag": null,
+                        "entries": {
+                          "1": 0,
+                          "RH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.333333333333333,
+                              "2": 0.333333333333333
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      },
+                      "1": {
+                        "tag": null,
+                        "entries": {
+                          "1": 1,
+                          "LH": {
+                            "tag": null,
+                            "entries": {
+                              "1": 0.666666666666667,
+                              "2": 0.666666666666667
+                            }
+                          },
+                          "Flags": {
+                            "tag": null,
+                            "entries": {
+                              "Linear": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "SplineColor": {
+                "tag": null,
+                "entries": {
+                  "Red": 255,
+                  "Green": 255,
+                  "Blue": 255
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }

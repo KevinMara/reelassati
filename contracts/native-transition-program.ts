@@ -13,7 +13,10 @@ export type NativeTransitionId =
   | "push-left"
   | "push-right"
   | "push-up"
-  | "push-down";
+  | "push-down"
+  | "box-from-right"
+  | "box-from-left"
+  | "scale-exchange";
 export const nativeTransitionIds: readonly NativeTransitionId[] = [
   "stretch",
   "slide",
@@ -23,6 +26,9 @@ export const nativeTransitionIds: readonly NativeTransitionId[] = [
   "push-right",
   "push-up",
   "push-down",
+  "box-from-right",
+  "box-from-left",
+  "scale-exchange",
 ];
 export const nativeTransitionDefinitions = {
   stretch: {
@@ -79,6 +85,27 @@ export const nativeTransitionDefinitions = {
     inputOrder: ["incoming", "outgoing"],
     description:
       "The outgoing shot moves downward as the incoming shot enters from above, accelerating through the cut and easing to rest. Use for a motivated downward continuation, not a default transition quota.",
+    intentionalEmptyMidpoint: false,
+  },
+  "box-from-right": {
+    name: "Picture reveal from right",
+    inputOrder: ["incoming", "outgoing"],
+    description:
+      "The next shot enters from the right as a small centered picture over the outgoing shot, then expands to fill the frame. Use to introduce a distinct example or result; do not cover important detail or add unrelated text during the reveal.",
+    intentionalEmptyMidpoint: false,
+  },
+  "box-from-left": {
+    name: "Picture reveal from left",
+    inputOrder: ["incoming", "outgoing"],
+    description:
+      "The next shot enters from the left as a small centered picture over the outgoing shot, then expands to fill the frame. Use to introduce a distinct example or result; do not cover important detail or add unrelated text during the reveal.",
+    intentionalEmptyMidpoint: false,
+  },
+  "scale-exchange": {
+    name: "Centered picture exchange",
+    inputOrder: ["incoming", "outgoing"],
+    description:
+      "The outgoing shot shrinks while the next shot grows from the center over it. The authored composition reveals a black border around the shrinking pictures. Use only when that deliberate framed look fits the brief, never when uninterrupted full-frame picture is required.",
     intentionalEmptyMidpoint: false,
   },
 } as const;

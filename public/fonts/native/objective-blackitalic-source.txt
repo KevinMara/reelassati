@@ -1,0 +1,10 @@
+Source: https://befonts.com/objective-10.charmap
+Archive SHA256: e512f0e0378627e35d5eecd3c72cb26f7b46d5c45bd19d9e9e320bc9120311ba
+Member: objective-black-italic.otf
+
+--- Befonts-License.txt ---
+License: Commercial Use Allowed
+Link: https://befonts.com/objective-font-family.html
+
+Copyright (c) 2017 by Alexander Slobzheninov. All rights reserved.
+

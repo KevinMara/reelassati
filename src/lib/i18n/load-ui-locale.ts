@@ -1,3 +1,4 @@
+import { nativeRevealUi } from "./locales/ui-native-reveal";
 import { nativeZoomUi } from "./locales/ui-native-zoom";
 import { nativePushUi } from "./locales/ui-native-push";
 import { editorFontUi } from "./locales/ui-editor-fonts";
@@ -178,6 +179,7 @@ export function loadUiLocale(
       ...nativeTransitionUi[code],
       ...nativeZoomUi[code],
       ...nativePushUi[code],
+      ...nativeRevealUi[code],
       ...editorFontUi[code],
     }));
   pendingCatalogs.set(code, pending);
