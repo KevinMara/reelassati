@@ -5,6 +5,7 @@ import {
 } from "./editor-presets";
 import { normalizeTranscriptWords } from "./transcript-timing";
 import type { EditProject } from "./workspace";
+import { editorFontDirection } from "./editor-fonts";
 
 export interface AutonomousCaptionTreatment {
   preset: string;
@@ -61,6 +62,7 @@ export function normalizeAutonomousCaptionTreatment(
   return {
     preset: p.id,
     appearance: {
+      ...(p.fontId ? { fontId: p.fontId } : {}),
       color: p.color,
       outlineColor: p.outlineColor,
       activeColor: p.activeColor,
@@ -98,5 +100,8 @@ export function autonomousCaptionDirection(
 ) {
   if (!canStyleAutonomousCaptions(project, enabled))
     return "Do not return captionTreatment. Preserve the explicit template and prepared caption treatment; never add or restyle burned-in source captions.";
-  return `You may return one optional top-level captionTreatment:{preset,appearance} for the prepared editable captions. Choose its typography and rhythm from this content and any specific user style request; do not default every source to word-pop or giant uppercase text. This styles existing transcript words only. Available presets: ${JSON.stringify(CAPTION_PRESETS.map(({ id, description }) => ({ id, description })))}. Appearance supports color/outlineColor/activeColor:#RRGGBB,background:#RRGGBB|null,size:2..12,bold:boolean,uppercase:boolean,outline:0..2,position:top|bottom,margin:2..40,maxCharacters:12..64,animation:none|active-word|word-reveal|word-only|word-pulse|word-pop|word-slide|word-fade|word-type|motion. For animation:motion, optional motion:{recipe:rise|pop|drift|focus|bounce|sweep,unit:letter|word|line,direction:up|down|left|right,duration:0.08..1.5,delay:0..0.5,stagger:0..0.12,amount:0..2,easing:smooth|snappy|bounce|linear,blur:0..1.2,glow:0..1.2,anchor:left|center|right,verticalAnchor:auto|top|center|bottom}. Durations, delay and stagger are visual seconds bounded to each measured word interval and never alter transcript clocks. Use motion only with complete measured word clocks; otherwise use none. Keep short readable lines, sufficient outline or a contrasting surface, and observed space around faces, demonstrations and other text. Preserve any explicit template treatment. Omit captionTreatment when the existing treatment already suits the content.`;
+  return (
+    editorFontDirection() +
+    ` You may return one optional top-level captionTreatment:{preset,appearance} for the prepared editable captions. Choose its typography and rhythm from this content and any specific user style request; do not default every source to word-pop or giant uppercase text. This styles existing transcript words only. Available presets: ${JSON.stringify(CAPTION_PRESETS.map(({ id, description }) => ({ id, description })))}. Appearance supports color/outlineColor/activeColor:#RRGGBB,background:#RRGGBB|null,size:2..12,bold:boolean,uppercase:boolean,outline:0..2,position:top|bottom,margin:2..40,maxCharacters:12..64,animation:none|active-word|word-reveal|word-only|word-pulse|word-pop|word-slide|word-fade|word-type|motion. For animation:motion, optional motion:{recipe:rise|pop|drift|focus|bounce|sweep,unit:letter|word|line,direction:up|down|left|right,duration:0.08..1.5,delay:0..0.5,stagger:0..0.12,amount:0..2,easing:smooth|snappy|bounce|linear,blur:0..1.2,glow:0..1.2,anchor:left|center|right,verticalAnchor:auto|top|center|bottom}. Durations, delay and stagger are visual seconds bounded to each measured word interval and never alter transcript clocks. Use motion only with complete measured word clocks; otherwise use none. Keep short readable lines, sufficient outline or a contrasting surface, and observed space around faces, demonstrations and other text. Preserve any explicit template treatment. Omit captionTreatment when the existing treatment already suits the content.`
+  );
 }

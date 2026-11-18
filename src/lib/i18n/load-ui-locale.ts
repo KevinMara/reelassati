@@ -1,3 +1,5 @@
+import { nativeZoomUi } from "./locales/ui-native-zoom";
+import { editorFontUi } from "./locales/ui-editor-fonts";
 import { studioPolishUi } from "./locales/ui-studio-polish";
 import { nativeTransitionUi } from "./locales/ui-native-transitions";
 import { momentumCalendarUi } from "./locales/ui-momentum-calendar";
@@ -173,6 +175,8 @@ export function loadUiLocale(
       ...editorNov1Ui[code],
       ...editorNov7Ui[code],
       ...nativeTransitionUi[code],
+      ...nativeZoomUi[code],
+      ...editorFontUi[code],
     }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {

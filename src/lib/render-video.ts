@@ -3,6 +3,8 @@ import { withFfmpegLease } from "./ffmpeg-lease";
 import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "./platform-api";
 import { buildRenderPlan } from "./render-plan";
+import { editorFont } from "@contracts/editor-fonts";
+import { fetchEditorFont } from "./editor-fonts";
 import { nativeTransitionRecipes } from "@contracts/native-transitions";
 import { materializeNativeTransition } from "@contracts/native-transition-materialize";
 import { probeExportMetadata } from "./export-probe";
@@ -120,6 +122,11 @@ async function renderVideoWithLease(
       "DejaVuSans.ttf",
       new Uint8Array(await font.arrayBuffer())
     );
+    const captionFont = editorFont(project.captionAppearance?.fontId);
+    if (captionFont) {
+      const bytes = await fetchEditorFont(captionFont.id, options.signal);
+      await ffmpeg.writeFile(`${captionFont.id}.ttf`, bytes);
+    }
     const sourceBlobs: Array<{ name: string; data: Blob }> = [];
     const audioIds = new Set<string>();
     const sourceMetadata = new Map<string, RenderSourceMetadata>();

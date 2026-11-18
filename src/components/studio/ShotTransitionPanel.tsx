@@ -5,7 +5,10 @@ import {
   shotTransitions,
 } from "@contracts/transition-presets";
 import type { ShotTransitionKind } from "@contracts/shot-transition";
-import { isNativeTransitionKind } from "@contracts/native-transitions";
+import {
+  isNativeTransitionKind,
+  nativeTransitionId,
+} from "@contracts/native-transitions";
 import { NativeTransitionPreview } from "./NativeTransitionPreview";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { Download, Upload } from "lucide-react";
@@ -125,7 +128,7 @@ function ShotTransitionControls({
           >
             {isNativeTransitionKind(p.kind) ? (
               <NativeTransitionPreview
-                id={p.kind === "native-stretch" ? "stretch" : "slide"}
+                id={nativeTransitionId(p.kind)}
                 seconds={p.duration}
               />
             ) : (
@@ -330,7 +333,13 @@ function ShotTransitionControls({
         <p className="text-xs text-foreground/65">
           {kind === "native-stretch"
             ? ui("Stretches and blends both shots.")
-            : ui("Slides through an intentional black midpoint.")}
+            : kind === "native-slide"
+              ? ui("Slides through an intentional black midpoint.")
+              : kind === "native-zoom"
+                ? ui("Gently zooms and blends both shots.")
+                : ui(
+                    "Pulls back into mirrored tiles, then returns to full frame."
+                  )}
         </p>
       )}
       <label className="block text-xs">

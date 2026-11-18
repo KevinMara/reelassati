@@ -5,6 +5,7 @@ import {
   type MotionGraphic,
 } from "./motion-graphics";
 import fontMetrics from "./caption-font-metrics.json";
+import { editorFont, editorFontMetrics } from "./editor-fonts";
 
 export const CAPTION_ANIMATIONS = [
   "none",
@@ -102,6 +103,7 @@ export function normalizeCaptionMotion(
   return result;
 }
 export interface CaptionPreset {
+  fontId?: string;
   animation: CaptionAnimation;
   motion?: CaptionMotionSettings;
   activeColor: string;
@@ -390,6 +392,7 @@ export const CAPTION_PRESETS: readonly CaptionPreset[] = [
 export type CaptionAppearance = Partial<
   Pick<
     CaptionPreset,
+    | "fontId"
     | "color"
     | "outlineColor"
     | "size"
@@ -413,6 +416,8 @@ export function getCaptionPreset(
     CAPTION_PRESETS.find(p => p.id === "classic")!;
   if (!appearance || typeof appearance !== "object") return base;
   const result = { ...base };
+  if (appearance.fontId === "default") delete result.fontId;
+  else if (editorFont(appearance.fontId)) result.fontId = appearance.fontId;
   for (const key of ["color", "outlineColor", "activeColor"] as const)
     if (
       typeof appearance[key] === "string" &&
@@ -461,7 +466,9 @@ export function getCaptionPreset(
 
 /** Advances extracted from our bundled DejaVu Sans; see public/fonts/DejaVuSans-LICENSE.txt. */
 export function captionLineWidth(text: string, preset: CaptionPreset): number {
-  const metrics = fontMetrics as Record<string, number>;
+  const metrics =
+    editorFontMetrics(preset.fontId)?.advances ??
+    (fontMetrics as Record<string, number>);
   return Array.from(text).reduce(
     (sum, point) => sum + (metrics[point] ?? 1) * preset.size,
     0

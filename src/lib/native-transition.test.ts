@@ -66,7 +66,12 @@ const apply = (p = source()) =>
   applyNativeAdjacentTransition(p, assets, "a", "b", "native-stretch", 0.4);
 
 describe("native transitions on real source handles", () => {
-  it.each(["native-stretch", "native-slide"] as const)(
+  it.each([
+    "native-stretch",
+    "native-slide",
+    "native-zoom",
+    "native-grid",
+  ] as const)(
     "persists and executes the %s action through the actual chat-state boundary",
     transition => {
       const p = source(),
@@ -132,7 +137,7 @@ describe("native transitions on real source handles", () => {
       });
       const edited = applyChatAction(p, retained[0], assets);
       expect(nativeTransitionRecipes(edited)[0].reference).toMatchObject({
-        id: transition === "native-stretch" ? "stretch" : "slide",
+        id: transition.slice(7),
         duration: 0.4,
       });
     }

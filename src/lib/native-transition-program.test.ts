@@ -2,12 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   nativeTransitionProgram,
   nativeTransitionDefinitions,
+  nativeTransitionIds,
 } from "@contracts/native-transition-program";
 describe("authored native transition clocks", () => {
   it.each([2, 8, 14, 24, 30, 60, 180, 300])(
     "compiles actual %i-frame clocks without unsupported operations",
     frames => {
-      for (const id of ["stretch", "slide"] as const) {
+      for (const id of nativeTransitionIds) {
         const p = nativeTransitionProgram(id, frames, 30);
         expect(p.frames).toBe(frames);
         expect(p.nodes.every(n => n.samples.length === frames)).toBe(true);

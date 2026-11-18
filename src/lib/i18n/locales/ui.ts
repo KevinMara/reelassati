@@ -1,3 +1,5 @@
+import { nativeZoomUi } from "./ui-native-zoom";
+import { editorFontUi } from "./ui-editor-fonts";
 import { studioPolishUi } from "./ui-studio-polish";
 import { nativeTransitionUi } from "./ui-native-transitions";
 import { momentumCalendarUi } from "./ui-momentum-calendar";
@@ -164,4 +166,10 @@ for (const [code, entries] of Object.entries(editorNov1Ui))
 for (const [code, entries] of Object.entries(editorNov7Ui))
   Object.assign(uiLocales[code], entries);
 for (const [code, entries] of Object.entries(nativeTransitionUi))
+  Object.assign(uiLocales[code], entries);
+
+for (const [code, entries] of Object.entries(editorFontUi))
+  Object.assign(uiLocales[code], entries);
+
+for (const [code, entries] of Object.entries(nativeZoomUi))
   Object.assign(uiLocales[code], entries);

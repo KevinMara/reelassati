@@ -5,7 +5,13 @@ import {
   type NativeFrameProgram,
 } from "./native-frame-program";
 
-export type NativeTransitionId = "stretch" | "slide";
+export type NativeTransitionId = "stretch" | "slide" | "zoom" | "grid";
+export const nativeTransitionIds: readonly NativeTransitionId[] = [
+  "stretch",
+  "slide",
+  "zoom",
+  "grid",
+];
 export const nativeTransitionDefinitions = {
   stretch: {
     name: "Elastic stretch",
@@ -20,6 +26,20 @@ export const nativeTransitionDefinitions = {
     description:
       "Both shots slide right out of frame, switch during an intentional black midpoint, and return. Avoid when continuous picture is required.",
     intentionalEmptyMidpoint: true,
+  },
+  zoom: {
+    name: "Measured zoom dissolve",
+    inputOrder: ["incoming", "outgoing"],
+    description:
+      "A small accelerating push on the outgoing shot blends into the incoming shot as it settles from a slight tiled zoom-out. Use for a motivated forward movement, not a hard whip.",
+    intentionalEmptyMidpoint: false,
+  },
+  grid: {
+    name: "Mirrored grid dissolve",
+    inputOrder: ["incoming", "outgoing"],
+    description:
+      "Both shots pull back into mirrored image tiles and dissolve before returning to full frame. A pronounced graphic effect; use only when repeated reflected picture suits the content.",
+    intentionalEmptyMidpoint: false,
   },
 } as const;
 const cache = new Map<string, NativeFrameProgram>();

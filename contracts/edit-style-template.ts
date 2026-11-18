@@ -129,6 +129,7 @@ export function normalizeEditStyleProfile(
     );
     const {
       color,
+      fontId,
       outlineColor,
       activeColor,
       background,
@@ -146,6 +147,7 @@ export function normalizeEditStyleProfile(
       preset: p.id,
       appearance: {
         color,
+        ...(fontId ? { fontId } : {}),
         outlineColor,
         activeColor,
         background: background ?? null,

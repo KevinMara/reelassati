@@ -10,7 +10,7 @@ import type { EditProject } from "./workspace";
 const edited = {
   duration: 12,
   captionStyle: "kinetic",
-  captionAppearance: { activeColor: "#AA3377" },
+  captionAppearance: { activeColor: "#AA3377", fontId: "montserrat-black" },
   transcript: [{ text: "SOURCE WORDS 987" }],
   clips: [
     ...[1, 3, 8].map((duration, i) => ({
@@ -65,6 +65,10 @@ describe("adaptive editing style templates", () => {
     };
     const profile = captureEditStyle(project);
     expect(profile.captionTreatment?.preset).toBe("kinetic");
+    expect(
+      normalizeEditStyleProfile(JSON.parse(JSON.stringify(profile)))
+        ?.captionTreatment?.appearance.fontId
+    ).toBe("montserrat-black");
     expect(profile.traits.captions).toBe("word-emphasis");
     expect(
       captureEditStyle({ ...project, transcript: [] }).captionTreatment

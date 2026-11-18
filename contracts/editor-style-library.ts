@@ -93,6 +93,7 @@ function safeCaptionAppearance(style: string, value: unknown) {
   return {
     captionStyle: preset.id,
     captionAppearance: {
+      ...(preset.fontId ? { fontId: preset.fontId } : {}),
       color: preset.color,
       outlineColor: preset.outlineColor,
       activeColor: preset.activeColor,

@@ -3,6 +3,9 @@ import { captionRuns, captionMotion } from "@contracts/caption-runs";
 import { captionMotionFrame } from "@contracts/caption-motion";
 import type { TranscriptSegment } from "@contracts/workspace";
 import { captionTextCss } from "@/lib/caption-rendering";
+import { useEffect, useState } from "react";
+import { loadEditorFont } from "@/lib/editor-fonts";
+import { useUiText } from "@/lib/i18n/ui";
 
 export function CaptionLayer({
   segments,
@@ -21,6 +24,25 @@ export function CaptionLayer({
   sample?: boolean;
 }) {
   const p = getCaptionPreset(presetId, appearance);
+  const ui = useUiText();
+  const fontId = p.fontId ?? "";
+  const [loaded, setLoaded] = useState("");
+  const [failed, setFailed] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let current = true;
+    setFailed("");
+    void loadEditorFont(fontId)
+      .then(() => {
+        if (current) setLoaded(fontId);
+      })
+      .catch(() => {
+        if (current) setFailed(fontId);
+      });
+    return () => {
+      current = false;
+    };
+  }, [fontId, attempt]);
   const verticalAnchor = sample
     ? "center"
     : p.animation === "motion" &&
@@ -32,6 +54,25 @@ export function CaptionLayer({
     s => s.start <= time && s.end > time && s.text.trim()
   );
   if (!active.length) return null;
+  if (fontId && loaded !== fontId)
+    return (
+      <div
+        className="absolute inset-0 flex items-center justify-center text-xs"
+        role="status"
+      >
+        {failed === fontId ? (
+          <button
+            type="button"
+            className="rounded-lg border border-border px-3 py-2"
+            onClick={() => setAttempt(n => n + 1)}
+          >
+            {ui("Retry font")}
+          </button>
+        ) : (
+          ui("Loading font…")
+        )}
+      </div>
+    );
   return (
     <div
       className="pointer-events-none absolute inset-x-[8%] z-20 flex flex-col items-center text-center"

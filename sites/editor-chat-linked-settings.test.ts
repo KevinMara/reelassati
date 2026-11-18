@@ -118,6 +118,48 @@ const fpsStep = (frameRate: unknown) => ({
 });
 
 describe("Reel caption motion planning", () => {
+  it("keeps a requested exact font through planning, persistence and execution", () => {
+    const ctx = context();
+    ctx.request.prompt = "Use Montserrat Black for captions";
+    const plan = normalizeEditorChatPlan(
+      {
+        actions: [
+          {
+            ...step,
+            kind: "settings",
+            requestExcerpt: ctx.request.prompt,
+            captionAppearance: { fontId: "montserrat-black" },
+          },
+        ],
+      },
+      ctx
+    );
+    expect(plan.blockedReasons).toEqual([]);
+    const saved = normalizeEditorChatState(
+      JSON.parse(
+        JSON.stringify({
+          mode: "ask",
+          maxCredits: 100,
+          messages: [
+            {
+              id: "font-request",
+              role: "assistant",
+              text: "Font change",
+              createdAt: "2026-11-18T00:00:00.000Z",
+              plan,
+            },
+          ],
+        })
+      )
+    )!;
+    const action = saved.messages[0].plan!.actions[0];
+    expect(action).toMatchObject({
+      captionAppearance: { fontId: "montserrat-black" },
+    });
+    expect(
+      applyChatAction(ctx.project, action, []).captionAppearance?.fontId
+    ).toBe("montserrat-black");
+  });
   it("preserves normalized custom motion through the server action and actual project application", () => {
     const ctx = context();
     ctx.request.prompt =

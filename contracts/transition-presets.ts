@@ -3,18 +3,17 @@ import {
   isNativeTransitionKind,
   type NativeTransitionKind,
 } from "./native-transitions";
-import { nativeTransitionDefinitions } from "./native-transition-program";
+import {
+  nativeTransitionDefinitions,
+  nativeTransitionIds,
+} from "./native-transition-program";
 import type { ShotTransitionKind } from "./shot-transition";
 export const shotTransitions = [
   ...visualTransitions.filter(t => t.value !== "none"),
-  {
-    value: "native-stretch" as const,
-    label: nativeTransitionDefinitions.stretch.name,
-  },
-  {
-    value: "native-slide" as const,
-    label: nativeTransitionDefinitions.slide.name,
-  },
+  ...nativeTransitionIds.map(id => ({
+    value: `native-${id}` as NativeTransitionKind,
+    label: nativeTransitionDefinitions[id].name,
+  })),
 ];
 export type TransitionPreset = {
   id: string;
@@ -34,7 +33,7 @@ export const TRANSITION_PRESETS: TransitionPreset[] = [
         duration,
       }))
     ),
-  ...(["stretch", "slide"] as const).map(id => ({
+  ...nativeTransitionIds.map(id => ({
     id: `native-${id}-0_45`,
     name: nativeTransitionDefinitions[id].name,
     kind: `native-${id}` as NativeTransitionKind,

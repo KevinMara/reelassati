@@ -11,11 +11,20 @@ import {
 import { exportFrameRates, type ExportFrameRate } from "./export-settings";
 import { effectiveTimelineClips } from "./timeline-mixer";
 
-export type NativeTransitionKind = "native-stretch" | "native-slide";
+export type NativeTransitionKind = `native-${NativeTransitionId}`;
+export function nativeTransitionId(
+  kind: NativeTransitionKind
+): NativeTransitionId {
+  return kind.slice(7) as NativeTransitionId;
+}
 export function isNativeTransitionKind(
   value: unknown
 ): value is NativeTransitionKind {
-  return value === "native-stretch" || value === "native-slide";
+  return (
+    typeof value === "string" &&
+    value.startsWith("native-") &&
+    Object.hasOwn(nativeTransitionDefinitions, value.slice(7))
+  );
 }
 export interface NativeTransitionReference {
   version: 1;
@@ -62,7 +71,7 @@ export function applyNativeAdjacentTransition(
     );
   const ref: NativeTransitionReference = {
     version: 1,
-    id: kind === "native-stretch" ? "stretch" : "slide",
+    id: nativeTransitionId(kind),
     duration,
     frameRate: project.frameRate ?? 30,
   };

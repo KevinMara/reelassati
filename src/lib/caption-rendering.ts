@@ -8,6 +8,11 @@ import { assTime, escapeAss } from "./graphic-ass";
 import { captionRuns, captionMotion } from "@contracts/caption-runs";
 import { normalizeTranscriptWords } from "@contracts/transcript-timing";
 import { captionMotionFrame } from "@contracts/caption-motion";
+import {
+  editorFont,
+  editorFontCssFamily,
+  editorFontMetrics,
+} from "@contracts/editor-fonts";
 
 const assColor = (hex: string) =>
   `&H00${hex.slice(5, 7)}${hex.slice(3, 5)}${hex.slice(1, 3)}`;
@@ -37,10 +42,16 @@ export function captionAssStyle(
   appearance?: CaptionAppearance
 ) {
   const p = getCaptionPreset(presetId, appearance);
+  const face = editorFont(p.fontId);
   const border = p.background ?? p.outlineColor;
-  // libass sizes the font's ascender-to-descender height; CSS sizes its em.
-  // Bundled DejaVu Sans hhea: (1901 - -483) / unitsPerEm 2048.
-  const fontHeight = p.animation === "motion" ? 2384 / 2048 : 1;
+  // libass sizes OS/2 Win ascent + descent, while CSS sizes the em.
+  // https://github.com/libass/libass/blob/master/libass/ass_font.c#set_font_metrics
+  // DejaVu's legacy compensation remains unchanged for existing projects.
+  const fontHeight = face
+    ? editorFontMetrics(face.id)!.height
+    : p.animation === "motion"
+      ? 2384 / 2048
+      : 1;
   const vertical =
     p.motion?.verticalAnchor && p.motion.verticalAnchor !== "auto"
       ? p.motion.verticalAnchor
@@ -52,7 +63,7 @@ export function captionAssStyle(
       : p.position === "top"
         ? 8
         : 2;
-  return `Style: Caption,DejaVu Sans,${((width * p.size * fontHeight) / 100).toFixed(2)},${assColor(p.color)},${assColor(p.color)},${assColor(border)},${assColor(border)},${p.bold ? -1 : 0},0,0,0,100,100,0,0,${p.background ? 3 : 1},${((width * p.outline) / 100).toFixed(2)},0,${alignment},${Math.round(width * 0.08)},${Math.round(width * 0.08)},${Math.round((height * p.margin) / 100)},1`;
+  return `Style: Caption,${face?.family ?? "DejaVu Sans"},${((width * p.size * fontHeight) / 100).toFixed(2)},${assColor(p.color)},${assColor(p.color)},${assColor(border)},${assColor(border)},${face ? (face.bold ? -1 : 0) : p.bold ? -1 : 0},${face?.italic ? -1 : 0},0,0,100,100,0,0,${p.background ? 3 : 1},${((width * p.outline) / 100).toFixed(2)},0,${alignment},${Math.round(width * 0.08)},${Math.round(width * 0.08)},${Math.round((height * p.margin) / 100)},1`;
 }
 
 export function captionAssEvents(
@@ -181,12 +192,22 @@ export function captionAssEvents(
 
 /** Percentage units refer to the video canvas, not the application viewport. */
 export function captionTextCss(p: CaptionPreset) {
+  const face = editorFont(p.fontId);
   return {
     color: p.color,
-    fontFamily: '"Editor Sans", "DejaVu Sans", sans-serif',
+    fontFamily: face
+      ? `"${editorFontCssFamily(face.id)}"`
+      : '"Editor Sans", "DejaVu Sans", sans-serif',
     fontSize: `${p.size}cqw`,
-    fontWeight: p.bold ? 700 : 400,
-    lineHeight: 1.2,
+    fontWeight: face ? 400 : p.bold ? 700 : 400,
+    fontSynthesis: face ? "none" : undefined,
+    fontKerning: face ? ("none" as const) : undefined,
+    // libass retains standard/contextual shaping. Disabling it only in CSS
+    // changes script-face outlines and widths (for example Great Vibes).
+    fontVariantLigatures: face ? "normal" : undefined,
+    fontFeatureSettings: face ? "normal" : undefined,
+    letterSpacing: face ? "normal" : undefined,
+    lineHeight: face ? editorFontMetrics(face.id)!.height : 1.2,
     background: p.background,
     padding: p.background ? `${p.outline}cqw` : undefined,
     WebkitTextStroke: p.background

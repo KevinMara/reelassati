@@ -10,6 +10,7 @@ import { CompactSelect } from "@/components/ui/compact-select";
 import { EditorInfo } from "./EditorInfo";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { CaptionMotionFields } from "./CaptionMotionFields";
+import { EDITOR_FONTS } from "@contracts/editor-fonts";
 
 export function CaptionAppearanceEditor({
   presetId,
@@ -78,6 +79,21 @@ export function CaptionAppearanceEditor({
           />
         ))}
       </div>
+      <label className="block space-y-2 text-xs">
+        <span>{ui("Font")}</span>
+        <CompactSelect
+          aria-label={ui("Font")}
+          value={p.fontId ?? "default"}
+          onValueChange={fontId => patch({ fontId })}
+          options={[
+            { value: "default", label: "Editor Sans" },
+            ...EDITOR_FONTS.map(face => ({
+              value: face.id,
+              label: face.label,
+            })),
+          ]}
+        />
+      </label>
       <CompactSelect
         aria-label={ui("Caption animation")}
         value={p.animation}
@@ -155,16 +171,18 @@ export function CaptionAppearanceEditor({
             ["bold", "Bold"],
             ["uppercase", "Uppercase"],
           ] as const
-        ).map(([key, label]) => (
-          <label key={key} className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={p[key]}
-              onChange={e => patch({ [key]: e.target.checked })}
-            />
-            {label}
-          </label>
-        ))}
+        )
+          .filter(([key]) => key !== "bold" || !p.fontId)
+          .map(([key, label]) => (
+            <label key={key} className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={p[key]}
+                onChange={e => patch({ [key]: e.target.checked })}
+              />
+              {label}
+            </label>
+          ))}
         <label className="flex items-center gap-1.5">
           <input
             type="checkbox"
