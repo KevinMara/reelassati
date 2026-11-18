@@ -149,7 +149,19 @@ export async function transcribeMediaLocally(
         if (event.data.type === "language" && import.meta.env.DEV)
           console.info(`[local-speech-language] ${event.data.language}`);
         else if (event.data.type === "progress")
-          onProgress?.(`Downloading speech model · ${event.data.percent}%`);
+          // Each download event belongs to one file, not the whole pipeline.
+          // Never leave a completed-file percentage on screen during inference.
+          onProgress?.(
+            `Downloading speech model · current file ${event.data.percent}%`
+          );
+        else if (event.data.type === "stage") {
+          if (event.data.stage === "preparing")
+            onProgress?.("Preparing speech recognition…");
+          else if (event.data.stage === "detecting-language")
+            onProgress?.("Detecting the spoken language…");
+          else if (event.data.stage === "transcribing")
+            onProgress?.("Transcribing speech and measuring word timing…");
+        }
         else if (event.data.type === "result") {
           cleanup();
           resolve(

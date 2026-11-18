@@ -28,13 +28,20 @@ self.onmessage = async (
               file: progress.file,
               percent: Math.round(progress.progress),
             });
+          else if ("status" in progress && progress.status === "done")
+            self.postMessage({ type: "stage", stage: "preparing" });
         },
       }
     );
+    self.postMessage({
+      type: "stage",
+      stage: event.data.language?.trim() ? "transcribing" : "detecting-language",
+    });
     const language =
       event.data.language?.trim() ||
       (await detectLocalSpeechLanguage(transcriber, Tensor, event.data.audio));
     if (import.meta.env.DEV) self.postMessage({ type: "language", language });
+    self.postMessage({ type: "stage", stage: "transcribing" });
     const output = await transcriber(event.data.audio, {
       chunk_length_s: 30,
       stride_length_s: 5,

@@ -384,8 +384,21 @@ describe("foreground local transcription lifetime", () => {
   });
 
   it("saves measured words and clears the worker and timeout after success", async () => {
-    const pending = transcribeMediaLocally(asset);
+    const progress = vi.fn();
+    const pending = transcribeMediaLocally(asset, undefined, undefined, progress);
     const worker = await waitForWorker();
+    worker.onmessage!({ data: { type: "progress", percent: 100 } });
+    expect(progress).toHaveBeenLastCalledWith(
+      "Downloading speech model · current file 100%"
+    );
+    worker.onmessage!({ data: { type: "stage", stage: "detecting-language" } });
+    expect(progress).toHaveBeenLastCalledWith("Detecting the spoken language…");
+    worker.onmessage!({ data: { type: "stage", stage: "transcribing" } });
+    expect(progress).toHaveBeenLastCalledWith(
+      "Transcribing speech and measuring word timing…"
+    );
+    expect(localApi.registerLocalTranscript).not.toHaveBeenCalled();
+    expect(worker.terminate).not.toHaveBeenCalled();
     worker.onmessage!({
       data: {
         type: "result",
