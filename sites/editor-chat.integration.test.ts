@@ -145,9 +145,9 @@ function expectAuthorCompatibleK3(payload: Record<string, unknown>) {
     allow_fallbacks: false,
     data_collection: "deny",
     max_price: { prompt: 3, completion: 15 },
-    ...(hasVideo ? { ignore: ["wafer"] } : {}),
+    ...(hasVideo ? { only: ["moonshotai"] } : {}),
   });
-  // Do not bypass capacity-aware primary selection or select another model.
+  // Keep capacity selection for non-video; never substitute another model.
   expect(payload.provider).not.toHaveProperty("order");
   expect(payload.provider).not.toHaveProperty("sort");
   expect(payload).not.toHaveProperty("models");
@@ -1288,7 +1288,6 @@ describe("foreground K3 auto-edit planning", () => {
         stream: true,
         provider: { require_parameters: true, allow_fallbacks: false },
       });
-      expect(providerCalls.at(-1)?.provider).not.toHaveProperty("only");
       expectAuthorCompatibleK3(providerCalls.at(-1)!);
       expect(balance()).toBe(before - 5);
     } finally {
@@ -2593,7 +2592,6 @@ describe("foreground K3 auto-edit planning", () => {
           model: "moonshotai/kimi-k3",
           provider: { require_parameters: true, allow_fallbacks: false },
         });
-        expect(providerCalls.at(-1)?.provider).not.toHaveProperty("only");
         expectAuthorCompatibleK3(providerCalls.at(-1)!);
         expect(failureLog).toHaveBeenCalledWith(
           "REELassati provider operation failed",
@@ -2984,7 +2982,7 @@ describe("authenticated paid editing chat route", () => {
         },
       ])
     );
-    expect(payload).toHaveProperty("provider.ignore", ["wafer"]);
+    expect(payload).toHaveProperty("provider.only", ["moonshotai"]);
     expect(balance()).toBe(before - 5);
     const replay = await request("/api/ai/editor-chat", body);
     expect(replay.status).toBe(200);
@@ -3231,9 +3229,6 @@ describe("authenticated paid editing chat route", () => {
     });
     expect(providerCalls.length).toBe(calls + 1);
     expect(payload).not.toHaveProperty("models");
-    expect((payload as Record<string, unknown>).provider).not.toHaveProperty(
-      "only"
-    );
     expectAuthorCompatibleK3(payload as Record<string, unknown>);
     expect(
       sqlite

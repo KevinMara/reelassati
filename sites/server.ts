@@ -4305,10 +4305,11 @@ async function chatJson(
             : requireJsonMode
               ? { response_format: { type: "json_object" } }
               : {}),
-          // A fixed K3 endpoint bypasses OpenRouter's capacity-aware primary
-          // selection and kept returning 429 while other K3 hosts were healthy.
-          // Choose one compatible, non-logging K3 host at no higher listed
-          // token price than the original route. No retry or model substitution.
+          // K3 hosts do not all accept its native video modality. Wafer and
+          // Alibaba rejected the same source packet with media-input HTTP 400;
+          // the author's endpoint has completed this video contract. Restrict
+          // video requests to that verified endpoint. Text/image requests can
+          // use capacity-aware primary selection. No retry/model substitution.
           // Keep temperature omitted: the author's endpoint does not support it.
           ...(analysisControl || (editing && foregroundK3)
             ? {
@@ -4319,12 +4320,9 @@ async function chatJson(
                     ? {
                         data_collection: "deny",
                         max_price: { prompt: 3, completion: 15 },
-                        // Wafer advertises K3 but rejects native video parts
-                        // (production request gen-1794995431-j45syyVojyDbzlk64LuE).
-                        // Preserve the video evidence and select another primary.
                         ...(Array.isArray(userContent) &&
                         userContent.some(part => part?.type === "video_url")
-                          ? { ignore: ["wafer"] }
+                          ? { only: ["moonshotai"] }
                           : {}),
                       }
                     : foregroundK3
