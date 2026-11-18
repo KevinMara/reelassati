@@ -160,6 +160,35 @@ const busyText: Partial<Record<InterfaceLanguage, string>> = {
   id: "Reel sedang sibuk sementara. Tunggu sebelum mengirim ulang permintaan.",
   th: "Reel มีการใช้งานหนาแน่นชั่วคราว โปรดรอก่อนส่งคำขออีกครั้ง",
 };
+const fontCharactersText: Partial<Record<InterfaceLanguage, string>> = {
+  it: "Questo font non supporta tutti i caratteri dei sottotitoli. Scegli un altro font.",
+  es: "Esta fuente no admite todos los caracteres de los subtítulos. Elige otra fuente.",
+  fr: "Cette police ne prend pas en charge tous les caractères des sous-titres. Choisissez une autre police.",
+  de: "Diese Schrift unterstützt nicht alle Untertitelzeichen. Wähle eine andere Schrift.",
+  pt: "Esta fonte não suporta todos os caracteres das legendas. Escolha outra fonte.",
+  nl: "Dit lettertype ondersteunt niet alle ondertiteltekens. Kies een ander lettertype.",
+  pl: "Ta czcionka nie obsługuje wszystkich znaków napisów. Wybierz inną czcionkę.",
+  ro: "Acest font nu acceptă toate caracterele subtitrărilor. Alege alt font.",
+  tr: "Bu yazı tipi tüm altyazı karakterlerini desteklemiyor. Başka bir yazı tipi seçin.",
+  uk: "Цей шрифт не підтримує всі символи субтитрів. Виберіть інший шрифт.",
+  ru: "Этот шрифт не поддерживает все символы субтитров. Выберите другой шрифт.",
+  ar: "هذا الخط لا يدعم جميع أحرف الترجمة. اختر خطًا آخر.",
+  hi: "यह फ़ॉन्ट सभी कैप्शन अक्षरों का समर्थन नहीं करता। दूसरा फ़ॉन्ट चुनें।",
+  ja: "このフォントは字幕の一部の文字に対応していません。別のフォントを選択してください。",
+  ko: "이 글꼴은 자막의 모든 문자를 지원하지 않습니다. 다른 글꼴을 선택하세요.",
+  zh: "此字体不支持字幕中的所有字符。请选择其他字体。",
+  vi: "Phông chữ này không hỗ trợ tất cả ký tự phụ đề. Hãy chọn phông chữ khác.",
+  da: "Denne skrifttype understøtter ikke alle underteksttegn. Vælg en anden skrifttype.",
+  sv: "Det här typsnittet stöder inte alla undertexttecken. Välj ett annat typsnitt.",
+  no: "Denne skrifttypen støtter ikke alle underteksttegn. Velg en annen skrifttype.",
+  fi: "Tämä fontti ei tue kaikkia tekstityksen merkkejä. Valitse toinen fontti.",
+  cs: "Toto písmo nepodporuje všechny znaky titulků. Vyberte jiné písmo.",
+  hu: "Ez a betűtípus nem támogatja a felirat összes karakterét. Válassz másik betűtípust.",
+  el: "Αυτή η γραμματοσειρά δεν υποστηρίζει όλους τους χαρακτήρες των υποτίτλων. Επιλέξτε άλλη γραμματοσειρά.",
+  he: "הגופן הזה אינו תומך בכל התווים בכתוביות. בחרו גופן אחר.",
+  id: "Font ini tidak mendukung semua karakter takarir. Pilih font lain.",
+  th: "แบบอักษรนี้ไม่รองรับอักขระทั้งหมดในคำบรรยาย โปรดเลือกแบบอักษรอื่น",
+};
 export const editorNov1Ui = Object.fromEntries(
   Object.entries(rows).map(([code, row]) => {
     const values = row.split("|");
@@ -168,6 +197,11 @@ export const editorNov1Ui = Object.fromEntries(
     const copy: Record<string, string> = Object.fromEntries(
       keys.map((key, index) => [key, values[index]])
     );
+    copy[
+      "This font does not support all caption characters. Choose another font."
+    ] =
+      fontCharactersText[code as InterfaceLanguage] ??
+      "This font does not support all caption characters. Choose another font.";
     copy["Reel couldn't finish this edit. Please try again."] =
       planFailureText[code as InterfaceLanguage] ??
       "Reel couldn't finish this edit. Please try again.";

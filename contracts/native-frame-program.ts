@@ -13,7 +13,7 @@ export interface NativeTransformSample {
 export type NativeFrameNode =
   | {
       id: string;
-      kind: "mix";
+      kind: "mix" | "over";
       a: string;
       b: string;
       samples: { mix: number }[];
@@ -86,10 +86,10 @@ export function readNativeFrameProgram(value: unknown): NativeFrameProgram {
     )
       throw new Error("Invalid native graph node");
     let node: NativeFrameNode;
-    if (n.kind === "mix") {
+    if (n.kind === "mix" || n.kind === "over") {
       node = {
         id: n.id,
-        kind: "mix",
+        kind: n.kind,
         a: input(n.a),
         b: input(n.b),
         samples: n.samples.map(s => ({ mix: numeric(record(s).mix, 0, 1) })),

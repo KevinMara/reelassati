@@ -30,6 +30,21 @@ const treatment = {
 };
 
 describe("content-specific automatic caption treatment", () => {
+  it("offers only fonts that can render the transcript and preserves captions on incompatible output", () => {
+    const accented = {
+      ...project,
+      transcript: [{ ...project.transcript[0], text: "È già così — voilà!" }],
+    };
+    const direction = autonomousCaptionDirection(accented, true);
+    expect(direction).not.toContain("scream (Scream)");
+    expect(direction).toContain("roboto-bold (Roboto Bold)");
+    expect(
+      applyAutonomousCaptionTreatment(accented, {
+        preset: "classic",
+        appearance: { fontId: "scream" },
+      })
+    ).toBe(accented);
+  });
   it("requires explicit opt-in and actual editable captions", () => {
     expect(canStyleAutonomousCaptions(project, false)).toBe(false);
     expect(canStyleAutonomousCaptions(project, true)).toBe(true);

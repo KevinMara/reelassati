@@ -79,27 +79,36 @@ export function compileFusionFrameProgram(
     if (ids.has(name)) return ids.get(name);
     const node = tools.get(name);
     if (!node) throw new Error(`Unresolved native image node ${name}`);
-    if (!["Dissolve", "Transform"].includes(node.tag))
+    if (!["Dissolve", "Transform", "Merge"].includes(node.tag))
       throw new Error(`Native renderer operation not implemented: ${node.tag}`);
     visiting.add(name);
     const allowed =
       node.tag === "Dissolve"
         ? ["Background", "Foreground", "Mix"]
-        : [
-            "Input",
-            "Center",
-            "Pivot",
-            "Size",
-            "Aspect",
-            "XSize",
-            "YSize",
-            "UseSizeAndAspect",
-            "Angle",
-            "Edges",
-            "MotionBlur",
-            "Quality",
-            "ShutterAngle",
-          ];
+        : node.tag === "Merge"
+          ? [
+              "Background",
+              "Foreground",
+              "Blend",
+              "PerformDepthMerge",
+              "ApplyMode",
+              "Operator",
+            ]
+          : [
+              "Input",
+              "Center",
+              "Pivot",
+              "Size",
+              "Aspect",
+              "XSize",
+              "YSize",
+              "UseSizeAndAspect",
+              "Angle",
+              "Edges",
+              "MotionBlur",
+              "Quality",
+              "ShutterAngle",
+            ];
     for (const key of Object.keys(fields(fields(node).Inputs)))
       if (!allowed.includes(key))
         throw new Error(
@@ -117,6 +126,23 @@ export function compileFusionFrameProgram(
         samples: Array.from({ length: frames }, (_, t) => ({
           mix: number(name, "Mix", t, 0.5),
         })),
+      };
+    } else if (node.tag === "Merge") {
+      record = {
+        kind: "over",
+        a: imageInput(name, "Background"),
+        b: imageInput(name, "Foreground"),
+        samples: Array.from({ length: frames }, (_, t) => {
+          if (
+            number(name, "PerformDepthMerge", t, 0) !== 0 ||
+            evaluator.input(name, "ApplyMode", t, "Normal") !== "Normal" ||
+            evaluator.input(name, "Operator", t, "Over") !== "Over"
+          )
+            throw new Error(
+              "Native merge mode requires a separate implementation"
+            );
+          return { mix: number(name, "Blend", t, 1) };
+        }),
       };
     } else {
       record = {

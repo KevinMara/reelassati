@@ -27,7 +27,7 @@ test("keeps authored input pin order rather than assuming background is first", 
 });
 test("does not silently flatten unsupported native effects or controls", () => {
   for (const node of [
-    "D=Merge{}",
+    'D=Merge{Inputs={Operator=Input{Value=FuID{"In"}}}}',
     'D=Dissolve{Inputs={Mix=Input{Value=.5},EffectMask=Input{SourceOp="Mask",Source="Output"}}}',
     'D=Dissolve{Transitions={[0]="VendorPlugin"}}',
   ])

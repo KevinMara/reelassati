@@ -6,6 +6,7 @@ import { captionTextCss } from "@/lib/caption-rendering";
 import { useEffect, useState } from "react";
 import { loadEditorFont } from "@/lib/editor-fonts";
 import { useUiText } from "@/lib/i18n/ui";
+import { missingEditorFontCharacters } from "@contracts/editor-fonts";
 
 export function CaptionLayer({
   segments,
@@ -54,6 +55,25 @@ export function CaptionLayer({
     s => s.start <= time && s.end > time && s.text.trim()
   );
   if (!active.length) return null;
+  if (
+    active.some(
+      s =>
+        missingEditorFontCharacters(
+          fontId,
+          p.uppercase ? s.text.toUpperCase() : s.text
+        ).length
+    )
+  )
+    return (
+      <div
+        role="alert"
+        className="absolute inset-0 flex items-center justify-center p-4 text-center text-xs"
+      >
+        {ui(
+          "This font does not support all caption characters. Choose another font."
+        )}
+      </div>
+    );
   if (fontId && loaded !== fontId)
     return (
       <div

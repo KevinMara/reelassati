@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseFusionSetting, fields, fusionTools } from "./fusion-setting.mjs";
+import { compileFusionFrameProgram } from "./fusion-frame-program.mjs";
 import {
   fusionParameterEvaluator,
   evaluateFusionSpline,
@@ -111,4 +112,40 @@ test("refuses expressions and cyclic modifier inputs", () => {
     { frames: 180 }
   );
   assert.throws(() => cyclic.output("A", "Value", 0), /Cyclic/);
+});
+
+test("inverts the normalized curve before applying scale and offset", () => {
+  const f = fusionParameterEvaluator(
+    parseFusionSetting(`{Tools={C=LUTLookup{Inputs={
+    Curve=Input{Value=FuID{"Easing"}},Invert=Input{Value=1},
+    Scale=Input{Value=2},Offset=Input{Value=3}
+  }}}}`),
+    { frames: 11 }
+  );
+  assert.equal(f.output("C", "Value", 0), 5);
+  assert.equal(f.output("C", "Value", 5), 4);
+  assert.equal(f.output("C", "Value", 10), 3);
+});
+
+test("compiles normal over without turning masks or other modes into dissolves", () => {
+  const source = extra => `{Tools={G=GroupOperator{
+    Inputs=ordered(){A=InstanceInput{SourceOp="M",Source="Background"},B=InstanceInput{SourceOp="M",Source="Foreground"}},
+    Outputs={Out=InstanceOutput{SourceOp="M",Source="Output"}},
+    Tools={M=Merge{Inputs={PerformDepthMerge=Input{Value=0},Blend=Input{Value=.25}${extra}}}}
+  }}}`;
+  const p = compileFusionFrameProgram(parseFusionSetting(source("")), {
+    frames: 2,
+  });
+  assert.equal(p.nodes[0].kind, "over");
+  assert.deepEqual(p.nodes[0].samples, [{ mix: 0.25 }, { mix: 0.25 }]);
+  for (const input of [
+    ',Operator=Input{Value=FuID{"In"}}',
+    ",Gain=Input{Value=.5}",
+    ',EffectMask=Input{SourceOp="Mask",Source="Mask"}',
+  ])
+    assert.throws(() =>
+      compileFusionFrameProgram(parseFusionSetting(source(input)), {
+        frames: 2,
+      })
+    );
 });

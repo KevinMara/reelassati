@@ -10,7 +10,11 @@ import {
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { EDITOR_FONTS, editorFontMetrics } from "@contracts/editor-fonts";
+import {
+  EDITOR_FONTS,
+  editorFontMetrics,
+  missingEditorFontCharacters,
+} from "@contracts/editor-fonts";
 import { getCaptionPreset, captionLineWidth } from "@contracts/editor-presets";
 import {
   captionAssEvents,
@@ -27,6 +31,12 @@ describe("bundled exact caption faces", () => {
       const data = readFileSync(`public${face.url}`);
       expect(createHash("sha256").update(data).digest("hex")).toBe(face.sha256);
       const appearance = { fontId: face.id, size: 8, outline: 0, bold: false };
+      const supportedCue = {
+        ...cue,
+        text: missingEditorFontCharacters(face.id, cue.text).length
+          ? "VIDEO 2026"
+          : cue.text,
+      };
       const preset = getCaptionPreset("classic", appearance);
       expect(captionLineWidth("MMMM", preset)).toBeCloseTo(
         editorFontMetrics(face.id)!.advances.M * 32
@@ -35,7 +45,7 @@ describe("bundled exact caption faces", () => {
       const dir = mkdtempSync(join(tmpdir(), "reel-font-"));
       try {
         copyFileSync(`public${face.url}`, join(dir, "face.ttf"));
-        const ass = `[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\nWrapStyle: 2\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n${captionAssStyle("classic", 640, 360, appearance)}\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n${captionAssEvents([cue], "classic", 1, appearance)}\n`;
+        const ass = `[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\nWrapStyle: 2\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\n${captionAssStyle("classic", 640, 360, appearance)}\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n${captionAssEvents([supportedCue], "classic", 1, appearance)}\n`;
         writeFileSync(join(dir, "caption.ass"), ass);
         const rendered = spawnSync(
           "ffmpeg",
@@ -66,6 +76,30 @@ describe("bundled exact caption faces", () => {
         rmSync(dir, { recursive: true, force: true });
       }
     });
+  it("rejects unsupported lettering before export instead of substituting an OS font", () => {
+    expect(
+      missingEditorFontCharacters("antrovectra-bolder", "VIDEO —")
+    ).toEqual(["—"]);
+    expect(() =>
+      captionAssEvents([cue], "classic", 1, { fontId: "antrovectra-bolder" })
+    ).toThrow("does not support");
+    expect(missingEditorFontCharacters("montserrat-black", cue.text)).toEqual(
+      []
+    );
+    expect(() =>
+      captionAssEvents([{ ...cue, start: 2, end: 3 }], "classic", 1, {
+        fontId: "antrovectra-bolder",
+      })
+    ).not.toThrow();
+  });
+  it("rejects legacy blank glyph slots and author badges as caption lettering", () => {
+    expect(missingEditorFontCharacters("scream", "voilà —")).toEqual([
+      "à",
+      "—",
+    ]);
+    expect(missingEditorFontCharacters("gypsycurse", "VIDEO —")).toEqual(["—"]);
+    expect(missingEditorFontCharacters("gypsycurse", "VIDEO 2026")).toEqual([]);
+  });
   it("rejects unknown identifiers and allows returning to the default font", () => {
     expect(
       getCaptionPreset("classic", { fontId: "../../secret" }).fontId

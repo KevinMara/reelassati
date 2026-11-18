@@ -49,6 +49,9 @@ void main(){
   ivec2 p=ivec2(gl_FragCoord.xy);
   if(operation==0){result=texelFetch(imageA,ivec2(p.x,int(size.y)-1-p.y),0);return;}
   if(operation==1){result=mix(texelFetch(imageA,p,0),texelFetch(imageB,p,0),weight);return;}
+  // Fusion Normal/Over uses premultiplied foreground + background*(1-alpha).
+  // Blend mixes the finished composite back against its background input.
+  if(operation==3){vec4 bg=texelFetch(imageA,p,0),fg=texelFetch(imageB,p,0);result=mix(bg,fg+bg*(1.-fg.a),weight);return;}
   if(abs(scales.x)<1e-8||abs(scales.y)<1e-8){result=vec4(0.);return;}
   // Textures retain top-down source rows. Native positive angles turn counter-clockwise.
   vec2 d=gl_FragCoord.xy-vec2(center.x,1.-center.y)*size;
@@ -259,15 +262,15 @@ export function createNativeFrameRenderer(
       });
       for (const node of program.nodes) {
         framebuffer(node.id);
-        if (node.kind === "mix") {
+        if (node.kind === "mix" || node.kind === "over") {
           bind(node.a, 0);
           bind(node.b, 1);
-          gl.uniform1i(uniforms.operation, 1);
+          gl.uniform1i(uniforms.operation, node.kind === "mix" ? 1 : 3);
           gl.uniform1f(
             uniforms.weight,
             nativeSampleAt(node.samples, frame).mix
           );
-        } else {
+        } else if (node.kind === "transform") {
           const s = nativeSampleAt(node.samples, frame);
           bind(node.input, 0);
           bind(node.input, 1);

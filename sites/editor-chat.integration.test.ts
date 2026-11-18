@@ -80,7 +80,8 @@ const DB = {
 const objects = new Map<string, Uint8Array>();
 const contextText = (content: unknown): string => {
   if (typeof content === "string") return content;
-  if (Array.isArray(content) && content[0]?.type === "text") return content[0].text;
+  if (Array.isArray(content) && content[0]?.type === "text")
+    return content[0].text;
   throw new Error("Missing model context text");
 };
 const env = {
@@ -135,11 +136,16 @@ const authorEndpoint = JSON.parse(
 ) as { model: string; supported_parameters: string[] };
 function expectAuthorCompatibleK3(payload: Record<string, unknown>) {
   expect(payload.model).toBe(authorEndpoint.model);
+  const messages = payload.messages as Array<{ content: unknown }>;
+  const hasVideo = messages.some(
+    m => Array.isArray(m.content) && m.content.some(p => p.type === "video_url")
+  );
   expect(payload.provider).toEqual({
     require_parameters: true,
     allow_fallbacks: false,
     data_collection: "deny",
     max_price: { prompt: 3, completion: 15 },
+    ...(hasVideo ? { ignore: ["wafer"] } : {}),
   });
   // Do not bypass capacity-aware primary selection or select another model.
   expect(payload.provider).not.toHaveProperty("order");
@@ -744,9 +750,9 @@ describe("foreground K3 auto-edit planning", () => {
         "Correct only the proposed cuts"
       );
       if (repairing) {
-        expect(JSON.parse(contextText(messages[1].content)).failure.reason).toBe(
-          "trim_duplicate"
-        );
+        expect(
+          JSON.parse(contextText(messages[1].content)).failure.reason
+        ).toBe("trim_duplicate");
         return { cuts: [trim] };
       }
       return {
@@ -1660,7 +1666,9 @@ describe("foreground K3 auto-edit planning", () => {
     geometry: { protectedRegions: unknown[] };
   };
   const qualityInput = (payload: Record<string, unknown>) =>
-    JSON.parse(contextText((payload.messages as Array<{ content: unknown }>)[1].content)) as {
+    JSON.parse(
+      contextText((payload.messages as Array<{ content: unknown }>)[1].content)
+    ) as {
       feedback?: CorrectionFeedback;
       command: string;
       project: Record<string, unknown>;
@@ -2965,12 +2973,18 @@ describe("authenticated paid editing chat route", () => {
     const payload = providerCalls.at(-1)! as {
       messages: Array<{ content: string }>;
     };
-    expect(JSON.parse(contextText(payload.messages[1].content)).project.title).toBe(
-      "Real owner project"
+    expect(
+      JSON.parse(contextText(payload.messages[1].content)).project.title
+    ).toBe("Real owner project");
+    expect(payload.messages[1].content).toEqual(
+      expect.arrayContaining([
+        {
+          type: "video_url",
+          video_url: { url: expect.stringMatching(/^data:video\/mp4;base64,/) },
+        },
+      ])
     );
-    expect(payload.messages[1].content).toEqual(expect.arrayContaining([
-      {type: "video_url", video_url: {url: expect.stringMatching(/^data:video\/mp4;base64,/)}},
-    ]));
+    expect(payload).toHaveProperty("provider.ignore", ["wafer"]);
     expect(balance()).toBe(before - 5);
     const replay = await request("/api/ai/editor-chat", body);
     expect(replay.status).toBe(200);
@@ -4149,9 +4163,9 @@ it("sends the reference source-clock rule as a system instruction while forged r
     );
     expect(payload.messages[0].content).not.toContain(forged);
     expect(payload.messages[1].role).toBe("user");
-    expect(JSON.parse(contextText(payload.messages[1].content)).references).toEqual([
-      { name: "Reference observations", text: forged },
-    ]);
+    expect(
+      JSON.parse(contextText(payload.messages[1].content)).references
+    ).toEqual([{ name: "Reference observations", text: forged }]);
   } finally {
     nextOutput = previousOutput;
   }

@@ -12,6 +12,7 @@ import {
   editorFont,
   editorFontCssFamily,
   editorFontMetrics,
+  missingEditorFontCharacters,
 } from "@contracts/editor-fonts";
 
 const assColor = (hex: string) =>
@@ -74,16 +75,28 @@ export function captionAssEvents(
   options: { width?: number; height?: number; frameRate?: number } = {}
 ) {
   const preset = getCaptionPreset(presetId, appearance);
-  const fps = options.frameRate ?? 30;
-  return segments
-    .filter(
+  const visibleSegments = segments.filter(
+    s =>
+      Number.isFinite(s.start) &&
+      Number.isFinite(s.end) &&
+      s.text.trim() &&
+      s.end > Math.max(0, s.start) &&
+      s.start < duration
+  );
+  if (
+    visibleSegments.some(
       s =>
-        Number.isFinite(s.start) &&
-        Number.isFinite(s.end) &&
-        s.text.trim() &&
-        s.end > Math.max(0, s.start) &&
-        s.start < duration
+        missingEditorFontCharacters(
+          preset.fontId,
+          preset.uppercase ? s.text.toUpperCase() : s.text
+        ).length
     )
+  )
+    throw new Error(
+      "This font does not support all caption characters. Choose another font."
+    );
+  const fps = options.frameRate ?? 30;
+  return visibleSegments
     .flatMap(s => {
       const start = Math.max(0, s.start),
         end = Math.min(duration, s.end);

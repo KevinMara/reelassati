@@ -1,0 +1,4 @@
+Source: https://www.dafont.com/apple-garamond.font
+Archive SHA256: 48637454ce08fa18961e0099fc62f7c48ef6436f8e27bde85bae9ed73aef7f71
+Member: AppleGaramond.ttf
+Copyright 1991 as an unpublished work by Bitstream Inc.  All rights reserved.  Confidential.

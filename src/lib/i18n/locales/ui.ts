@@ -1,4 +1,5 @@
 import { nativeZoomUi } from "./ui-native-zoom";
+import { nativePushUi } from "./ui-native-push";
 import { editorFontUi } from "./ui-editor-fonts";
 import { studioPolishUi } from "./ui-studio-polish";
 import { nativeTransitionUi } from "./ui-native-transitions";
@@ -171,5 +172,7 @@ for (const [code, entries] of Object.entries(nativeTransitionUi))
 for (const [code, entries] of Object.entries(editorFontUi))
   Object.assign(uiLocales[code], entries);
 
-for (const [code, entries] of Object.entries(nativeZoomUi))
+for (const [code, entries] of Object.entries(nativeZoomUi).map(
+  ([code, entries]) => [code, { ...entries, ...nativePushUi[code] }] as const
+))
   Object.assign(uiLocales[code], entries);

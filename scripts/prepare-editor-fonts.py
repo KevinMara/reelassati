@@ -40,8 +40,11 @@ def build(download):
     commit = old['sourceCommit'] if old else json.loads(read_url('https://api.github.com/repos/google/fonts/commits/main'))['sha']
     base = 'https://raw.githubusercontent.com/google/fonts/'+commit+'/ofl/'
     dest = ROOT/'public/fonts/native'; dest.mkdir(parents=True,exist_ok=True)
-    manifest = {'sourceCommit':commit,'faces':[]}
-    metrics = {}
+    # Preserve explicitly imported original faces when refreshing Google sources.
+    imported = [f for f in (old or {}).get('faces',[]) if f.get('sourceMember')]
+    manifest = {'sourceCommit':commit,'faces':imported}
+    old_metrics = json.loads((ROOT/'contracts/editor-font-metrics.json').read_text(encoding='utf8')) if imported else {}
+    metrics = {f['id']:old_metrics[f['id']] for f in imported}
     for family, filename, faces in SPECS:
         url = base+family+'/'+urllib.parse.quote(filename)
         data = read_url(url)

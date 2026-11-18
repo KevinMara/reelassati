@@ -1,0 +1,87 @@
+Source: https://www.1001fonts.com/corleone-font.html
+Archive SHA256: fe9c526d59bb72079ca09b3f94d9f0b3676fa18e63dc72ac391709b603c85b2d
+Member: CorleoneDue.ttf
+
+--- Corleone Readme.txt ---
+ ___   __  _  _  ____  __  __  ___  ___   __      __  __  __  __ 
+(  _) /  \( \( )(_  _)(  \/  )(  _)/ __) (  )    / _)/  \(  \/  )
+ ) _)( () ))  (   )(   )    (  ) _)\__ \ /__\  _( (_( () ))    ( 
+(_)   \__/(_)\_) (__) (_/\/\_)(___)(___/(_)(_)(_)\__)\__/(_/\/\_)
+
+Font Name - Corleone and Corleone Due v1.0 (Freeware)
+*******************************************************
+Release Date - December 7, 2001
+Designed by Michael Hagemann at www.FontMesa.com
+Available for PC Truetype and Type1
+Available for Mac in Type1
+International Characters: Yes
+Euro symbol: Yes
+Kerning: Yes
+Platform: Win95, Win98, WinME, Win2000, WinXP
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+FontMesa Freeware
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+The Corleone font resembles the style of lettering used in
+the Godfather movies. The original logo from the first movie
+was too tightly spaced and didn't work well as a font but the
+Godfather logo from the third movie was better spaced and worked
+well even at smaller type sizes.
+
+The first Corleone font has an upper case with an extended top line
+while the second font Corleone Due has normal upper case letters
+
+There are three ligatures or custom letter combinations in the fonts,
+the custom letters (th) are located on the less than key and can be 
+acsessed by holding down the shift key and pressing the comma key.
+Another custom letter (tt) is located on the greater than key and can be 
+accessed by holding down the shift key and pressing the period key.
+And a third custom ligature (Th) is located on the vertical bar key and 
+can acsessed by holding down the shift key and pressing the back slash key.
+
+And last there is the hand holding the puppet strings symbol located on
+the at key (@) and can be accessed by holding down the shift key and pressing 
+the number two key.
+
+
+I hope you enjoy this font as much as I do.
+
+Michael
+
+
+
+--- 1001fonts-corleone-eula.txt ---
+1001Fonts Free For Commercial Use License (FFC)
+
+Preamble
+In this license, 'Corleone' refers to the given .zip file, which may contain one or numerous fonts. These fonts can be of any type (.ttf, .otf, ...) and together they form a 'font family' or in short a 'typeface'.
+
+1. Copyright
+Corleone is the intellectual property of its respective author, provided it is original, and is protected by copyright laws in many parts of the world.
+
+2. Usage
+Corleone may be downloaded and used free of charge for both personal and commercial use, as long as the usage is not racist or illegal. Personal use refers to all usage that does not generate financial income in a business manner, for instance:
+
+ - personal scrapbooking for yourself
+ - recreational websites and blogs for friends and family
+ - prints such as flyers, posters, t-shirts for churches, charities, and non-profit organizations
+
+Commercial use refers to usage in a business environment, including:
+
+ - business cards, logos, advertising, websites for companies
+ - t-shirts, books, apparel that will be sold for money
+ - flyers, posters for events that charge admission
+ - freelance graphic design work
+ - anything that will generate direct or indirect income
+
+3. Modification
+Corleone may not be modified, altered, adapted or built upon without written permission by its respective author. This pertains all files within the downloadable font zip-file.
+
+4. Distribution
+While Corleone may freely be copied and passed along to other individuals for private use as its original downloadable zip-file, it may not be sold or published without written permission by its respective author.
+
+5. Disclaimer
+Corleone is offered 'as is' without any warranty. 1001fonts.com and the respective author of Corleone shall not be liable for any damage derived from using this typeface. By using Corleone you agree to the terms of this license.
+(c) 2001 Michael Hagemann www.FontMesa.com All Rights Reserved

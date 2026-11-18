@@ -337,9 +337,11 @@ function ShotTransitionControls({
               ? ui("Slides through an intentional black midpoint.")
               : kind === "native-zoom"
                 ? ui("Gently zooms and blends both shots.")
-                : ui(
-                    "Pulls back into mirrored tiles, then returns to full frame."
-                  )}
+                : kind === "native-grid"
+                  ? ui(
+                      "Pulls back into mirrored tiles, then returns to full frame."
+                    )
+                  : ui("Pushes one shot into the next with eased motion.")}
         </p>
       )}
       <label className="block text-xs">

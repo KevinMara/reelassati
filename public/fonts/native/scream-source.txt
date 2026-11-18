@@ -1,0 +1,18 @@
+Source: https://www.dafont.com/scream.font
+Archive SHA256: d4127627ece0f6eac82207faf59a2de95bb28d1d879845f2c1e8d443e76ba9a9
+Member: SCREAM__.TTF
+
+--- info.txt ---
+----------------------------------------------------------------------
+Font: Scream regular, outlined, alternative and alternative outlined
+Author: Samuel Park 
+- park@telia.com 
+- http://members.xoom.com/djura
+----------------------------------------------------------------------
+
+Hello! This font is a remake of the font "RsFutura", which look almost like the Scream font. I've made it a little bit bolder and made some few fixes, including the Scream-look on the M and the V's.
+I give it to you for free, but I haven't got any idea of what those who made RsFutura think about that....so don't tell anyone =)
+Hope you enjoy it!
+
+/Samuel
+Based on the Scream films logo. Samuel Park -99

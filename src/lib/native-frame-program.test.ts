@@ -21,6 +21,15 @@ const program = () => ({
   ],
 });
 describe("native graph boundary", () => {
+  it("retains premultiplied over as a distinct operation and validates its blend", () => {
+    const p = {
+      ...program(),
+      nodes: [{ ...program().nodes[0], kind: "over" }],
+    };
+    expect(readNativeFrameProgram(p).nodes[0].kind).toBe("over");
+    p.nodes[0].samples[0].mix = 1.1;
+    expect(() => readNativeFrameProgram(p)).toThrow();
+  });
   it("keeps authored image pin order and deterministic sample clock", () => {
     const p = program();
     p.nodes[0].a = "input-1";

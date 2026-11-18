@@ -1,0 +1,4 @@
+Source: https://www.1001fonts.com/undeveloped-font.html
+Archive SHA256: ddf9492f490d21bb0824a14ea504f63688421fa7321aa7c0702e6f9af5895dec
+Member: Undeveloped.ttf
+Copyright (c) 2018 by Vladimir Nikolic. All rights reserved.

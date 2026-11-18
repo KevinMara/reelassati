@@ -71,6 +71,10 @@ describe("native transitions on real source handles", () => {
     "native-slide",
     "native-zoom",
     "native-grid",
+    "native-push-left",
+    "native-push-right",
+    "native-push-up",
+    "native-push-down",
   ] as const)(
     "persists and executes the %s action through the actual chat-state boundary",
     transition => {

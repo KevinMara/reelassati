@@ -4319,6 +4319,13 @@ async function chatJson(
                     ? {
                         data_collection: "deny",
                         max_price: { prompt: 3, completion: 15 },
+                        // Wafer advertises K3 but rejects native video parts
+                        // (production request gen-1794995431-j45syyVojyDbzlk64LuE).
+                        // Preserve the video evidence and select another primary.
+                        ...(Array.isArray(userContent) &&
+                        userContent.some(part => part?.type === "video_url")
+                          ? { ignore: ["wafer"] }
+                          : {}),
                       }
                     : foregroundK3
                       ? { order: ["moonshotai"] }

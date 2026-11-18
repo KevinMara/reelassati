@@ -139,6 +139,7 @@ export function fusionParameterEvaluator(root, { frames }) {
             "EaseOut",
             "Lookup",
             "Mirror",
+            "Invert",
             "Scale",
             "Offset",
             "TimeScale",
@@ -177,6 +178,12 @@ export function fusionParameterEvaluator(root, { frames }) {
               p
             );
           } else throw new Error(`Unverified native curve: ${curve}`);
+          const invert = n("Invert", 0);
+          if (![0, 1].includes(invert))
+            throw new Error("Unverified invert mode");
+          // Fusion 18 reference, Anim Curves: flip the normalized curve before
+          // applying the separately authored value scale and offset.
+          if (invert) p = 1 - p;
           return p * n("Scale", 1) + n("Offset", 0);
         }
         case "BezierSpline":

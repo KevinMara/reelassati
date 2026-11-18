@@ -5,12 +5,24 @@ import {
   type NativeFrameProgram,
 } from "./native-frame-program";
 
-export type NativeTransitionId = "stretch" | "slide" | "zoom" | "grid";
+export type NativeTransitionId =
+  | "stretch"
+  | "slide"
+  | "zoom"
+  | "grid"
+  | "push-left"
+  | "push-right"
+  | "push-up"
+  | "push-down";
 export const nativeTransitionIds: readonly NativeTransitionId[] = [
   "stretch",
   "slide",
   "zoom",
   "grid",
+  "push-left",
+  "push-right",
+  "push-up",
+  "push-down",
 ];
 export const nativeTransitionDefinitions = {
   stretch: {
@@ -39,6 +51,34 @@ export const nativeTransitionDefinitions = {
     inputOrder: ["incoming", "outgoing"],
     description:
       "Both shots pull back into mirrored image tiles and dissolve before returning to full frame. A pronounced graphic effect; use only when repeated reflected picture suits the content.",
+    intentionalEmptyMidpoint: false,
+  },
+  "push-left": {
+    name: "Accelerated push left",
+    inputOrder: ["outgoing", "incoming"],
+    description:
+      "The outgoing shot moves left as the incoming shot enters from the right, accelerating through the cut and easing to rest. Use for a motivated leftward continuation; preserves the authored curves and source compositing.",
+    intentionalEmptyMidpoint: false,
+  },
+  "push-right": {
+    name: "Accelerated push right",
+    inputOrder: ["incoming", "outgoing"],
+    description:
+      "The outgoing shot moves right as the incoming shot enters from the left, accelerating through the cut and easing to rest. Use for a motivated rightward continuation; preserves the authored curves and source compositing.",
+    intentionalEmptyMidpoint: false,
+  },
+  "push-up": {
+    name: "Accelerated push up",
+    inputOrder: ["outgoing", "incoming"],
+    description:
+      "The outgoing shot moves upward as the incoming shot enters from below, accelerating through the cut and easing to rest. Use for a motivated upward continuation, not a default transition quota.",
+    intentionalEmptyMidpoint: false,
+  },
+  "push-down": {
+    name: "Accelerated push down",
+    inputOrder: ["incoming", "outgoing"],
+    description:
+      "The outgoing shot moves downward as the incoming shot enters from above, accelerating through the cut and easing to rest. Use for a motivated downward continuation, not a default transition quota.",
     intentionalEmptyMidpoint: false,
   },
 } as const;
