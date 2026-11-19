@@ -31,7 +31,9 @@ export function buildRenderPlan(
   audioIds: Set<string>,
   options: ExportResolution | Partial<ExportSettings> = 720,
   sourceMetadata: ReadonlyMap<string, RenderSourceMetadata> = new Map(),
-  colorLuts: ReadonlyMap<string, CubeLut> = new Map()
+  colorLuts: ReadonlyMap<string, CubeLut> = new Map(),
+  nativeGraphics: ReadonlyMap<string, Asset> = new Map(),
+  prepareOnly = false
 ) {
   const luts = projectColorLuts(project).map(reference => {
     const lut = colorLuts.get(reference.sha256);
@@ -160,6 +162,11 @@ export function buildRenderPlan(
     s => s.text.trim() && s.end > s.start && s.start < duration
   );
   const graphics = graphicAssEvents(effectiveClips, width, height, duration);
+  const orderedGraphics = effectiveClips
+    .filter(c => c.graphic && !c.hidden && c.start < duration)
+    .sort(compareTimelineLayers);
+  const hasNative = orderedGraphics.some(c => c.graphic?.native);
+  const assFiles: Array<{ filename: string; data: string }> = [];
   const ass =
     `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Default,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,40,40,${Math.round(height * 0.14)},1\nStyle: Callout,DejaVu Sans,${Math.round(width / 22)},&H00FFFFFF,&H00FFFFFF,&H006F5AD8,&H006F5AD8,-1,0,0,0,100,100,0,0,3,8,0,5,0,0,0,1\n${captionAssStyle(project.captionStyle, width, height, project.captionAppearance)}\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n` +
     captionAssEvents(
@@ -171,7 +178,56 @@ export function buildRenderPlan(
     ) +
     "\n" +
     graphics;
-  if (captions.length || graphics) {
+  let finalAss = ass;
+  if (hasNative) {
+    const header = ass.slice(
+      0,
+      ass.indexOf(
+        "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n"
+      ) +
+        "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n"
+          .length
+    );
+    finalAss =
+      header +
+      captionAssEvents(
+        captions,
+        project.captionStyle,
+        duration,
+        project.captionAppearance,
+        { width, height, frameRate }
+      );
+    let nativeIndex = 0;
+    for (const [index, clip] of orderedGraphics.entries()) {
+      const label = `graphiclayer${index}`;
+      if (clip.graphic!.native) {
+        const asset = nativeGraphics.get(clip.id);
+        if (!asset) {
+          if (prepareOnly) continue;
+          throw new Error(
+            "An animated title has not rendered. Try exporting again."
+          );
+        }
+        if (!inputs.includes(asset)) inputs.push(asset);
+        args.push("-i", `input-${inputs.indexOf(asset)}`);
+        const stream = mediaClips.length + nativeIndex++;
+        filters.push(
+          `[${stream}:v]trim=duration=${number(clip.duration)},setpts=PTS-STARTPTS+${number(clip.start)}/TB,format=rgba[nativegraphic${index}]`
+        );
+        filters.push(
+          `[${visual}][nativegraphic${index}]overlay=eof_action=pass:shortest=0:enable='gte(t,${number(clip.start)})*lt(t,${number(clip.start + clip.duration)})'[${label}]`
+        );
+      } else {
+        const events = graphicAssEvents([clip], width, height, duration);
+        if (!events) continue;
+        const filename = `graphic-${index}.ass`;
+        assFiles.push({ filename, data: header + events });
+        filters.push(`[${visual}]subtitles=${filename}:fontsdir=.[${label}]`);
+      }
+      visual = label;
+    }
+  }
+  if (captions.length || (!hasNative && graphics)) {
     filters.push(`[${visual}]subtitles=captions.ass:fontsdir=.[video]`);
     visual = "video";
   }
@@ -235,7 +291,8 @@ export function buildRenderPlan(
     args,
     inputs,
     luts,
-    ass,
+    ass: finalAss,
+    assFiles,
     duration,
     width,
     height,

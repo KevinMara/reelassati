@@ -1,3 +1,7 @@
+import {
+  normalizeNativeGraphic,
+  type NativeGraphicSettings,
+} from "./native-graphics";
 export const GRAPHIC_KINDS = [
   "text",
   "callout",
@@ -49,6 +53,7 @@ export interface GraphicKeyframe {
   easing?: GraphicEasing;
 }
 export interface MotionGraphic {
+  native?: NativeGraphicSettings;
   kind: GraphicKind;
   text: string;
   color: string;
@@ -88,6 +93,8 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
   if (!value || typeof value !== "object") return undefined;
   const v = value as Record<string, unknown>;
   if (!GRAPHIC_KINDS.includes(v.kind as GraphicKind)) return undefined;
+  const native = normalizeNativeGraphic(v.native);
+  if (v.native && (!native || v.kind !== "text")) return undefined;
   const color = (c: unknown, fallback: string) =>
     typeof c === "string" && /^#[a-f\d]{6}$/i.test(c) ? c : fallback;
   const text = (t: unknown, max: number) =>
@@ -122,6 +129,7 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
       });
     }
   return {
+    ...(native ? { native } : {}),
     kind: v.kind as GraphicKind,
     text: text(v.text, 180),
     color: color(v.color, "#FFFFFF"),

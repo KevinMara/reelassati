@@ -2406,6 +2406,7 @@ export default function EditorPage() {
         asset={previewAsset}
         duration={project.duration}
         canvas={canvasContent}
+        aspectRatio={project.aspectRatio}
         onApply={applyClipDraft}
         onToggle={toggleClipProperty}
         onDetach={detachSelectedAudio}

@@ -1,5 +1,7 @@
 import { graphicCardLayout, graphicShapePixels } from "./graphic-layout";
 import { graphicFrame, normalizeGraphic } from "./motion-graphics";
+import { nativeGraphicTextProblems } from "./native-graphics";
+import { graphicSelectionBounds } from "./graphic-selection";
 import type { EditProject, TimelineClip } from "./workspace";
 
 /** Contrast of two actual opaque colors. It says nothing about unseen footage. */
@@ -34,6 +36,58 @@ export function graphicReadabilityProblems(
     return [];
   const copy = `${g.text} ${g.secondaryText ?? ""}`.trim();
   if (!copy) return [];
+  if (g.native) {
+    const height =
+      aspectRatio === "16:9" ? 56.25 : aspectRatio === "1:1" ? 100 : 1600 / 9;
+    const issues = nativeGraphicTextProblems(g, aspectRatio);
+    const duration = clip.graphicDuration ?? clip.outPoint ?? clip.duration;
+    const enter = Math.min(g.native.enter, duration * 0.3),
+      exit = Math.min(g.native.exit, duration * 0.3);
+    const samples = Math.min(900, Math.max(1, Math.ceil(clip.duration * 30))),
+      step = clip.duration / samples;
+    let hold = 0,
+      longestHold = 0,
+      inFrame = false;
+    for (let i = 0; i < samples; i++) {
+      const elapsed = clip.inPoint + i * step * (clip.speed ?? 1),
+        pose = graphicFrame(g, elapsed, duration);
+      const box = graphicSelectionBounds(
+        clip,
+        clip.start + i * step,
+        100,
+        height
+      )!;
+      const fits =
+        box.x >= -0.01 &&
+        box.y >= -0.01 &&
+        box.x + box.width <= 100.01 &&
+        box.y + box.height <= height + 0.01;
+      const settled =
+        elapsed >= enter && elapsed <= duration - exit && pose.opacity >= 0.75;
+      inFrame ||= settled && fits;
+      if (
+        settled &&
+        fits &&
+        !nativeGraphicTextProblems(
+          { ...g, size: g.size * Math.abs(pose.scale) },
+          aspectRatio
+        ).length
+      ) {
+        hold += step;
+        longestHold = Math.max(longestHold, hold);
+      } else hold = 0;
+    }
+    if (!inFrame)
+      issues.push(
+        `Graphic text does not fit fully inside the frame: ${clip.label}`
+      );
+    const readTime = Math.max(0.5, copy.trim().split(/\s+/).length / 4);
+    if (longestHold + 1 / 30 < readTime)
+      issues.push(
+        `Graphic text has too little visible reading time: ${clip.label}`
+      );
+    return issues;
+  }
   const problems: string[] = [];
   // 3:1 catches severe failures. Planner direction asks for 4.5:1; do not treat
   // this permissive floor as a promise that smaller secondary text is readable.
@@ -89,8 +143,10 @@ export function graphicReadabilityProblems(
     );
     if (frame.opacity >= 0.75 && fits) {
       inFrame = true;
-      const readablePrimary = !g.text || g.size * Math.abs(frame.scale) >= minimumSize;
-      const readableSecondary = !g.secondaryText || g.size * 0.6 * Math.abs(frame.scale) >= minimumSize;
+      const readablePrimary =
+        !g.text || g.size * Math.abs(frame.scale) >= minimumSize;
+      const readableSecondary =
+        !g.secondaryText || g.size * 0.6 * Math.abs(frame.scale) >= minimumSize;
       primaryReadable ||= readablePrimary;
       secondaryReadable ||= readableSecondary;
       if (readablePrimary && readableSecondary) {
@@ -110,8 +166,14 @@ export function graphicReadabilityProblems(
       `Graphic text never fits fully inside the frame: ${clip.label}`
     );
   else if (!primaryReadable || !secondaryReadable) {
-    if (!primaryReadable) problems.push(`Graphic text is too small for mobile delivery: ${clip.label}`);
-    if (!secondaryReadable) problems.push(`Graphic secondary text is too small for mobile delivery: ${clip.label}`);
+    if (!primaryReadable)
+      problems.push(
+        `Graphic text is too small for mobile delivery: ${clip.label}`
+      );
+    if (!secondaryReadable)
+      problems.push(
+        `Graphic secondary text is too small for mobile delivery: ${clip.label}`
+      );
   } else if (longestHold + 1 / 30 < minimumHold)
     problems.push(
       `Graphic text has too little visible reading time: ${clip.label}`

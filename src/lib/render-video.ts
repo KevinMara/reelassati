@@ -1,11 +1,13 @@
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import { withFfmpegLease } from "./ffmpeg-lease";
+import { beginNativeGraphicExport } from "./native-graphic-activity";
 import type { Asset, EditProject } from "@contracts/workspace";
 import { platformApi } from "./platform-api";
 import { buildRenderPlan } from "./render-plan";
 import { editorFont } from "@contracts/editor-fonts";
 import { fetchEditorFont } from "./editor-fonts";
 import { nativeTransitionRecipes } from "@contracts/native-transitions";
+import { effectiveTimelineClips } from "@contracts/timeline-mixer";
 import { materializeNativeTransition } from "@contracts/native-transition-materialize";
 import { probeExportMetadata } from "./export-probe";
 import {
@@ -30,9 +32,14 @@ export function renderVideo(
   assets: Asset[],
   options: Parameters<typeof renderVideoWithLease>[2]
 ) {
-  return withFfmpegLease(options.signal, () =>
-    renderVideoWithLease(project, assets, options)
-  );
+  return withFfmpegLease(options.signal, async () => {
+    const release = beginNativeGraphicExport();
+    try {
+      return await renderVideoWithLease(project, assets, options);
+    } finally {
+      release();
+    }
+  });
 }
 
 async function renderVideoWithLease(
@@ -85,7 +92,9 @@ async function renderVideoWithLease(
         format: options.format,
       },
       new Map(),
-      colorLuts
+      colorLuts,
+      new Map(),
+      true
     );
     options.onProgress(0, "Preparing export");
     const core = await fetch("/vendor/render/core.bin", {
@@ -163,7 +172,15 @@ async function renderVideoWithLease(
       firstPlan.inputs.map((asset, i) => [asset.id, `/sources/input-${i}`])
     );
     const nativeRecipes = nativeTransitionRecipes(project);
-    const renderingStart = nativeRecipes.length ? 35 : 15;
+    const nativeClips = effectiveTimelineClips(project)
+      .filter(c => c.graphic?.native && !c.hidden && c.start < project.duration)
+      .map(c => ({
+        ...c,
+        graphicDuration: c.graphicDuration ?? c.outPoint ?? c.duration,
+        duration: Math.min(c.duration, project.duration - c.start),
+      }));
+    const preparationCount = nativeRecipes.length + nativeClips.length;
+    const renderingStart = nativeRecipes.length || nativeClips.length ? 35 : 15;
     if (
       options.nativePreviewOnly &&
       !nativeRecipes.some(recipe => recipe.key === options.nativePreviewOnly)
@@ -176,7 +193,7 @@ async function renderVideoWithLease(
         continue;
       options.signal.throwIfAborted();
       options.onProgress(
-        15 + Math.round((index / nativeRecipes.length) * 20),
+        15 + Math.round((index / preparationCount) * 20),
         "Preparing transition"
       );
       const { renderNativeTransition } =
@@ -192,8 +209,7 @@ async function renderVideoWithLease(
         signal: options.signal,
         onProgress: (frame, total) =>
           options.onProgress(
-            15 +
-              Math.round(((index + frame / total) / nativeRecipes.length) * 20),
+            15 + Math.round(((index + frame / total) / preparationCount) * 20),
             "Rendering shot transition"
           ),
       });
@@ -252,6 +268,42 @@ async function renderVideoWithLease(
       filenames.set(materialized.asset.id, rendered.filename);
       sourceMetadata.set(materialized.asset.id, { hasAudio: false });
     }
+    const nativeGraphics = new Map<string, Asset>();
+    for (const [index, clip] of nativeClips.entries()) {
+      const { renderNativeGraphic } = await import("./render-native-graphic");
+      const rendered = await renderNativeGraphic(ffmpeg, clip, {
+        width: firstPlan.width,
+        height: firstPlan.height,
+        frameRate: firstPlan.frameRate,
+        prefix: `title-${index}`,
+        signal: options.signal,
+        onProgress: (frame, total) =>
+          options.onProgress(
+            15 +
+              Math.round(
+                ((nativeRecipes.length + index + frame / total) /
+                  preparationCount) *
+                  20
+              ),
+            "Rendering editable animation"
+          ),
+      });
+      const asset: Asset = {
+        id: `native-graphic-${clip.id}`,
+        name: clip.label,
+        kind: "video",
+        status: "ready",
+        url: "",
+        contentType: "video/quicktime",
+        width: firstPlan.width,
+        height: firstPlan.height,
+        duration: rendered.duration,
+        size: 0,
+        createdAt: "",
+      };
+      nativeGraphics.set(clip.id, asset);
+      filenames.set(asset.id, rendered.filename);
+    }
     const plan = buildRenderPlan(
       renderProject,
       renderAssets,
@@ -262,9 +314,12 @@ async function renderVideoWithLease(
         format: options.format,
       },
       sourceMetadata,
-      colorLuts
+      colorLuts,
+      nativeGraphics
     );
     await ffmpeg.writeFile("captions.ass", plan.ass);
+    for (const file of plan.assFiles)
+      await ffmpeg.writeFile(file.filename, file.data);
     const renderProgress = ({ time }: { time: number }) =>
       options.onProgress(
         Math.max(

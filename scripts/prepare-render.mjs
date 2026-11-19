@@ -1,5 +1,6 @@
 import "./prepare-pdf-reference.mjs";
 import "./prepare-search.mjs";
+import "./verify-native-runtime.mjs";
 import { build } from "esbuild";
 import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";

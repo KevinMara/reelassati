@@ -292,6 +292,7 @@ export function ClipInspector({
   setDraft,
   asset,
   duration,
+  aspectRatio,
   canvas,
   onApply,
   onToggle,
@@ -305,6 +306,7 @@ export function ClipInspector({
   setDraft: Dispatch<SetStateAction<TimelineClip | null>>;
   asset?: Asset;
   duration: number;
+  aspectRatio?: "9:16" | "16:9" | "1:1";
   canvas: ReactNode;
   onApply: () => Promise<void>;
   onToggle: (key: "locked" | "muted") => Promise<void>;
@@ -635,6 +637,7 @@ export function ClipInspector({
                 key={JSON.stringify(draft.graphic)}
                 initial={draft.graphic}
                 duration={draft.duration}
+                aspectRatio={aspectRatio}
                 busy={draft.locked}
                 onSave={onGraphic}
               />

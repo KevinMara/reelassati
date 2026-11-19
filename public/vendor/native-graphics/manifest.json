@@ -1,0 +1,8 @@
+{
+  "effectcraftCommit": "665bfac0b33904b1dcda6de889f43f43a94ad3f8",
+  "wasmBindgen": "0.2.129",
+  "sourceSha256": "d211bed5633a0ffed4b6848f80d1b0a8fe9078b996c4c6dfe24e918ed9557065",
+  "jsSha256": "bc69e0f4409e168e456372af767c9aaf5fd0aae152c0141fcb5de2e381af1229",
+  "wasmSha256": "e617d9c2807bfefd9ccb78a42a865e1005aad877190d3217b506c0c2d594ac11",
+  "wasmBytes": 26731493
+}

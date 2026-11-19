@@ -65,7 +65,11 @@ def inventory(source):
                         root = xml_document(data)
                         row['root'] = root.tag
                         row['operations'] = sorted(set(x.text for x in root.findall('.//factory/description') if x.text))
-                        row['fonts'] = sorted(set(x.text for x in root.iter() if 'font' in x.tag.lower() and x.text and x.text.strip() and len(x.text) < 200))
+                        # Motion stores Helvetica as defaultFont even when every
+                        # visible run uses a supplied face. Preserve that fallback
+                        # separately; it is not an unresolved authored dependency.
+                        row['fonts'] = sorted(set(x.text for x in root.iter() if x.tag.lower() == 'font' and x.text and x.text.strip() and len(x.text) < 200))
+                        row['fallbackFonts'] = sorted(set(x.text for x in root.iter() if x.tag.lower() == 'defaultfont' and x.text and x.text.strip() and len(x.text) < 200))
                         row['expressions'] = sum(1 for x in root.iter() if 'expression' in x.tag.lower())
                         row['externalPaths'] = sorted(set(x.text for x in root.iter() if x.text and len(x.text) < 2000 and (x.text.startswith(('file:', '/Users/', '/Library/', 'C:', 'D:')))))
                     elif ext == '.setting':

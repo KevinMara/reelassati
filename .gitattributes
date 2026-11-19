@@ -1,0 +1,3 @@
+# These bytes are checked against the packaged native-runtime manifest.
+/native/compositor/src/lib.rs text eol=lf
+/public/vendor/native-graphics/compositor.js text eol=lf

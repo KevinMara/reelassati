@@ -268,10 +268,19 @@ function GraphicCard({
         className="relative aspect-[1.8] overflow-hidden rounded-md bg-[#252A32]"
         style={{ containerType: "inline-size" }}
       >
-        <MotionGraphicLayer
-          clip={clip}
-          time={hovered ? previewTime : Math.min(0.8, preset.duration / 2)}
-        />
+        {preset.graphic.native && !hovered ? (
+          <img
+            src={`/native-graphics/${preset.graphic.native.id}.png`}
+            alt={ui(preset.name)}
+            loading="lazy"
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <MotionGraphicLayer
+            clip={clip}
+            time={hovered ? previewTime : Math.min(0.8, preset.duration / 2)}
+          />
+        )}
       </div>
       <div className="mt-2 truncate text-xs font-medium">{ui(preset.name)}</div>
     </button>

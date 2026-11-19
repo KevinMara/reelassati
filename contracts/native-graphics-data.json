@@ -1,0 +1,4252 @@
+[
+  {
+    "id": "motion-14eddf34e5ef",
+    "name": "Stacked outline",
+    "description": "Editable bold kinetic title with authored text animation and a transparent background. Keep the copy short.",
+    "category": "title",
+    "url": "/native-graphics/motion-14eddf34e5ef.bin",
+    "sha256": "d55f8066db53bdfa68ff7b32fd29190be344712ace8a713a9050d66fe698e978",
+    "sourceSha256": "14eddf34e5efdfced6574f10302345f2065321c95f8da18494dfcf33216f547c",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.433333333333333,
+    "exitStart": 12.233333333333333,
+    "bounds": {
+      "x": 0.29791666666666666,
+      "y": 0.3111111111111111,
+      "width": 0.4041666666666667,
+      "height": 0.42592592592592593
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/hansonbold.ttf",
+        "sha256": "6e9b388b2932c8c1f89843d885a4ae5f39032d831ea3a7aeafed24cf3874d77c"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-42",
+        "type": "color",
+        "label": "Text 01 T04",
+        "comp": 4,
+        "layer": 18,
+        "property": 42,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 7,
+        "layer": 69,
+        "property": 71,
+        "default": "modern",
+        "font": "HansonBold",
+        "fontSize": 271,
+        "justify": "Center",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "One bold filled word above three outlined copies of that same word; centered four-row stack.",
+      "motion": "The four word rows separate vertically into the stack, hold, then collapse away.",
+      "bestFor": "A single-word emphasis or short chapter label with a large clear area.",
+      "avoid": "Do not repeat burned-in captions, cover a face/product, or use as decoration. Use short source-grounded copy and leave a readable hold."
+    }
+  },
+  {
+    "id": "motion-7d1c41d6b9f8",
+    "name": "Split stack",
+    "description": "Editable bold kinetic title with authored text animation and a transparent background. Keep the copy short.",
+    "category": "title",
+    "url": "/native-graphics/motion-7d1c41d6b9f8.bin",
+    "sha256": "bea0cede26ea2ba92092f942c391b29ce942bf327c0378f314d88938fde18218",
+    "sourceSha256": "7d1c41d6b9f81197d82ef29c20955a0a43c0670c1bbbe4a86b67ca4d051c357d",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 4.366666666666666,
+    "exitStart": 11.166666666666666,
+    "bounds": {
+      "x": 0.20416666666666666,
+      "y": 0.17407407407407408,
+      "width": 0.5916666666666667,
+      "height": 0.6555555555555556
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/hansonbold.ttf",
+        "sha256": "6e9b388b2932c8c1f89843d885a4ae5f39032d831ea3a7aeafed24cf3874d77c"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-42",
+        "type": "color",
+        "label": "Text 01 T07",
+        "comp": 4,
+        "layer": 18,
+        "property": 42,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-44",
+        "type": "color",
+        "label": "Text 02 T07",
+        "comp": 4,
+        "layer": 18,
+        "property": 44,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 7,
+        "layer": 71,
+        "property": 73,
+        "default": "extreme",
+        "font": "HansonBold",
+        "fontSize": 286,
+        "justify": "Center",
+        "textSlot": 0
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "label": "Text 02",
+        "comp": 8,
+        "layer": 110,
+        "property": 112,
+        "default": "maximum",
+        "font": "HansonBold",
+        "fontSize": 286,
+        "justify": "Center",
+        "textSlot": 1
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Two heavy filled text lines tilted together diagonally, with repeated letterforms; broad poster-like composition.",
+      "motion": "Authored text entrance and exit around a static diagonal reading hold.",
+      "bestFor": "Two short related words on a clean background or a dedicated title card.",
+      "avoid": "Do not repeat burned-in captions, cover a face/product, or use as decoration. Use short source-grounded copy and leave a readable hold."
+    }
+  },
+  {
+    "id": "motion-e59d684a8331",
+    "name": "Scrolling outline",
+    "description": "Editable bold kinetic title with authored text animation and a transparent background. Keep the copy short.",
+    "category": "title",
+    "url": "/native-graphics/motion-e59d684a8331.bin",
+    "sha256": "e50182a19355a93827c83a8efd747683c3f376f923ab9968d1d555460cd78b19",
+    "sourceSha256": "e59d684a83316fe94fde3314dbcf9f07f1daba549e7f0f9be20c8cd4c48a72d5",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.3333333333333335,
+    "exitStart": 12,
+    "bounds": {
+      "x": 0.27291666666666664,
+      "y": 0,
+      "width": 0.45416666666666666,
+      "height": 1
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/hansonbold.ttf",
+        "sha256": "6e9b388b2932c8c1f89843d885a4ae5f39032d831ea3a7aeafed24cf3874d77c"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 T05",
+        "comp": 4,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 7,
+        "layer": 81,
+        "property": 83,
+        "default": "abstract",
+        "font": "HansonBold",
+        "fontSize": 223,
+        "justify": "Center",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "A tall, tilted column of many alternating filled and outlined copies of the same word.",
+      "motion": "Repeated word rows animate into and out of a diagonal stacked reading hold.",
+      "bestFor": "A deliberate full-title visual beat, not a small subtitle or lower third.",
+      "avoid": "Do not repeat burned-in captions, cover a face/product, or use as decoration. Use short source-grounded copy and leave a readable hold."
+    }
+  },
+  {
+    "id": "motion-5bbc553acf05",
+    "name": "Rising word",
+    "description": "Editable bold kinetic title with authored text animation and a transparent background. Keep the copy short.",
+    "category": "title",
+    "url": "/native-graphics/motion-5bbc553acf05.bin",
+    "sha256": "e604e51a84971b4c8227bac511193b6eccd3fcea4de36d282c1760fb8d3f06af",
+    "sourceSha256": "5bbc553acf05a4943227a5ef7cb51f2e1f625f92821ff559cd17d5b735763ee7",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.6666666666666665,
+    "exitStart": 11.433333333333334,
+    "bounds": {
+      "x": 0.1875,
+      "y": 0.2111111111111111,
+      "width": 0.6229166666666667,
+      "height": 0.5777777777777777
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/hansonbold.ttf",
+        "sha256": "6e9b388b2932c8c1f89843d885a4ae5f39032d831ea3a7aeafed24cf3874d77c"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-40",
+        "type": "color",
+        "label": "Text 01 T01",
+        "comp": 4,
+        "layer": 16,
+        "property": 40,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 7,
+        "layer": 67,
+        "property": 69,
+        "default": "klonedike",
+        "font": "HansonBold",
+        "fontSize": 410,
+        "justify": "Center",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "One filled word across the center with outlined copies fanning in curved trails above its left side and below its right side.",
+      "motion": "The repeated outlined word trails reveal around the central filled word and retract on exit.",
+      "bestFor": "A short emphatic word on a dedicated card or a large empty background, not a compact lower third.",
+      "avoid": "Do not repeat burned-in captions, cover a face/product, or use as decoration. Use short source-grounded copy and leave a readable hold."
+    }
+  },
+  {
+    "id": "motion-1c8b5814b60b",
+    "name": "Split two-line",
+    "description": "Editable bold kinetic title with authored text animation and a transparent background. Keep the copy short.",
+    "category": "title",
+    "url": "/native-graphics/motion-1c8b5814b60b.bin",
+    "sha256": "4eefa3dfc301893b251b1e01b7f060fb0547e394f7ab12e02cd6aadbbaccc30c",
+    "sourceSha256": "1c8b5814b60b6d25a8abe2ea69dc6457f21f2cc0980af3b48e08a0b4d2a7e17e",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.8666666666666667,
+    "exitStart": 11.366666666666667,
+    "bounds": {
+      "x": 0.2,
+      "y": 0.22962962962962963,
+      "width": 0.60625,
+      "height": 0.5296296296296297
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/hansonbold.ttf",
+        "sha256": "6e9b388b2932c8c1f89843d885a4ae5f39032d831ea3a7aeafed24cf3874d77c"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-41",
+        "type": "color",
+        "label": "Text 01 T03",
+        "comp": 4,
+        "layer": 17,
+        "property": 41,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-43",
+        "type": "color",
+        "label": "Text 02 T03",
+        "comp": 4,
+        "layer": 17,
+        "property": 43,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 7,
+        "layer": 70,
+        "property": 72,
+        "default": "hello",
+        "font": "HansonBold",
+        "fontSize": 393,
+        "justify": "Center",
+        "textSlot": 0
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "label": "Text 02",
+        "comp": 8,
+        "layer": 143,
+        "property": 145,
+        "default": "world",
+        "font": "HansonBold",
+        "fontSize": 393,
+        "justify": "Center",
+        "textSlot": 1
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Two filled bold lines with independently editable text and colors and multiple outlined echoes stepping diagonally behind both words.",
+      "motion": "The filled words and outlined echoes animate into and out of a stepped two-line hold.",
+      "bestFor": "A bold two-word title card, with meaningful copy on both lines and ample clear space around the echoes.",
+      "avoid": "Do not repeat burned-in captions, cover a face/product, or use as decoration. Use short source-grounded copy and leave a readable hold."
+    }
+  },
+  {
+    "id": "motion-38856127f7cf",
+    "name": "Two-line reveal",
+    "description": "Editable bold kinetic title with authored text animation and a transparent background. Keep the copy short.",
+    "category": "title",
+    "url": "/native-graphics/motion-38856127f7cf.bin",
+    "sha256": "14edb067b6b09bfff50efcb52f8f656a5608b77d3a6011862edd5edbaace947d",
+    "sourceSha256": "38856127f7cf196da88d7a80b93c7364988f23a93b418c1839c43e91463c9712",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.8,
+    "exitStart": 11.366666666666667,
+    "bounds": {
+      "x": 0.27708333333333335,
+      "y": 0.21851851851851853,
+      "width": 0.4354166666666667,
+      "height": 0.5296296296296297
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/hansonbold.ttf",
+        "sha256": "6e9b388b2932c8c1f89843d885a4ae5f39032d831ea3a7aeafed24cf3874d77c"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-43",
+        "type": "color",
+        "label": "Text 01 T08",
+        "comp": 4,
+        "layer": 19,
+        "property": 43,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-45",
+        "type": "color",
+        "label": "Text 02 T08",
+        "comp": 4,
+        "layer": 19,
+        "property": 45,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-47",
+        "type": "color",
+        "label": "Text 03 T08",
+        "comp": 4,
+        "layer": 19,
+        "property": 47,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-49",
+        "type": "color",
+        "label": "Text 04 T08",
+        "comp": 4,
+        "layer": 19,
+        "property": 49,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 7,
+        "layer": 76,
+        "property": 78,
+        "default": "fr",
+        "font": "HansonBold",
+        "fontSize": 286,
+        "justify": "Right",
+        "textSlot": 0,
+        "part": "left"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 8,
+        "layer": 115,
+        "property": 117,
+        "default": "ee",
+        "font": "HansonBold",
+        "fontSize": 286,
+        "justify": "Left",
+        "textSlot": 0,
+        "part": "right"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "label": "Text 02",
+        "comp": 9,
+        "layer": 154,
+        "property": 156,
+        "default": "fo",
+        "font": "HansonBold",
+        "fontSize": 286,
+        "justify": "Right",
+        "textSlot": 1,
+        "part": "left"
+      },
+      {
+        "key": "text-4",
+        "type": "text",
+        "label": "Text 02",
+        "comp": 10,
+        "layer": 193,
+        "property": 195,
+        "default": "nt",
+        "font": "HansonBold",
+        "fontSize": 286,
+        "justify": "Left",
+        "textSlot": 1,
+        "part": "right"
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Two bold lines split into left and right halves, surrounded by outlined copies fanning diagonally; a large decorative title composition.",
+      "motion": "The filled halves and outlined echoes spread into a diagonal stack, hold, then retract.",
+      "bestFor": "A concise two-line title on a dedicated card or a large empty area, with two or more characters per line.",
+      "avoid": "Do not repeat burned-in captions, cover a face/product, or use as decoration. Use short source-grounded copy and leave a readable hold."
+    }
+  },
+  {
+    "id": "motion-b81f3baeb353",
+    "name": "Behance handle · right",
+    "description": "Animated Behance icon and handle bar. Use only for an actual supplied Behance handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Behance",
+    "url": "/native-graphics/motion-b81f3baeb353.bin",
+    "sha256": "9cc3d727cf465c3ba52bc6d911c927e3e48e96d5d9d8c19570614db71eedc6c5",
+    "sourceSha256": "b81f3baeb353c55702bec90fa4b0a7918958347a3ccfa07dd5c6f68b064c4083",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.2,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Behance",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#065BFF"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-64",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 64,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 91,
+        "property": 93,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Behance icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Behance handle or an explicit Behance promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-628cf69c9461",
+    "name": "Youtube handle · right",
+    "description": "Animated Youtube icon and handle bar. Use only for an actual supplied Youtube handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Youtube",
+    "url": "/native-graphics/motion-628cf69c9461.bin",
+    "sha256": "a41c1b234132b16d76a12c2f949bc025d0c1f7daa8d3a5f3972b1431905e2ff7",
+    "sourceSha256": "628cf69c94611fbfcaa2be06648efb9b40746e38180c645c71beb2f6bba0f27c",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R15",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Youtube",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FF0000"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-415",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 415,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Youtube icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Youtube handle or an explicit Youtube promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-19ca306e59e5",
+    "name": "Twitch handle · right",
+    "description": "Animated Twitch icon and handle bar. Use only for an actual supplied Twitch handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Twitch",
+    "url": "/native-graphics/motion-19ca306e59e5.bin",
+    "sha256": "6b00dddd8e11b6626a9b825349e775c778bd34902967a22317c75996fdf4d051",
+    "sourceSha256": "19ca306e59e52f44c89c279f34b45a97fa1325080626b72d77876fcb18637f37",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R12",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#9146FF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-60",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-465",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 465,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 87,
+        "property": 89,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Twitch icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Twitch handle or an explicit Twitch promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-2cde56588aab",
+    "name": "Dribbble handle · right",
+    "description": "Animated Dribbble icon and handle bar. Use only for an actual supplied Dribbble handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Dribbble",
+    "url": "/native-graphics/motion-2cde56588aab.bin",
+    "sha256": "e61e3df3001d052e5b2a18e80bb690dfc64ef84793bc98828ef92bab9db64a63",
+    "sourceSha256": "2cde56588aab566684c6e21a221fc269c1c903563a10d135c2e6a6001f092459",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R16",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Dribbble",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#C92E62"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-430",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 430,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Dribbble icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Dribbble handle or an explicit Dribbble promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-0adb6623f224",
+    "name": "Google Plus handle · right",
+    "description": "Animated Google Plus icon and handle bar. Use only for an actual supplied Google Plus handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Google Plus",
+    "url": "/native-graphics/motion-0adb6623f224.bin",
+    "sha256": "73649c8957518f4c5fb917269d834aa35079d927cc4d6c5c79139edb998cb59e",
+    "sourceSha256": "0adb6623f2244c2998fdaf866888ecc6e5e8879f07d06b73d4ab729569ffa416",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R18",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Google Plus",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#F4511F"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-435",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 435,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Google Plus icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Google Plus handle or an explicit Google Plus promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-f651d289e5a1",
+    "name": "Soundcloud handle · right",
+    "description": "Animated Soundcloud icon and handle bar. Use only for an actual supplied Soundcloud handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Soundcloud",
+    "url": "/native-graphics/motion-f651d289e5a1.bin",
+    "sha256": "0d0ba136b81b35f543203b907277bb123d4886ec7fff7e8167897ebb5904a165",
+    "sourceSha256": "f651d289e5a139349336b4eff7921ffbda6f1e42ad5757b668568628fea152f6",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R08",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Soundcloud",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FF5500"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-451",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 451,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Soundcloud icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Soundcloud handle or an explicit Soundcloud promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-0007a3b3f2c1",
+    "name": "Instagram handle · right",
+    "description": "Animated Instagram icon and handle bar. Use only for an actual supplied Instagram handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Instagram",
+    "url": "/native-graphics/motion-0007a3b3f2c1.bin",
+    "sha256": "c67982a4968bae9266818643888e54b089ec2b2b02d5538650c08e080305d431",
+    "sourceSha256": "0007a3b3f2c1362ff2e51314214630395865809989ee72b8b86d3ac1359e6ec5",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.7,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R04",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Instagram",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01 Color1",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#D023D6"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 01 Color2",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FEDA75"
+      },
+      {
+        "key": "color-62",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-64",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 64,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-462",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 462,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 91,
+        "property": 93,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Instagram icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Instagram handle or an explicit Instagram promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-621c7603833a",
+    "name": "Snapchat handle · right",
+    "description": "Animated Snapchat icon and handle bar. Use only for an actual supplied Snapchat handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Snapchat",
+    "url": "/native-graphics/motion-621c7603833a.bin",
+    "sha256": "fd2864153649bbb751c93bbc962ec6f221809c6a779511bd17168dca40339bee",
+    "sourceSha256": "621c7603833a5e0db8ad20be28532ac5f36fbba416861ebea8ba17089f62e974",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R07",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#000000"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FEFB00"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-60",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-420",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 420,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 87,
+        "property": 89,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Snapchat icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Snapchat handle or an explicit Snapchat promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-8656c6199c51",
+    "name": "WhatsApp handle · right",
+    "description": "Animated WhatsApp icon and handle bar. Use only for an actual supplied WhatsApp handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "WhatsApp",
+    "url": "/native-graphics/motion-8656c6199c51.bin",
+    "sha256": "3d48979f647412c1ccc7af462f68d95b55ff228c33907699012c0d24e615b444",
+    "sourceSha256": "8656c6199c510aaef4c756f87ecc811cb328a178e993ac2730d029ab680db7f9",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R14",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_WhatsApp",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#4EC763"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-418",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 418,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "WhatsApp icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied WhatsApp handle or an explicit WhatsApp promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-92ffeeb813a3",
+    "name": "Linkedin handle · right",
+    "description": "Animated Linkedin icon and handle bar. Use only for an actual supplied Linkedin handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Linkedin",
+    "url": "/native-graphics/motion-92ffeeb813a3.bin",
+    "sha256": "003a840f146273f42e79883f235c2c17a16a534e03ef5c9764247f0f27635492",
+    "sourceSha256": "92ffeeb813a3b99161af4f4552d3aa70398a755c44b4c47159bed2b7085e3d76",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.466666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R05",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Linkedin",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#4467AD"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-450",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 450,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Linkedin icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Linkedin handle or an explicit Linkedin promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-c50eb2a3c6ab",
+    "name": "X handle · right",
+    "description": "Animated X icon and handle bar. Use only for an actual supplied X handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "X",
+    "url": "/native-graphics/motion-c50eb2a3c6ab.bin",
+    "sha256": "f679c81edf6c3e6302aa8aa6a0ffbe4f697b9ecc002e111ec4a09947dcfc7b47",
+    "sourceSha256": "c50eb2a3c6ab26123f2a5689f909a3f7c44b5006a975411ab30414d188db2b89",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R13",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#000000"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Twitter",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#000000"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#000000"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-415",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 415,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "X icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied X handle or an explicit X promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-f89b11c36776",
+    "name": "TikTok handle · right",
+    "description": "Animated TikTok icon and handle bar. Use only for an actual supplied TikTok handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "TikTok",
+    "url": "/native-graphics/motion-f89b11c36776.bin",
+    "sha256": "939563858dacfbb5bb7a9a2149de0eb3638e61a4f869125cd23755cab5578b0a",
+    "sourceSha256": "f89b11c36776e234c0b403e106ecded52ad5774efc0d095e89f31942e6d7eacd",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R11",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#000000"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 87,
+        "property": 89,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "TikTok icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied TikTok handle or an explicit TikTok promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-605e57395efc",
+    "name": "Vimeo handle · right",
+    "description": "Animated Vimeo icon and handle bar. Use only for an actual supplied Vimeo handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Vimeo",
+    "url": "/native-graphics/motion-605e57395efc.bin",
+    "sha256": "ea5f480b3470fb4a5bbbf1869ac29d8a99543d0cb05ae4cccd37c18c7e8551a9",
+    "sourceSha256": "605e57395efc14d4728f667b1842ec7e36a9035cec0b64ea2d9083fbfc23ecb5",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R17",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Vimeo",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#44B5F5"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-410",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 410,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Vimeo icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Vimeo handle or an explicit Vimeo promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-81eac1cc84a2",
+    "name": "Facebook handle · right",
+    "description": "Animated Facebook icon and handle bar. Use only for an actual supplied Facebook handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Facebook",
+    "url": "/native-graphics/motion-81eac1cc84a2.bin",
+    "sha256": "76945226f9cdd5929dc2d4bc27ec81466b7e71765139b4ec4efb74e826392d4d",
+    "sourceSha256": "81eac1cc84a2aa3ea68dcec83c3ca4778712e05180f397a4dd3be8cd8edab98f",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 4.333333333333333,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R03",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Facebook",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#4676ED"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-410",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 410,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Facebook icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Facebook handle or an explicit Facebook promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-28abfe60657b",
+    "name": "Discord handle · right",
+    "description": "Animated Discord icon and handle bar. Use only for an actual supplied Discord handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Discord",
+    "url": "/native-graphics/motion-28abfe60657b.bin",
+    "sha256": "446eb91c3977a26e9bba24bba1272909adf8c67bead279adb3b82a397a0acd7e",
+    "sourceSha256": "28abfe60657ba2f98fda51c2383151ee23e7b20142ab17974338c93c4b660a6b",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.6666666666666665,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R02",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Discord",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#685CAE"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-418",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 418,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Discord icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Discord handle or an explicit Discord promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-d66befd1dcd6",
+    "name": "Telegram handle · right",
+    "description": "Animated Telegram icon and handle bar. Use only for an actual supplied Telegram handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Telegram",
+    "url": "/native-graphics/motion-d66befd1dcd6.bin",
+    "sha256": "2650e281444ca7ab02e7e353ea3f640618bf22513108ea4ecc6de04073f710d6",
+    "sourceSha256": "d66befd1dcd6ea3bc233371911db6c198b23a52c9b68422aa42ba4221433fc51",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R10",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Telegram",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#2191C5"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-410",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 410,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Telegram icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Telegram handle or an explicit Telegram promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-be7fcd2e1ac0",
+    "name": "Spotify handle · right",
+    "description": "Animated Spotify icon and handle bar. Use only for an actual supplied Spotify handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Spotify",
+    "url": "/native-graphics/motion-be7fcd2e1ac0.bin",
+    "sha256": "0cd4250ce9625281a359064d176de73d9923ede06dae61c422180a9a48586ad9",
+    "sourceSha256": "be7fcd2e1ac00e8c37c52fac5de31cbec86332343b506b8d3ff6314cec839614",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R09",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#000000"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Spotify",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#000000"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#7BD568"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-450",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 450,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Spotify icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Spotify handle or an explicit Spotify promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-763458bc8cc2",
+    "name": "Pinterest handle · right",
+    "description": "Animated Pinterest icon and handle bar. Use only for an actual supplied Pinterest handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Pinterest",
+    "url": "/native-graphics/motion-763458bc8cc2.bin",
+    "sha256": "5af6a647430f1d19da364707cc3b9c3102812f47b31602f1cb366741efa02717",
+    "sourceSha256": "763458bc8cc269de4fb10ceefa4c91f32d8641bcb2d3585abc06a87c3895e894",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.8333333333333335,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.48125,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 R06",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Pinterest",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#AD0023"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-410",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 410,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Right",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Pinterest icon with a horizontal colored handle bar; icon on the right.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Pinterest handle or an explicit Pinterest promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-cbd957ec9c8c",
+    "name": "Instagram handle · left",
+    "description": "Animated Instagram icon and handle bar. Use only for an actual supplied Instagram handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Instagram",
+    "url": "/native-graphics/motion-cbd957ec9c8c.bin",
+    "sha256": "81a7ad2b3d675600546865137eecb92147c38260a5e69039524c624d2760e188",
+    "sourceSha256": "cbd957ec9c8cb5ad57e03aeaab3281215485a03f13710e3ffe017c49d639777d",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Instagram",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01 Color1",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#D023D6"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 01 Color2",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FEDA75"
+      },
+      {
+        "key": "color-62",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-64",
+        "type": "number",
+        "label": "Scale X Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 64,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-462",
+        "type": "number",
+        "label": "Scale X Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 462,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 91,
+        "property": 93,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Instagram icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Instagram handle or an explicit Instagram promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-809e2e68743f",
+    "name": "TikTok handle · left",
+    "description": "Animated TikTok icon and handle bar. Use only for an actual supplied TikTok handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "TikTok",
+    "url": "/native-graphics/motion-809e2e68743f.bin",
+    "sha256": "6812523d219b365978653511da70c5afd0f34d7bebc0b82f90625b1f98220206",
+    "sourceSha256": "809e2e68743f52a07f440744ba581def38926d39bc7174d39f2aae4067a3d720",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#000000"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-60",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-520",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 520,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 87,
+        "property": 89,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "TikTok icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied TikTok handle or an explicit TikTok promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-644540aee566",
+    "name": "X handle · left",
+    "description": "Animated X icon and handle bar. Use only for an actual supplied X handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "X",
+    "url": "/native-graphics/motion-644540aee566.bin",
+    "sha256": "30e7a80fac4bd175518eb38b68887dc226bdfe2b7a72fc86cc0d2e150a8dbe13",
+    "sourceSha256": "644540aee5660e3e792022b8f80b555d7a440996b6b8aea6d198a090e0720b53",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#000000"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Twitter",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#000000"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#000000"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-415",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 415,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "X icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied X handle or an explicit X promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-65ece237b6d8",
+    "name": "Facebook handle · left",
+    "description": "Animated Facebook icon and handle bar. Use only for an actual supplied Facebook handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Facebook",
+    "url": "/native-graphics/motion-65ece237b6d8.bin",
+    "sha256": "f8b7f8f18f60d6bb069e3a9a9b683a6e929386b25135d735597325c8974f8389",
+    "sourceSha256": "65ece237b6d8957d3aed72e9d4487fc5da73fa62d450415e7379e0caaf051b09",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.433333333333333,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Facebook",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#4676ED"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-410",
+        "type": "number",
+        "label": "Scale X Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 410,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Facebook icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Facebook handle or an explicit Facebook promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-41f877edb838",
+    "name": "Soundcloud handle · left",
+    "description": "Animated Soundcloud icon and handle bar. Use only for an actual supplied Soundcloud handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Soundcloud",
+    "url": "/native-graphics/motion-41f877edb838.bin",
+    "sha256": "f140adebd6c3f8e6b09518704205b00e55c95c3e2831fb68ebb1846278c5909f",
+    "sourceSha256": "41f877edb838261ca052ac32131a50d09f095f85cf10c15df41984c08283cd7a",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Soundcloud",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FF5500"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-451",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 451,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Soundcloud icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Soundcloud handle or an explicit Soundcloud promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-5720d53b0adc",
+    "name": "Spotify handle · left",
+    "description": "Animated Spotify icon and handle bar. Use only for an actual supplied Spotify handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Spotify",
+    "url": "/native-graphics/motion-5720d53b0adc.bin",
+    "sha256": "c906b549c77ae0062de31a370faaa073b214ce5c8e2a0b0d2f996f3df2c50646",
+    "sourceSha256": "5720d53b0adc2f8232ee2aac40904c41512e8cce3f178f1f4fdc6580f8795ee5",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.5,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#000000"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Spotify",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#000000"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#7BD568"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-450",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 450,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Spotify icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Spotify handle or an explicit Spotify promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-49104f149ea0",
+    "name": "Telegram handle · left",
+    "description": "Animated Telegram icon and handle bar. Use only for an actual supplied Telegram handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Telegram",
+    "url": "/native-graphics/motion-49104f149ea0.bin",
+    "sha256": "cd123eef489e21fefd183ed04cb911e3df6db2895d5d48b32061d291ee369c54",
+    "sourceSha256": "49104f149ea08dcee725113defe2f14531e85fe1c9de7118706009ebd42dbcf2",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Telegram",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#2191C5"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-410",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 410,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Telegram icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Telegram handle or an explicit Telegram promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-1f1d2fe8f33b",
+    "name": "Youtube handle · left",
+    "description": "Animated Youtube icon and handle bar. Use only for an actual supplied Youtube handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Youtube",
+    "url": "/native-graphics/motion-1f1d2fe8f33b.bin",
+    "sha256": "8da5f0a0d876ad5f931359ff91fe6f965491135459c0b5d79ee667d4f7298715",
+    "sourceSha256": "1f1d2fe8f33b2df6488d728b92d05847c92a03cf59a66c54cf7eb3ef13312e7c",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Youtube",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FF0000"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-415",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 415,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Youtube icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Youtube handle or an explicit Youtube promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-580cd7785101",
+    "name": "Vimeo handle · left",
+    "description": "Animated Vimeo icon and handle bar. Use only for an actual supplied Vimeo handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Vimeo",
+    "url": "/native-graphics/motion-580cd7785101.bin",
+    "sha256": "6a3f9fb3572ee1b9deb05d80158f8793d55e52d3ac5f2bb7ebaaa73f03a45054",
+    "sourceSha256": "580cd7785101e3ed6583ece9fd4fe67fee6506dfcde91bf66f386fdc782b4af4",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Vimeo",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#44B5F5"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-410",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 410,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Vimeo icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Vimeo handle or an explicit Vimeo promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-c8a985258e58",
+    "name": "Google Plus handle · left",
+    "description": "Animated Google Plus icon and handle bar. Use only for an actual supplied Google Plus handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Google Plus",
+    "url": "/native-graphics/motion-c8a985258e58.bin",
+    "sha256": "317121b8b13120ad3318d08cef8645707125437c1fd0f6f7ccd2a21010538f0b",
+    "sourceSha256": "c8a985258e580f6f58d5c54623d4b6446b78200137304d34817798fbc17be2cf",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.1,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Google Plus",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#F4511F"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-435",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 435,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Google Plus icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Google Plus handle or an explicit Google Plus promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-908d4da1651c",
+    "name": "Twitch handle · left",
+    "description": "Animated Twitch icon and handle bar. Use only for an actual supplied Twitch handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Twitch",
+    "url": "/native-graphics/motion-908d4da1651c.bin",
+    "sha256": "8c4ca0a5248e9fccf4f5b583b27164152a23cc5622c62b98b5dcdd3321950bcd",
+    "sourceSha256": "908d4da1651c503a7877a5e704e6a7559982b7944041395c18a1d8080f01d7c1",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#9146FF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-60",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-465",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 465,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 87,
+        "property": 89,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Twitch icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Twitch handle or an explicit Twitch promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-da7b4a1eb4b1",
+    "name": "Pinterest handle · left",
+    "description": "Animated Pinterest icon and handle bar. Use only for an actual supplied Pinterest handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Pinterest",
+    "url": "/native-graphics/motion-da7b4a1eb4b1.bin",
+    "sha256": "060efad138c413f9be0f685f559ce13d4472ba2c525fe510aed29f88f76a5cb4",
+    "sourceSha256": "da7b4a1eb4b191824110d7f34bbc4ad06b909e36e9552757ad22060d24fef718",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Pinterest",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#AD0023"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-410",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 410,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Pinterest icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Pinterest handle or an explicit Pinterest promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-1006a582e37c",
+    "name": "Dribbble handle · left",
+    "description": "Animated Dribbble icon and handle bar. Use only for an actual supplied Dribbble handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Dribbble",
+    "url": "/native-graphics/motion-1006a582e37c.bin",
+    "sha256": "43c64917bf75b9fe9534aa1336a69057b1509de1a3b5dd6331c1a6fa1e1f2f1c",
+    "sourceSha256": "1006a582e37cf9d45e8dc6b05a2761df06fb366e33d602b5bc8d67a9b70a9e50",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Dribbble",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#C92E62"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-430",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 430,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Dribbble icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Dribbble handle or an explicit Dribbble promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-da654750b126",
+    "name": "Discord handle · left",
+    "description": "Animated Discord icon and handle bar. Use only for an actual supplied Discord handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Discord",
+    "url": "/native-graphics/motion-da654750b126.bin",
+    "sha256": "79327f010af62424d8737b08525c5bbb638b686446e55cb02dc0432e06f26407",
+    "sourceSha256": "da654750b126782e0c7a3c50a309a250ed6133931bc8b68271e4ba2da617f718",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 3.566666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Discord",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#685CAE"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-418",
+        "type": "number",
+        "label": "Scale X Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 418,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Discord icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Discord handle or an explicit Discord promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-01137a703090",
+    "name": "Behance handle · left",
+    "description": "Animated Behance icon and handle bar. Use only for an actual supplied Behance handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Behance",
+    "url": "/native-graphics/motion-01137a703090.bin",
+    "sha256": "a068cac4dfedebb86cf1d9f30fb2119b579700f5805bdd3ae005bb3c771fb128",
+    "sourceSha256": "01137a7030907b18988490b5ccec2b56a529768b891f3baaeec3efcd6aad25fa",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Behance",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#065BFF"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-471",
+        "type": "number",
+        "label": "Scale X Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 471,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Behance icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Behance handle or an explicit Behance promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-9fed9cf80bd5",
+    "name": "Linkedin handle · left",
+    "description": "Animated Linkedin icon and handle bar. Use only for an actual supplied Linkedin handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Linkedin",
+    "url": "/native-graphics/motion-9fed9cf80bd5.bin",
+    "sha256": "0b9c73995ae7b5c8bcb8b23964efd757ec5260b058964160934e8ec8ebe039a7",
+    "sourceSha256": "9fed9cf80bd5d20c511a25bb1a156d5d7153d604dd55d3c5c58eff60d5af0117",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_Linkedin",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#4467AD"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-450",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 450,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Linkedin icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Linkedin handle or an explicit Linkedin promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-4ea94c02dc2a",
+    "name": "WhatsApp handle · left",
+    "description": "Animated WhatsApp icon and handle bar. Use only for an actual supplied WhatsApp handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "WhatsApp",
+    "url": "/native-graphics/motion-4ea94c02dc2a.bin",
+    "sha256": "c20394bc3bdab4e74395916b939830630cf87827b39bf64d1fcd18a8be2a12a0",
+    "sourceSha256": "4ea94c02dc2a9e19b89724651649180e54817337b49afbbff9df6a1d509d20b7",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "L_WhatsApp",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#4EC763"
+      },
+      {
+        "key": "color-60",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-62",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 62,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-418",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 418,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 89,
+        "property": 91,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "WhatsApp icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied WhatsApp handle or an explicit WhatsApp promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  },
+  {
+    "id": "motion-48d79271099b",
+    "name": "Snapchat handle · left",
+    "description": "Animated Snapchat icon and handle bar. Use only for an actual supplied Snapchat handle or an explicit promotion request.",
+    "category": "social",
+    "platform": "Snapchat",
+    "url": "/native-graphics/motion-48d79271099b.bin",
+    "sha256": "681db50adf54d96fc03698548b2dd2c0826fd484df8183cd872e1494d73f5703",
+    "sourceSha256": "48d79271099b44bd571b3fbb35b9df1ddbe9469d26503435c6264f91795546ab",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 15,
+    "entranceEnd": 2.8666666666666667,
+    "exitStart": 12.166666666666666,
+    "bounds": {
+      "x": 0.09791666666666667,
+      "y": 0.7666666666666667,
+      "width": 0.42083333333333334,
+      "height": 0.13703703703703704
+    },
+    "fonts": [
+      {
+        "url": "/fonts/native/kanit-semibold.ttf",
+        "sha256": "5572c26d7dc07d2d609d6dd95b9a8aa338c292fb7b2059bf02d0f619e97cdc57"
+      }
+    ],
+    "controls": [
+      {
+        "key": "color-54",
+        "type": "color",
+        "label": "Text 01 L01",
+        "comp": 6,
+        "layer": 30,
+        "property": 54,
+        "default": "#000000"
+      },
+      {
+        "key": "color-56",
+        "type": "color",
+        "label": "Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 56,
+        "default": "#FEFB00"
+      },
+      {
+        "key": "color-58",
+        "type": "color",
+        "label": "Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 58,
+        "default": "#FFFFFF"
+      },
+      {
+        "key": "number-60",
+        "type": "number",
+        "label": "Scale X SRV Box 01",
+        "comp": 6,
+        "layer": 30,
+        "property": 60,
+        "default": 0,
+        "min": -960,
+        "max": 1145
+      },
+      {
+        "key": "number-420",
+        "type": "number",
+        "label": "Scale X SRV Box 02",
+        "comp": 6,
+        "layer": 30,
+        "property": 420,
+        "default": 0,
+        "min": -500,
+        "max": 500
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "label": "Text 01",
+        "comp": 11,
+        "layer": 87,
+        "property": 89,
+        "default": "@yourusername",
+        "font": "Kanit-SemiBold",
+        "fontSize": 119,
+        "justify": "Left",
+        "textSlot": 0
+      }
+    ],
+    "staticHold": true,
+    "design": {
+      "layout": "Snapchat icon with a horizontal colored handle bar; icon on the left.",
+      "motion": "The bar extends, the icon and handle reveal, hold together, then retract.",
+      "bestFor": "Only an actual user-supplied Snapchat handle or an explicit Snapchat promotion request.",
+      "avoid": "Never invent an account or apply a platform badge as unrelated decoration. Keep the bar away from faces and captions."
+    }
+  }
+]

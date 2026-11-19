@@ -1,4 +1,5 @@
 import { nativeRevealUi } from "./ui-native-reveal";
+import { nativeGraphicsTranslations } from "./ui-native-graphics";
 import { nativeMotionUi } from "./ui-native-motion";
 import { nativeZoomUi } from "./ui-native-zoom";
 import { nativePushUi } from "./ui-native-push";
@@ -173,6 +174,10 @@ for (const [code, entries] of Object.entries(nativeTransitionUi))
 
 for (const [code, entries] of Object.entries(editorFontUi))
   Object.assign(uiLocales[code], entries);
+
+for (const [code, catalog] of Object.entries(uiLocales))
+  if (code !== "en")
+    Object.assign(catalog, nativeGraphicsTranslations(code, catalog));
 
 for (const [code, entries] of Object.entries(nativeZoomUi).map(
   ([code, entries]) =>

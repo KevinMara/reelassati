@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { NativeGraphicComposer } from "@/components/studio/NativeGraphicComposer";
 import type { EditorSavedStyle } from "@contracts/editor-style-library";
 import {
   GRAPHIC_KINDS,
@@ -42,6 +43,19 @@ export function GraphicStyleFields({
 }) {
   const ui = useUiText();
   const [position, setPosition] = useState(0.5);
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    if (!playing || !value.graphic.native) return;
+    let frame = 0;
+    const start = performance.now(),
+      duration = Math.max(0.1, value.graphicDuration);
+    const tick = (now: number) => {
+      setPosition((((now - start) / 1000) % duration) / duration);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [playing, value.graphic.native, value.graphicDuration]);
   const graphic = value.graphic;
   const shapeDimensions = graphicShapeDimensions(graphic, 9 / 16);
   const patch = (patch: Partial<MotionGraphic>) =>
@@ -49,6 +63,23 @@ export function GraphicStyleFields({
       ...value,
       graphic: normalizeGraphic({ ...graphic, ...patch })!,
     });
+  if (graphic.native)
+    return (
+      <NativeGraphicComposer
+        embedded
+        graphic={graphic}
+        onChange={graphic => onChange({ ...value, graphic })}
+        onSave={async () => undefined}
+        initial={false}
+        seconds={value.graphicDuration}
+        onDuration={graphicDuration => onChange({ ...value, graphicDuration })}
+        busy={false}
+        position={position}
+        onPosition={setPosition}
+        playing={playing}
+        onPlaying={() => setPlaying(v => !v)}
+      />
+    );
   return (
     <div className="space-y-4">
       <div

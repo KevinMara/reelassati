@@ -1,0 +1,26 @@
+[package]
+name = "reel-native-compositor"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "=0.2.129"
+serde_json = "1"
+effectcraft-aep = { path = "../.cache/effectcraft/crates/aep" }
+effectcraft-project = { path = "../.cache/effectcraft/crates/project" }
+effectcraft-render = { path = "../.cache/effectcraft/crates/render" }
+effectcraft-raster = { path = "../.cache/effectcraft/crates/raster" }
+effectcraft-text = { path = "../.cache/effectcraft/crates/text" }
+effectcraft-time = { path = "../.cache/effectcraft/crates/time" }
+effectcraft-expr = { path = "../.cache/effectcraft/crates/expr" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
+

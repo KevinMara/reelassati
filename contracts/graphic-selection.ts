@@ -5,6 +5,7 @@ import {
   type GraphicPoint,
 } from "./graphic-layout";
 import { graphicFrame, normalizeGraphic } from "./motion-graphics";
+import { nativeGraphicBox } from "./native-graphics";
 import { isSpatialGraphic, spatialGraphicFrame } from "./spatial-graphics";
 import type { TimelineClip } from "./workspace";
 
@@ -26,6 +27,23 @@ export function graphicSelectionBounds(
     return undefined;
   const elapsed = clip.inPoint + (time - clip.start) * (clip.speed ?? 1);
   const duration = clip.graphicDuration ?? clip.outPoint ?? clip.duration;
+  if (g.native) {
+    const pose = graphicFrame(g, elapsed, duration),
+      box = nativeGraphicBox(g, width, height)!;
+    const angle = (pose.rotation * Math.PI) / 180,
+      cos = Math.cos(angle),
+      sin = Math.sin(angle);
+    const halfW = (box.width * pose.scale) / 2,
+      halfH = (box.height * pose.scale) / 2;
+    const w = 2 * (Math.abs(halfW * cos) + Math.abs(halfH * sin)),
+      h = 2 * (Math.abs(halfW * sin) + Math.abs(halfH * cos));
+    return {
+      x: (pose.x * width) / 100 - w / 2,
+      y: (pose.y * height) / 100 - h / 2,
+      width: w,
+      height: h,
+    };
+  }
   let points: GraphicPoint[];
   if (isSpatialGraphic(g)) {
     const spatial = spatialGraphicFrame(g, elapsed, duration);

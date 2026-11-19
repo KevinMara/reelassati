@@ -9,6 +9,7 @@ import {
   type MotionGraphic,
 } from "@contracts/motion-graphics";
 import { MotionGraphicLayer } from "./MotionGraphicLayer";
+import { NativeGraphicComposer } from "./NativeGraphicComposer";
 import { GraphicMotionEditor } from "./GraphicMotionEditor";
 import { graphicShapeDimensions } from "@contracts/graphic-layout";
 import type { TimelineClip } from "@contracts/workspace";
@@ -22,6 +23,7 @@ export function GraphicComposer({
   onSave,
   busy = false,
   duration = 3,
+  aspectRatio = "9:16",
 }: {
   initial?: MotionGraphic;
   /** Preset seed for a new graphic, preserving the editable duration and insert action. */
@@ -29,6 +31,7 @@ export function GraphicComposer({
   onSave: (graphic: MotionGraphic, seconds: number) => Promise<void>;
   busy?: boolean;
   duration?: number;
+  aspectRatio?: "9:16" | "16:9" | "1:1";
 }) {
   const ui = useUiText();
   const graphicKindLabels = {
@@ -93,6 +96,23 @@ export function GraphicComposer({
     color: g.background,
     graphic: g,
   };
+  if (g.native)
+    return (
+      <NativeGraphicComposer
+        aspectRatio={aspectRatio}
+        graphic={g}
+        onChange={setG}
+        onSave={onSave}
+        initial={Boolean(initial)}
+        seconds={seconds}
+        onDuration={setSeconds}
+        busy={busy}
+        position={previewPosition}
+        onPosition={setPreviewPosition}
+        playing={playing}
+        onPlaying={() => setPlaying(v => !v)}
+      />
+    );
   return (
     <form
       className="space-y-3"

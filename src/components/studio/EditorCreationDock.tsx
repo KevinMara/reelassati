@@ -494,6 +494,7 @@ export function EditorCreationDock({
                 }
                 draft={graphicPreset?.preset.graphic}
                 duration={graphicPreset?.preset.duration ?? 3}
+                aspectRatio={project.aspectRatio}
                 onSave={onGraphic}
               />
             </div>

@@ -29,7 +29,13 @@ export function graphicAssEvents(
   const events: string[] = [];
   for (const clip of clips) {
     const g = normalizeGraphic(clip.graphic);
-    if (!g || clip.hidden || clip.start >= duration || clip.duration <= 0)
+    if (
+      !g ||
+      g.native ||
+      clip.hidden ||
+      clip.start >= duration ||
+      clip.duration <= 0
+    )
       continue;
     const end = Math.min(duration, clip.start + clip.duration);
     const layer =

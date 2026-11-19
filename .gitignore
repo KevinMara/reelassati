@@ -54,6 +54,9 @@ coverage/
 
 /public/vendor/render/
 
+/native/.cache/
+/native/compositor/target/
+
 /public/vendor/pdfjs/
 
 # Rebuilt from the exact Transformers/ORT versions in pnpm-lock.yaml.

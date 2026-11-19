@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NativeGraphicLayer } from "./NativeGraphicLayer";
 import {
   graphicTextLines,
   graphicShapes,
@@ -34,6 +35,7 @@ export function MotionGraphicLayer({
   }, [clip.graphic?.kind]);
   const g = normalizeGraphic(clip.graphic);
   if (!g) return null;
+  if (g.native) return <NativeGraphicLayer clip={clip} time={time} />;
   const elapsed = clip.inPoint + (time - clip.start) * (clip.speed ?? 1);
   const graphicDuration =
     clip.graphicDuration ?? clip.outPoint ?? clip.duration;

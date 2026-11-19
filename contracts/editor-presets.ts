@@ -5,6 +5,7 @@ import {
   type MotionGraphic,
 } from "./motion-graphics";
 import fontMetrics from "./caption-font-metrics.json";
+import { NATIVE_GRAPHIC_TEMPLATES } from "./native-graphics";
 import { editorFont, editorFontMetrics } from "./editor-fonts";
 
 export const CAPTION_ANIMATIONS = [
@@ -920,6 +921,43 @@ const BASE_GRAPHIC_PRESETS: readonly GraphicPreset[] = [
 /** Curated motion paths: deliberate entrance, readable hold, and a short exit. */
 export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
   ...BASE_GRAPHIC_PRESETS,
+  ...NATIVE_GRAPHIC_TEMPLATES.map(template => {
+    const texts = template.controls.filter(c => c.type === "text");
+    return graphic(
+      template.id,
+      template.name,
+      template.category === "title"
+        ? "Editable animated title."
+        : "Animated icon and editable handle.",
+      {
+        kind: "text",
+        native: { id: template.id, values: {}, enter: 0.65, exit: 0.45 },
+        text: texts
+          .filter(c => c.textSlot === 0)
+          .map(c => c.default)
+          .join(""),
+        secondaryText: texts
+          .filter(c => c.textSlot === 1)
+          .map(c => c.default)
+          .join(""),
+        color: String(
+          template.controls.find(
+            c => c.type === "color" && /^Text 01/.test(c.label)
+          )?.default ?? "#FFFFFF"
+        ),
+        accent: String(
+          template.controls.find(
+            c => c.type === "color" && /^Text 02/.test(c.label)
+          )?.default ?? "#FFFFFF"
+        ),
+        animation: "none",
+        x: 50,
+        y: template.category === "social" ? 65 : 38,
+        size: template.category === "social" ? 6 : 7,
+      },
+      4
+    );
+  }),
   ...BASE_GRAPHIC_PRESETS.flatMap(p =>
     (p.graphic.kind === "line" || p.graphic.kind === "arrow"
       ? (["slide", "fade"] as const)
