@@ -1009,6 +1009,61 @@ describe("bounded auto-edit graphic decisions", () => {
     ).toBe("replace");
   });
 
+  it("honors an exact supplied social handle while preserving source protection", () => {
+    const request =
+      "Add the editable Instagram handle · left animation with the supplied handle @reel.studio for the first 4 seconds, placed in the clear top margin (x=50, y=8, size=6); verify it does not cover source text or face.";
+    const g = normalizeGraphic({
+      kind: "text",
+      text: "@reel.studio",
+      x: 50,
+      y: 8,
+      size: 6,
+      animation: "none",
+      native: { id: "motion-cbd957ec9c8c" },
+    })!;
+    expect(automaticGraphicIntent(request, g)).toBe("requested");
+    for (const candidate of [
+      { ...g, text: "@reel_studio" },
+      { ...g, text: "@other.account" },
+      { ...g, secondaryText: "An invented endorsement" },
+      { ...g, native: undefined },
+    ])
+      expect(automaticGraphicIntent(request, candidate)).toBe("automatic");
+    expect(
+      automaticGraphicIntent("Do not add the Instagram handle @reel.studio", g)
+    ).toBe("automatic");
+    expect(
+      automaticGraphicIntent("Add the TikTok handle @reel.studio", g)
+    ).toBe("automatic");
+    const p = project(
+      evidence({
+        regions: [
+          { ...region(), rect: { x: 0.2, y: 0, width: 0.6, height: 0.2 } },
+        ],
+      })
+    );
+    const proposed = graphic({
+      start: 0,
+      duration: 4,
+      outPoint: 4,
+      graphic: g,
+    });
+    const result = filterAutonomousGraphics(p, [operation(proposed)], [asset], {
+      request,
+    });
+    expect(result.omitted[0]?.issues.map(issue => issue.reason)).toContain(
+      "source-overlap"
+    );
+    expect(result.omitted[0]?.issues.map(issue => issue.reason)).not.toContain(
+      "unsupported-source-copy"
+    );
+    p.sourceReviews![0].visualProtection!.regions = [];
+    expect(
+      filterAutonomousGraphics(p, [operation(proposed)], [asset], { request })
+        .changes
+    ).toHaveLength(1);
+  });
+
   it.each(["Ajoute un titre", "Añade un título", "Füge einen Titel hinzu"])(
     "recognizes a specific title request in %j",
     request => {

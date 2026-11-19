@@ -24,6 +24,7 @@ import { captionMotion, captionRuns } from "./caption-runs";
 import { captionMotionFrame } from "./caption-motion";
 import { normalizeTranscriptWords } from "./transcript-timing";
 import { graphicReadabilityProblems } from "./graphic-readability";
+import { nativeGraphicTemplate } from "./native-graphics";
 
 export type AutomaticGraphicIntent =
   "automatic" | "source-design" | "requested" | "replace";
@@ -218,7 +219,8 @@ export function automaticGraphicIntent(
   const actions =
     /\b(?:add|insert|put|place|create|make|design|use|show|write|replace|cover|hide|aggiungi|inserisci|metti|posiziona|crea|usa|realizza|mostra|scrivi|sostituisci|copri|nascondi|ajoute|ajoutez|insere|cree|utilise|ecris|remplace|anade|agrega|inserta|pon|crea|usa|escribe|reemplaza|fuge|hinzufugen|erstelle|gestalte|verwende|schreibe|ersetze|adicione|insira)\b/u;
   const sentences = text
-    .split(/[.!?;\n]/u)
+    // A handle/domain or decimal is not a sentence boundary.
+    .split(/[!?;\n]|\.(?=\s|$)/u)
     .filter(
       part =>
         actions.test(part) &&
@@ -227,6 +229,36 @@ export function automaticGraphicIntent(
           part
         )
     );
+  // Social templates use a handle, not a spoken title. Accept only an exact
+  // handle supplied in an affirmative request for that platform/template.
+  // This grants copy permission only; source-overlap checks still apply.
+  const native = nativeGraphicTemplate(candidate?.native?.id);
+  if (candidate && native?.category === "social") {
+    const supplied = text
+      .split(/[!?;\n]|\.(?=\s|$)/u)
+      .filter(
+        part =>
+          actions.test(part) &&
+          /\b(?:handle|username|account|profilo|nome utente|usuario|compte)\b/u.test(
+            part
+          ) &&
+          (!native.platform ||
+            part.includes(native.platform.toLocaleLowerCase("en"))) &&
+          !/\b(?:no|not|never|without|avoid|non|senza|evita|nessun[ao]|pas|sans|sin|nunca|kein|keine|ohne|nao)\b/u.test(
+            part
+          )
+      )
+      .flatMap(
+        part => part.match(/@[\p{L}\p{N}_]+(?:[._][\p{L}\p{N}_]+)*/gu) ?? []
+      );
+    const exact = candidate.text
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "")
+      .toLocaleLowerCase("en")
+      .trim();
+    if (supplied.includes(exact) && !candidate.secondaryText?.trim())
+      return "requested";
+  }
   if (!sentences.length) return "automatic";
   if (candidate) {
     const suppliedCopy = [
