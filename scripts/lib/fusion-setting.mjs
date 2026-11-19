@@ -182,3 +182,47 @@ export function fusionTools(root) {
   visit(fields(root).Tools);
   return tools;
 }
+
+/** Resolve authored tool instances on demand. An explicit empty local input
+ * resets that input to its tool default; it must not inherit the parent's value.
+ * No script or expression is evaluated while resolving the serialized graph. */
+export function resolvedFusionTools(root) {
+  const original = fusionTools(root),
+    resolved = new Map(),
+    pending = new Set();
+  function get(name) {
+    if (resolved.has(name)) return resolved.get(name);
+    const node = original.get(name);
+    if (!node) return undefined;
+    if (pending.has(name)) throw new Error("Cyclic native tool instance");
+    const source = fields(node).SourceOp;
+    if (source === undefined) {
+      resolved.set(name, node);
+      return node;
+    }
+    if (typeof source !== "string")
+      throw new Error("Invalid native instance source");
+    pending.add(name);
+    try {
+      const base = get(source);
+      if (!base || base.tag !== node.tag)
+        throw new Error("Native instance source type mismatch");
+      const inputs = {
+        ...fields(fields(base).Inputs),
+        ...fields(fields(node).Inputs),
+      };
+      const entries = {
+        ...fields(base),
+        ...fields(node),
+        Inputs: { tag: null, entries: inputs },
+      };
+      delete entries.SourceOp;
+      const value = { tag: node.tag, entries };
+      resolved.set(name, value);
+      return value;
+    } finally {
+      pending.delete(name);
+    }
+  }
+  return { get };
+}

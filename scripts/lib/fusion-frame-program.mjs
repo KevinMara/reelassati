@@ -1,4 +1,4 @@
-import { fields, fusionTools } from "./fusion-setting.mjs";
+import { fields, resolvedFusionTools } from "./fusion-setting.mjs";
 import { fusionParameterEvaluator } from "./fusion-curves.mjs";
 
 /** Compile verified data operations to a neutral, sampled render graph.
@@ -18,7 +18,7 @@ export function compileFusionFrameProgram(
     fps > 120
   )
     throw new Error("Invalid native reference clock");
-  const tools = fusionTools(root);
+  const tools = resolvedFusionTools(root);
   const groups = Object.values(fields(fields(root).Tools)).filter(n =>
     ["GroupOperator", "MacroOperator"].includes(n.tag)
   );
@@ -108,9 +108,11 @@ export function compileFusionFrameProgram(
               "MotionBlur",
               "Quality",
               "ShutterAngle",
+              "FlipHoriz",
+              "FlipVert",
             ];
-    for (const key of Object.keys(fields(fields(node).Inputs)))
-      if (!allowed.includes(key))
+    for (const [key, value] of Object.entries(fields(fields(node).Inputs)))
+      if (!allowed.includes(key) && Object.keys(fields(value)).length)
         throw new Error(
           `Native renderer input not implemented: ${node.tag}.${key}`
         );
@@ -152,15 +154,26 @@ export function compileFusionFrameProgram(
           const linked = number(name, "UseSizeAndAspect", t, 1),
             size = number(name, "Size", t, 1),
             aspect = number(name, "Aspect", t, 1);
-          if (![0, 1].includes(linked) || aspect !== 1)
-            throw new Error(
-              "Native aspect conversion needs reference validation"
-            );
+          const flipX = number(name, "FlipHoriz", t, 0),
+            flipY = number(name, "FlipVert", t, 0);
+          if (
+            ![0, 1].includes(linked) ||
+            ![0, 1].includes(flipX) ||
+            ![0, 1].includes(flipY) ||
+            (linked && aspect <= 0)
+          )
+            throw new Error("Invalid native transform aspect or flip mode");
           return {
             center: point(name, "Center", t),
             pivot: point(name, "Pivot", t),
-            scaleX: linked ? size : number(name, "XSize", t, 1),
-            scaleY: linked ? size : number(name, "YSize", t, 1),
+            scaleX:
+              (linked
+                ? size * Math.max(1, aspect)
+                : number(name, "XSize", t, 1)) * (flipX ? -1 : 1),
+            scaleY:
+              (linked
+                ? size / Math.min(1, aspect)
+                : number(name, "YSize", t, 1)) * (flipY ? -1 : 1),
             angle: number(name, "Angle", t, 0),
             edges: number(name, "Edges", t, 0),
             motionBlur: number(name, "MotionBlur", t, 0),

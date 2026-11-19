@@ -21,6 +21,7 @@ uniform vec2 pivot;
 uniform vec2 scales;
 uniform float angle;
 uniform int edges;
+uniform vec4 cropEdges;
 out vec4 result;
 int modulo(int p,int n){return ((p%n)+n)%n;}
 ivec2 mapped(ivec2 p){
@@ -52,6 +53,14 @@ void main(){
   // Fusion Normal/Over uses premultiplied foreground + background*(1-alpha).
   // Blend mixes the finished composite back against its background input.
   if(operation==3){vec4 bg=texelFetch(imageA,p,0),fg=texelFetch(imageB,p,0);result=mix(bg,fg+bg*(1.-fg.a),weight);return;}
+  if(operation==4){
+    // Crop removes picture; it never scales or stretches the retained region.
+    // Pixel area coverage preserves fractional authored crop edges and alpha.
+    vec2 lo=vec2(cropEdges.x,cropEdges.z)*size;
+    vec2 hi=(vec2(1.)-vec2(cropEdges.y,cropEdges.w))*size;
+    vec2 coverage=max(vec2(0.),min(vec2(p)+1.,hi)-max(vec2(p),lo));
+    result=texelFetch(imageA,p,0)*coverage.x*coverage.y;return;
+  }
   if(abs(scales.x)<1e-8||abs(scales.y)<1e-8){result=vec4(0.);return;}
   // Textures retain top-down source rows. Native positive angles turn counter-clockwise.
   vec2 d=gl_FragCoord.xy-vec2(center.x,1.-center.y)*size;
@@ -129,6 +138,7 @@ export function createNativeFrameRenderer(
       "scales",
       "angle",
       "edges",
+      "cropEdges",
     ].map(n => [n, gl.getUniformLocation(pipeline, n)])
   );
   gl.uniform1i(uniforms.imageA, 0);
@@ -270,6 +280,12 @@ export function createNativeFrameRenderer(
             uniforms.weight,
             nativeSampleAt(node.samples, frame).mix
           );
+        } else if (node.kind === "crop") {
+          const s = nativeSampleAt(node.samples, frame);
+          bind(node.input, 0);
+          bind(node.input, 1);
+          gl.uniform1i(uniforms.operation, 4);
+          gl.uniform4f(uniforms.cropEdges, s.left, s.right, s.top, s.bottom);
         } else if (node.kind === "transform") {
           const s = nativeSampleAt(node.samples, frame);
           bind(node.input, 0);

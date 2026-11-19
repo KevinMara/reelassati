@@ -1097,6 +1097,66 @@
       "sourceSha256": "78eb1f390e864c31520cfb56d4ff977a9a1b22f819b49ef666a01a97df3bbfd9",
       "sourceMember": "Miami.ttf",
       "license": "/fonts/native/miami-source.txt"
+    },
+    {
+      "id": "optibodoni-antiqua",
+      "label": "OPTIBodoni-Antiqua",
+      "family": "OPTIBodoni-Antiqua",
+      "postscript": "OPTIBodoni-Antiqua",
+      "weight": 400,
+      "bold": false,
+      "italic": false,
+      "url": "/fonts/native/optibodoni-antiqua.otf",
+      "sha256": "260b6f99cf19aab9533f24342969365ec38925dd1c7f7416d10fd70ce503c258",
+      "source": "https://fontmeme.com/fonts/bodoni-antiqua-font/",
+      "sourceSha256": "1dc73255617bf0bd2f016a054c8ebbff69e10e1775182091707121668feed059",
+      "sourceMember": "OPTIBodoni-Antiqua.otf",
+      "license": "/fonts/native/optibodoni-antiqua-source.txt"
+    },
+    {
+      "id": "optibodoniantiqua-italic",
+      "label": "OPTIBodoniAntiqua-Italic",
+      "family": "OPTIBodoniAntiqua-Italic",
+      "postscript": "OPTIBodoniAntiqua-Italic",
+      "weight": 500,
+      "bold": false,
+      "italic": true,
+      "url": "/fonts/native/optibodoniantiqua-italic.otf",
+      "sha256": "2f78700800c97849168503b10e70239cf2b77183005b0d7c84f7437182bd7af7",
+      "source": "https://fontmeme.com/fonts/bodoni-antiqua-font/",
+      "sourceSha256": "1dc73255617bf0bd2f016a054c8ebbff69e10e1775182091707121668feed059",
+      "sourceMember": "OPTIBodoniAntiqua-Italic.otf",
+      "license": "/fonts/native/optibodoniantiqua-italic-source.txt"
+    },
+    {
+      "id": "optibodoniantiqua-medita",
+      "label": "OPTIBodoniAntiqua-MedIta",
+      "family": "OPTIBodoniAntiqua-MedIta",
+      "postscript": "OPTIBodoniAntiqua-MedIta",
+      "weight": 500,
+      "bold": false,
+      "italic": false,
+      "url": "/fonts/native/optibodoniantiqua-medita.otf",
+      "sha256": "10f6f23563fa487682974105899e5bd1522c2576aed17dc923328f93278b573a",
+      "source": "https://fontmeme.com/fonts/bodoni-antiqua-font/",
+      "sourceSha256": "1dc73255617bf0bd2f016a054c8ebbff69e10e1775182091707121668feed059",
+      "sourceMember": "OPTIBodoniAntiqua-MedIta.otf",
+      "license": "/fonts/native/optibodoniantiqua-medita-source.txt"
+    },
+    {
+      "id": "optibodoniantiqua-medium",
+      "label": "OPTIBodoniAntiqua-Medium",
+      "family": "OPTIBodoniAntiqua-Medium",
+      "postscript": "OPTIBodoniAntiqua-Medium",
+      "weight": 500,
+      "bold": false,
+      "italic": false,
+      "url": "/fonts/native/optibodoniantiqua-medium.otf",
+      "sha256": "243912b917046a0ac5f5780ae5e637036b98f0f742e7f908c3ff72a18535a397",
+      "source": "https://fontmeme.com/fonts/bodoni-antiqua-font/",
+      "sourceSha256": "1dc73255617bf0bd2f016a054c8ebbff69e10e1775182091707121668feed059",
+      "sourceMember": "OPTIBodoniAntiqua-Medium.otf",
+      "license": "/fonts/native/optibodoniantiqua-medium-source.txt"
     }
   ]
 }

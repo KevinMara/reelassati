@@ -1,4 +1,4 @@
-import { fields, fusionTools } from "./fusion-setting.mjs";
+import { fields, resolvedFusionTools } from "./fusion-setting.mjs";
 
 const clamp = x => Math.max(0, Math.min(1, x));
 const finite = (v, label) => {
@@ -103,7 +103,7 @@ function easeOut(kind, p) {
 export function fusionParameterEvaluator(root, { frames }) {
   if (!Number.isInteger(frames) || frames < 2)
     throw new Error("Native timeline needs at least two frames");
-  const tools = fusionTools(root);
+  const tools = resolvedFusionTools(root);
   const stack = new Set();
   function input(name, key, time, fallback) {
     const node = tools.get(name);

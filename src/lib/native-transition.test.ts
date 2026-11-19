@@ -78,6 +78,8 @@ describe("native transitions on real source handles", () => {
     "native-box-from-right",
     "native-box-from-left",
     "native-scale-exchange",
+    "native-motion-wipe-up",
+    "native-motion-wipe-down",
   ] as const)(
     "persists and executes the %s action through the actual chat-state boundary",
     transition => {

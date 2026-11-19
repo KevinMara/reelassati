@@ -350,7 +350,14 @@ function ShotTransitionControls({
                       ? ui(
                           "Slides in a small picture, then expands it to fill the frame."
                         )
-                      : ui("Pushes one shot into the next with eased motion.")}
+                      : kind === "native-motion-wipe-up" ||
+                          kind === "native-motion-wipe-down"
+                        ? ui(
+                            "Reveals the next shot while both pictures stay fixed."
+                          )
+                        : ui(
+                            "Pushes one shot into the next with eased motion."
+                          )}
         </p>
       )}
       <label className="block text-xs">

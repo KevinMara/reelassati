@@ -1,4 +1,6 @@
 import roots from "./native-transition-data.json";
+import motionRoots from "./native-motion-data.json";
+import { compileMotionCropProgram } from "../scripts/lib/motion-curves.mjs";
 import { compileFusionFrameProgram } from "../scripts/lib/fusion-frame-program.mjs";
 import {
   readNativeFrameProgram,
@@ -16,7 +18,9 @@ export type NativeTransitionId =
   | "push-down"
   | "box-from-right"
   | "box-from-left"
-  | "scale-exchange";
+  | "scale-exchange"
+  | "motion-wipe-up"
+  | "motion-wipe-down";
 export const nativeTransitionIds: readonly NativeTransitionId[] = [
   "stretch",
   "slide",
@@ -29,8 +33,24 @@ export const nativeTransitionIds: readonly NativeTransitionId[] = [
   "box-from-right",
   "box-from-left",
   "scale-exchange",
+  "motion-wipe-up",
+  "motion-wipe-down",
 ];
 export const nativeTransitionDefinitions = {
+  "motion-wipe-up": {
+    name: "Eased wipe up",
+    inputOrder: ["outgoing", "incoming"],
+    intentionalEmptyMidpoint: false,
+    description:
+      "The next shot is revealed from bottom to top while both pictures stay fixed. Preserves the source crop curves, including their acceleration and slowdown. Use for an intentional upward reveal or before/after comparison; no black interval.",
+  },
+  "motion-wipe-down": {
+    name: "Eased wipe down",
+    inputOrder: ["outgoing", "incoming"],
+    intentionalEmptyMidpoint: false,
+    description:
+      "The next shot is revealed from top to bottom while both pictures stay fixed. Preserves the source crop curve, including its acceleration and slowdown. Use for an intentional downward reveal or before/after comparison; no black interval.",
+  },
   stretch: {
     name: "Elastic stretch",
     inputOrder: ["outgoing", "incoming"],
@@ -123,7 +143,9 @@ export function nativeTransitionProgram(
   let program = cache.get(key);
   if (!program) {
     program = readNativeFrameProgram(
-      compileFusionFrameProgram(roots[id], { frames, fps })
+      id === "motion-wipe-up" || id === "motion-wipe-down"
+        ? compileMotionCropProgram(motionRoots[id], { frames, fps })
+        : compileFusionFrameProgram(roots[id], { frames, fps })
     );
     if (cache.size >= 32) cache.delete(cache.keys().next().value!);
     cache.set(key, program);

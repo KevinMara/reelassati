@@ -1,0 +1,4 @@
+Source: https://fontmeme.com/fonts/bodoni-antiqua-font/
+Archive SHA256: 1dc73255617bf0bd2f016a054c8ebbff69e10e1775182091707121668feed059
+Member: OPTIBodoniAntiqua-Italic.otf
+1.2, Copyright Copr. Castcraft Software, Inc. 1990-1991.

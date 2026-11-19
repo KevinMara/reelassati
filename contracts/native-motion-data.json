@@ -1,0 +1,112 @@
+{
+  "motion-wipe-up": {
+    "schema": "reel-motion-crop-source-v1",
+    "sourceSha256": "13c95d5c81c2164898245f1ff126445df90c0b57451db688aef3bf6aa94e63aa",
+    "width": 1280,
+    "height": 720,
+    "endTime": 0.9843166666666666,
+    "crop": {
+      "bottom": {
+        "interpolation": "bezier",
+        "knots": [
+          {
+            "at": 0.0,
+            "value": 0.0,
+            "right": [
+              0.32810555555555554,
+              0.0
+            ]
+          },
+          {
+            "at": 0.9843166666666666,
+            "value": 800.0,
+            "left": [
+              0.6562111111111111,
+              800.0
+            ],
+            "right": [
+              1.3124222222222222,
+              800.0
+            ]
+          }
+        ],
+        "minimum": 0.0
+      },
+      "top": {
+        "interpolation": "bezier",
+        "knots": [
+          {
+            "at": 0.0,
+            "value": 0.0,
+            "right": [
+              0.3169833333333334,
+              0.0
+            ]
+          },
+          {
+            "at": 0.95095,
+            "value": 0.0,
+            "left": [
+              0.6339666667999999,
+              -259.55932192471926
+            ],
+            "right": [
+              0.9620722224,
+              9.107344778340302
+            ]
+          },
+          {
+            "at": 0.9843166666666666,
+            "value": 0.0,
+            "left": [
+              0.9731944444444444,
+              0.0
+            ],
+            "right": [
+              1.3124222222222222,
+              0.0
+            ]
+          }
+        ],
+        "minimum": 0.0
+      }
+    },
+    "sourcePath": "FCP Exclusive Transitions.zip!/Exclusive Transitions/FOUR Editors Transitions/Wipe/Simple Wipe Up/Simple Wipe Up.motr"
+  },
+  "motion-wipe-down": {
+    "schema": "reel-motion-crop-source-v1",
+    "sourceSha256": "ea5611b6823556ae26f4baea9c05f6a7ce33987657d6ac48950c9e1c2aac628c",
+    "width": 1280,
+    "height": 720,
+    "endTime": 0.9843166666666666,
+    "crop": {
+      "top": {
+        "interpolation": "bezier",
+        "knots": [
+          {
+            "at": 0.0,
+            "value": 0.0,
+            "right": [
+              0.32810555555555554,
+              0.0
+            ]
+          },
+          {
+            "at": 0.9843166666666666,
+            "value": 806.0,
+            "left": [
+              0.6562111111111111,
+              806.0
+            ],
+            "right": [
+              1.3124222222222222,
+              806.0
+            ]
+          }
+        ],
+        "minimum": 0.0
+      }
+    },
+    "sourcePath": "FCP Exclusive Transitions.zip!/Exclusive Transitions/FOUR Editors Transitions/Wipe/Simple Wipe Down/Simple Wipe Down.motr"
+  }
+}

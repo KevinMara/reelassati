@@ -10,7 +10,14 @@ export interface NativeTransformSample {
   quality: number;
   shutterAngle: number;
 }
+export interface NativeCropSample {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
 export type NativeFrameNode =
+  | { id: string; kind: "crop"; input: string; samples: NativeCropSample[] }
   | {
       id: string;
       kind: "mix" | "over";
@@ -94,6 +101,21 @@ export function readNativeFrameProgram(value: unknown): NativeFrameProgram {
         b: input(n.b),
         samples: n.samples.map(s => ({ mix: numeric(record(s).mix, 0, 1) })),
       };
+    } else if (n.kind === "crop") {
+      node = {
+        id: n.id,
+        kind: "crop",
+        input: input(n.input),
+        samples: n.samples.map(rawSample => {
+          const s = record(rawSample);
+          return {
+            left: numeric(s.left, 0, 1000),
+            right: numeric(s.right, 0, 1000),
+            top: numeric(s.top, 0, 1000),
+            bottom: numeric(s.bottom, 0, 1000),
+          };
+        }),
+      };
     } else if (n.kind === "transform") {
       node = {
         id: n.id,
@@ -141,7 +163,7 @@ export function readNativeFrameProgram(value: unknown): NativeFrameProgram {
 /** Integer frames are exact samples; fractional preview positions interpolate
  * between them. Neither wall-clock time nor playback order changes the result. */
 export function nativeSampleAt<
-  T extends { mix: number } | NativeTransformSample,
+  T extends { mix: number } | NativeTransformSample | NativeCropSample,
 >(samples: T[], frame: number): T {
   if (!Number.isFinite(frame) || !samples.length)
     throw new Error("Invalid native frame time");
@@ -153,6 +175,14 @@ export function nativeSampleAt<
   if (f === 0) return a;
   if ("mix" in a && "mix" in b)
     return { mix: a.mix + (b.mix - a.mix) * f } as T;
+  if ("left" in a && "left" in b) {
+    return {
+      left: a.left + (b.left - a.left) * f,
+      right: a.right + (b.right - a.right) * f,
+      top: a.top + (b.top - a.top) * f,
+      bottom: a.bottom + (b.bottom - a.bottom) * f,
+    } as T;
+  }
   if (!("center" in a) || !("center" in b))
     throw new Error("Inconsistent native samples");
   const mix = (a: number, b: number) => a + (b - a) * f;
