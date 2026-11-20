@@ -234,7 +234,9 @@ export function automaticGraphicIntent(
   // This grants copy permission only; source-overlap checks still apply.
   const native = nativeGraphicTemplate(candidate?.native?.id);
   if (candidate && native?.category === "social") {
-    const supplied = text
+    const supplied = request
+      .normalize("NFKC")
+      .toLocaleLowerCase("en")
       .split(/[!?;\n]|\.(?=\s|$)/u)
       .filter(
         part =>
@@ -243,17 +245,20 @@ export function automaticGraphicIntent(
             part
           ) &&
           (!native.platform ||
-            part.includes(native.platform.toLocaleLowerCase("en"))) &&
-          !/\b(?:no|not|never|without|avoid|non|senza|evita|nessun[ao]|pas|sans|sin|nunca|kein|keine|ohne|nao)\b/u.test(
-            part
-          )
+            part.includes(native.platform.toLocaleLowerCase("en")))
       )
-      .flatMap(
-        part => part.match(/@[\p{L}\p{N}_]+(?:[._][\p{L}\p{N}_]+)*/gu) ?? []
+      .flatMap(part =>
+        [...part.matchAll(/@[\p{L}\p{N}_]+(?:[._][\p{L}\p{N}_]+)*/gu)]
+          .filter(
+            match =>
+              !/\b(?:no|not|never|without|avoid|non|senza|evita|nessun[ao]|pas|sans|sin|nunca|kein|keine|ohne|nao)\b|\bdon['’]t\b/u.test(
+                part.slice(0, match.index)
+              )
+          )
+          .map(match => match[0])
       );
     const exact = candidate.text
-      .normalize("NFKD")
-      .replace(/\p{M}/gu, "")
+      .normalize("NFKC")
       .toLocaleLowerCase("en")
       .trim();
     if (supplied.includes(exact) && !candidate.secondaryText?.trim())

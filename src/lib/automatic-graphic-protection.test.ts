@@ -1022,6 +1022,24 @@ describe("bounded auto-edit graphic decisions", () => {
       native: { id: "motion-cbd957ec9c8c" },
     })!;
     expect(automaticGraphicIntent(request, g)).toBe("requested");
+    expect(
+      automaticGraphicIntent(
+        "Add the Instagram handle @reel.studio without covering the face",
+        g
+      )
+    ).toBe("requested");
+    expect(
+      automaticGraphicIntent("Don't add the Instagram handle @reel.studio", g)
+    ).toBe("automatic");
+    expect(
+      automaticGraphicIntent(
+        "Add Instagram handle @other but don't add @reel.studio",
+        g
+      )
+    ).toBe("automatic");
+    expect(automaticGraphicIntent("Add Instagram handle @réel.studio", g)).toBe(
+      "automatic"
+    );
     for (const candidate of [
       { ...g, text: "@reel_studio" },
       { ...g, text: "@other.account" },
