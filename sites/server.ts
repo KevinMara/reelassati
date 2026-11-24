@@ -6862,6 +6862,7 @@ async function handleAi(
       model?: string;
       effort?: string;
       stock?: boolean;
+      catalogMedia?: boolean;
       captionStyling?: boolean;
       contentReview?: boolean;
       graphicRequest?: string;
@@ -6917,17 +6918,20 @@ async function handleAi(
     const presetWorkspace = await getWorkspace(env, user);
     const personalStyles = presetWorkspace.editorStyles ?? [];
     analysisControl.diagnosticStage = "catalog";
+    // Rank candidates against the creator's direction. The compiled command
+    // also contains library filenames and general-purpose editing guidance.
+    const catalogDirection = stringValue(input.graphicRequest ?? input.command);
     await initializeSharedCatalog(env);
     analysisControl.diagnosticStage = "catalog-visuals";
     const catalogEvidence = await catalogVisualEvidence(
       env,
       await sharedCatalogCandidates(
         env,
-        stringValue(input.command),
+        catalogDirection,
         project.clips.flatMap(clip =>
           clip.colorLut ? [clip.colorLut.id] : []
         ),
-        catalogCandidateContext(project),
+        { ...catalogCandidateContext(project), includeCatalogMedia: input.catalogMedia !== false },
         analysisControl.signal
       ),
       analysisControl.signal
@@ -6964,7 +6968,7 @@ async function handleAi(
     const presetCatalog = editorPresetCatalog(
       personalStyles,
       presetWorkspace.transitionPresets,
-      stringValue(input.command)
+      catalogDirection
     );
     const projectContext = {
       title: input.project.title,

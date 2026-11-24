@@ -2,6 +2,25 @@ import type { Asset, EditOperation } from "./workspace";
 import type { EditPlanningContext } from "./edit-planning-context";
 import type { StockMedia } from "./stock-media";
 
+/** A whole-brief opt-out can set the stock checkbox. Leave conditional,
+ * conflicting or shot-specific directions to the planner and the creator. */
+export function excludesStockMedia(brief: string): boolean {
+  const clauses = brief.toLowerCase().split(/[.!?;\n]+/).map(s => s.trim());
+  let excludes = false;
+  for (const clause of clauses.filter(s => /\bstock\b/.test(s))) {
+    const negative = /^(?:please )?(?:no|without|avoid|do not (?:add|use)|don't (?:add|use)|senza|niente|non (?:usare|aggiungere))\s+(.+)$/.exec(clause);
+    if (!negative) return false;
+    const items = negative[1].split(/\s*,\s*|\s+(?:and|or|e|o)\s+/);
+    const allStock = /^(?:(?:any|new) )?stock(?: assets?| media)?$|^materiale (?:di )?stock$/;
+    const inserts = /^(?:stock (?:footage|inserts?)|filmati (?:di )?stock)$/;
+    const excludesSound = items.includes("music") || items.includes("musica");
+    if (!items.some(item => allStock.test(item)) &&
+        !(excludesSound && items.some(item => inserts.test(item)))) return false;
+    excludes = true;
+  }
+  return excludes;
+}
+
 export interface EditorialStockPurpose {
   sceneId: string;
   start: number;

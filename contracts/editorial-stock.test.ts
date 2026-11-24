@@ -5,8 +5,16 @@ import type { StockMedia } from "./stock-media";
 import {
   associateEditorialStock,
   editorialStockSearches,
+  excludesStockMedia,
   reviewEditorialStockOperations,
 } from "./editorial-stock";
+
+it("uses only unambiguous whole-edit stock exclusions as the default", () => {
+  expect(excludesStockMedia("Keep the audio. No generated media, music, stock inserts or additional captions.")).toBe(true);
+  expect(excludesStockMedia("Non usare materiale di stock.")).toBe(true);
+  for (const brief of ["No stock in the opening.", "Use stock if needed.", "No stock. Use stock in the final shot.", "No stock music.", "No stock images. Add music.", "Keep original speech."])
+    expect(excludesStockMedia(brief)).toBe(false);
+});
 
 const source = {
   id: "source",

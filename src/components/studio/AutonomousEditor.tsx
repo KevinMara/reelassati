@@ -1,4 +1,5 @@
 import { sharedCatalogPlanningAssets } from "@contracts/shared-media-catalog";
+import { excludesStockMedia } from "@contracts/editorial-stock";
 import {
   editorRunDiagnostic,
   type EditorRunStage,
@@ -203,6 +204,8 @@ export function AutonomousEditor({
     "presets" | "options" | null
   >(null);
   const [captions, setCaptions] = useState(true);
+  const [stockOverride, setStockOverride] = useState<boolean>();
+  const stockMedia = stockOverride ?? !excludesStockMedia(style);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [finished, setFinished] = useState(false);
@@ -272,7 +275,7 @@ export function AutonomousEditor({
   const cacheOptions = {
     model,
     effort: "max",
-    stock: true,
+    stock: stockMedia,
     style,
     referenceBrief,
     durationMode,
@@ -393,6 +396,7 @@ export function AutonomousEditor({
           label: ui("Transcribe and caption footage"),
           value: ui(captions ? "On" : "Off"),
         },
+        { label: ui("Stock media"), value: ui(stockMedia ? "On" : "Off") },
         {
           label: ui("Footage"),
           value: sources.map(source => source.name).join("\n"),
@@ -733,7 +737,8 @@ export function AutonomousEditor({
             project: working,
             command: `AUTONOMOUS COMPLETE EDIT. Style: ${style.trim() || AUTOMATIC_EDIT_DIRECTION}. Reference style evidence: ${referenceBrief || "No reference supplied"}. ${durationDirection} Brand: ${workspace.brandKit.name}; voice: ${workspace.brandKit.voice}; audience: ${workspace.brandKit.audience}. Observation intervals below use SOURCE timestamps; map them through each clip inPoint/start/speed before editing. Footage observations: ${JSON.stringify(analysis)}. Existing library: ${JSON.stringify(runWorkspace.assets.filter(a => !styleSourceIds.has(a.id) || working.clips.some(clip => clip.assetId === a.id)).map(a => ({ id: a.id, name: a.name, kind: a.kind, duration: a.duration })))}. Build the story form that fits this footage and brief; deliver its opening promise and meaningful ending without forcing an advertising structure. Remove only evidenced dead space, preserve speech meaning and all locked clips. ${captions ? "Use existing/transcribed words for captions; never fabricate spoken dialogue." : "Do not add captions."} Use editable graphic operations for motivated text, callouts, counters, arrows and highlights. Keep them clear of faces and existing source captions. Do not duplicate burned-in captions. Reuse appropriate library media. Choose supporting images and video shots from the story and actual coverage gaps, subject to every explicit user restriction. Use broll operations with parameters.prompt and parameters.mediaKind. Each generated image is 1K and each generated video is 5 seconds; fit the requested insert to its usable length. Prefer relevant licensed stock or owned footage when it achieves the intended picture. The user brief controls generation permission. If it excludes paid or generated media, use existing media and editable graphics only. Never treat these general editing instructions as overriding that restriction. Mark a generated shot parameters.optional=true only if the core story remains complete without it; required coverage is optional=false. This distinction informs the estimate, never a media quota. Do not add decorative filler just to spend credits. No new voiceover or unpriced generation. For audio, duck existing music under speech. Include executable parameters for every operation.`,
             model,
-            stock: true,
+            stock: stockMedia,
+            catalogMedia: stockMedia,
             captionStyling: captions,
             contentReview: true,
             transitionPlanning: true,
@@ -1528,6 +1533,15 @@ export function AutonomousEditor({
                             onChange={e => setCaptions(e.target.checked)}
                           />
                           {ui("Transcribe and caption footage")}
+                        </label>
+                        <label className="mt-3 flex items-center gap-2 text-sm">
+                          <input
+                            disabled={busy}
+                            type="checkbox"
+                            checked={stockMedia}
+                            onChange={event => setStockOverride(event.target.checked)}
+                          />
+                          {ui("Stock media")}
                         </label>
                       </div>
                     )}

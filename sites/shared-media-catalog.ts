@@ -288,6 +288,7 @@ export interface CatalogCandidateContext {
   sourceText: string[];
   styleText: string[];
   aspectRatio: string;
+  includeCatalogMedia?: boolean;
 }
 
 /** Source observations rank candidates; they never establish events inside
@@ -495,11 +496,12 @@ export async function sharedCatalogCandidates(
   context?: CatalogCandidateContext,
   signal?: AbortSignal
 ) {
+  const candidates = (kind: SharedMediaCatalogItem["kind"]) =>
+    context?.includeCatalogMedia === false
+      ? []
+      : sharedCatalogKindCandidates(env, prompt, kind, context, signal);
   const [videos, images, sounds, looks] = await Promise.all([
-    sharedCatalogKindCandidates(env, prompt, "video", context, signal),
-    sharedCatalogKindCandidates(env, prompt, "image", context, signal),
-    sharedCatalogKindCandidates(env, prompt, "audio", context, signal),
-    sharedCatalogKindCandidates(env, prompt, "lut", context, signal),
+    candidates("video"), candidates("image"), candidates("audio"), candidates("lut"),
   ]);
   // Balance available kinds, then spend spare capacity on nonempty pools.
   const media: SharedMediaCatalogItem[] = [];

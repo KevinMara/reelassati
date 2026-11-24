@@ -8,6 +8,8 @@ export type ProviderDiagnostics = {
     | "response-schema"
     | "media-input"
     | "context-limit"
+    | "output-reservation"
+    | "provider-credit-balance"
     | "unsupported-parameter"
     | "rate-limit";
   reportedField?: string;
@@ -161,7 +163,16 @@ export function openRouterErrorDiagnostics(
     .map(boundedText)
     .join(" ")
     .slice(0, 16384);
-  const reportedIssue =
+  // Distinguish a refused token reservation from an exhausted service
+  // balance without retaining amounts, account IDs or the provider message.
+  let billingIssue: ProviderDiagnostics["reportedIssue"];
+  if (Number(error.code) === 402) {
+    if (/can (?:only afford|afford only)\s+\d|fewer\s+max_tokens/i.test(message))
+      billingIssue = "output-reservation";
+    else if (/insufficient (?:funds|credits|balance)|(?:credits|balance) (?:are |is )?(?:exhausted|insufficient)|negative (?:credit )?balance/i.test(message))
+      billingIssue = "provider-credit-balance";
+  }
+  const reportedIssue = billingIssue ?? (
     /rate[ _-]?limit|too many requests|RESOURCE_EXHAUSTED/i.test(message) ||
     Number(error.code) === 429
       ? "rate-limit"
@@ -179,7 +190,7 @@ export function openRouterErrorDiagnostics(
                   message
                 )
               ? "unsupported-parameter"
-              : undefined;
+              : undefined);
   const reportedField =
     violations.map(field => diagnosticField(field.field)).find(Boolean) ??
     diagnosticField(

@@ -1359,6 +1359,10 @@ describe("shared catalog verified publication", () => {
     expect(withApplied.map(row => row.id)).toContain(looks[65].id);
     expect(withApplied.map(row => row.id)).not.toContain(looks[66].id);
     expect(withApplied.every(row => row.kind === "lut")).toBe(true);
+    const withoutNewStock = await sharedCatalogCandidates(env, "film color", [looks[65].id], {
+      sourceText: [], styleText: [], aspectRatio: "9:16", includeCatalogMedia: false,
+    });
+    expect(withoutNewStock.map(row => row.id)).toEqual([looks[65].id]);
     expect((await searchSharedCatalog(env, { kind: "media" })).total).toBe(0);
   });
 });

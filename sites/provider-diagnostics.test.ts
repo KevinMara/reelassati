@@ -6,6 +6,14 @@ const field =
   "generation_config.response_schema.properties[changes].items.properties[parameters].properties[fit].enum[2]";
 
 describe("bounded provider error diagnostics", () => {
+  it.each([
+    ["This request requires more credits, or fewer max_tokens. You can only afford 7,321.", "output-reservation"],
+    ["Insufficient credits for this request. Private account detail.", "provider-credit-balance"],
+    ["Payment required", undefined],
+  ])("classifies an upstream billing refusal without retaining private details", (message, reportedIssue) => {
+    const result = openRouterErrorDiagnostics({ error: { code: 402, message } }, new Headers());
+    expect(result).toEqual({ upstreamCode: "402", ...(reportedIssue ? { reportedIssue } : {}) });
+  });
   it("retains canonical streamed errors without leaking unknown metadata", () => {
     expect(openRouterErrorDiagnostics({error: {code: 502, metadata: {
       error_type: "provider_unavailable", provider_code: "UNAVAILABLE",

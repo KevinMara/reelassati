@@ -1243,6 +1243,7 @@ export const platformApi = {
       model?: import("@contracts/edit-model").EditModel;
       effort?: import("@contracts/edit-model").EditEffort;
       stock?: boolean;
+      catalogMedia?: boolean;
       captionStyling?: boolean;
       contentReview?: boolean;
       graphicRequest?: string;
