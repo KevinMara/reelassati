@@ -7,6 +7,7 @@ import {
 } from "./native-graphics";
 import { GRAPHIC_PRESETS } from "./editor-presets";
 import { instantiateGraphicPreset } from "./graphic-design-evidence";
+import { editorPresetCatalog, resolveEditorPresetOperation } from "./editor-preset-catalog";
 import { normalizeEditorChatState } from "./editor-chat-state";
 import { graphicReadabilityProblems } from "./graphic-readability";
 import type { TimelineClip } from "./workspace";
@@ -15,6 +16,38 @@ const template = NATIVE_GRAPHIC_TEMPLATES.find(
   t => t.name === "Stacked outline"
 )!;
 describe("editable native graphic contract", () => {
+  it("resolves every advertised text binding from planner output through persisted renderer inputs", () => {
+    const catalog = editorPresetCatalog();
+    for (const template of NATIVE_GRAPHIC_TEMPLATES) {
+      const fields = catalog.graphics.find(p => p.id === template.id)!.design.template!.textFields!;
+      const values: Record<string, string | number> = {};
+      for (const field of fields) values[field.key] = `Prøva ${field.slot} – 你好`;
+      for (const c of template.controls.filter(c => c.displayedValue)) values[c.key] = c.min!;
+      const resolved = resolveEditorPresetOperation({
+        type: "graphic", parameters: { presetId: template.id, graphic: { native: { values } } },
+      }) as {parameters: {graphic: unknown}};
+      const saved = normalizeGraphic(JSON.parse(JSON.stringify(resolved.parameters.graphic)))!;
+      expect(saved.native?.id).toBe(template.id);
+      for (const field of fields) {
+        const expected = String(values[field.key]);
+        const control = template.controls.find(c => c.key === field.key)!;
+        // Split title layers display an authored half of the same editable slot.
+        const characters = Array.from(expected);
+        const middle = Math.ceil(characters.length / 2);
+        const rendered = control.part === "left" ? characters.slice(0, middle).join("")
+          : control.part === "right" ? characters.slice(middle).join("") : expected;
+        expect(nativeTextValue(control, saved)).toBe(rendered);
+      }
+    }
+  });
+  it("keeps all four phone alert fields editable and rejects conflicting assignments", () => {
+    const preset = GRAPHIC_PRESETS.find(p => p.name === "Phone alert · 06")!;
+    const values = {"text-1":"Promemoria","text-2":"Rivedi il video","text-3":"Chiudi","text-4":"Salva"};
+    const saved = normalizeGraphic(instantiateGraphicPreset(preset.graphic, {native:{values}}))!;
+    expect(saved).toMatchObject({text:"Promemoria",secondaryText:"Rivedi il video",native:{values:{"text-3":"Chiudi","text-4":"Salva"}}});
+    expect(saved.native?.values).not.toHaveProperty("text-1");
+    expect(() => instantiateGraphicPreset(preset.graphic, {text:"Other",native:{values}})).toThrow(/conflicting/i);
+  });
   it("requires real copy for each displayed field and preserves it through save and reload", () => {
     const card = NATIVE_GRAPHIC_TEMPLATES.find(
       t =>

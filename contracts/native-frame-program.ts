@@ -1,15 +1,18 @@
 import { isNativeMatteId, type NativeMatteId } from "./native-motion-mattes";
 /** Validated data graph. This contract never executes native template source. */
-export interface NativeTransformSample {
+export interface NativeTransformPose {
   center: [number, number];
   pivot: [number, number];
   scaleX: number;
   scaleY: number;
   angle: number;
   edges: number;
+}
+export interface NativeTransformSample extends NativeTransformPose {
   motionBlur: number;
   quality: number;
   shutterAngle: number;
+  shutter?: NativeTransformPose[];
 }
 export interface NativeCropSample {
   left: number;
@@ -58,6 +61,16 @@ const point = (v: unknown): [number, number] => {
     throw new Error("Invalid native graph point");
   return [numeric(v[0], -1000, 1000), numeric(v[1], -1000, 1000)];
 };
+function readPose(s: Record<string, unknown>): NativeTransformPose {
+  const edges = numeric(s.edges, 0, 3);
+  if (!Number.isInteger(edges)) throw new Error("Invalid native edge mode");
+  return {
+    center: point(s.center), pivot: point(s.pivot),
+    scaleX: numeric(s.scaleX, -1000, 1000),
+    scaleY: numeric(s.scaleY, -1000, 1000),
+    angle: numeric(s.angle, -100000, 100000), edges,
+  };
+}
 /** Validate before allocating GPU resources. Forward references, cycles and
  * unknown image operations fail instead of becoming a generic effect. */
 export function readNativeFrameProgram(value: unknown): NativeFrameProgram {
@@ -137,23 +150,19 @@ export function readNativeFrameProgram(value: unknown): NativeFrameProgram {
         input: input(n.input),
         samples: n.samples.map(rawSample => {
           const s = record(rawSample);
-          const edges = numeric(s.edges, 0, 3),
-            motionBlur = numeric(s.motionBlur, 0, 1);
-          if (!Number.isInteger(edges) || motionBlur !== 0)
-            throw new Error(
-              "Native temporal blur requires subframe reference validation"
-            );
-          return {
-            center: point(s.center),
-            pivot: point(s.pivot),
-            scaleX: numeric(s.scaleX, -1000, 1000),
-            scaleY: numeric(s.scaleY, -1000, 1000),
-            angle: numeric(s.angle, -100000, 100000),
-            edges,
-            motionBlur,
-            quality: numeric(s.quality, 1, 128),
-            shutterAngle: numeric(s.shutterAngle, 0, 360),
-          };
+          const pose = readPose(s);
+          const motionBlur = numeric(s.motionBlur, 0, 1);
+          const quality = numeric(s.quality, 1, 128);
+          const shutterAngle = numeric(s.shutterAngle, 0, 360);
+          const sample = { ...pose, motionBlur, quality, shutterAngle };
+          if (motionBlur === 0 && s.shutter === undefined) return sample;
+          if (motionBlur !== 1 || !Number.isInteger(quality) || quality > 10 ||
+              !Array.isArray(s.shutter) || s.shutter.length !== quality * 2 + 1)
+            throw new Error("Invalid native motion blur samples");
+          const shutter = s.shutter.map(v => readPose(record(v)));
+          if (shutter.some(subframe => subframe.edges !== pose.edges))
+            throw new Error("Variable native blur edge mode is unsupported");
+          return { ...sample, shutter };
         }),
       };
     } else throw new Error("Native image operation is not implemented");
@@ -199,13 +208,16 @@ export function nativeSampleAt<
   }
   if (!("center" in a) || !("center" in b))
     throw new Error("Inconsistent native samples");
-  const mix = (a: number, b: number) => a + (b - a) * f;
-  return {
-    ...a,
-    center: [mix(a.center[0], b.center[0]), mix(a.center[1], b.center[1])],
-    pivot: [mix(a.pivot[0], b.pivot[0]), mix(a.pivot[1], b.pivot[1])],
-    scaleX: mix(a.scaleX, b.scaleX),
-    scaleY: mix(a.scaleY, b.scaleY),
-    angle: mix(a.angle, b.angle),
-  } as T;
+  const lerp = (a: number, b: number) => a + (b - a) * f;
+  const interpolate = (a: NativeTransformPose, b: NativeTransformPose): NativeTransformPose => ({
+    center: [lerp(a.center[0], b.center[0]), lerp(a.center[1], b.center[1])],
+    pivot: [lerp(a.pivot[0], b.pivot[0]), lerp(a.pivot[1], b.pivot[1])],
+    scaleX: lerp(a.scaleX, b.scaleX), scaleY: lerp(a.scaleY, b.scaleY),
+    angle: lerp(a.angle, b.angle), edges: a.edges,
+  });
+  const nextShutter = b.shutter;
+  const shutter = a.shutter && nextShutter?.length === a.shutter.length
+    ? a.shutter.map((pose, index) => interpolate(pose, nextShutter[index]))
+    : a.shutter;
+  return { ...a, ...interpolate(a, b), ...(shutter && {shutter}) } as T;
 }

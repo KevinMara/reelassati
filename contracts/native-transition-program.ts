@@ -1,5 +1,7 @@
 import roots from "./native-transition-data.json";
 import expanded from "./native-fusion-expanded.json";
+import shutterGraphs from "./native-fusion-shutter.json";
+import { shutterDefinitions, shutterIds, type NativeShutterId } from "./native-shutter-transitions";
 import motionRoots from "./native-motion-data.json";
 import { isNativeMatteId, matteDefinition, nativeMattes, type NativeMatteId } from "./native-motion-mattes";
 import { compileMotionCropProgram } from "../scripts/lib/motion-curves.mjs";
@@ -11,6 +13,7 @@ import {
 
 export type NativeTransitionId =
   | NativeMatteId
+  | NativeShutterId
   | keyof typeof expanded
   | "stretch"
   | "slide"
@@ -40,9 +43,11 @@ export const nativeTransitionIds: readonly NativeTransitionId[] = [
   "motion-wipe-up",
   "motion-wipe-down",
   ...(Object.keys(expanded) as (keyof typeof expanded)[]),
+  ...shutterIds,
   ...(Object.keys(nativeMattes) as NativeMatteId[]),
 ];
 export const nativeTransitionDefinitions = {
+  ...shutterDefinitions,
   ...(Object.fromEntries((Object.keys(nativeMattes) as NativeMatteId[]).map(id => [id, matteDefinition(id)])) as Record<NativeMatteId, ReturnType<typeof matteDefinition>>),
   "stretch-wide": { name: "Wide stretch dissolve", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "The full picture stretches horizontally to six times its width at the cut while the shots blend. Use a clear center subject and avoid stretching faces or readable text." },
   "rotate-pull": { name: "Turning pullback", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "The outgoing shot turns through half a rotation and pulls back, exposing a border, as the incoming shot settles upright. Use for an intentional rotating reveal." },
@@ -148,7 +153,7 @@ export const nativeTransitionDefinitions = {
   },
 } as const;
 const cache = new Map<string, NativeFrameProgram>();
-const fusionSources = { ...roots, ...expanded };
+const fusionSources = { ...roots, ...expanded, ...shutterGraphs };
 /** Re-evaluate the authored native curves on the actual effect clock. Do not
  * scale a fixed list of poses or substitute a generic animation. */
 export function nativeTransitionProgram(

@@ -39,13 +39,12 @@ export function graphicDesignEvidence(g: MotionGraphic, duration: number) {
                 }
               )
             ),
-            textFields: template?.controls.filter(
-                c => c.type === "text" && (c.textSlot ?? 0) >= 2
-              )
+            textFields: template?.controls.filter(c => c.type === "text")
               .map(c => ({
                 key: c.key,
                 label: c.displayLabel ?? c.label,
-                value: "supply actual copy in native.values",
+                slot: c.textSlot ?? 0,
+                binding: `parameters.graphic.native.values[${JSON.stringify(c.key)}]`,
               })),
             displayedNumbers: template?.controls.filter(c => c.displayedValue)
               .map(c => ({
@@ -175,8 +174,22 @@ export function instantiateGraphicPreset(
             "Supply the actual date or count for this graphic preset."
           );
       }
-      if (c.type !== "text" || (c.textSlot ?? 0) < 2) continue;
+      if (c.type !== "text") continue;
       const value = result.native.values[c.key];
+      // The planning catalog exposes every native text control by key. Store
+      // the first two slots in the same editable fields used by preview/export.
+      // Several source layers may share one slot in a split-title design.
+      if ((c.textSlot ?? 0) < 2) {
+        const field = c.textSlot === 1 ? "secondaryText" : "text";
+        if (typeof value === "string" && value.trim()) {
+          const existing = result[field];
+          if (typeof existing === "string" && existing.trim() && existing !== value)
+            throw new PresetContentError("Conflicting copy for one graphic text field.");
+          result[field] = value;
+        }
+        delete result.native.values[c.key];
+        continue;
+      }
       if (typeof value !== "string" || !value.trim())
         throw new PresetContentError(
           "Supply every text field for this graphic preset."
@@ -186,7 +199,7 @@ export function instantiateGraphicPreset(
   const kind = typeof overrides.kind === "string" ? overrides.kind : g.kind;
   if (
     TEXT_KINDS.has(kind) &&
-    (typeof overrides.text !== "string" || !overrides.text.trim())
+    (typeof result.text !== "string" || !result.text.trim())
   )
     throw new PresetContentError(
       "Supply the actual text for this graphic preset."
@@ -196,8 +209,8 @@ export function instantiateGraphicPreset(
     template?.controls.some(
       c => c.type === "text" && c.textSlot === 1
     ) &&
-    (typeof overrides.secondaryText !== "string" ||
-      !overrides.secondaryText.trim())
+    (typeof result.secondaryText !== "string" ||
+      !result.secondaryText.trim())
   )
     throw new PresetContentError(
       "Supply both text lines for this graphic preset."

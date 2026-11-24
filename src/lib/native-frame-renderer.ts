@@ -27,6 +27,9 @@ uniform vec2 scales;
 uniform float angle;
 uniform int edges;
 uniform vec4 cropEdges;
+uniform int shutterCount;
+uniform vec4 shutterX[21];
+uniform vec3 shutterY[21];
 out vec4 result;
 int modulo(int p,int n){return ((p%n)+n)%n;}
 ivec2 mapped(ivec2 p){
@@ -53,6 +56,17 @@ vec4 sampleImage(vec2 p){
 }
 void main(){
   ivec2 p=ivec2(gl_FragCoord.xy);
+  if(operation==6){
+    vec3 pos=vec3(gl_FragCoord.xy,1.);
+    vec4 total=vec4(0.);
+    for(int i=0;i<21;i++){
+      if(i>=shutterCount)break;
+      if(shutterX[i].w>0.)
+        total+=sampleImage(vec2(dot(shutterX[i].xyz,pos),dot(shutterY[i],pos)));
+    }
+    result=total/float(shutterCount);
+    return;
+  }
   if(operation==0){result=texelFetch(imageA,ivec2(p.x,int(size.y)-1-p.y),0);return;}
   if(operation==1){result=mix(texelFetch(imageA,p,0),texelFetch(imageB,p,0),weight);return;}
   if(operation==5){
@@ -75,10 +89,14 @@ void main(){
   }
   if(abs(scales.x)<1e-8||abs(scales.y)<1e-8){result=vec4(0.);return;}
   // Textures retain top-down source rows. Native positive angles turn counter-clockwise.
-  vec2 d=gl_FragCoord.xy-vec2(center.x,1.-center.y)*size;
+  // Center translates the picture. Pivot is the point about which size and
+  // rotation act; moving it alone leaves an identity transform unchanged.
+  vec2 anchor=vec2(pivot.x,1.-pivot.y)*size;
+  vec2 shift=vec2(center.x-.5,.5-center.y)*size;
+  vec2 d=gl_FragCoord.xy-anchor-shift;
   float c=cos(angle),s=sin(angle);
   vec2 source=vec2((c*d.x-s*d.y)/scales.x,(s*d.x+c*d.y)/scales.y)
-    +vec2(pivot.x,1.-pivot.y)*size-.5;
+    +anchor-.5;
   result=sampleImage(source);
 }`;
 /** Shared browser/export frame renderer. Float intermediates preserve native
@@ -154,6 +172,9 @@ export function createNativeFrameRenderer(
       "angle",
       "edges",
       "cropEdges",
+      "shutterCount",
+      "shutterX[0]",
+      "shutterY[0]",
     ].map(n => [n, gl.getUniformLocation(pipeline, n)])
   );
   gl.uniform1i(uniforms.imageA, 0);
@@ -163,6 +184,8 @@ export function createNativeFrameRenderer(
   gl.disable(gl.BLEND);
   gl.disable(gl.DEPTH_TEST);
   gl.viewport(0, 0, width, height);
+  const shutterX = new Float32Array(21 * 4);
+  const shutterY = new Float32Array(21 * 3);
   const textures = new Map<string, WebGLTexture>(),
     framebuffers = new Map<string, WebGLFramebuffer>();
   let disposed = false,
@@ -341,6 +364,26 @@ export function createNativeFrameRenderer(
           gl.uniform2f(uniforms.scales, s.scaleX, s.scaleY);
           gl.uniform1f(uniforms.angle, (s.angle * Math.PI) / 180);
           gl.uniform1i(uniforms.edges, s.edges);
+          if (s.shutter) {
+            for (const [i, pose] of s.shutter.entries()) {
+              const ox = (pose.pivot[0] + pose.center[0] - .5) * width;
+              const oy = (1 - pose.pivot[1] + .5 - pose.center[1]) * height;
+              const radians = pose.angle * Math.PI / 180;
+              const cos = Math.cos(radians), sin = Math.sin(radians);
+              if (Math.abs(pose.scaleX) < 1e-8 || Math.abs(pose.scaleY) < 1e-8) {
+                shutterX[i * 4 + 3] = 0;
+                continue;
+              }
+              const xx = cos / pose.scaleX, xy = -sin / pose.scaleX;
+              const yx = sin / pose.scaleY, yy = cos / pose.scaleY;
+              shutterX.set([xx, xy, pose.pivot[0] * width - .5 - xx * ox - xy * oy, 1], i * 4);
+              shutterY.set([yx, yy, (1 - pose.pivot[1]) * height - .5 - yx * ox - yy * oy], i * 3);
+            }
+            gl.uniform1i(uniforms.operation, 6);
+            gl.uniform1i(uniforms.shutterCount, s.shutter.length);
+            gl.uniform4fv(uniforms["shutterX[0]"], shutterX);
+            gl.uniform3fv(uniforms["shutterY[0]"], shutterY);
+          }
         }
         gl.drawArrays(gl.TRIANGLES, 0, 3);
       }

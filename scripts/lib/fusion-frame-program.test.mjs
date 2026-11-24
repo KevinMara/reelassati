@@ -25,6 +25,15 @@ test("keeps authored input pin order rather than assuming background is first", 
   ]);
   assert.equal(program.admission, "requires-renderer-and-native-parity");
 });
+test("evaluates the authored spline on each side of the exposure", () => {
+  const root = parseFusionSetting(source(
+    'D=Dissolve{},T=Transform{Inputs={Input=Input{SourceOp="D",Source="Output"},Angle=Input{SourceOp="A",Source="Value"},MotionBlur=Input{Value=1},Quality=Input{Value=2},ShutterAngle=Input{Value=180}}},A=BezierSpline{KeyFrames={[0]={0},[2]={40,Flags={Linear=true}}}}'
+  ).replace('Main=InstanceOutput{SourceOp="D"', 'Main=InstanceOutput{SourceOp="T"'));
+  const p = compileFusionFrameProgram(root,{frames:3,fps:30});
+  const sample = p.nodes.at(-1).samples[1];
+  assert.equal(sample.angle,20);
+  assert.deepEqual(sample.shutter.map(p=>p.angle),[15,17.5,20,22.5,25]);
+});
 test("does not silently flatten unsupported native effects or controls", () => {
   for (const node of [
     'D=Merge{Inputs={Operator=Input{Value=FuID{"In"}}}}',

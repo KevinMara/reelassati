@@ -114,4 +114,18 @@ describe("native graph boundary", () => {
       edges: 2,
     });
   });
+  it("preserves subframe timing on reload and rejects incomplete or inconsistent exposures", () => {
+    const pose = {center:[.5,.5] as [number,number],pivot:[0,0] as [number,number],angle:0,scaleX:1,scaleY:1,edges:1};
+    const sample = (angle:number) => ({...pose,angle,motionBlur:1,quality:1,shutterAngle:180,
+      shutter:[-5,0,5].map(offset=>({...pose,angle:angle+offset}))});
+    const samples = [sample(20),sample(40)];
+    const graph = {...program(),nodes:[{id:"node-0",kind:"transform",input:"input-0",samples}]};
+    const node = readNativeFrameProgram(JSON.parse(JSON.stringify(graph))).nodes[0];
+    if (node.kind !== "transform") throw Error("Expected a transform");
+    expect(nativeSampleAt(node.samples,.5).shutter?.map(p=>p.angle)).toEqual([25,30,35]);
+    samples[1].shutter[0].edges=0;
+    expect(()=>readNativeFrameProgram(graph)).toThrow(/edge/);
+    samples[1].shutter.pop();
+    expect(()=>readNativeFrameProgram(graph)).toThrow(/blur/);
+  });
 });

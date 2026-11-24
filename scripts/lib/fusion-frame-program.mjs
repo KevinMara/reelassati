@@ -189,39 +189,60 @@ export function compileFusionFrameProgram(
         }),
       };
     } else {
+      const poseAt = t => {
+        const linked = number(name, "UseSizeAndAspect", t, 1),
+          size = number(name, "Size", t, 1),
+          aspect = number(name, "Aspect", t, 1);
+        const flipX = number(name, "FlipHoriz", t, 0),
+          flipY = number(name, "FlipVert", t, 0);
+        if (
+          ![0, 1].includes(linked) ||
+          ![0, 1].includes(flipX) ||
+          ![0, 1].includes(flipY) ||
+          (linked && aspect <= 0)
+        )
+          throw new Error("Invalid native transform aspect or flip mode");
+        return {
+          center: point(name, "Center", t),
+          pivot: point(name, "Pivot", t),
+          scaleX:
+            (linked
+              ? size * Math.max(1, aspect)
+              : number(name, "XSize", t, 1)) * (flipX ? -1 : 1),
+          scaleY:
+            (linked
+              ? size / Math.min(1, aspect)
+              : number(name, "YSize", t, 1)) * (flipY ? -1 : 1),
+          angle: number(name, "Angle", t, 0),
+          edges: number(name, "Edges", t, 0),
+        };
+      };
       record = {
         kind: "transform",
         input: imageInput(name, "Input"),
         samples: Array.from({ length: frames }, (_, t) => {
-          const linked = number(name, "UseSizeAndAspect", t, 1),
-            size = number(name, "Size", t, 1),
-            aspect = number(name, "Aspect", t, 1);
-          const flipX = number(name, "FlipHoriz", t, 0),
-            flipY = number(name, "FlipVert", t, 0);
+          const pose = poseAt(t);
+          const motionBlur = number(name, "MotionBlur", t, 0);
+          const quality = number(name, "Quality", t, 2);
+          const shutterAngle = number(name, "ShutterAngle", t, 180);
+          if (motionBlur !== 0 && motionBlur !== 1)
+            throw new Error("Unsupported native motion blur mode");
+          if (!motionBlur)
+            return { ...pose, motionBlur, quality, shutterAngle };
           if (
-            ![0, 1].includes(linked) ||
-            ![0, 1].includes(flipX) ||
-            ![0, 1].includes(flipY) ||
-            (linked && aspect <= 0)
+            !Number.isInteger(quality) ||
+            quality < 1 ||
+            quality > 10 ||
+            shutterAngle < 0 ||
+            shutterAngle > 360
           )
-            throw new Error("Invalid native transform aspect or flip mode");
-          return {
-            center: point(name, "Center", t),
-            pivot: point(name, "Pivot", t),
-            scaleX:
-              (linked
-                ? size * Math.max(1, aspect)
-                : number(name, "XSize", t, 1)) * (flipX ? -1 : 1),
-            scaleY:
-              (linked
-                ? size / Math.min(1, aspect)
-                : number(name, "YSize", t, 1)) * (flipY ? -1 : 1),
-            angle: number(name, "Angle", t, 0),
-            edges: number(name, "Edges", t, 0),
-            motionBlur: number(name, "MotionBlur", t, 0),
-            quality: number(name, "Quality", t, 2),
-            shutterAngle: number(name, "ShutterAngle", t, 180),
-          };
+            throw new Error("Unsupported native shutter settings");
+          // Fusion samples both sides of the frame. Evaluate the actual source
+          // splines at those times, including the two edges of the exposure.
+          const shutter = Array.from({ length: quality * 2 + 1 }, (_, i) =>
+            poseAt(t + ((i / (2 * quality) - 0.5) * shutterAngle) / 360)
+          );
+          return { ...pose, motionBlur, quality, shutterAngle, shutter };
         }),
       };
     }
