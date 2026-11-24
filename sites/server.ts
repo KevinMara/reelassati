@@ -6972,6 +6972,7 @@ async function handleAi(
       platform: input.project.platform,
       aspectRatio: input.project.aspectRatio,
       clips: input.project.clips,
+      clipTargets: planningContext.clipTargets.map(({id,clipRef,track,start,end,locked}) => ({id,clipRef,track,start,end,locked})),
       transcript: input.project.transcript,
       speechEvidence: planningContext.speechEvidence,
       scenes: planningContext.scenes,

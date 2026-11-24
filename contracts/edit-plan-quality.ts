@@ -381,6 +381,14 @@ export function mergeGraphicRefinement(
     )
       throw scopeError();
     assertRefinementParameters(operation.type, operation.parameters);
+    // The correction receives canonical clip IDs from the compiled draft.
+    // Check its stated scope before a new graphic can infer a picture anchor.
+    if (
+      operation.targetClipIds != null &&
+      (!Array.isArray(operation.targetClipIds) ||
+        operation.targetClipIds.some(id => !prior.targetClipIds.includes(id)))
+    )
+      throw scopeError();
     const compiled = compile([operation]);
     if (compiled.length !== 1) throw invalid();
     const replacement = compiled[0];

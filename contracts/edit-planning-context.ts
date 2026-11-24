@@ -195,8 +195,9 @@ export function buildEditPlanningContext(
     clock: "current-timeline-seconds" as const,
     ...buildAutonomousTransitionContext(project, assets, personalTransitions),
     clipTargets: effectiveTimelineClips(normalizeClipGroups(project)).map(
-      clip => ({
+      (clip, index) => ({
         id: clip.id,
+        clipRef: `clip:${index}`,
         assetId: clip.assetId,
         catalogAssetId: byAsset
           .get(clip.assetId ?? "")
@@ -357,6 +358,16 @@ export function resolveEditPlanningReferences(
         ([key, value]) => value !== null || key === "colorLut"
       )
     );
+    if (operation.type !== "transition" && operation.targetClipIds !== undefined) {
+      const supplied = typeof operation.targetClipIds === "string"
+        ? [operation.targetClipIds] : operation.targetClipIds;
+      if (Array.isArray(supplied)) {
+        operation.targetClipIds = supplied.map(id =>
+          context.clipTargets.find(t => t.id === id)?.id ??
+          context.clipTargets.find(t => t.clipRef === id)?.id ?? id
+        );
+      }
+    }
     if (operation.type === "transition") {
       const transition = normalizeAutonomousTransition(
         parameters.transition,
@@ -527,23 +538,11 @@ export function resolveEditPlanningReferences(
         );
       operation.type = "sound";
     }
-    if (operation.targetClipIds !== undefined) {
-      if (
-        !Array.isArray(operation.targetClipIds) ||
-        operation.targetClipIds.some(
-          id =>
-            typeof id !== "string" ||
-            !context.clipTargets.some(
-              clip =>
-                clip.id === id && (!clip.locked || operation.type === "sound")
-            )
-        )
-      )
-        invalid(
-          "target_invalid",
-          `Edit ${index + 1} references an unavailable or locked target.`
-        );
-    }
+    // Reject malformed references before cue resolution could replace them.
+    if (operation.targetClipIds !== undefined &&
+        (!Array.isArray(operation.targetClipIds) ||
+         operation.targetClipIds.some(id => typeof id !== "string" || !id.trim())))
+      invalid("target_invalid", `Edit ${index + 1} needs timeline clip references.`);
     const excerptId = operation.mediaExcerptId;
     if (excerptId !== undefined) {
       const excerpt = context.mediaExcerpts.find(row => row.id === excerptId);
@@ -700,6 +699,30 @@ export function resolveEditPlanningReferences(
         "missing_timing",
         `Edit ${index + 1} has no measured timeline interval.`
       );
+    if (Array.isArray(operation.targetClipIds)) {
+      const supplied: string[] = operation.targetClipIds;
+      let targets = supplied;
+      // Creating an overlay does not mutate its underlying shot. A planner
+      // sometimes puts the new layer or preset in targetClipIds. Anchor it to
+      // measured footage only when there is one unambiguous picture for the
+      // whole interval. Updates, locks and explicit selections stay strict.
+      if (operation.type === "graphic" &&
+          (parameters.graphicMode === undefined || parameters.graphicMode === "create") &&
+          supplied.length === 1 && !context.clipTargets.some(t => t.id === supplied[0])) {
+        const pictures = context.clipTargets.filter(t => t.picture &&
+          t.start < (operation.end as number) && t.end > (operation.start as number));
+        const picture = pictures.length === 1 ? pictures[0] : undefined;
+        const knownAsset = context.clipTargets.some(t => t.assetId === supplied[0]);
+        if (picture && !picture.locked && picture.start <= (operation.start as number) &&
+            picture.end >= (operation.end as number) && (!knownAsset || picture.assetId === supplied[0]) &&
+            (!selectedClipIds.length || selectedClipIds.includes(picture.id)))
+          targets = [picture.id];
+      }
+      if (targets.some(id => !context.clipTargets.some(t =>
+        t.id === id && (!t.locked || operation.type === "sound"))))
+        invalid("target_invalid", `Edit ${index + 1} references an unavailable or locked target.`);
+      operation.targetClipIds = targets;
+    }
     // Make the executor's existing defaults explicit in the signed proposal.
     if (operation.type === "move" && parameters.destination === undefined)
       parameters.destination = operation.start;

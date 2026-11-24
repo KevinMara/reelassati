@@ -2018,7 +2018,8 @@ function RunControls({
   const retryAt = message.rateLimitRetryAt;
   const retryTime = useEditorRetryClock(retryAt);
   const plan = message.plan;
-  if (!plan && message.status === "failed" && retryAt !== undefined) {
+  if (!plan && message.status === "failed" &&
+      (retryAt !== undefined || message.activity?.kind === "auto-edit")) {
     return <button type="button" disabled={busy || Boolean(retryTime)} onClick={() => message.activity?.kind === "auto-edit" ? onAutoEdit() : onResume()}
       className="mt-3 rounded-lg border border-border px-3 py-2 text-sm text-primary disabled:opacity-50">
       {ui("Retry")}{retryTime && " · " + retryTime}

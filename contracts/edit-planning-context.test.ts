@@ -511,6 +511,30 @@ describe("evidence-backed auto-edit planning", () => {
     expect(serialized).not.toContain("Recommendation:");
   });
 
+  it("anchors a newly inserted graphic to the sole picture at its measured time", () => {
+    const { context } = fixture();
+    const create = {
+      type: "graphic", start: 8, end: 10,
+      parameters: { graphicMode: "create", graphic: { text: "Promemoria" } },
+    };
+    for (const targetClipIds of [["new-overlay"], ["source"], ["clip:1"], "repeat"]) {
+      expect(resolveEditPlanningReferences([{ ...create, targetClipIds }], context, 12)[0])
+        .toMatchObject({ ...create, targetClipIds: ["repeat"] });
+    }
+    const layer = { ...create, targetClipIds: ["new-overlay"] };
+    for (const [change, ctx, selection] of [
+      [{ ...layer, parameters: { ...create.parameters, graphicMode: "update" } }, context, []],
+      [{ ...layer, type: "trim" }, context, []],
+      [{ ...layer, start: 5.9 }, context, []],
+      [layer, context, ["first"]],
+      [layer, { ...context, clipTargets: context.clipTargets.map(t => ({ ...t, locked: true })) }, []],
+      [layer, { ...context, clipTargets: [...context.clipTargets, { ...context.clipTargets[1], id: "other" }] }, []],
+    ] as const) {
+      expect(() => resolveEditPlanningReferences([change], { ...ctx, clipTargets: [...ctx.clipTargets] }, 12, [...selection]))
+        .toThrow();
+    }
+  });
+
   it("exposes observed usable excerpts without converting filenames into visual facts", () => {
     const { context } = fixture();
     expect(

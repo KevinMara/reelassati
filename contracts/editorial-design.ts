@@ -98,6 +98,11 @@ labels already visible on a prop. A graphic must explain, compare, locate or
 quantify something grounded in the source. Match one coherent type, color and
 motion system; use restrained easing and a readable hold. Use the editable
 geometry and keyframes below before requesting raster video generation.
+For a new graphic use graphicMode=create in parameters. Give targetClipIds as
+an empty array for a timed overlay, or use an exact underlying timeline clip ID
+from clipTargets. The executor creates the graphic's new ID. Asset, scene,
+preset and future overlay IDs are separate namespaces. Updating an existing
+graphic requires its exact unlocked timeline clip ID.
 Graphics use type=graphic with parameters.graphic. Supported kind values are
 text,callout,counter,countdown,arrow,highlight,rectangle,ellipse,star,line,
 spatial-title,spatial-cube,spatial-orbit. Shared fields: text,color:#RRGGBB,
