@@ -14,6 +14,7 @@ export function projectedSourceRegions(
   assets: Asset[],
   checkpoint: () => void = noCheckpoint
 ) {
+  if (typeof project.aspectRatio !== "string") return [];
   const [width, height] = project.aspectRatio.split(":").map(Number);
   if (!(width > 0 && height > 0)) return [];
   const canvas = { width: 1000, height: (1000 * height) / width };

@@ -928,10 +928,21 @@ export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
       template.name,
       template.category === "title"
         ? "Editable animated title."
-        : "Animated icon and editable handle.",
+        : template.category === "social"
+          ? "Animated icon and editable handle."
+          : "Editable notification card.",
       {
         kind: "text",
-        native: { id: template.id, values: {}, enter: 0.65, exit: 0.45 },
+        native: {
+          id: template.id,
+          values: Object.fromEntries(
+            texts
+              .filter(c => (c.textSlot ?? 0) >= 2)
+              .map(c => [c.key, c.default])
+          ),
+          enter: 0.65,
+          exit: 0.45,
+        },
         text: texts
           .filter(c => c.textSlot === 0)
           .map(c => c.default)
@@ -942,18 +953,31 @@ export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
           .join(""),
         color: String(
           template.controls.find(
-            c => c.type === "color" && /^Text 01/.test(c.label)
+            c =>
+              c.type === "color" &&
+              (c.colorSlot === 0 ||
+                (c.colorSlot === undefined && /^Text 01/.test(c.label)))
           )?.default ?? "#FFFFFF"
         ),
         accent: String(
           template.controls.find(
-            c => c.type === "color" && /^Text 02/.test(c.label)
+            c =>
+              c.type === "color" &&
+              (c.colorSlot === 1 ||
+                (c.colorSlot === undefined && /^Text 02/.test(c.label)))
           )?.default ?? "#FFFFFF"
         ),
         animation: "none",
         x: 50,
         y: template.category === "social" ? 65 : 38,
-        size: template.category === "social" ? 6 : 7,
+        size:
+          template.category === "notification"
+            ? 9
+            : template.category === "social"
+              ? texts.length > 1
+                ? 8
+                : 6
+              : 7,
       },
       4
     );

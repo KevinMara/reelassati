@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { nativeTransitionIds } from "@contracts/native-transition-program";
 import {
   applyNativeAdjacentTransition,
   nativeTransitionInput,
@@ -66,21 +68,14 @@ const apply = (p = source()) =>
   applyNativeAdjacentTransition(p, assets, "a", "b", "native-stretch", 0.4);
 
 describe("native transitions on real source handles", () => {
-  it.each([
-    "native-stretch",
-    "native-slide",
-    "native-zoom",
-    "native-grid",
-    "native-push-left",
-    "native-push-right",
-    "native-push-up",
-    "native-push-down",
-    "native-box-from-right",
-    "native-box-from-left",
-    "native-scale-exchange",
-    "native-motion-wipe-up",
-    "native-motion-wipe-down",
-  ] as const)(
+  it("has a rendered 14-frame browser preview for each selectable native transition", () => {
+    for (const id of nativeTransitionIds) {
+      const png = readFileSync(`public/native-transition-previews/${id}.png`);
+      expect([png.readUInt32BE(0), png.readUInt32BE(16), png.readUInt32BE(20)], id)
+        .toEqual([0x89504e47, 240 * 14, 135]);
+    }
+  });
+  it.each(nativeTransitionIds.map(id => `native-${id}` as const))(
     "persists and executes the %s action through the actual chat-state boundary",
     transition => {
       const p = source(),

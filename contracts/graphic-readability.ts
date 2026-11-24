@@ -1,6 +1,9 @@
 import { graphicCardLayout, graphicShapePixels } from "./graphic-layout";
 import { graphicFrame, normalizeGraphic } from "./motion-graphics";
-import { nativeGraphicTextProblems } from "./native-graphics";
+import {
+  nativeGraphicTextProblems,
+  nativeGraphicExtraCopy,
+} from "./native-graphics";
 import { graphicSelectionBounds } from "./graphic-selection";
 import type { EditProject, TimelineClip } from "./workspace";
 
@@ -34,7 +37,9 @@ export function graphicReadabilityProblems(
     clip.duration <= 0
   )
     return [];
-  const copy = `${g.text} ${g.secondaryText ?? ""}`.trim();
+  const copy = [g.text, g.secondaryText ?? "", ...nativeGraphicExtraCopy(g)]
+    .join(" ")
+    .trim();
   if (!copy) return [];
   if (g.native) {
     const height =

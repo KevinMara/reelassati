@@ -8,9 +8,19 @@ const { NativeCompositor } = createRequire(import.meta.url)(
 );
 const engine = new NativeCompositor(),
   fonts = new Set();
+let count = 0;
 for (const t of JSON.parse(
   await fs.readFile("contracts/native-graphics-data.json", "utf8")
 )) {
+  if (process.argv.includes("--notifications") && t.category !== "notification") continue;
+  if (
+    process.argv.includes("--missing") &&
+    (await fs.stat(`public/native-graphics/${t.id}.png`).then(
+      s => s.size > 0,
+      () => false
+    ))
+  )
+    continue;
   for (const f of t.fonts)
     if (!fonts.has(f.url)) {
       engine.add_font(await fs.readFile("public" + f.url));
@@ -56,6 +66,7 @@ for (const t of JSON.parse(
     { input: pixels, maxBuffer: 1000000, windowsHide: true }
   );
   if (encoded.status !== 0) throw Error(encoded.stderr.toString());
+  count++;
 }
 engine.free();
-console.log("42 native previews rendered");
+console.log(count, "native previews rendered");

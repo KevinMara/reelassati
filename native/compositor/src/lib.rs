@@ -140,6 +140,7 @@ impl NativeCompositor {
             (Value::Vec2(_),Value::Vec2(v))=>v.iter().all(|x|x.is_finite()&&x.abs()<=1_000_000.),
             (Value::Vec3(_),Value::Vec3(v))=>v.iter().all(|x|x.is_finite()&&x.abs()<=1_000_000.),
             (Value::Bool(_),Value::Bool(_))=>true,
+            (Value::Enum(_),Value::Enum(index))=>matches!(&property.ui,effectcraft_project::ParamUi::Popup{options} if (*index as usize)<options.len()),
             _=>false,
         };
         if !safe { return Err(err("Template control type or value is invalid")); }

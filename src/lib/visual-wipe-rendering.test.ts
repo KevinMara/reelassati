@@ -61,9 +61,8 @@ function checkFrames(bytes: Uint8Array, clip: TimelineClip) {
         const offset = ((frame * height + y) * width + x) * 4;
         // The source generator's integer expressions do not sample neighboring
         // pixels. A reveal must never modify RGB, including the last row/column.
-        expect(bytes[offset]).toBe(x + 20);
-        expect(bytes[offset + 1]).toBe(y + 50);
-        expect(bytes[offset + 2]).toBe(frame + 80);
+        if (bytes[offset] !== x + 20 || bytes[offset + 1] !== y + 50 || bytes[offset + 2] !== frame + 80)
+          throw Error(`RGB changed in frame ${frame} at (${x}, ${y}): ${bytes.subarray(offset, offset + 3)}`);
         const left = (width * crop.left) / 100,
           right = width * (1 - crop.right / 100);
         const top = (height * crop.top) / 100,
@@ -81,9 +80,8 @@ function checkFrames(bytes: Uint8Array, clip: TimelineClip) {
           continue;
         const visible = x >= left && x < right && y >= top && y < bottom;
         const expected = visible ? (100 + x + y) * pose.opacity : 0;
-        expect(Math.abs(bytes[offset + 3] - expected)).toBeLessThanOrEqual(
-          1.01
-        );
+        if (Math.abs(bytes[offset + 3] - expected) > 1.01)
+          throw Error(`Alpha changed in frame ${frame} at (${x}, ${y}): ${bytes[offset + 3]}, expected ${expected}`);
       }
   }
 }

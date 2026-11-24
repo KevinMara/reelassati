@@ -227,14 +227,14 @@ export function CatalogEvidenceImport() {
         />
       </label>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
+        <button type="button"
           className="rounded-lg border border-border px-3 py-2 text-xs"
           disabled={busy || !count}
           onClick={() => void run(false)}
         >
           Upload evidence
         </button>
-        <button
+        <button type="button"
           className="rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground"
           disabled={busy || !count}
           onClick={() => void run("sound")}
@@ -250,7 +250,7 @@ export function CatalogEvidenceImport() {
           Upload and review visuals
         </button>
         {busy && (
-          <button
+          <button type="button"
             className="rounded-lg border px-3 py-2 text-xs"
             onClick={() => controller.current?.abort()}
           >

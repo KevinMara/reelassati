@@ -97,11 +97,17 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
   if (v.native && (!native || v.kind !== "text")) return undefined;
   const color = (c: unknown, fallback: string) =>
     typeof c === "string" && /^#[a-f\d]{6}$/i.test(c) ? c : fallback;
-  const text = (t: unknown, max: number) =>
+  const text = (t: unknown, max: number, multiline = false) =>
     typeof t === "string"
       ? // Strip uploaded control bytes before rendering the graphic.
         // eslint-disable-next-line no-control-regex
-        t.replace(/[\u0000-\u001f]/g, " ").slice(0, max)
+        t
+          .replace(/\r\n?/g, "\n")
+          .replace(
+            multiline ? /[\u0000-\u0009\u000b-\u001f]/g : /[\u0000-\u001f]/g,
+            " "
+          )
+          .slice(0, max)
       : "";
   const motion = new Map<number, GraphicKeyframe>();
   if (Array.isArray(v.motion))
@@ -131,7 +137,7 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
   return {
     ...(native ? { native } : {}),
     kind: v.kind as GraphicKind,
-    text: text(v.text, 180),
+    text: text(v.text, native ? 500 : 180, !!native),
     color: color(v.color, "#FFFFFF"),
     background: color(v.background, "#6F5AD8"),
     x: bounded(v.x, 50, 0, 100),
@@ -146,7 +152,7 @@ export function normalizeGraphic(value: unknown): MotionGraphic | undefined {
     suffix: text(v.suffix, 12),
     rotation: bounded(v.rotation, 0, -720, 720),
     ...(typeof v.secondaryText === "string"
-      ? { secondaryText: text(v.secondaryText, 120) }
+      ? { secondaryText: text(v.secondaryText, native ? 500 : 120, !!native) }
       : {}),
     ...([
       "plain",

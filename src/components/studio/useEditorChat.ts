@@ -4,6 +4,7 @@ import {
 } from "@/lib/shared-media-catalog";
 import { preflightEditColorLuts } from "@/lib/catalog-color-lut-preflight";
 import { mergeCreditReceipt } from "@contracts/credit-receipt";
+import { editorRateLimitRetryAt, manualEditorRetryRequest } from "@contracts/editor-errors";
 import { nextReelAddition, type ReelAddition } from "@/lib/reel-additions";
 import { timelineFingerprint } from "@/lib/autonomous-live-publish";
 import { translateUi } from "@/lib/i18n/ui";
@@ -1446,6 +1447,7 @@ export function useEditorChat(
         ...m,
         text: stopped ? "Edit stopped. Your instructions are saved." : detail,
         status: stopped ? "stopped" : "failed",
+        rateLimitRetryAt: stopped ? undefined : editorRateLimitRetryAt(cause),
         creditReceiptsComplete: stopped ? false : m.creditReceiptsComplete,
       })).catch(() => undefined);
     } finally {
@@ -1642,6 +1644,7 @@ export function useEditorChat(
     )
       return;
     let m = getMessage(messageId);
+    if (m.rateLimitRetryAt && Date.now() < m.rateLimitRetryAt) return;
     if (!m.plan) {
       if (!m.request) {
         setError(
@@ -1665,7 +1668,7 @@ export function useEditorChat(
                   messageId
                 ),
               }
-            : m.request;
+            : manualEditorRetryRequest(m.request, m.rateLimitRetryAt);
         // An addition can be resumed after Stop or a reload before it has ever
         // planned. Rehydrate the same scope as send(), and count that first plan
         // against its cap without changing the idempotent saved request body.
@@ -1673,6 +1676,7 @@ export function useEditorChat(
           ...item,
           request,
           status: "planning",
+          rateLimitRetryAt: undefined,
           planningAttempted: true,
           range: request.range,
           selectedClipIds: request.selectedClipIds,
@@ -1709,6 +1713,7 @@ export function useEditorChat(
           ...item,
           status: stopped ? "stopped" : "failed",
           text: stopped ? "Edit stopped. Your instructions are saved." : detail,
+          rateLimitRetryAt: stopped ? undefined : editorRateLimitRetryAt(cause),
         })).catch(() => undefined);
         return;
       } finally {

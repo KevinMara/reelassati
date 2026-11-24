@@ -1,3 +1,4 @@
+import { isNativeMatteId, type NativeMatteId } from "./native-motion-mattes";
 /** Validated data graph. This contract never executes native template source. */
 export interface NativeTransformSample {
   center: [number, number];
@@ -17,6 +18,7 @@ export interface NativeCropSample {
   bottom: number;
 }
 export type NativeFrameNode =
+  | { id: string; kind: "matte"; a: string; b: string; matteId: NativeMatteId; samples: { mix: number }[] }
   | { id: string; kind: "crop"; input: string; samples: NativeCropSample[] }
   | {
       id: string;
@@ -82,7 +84,8 @@ export function readNativeFrameProgram(value: unknown): NativeFrameProgram {
       throw new Error("Unresolved or cyclic native image input");
     return id;
   };
-  const nodes: NativeFrameNode[] = v.nodes.map(raw => {
+  const rawNodes = v.nodes;
+  const nodes: NativeFrameNode[] = rawNodes.map(raw => {
     const n = record(raw);
     if (
       typeof n.id !== "string" ||
@@ -93,13 +96,24 @@ export function readNativeFrameProgram(value: unknown): NativeFrameProgram {
     )
       throw new Error("Invalid native graph node");
     let node: NativeFrameNode;
-    if (n.kind === "mix" || n.kind === "over") {
+    if (n.kind === "matte") {
+      if (!isNativeMatteId(n.matteId) || rawNodes.length !== 1)
+        throw new Error("Unknown native image mask");
+      node = {
+        id: n.id, kind: "matte", a: input(n.a), b: input(n.b), matteId: n.matteId,
+        samples: n.samples.map(s => ({ mix: numeric(record(s).mix, 0, 1) })),
+      };
+    } else if (n.kind === "mix" || n.kind === "over") {
       node = {
         id: n.id,
         kind: n.kind,
         a: input(n.a),
         b: input(n.b),
-        samples: n.samples.map(s => ({ mix: numeric(record(s).mix, 0, 1) })),
+        // Preserve sub-pixel spline overshoot from the authored dissolve.
+        // Normal/Over opacity still uses its strict unit range.
+        samples: n.samples.map(s => ({ mix: n.kind === "mix"
+          ? numeric(record(s).mix, -0.0001, 1.0001)
+          : numeric(record(s).mix, 0, 1) })),
       };
     } else if (n.kind === "crop") {
       node = {

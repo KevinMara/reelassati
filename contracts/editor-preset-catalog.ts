@@ -3,6 +3,7 @@ import {
   CLIP_LOOK_PRESETS,
   CAPTION_PRESETS,
 } from "./editor-presets";
+import { nativeGraphicTemplate } from "./native-graphics";
 import {
   normalizeEditorSavedStyles,
   type EditorSavedStyle,
@@ -23,10 +24,28 @@ export const EDITOR_PRESET_GUIDANCE = `Native graphic templates have their own a
 
 export function editorPresetCatalog(
   styles: EditorSavedStyle[] = [],
-  personalTransitions: TransitionPreset[] = []
+  personalTransitions: TransitionPreset[] = [],
+  direction?: string
 ) {
+  const normalized = " " + (direction ?? "").normalize("NFKC").toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ").trim() + " ";
+  const compact = new Set<string>();
+  if (direction !== undefined) {
+    for (const p of GRAPHIC_PRESETS) {
+      const t = nativeGraphicTemplate(p.graphic.native?.id);
+      if (t?.platform && !normalized.includes(" " + t.platform.toLowerCase() + " ") &&
+          !(t.platform === "X" && normalized.includes(" twitter ")) && !direction.includes(t.id))
+        compact.add(t.id);
+    }
+  }
   return {
-    graphics: GRAPHIC_PRESETS.map(p => ({
+    // Every social design remains discoverable by exact ID. Expand the repeated
+    // layout/placement evidence only for platforms actually named in the brief.
+    ...(compact.size ? { otherSocialGraphics: {
+      usage: "Only for a supplied account on the named platform. A profile also requires a supplied call to action. Place in clear space.",
+      variants: GRAPHIC_PRESETS.filter(p => compact.has(p.id)).map(p => [p.id, p.name]),
+    }} : {}),
+    graphics: GRAPHIC_PRESETS.filter(p => !compact.has(p.id)).map(p => ({
       id: p.id,
       name: p.name,
       description: p.description,

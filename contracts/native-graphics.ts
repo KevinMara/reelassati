@@ -17,6 +17,17 @@ export interface NativeGraphicControl {
   min?: number;
   max?: number;
   textSlot?: number;
+  /** Explicit source mapping; legacy templates retain their original mapping. */
+  colorSlot?: number;
+  displayLabel?: string;
+  allCaps?: boolean;
+  /** One editable coordinate of a source point control. */
+  component?: 0 | 1;
+  vector?: [number, number];
+  valueType?: "Bool" | "Enum";
+  /** A control whose value appears as text in the rendered picture. */
+  displayedValue?: boolean;
+  options?: string[];
   part?: "left" | "right";
   font?: string;
   fontSize?: number;
@@ -25,7 +36,7 @@ export interface NativeGraphicTemplate {
   id: string;
   name: string;
   description: string;
-  category: "title" | "social";
+  category: "title" | "social" | "notification";
   platform?: string;
   url: string;
   sha256: string;
@@ -68,7 +79,18 @@ export function normalizeNativeGraphic(
     if (c.type === "color" && typeof v === "string" && /^#[a-f\d]{6}$/i.test(v))
       values[c.key] = v.toUpperCase();
     if (c.type === "number" && typeof v === "number" && Number.isFinite(v))
-      values[c.key] = Math.max(c.min ?? -500, Math.min(c.max ?? 500, v));
+      values[c.key] = Math.max(
+        c.min ?? -500,
+        Math.min(c.max ?? 500, c.valueType ? Math.round(v) : v)
+      );
+    if (c.type === "text" && (c.textSlot ?? 0) >= 2 && typeof v === "string")
+      // Extra fields have the same bounded, plain-text contract as primary copy.
+      // eslint-disable-next-line no-control-regex
+      values[c.key] = Array.from(
+        v.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f]/g, " ")
+      )
+        .slice(0, 500)
+        .join("");
   }
   const seconds = (v: unknown, fallback: number) =>
     typeof v === "number" && Number.isFinite(v)
@@ -125,10 +147,14 @@ export function nativeGraphicBox(
 }
 export function nativeTextValue(
   control: NativeGraphicControl,
-  g: Pick<MotionGraphic, "text" | "secondaryText">
+  g: Pick<MotionGraphic, "text" | "secondaryText" | "native">
 ) {
   const value = (
-    control.textSlot === 1 ? (g.secondaryText ?? "") : g.text
+    (control.textSlot ?? 0) >= 2
+      ? String(g.native?.values[control.key] ?? "")
+      : control.textSlot === 1
+        ? (g.secondaryText ?? "")
+        : g.text
   ).trim();
   if (!control.part) return value;
   const chars = Array.from(value),
@@ -136,6 +162,23 @@ export function nativeTextValue(
   return (
     control.part === "left" ? chars.slice(0, middle) : chars.slice(middle)
   ).join("");
+}
+
+/** Every displayed extra field participates in copy/reading-time checks. */
+export function nativeGraphicExtraCopy(
+  g: Pick<MotionGraphic, "text" | "secondaryText" | "native">
+) {
+  return (nativeGraphicTemplate(g.native?.id)?.controls ?? []).flatMap(c => {
+    if (c.type === "text" && (c.textSlot ?? 0) >= 2)
+      return [nativeTextValue(c, g)];
+    if (!c.displayedValue) return [];
+    const n = Number(g.native?.values[c.key] ?? c.default);
+    return [
+      c.options
+        ? (c.options[n] ?? "").slice(0, 3).toUpperCase()
+        : String(Math.round(n)),
+    ];
+  });
 }
 
 /** Conservative checks from the exact bundled font metrics. The renderer still
@@ -154,10 +197,11 @@ export function nativeGraphicTextProblems(
       font = EDITOR_FONTS.find(f => f.postscript === c.font),
       metrics = editorFontMetrics(font?.id);
     if (!text) {
-      issues.push("Write both text lines for this animation.");
+      issues.push("Complete every text field for this animation.");
       continue;
     }
-    const displayed = template.category === "title" ? text.toUpperCase() : text;
+    const allCaps = c.allCaps ?? template.category === "title";
+    const displayed = allCaps ? text.toUpperCase() : text;
     if (font && missingEditorFontCharacters(font.id, displayed).length) {
       issues.push(
         "The template font does not contain these characters. Choose a different text style."
@@ -166,14 +210,23 @@ export function nativeGraphicTextProblems(
     }
     if (metrics) {
       const measure = (s: string) =>
-        Array.from(s).reduce((n, c) => n + (metrics.advances[c] ?? 1), 0);
-      const original =
-        template.category === "title"
-          ? String(c.default).toUpperCase()
-          : String(c.default);
+        Math.max(
+          ...s
+            .split(/\r?\n/u)
+            .map(line =>
+              Array.from(line).reduce(
+                (n, c) => n + (metrics.advances[c] ?? 1),
+                0
+              )
+            )
+        );
+      const original = allCaps
+        ? String(c.default).toUpperCase()
+        : String(c.default);
       const fit = Math.min(
         1,
-        measure(original) / Math.max(0.01, measure(displayed))
+        measure(original) / Math.max(0.01, measure(displayed)),
+        original.split(/\r?\n/u).length / displayed.split(/\r?\n/u).length
       );
       measurements.push({ control: c, fit });
     }
@@ -188,10 +241,17 @@ export function nativeGraphicTextProblems(
             .map(m => m.fit)
         )
       : fit;
+    const scaleControl = template.controls.find(
+      s => s.label === c.label + " Control · Scale"
+    );
+    const authoredScale = scaleControl
+      ? Number(g.native?.values[scaleControl.key] ?? scaleControl.default) / 100
+      : 1;
     const pixels =
       ((c.fontSize ?? 0) / template.compWidth / template.bounds.width) *
       (g.size * 10) *
-      sharedFit;
+      sharedFit *
+      authoredScale;
     if (pixels < shortEdge / 30)
       issues.push(
         "The text is too small for mobile delivery. Shorten the copy or increase the graphic size."

@@ -95,6 +95,17 @@ describe("selected section boundaries", () => {
   });
 });
 describe("reusable free presets", () => {
+  it("keeps every social graphic discoverable and expands the requested platform", () => {
+    const all = editorPresetCatalog();
+    const selected = editorPresetCatalog([], [], "Use the Google Plus profile for the supplied handle");
+    const compact = selected.otherSocialGraphics!.variants.map(([id]) => id);
+    expect(new Set([...selected.graphics.map(g => g.id), ...compact])).toEqual(
+      new Set(all.graphics.map(g => g.id))
+    );
+    expect(selected.graphics.some(g => g.design.template?.platform === "Google Plus")).toBe(true);
+    expect(selected.graphics.some(g => g.design.template?.platform === "TikTok")).toBe(false);
+    expect(JSON.stringify(selected).length).toBeLessThan(JSON.stringify(all).length);
+  });
   it("resolves every kit layer to the exact editable UI composition", () => {
     const catalog = editorPresetCatalog();
     for (const kit of MOTION_KITS) {

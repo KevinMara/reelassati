@@ -456,7 +456,8 @@ export function editorChatModelContext(context: EditorChatContext) {
     ),
     presetCatalog: editorPresetCatalog(
       context.personalStyles,
-      context.personalTransitions
+      context.personalTransitions,
+      [request.prompt, ...(request.history ?? []).filter(m => m.role === "user").map(m => m.text)].join(" ")
     ),
     captionStyles: CAPTION_PRESETS.map(({ id, description }) => ({
       id,

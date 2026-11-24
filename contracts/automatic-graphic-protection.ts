@@ -24,7 +24,10 @@ import { captionMotion, captionRuns } from "./caption-runs";
 import { captionMotionFrame } from "./caption-motion";
 import { normalizeTranscriptWords } from "./transcript-timing";
 import { graphicReadabilityProblems } from "./graphic-readability";
-import { nativeGraphicTemplate } from "./native-graphics";
+import {
+  nativeGraphicTemplate,
+  nativeGraphicExtraCopy,
+} from "./native-graphics";
 
 export type AutomaticGraphicIntent =
   "automatic" | "source-design" | "requested" | "replace";
@@ -234,14 +237,15 @@ export function automaticGraphicIntent(
   // This grants copy permission only; source-overlap checks still apply.
   const native = nativeGraphicTemplate(candidate?.native?.id);
   if (candidate && native?.category === "social") {
-    const supplied = request
+    const socialParts = request
       .normalize("NFKC")
       .toLocaleLowerCase("en")
-      .split(/[!?;\n]|\.(?=\s|$)/u)
+      .split(/[!?;\n]|\.(?=\s|$)/u);
+    const supplied = socialParts
       .filter(
         part =>
           actions.test(part) &&
-          /\b(?:handle|username|account|profilo|nome utente|usuario|compte)\b/u.test(
+          /\b(?:handle|username|account|profile|profil|profilo|nome utente|usuario|compte)\b/u.test(
             part
           ) &&
           (!native.platform ||
@@ -257,12 +261,34 @@ export function automaticGraphicIntent(
           )
           .map(match => match[0])
       );
-    const exact = candidate.text
-      .normalize("NFKC")
-      .toLocaleLowerCase("en")
-      .trim();
-    if (supplied.includes(exact) && !candidate.secondaryText?.trim())
+    const displayed = [
+      candidate.text,
+      candidate.secondaryText ?? "",
+      ...nativeGraphicExtraCopy(candidate),
+    ]
+      .map(part => part.normalize("NFKC").toLocaleLowerCase("en").trim())
+      .filter(Boolean);
+    const handles = displayed.filter(part =>
+      /^@[\p{L}\p{N}_]+(?:[._][\p{L}\p{N}_]+)*$/u.test(part)
+    );
+    const otherCopy = displayed.filter(part => !handles.includes(part));
+    const quoted = socialParts.flatMap(part =>
+      [...part.matchAll(/["“«]([^"”»]+)["”»]|(?:^|\s)'([^']+)'/gu)]
+        .filter(
+          match =>
+            !/\b(?:no|not|never|avoid|non|evita|pas|nunca|kein|nao)\b|\bdon['’]t\b/u.test(
+              part.slice(0, match.index)
+            )
+        )
+        .map(match => (match[1] ?? match[2]).trim())
+    );
+    if (
+      handles.length === 1 &&
+      supplied.includes(handles[0]) &&
+      otherCopy.every(copy => quoted.includes(copy))
+    )
       return "requested";
+    return "automatic";
   }
   if (!sentences.length) return "automatic";
   if (candidate) {
@@ -279,6 +305,7 @@ export function automaticGraphicIntent(
     const displayed = [
       textKinds.includes(candidate.kind) ? candidate.text : "",
       candidate.secondaryText ?? "",
+      ...nativeGraphicExtraCopy(candidate),
     ]
       .map(copyKey)
       .filter(Boolean);
@@ -751,7 +778,11 @@ export function automaticGraphicProblems(
                 : graphic.text
               : "",
           ];
-    const parts = [...primaryCopy, graphic.secondaryText ?? ""]
+    const parts = [
+      ...primaryCopy,
+      graphic.secondaryText ?? "",
+      ...nativeGraphicExtraCopy(graphic),
+    ]
       .map(copyKey)
       .filter(Boolean);
     if (
@@ -977,7 +1008,12 @@ export function automaticGraphicProblems(
     (intent === "automatic" || intent === "source-design") &&
     ["text", "callout"].includes(graphic.kind)
   ) {
-    const words = `${graphic.text} ${graphic.secondaryText ?? ""}`
+    const words = [
+      graphic.text,
+      graphic.secondaryText ?? "",
+      ...nativeGraphicExtraCopy(graphic),
+    ]
+      .join(" ")
       .trim()
       .split(/\s+/u)
       .filter(Boolean).length;

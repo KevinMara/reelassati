@@ -2,6 +2,7 @@ import { composerToken, rankComposerCommands } from "@/lib/composer-commands";
 import { creditReceiptTotal } from "@contracts/credit-receipt";
 import { ConciseResponse } from "./ConciseResponse";
 import { EditorialNotes } from "./EditorialNotes";
+import { useEditorRetryClock } from "./useEditorRetryClock";
 import { EditorialCoverage } from "./EditorialCoverage";
 import { editorFailureMessage } from "@contracts/editor-errors";
 import { editorChatReceipt } from "@/lib/editor-chat-receipt";
@@ -1106,6 +1107,7 @@ export function EditorChat({
                       <RunControls
                         message={message}
                         busy={busyChoice}
+                        onAutoEdit={onAutoEdit}
                         onResume={(newCap, applyPlan) =>
                           void runChoice(`resume:${message.id}`, () =>
                             chat.resume(message.id, newCap, applyPlan)
@@ -2005,13 +2007,23 @@ function RunControls({
   message,
   busy,
   onResume,
+  onAutoEdit,
 }: {
   message: EditorChatMessage;
   busy: boolean;
   onResume: (cap?: number, applyPlan?: boolean) => void;
+  onAutoEdit: () => void;
 }) {
   const ui = useUiText();
+  const retryAt = message.rateLimitRetryAt;
+  const retryTime = useEditorRetryClock(retryAt);
   const plan = message.plan;
+  if (!plan && message.status === "failed" && retryAt !== undefined) {
+    return <button type="button" disabled={busy || Boolean(retryTime)} onClick={() => message.activity?.kind === "auto-edit" ? onAutoEdit() : onResume()}
+      className="mt-3 rounded-lg border border-border px-3 py-2 text-sm text-primary disabled:opacity-50">
+      {ui("Retry")}{retryTime && " · " + retryTime}
+    </button>;
+  }
   if (message.pendingAddition && busy) return null;
   if (!plan)
     return message.request && message.status !== "planning" ? (

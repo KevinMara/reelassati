@@ -1,4 +1,5 @@
 import { nativeRevealUi } from "./locales/ui-native-reveal";
+import { nativeGraphicsTranslations } from "./locales/ui-native-graphics";
 import { nativeMotionUi } from "./locales/ui-native-motion";
 import { nativeZoomUi } from "./locales/ui-native-zoom";
 import { nativePushUi } from "./locales/ui-native-push";
@@ -183,6 +184,11 @@ export function loadUiLocale(
       ...nativeRevealUi[code],
       ...nativeMotionUi[code],
       ...editorFontUi[code],
+    }));
+  if (code !== "en")
+    pending = pending.then(catalog => ({
+      ...catalog,
+      ...nativeGraphicsTranslations(code, catalog),
     }));
   pendingCatalogs.set(code, pending);
   void pending.catch(() => {

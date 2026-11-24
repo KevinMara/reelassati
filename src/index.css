@@ -887,3 +887,8 @@
 .editor-workspace[data-media-hidden="true"] > #editor-media-panel { display:none; }
 @media(max-width:1099px) { .editor-workspace > #editor-media-panel,.editor-workspace #editor-preview-panel,.editor-workspace > #editor-chat-panel,.editor-workspace #editor-timeline-panel { grid-column:1; grid-row:auto; } }
 #editor-preview-panel:fullscreen .editor-preview-stage > div { max-width:min(100%,calc((100dvh - 120px)*var(--preview-aspect,0.5625))) !important; }
+
+@keyframes native-transition-strip {
+  from { transform: translateX(0); }
+  to { transform: translateX(-92.85714286%); }
+}

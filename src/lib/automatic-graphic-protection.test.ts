@@ -1009,6 +1009,29 @@ describe("bounded auto-edit graphic decisions", () => {
     ).toBe("replace");
   });
 
+  it("requires both the requested handle and the exact CTA on a two-line profile", () => {
+    const card = normalizeGraphic({
+      kind: "text",
+      text: "Follow along",
+      secondaryText: "@reel.studio",
+      native: { id: "motion-d6bd54f0d64c" },
+    })!;
+    expect(
+      automaticGraphicIntent(
+        'Add the TikTok profile @reel.studio with "Follow along"',
+        card
+      )
+    ).toBe("requested");
+    expect(
+      automaticGraphicIntent("Add the TikTok profile @reel.studio", card)
+    ).toBe("automatic");
+    expect(
+      automaticGraphicIntent(
+        'Add the TikTok profile @reel.studio but never use "Follow along"',
+        card
+      )
+    ).toBe("automatic");
+  });
   it("honors an exact supplied social handle while preserving source protection", () => {
     const request =
       "Add the editable Instagram handle · left animation with the supplied handle @reel.studio for the first 4 seconds, placed in the clear top margin (x=50, y=8, size=6); verify it does not cover source text or face.";

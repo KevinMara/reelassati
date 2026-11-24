@@ -1,4 +1,5 @@
 import type { NativeFrameProgram } from "@contracts/native-frame-program";
+import { NativeMatteReader } from "./native-matte-reader";
 import {
   createNativeFrameRenderer,
   type NativeImageInput,
@@ -25,13 +26,16 @@ export async function renderNativeFrameSequence(
   options.signal.throwIfAborted();
   const canvas = new OffscreenCanvas(size.width, size.height);
   const renderer = createNativeFrameRenderer(canvas, size.width, size.height);
+  const mask = program.nodes.find(n => n.kind === "matte");
+  const reader = mask ? new NativeMatteReader(mask.matteId) : undefined;
   try {
     for (let frame = 0; frame < program.frames; frame++) {
       options.signal.throwIfAborted();
       const inputs = await options.loadInputs(frame, options.signal);
       try {
         options.signal.throwIfAborted();
-        renderer.render(program, inputs, frame);
+        const matte = reader && mask ? await reader.frame(mask.samples[frame].mix, options.signal) : undefined;
+        renderer.render(program, inputs, frame, matte);
         let bytes: Uint8Array;
         if (options.format === "rgb24") {
           // Premultiplied float RGB is already composited against black. This
@@ -55,6 +59,9 @@ export async function renderNativeFrameSequence(
       }
     }
   } finally {
-    renderer.dispose();
+    reader?.close();
+    // Each transition creates its own export canvas. Release its WebGL
+    // context before the next cut, including after a cancelled export.
+    renderer.dispose(true);
   }
 }

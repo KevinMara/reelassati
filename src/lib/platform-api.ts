@@ -38,6 +38,8 @@ import { platformApiUrl } from "@/lib/runtime";
 import { DIRECT_UPLOAD_MAX_BYTES, UPLOAD_PART_BYTES } from "@contracts/uploads";
 
 interface ApiErrorBody {
+  code?: unknown;
+  retryAfterSeconds?: unknown;
   error?: string;
   message?: string;
   missing?: string[];
@@ -47,6 +49,7 @@ interface ApiErrorBody {
 }
 
 export class PlatformApiError extends Error {
+  retryAfterSeconds?: number;
   status: number;
   missing: string[];
   reference?: string;
@@ -57,7 +60,8 @@ export class PlatformApiError extends Error {
     status: number,
     missing: string[] = [],
     reference?: string,
-    reason?: string
+    reason?: string,
+    retryAfterSeconds?: number
   ) {
     super(message);
     this.name = "PlatformApiError";
@@ -65,6 +69,7 @@ export class PlatformApiError extends Error {
     this.missing = missing;
     this.reference = reference;
     this.reason = reason;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -232,7 +237,9 @@ async function requestJson<T>(
           /^[\w-]{1,100}$/.test(body.reference)
           ? body.reference
           : undefined,
-        body.reason === "provider_billing_unavailable" &&
+        response.status === 429 && body.code === "provider_rate_limited"
+          ? "provider_rate_limited"
+          : body.reason === "provider_billing_unavailable" &&
           response.status === 503
           ? body.reason
           : path === "/api/ai/analyze" &&
@@ -241,7 +248,11 @@ async function requestJson<T>(
               typeof body.reason === "string" &&
               videoReviewFailureMessage(body.reason)
             ? body.reason
-            : undefined
+            : undefined,
+        response.status === 429 && body.code === "provider_rate_limited" &&
+          typeof body.retryAfterSeconds === "number" && Number.isInteger(body.retryAfterSeconds) &&
+          body.retryAfterSeconds >= 0 && body.retryAfterSeconds <= 86400
+          ? body.retryAfterSeconds : undefined
       );
     }
 

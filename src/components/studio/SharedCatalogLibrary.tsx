@@ -219,11 +219,11 @@ export function SharedCatalogLibrary({
                     </video>
                   ) : (
                     <button
+                      type="button"
                       className="h-full w-full"
                       onClick={() =>
                         setPreview(preview === item.id ? "" : item.id)
                       }
-                      type="button"
                       aria-label={ui("Preview {{name}}", { name: item.name })}
                     >
                       {poster && (

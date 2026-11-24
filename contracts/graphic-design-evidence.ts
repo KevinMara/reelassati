@@ -16,20 +16,45 @@ export class PresetContentError extends Error {
  */
 export function graphicDesignEvidence(g: MotionGraphic, duration: number) {
   const numeric = g.kind === "counter";
+  const template = nativeGraphicTemplate(g.native?.id);
   const round = (value: number) => Math.round(value * 1000) / 1000;
   return {
     ...(g.native
       ? {
           template: {
             id: g.native.id,
-            description: nativeGraphicTemplate(g.native.id)?.description,
-            design: nativeGraphicTemplate(g.native.id)?.design,
-            platform: nativeGraphicTemplate(g.native.id)?.platform,
+            description: template?.description,
+            design: template?.design,
+            platform: template?.platform,
             sizeUnit: "size × 10% of canvas width",
-            authoredBounds: nativeGraphicTemplate(g.native.id)?.bounds,
+            authoredBounds: template?.bounds,
             enter: g.native.enter,
             exit: g.native.exit,
-            values: g.native.values,
+            // Sample notification text is not evidence about this user's source.
+            values: Object.fromEntries(
+              Object.entries(g.native.values).filter(
+                ([key]) => {
+                  const c = template?.controls.find(c => c.key === key);
+                  return c && c.type !== "text" && !c.displayedValue;
+                }
+              )
+            ),
+            textFields: template?.controls.filter(
+                c => c.type === "text" && (c.textSlot ?? 0) >= 2
+              )
+              .map(c => ({
+                key: c.key,
+                label: c.displayLabel ?? c.label,
+                value: "supply actual copy in native.values",
+              })),
+            displayedNumbers: template?.controls.filter(c => c.displayedValue)
+              .map(c => ({
+                key: c.key,
+                label: c.label,
+                min: c.min,
+                max: c.max,
+                options: c.options,
+              })),
           },
         }
       : {}),
@@ -104,6 +129,7 @@ export function instantiateGraphicPreset(
   g: MotionGraphic,
   overrides: Record<string, unknown>
 ) {
+  const template = nativeGraphicTemplate(g.native?.id);
   const result = {
     ...g,
     text: "",
@@ -122,12 +148,40 @@ export function instantiateGraphicPreset(
       ...supplied,
       id: g.native.id,
       values: {
-        ...g.native.values,
+        ...Object.fromEntries(
+          Object.entries(g.native.values).filter(([key]) => {
+            const c = template?.controls.find(c => c.key === key);
+            return c && c.type !== "text" && !c.displayedValue;
+          })
+        ),
         ...(supplied.values && typeof supplied.values === "object"
           ? supplied.values
           : {}),
       },
     };
+    for (const c of template?.controls ?? []) {
+      if (c.displayedValue) {
+        const v =
+          supplied.values && typeof supplied.values === "object"
+            ? (supplied.values as Record<string, unknown>)[c.key]
+            : undefined;
+        if (
+          typeof v !== "number" ||
+          !Number.isInteger(v) ||
+          v < c.min! ||
+          v > c.max!
+        )
+          throw new PresetContentError(
+            "Supply the actual date or count for this graphic preset."
+          );
+      }
+      if (c.type !== "text" || (c.textSlot ?? 0) < 2) continue;
+      const value = result.native.values[c.key];
+      if (typeof value !== "string" || !value.trim())
+        throw new PresetContentError(
+          "Supply every text field for this graphic preset."
+        );
+    }
   }
   const kind = typeof overrides.kind === "string" ? overrides.kind : g.kind;
   if (
@@ -139,7 +193,7 @@ export function instantiateGraphicPreset(
     );
   if (
     g.native &&
-    nativeGraphicTemplate(g.native.id)?.controls.some(
+    template?.controls.some(
       c => c.type === "text" && c.textSlot === 1
     ) &&
     (typeof overrides.secondaryText !== "string" ||

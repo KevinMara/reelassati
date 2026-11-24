@@ -102,7 +102,7 @@ describe("platform-wide functional invariants", () => {
   it("prevents native buttons from accidentally submitting a surrounding form", () => {
     const componentFiles = filesUnder(
       fileURLToPath(new URL(".", import.meta.url))
-    ).filter(path => path.endsWith(".tsx"));
+    ).filter(path => path.endsWith(".tsx") && !path.endsWith(".test.tsx"));
     const offenders: string[] = [];
     for (const path of componentFiles) {
       const text = readFileSync(path, "utf8");
@@ -530,10 +530,12 @@ describe("platform-wide functional invariants", () => {
     const editor = source("./pages/dashboard/EditorPage.tsx");
     expect(editor).toContain("TimelinePreview");
     const preview = source("./components/studio/TimelinePreview.tsx");
-    expect(preview).toContain("media.play()");
-    expect(preview).toContain("media.pause()");
-    expect(preview).toContain("media.currentTime = sourceTime");
-    expect(preview).toContain("media.playbackRate =");
+    expect(preview).toContain("createPreviewMediaTransport(media)");
+    const transport = source("./lib/preview-media.ts");
+    expect(transport).toContain("media.play()");
+    expect(transport).toContain("media.pause()");
+    expect(transport).toContain("media.currentTime = sourceTime");
+    expect(transport).toContain("media.playbackRate =");
     expect(preview).toContain("media.volume =");
   });
 

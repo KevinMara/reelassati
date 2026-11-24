@@ -1,3 +1,47 @@
+import { v5 as uuidv5 } from "uuid";
+import type { EditorChatRequest } from "./editor-chat";
+
+export function editorRateLimitRetryAt(error: unknown, now = Date.now()) {
+  if (!error || typeof error !== "object") return;
+  const e = error as {
+    status?: number;
+    reason?: string;
+    retryAfterSeconds?: number;
+  };
+  if (e.status !== 429 || e.reason !== "provider_rate_limited") return;
+  const seconds = e.retryAfterSeconds;
+  return (
+    now +
+    (typeof seconds === "number" &&
+    Number.isInteger(seconds) &&
+    seconds >= 0 &&
+    seconds <= 86400
+      ? seconds * 1000
+      : 0)
+  );
+}
+
+/** A finished 429 is replayed forever under its original ID. Repeated clicks
+ * on this particular rejected attempt must still claim a single replacement. */
+export function manualEditorRetryRequest(
+  request: EditorChatRequest,
+  retryAt?: number,
+  now = Date.now()
+) {
+  if (retryAt === undefined) return request;
+  if (now < retryAt)
+    throw Error(
+      "Reel is temporarily busy. Wait before sending your request again."
+    );
+  return {
+    ...request,
+    requestId: uuidv5(
+      "reelassati/editor/retry/" + request.requestId,
+      uuidv5.URL
+    ),
+  };
+}
+
 /** Public copy is deliberately separate from provider diagnostics and receipts.
  * Also accepts persisted errors, so older conversations no longer expose internals. */
 export function editorFailureMessage(error: unknown): string {

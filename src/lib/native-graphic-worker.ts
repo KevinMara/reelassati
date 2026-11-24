@@ -96,9 +96,17 @@ async function configure(g: MotionGraphic) {
     if (scenes.size > 4) scenes.delete(scenes.keys().next().value!);
   }
   const scene = scenes.get(template.id)!;
+  // Configuration can fail after a partially applied edit. A later request
+  // for the previous graphic must reload its project and reapply its controls.
+  selected = "";
+  cachedFrame = undefined;
   engine.load_project(JSON.stringify(scene.project));
   main = scene.main;
   const fits = new Map<string, number>();
+  const points = new Map<
+    number,
+    { control: (typeof template.controls)[number]; value: [number, number] }
+  >();
   const paired = template.controls.some(c => c.type === "text" && c.part);
   for (const control of template.controls) {
     if (control.type === "text")
@@ -113,15 +121,22 @@ async function configure(g: MotionGraphic) {
       );
     else {
       const override = g.native.values[control.key];
-      const slot = /^Text 0([1-4])/.exec(control.label)?.[1];
-      const primary = slot && (paired ? Number(slot) <= 2 : Number(slot) === 1);
-      const color = slot
-        ? primary
+      const legacySlot = /^Text 0([1-4])/.exec(control.label)?.[1];
+      const slot =
+        control.colorSlot ??
+        (legacySlot && !control.displayLabel
+          ? (paired ? Number(legacySlot) <= 2 : Number(legacySlot) === 1)
+            ? 0
+            : 1
+          : undefined);
+      const color =
+        slot === 0
           ? g.color
-          : g.accent
-        : typeof override === "string"
-          ? override
-          : undefined;
+          : slot === 1
+            ? g.accent
+            : typeof override === "string"
+              ? override
+              : undefined;
       if (control.type === "color" && color)
         engine.set_control(
           control.comp,
@@ -135,15 +150,34 @@ async function configure(g: MotionGraphic) {
             ],
           })
         );
-      else if (control.type === "number" && typeof override === "number")
-        engine.set_control(
-          control.comp,
-          control.layer,
-          control.property,
-          JSON.stringify({ t: "Scalar", v: override })
-        );
+      else if (control.type === "number" && typeof override === "number") {
+        if (control.component !== undefined && control.vector) {
+          const point = points.get(control.property) ?? {
+            control,
+            value: [...control.vector] as [number, number],
+          };
+          point.value[control.component] = override;
+          points.set(control.property, point);
+        } else
+          engine.set_control(
+            control.comp,
+            control.layer,
+            control.property,
+            JSON.stringify({
+              t: control.valueType ?? "Scalar",
+              v: control.valueType === "Bool" ? !!override : override,
+            })
+          );
+      }
     }
   }
+  for (const { control, value } of points.values())
+    engine.set_control(
+      control.comp,
+      control.layer,
+      control.property,
+      JSON.stringify({ t: "Vec2", v: value })
+    );
   for (const slot of [0, 1]) {
     const halves = template.controls.filter(
       c => c.type === "text" && c.part && c.textSlot === slot

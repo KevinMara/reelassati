@@ -1,0 +1,150 @@
+{
+  "Pseudo/26080": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Text C Color", "Color"],
+    ["Text D Color", "Color"],
+    ["Icon Color 1", "Color"],
+    ["Icon Color 2", "Color"]
+  ],
+  "Pseudo/987118": [
+    ["Width", "Scalar"],
+    ["Height", "Scalar"],
+    ["Roundness", "Scalar"]
+  ],
+  "Pseudo/284719": [
+    ["Scale", "Scalar"],
+    ["Position", "Vec2"],
+    ["Tracking", "Scalar"]
+  ],
+  "Pseudo/480213": [
+    ["Scale", "Scalar"],
+    ["Position", "Vec2"],
+    ["Tracking", "Scalar"],
+    ["Line Spacing", "Scalar"]
+  ],
+  "Pseudo/20588": [
+    ["Scale", "Scalar"],
+    ["Position", "Vec2"]
+  ],
+  "Pseudo/MDS Elastic Controller": [
+    ["Amplitude", "Scalar"],
+    ["Frequency", "Scalar"],
+    ["Decay", "Scalar"]
+  ],
+  "Pseudo/69793": [
+    ["Size", "Scalar"],
+    ["Position", "Vec2"],
+    ["Glow On/Off", "Bool"]
+  ],
+  "Pseudo/849068": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Text C Color", "Color"],
+    ["Text D Color", "Color"],
+    ["Icon Color 1", "Color"],
+    ["Icon Color 2", "Color"],
+    ["Icon Color 3", "Color"]
+  ],
+  "Pseudo/682621": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Text C Color", "Color"],
+    ["Text D Color", "Color"],
+    ["Icon Box Color", "Color"],
+    ["Icon Text Color", "Color"],
+    ["Icon Number Color", "Color"]
+  ],
+  "Pseudo/371882": [
+    ["Day", "Enum"],
+    ["Number", "Scalar"]
+  ],
+  "Pseudo/658159": [
+    ["Box Color", "Color"],
+    ["Text Color", "Color"],
+    ["Bell Color", "Color"],
+    ["Circle Color", "Color"],
+    ["Number Color", "Color"]
+  ],
+  "Pseudo/704799": [
+    ["Size", "Scalar"],
+    ["Position", "Vec2"],
+    ["Number Count", "Scalar"]
+  ],
+  "Pseudo/246722": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Text C Color", "Color"],
+    ["Text D Color", "Color"],
+    ["Line Control", "Color"],
+    ["Button Push Color", "Color"],
+    ["Text Push Color", "Color"]
+  ],
+  "Pseudo/621851": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Line Control", "Color"],
+    ["Button Push Color", "Color"],
+    ["Push Text Color", "Color"]
+  ],
+  "Pseudo/226298": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Text C Color", "Color"],
+    ["Line Control", "Color"],
+    ["Button Push Color", "Color"],
+    ["Push Text Color", "Color"]
+  ],
+  "Pseudo/125475": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Text C Color", "Color"],
+    ["Text D Color", "Color"],
+    ["Line Control", "Color"]
+  ],
+  "Pseudo/815595": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Line Control", "Color"]
+  ],
+  "Pseudo/561916": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Text C Color", "Color"],
+    ["Line Control", "Color"]
+  ],
+  "Pseudo/407061": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Text C Color", "Color"],
+    ["Text D Color", "Color"],
+    ["Text E Color", "Color"],
+    ["Line Control", "Color"],
+    ["Button Push Color", "Color"],
+    ["Text Push Color", "Color"]
+  ],
+  "Pseudo/955865": [
+    ["Width", "Scalar"],
+    ["Height", "Scalar"],
+    ["Roundness", "Scalar"]
+  ],
+  "Pseudo/105665": [
+    ["Box Color", "Color"],
+    ["Text A Color", "Color"],
+    ["Text B Color", "Color"],
+    ["Text C Color", "Color"],
+    ["Text D Color", "Color"],
+    ["Text E Color", "Color"],
+    ["Line Control", "Color"]
+  ]
+}

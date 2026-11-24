@@ -2,6 +2,8 @@ import {
   nativeSampleAt,
   type NativeFrameProgram,
 } from "@contracts/native-frame-program";
+import { nativeMattes } from "@contracts/native-motion-mattes";
+import type { NativeMatteFrame } from "./native-matte-reader";
 
 export type NativeImageInput =
   TexImageSource | { width: number; height: number; pixels: Float32Array };
@@ -13,6 +15,9 @@ precision highp float;
 precision highp int;
 uniform sampler2D imageA;
 uniform sampler2D imageB;
+uniform sampler2D maskSheet;
+uniform vec4 maskRegion;
+uniform vec2 maskScale;
 uniform vec2 size;
 uniform int operation;
 uniform float weight;
@@ -50,6 +55,13 @@ void main(){
   ivec2 p=ivec2(gl_FragCoord.xy);
   if(operation==0){result=texelFetch(imageA,ivec2(p.x,int(size.y)-1-p.y),0);return;}
   if(operation==1){result=mix(texelFetch(imageA,p,0),texelFetch(imageB,p,0),weight);return;}
+  if(operation==5){
+    vec2 uv=(gl_FragCoord.xy/size-.5)*maskScale+.5;
+    uv=1.-abs(mod(uv,2.)-1.);
+    vec2 local=clamp(uv*maskRegion.zw,vec2(.5),maskRegion.zw-.5);
+    float matte=texture(maskSheet,(maskRegion.xy+local)/vec2(textureSize(maskSheet,0))).r;
+    result=mix(texelFetch(imageA,p,0),texelFetch(imageB,p,0),weight>0.5?matte:1.-matte);return;
+  }
   // Fusion Normal/Over uses premultiplied foreground + background*(1-alpha).
   // Blend mixes the finished composite back against its background input.
   if(operation==3){vec4 bg=texelFetch(imageA,p,0),fg=texelFetch(imageB,p,0);result=mix(bg,fg+bg*(1.-fg.a),weight);return;}
@@ -130,6 +142,9 @@ export function createNativeFrameRenderer(
     [
       "imageA",
       "imageB",
+      "maskSheet",
+      "maskRegion",
+      "maskScale",
       "size",
       "operation",
       "weight",
@@ -143,6 +158,7 @@ export function createNativeFrameRenderer(
   );
   gl.uniform1i(uniforms.imageA, 0);
   gl.uniform1i(uniforms.imageB, 1);
+  gl.uniform1i(uniforms.maskSheet, 1);
   gl.uniform2f(uniforms.size, width, height);
   gl.disable(gl.BLEND);
   gl.disable(gl.DEPTH_TEST);
@@ -151,6 +167,8 @@ export function createNativeFrameRenderer(
     framebuffers = new Map<string, WebGLFramebuffer>();
   let disposed = false,
     output: string | undefined;
+  let maskTexture: WebGLTexture | null = null;
+  let previousSheet: ImageBitmap | undefined;
   const texture = (id: string) => {
     let t = textures.get(id);
     if (t) return t;
@@ -202,7 +220,8 @@ export function createNativeFrameRenderer(
     render(
       program: NativeFrameProgram,
       inputs: [NativeImageInput, NativeImageInput],
-      frame: number
+      frame: number,
+      matte?: NativeMatteFrame
     ) {
       if (disposed || gl.isContextLost())
         throw new Error("Native effect renderer is unavailable");
@@ -272,7 +291,33 @@ export function createNativeFrameRenderer(
       });
       for (const node of program.nodes) {
         framebuffer(node.id);
-        if (node.kind === "mix" || node.kind === "over") {
+        if (node.kind === "matte") {
+          if (!matte) throw new Error("The authored transition mask is missing");
+          bind(node.a, 0);
+          bind(node.b, 1);
+          gl.activeTexture(gl.TEXTURE2);
+          if (!maskTexture) {
+            maskTexture = gl.createTexture();
+            if (!maskTexture) throw new Error("The transition mask texture could not be allocated");
+            gl.bindTexture(gl.TEXTURE_2D, maskTexture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          }
+          gl.bindTexture(gl.TEXTURE_2D, maskTexture);
+          if (previousSheet !== matte.sheet) {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, matte.sheet);
+            previousSheet = matte.sheet;
+          }
+          gl.uniform1i(uniforms.maskSheet, 2);
+          gl.uniform1i(uniforms.operation, 5);
+          const source = nativeMattes[node.matteId];
+          gl.uniform1f(uniforms.weight, source.inverted ? 1 : 0);
+          gl.uniform2f(uniforms.maskScale, source.mirrorCanvas ? source.mirrorCanvas[0] / source.width : 1,
+            source.mirrorCanvas ? source.mirrorCanvas[1] / source.height : 1);
+          gl.uniform4f(uniforms.maskRegion, matte.left, matte.top, matte.width, matte.height);
+        } else if (node.kind === "mix" || node.kind === "over") {
           bind(node.a, 0);
           bind(node.b, 1);
           gl.uniform1i(uniforms.operation, node.kind === "mix" ? 1 : 3);
@@ -316,15 +361,17 @@ export function createNativeFrameRenderer(
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       return pixels;
     },
-    dispose() {
+    dispose(releaseContext = false) {
       if (disposed) return;
       disposed = true;
       for (const t of textures.values()) gl.deleteTexture(t);
       for (const f of framebuffers.values()) gl.deleteFramebuffer(f);
       gl.deleteBuffer(buffer);
+      gl.deleteTexture(maskTexture);
       gl.deleteProgram(pipeline);
       textures.clear();
       framebuffers.clear();
+      if (releaseContext) gl.getExtension("WEBGL_lose_context")?.loseContext();
     },
   };
 }

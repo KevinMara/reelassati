@@ -56,6 +56,36 @@ const rows: Record<string, string> = {
   id: "Garis bertumpuk|Teks terpisah|Garis bergulir|Kata naik|Dua baris terpisah|Kemunculan dua baris|Profil sosial|Judul animasi yang dapat diedit.|Ikon animasi dan nama pengguna yang dapat diedit.|Warna ikon|Lebar bilah|Lebar kemunculan|Awal gradien|Akhir gradien|Warna bilah|Warna kemunculan|Memuat animasi…|Posisi pratinjau|Baris kedua|Warna baris kedua|Sesuaikan tampilan|Isi kedua baris teks.|Persingkat teks atau perbesar ukurannya.|Karakter tidak didukung. Pilih gaya teks lain.|Persingkat teks untuk animasi ini.|Animasi tidak dapat dimuat. Coba lagi.",
   th: "เส้นขอบซ้อนกัน|ข้อความแยก|เส้นขอบเลื่อน|คำลอยขึ้น|สองบรรทัดแยก|เผยสองบรรทัด|โปรไฟล์โซเชียล|ชื่อเรื่องเคลื่อนไหวที่แก้ไขได้|ไอคอนเคลื่อนไหวและชื่อผู้ใช้ที่แก้ไขได้|สีไอคอน|ความกว้างแถบ|ความกว้างการเผย|จุดเริ่มไล่สี|จุดสิ้นสุดไล่สี|สีแถบ|สีการเผย|กำลังโหลดภาพเคลื่อนไหว…|ตำแหน่งตัวอย่าง|บรรทัดที่สอง|สีบรรทัดที่สอง|ปรับแต่งรูปลักษณ์|กรอกข้อความทั้งสองบรรทัด|ย่อข้อความหรือเพิ่มขนาด|มีอักขระที่ไม่รองรับ โปรดเลือกรูปแบบข้อความอื่น|ย่อข้อความสำหรับภาพเคลื่อนไหวนี้|โหลดภาพเคลื่อนไหวไม่ได้ โปรดลองอีกครั้ง",
 };
+const expandedRows: Record<string, string> = {
+  it: "Cascata su tre righe|Scheda messaggio|Promemoria|Avviso sul telefono|Scheda di notifica modificabile.|Completa tutti i campi di testo.",
+  es: "Cascada de tres líneas|Tarjeta de mensaje|Recordatorio|Alerta del teléfono|Tarjeta de notificación editable.|Completa todos los campos de texto.",
+  fr: "Cascade sur trois lignes|Carte de message|Rappel|Alerte téléphonique|Carte de notification modifiable.|Remplissez tous les champs de texte.",
+  de: "Dreizeilige Kaskade|Nachrichtenkarte|Erinnerung|Handyhinweis|Bearbeitbare Benachrichtigungskarte.|Alle Textfelder ausfüllen.",
+  pt: "Cascata de três linhas|Cartão de mensagem|Lembrete|Alerta do telefone|Cartão de notificação editável.|Preencha todos os campos de texto.",
+  nl: "Cascade van drie regels|Berichtkaart|Herinnering|Telefoonmelding|Bewerkbare meldingskaart.|Vul alle tekstvelden in.",
+  pl: "Kaskada trzech wierszy|Karta wiadomości|Przypomnienie|Alert telefonu|Edytowalna karta powiadomienia.|Wypełnij wszystkie pola tekstowe.",
+  ro: "Cascadă pe trei rânduri|Card de mesaj|Memento|Alertă pe telefon|Card de notificare editabil.|Completează toate câmpurile de text.",
+  tr: "Üç satırlı kademeli başlık|Mesaj kartı|Hatırlatıcı|Telefon uyarısı|Düzenlenebilir bildirim kartı.|Tüm metin alanlarını doldurun.",
+  uk: "Каскад у три рядки|Картка повідомлення|Нагадування|Сповіщення телефону|Редагована картка сповіщення.|Заповніть усі текстові поля.",
+  ru: "Каскад в три строки|Карточка сообщения|Напоминание|Оповещение телефона|Редактируемая карточка уведомления.|Заполните все текстовые поля.",
+  ar: "تتابع من ثلاثة أسطر|بطاقة رسالة|تذكير|تنبيه الهاتف|بطاقة إشعار قابلة للتعديل.|أكمل جميع حقول النص.",
+  hi: "तीन पंक्तियों का क्रमिक शीर्षक|संदेश कार्ड|रिमाइंडर|फ़ोन अलर्ट|संपादन योग्य सूचना कार्ड।|सभी टेक्स्ट फ़ील्ड भरें।",
+  ja: "3行カスケード|メッセージカード|リマインダー|スマートフォン通知|編集可能な通知カード。|すべてのテキスト欄を入力してください。",
+  ko: "세 줄 순차 제목|메시지 카드|미리 알림|휴대폰 알림|편집 가능한 알림 카드입니다.|모든 텍스트 필드를 입력하세요.",
+  zh: "三行层叠标题|消息卡片|提醒卡片|手机通知|可编辑的通知卡片。|请填写所有文本字段。",
+  vi: "Tiêu đề ba dòng nối tiếp|Thẻ tin nhắn|Lời nhắc|Thông báo điện thoại|Thẻ thông báo có thể chỉnh sửa.|Điền vào mọi trường văn bản.",
+  da: "Kaskade i tre linjer|Beskedkort|Påmindelse|Telefonvarsel|Redigerbart notifikationskort.|Udfyld alle tekstfelter.",
+  sv: "Kaskad i tre rader|Meddelandekort|Påminnelse|Telefonavisering|Redigerbart aviseringskort.|Fyll i alla textfält.",
+  no: "Kaskade over tre linjer|Meldingskort|Påminnelse|Telefonvarsel|Redigerbart varselkort.|Fyll ut alle tekstfeltene.",
+  fi: "Kolmirivinen porrastus|Viestikortti|Muistutus|Puhelimen ilmoitus|Muokattava ilmoituskortti.|Täytä kaikki tekstikentät.",
+  cs: "Třířádková kaskáda|Karta zprávy|Připomínka|Upozornění telefonu|Upravitelná karta oznámení.|Vyplňte všechna textová pole.",
+  hu: "Háromsoros lépcsőzetes cím|Üzenetkártya|Emlékeztető|Telefonos értesítés|Szerkeszthető értesítési kártya.|Tölts ki minden szövegmezőt.",
+  el: "Διαδοχικός τίτλος τριών γραμμών|Κάρτα μηνύματος|Υπενθύμιση|Ειδοποίηση τηλεφώνου|Επεξεργάσιμη κάρτα ειδοποίησης.|Συμπληρώστε όλα τα πεδία κειμένου.",
+  he: "כותרת מדורגת בשלוש שורות|כרטיס הודעה|תזכורת|התראת טלפון|כרטיס התראה הניתן לעריכה.|יש למלא את כל שדות הטקסט.",
+  id: "Judul tiga baris berurutan|Kartu pesan|Pengingat|Peringatan ponsel|Kartu notifikasi yang dapat diedit.|Isi semua kolom teks.",
+  th: "ชื่อเรื่องสามบรรทัดแบบไล่ลำดับ|การ์ดข้อความ|การเตือนความจำ|การแจ้งเตือนบนโทรศัพท์|การ์ดแจ้งเตือนที่แก้ไขได้|กรอกข้อความให้ครบทุกช่อง",
+};
+
 export function nativeGraphicsTranslations(
   code: string,
   catalog: Record<string, string>
@@ -67,10 +97,32 @@ export function nativeGraphicsTranslations(
   const result: Record<string, string> = Object.fromEntries(
     keys.map((key, i) => [key, row[i]])
   );
-  for (const t of NATIVE_GRAPHIC_TEMPLATES)
-    if (t.platform)
+  const [cascade, message, reminder, phone, description, missing] =
+    expandedRows[code].split("|");
+  result["Three-line cascade"] = cascade;
+  result["Editable notification card."] = description;
+  result["Complete every text field for this animation."] = missing;
+  for (const t of NATIVE_GRAPHIC_TEMPLATES) {
+    if (t.platform) {
+      const profile = t.controls.some(
+        c => c.type === "text" && c.textSlot === 1
+      );
+      const type =
+        result["Social handle"] + (profile ? " · 2× " + catalog["Text"] : "");
       result[t.name] =
-        `${t.platform} · ${result["Social handle"]} · ${catalog[t.name.endsWith("left") ? "Left" : "Right"]}`;
+        `${t.platform} · ${type} · ${catalog[t.name.endsWith("left") ? "Left" : "Right"]}`;
+    } else if (t.category === "notification") {
+      const [name, n] = t.name.split(" · ");
+      result[t.name] =
+        (name === "Phone alert"
+          ? phone
+          : name === "Reminder card"
+            ? reminder
+            : message) +
+        " · " +
+        n;
+    }
+  }
   const aliases: Record<string, string> = {
     "Write both text lines for this animation.": "Complete both text lines.",
     "The text is too small for mobile delivery. Shorten the copy or increase the graphic size.":

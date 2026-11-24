@@ -93,6 +93,11 @@ export function compileFusionFrameProgram(
               "PerformDepthMerge",
               "ApplyMode",
               "Operator",
+              "Center",
+              "Size",
+              "Angle",
+              "FlipHoriz",
+              "FlipVert",
             ]
           : [
               "Input",
@@ -130,10 +135,47 @@ export function compileFusionFrameProgram(
         })),
       };
     } else if (node.tag === "Merge") {
+      const background = imageInput(name, "Background");
+      let foreground = imageInput(name, "Foreground");
+      // Fusion's Merge sizing controls transform only the foreground before
+      // compositing (Fusion manual, Composite Nodes / Foreground Sizing).
+      // Keep that operation separate so input order and alpha remain explicit.
+      const sourceInputs = fields(fields(node).Inputs);
+      if (
+        ["Center", "Size", "Angle", "FlipHoriz", "FlipVert"].some(
+          key => sourceInputs[key]
+        )
+      ) {
+        const transformId = `node-${nodes.length}`;
+        nodes.push({
+          id: transformId,
+          kind: "transform",
+          input: foreground,
+          samples: Array.from({ length: frames }, (_, t) => {
+            const size = number(name, "Size", t, 1),
+              flipX = number(name, "FlipHoriz", t, 0),
+              flipY = number(name, "FlipVert", t, 0);
+            if (size < 0 || ![0, 1].includes(flipX) || ![0, 1].includes(flipY))
+              throw new Error("Invalid native merge sizing or flip mode");
+            return {
+              center: point(name, "Center", t),
+              pivot: [0.5, 0.5],
+              scaleX: size * (flipX ? -1 : 1),
+              scaleY: size * (flipY ? -1 : 1),
+              angle: number(name, "Angle", t, 0),
+              edges: 0,
+              motionBlur: 0,
+              quality: 2,
+              shutterAngle: 180,
+            };
+          }),
+        });
+        foreground = transformId;
+      }
       record = {
         kind: "over",
-        a: imageInput(name, "Background"),
-        b: imageInput(name, "Foreground"),
+        a: background,
+        b: foreground,
         samples: Array.from({ length: frames }, (_, t) => {
           if (
             number(name, "PerformDepthMerge", t, 0) !== 0 ||

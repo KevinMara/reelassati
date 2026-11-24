@@ -1,5 +1,7 @@
 import roots from "./native-transition-data.json";
+import expanded from "./native-fusion-expanded.json";
 import motionRoots from "./native-motion-data.json";
+import { isNativeMatteId, matteDefinition, nativeMattes, type NativeMatteId } from "./native-motion-mattes";
 import { compileMotionCropProgram } from "../scripts/lib/motion-curves.mjs";
 import { compileFusionFrameProgram } from "../scripts/lib/fusion-frame-program.mjs";
 import {
@@ -8,6 +10,8 @@ import {
 } from "./native-frame-program";
 
 export type NativeTransitionId =
+  | NativeMatteId
+  | keyof typeof expanded
   | "stretch"
   | "slide"
   | "zoom"
@@ -35,8 +39,22 @@ export const nativeTransitionIds: readonly NativeTransitionId[] = [
   "scale-exchange",
   "motion-wipe-up",
   "motion-wipe-down",
+  ...(Object.keys(expanded) as (keyof typeof expanded)[]),
+  ...(Object.keys(nativeMattes) as NativeMatteId[]),
 ];
 export const nativeTransitionDefinitions = {
+  ...(Object.fromEntries((Object.keys(nativeMattes) as NativeMatteId[]).map(id => [id, matteDefinition(id)])) as Record<NativeMatteId, ReturnType<typeof matteDefinition>>),
+  "stretch-wide": { name: "Wide stretch dissolve", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "The full picture stretches horizontally to six times its width at the cut while the shots blend. Use a clear center subject and avoid stretching faces or readable text." },
+  "rotate-pull": { name: "Turning pullback", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "The outgoing shot turns through half a rotation and pulls back, exposing a border, as the incoming shot settles upright. Use for an intentional rotating reveal." },
+  "rotate-push": { name: "Turning push-in", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "A fast half-turn and roughly threefold push-in fill the frame before settling on the upright incoming shot. Reserve for a requested spin or matching camera rotation." },
+  "fold-y": { name: "Horizontal mirror bands", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "The two shots compress vertically into thin mirrored horizontal bands through the dissolve, then unfold. Use for an explicit graphic interruption." },
+  "fold-x": { name: "Vertical mirror bands", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "Both shots compress horizontally into mirrored vertical strips at the center of the dissolve, then expand. Keep away from dialogue and small type." },
+  "fold-left": { name: "Left-anchored mirror bands", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "Mirrored vertical strips fold around a left-hand pivot through the cut. Use when a graphic fold deliberately follows leftward composition." },
+  "fold-right": { name: "Right-anchored mirror bands", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "Mirrored vertical strips fold around a right-hand pivot through the cut. Use when a graphic fold deliberately follows rightward composition." },
+  "tile-right": { name: "Mirrored drift right", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "Both pictures pull back to one fifth scale in mirrored tiles and travel right through the dissolve. Use only for an intentional moving mosaic with clear subjects." },
+  "tile-left": { name: "Mirrored drift left", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "Both pictures pull back to one fifth scale in mirrored tiles and travel left through the dissolve. Use only for an intentional moving mosaic with clear subjects." },
+  "tile-up": { name: "Mirrored drift up", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "Both pictures pull back to one fifth scale in mirrored tiles and travel up through the dissolve. Use only for an intentional moving mosaic with clear subjects." },
+  "tile-down": { name: "Mirrored drift down", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "Both pictures pull back to one fifth scale in mirrored tiles and travel down through the dissolve. Use only for an intentional moving mosaic with clear subjects." },
   "motion-wipe-up": {
     name: "Eased wipe up",
     inputOrder: ["outgoing", "incoming"],
@@ -130,6 +148,7 @@ export const nativeTransitionDefinitions = {
   },
 } as const;
 const cache = new Map<string, NativeFrameProgram>();
+const fusionSources = { ...roots, ...expanded };
 /** Re-evaluate the authored native curves on the actual effect clock. Do not
  * scale a fixed list of poses or substitute a generic animation. */
 export function nativeTransitionProgram(
@@ -142,10 +161,19 @@ export function nativeTransitionProgram(
   const key = `${id}:${frames}:${fps}`;
   let program = cache.get(key);
   if (!program) {
+    if (!Number.isInteger(frames) || frames < 2 || frames > 18000)
+      throw new Error("Invalid native transition clock");
     program = readNativeFrameProgram(
-      id === "motion-wipe-up" || id === "motion-wipe-down"
+      isNativeMatteId(id)
+        ? {
+            schema: "reel-native-frame-program-v1", frames, fps, inputs: ["input-0", "input-1"],
+            output: "node-0", admission: "requires-renderer-and-native-parity",
+            nodes: [{ id: "node-0", kind: "matte", a: "input-0", b: "input-1", matteId: id,
+              samples: Array.from({ length: frames }, (_, i) => ({ mix: i / (frames - 1) })) }],
+          }
+        : id === "motion-wipe-up" || id === "motion-wipe-down"
         ? compileMotionCropProgram(motionRoots[id], { frames, fps })
-        : compileFusionFrameProgram(roots[id], { frames, fps })
+        : compileFusionFrameProgram(fusionSources[id], { frames, fps })
     );
     if (cache.size >= 32) cache.delete(cache.keys().next().value!);
     cache.set(key, program);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   nativeGraphicTemplate,
   nativeGraphicTextProblems,
+  nativeTextValue,
   type NativeGraphicControl,
 } from "@contracts/native-graphics";
 import {
@@ -14,6 +15,7 @@ import { ColorPicker } from "@/components/ui/color-picker";
 import { NativeGraphicRenderer } from "@/lib/native-graphic-renderer";
 
 export function nativeControlLabel(c: NativeGraphicControl) {
+  if (c.displayLabel) return c.displayLabel;
   if (c.label.startsWith("Text"))
     return /0[24]/.test(c.label) ? "Second line color" : "Text color";
   if (c.label.startsWith("L_") || c.label.startsWith("R_")) return "Icon color";
@@ -73,9 +75,16 @@ export function NativeGraphicComposer({
   const second = template.controls.some(
     c => c.type === "text" && c.textSlot === 1
   );
+  const textFields = template.controls.filter(
+    (c, i, all) =>
+      c.type === "text" &&
+      all.findIndex(
+        other => other.type === "text" && other.textSlot === c.textSlot
+      ) === i
+  );
   const save = async () => {
     if (validation.current) return;
-    if (!graphic.text.trim() || (second && !graphic.secondaryText?.trim())) {
+    if (textFields.some(c => !nativeTextValue(c, graphic))) {
       setError(ui("Write the words for your graphic before adding it."));
       return;
     }
@@ -161,18 +170,40 @@ export function NativeGraphicComposer({
         value={position}
         onChange={e => onPosition(Number(e.target.value))}
       />
-      {(
-        ["text", ...(second ? ["secondaryText"] : [])] as (
-          "text" | "secondaryText"
-        )[]
-      ).map((key, i) => (
-        <label key={key} className="block text-sm">
-          {ui(i ? "Second line" : "Text")}
-          <input
+      {textFields.map(c => (
+        <label key={c.key} className="block text-sm">
+          {c.displayLabel
+            ? ui(c.displayLabel)
+            : c.textSlot === 1
+              ? ui("Second line")
+              : `${ui("Text")}${(c.textSlot ?? 0) >= 2 ? ` ${c.textSlot! + 1}` : ""}`}
+          <textarea
             className={field}
-            maxLength={80}
-            value={graphic[key] ?? ""}
-            onChange={e => patch({ [key]: e.target.value })}
+            rows={Math.min(
+              5,
+              Math.max(1, nativeTextValue(c, graphic).split("\n").length)
+            )}
+            maxLength={500}
+            value={
+              (c.textSlot ?? 0) >= 2
+                ? String(graphic.native!.values[c.key] ?? "")
+                : c.textSlot === 1
+                  ? (graphic.secondaryText ?? "")
+                  : graphic.text
+            }
+            onChange={e =>
+              (c.textSlot ?? 0) >= 2
+                ? native({
+                    values: {
+                      ...graphic.native!.values,
+                      [c.key]: e.target.value,
+                    },
+                  })
+                : patch({
+                    [c.textSlot === 1 ? "secondaryText" : "text"]:
+                      e.target.value,
+                  })
+            }
           />
         </label>
       ))}
@@ -232,7 +263,13 @@ export function NativeGraphicComposer({
         </summary>
         <div className="mt-3 space-y-3">
           {template.controls
-            .filter(c => c.type !== "text" && !c.label.startsWith("Text"))
+            .filter(
+              c =>
+                c.type !== "text" &&
+                !(c.colorSlot !== undefined
+                  ? c.colorSlot < 2
+                  : !c.displayLabel && c.label.startsWith("Text"))
+            )
             .map(c =>
               c.type === "color" ? (
                 <ColorPicker
@@ -248,22 +285,57 @@ export function NativeGraphicComposer({
               ) : (
                 <label key={c.key} className="block text-sm">
                   {ui(nativeControlLabel(c))}
-                  <input
-                    className={field}
-                    type="number"
-                    min={c.min}
-                    max={c.max}
-                    step={10}
-                    value={graphic.native!.values[c.key] ?? c.default}
-                    onChange={e =>
-                      native({
-                        values: {
-                          ...graphic.native!.values,
-                          [c.key]: Number(e.target.value),
-                        },
-                      })
-                    }
-                  />
+                  {c.options ? (
+                    <select
+                      className={field}
+                      value={graphic.native!.values[c.key] ?? c.default}
+                      onChange={e =>
+                        native({
+                          values: {
+                            ...graphic.native!.values,
+                            [c.key]: Number(e.target.value),
+                          },
+                        })
+                      }
+                    >
+                      {c.options.map((option, i) => (
+                        <option key={i} value={i}>
+                          {ui(option)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : c.valueType === "Bool" ? (
+                    <input
+                      className="ml-2 accent-primary"
+                      type="checkbox"
+                      checked={!!(graphic.native!.values[c.key] ?? c.default)}
+                      onChange={e =>
+                        native({
+                          values: {
+                            ...graphic.native!.values,
+                            [c.key]: Number(e.target.checked),
+                          },
+                        })
+                      }
+                    />
+                  ) : (
+                    <input
+                      className={field}
+                      type="number"
+                      min={c.min}
+                      max={c.max}
+                      step={c.displayedValue ? 1 : "any"}
+                      value={graphic.native!.values[c.key] ?? c.default}
+                      onChange={e =>
+                        native({
+                          values: {
+                            ...graphic.native!.values,
+                            [c.key]: Number(e.target.value),
+                          },
+                        })
+                      }
+                    />
+                  )}
                 </label>
               )
             )}
@@ -290,6 +362,7 @@ export function NativeGraphicComposer({
       )}
       {!embedded && (
         <button
+          type="submit"
           className="w-full rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
           disabled={busy || saving}
         >

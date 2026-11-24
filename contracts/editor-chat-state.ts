@@ -480,6 +480,10 @@ export function normalizeEditorChatState(
       role: row.role,
       text: string(row.text, 6000),
       createdAt: row.createdAt,
+      ...(row.role === "assistant" && row.status === "failed" &&
+        typeof row.rateLimitRetryAt === "number" && Number.isSafeInteger(row.rateLimitRetryAt) &&
+        row.rateLimitRetryAt > 0 && row.rateLimitRetryAt <= 8640000000000000
+        ? { rateLimitRetryAt: row.rateLimitRetryAt } : {}),
       ...(Array.isArray(row.inputDetails)
         ? {
             inputDetails: row.inputDetails.slice(0, 16).flatMap(item => {

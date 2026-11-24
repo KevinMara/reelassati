@@ -2323,7 +2323,8 @@ describe("provenance integrity boundaries", () => {
       model: "moonshotai/kimi-k3",
       reasoning: { effort: "high" },
       provider: {
-        order: ["moonshotai"],
+        data_collection: "deny",
+        max_price: { prompt: 3, completion: 15 },
         allow_fallbacks: false,
         require_parameters: true,
       },

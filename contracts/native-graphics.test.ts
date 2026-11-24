@@ -11,8 +11,35 @@ import { normalizeEditorChatState } from "./editor-chat-state";
 import { graphicReadabilityProblems } from "./graphic-readability";
 import type { TimelineClip } from "./workspace";
 
-const template = NATIVE_GRAPHIC_TEMPLATES[0];
+const template = NATIVE_GRAPHIC_TEMPLATES.find(
+  t => t.name === "Stacked outline"
+)!;
 describe("editable native graphic contract", () => {
+  it("requires real copy for each displayed field and preserves it through save and reload", () => {
+    const card = NATIVE_GRAPHIC_TEMPLATES.find(
+      t =>
+        t.category === "notification" && t.controls.some(c => c.textSlot === 2)
+    )!;
+    const preset = GRAPHIC_PRESETS.find(p => p.id === card.id)!;
+    const fields = card.controls.filter(
+      c => c.type === "text" && (c.textSlot ?? 0) >= 2
+    );
+    const copy = { text: "Your request", secondaryText: "Confirmed" };
+    expect(() => instantiateGraphicPreset(preset.graphic, copy)).toThrow(
+      "every text field"
+    );
+    const values = Object.fromEntries(
+      fields.map(c => [c.key, "Tuesday\n18:00"])
+    );
+    const saved = instantiateGraphicPreset(preset.graphic, {
+      ...copy,
+      native: { values },
+    });
+    const reopened = normalizeGraphic(JSON.parse(JSON.stringify(saved)))!;
+    expect(fields.map(c => nativeTextValue(c, reopened))).toEqual(
+      fields.map(() => "Tuesday\n18:00")
+    );
+  });
   it("keeps executable templates restricted to the reviewed catalog", () => {
     expect(
       normalizeGraphic({

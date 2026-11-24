@@ -160,6 +160,8 @@ export interface EditorChatMessage {
   text: string;
   createdAt: string;
   requestId?: string;
+  /** Earliest explicit retry after a confirmed provider rejection. */
+  rateLimitRetryAt?: number;
   references?: EditorChatReference[];
   plan?: EditorChatResponse;
   status?:

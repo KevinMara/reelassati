@@ -9,6 +9,7 @@ import {
   isNativeTransitionKind,
   nativeTransitionId,
 } from "@contracts/native-transitions";
+import { nativeTransitionDefinitions } from "@contracts/native-transition-program";
 import { NativeTransitionPreview } from "./NativeTransitionPreview";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { Download, Upload } from "lucide-react";
@@ -79,6 +80,7 @@ function ShotTransitionControls({
   const ui = useUiText();
   const { workspace, updateWorkspace } = useWorkspace();
   const [personalName, setPersonalName] = useState("");
+  const [playingPreview, setPlayingPreview] = useState<string>();
   const [personalId, setPersonalId] = useState<string>();
   const [saving, setSaving] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
@@ -130,6 +132,9 @@ function ShotTransitionControls({
               <NativeTransitionPreview
                 id={nativeTransitionId(p.kind)}
                 seconds={p.duration}
+                playing={playingPreview === p.id}
+                onToggle={() => setPlayingPreview(current => current === p.id ? undefined : p.id)}
+                onEnd={() => setPlayingPreview(current => current === p.id ? undefined : current)}
               />
             ) : (
               <PresetPreview
@@ -355,9 +360,9 @@ function ShotTransitionControls({
                         ? ui(
                             "Reveals the next shot while both pictures stay fixed."
                           )
-                        : ui(
-                            "Pushes one shot into the next with eased motion."
-                          )}
+                        : kind.startsWith("native-push-")
+                          ? ui("Pushes one shot into the next with eased motion.")
+                          : ui(nativeTransitionDefinitions[nativeTransitionId(kind)].description)}
         </p>
       )}
       <label className="block text-xs">

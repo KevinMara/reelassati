@@ -1,3 +1,4 @@
+import { editorRateLimitRetryAt, manualEditorRetryRequest } from "../contracts/editor-errors";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
@@ -3040,6 +3041,34 @@ describe("authenticated paid editing chat route", () => {
         }),
       ])
     );
+  });
+  it("retries a confirmed 429 once on a new identity after the wait and replays the successful result", async () => {
+    const before = balance(), calls = providerCalls.length;
+    const original = { ...chat("route-rate-limit-retry"), mode: "ask" as const };
+    providerFailure = { status: 429, headers: { "Retry-After": "90" }, payload: { error: { code: 429 } } };
+    try {
+      const response = await request("/api/ai/editor-chat", original);
+      const body = await response.json();
+      expect(response.status).toBe(429);
+      expect(body).toMatchObject({ code: "provider_rate_limited", retryAfterSeconds: 90 });
+      expect(balance()).toBe(before);
+      providerFailure = undefined;
+      expect((await request("/api/ai/editor-chat", original)).status).toBe(429);
+      expect(providerCalls.length).toBe(calls + 1);
+      const deadline = editorRateLimitRetryAt({status:response.status, reason:body.code,
+        retryAfterSeconds:body.retryAfterSeconds},1000)!;
+      expect(() => manualEditorRetryRequest(original,deadline,deadline-1)).toThrow(/Wait/);
+      const replacement = manualEditorRetryRequest(original,deadline,deadline);
+      expect(replacement.requestId).not.toBe(original.requestId);
+      expect((await request("/api/ai/editor-chat",replacement)).status).toBe(200);
+      const replay = await request("/api/ai/editor-chat",manualEditorRetryRequest(original,deadline,deadline+1));
+      expect(replay.status).toBe(200);
+      expect(providerCalls.length).toBe(calls+2);
+      expect(balance()).toBe(before-5);
+      expect(manualEditorRetryRequest(original)).toBe(original);
+    } finally {
+      providerFailure = undefined;
+    }
   });
   it("a concurrent retry does not buy a second model call", async () => {
     let release!: () => void;

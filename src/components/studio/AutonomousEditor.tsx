@@ -29,6 +29,7 @@ import {
 } from "@/lib/autonomous-credit-estimate";
 import { activeEditorProjects, editorRunKey } from "@/lib/editor-run-lock";
 import { ConciseResponse } from "./ConciseResponse";
+import { useEditorRetryClock } from "./useEditorRetryClock";
 import { editPlanQualityAssets } from "@contracts/edit-plan-quality";
 import { buildEditPlanningContext } from "@contracts/edit-planning-context";
 import {
@@ -71,7 +72,7 @@ import {
   saveStyleExampleReview,
 } from "@/lib/style-example-preparation";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
-import { editorFailureMessage } from "@contracts/editor-errors";
+import { editorFailureMessage, editorRateLimitRetryAt } from "@contracts/editor-errors";
 import {
   eligibleAnalyzerOptimization,
   checkpointAnalyzerReport,
@@ -206,6 +207,15 @@ export function AutonomousEditor({
   const [status, setStatus] = useState("");
   const [finished, setFinished] = useState(false);
   const [failure, setFailure] = useState("");
+  const [localRetry, setLocalRetry] = useState<{ key: string; at: number }>();
+  const lastActivity = project.editorChat?.messages.slice().reverse().find(
+    message => message.activity?.kind === "auto-edit"
+  );
+  const retryAt = Math.max(
+    localRetry?.key === runKey ? localRetry.at : 0,
+    lastActivity?.status === "failed" ? lastActivity.rateLimitRetryAt ?? 0 : 0
+  );
+  const retryTime = useEditorRetryClock(retryAt);
   const [stage, setStage] = useState("");
   const preparationCache = useRef(createAutonomousPreparationCache());
   const [planCache] = useState(createAutonomousPlanCache);
@@ -301,7 +311,7 @@ export function AutonomousEditor({
     (!transcriptCost || capabilities.transcription);
 
   async function run(quoteOnly = false) {
-    if (matching || activeEditorProjects.has(runKey) || runController.current)
+    if (matching || activeEditorProjects.has(runKey) || runController.current || Date.now() < retryAt)
       return;
     // Validate before scope capture, paid preparation, or any provider request.
     if (!durationTarget) {
@@ -391,6 +401,7 @@ export function AutonomousEditor({
     };
     let receipts: CreditReceipt[] = [];
     let receiptsComplete = true;
+    let rateLimitRetryAt: number | undefined;
     const savedSteps: string[] = [];
     const saveActivity = async (
       text: string,
@@ -428,6 +439,7 @@ export function AutonomousEditor({
               role: "assistant" as const,
               text,
               status: state,
+              ...(state === "failed" && rateLimitRetryAt !== undefined ? { rateLimitRetryAt } : {}),
               createdAt: previous?.createdAt ?? new Date().toISOString(),
               activity: {
                 kind: "auto-edit" as const,
@@ -1152,8 +1164,10 @@ export function AutonomousEditor({
       if (!mounted.current || runController.current !== controller) return;
       const failureText = signal.aborted
         ? `Stopped. Provider work already submitted may still finish in your Library; no further steps will start. ${timelineSaveStarted ? "The timeline save had already started; review your project and use Undo if needed." : "Your original timeline is intact."}`
-        : ui(editorFailureMessage(e));
-      setFailure(failureText);
+        : editorFailureMessage(e);
+      rateLimitRetryAt = signal.aborted ? undefined : editorRateLimitRetryAt(e);
+      if (rateLimitRetryAt !== undefined) setLocalRetry({ key: runKey, at: rateLimitRetryAt });
+      setFailure(signal.aborted ? failureText : ui(failureText));
       await saveActivity(
         failureText,
         signal.aborted ? "stopped" : "failed"
@@ -1524,7 +1538,7 @@ export function AutonomousEditor({
                 <button
                   type="button"
                   disabled={
-                    busy || !ready || !project.clips.length || !durationTarget
+                    busy || !ready || !project.clips.length || !durationTarget || Boolean(retryTime)
                   }
                   onClick={() => void run(false)}
                   className="ai-magic flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium disabled:opacity-40"
@@ -1534,7 +1548,7 @@ export function AutonomousEditor({
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  {failure ? ui("Continue edit") : ui("Build my edit")}
+                  {retryTime ? ui("Retry") + " · " + retryTime : failure ? ui("Continue edit") : ui("Build my edit")}
                 </button>
                 <div className="flex items-center justify-end gap-3">
                   {quote && (
@@ -1548,7 +1562,7 @@ export function AutonomousEditor({
                   <button
                     type="button"
                     disabled={
-                      busy || !ready || !project.clips.length || !durationTarget
+                      busy || !ready || !project.clips.length || !durationTarget || Boolean(retryTime)
                     }
                     onClick={() => void run(true)}
                     title={`${ui("Estimating runs paid review and planning: up to {{credits}} credits. Completed preparation is reused.", { credits: estimatePreparationCost })}${unreviewedExamples.length ? ` ${ui("Style example review: {{credits}} credits.", { credits: styleExampleCost })}` : ""}`}

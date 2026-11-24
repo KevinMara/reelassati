@@ -6963,7 +6963,8 @@ async function handleAi(
     );
     const presetCatalog = editorPresetCatalog(
       personalStyles,
-      presetWorkspace.transitionPresets
+      presetWorkspace.transitionPresets,
+      stringValue(input.command)
     );
     const projectContext = {
       title: input.project.title,

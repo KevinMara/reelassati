@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Render transition previews</title>
+<button type="button">Render transition previews</button><p role="status">Ready</p><a hidden>Download rendered sheets</a>
+<script type="module">
+import { nativeTransitionDefinitions, nativeTransitionIds, nativeTransitionProgram } from "/contracts/native-transition-program.ts";
+import { isNativeMatteId } from "/contracts/native-motion-mattes.ts";
+import { NativeMatteReader } from "/src/lib/native-matte-reader.ts";
+import { createNativeFrameRenderer } from "/src/lib/native-frame-renderer.ts";
+const button = document.querySelector("button"), status = document.querySelector("p"), link = document.querySelector("a");
+const width = 240, height = 135, frames = 14;
+const inputs = ["outgoing", "incoming"].map((role, index) => {
+  const sample = new OffscreenCanvas(width, height), ctx = sample.getContext("2d");
+  ctx.fillStyle = index ? "#15333c" : "#30224e";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = index ? "#72d9c4" : "#b6a0ff";
+  ctx.beginPath(); ctx.arc(index ? 166 : 74, 67, 34, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.font = "600 14px sans-serif"; ctx.fillText(index ? "B" : "A", index ? 161 : 69, 72);
+  return {role, sample};
+});
+button.onclick = async () => {
+  button.disabled = true;
+  const canvas = new OffscreenCanvas(width, height), sheets = {};
+  const renderer = createNativeFrameRenderer(canvas, width, height);
+  try {
+    for (const id of nativeTransitionIds) {
+      status.textContent = nativeTransitionDefinitions[id].name;
+      const pictures = nativeTransitionDefinitions[id].inputOrder.map(role => inputs.find(p => p.role === role).sample);
+      const program = nativeTransitionProgram(id, frames, 30);
+      const reader = isNativeMatteId(id) ? new NativeMatteReader(id) : undefined;
+      const strip = document.createElement("canvas"); strip.width = width * frames; strip.height = height;
+      const ctx = strip.getContext("2d");
+      try {
+        for (let i = 0; i < frames; i++) {
+          renderer.render(program, pictures, i, reader ? await reader.frame(i / (frames - 1)) : undefined);
+          ctx.drawImage(canvas, i * width, 0);
+        }
+        sheets[id] = strip.toDataURL("image/png").split(",")[1];
+      } finally { reader?.close(); }
+    }
+    if (link.href.startsWith("blob:")) URL.revokeObjectURL(link.href);
+    link.href = URL.createObjectURL(new Blob([JSON.stringify(sheets)], {type:"application/json"}));
+    link.download = "native-transition-previews.json"; link.hidden = false;
+    status.textContent = Object.keys(sheets).length + " transition sheets rendered";
+  } catch (e) { status.textContent = String(e); }
+  finally { renderer.dispose(); button.disabled = false; }
+};
+</script></html>

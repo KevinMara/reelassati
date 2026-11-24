@@ -48,3 +48,57 @@ test("rejects image cycles, ambiguous source pins and invalid clocks", () => {
     /Duplicate/
   );
 });
+
+test("merge sizing transforms only its foreground before alpha compositing", () => {
+  const program = compileFusionFrameProgram(
+    parseFusionSetting(
+      source(
+        "D=Merge{Inputs={Center=Input{Value={.75,.3}},Size=Input{Value=.5},Angle=Input{Value=90},FlipHoriz=Input{Value=1},Blend=Input{Value=.8}}}"
+      )
+    ),
+    { frames: 2 }
+  );
+  assert.deepEqual(program.nodes, [
+    {
+      id: "node-0",
+      kind: "transform",
+      input: "input-0",
+      samples: Array.from({ length: 2 }, () => ({
+        center: [0.75, 0.3],
+        pivot: [0.5, 0.5],
+        scaleX: -0.5,
+        scaleY: 0.5,
+        angle: 90,
+        edges: 0,
+        motionBlur: 0,
+        quality: 2,
+        shutterAngle: 180,
+      })),
+    },
+    {
+      id: "node-1",
+      kind: "over",
+      a: "input-1",
+      b: "node-0",
+      samples: [{ mix: 0.8 }, { mix: 0.8 }],
+    },
+  ]);
+  assert.equal(program.output, "node-1");
+});
+
+test("merge sizing does not hide unsupported modes, masks or negative sizes", () => {
+  for (const extra of [
+    'Operator=Input{Value=FuID{"In"}}',
+    'EffectMask=Input{SourceOp="Mask",Source="Output"}',
+    "Size=Input{Value=-1}",
+    "FlipHoriz=Input{Value=.5}",
+  ])
+    assert.throws(() =>
+      compileFusionFrameProgram(
+        parseFusionSetting(
+          source(`D=Merge{Inputs={Center=Input{Value={.5,.5}},${extra}}}`)
+        ),
+        { frames: 2 }
+      )
+    );
+});
