@@ -17258,7 +17258,8 @@
         "fontSize": 73,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert title"
       },
       {
         "key": "text-2",
@@ -17272,7 +17273,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-3",
@@ -17286,7 +17288,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 2
+        "textSlot": 2,
+        "displayLabel": "Right button"
       },
       {
         "key": "text-4",
@@ -17300,7 +17303,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 3
+        "textSlot": 3,
+        "displayLabel": "Left button"
       }
     ]
   },
@@ -17639,7 +17643,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-2",
@@ -17653,7 +17658,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Button label"
       }
     ]
   },
@@ -18087,7 +18093,8 @@
         "fontSize": 73,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert title"
       },
       {
         "key": "text-2",
@@ -18101,7 +18108,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-3",
@@ -18115,7 +18123,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 2
+        "textSlot": 2,
+        "displayLabel": "Button label"
       }
     ]
   },
@@ -18564,7 +18573,8 @@
         "fontSize": 73,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert title"
       },
       {
         "key": "text-2",
@@ -18578,7 +18588,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-3",
@@ -18592,7 +18603,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 2
+        "textSlot": 2,
+        "displayLabel": "Right button"
       },
       {
         "key": "text-4",
@@ -18606,7 +18618,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 3
+        "textSlot": 3,
+        "displayLabel": "Left button"
       }
     ]
   },
@@ -19031,7 +19044,8 @@
         "fontSize": 73,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert title"
       },
       {
         "key": "text-2",
@@ -19045,7 +19059,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-3",
@@ -19059,7 +19074,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 2
+        "textSlot": 2,
+        "displayLabel": "Right button"
       },
       {
         "key": "text-4",
@@ -19073,7 +19089,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 3
+        "textSlot": 3,
+        "displayLabel": "Left button"
       }
     ]
   },
@@ -19414,7 +19431,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-2",
@@ -19428,7 +19446,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Button label"
       }
     ]
   },
@@ -19830,7 +19849,8 @@
         "fontSize": 73,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert title"
       },
       {
         "key": "text-2",
@@ -19844,7 +19864,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-3",
@@ -19858,7 +19879,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 2
+        "textSlot": 2,
+        "displayLabel": "Button label"
       }
     ]
   },
@@ -20462,7 +20484,8 @@
         "fontSize": 73,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert title"
       },
       {
         "key": "text-2",
@@ -20476,7 +20499,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-3",
@@ -20490,7 +20514,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 2
+        "textSlot": 2,
+        "displayLabel": "Top button"
       },
       {
         "key": "text-4",
@@ -20504,7 +20529,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 3
+        "textSlot": 3,
+        "displayLabel": "Middle button"
       },
       {
         "key": "text-5",
@@ -20518,7 +20544,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 4
+        "textSlot": 4,
+        "displayLabel": "Bottom button"
       }
     ]
   },
@@ -21122,7 +21149,8 @@
         "fontSize": 73,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert title"
       },
       {
         "key": "text-2",
@@ -21136,7 +21164,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-3",
@@ -21150,7 +21179,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 2
+        "textSlot": 2,
+        "displayLabel": "Top button"
       },
       {
         "key": "text-4",
@@ -21164,7 +21194,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 3
+        "textSlot": 3,
+        "displayLabel": "Middle button"
       },
       {
         "key": "text-5",
@@ -21178,7 +21209,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 4
+        "textSlot": 4,
+        "displayLabel": "Bottom button"
       }
     ]
   },
@@ -21726,7 +21758,8 @@
         "fontSize": 73,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 0
+        "textSlot": 0,
+        "displayLabel": "Alert title"
       },
       {
         "key": "text-2",
@@ -21740,7 +21773,8 @@
         "fontSize": 49,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 1
+        "textSlot": 1,
+        "displayLabel": "Alert message"
       },
       {
         "key": "text-3",
@@ -21754,7 +21788,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 2
+        "textSlot": 2,
+        "displayLabel": "Top button"
       },
       {
         "key": "text-4",
@@ -21768,7 +21803,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 3
+        "textSlot": 3,
+        "displayLabel": "Middle button"
       },
       {
         "key": "text-5",
@@ -21782,7 +21818,8 @@
         "fontSize": 54.75621,
         "justify": "Center",
         "allCaps": false,
-        "textSlot": 4
+        "textSlot": 4,
+        "displayLabel": "Bottom button"
       }
     ]
   }

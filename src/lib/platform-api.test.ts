@@ -7,7 +7,7 @@ import {
 } from "./platform-api";
 import { supabase } from "@/lib/supabase/client";
 import { ANALYZER_STREAM_TYPE } from "@contracts/analyzer-transport";
-import { editorFailureMessage } from "@contracts/editor-errors";
+import { editorChatRetryAt, editorFailureMessage, manualEditorRetryRequest } from "@contracts/editor-errors";
 import { publicProviderFailure } from "../../sites/provider-failure";
 const planCapabilities = () =>
   Response.json({
@@ -37,6 +37,29 @@ afterEach(() => {
 });
 
 describe("platform API transport", () => {
+  it.each(["released", "settled", "reserved", "absent"])(
+    "chooses a fresh manual retry only for a released chat failure (%s)",
+    async status => {
+      const request = {
+        projectId: "project", requestId: "original-test-plan", prompt: "Tighten this cut",
+        mode: "ask" as const, executionMode: "plan" as const, maxCredits: 5,
+      };
+      const fetchMock = vi.fn().mockResolvedValue(Response.json({
+        error: "Planning failed", ...(status === "absent" ? {} : {
+          creditReceipt: {id:"ledger-test", credits:0, status},
+        }),
+      }, {status:422}));
+      vi.stubGlobal("fetch", fetchMock);
+      const failure = await platformApi.editorChat(request).catch(e => e);
+      expect(failure).toBeInstanceOf(PlatformApiError);
+      const retryAt = editorChatRetryAt(failure, 1000);
+      expect(retryAt).toBe(status === "released" ? 1000 : undefined);
+      const retry = manualEditorRetryRequest(request, retryAt, 1000);
+      expect(retry.requestId === request.requestId).toBe(status !== "released");
+      expect(manualEditorRetryRequest(request, retryAt, 1001).requestId).toBe(retry.requestId);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
   it.each([false, true])(
     "preserves the service billing failure through HTTP/foreground transport (%s), without retrying",
     async streamed => {

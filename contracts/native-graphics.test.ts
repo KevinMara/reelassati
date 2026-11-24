@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { normalizeGraphic } from "./motion-graphics";
 import {
   NATIVE_GRAPHIC_TEMPLATES,
+  nativeGraphicTemplate,
   nativeGraphicSourceTime,
   nativeTextValue,
 } from "./native-graphics";
@@ -42,6 +43,10 @@ describe("editable native graphic contract", () => {
   });
   it("keeps all four phone alert fields editable and rejects conflicting assignments", () => {
     const preset = GRAPHIC_PRESETS.find(p => p.name === "Phone alert · 06")!;
+    const fields = nativeGraphicTemplate(preset.id)!.controls.filter(c => c.type === "text");
+    expect(fields.map(c => [c.key,c.displayLabel])).toEqual([
+      ["text-1","Alert title"],["text-2","Alert message"],["text-3","Right button"],["text-4","Left button"]
+    ]);
     const values = {"text-1":"Promemoria","text-2":"Rivedi il video","text-3":"Chiudi","text-4":"Salva"};
     const saved = normalizeGraphic(instantiateGraphicPreset(preset.graphic, {native:{values}}))!;
     expect(saved).toMatchObject({text:"Promemoria",secondaryText:"Rivedi il video",native:{values:{"text-3":"Chiudi","text-4":"Salva"}}});

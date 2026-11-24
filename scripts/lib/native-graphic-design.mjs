@@ -1,3 +1,21 @@
+/** Positions measured by removing each original text layer and comparing
+ * settled frames. The two-button source stores its right button first. */
+export function labelPhoneAlertFields(name, controls) {
+  const variant = /^Phone alert · (\d{2})$/.exec(name)?.[1];
+  if (!variant) return;
+  const layouts = [
+    [["01", "02"], ["Alert title", "Alert message", "Button label"]],
+    [["03", "04"], ["Alert message", "Button label"]],
+    [["05", "06", "07"], ["Alert title", "Alert message", "Right button", "Left button"]],
+    [["08", "09", "10"], ["Alert title", "Alert message", "Top button", "Middle button", "Bottom button"]],
+  ];
+  const labels = layouts.find(([variants]) => variants.includes(variant))?.[1];
+  const fields = controls.filter(c => c.type === "text");
+  if (!labels || fields.length !== labels.length || fields.some((c, i) => c.key !== `text-${i + 1}` || c.textSlot !== i))
+    throw Error("Unreviewed phone alert layout: " + name);
+  fields.forEach((c, i) => { c.displayLabel = labels[i]; });
+}
+
 /** Reviewed source layouts. These are structural observations, not a claim
  * that any title belongs on footage whose protected regions are unknown. */
 export function nativeGraphicDesign(name, platform) {

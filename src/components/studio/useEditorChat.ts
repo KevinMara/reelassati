@@ -4,7 +4,7 @@ import {
 } from "@/lib/shared-media-catalog";
 import { preflightEditColorLuts } from "@/lib/catalog-color-lut-preflight";
 import { mergeCreditReceipt } from "@contracts/credit-receipt";
-import { editorRateLimitRetryAt, manualEditorRetryRequest } from "@contracts/editor-errors";
+import { editorChatRetryAt, manualEditorRetryRequest } from "@contracts/editor-errors";
 import { nextReelAddition, type ReelAddition } from "@/lib/reel-additions";
 import { timelineFingerprint } from "@/lib/autonomous-live-publish";
 import { translateUi } from "@/lib/i18n/ui";
@@ -1447,7 +1447,7 @@ export function useEditorChat(
         ...m,
         text: stopped ? "Edit stopped. Your instructions are saved." : detail,
         status: stopped ? "stopped" : "failed",
-        rateLimitRetryAt: stopped ? undefined : editorRateLimitRetryAt(cause),
+        rateLimitRetryAt: stopped ? undefined : editorChatRetryAt(cause),
         creditReceiptsComplete: stopped ? false : m.creditReceiptsComplete,
       })).catch(() => undefined);
     } finally {
@@ -1713,7 +1713,7 @@ export function useEditorChat(
           ...item,
           status: stopped ? "stopped" : "failed",
           text: stopped ? "Edit stopped. Your instructions are saved." : detail,
-          rateLimitRetryAt: stopped ? undefined : editorRateLimitRetryAt(cause),
+          rateLimitRetryAt: stopped ? undefined : editorChatRetryAt(cause),
         })).catch(() => undefined);
         return;
       } finally {

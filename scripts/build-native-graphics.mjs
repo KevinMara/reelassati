@@ -7,7 +7,7 @@ import {
   adaptAdobeProject,
   adobeMainComposition,
 } from "./lib/native-adobe-adapter.mjs";
-import { nativeGraphicDesign } from "./lib/native-graphic-design.mjs";
+import { labelPhoneAlertFields, nativeGraphicDesign } from "./lib/native-graphic-design.mjs";
 import { restorePhoneFills } from "./lib/native-adobe-fill.mjs";
 import {
   controlOnlyAdobeReport,
@@ -477,6 +477,7 @@ for (const row of selected) {
       : social
         ? `${social[2]} ${liveTexts.length > 1 ? "profile" : "handle"} · ${social[1] === "L" ? "left" : "right"}`
         : `${notification[1] === "Phone" ? "Phone alert" : notification[1] === "Others" ? "Reminder card" : "Message card"} · ${notification[2]}`;
+    labelPhoneAlertFields(name, liveControls);
     const description = title
       ? "Editable bold kinetic title with authored text animation and a transparent background. Keep the copy short."
       : social

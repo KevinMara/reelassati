@@ -1,4 +1,4 @@
-import { editorRateLimitRetryAt, manualEditorRetryRequest } from "../contracts/editor-errors";
+import { editorChatRetryAt, editorRateLimitRetryAt, manualEditorRetryRequest } from "../contracts/editor-errors";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
@@ -3066,6 +3066,30 @@ describe("authenticated paid editing chat route", () => {
       expect(providerCalls.length).toBe(calls+2);
       expect(balance()).toBe(before-5);
       expect(manualEditorRetryRequest(original)).toBe(original);
+    } finally {
+      providerFailure = undefined;
+    }
+  });
+  it("recovers a released billing failure after service restoration without double charging the user", async () => {
+    const before = balance(), calls = providerCalls.length;
+    const original = { ...chat("route-released-billing-retry"), mode: "ask" as const };
+    providerFailure = { status: 402, headers: {}, payload: { error: { code: 402 } } };
+    try {
+      const failed = await request("/api/ai/editor-chat", original);
+      const body = await failed.json();
+      expect(failed.status).toBe(503);
+      expect(body).toMatchObject({reason:"provider_billing_unavailable",creditReceipt:{status:"released",credits:0}});
+      expect(balance()).toBe(before);
+      providerFailure = undefined;
+      expect((await request("/api/ai/editor-chat",original)).status).toBe(503);
+      expect(providerCalls.length).toBe(calls+1);
+      const at = editorChatRetryAt({releasedEditorPlan:body.creditReceipt.status === "released"},1000);
+      const retry = manualEditorRetryRequest(original,at,1000);
+      expect(retry.requestId).not.toBe(original.requestId);
+      expect((await request("/api/ai/editor-chat",retry)).status).toBe(200);
+      expect((await request("/api/ai/editor-chat",manualEditorRetryRequest(original,at,1001))).status).toBe(200);
+      expect(balance()).toBe(before-5);
+      expect(providerCalls.length).toBe(calls+2);
     } finally {
       providerFailure = undefined;
     }

@@ -21,7 +21,16 @@ export function editorRateLimitRetryAt(error: unknown, now = Date.now()) {
   );
 }
 
-/** A finished 429 is replayed forever under its original ID. Repeated clicks
+/** A released planning failure is also cached by the server. When the response
+ * was lost, keep the original identity so a manual recovery retrieves its result. */
+export function editorChatRetryAt(error: unknown, now = Date.now()) {
+  const rateLimit = editorRateLimitRetryAt(error, now);
+  if (rateLimit !== undefined) return rateLimit;
+  if (error && typeof error === "object" && "releasedEditorPlan" in error && error.releasedEditorPlan === true)
+    return now;
+}
+
+/** A finished rejection is replayed forever under its original ID. Repeated clicks
  * on this particular rejected attempt must still claim a single replacement. */
 export function manualEditorRetryRequest(
   request: EditorChatRequest,

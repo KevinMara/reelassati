@@ -86,6 +86,37 @@ const expandedRows: Record<string, string> = {
   th: "ชื่อเรื่องสามบรรทัดแบบไล่ลำดับ|การ์ดข้อความ|การเตือนความจำ|การแจ้งเตือนบนโทรศัพท์|การ์ดแจ้งเตือนที่แก้ไขได้|กรอกข้อความให้ครบทุกช่อง",
 };
 
+const phoneLabels = ["Alert title", "Alert message", "Button label", "Right button", "Left button", "Top button", "Middle button", "Bottom button"];
+const phoneFields: Record<string, string> = {
+  it: "Titolo dell’avviso|Messaggio dell’avviso|Testo del pulsante|Pulsante destro|Pulsante sinistro|Pulsante superiore|Pulsante centrale|Pulsante inferiore",
+  es: "Título del aviso|Mensaje del aviso|Texto del botón|Botón derecho|Botón izquierdo|Botón superior|Botón central|Botón inferior",
+  fr: "Titre de l’alerte|Message de l’alerte|Libellé du bouton|Bouton de droite|Bouton de gauche|Bouton du haut|Bouton du milieu|Bouton du bas",
+  de: "Titel der Meldung|Meldungstext|Beschriftung der Schaltfläche|Rechte Schaltfläche|Linke Schaltfläche|Obere Schaltfläche|Mittlere Schaltfläche|Untere Schaltfläche",
+  pt: "Título do alerta|Mensagem do alerta|Texto do botão|Botão direito|Botão esquerdo|Botão superior|Botão central|Botão inferior",
+  nl: "Meldingstitel|Meldingstekst|Knoptekst|Rechterknop|Linkerknop|Bovenste knop|Middelste knop|Onderste knop",
+  pl: "Tytuł komunikatu|Treść komunikatu|Etykieta przycisku|Prawy przycisk|Lewy przycisk|Górny przycisk|Środkowy przycisk|Dolny przycisk",
+  ro: "Titlul alertei|Mesajul alertei|Textul butonului|Butonul din dreapta|Butonul din stânga|Butonul de sus|Butonul din mijloc|Butonul de jos",
+  tr: "Uyarı başlığı|Uyarı mesajı|Düğme metni|Sağ düğme|Sol düğme|Üst düğme|Orta düğme|Alt düğme",
+  uk: "Заголовок сповіщення|Текст сповіщення|Напис на кнопці|Права кнопка|Ліва кнопка|Верхня кнопка|Середня кнопка|Нижня кнопка",
+  ru: "Заголовок уведомления|Текст уведомления|Надпись на кнопке|Правая кнопка|Левая кнопка|Верхняя кнопка|Средняя кнопка|Нижняя кнопка",
+  ar: "عنوان التنبيه|نص التنبيه|تسمية الزر|الزر الأيمن|الزر الأيسر|الزر العلوي|الزر الأوسط|الزر السفلي",
+  hi: "अलर्ट का शीर्षक|अलर्ट संदेश|बटन का टेक्स्ट|दायाँ बटन|बायाँ बटन|ऊपर का बटन|बीच का बटन|नीचे का बटन",
+  ja: "アラートのタイトル|アラートの本文|ボタンのラベル|右のボタン|左のボタン|上のボタン|中央のボタン|下のボタン",
+  ko: "알림 제목|알림 메시지|버튼 문구|오른쪽 버튼|왼쪽 버튼|위쪽 버튼|가운데 버튼|아래쪽 버튼",
+  zh: "提醒标题|提醒正文|按钮文字|右侧按钮|左侧按钮|顶部按钮|中间按钮|底部按钮",
+  vi: "Tiêu đề thông báo|Nội dung thông báo|Nhãn nút|Nút bên phải|Nút bên trái|Nút trên|Nút giữa|Nút dưới",
+  da: "Beskedens titel|Beskedtekst|Knaptekst|Højre knap|Venstre knap|Øverste knap|Midterste knap|Nederste knap",
+  sv: "Aviseringens titel|Aviseringstext|Knapptext|Höger knapp|Vänster knapp|Översta knappen|Mittenknappen|Nedersta knappen",
+  no: "Varseltittel|Varseltekst|Knappetekst|Høyre knapp|Venstre knapp|Øverste knapp|Midterste knapp|Nederste knapp",
+  fi: "Ilmoituksen otsikko|Ilmoitusteksti|Painikkeen teksti|Oikea painike|Vasen painike|Ylin painike|Keskimmäinen painike|Alin painike",
+  cs: "Nadpis upozornění|Text upozornění|Popisek tlačítka|Pravé tlačítko|Levé tlačítko|Horní tlačítko|Prostřední tlačítko|Dolní tlačítko",
+  hu: "Értesítés címe|Értesítés szövege|Gombfelirat|Jobb oldali gomb|Bal oldali gomb|Felső gomb|Középső gomb|Alsó gomb",
+  el: "Τίτλος ειδοποίησης|Κείμενο ειδοποίησης|Κείμενο κουμπιού|Δεξί κουμπί|Αριστερό κουμπί|Επάνω κουμπί|Μεσαίο κουμπί|Κάτω κουμπί",
+  he: "כותרת ההתראה|תוכן ההתראה|תווית הכפתור|הכפתור הימני|הכפתור השמאלי|הכפתור העליון|הכפתור האמצעי|הכפתור התחתון",
+  id: "Judul pemberitahuan|Isi pemberitahuan|Label tombol|Tombol kanan|Tombol kiri|Tombol atas|Tombol tengah|Tombol bawah",
+  th: "ชื่อการแจ้งเตือน|ข้อความแจ้งเตือน|ข้อความบนปุ่ม|ปุ่มขวา|ปุ่มซ้าย|ปุ่มบน|ปุ่มกลาง|ปุ่มล่าง",
+};
+
 export function nativeGraphicsTranslations(
   code: string,
   catalog: Record<string, string>
@@ -99,6 +130,9 @@ export function nativeGraphicsTranslations(
   );
   const [cascade, message, reminder, phone, description, missing] =
     expandedRows[code].split("|");
+  const fields = phoneFields[code].split("|");
+  if (fields.length !== phoneLabels.length) throw Error("Incomplete alert labels: " + code);
+  phoneLabels.forEach((key, i) => { result[key] = fields[i]; });
   result["Three-line cascade"] = cascade;
   result["Editable notification card."] = description;
   result["Complete every text field for this animation."] = missing;

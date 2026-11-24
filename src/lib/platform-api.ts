@@ -38,6 +38,7 @@ import { platformApiUrl } from "@/lib/runtime";
 import { DIRECT_UPLOAD_MAX_BYTES, UPLOAD_PART_BYTES } from "@contracts/uploads";
 
 interface ApiErrorBody {
+  creditReceipt?: unknown;
   code?: unknown;
   retryAfterSeconds?: unknown;
   error?: string;
@@ -49,6 +50,7 @@ interface ApiErrorBody {
 }
 
 export class PlatformApiError extends Error {
+  releasedEditorPlan = false;
   retryAfterSeconds?: number;
   status: number;
   missing: string[];
@@ -229,7 +231,7 @@ async function requestJson<T>(
     }
     if (!response.ok) {
       const body = (parsed ?? {}) as ApiErrorBody;
-      throw new PlatformApiError(
+      const failure = new PlatformApiError(
         body.error || body.message || `Request failed (${response.status})`,
         response.status,
         body.missing,
@@ -241,6 +243,8 @@ async function requestJson<T>(
           ? "provider_rate_limited"
           : body.reason === "provider_billing_unavailable" &&
           response.status === 503
+          ? body.reason
+          : path === "/api/ai/edit-plan" && response.status === 422 && body.reason === "edit_plan_invalid"
           ? body.reason
           : path === "/api/ai/analyze" &&
               response.status === 422 &&
@@ -254,6 +258,11 @@ async function requestJson<T>(
           body.retryAfterSeconds >= 0 && body.retryAfterSeconds <= 86400
           ? body.retryAfterSeconds : undefined
       );
+      failure.releasedEditorPlan =
+        path === "/api/ai/editor-chat" &&
+        [422, 502, 503, 504].includes(response.status) &&
+        readCreditReceipt(body.creditReceipt)?.status === "released";
+      throw failure;
     }
 
     if (!isJson || parsed === undefined) {
