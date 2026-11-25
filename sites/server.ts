@@ -594,7 +594,38 @@ const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const DEFAULT_ANALYSIS_MODEL = "moonshotai/kimi-k3";
 const KIMI_CODE_BASE = "https://api.kimi.com/coding/v1";
 const ZERNIO_BASE = "https://zernio.com/api/v1";
-const MAX_WORKSPACE_BYTES = 2_000_000;
+const MAX_JSON_BODY_BYTES = 2_000_000;
+const MAX_WORKSPACE_BYTES = 16_000_000;
+const MAX_WORKSPACE_ROW_BYTES = 1_900_000;
+
+function workspaceTooLarge() {
+  return new Response(JSON.stringify({ error: "Workspace data exceeds the available snapshot storage." }), {
+    status: 413, headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function encodeWorkspaceDocument(workspace: WorkspaceDocument): Promise<string> {
+  const json = JSON.stringify(workspace);
+  const byteLength = new TextEncoder().encode(json).byteLength;
+  if (byteLength > MAX_WORKSPACE_BYTES) throw workspaceTooLarge();
+  if (byteLength <= MAX_WORKSPACE_ROW_BYTES) return json;
+  // Brand selection and legacy billing read these two fields directly in D1.
+  const { profile, brandKit, ...body } = workspace;
+  const stream = new Blob([JSON.stringify(body)]).stream().pipeThrough(new CompressionStream("gzip"));
+  const payload = arrayBufferToBase64(await new Response(stream).arrayBuffer());
+  const stored = JSON.stringify({ storageFormat: "workspace-gzip-v1", profile, brandKit, payload });
+  if (new TextEncoder().encode(stored).byteLength > MAX_WORKSPACE_ROW_BYTES) throw workspaceTooLarge();
+  return stored;
+}
+
+async function decodeWorkspaceDocument(document: string) {
+  const stored = JSON.parse(document);
+  if (stored?.storageFormat !== "workspace-gzip-v1") return stored;
+  const bytes = Uint8Array.from(atob(stored.payload), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  const body = JSON.parse(await new Response(stream).text());
+  return { ...body, profile: stored.profile, brandKit: stored.brandKit };
+}
 const MAX_PROVENANCE_UPLOAD_BYTES = 64 * 1024 * 1024;
 const REFERRAL_REWARD_CREDITS = 500;
 const REFERRAL_REWARD_CENTS = 500;
@@ -2203,7 +2234,7 @@ async function getWorkspace(
   let workspace: WorkspaceDocument | null = null;
   if (row?.document) {
     try {
-      workspace = normalizeWorkspace(JSON.parse(row.document), user);
+      workspace = normalizeWorkspace(await decodeWorkspaceDocument(row.document), user);
       workspace.revision = Number.isSafeInteger(row.revision)
         ? Math.max(0, row.revision)
         : 0;
@@ -3259,7 +3290,7 @@ async function saveWorkspace(
     return reconcileWorkspaceProvenance(
       env,
       user,
-      normalizeWorkspace(JSON.parse(current.document), user),
+      normalizeWorkspace(await decodeWorkspaceDocument(current.document), user),
       {
         resealScriptEdits: false,
       }
@@ -3296,13 +3327,7 @@ async function saveWorkspace(
     JSON.stringify(workspace)
   ).byteLength;
   if (unsealedBytes > MAX_WORKSPACE_BYTES) {
-    throw new Response(
-      JSON.stringify({ error: "Workspace data exceeds the safe 2 MB limit" }),
-      {
-        status: 413,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    throw workspaceTooLarge();
   }
 
   const provisionalRecordIds: string[] = [];
@@ -3312,16 +3337,7 @@ async function saveWorkspace(
       createdProvenanceRecordIds: provisionalRecordIds,
     });
     workspace.updatedAt = new Date().toISOString();
-    const serialized = JSON.stringify(workspace);
-    if (new TextEncoder().encode(serialized).byteLength > MAX_WORKSPACE_BYTES) {
-      throw new Response(
-        JSON.stringify({ error: "Workspace data exceeds the safe 2 MB limit" }),
-        {
-          status: 413,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
+    const serialized = await encodeWorkspaceDocument(workspace);
 
     const result = current
       ? await env.DB.prepare(
@@ -3497,8 +3513,8 @@ async function readBoundedBody(
   return bytes;
 }
 
-async function parseJsonBody<T>(request: Request): Promise<T> {
-  const bytes = await readBoundedBody(request, MAX_WORKSPACE_BYTES);
+async function parseJsonBody<T>(request: Request, maximumBytes = MAX_JSON_BODY_BYTES): Promise<T> {
+  const bytes = await readBoundedBody(request, maximumBytes);
   try {
     return JSON.parse(new TextDecoder().decode(bytes)) as T;
   } catch {
@@ -10267,7 +10283,7 @@ async function handleVideoWebhook(
     return errorResponse("Webhook unavailable", 404);
   }
   const rawBody = new TextDecoder().decode(
-    await readBoundedBody(request, MAX_WORKSPACE_BYTES)
+    await readBoundedBody(request, MAX_JSON_BODY_BYTES)
   );
   if (
     env.OPENROUTER_WEBHOOK_SECRET &&
@@ -12021,7 +12037,7 @@ async function handleReferralBillingWebhook(
   }
 
   const rawBody = new TextDecoder().decode(
-    await readBoundedBody(request, MAX_WORKSPACE_BYTES)
+    await readBoundedBody(request, MAX_JSON_BODY_BYTES)
   );
   const signatureValid = await verifyReferralBillingWebhook(
     rawBody,
@@ -12449,7 +12465,7 @@ async function handlePublicProvenance(
       embeddedToken = true;
       fingerprint = await sha256Hex(embeddedMark.unmarkedBytes);
     } else if (
-      file.size <= MAX_WORKSPACE_BYTES &&
+      file.size <= MAX_JSON_BODY_BYTES &&
       (file.type.startsWith("text/") ||
         file.type === "application/json" ||
         /\.(?:txt|md|json|csv|srt|vtt)$/i.test(file.name))
@@ -15006,7 +15022,7 @@ async function handleApi(
       const body = await parseJsonBody<{
         workspace?: unknown;
         writeId?: string;
-      }>(request);
+      }>(request, MAX_WORKSPACE_BYTES + 1024);
       if (
         body.writeId !== undefined &&
         (typeof body.writeId !== "string" ||

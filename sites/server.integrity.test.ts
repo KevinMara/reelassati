@@ -567,6 +567,28 @@ const signingKey = "test-only-provenance-signing-key-32-characters";
 const rawMp3 = new Uint8Array([0xff, 0xfb, 0x90, 0x64, 1, 2, 3, 4]);
 
 describe("stock persistence and strict local speech", () => {
+  it("saves, replays and reopens a multibyte workspace larger than a D1 row", async () => {
+    const DB = createIntegrityD1(), env = testEnv(DB, createMemoryBucket());
+    const url = "https://studio.example/api/workspace";
+    const workspace = {
+      ...createEmptyWorkspace("creator@example.com", "Creator"),
+      activity: Array.from({ length: 1000 }, (_, i) => ({
+        id: `edit-${i}`, title: `🥁 café ${i} `.repeat(220),
+      })),
+    };
+    const body = JSON.stringify({ workspace, writeId: "large-workspace-save-001" });
+    expect(new TextEncoder().encode(body).byteLength).toBeGreaterThan(2_000_000);
+    const put = () => worker.fetch(new Request(url, { method: "PUT", headers: authHeaders, body }), env as never);
+    const first = await put();
+    expect(first.status).toBe(200);
+    expect(JSON.parse(String(DB.state.workspaces[0].document)).storageFormat).toBe("workspace-gzip-v1");
+    const replay = await put();
+    expect(replay.status).toBe(200);
+    const reopened = await worker.fetch(new Request(url, { headers: authHeaders }), env as never);
+    const result = await reopened.json() as { workspace: typeof workspace };
+    expect(result.workspace.activity).toEqual(workspace.activity);
+    expect(result.workspace.revision).toBe(0);
+  });
   const mockStock = () => {
     globalThis.fetch = async input => {
       const url = String(input);
@@ -1573,7 +1595,7 @@ describe("provenance integrity boundaries", () => {
       }
       // The new fields must preserve the existing whole-document size limit.
       const oversized = structuredClone(reloaded);
-      oversized.projects[0].referenceStyleBrief = "x".repeat(2_100_000);
+      oversized.projects[0].referenceStyleBrief = "x".repeat(16_100_000);
       const rejected = await worker.fetch(
         new Request("https://studio.example/api/workspace", {
           method: "PUT",
@@ -1696,7 +1718,7 @@ describe("provenance integrity boundaries", () => {
               {
                 id: "oversized",
                 type: "script",
-                label: "x".repeat(2_100_000),
+                label: "x".repeat(16_100_000),
                 detail: "oversized",
                 createdAt: "2026-08-04T00:00:00.000Z",
               },

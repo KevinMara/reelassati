@@ -5,6 +5,18 @@ import {
   nativeTransitionIds,
 } from "@contracts/native-transition-program";
 describe("authored native transition clocks", () => {
+  it.each(["zoom-out-return", "deep-zoom-dissolve"] as const)("retains the original shot order and distinct zoom curve for %s", id => {
+    const program = nativeTransitionProgram(id, 61, 30);
+    const [outgoing, incoming, dissolve] = program.nodes;
+    if (outgoing.kind !== "transform" || incoming.kind !== "transform" || dissolve.kind !== "mix")
+      throw Error("Expected two independently transformed shots and a dissolve");
+    expect(nativeTransitionDefinitions[id].inputOrder).toEqual(["incoming", "outgoing"]);
+    expect([outgoing.input, incoming.input, dissolve.a, dissolve.b]).toEqual(["input-1", "input-0", outgoing.id, incoming.id]);
+    expect([dissolve.samples[0].mix, dissolve.samples[60].mix]).toEqual([0, 1]);
+    expect(outgoing.samples[0].scaleX).toBeCloseTo(1, 3);
+    expect(incoming.samples[60].scaleX).toBeCloseTo(1, 2);
+    expect(outgoing.samples[30].scaleX).toBeCloseTo(id === "deep-zoom-dissolve" ? 2 : 0.9278222872, 7);
+  });
   it("keeps the two bottom-corner exchanges horizontally reflected throughout the shutter exposure", () => {
     const right = nativeTransitionProgram("drag-from-bottom-right", 25, 24);
     const left = nativeTransitionProgram("drag-from-bottom-left", 25, 24);

@@ -11,6 +11,8 @@ import {
 } from "./autonomous-execution";
 import { normalizeGraphic } from "./motion-graphics";
 import { graphicLayoutSpace } from "./graphic-layout-space";
+import { nativeGraphicTextProblems } from "./native-graphics";
+import { automaticGraphicIntent } from "./automatic-graphic-protection";
 
 export interface EditPlanQualityReview {
   repairedOperationIds: string[];
@@ -95,7 +97,8 @@ function repositionGraphic(operation: EditOperation, x: number, y: number): Edit
 
 /** Only unanchored text cards with delegated placement may move.
  * Every candidate uses the full renderer-aware source and motion checks. Text,
- * size, duration, source timing and every unrelated operation stay untouched. */
+ * duration, source timing and every unrelated operation stay untouched. A
+ * requested native card may grow to its minimum legible size when permitted. */
 export function finalizeEditPlanGraphics(
   project: EditProject,
   changes: EditOperation[],
@@ -126,11 +129,25 @@ export function finalizeEditPlanGraphics(
       operation.parameters?.graphicMode === "update" ||
       !graphic ||
       !["text", "callout"].includes(graphic.kind) ||
-      decision.issues.some(
-        issue => !["source-overlap", "competing-text"].includes(issue.reason)
-      )
+      decision.issues.some(issue => !["source-overlap", "competing-text"].includes(issue.reason) &&
+        !(issue.reason === "text-readability" && graphic.native && automaticGraphicIntent(request, graphic) === "requested"))
     )
       continue;
+    let source = operation;
+    if (graphic.native && decision.issues.some(issue => issue.reason === "text-readability") &&
+        nativeGraphicTextProblems(graphic, project.aspectRatio).length) {
+      // The painted native width is size × 10 percent. Find the smallest
+      // legible fit without editing the authored text fields or exceeding the canvas.
+      const maxSize = 10;
+      if (/\b(?:size|dimensione|larghezza|width)\s*[:=]?\s*\d|\d\s*(?:px|pt)\b/iu.test(request)) continue;
+      let size = Math.ceil(graphic.size * 20) / 20;
+      while (size <= maxSize && nativeGraphicTextProblems({ ...graphic, size }, project.aspectRatio).length) {
+        checkpoint();
+        size = Math.round((size + 0.05) * 20) / 20;
+      }
+      if (size > maxSize) continue;
+      source = { ...operation, parameters: { ...operation.parameters, graphic: { ...graphic, size } } };
+    }
     const measuredSpaces = editPlanGraphicFeedback(project, changes, assets, { ...review, omitted: [decision] }, checkpoint).rejected[0].layoutCandidates;
     const measured = measuredSpaces.map(r => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 }));
     const grid = [...new Set([graphic.x, 25, 50, 75])]
@@ -144,8 +161,8 @@ export function finalizeEditPlanGraphics(
       );
     for (const position of [...measured, ...grid]) {
       checkpoint();
-      if (position.x === graphic.x && position.y === graphic.y) continue;
-      const candidate = repositionGraphic(operation, position.x, position.y);
+      if (source === operation && position.x === graphic.x && position.y === graphic.y) continue;
+      const candidate = repositionGraphic(source, position.x, position.y);
       if (!candidate) continue;
       const attempt = changes.flatMap(item =>
         item.id === operation.id

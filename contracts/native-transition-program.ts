@@ -47,6 +47,18 @@ export const nativeTransitionIds: readonly NativeTransitionId[] = [
   ...(Object.keys(nativeMattes) as NativeMatteId[]),
 ];
 export const nativeTransitionDefinitions = {
+  "zoom-out-return": {
+    name: "Pullback and return",
+    inputOrder: ["incoming", "outgoing"],
+    intentionalEmptyMidpoint: false,
+    description: "Both pictures ease back from full scale as they dissolve. The incoming picture returns to full size. Use for a gentle change of subject with space around the center.",
+  },
+  "deep-zoom-dissolve": {
+    name: "Deep zoom dissolve",
+    inputOrder: ["incoming", "outgoing"],
+    intentionalEmptyMidpoint: false,
+    description: "The outgoing frame pushes toward a threefold enlargement. The incoming frame pulls back from the same enlargement through a centered dissolve. Use on center-matched subjects and keep small text outside the transition.",
+  },
   ...shutterDefinitions,
   ...(Object.fromEntries((Object.keys(nativeMattes) as NativeMatteId[]).map(id => [id, matteDefinition(id)])) as Record<NativeMatteId, ReturnType<typeof matteDefinition>>),
   "stretch-wide": { name: "Wide stretch dissolve", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "The full picture stretches horizontally to six times its width at the cut while the shots blend. Use a clear center subject and avoid stretching faces or readable text." },

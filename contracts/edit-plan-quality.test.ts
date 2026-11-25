@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Asset, EditOperation, EditProject } from "./workspace";
 import { normalizeGraphic } from "./motion-graphics";
+import { GRAPHIC_PRESETS } from "./editor-presets";
+import { instantiateGraphicPreset } from "./graphic-design-evidence";
+import { nativeGraphicTextProblems } from "./native-graphics";
 import { visualFrame } from "./clip-visual";
 import {
   editPlanGraphicFeedback,
@@ -254,6 +257,25 @@ describe("bounded graphic quality correction", () => {
     expect(result.changes[1]).toEqual({ ...safe, parameters: { ...safe.parameters, graphic: { ...safe.parameters.graphic, x: 42, y: 79 } } });
     expect(() => patch({ x: 42, y: 79, text: "Changed" })).toThrow();
     expect(() => patch({ x: -10, y: 79 })).toThrow();
+  });
+
+  it("finds the minimum legible size for four requested alert fields on a portrait edit", () => {
+    const portrait: EditProject = { ...project, aspectRatio: "9:16" };
+    const preset = GRAPHIC_PRESETS.find(item => item.name === "Phone alert · 06")!;
+    const graphic = normalizeGraphic(instantiateGraphicPreset(preset.graphic, {
+      x: 50, y: 40, size: 4,
+      native: { values: { "text-1": "Promemoria", "text-2": "Rivedi il video", "text-3": "Chiudi", "text-4": "Salva" } },
+    }))!;
+    const alert = { ...safe, end: 6, parameters: { graphic, graphicMode: "create" as const } };
+    const request = 'Add a small Phone alert · 06 with “Promemoria”, “Rivedi il video”, “Chiudi” and “Salva”. Place it in available space.';
+    const { changes, qualityReview } = finalizeEditPlanGraphics(portrait, [grade, alert], [{ ...asset, width: 720, height: 1280 }], request, checkpoint);
+    expect(qualityReview.withdrawn).toEqual([]);
+    const saved = changes[1].parameters!.graphic!;
+    expect(saved.native).toEqual(graphic.native);
+    expect(saved.text).toEqual(graphic.text);
+    expect(saved.secondaryText).toEqual(graphic.secondaryText);
+    expect(nativeGraphicTextProblems(saved, "9:16")).toEqual([]);
+    expect(nativeGraphicTextProblems({ ...saved, size: saved.size - 0.05 }, "9:16").length).toBeGreaterThan(0);
   });
 
   it("translates an entire animated path and rechecks every frame without clamping its geometry", () => {
