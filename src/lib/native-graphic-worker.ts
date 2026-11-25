@@ -209,8 +209,9 @@ self.onmessage = ({ data }) => {
         duration <= 0
       )
         throw Error("Invalid animation frame");
-      const template = await configure(g),
-        pose = graphicFrame(g, elapsed, duration),
+      const template = await configure(g);
+      self.postMessage({ id: data.id, phase: "rendering" });
+      const pose = graphicFrame(g, elapsed, duration),
         box = template.bounds;
       const maximum = Math.floor(
         Math.sqrt((8_294_400 * template.compWidth) / template.compHeight)

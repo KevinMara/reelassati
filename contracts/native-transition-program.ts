@@ -47,6 +47,12 @@ export const nativeTransitionIds: readonly NativeTransitionId[] = [
   ...(Object.keys(nativeMattes) as NativeMatteId[]),
 ];
 export const nativeTransitionDefinitions = {
+  "vertical-card-exchange": {
+    name: "Rising card exchange",
+    inputOrder: ["incoming", "outgoing"],
+    intentionalEmptyMidpoint: false,
+    description: "The incoming shot rises from below as a smaller card over the receding outgoing picture, then expands. A sliver of the incoming shot is visible from the start. Use for a deliberate card reveal where a framed edge suits the footage.",
+  },
   "zoom-out-return": {
     name: "Pullback and return",
     inputOrder: ["incoming", "outgoing"],

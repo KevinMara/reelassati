@@ -27,6 +27,14 @@ export class NativeGraphicRenderer {
       const task = this.pending.get(data.id);
       if (!task) return;
       clearTimeout(task.timer);
+      if (data.phase === "rendering") {
+        // Loading the compositor, fonts and source graph has its own deadline.
+        // Give the first painted frame the same budget as every later frame.
+        task.timer = setTimeout(() => this.close(new Error(
+          "The motion frame took too long. Try a smaller export size."
+        )), 45_000);
+        return;
+      }
       this.pending.delete(data.id);
       if (data.error) task.reject(new Error(data.error));
       else task.resolve(data);
@@ -51,10 +59,10 @@ export class NativeGraphicRenderer {
         () =>
           this.close(
             new Error(
-              "The motion frame took too long. Try a smaller export size."
+              "The motion renderer could not prepare the animation in time. Retry the export."
             )
           ),
-        45000
+        120_000
       );
       this.pending.set(id, { resolve, reject, timer });
       this.worker.postMessage({
