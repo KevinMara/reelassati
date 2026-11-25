@@ -107,7 +107,7 @@ import {
   SOCIAL_VIDEO_UNAVAILABLE,
   socialVideoSource,
 } from "../contracts/social-video";
-import { editModel, editReasoningEffort } from "../contracts/edit-model";
+import { editModel, editPlanOutputTokens, editReasoningEffort } from "../contracts/edit-model";
 import {
   searchStock,
   searchStockPage,
@@ -6970,6 +6970,12 @@ async function handleAi(
       presetWorkspace.transitionPresets,
       catalogDirection
     );
+    const outputTokens = editPlanOutputTokens(
+      planningContext.scenes.length, project.clips.length, duration, input.effort
+    );
+    // transitionPresets below already contains the full built-in and personal
+    // catalog. Do not repeat every design description in each model request.
+    const { transitions: _builtIn, personalTransitions: _personal, ...designCatalog } = presetCatalog;
     const projectContext = {
       title: input.project.title,
       duration,
@@ -7004,12 +7010,7 @@ async function handleAi(
         ? input.selectedClipIds.slice(0, 20)
         : [],
       selectedRange: input.range,
-      presetCatalog: {
-        ...presetCatalog,
-        ...(!transitionPlanning
-          ? { transitions: [], personalTransitions: [] }
-          : {}),
-      },
+      presetCatalog: designCatalog,
       freeSounds: planningContext.freeSounds,
       sharedCatalog: planningContext.sharedCatalog,
       catalogColorLooks: planningContext.catalogColorLooks,
@@ -7092,7 +7093,7 @@ async function handleAi(
               }),
           requestedModel,
           true,
-          24000,
+          outputTokens,
           false,
           undefined,
           analysisControl,
@@ -7243,7 +7244,7 @@ async function handleAi(
               ],
               requestedModel,
               true,
-              24000,
+              outputTokens,
               false,
               undefined,
               analysisControl,
@@ -7749,7 +7750,7 @@ async function handleAi(
             }),
             requestedModel,
             true,
-            24000,
+            outputTokens,
             false,
             undefined,
             analysisControl,

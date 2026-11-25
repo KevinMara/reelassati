@@ -12,3 +12,10 @@ export function editModel(value: unknown): EditModel {
 }
 export const editReasoningEffort = (value: unknown) =>
   value === "max" ? ("high" as const) : ("low" as const);
+
+/** Output includes the reasoning, the edit decisions and the per-scene review.
+ * Asking for the largest possible completion also reserves it on short edits. */
+export function editPlanOutputTokens(scenes: number, clips: number, seconds: number, effort: unknown) {
+  const beats = Math.max(scenes, clips, Math.ceil(seconds / 3));
+  return Math.min(24_000, (effort === "max" ? 8_192 : 6_144) + 384 * beats);
+}

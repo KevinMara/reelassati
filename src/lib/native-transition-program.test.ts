@@ -5,6 +5,25 @@ import {
   nativeTransitionIds,
 } from "@contracts/native-transition-program";
 describe("authored native transition clocks", () => {
+  it("keeps the two bottom-corner exchanges horizontally reflected throughout the shutter exposure", () => {
+    const right = nativeTransitionProgram("drag-from-bottom-right", 25, 24);
+    const left = nativeTransitionProgram("drag-from-bottom-left", 25, 24);
+    expect(nativeTransitionDefinitions["drag-from-bottom-right"].inputOrder).toEqual(["incoming", "outgoing"]);
+    for (const [i, node] of right.nodes.entries()) {
+      const other = left.nodes[i];
+      if (node.kind !== "transform" || other.kind !== "transform") {
+        expect(node).toEqual(other);
+        continue;
+      }
+      expect(node.input).toBe(other.input);
+      for (const [t, sample] of node.samples.entries()) {
+        const opposite = other.samples[t];
+        expect(sample.pivot).toEqual([1 - opposite.pivot[0], opposite.pivot[1]]);
+        expect(sample.scaleX).toBeCloseTo(opposite.scaleX, 10);
+        expect(sample.shutter?.map(s => s.scaleX)).toEqual(opposite.shutter?.map(s => s.scaleX));
+      }
+    }
+  });
   it.each([2, 8, 14, 24, 30, 60, 180, 300])(
     "compiles actual %i-frame clocks without unsupported operations",
     frames => {

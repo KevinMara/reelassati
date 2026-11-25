@@ -37,6 +37,10 @@ const details: Record<keyof typeof graphs, [string, string]> = {
     "Bottom-left corner exchange",
     "The incoming picture grows from its bottom-left corner over the receding, tiled outgoing picture.",
   ],
+  "drag-from-bottom-right": [
+    "Bottom-right corner exchange",
+    "The incoming picture expands from its bottom-right corner as the outgoing picture retreats into repeating tiles around the opposite corner.",
+  ],
   "drag-from-top-left": [
     "Top-left corner exchange",
     "The incoming picture grows from its top-left corner over the receding, tiled outgoing picture.",
@@ -61,7 +65,7 @@ export const shutterDefinitions = Object.fromEntries(
   shutterIds.map(id => {
     const [name, motion] = details[id];
     const inputOrder =
-      id === "drag-from-bottom-left" || id === "drag-from-top-left"
+      id === "drag-from-bottom-left" || id === "drag-from-bottom-right" || id === "drag-from-top-left"
         ? (["incoming", "outgoing"] as const)
         : (["outgoing", "incoming"] as const);
     return [

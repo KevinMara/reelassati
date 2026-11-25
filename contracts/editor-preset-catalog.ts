@@ -27,13 +27,30 @@ export function editorPresetCatalog(
   personalTransitions: TransitionPreset[] = [],
   direction?: string
 ) {
-  const normalized = " " + (direction ?? "").normalize("NFKC").toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ").trim() + " ";
+  const words = (s: string) => s.normalize("NFKC").toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const normalized = " " + words(direction ?? "") + " ";
+  // When the creator names a numbered template, the model needs its complete
+  // bindings. The other variants in that family need only discovery entries.
+  const requested = new Set<string>();
+  const families = new Set<string>();
+  const family = (name: string) => words(name).match(/^(.+) \d+$/)?.[1];
   const compact = new Set<string>();
+  const siblings = new Set<string>();
   if (direction !== undefined) {
     for (const p of GRAPHIC_PRESETS) {
+      const series = family(p.name);
+      if (p.graphic.native && series && (normalized.includes(" " + words(p.name) + " ") ||
+          normalized.includes(" " + words(p.id) + " "))) {
+        requested.add(p.id);
+        families.add(series);
+      }
+    }
+    for (const p of GRAPHIC_PRESETS) {
       const t = nativeGraphicTemplate(p.graphic.native?.id);
-      if (t?.platform && !normalized.includes(" " + t.platform.toLowerCase() + " ") &&
+      if (!t || requested.has(t.id)) continue;
+      if (families.has(family(p.name) ?? "")) siblings.add(t.id);
+      else if (t.platform && !normalized.includes(" " + t.platform.toLowerCase() + " ") &&
           !(t.platform === "X" && normalized.includes(" twitter ")) && !direction.includes(t.id))
         compact.add(t.id);
     }
@@ -45,7 +62,9 @@ export function editorPresetCatalog(
       usage: "Only for a supplied account on the named platform. A profile also requires a supplied call to action. Place in clear space.",
       variants: GRAPHIC_PRESETS.filter(p => compact.has(p.id)).map(p => [p.id, p.name]),
     }} : {}),
-    graphics: GRAPHIC_PRESETS.filter(p => !compact.has(p.id)).map(p => ({
+    ...(siblings.size ? { otherNumberedVariants: GRAPHIC_PRESETS
+      .filter(p => siblings.has(p.id)).map(p => [p.id, p.name]) } : {}),
+    graphics: GRAPHIC_PRESETS.filter(p => !compact.has(p.id) && !siblings.has(p.id)).map(p => ({
       id: p.id,
       name: p.name,
       description: p.description,

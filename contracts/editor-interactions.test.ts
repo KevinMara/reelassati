@@ -95,6 +95,16 @@ describe("selected section boundaries", () => {
   });
 });
 describe("reusable free presets", () => {
+  it("keeps all requested numbered native bindings and indexes their siblings", () => {
+    const all = editorPresetCatalog();
+    const selected = editorPresetCatalog([], [], "Use Phone alert · 06 and Phone alert 02. Preserve the source captions.");
+    const alerts = selected.graphics.filter(p => /^Phone alert/i.test(p.name));
+    expect(alerts.map(p => p.name).sort()).toEqual(["Phone alert · 02", "Phone alert · 06"]);
+    expect(alerts.find(p => p.name.endsWith("06"))?.design.template?.textFields).toHaveLength(4);
+    expect(new Set([...selected.graphics.map(p => p.id), ...selected.otherSocialGraphics!.variants.map(([id]) => id),
+      ...selected.otherNumberedVariants!.map(([id]) => id)])).toEqual(new Set(all.graphics.map(p => p.id)));
+    expect(editorPresetCatalog([], [], "Choose a phone alert").otherNumberedVariants).toBeUndefined();
+  });
   it("keeps every social graphic discoverable and expands the requested platform", () => {
     const all = editorPresetCatalog();
     const selected = editorPresetCatalog([], [], "Use the Google Plus profile for the supplied handle");

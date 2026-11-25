@@ -108,6 +108,7 @@ export function compileFusionFrameProgram(
               "XSize",
               "YSize",
               "UseSizeAndAspect",
+              "ReferenceSize",
               "Angle",
               "Edges",
               "MotionBlur",
@@ -190,6 +191,12 @@ export function compileFusionFrameProgram(
       };
     } else {
       const poseAt = t => {
+        // Fusion displays Center and Pivot in pixels when Reference Size is on.
+        // The serialized coordinates are still normalized. Explicit custom
+        // reference dimensions remain unsupported by the input allowlist.
+        const referenceSize = number(name, "ReferenceSize", t, 0);
+        if (referenceSize !== 0 && referenceSize !== 1)
+          throw new Error("Unsupported native transform reference size mode");
         const linked = number(name, "UseSizeAndAspect", t, 1),
           size = number(name, "Size", t, 1),
           aspect = number(name, "Aspect", t, 1);
