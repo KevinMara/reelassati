@@ -221,13 +221,16 @@ export function automaticGraphicIntent(
       );
   const actions =
     /\b(?:add|insert|put|place|create|make|design|use|show|write|replace|cover|hide|aggiungi|inserisci|metti|posiziona|crea|usa|realizza|mostra|scrivi|sostituisci|copri|nascondi|ajoute|ajoutez|insere|cree|utilise|ecris|remplace|anade|agrega|inserta|pon|crea|usa|escribe|reemplaza|fuge|hinzufugen|erstelle|gestalte|verwende|schreibe|ersetze|adicione|insira)\b/u;
+  const native = nativeGraphicTemplate(candidate?.native?.id);
+  const namesTemplate = (part: string) =>
+    !!native && ` ${copyKey(part)} `.includes(` ${copyKey(native.name)} `);
   const sentences = text
     // A handle/domain or decimal is not a sentence boundary.
     .split(/[!?;\n]|\.(?=\s|$)/u)
     .filter(
       part =>
         actions.test(part) &&
-        (graphic.test(part) || general.test(part)) &&
+        (graphic.test(part) || general.test(part) || namesTemplate(part)) &&
         !/\b(?:no|not|never|without|avoid|non|senza|evita|nessun[ao]|pas|sans|sin|nunca|kein|keine|ohne|nao)\b/u.test(
           part
         )
@@ -235,7 +238,6 @@ export function automaticGraphicIntent(
   // Social templates use a handle, not a spoken title. Accept only an exact
   // handle supplied in an affirmative request for that platform/template.
   // This grants copy permission only; source-overlap checks still apply.
-  const native = nativeGraphicTemplate(candidate?.native?.id);
   if (candidate && native?.category === "social") {
     const socialParts = request
       .normalize("NFKC")
@@ -309,6 +311,8 @@ export function automaticGraphicIntent(
     ]
       .map(copyKey)
       .filter(Boolean);
+    if (sentences.some(namesTemplate) && displayed.length && !suppliedCopy.length)
+      return "source-design";
     // Exact human-supplied wording scopes the exception. Asking for the title
     // “Workshop” cannot authorize a different same-kind claim or extra subtitle.
     if (
@@ -334,7 +338,7 @@ export function automaticGraphicIntent(
   // A broad request to design graphics authorizes repeating grounded source
   // wording as part of the design, not inventing copy or assuming empty space.
   // Keep specific human titles/arrows and explicit replacement scoped above.
-  return sentences.some(part => graphic.test(part))
+  return sentences.some(part => graphic.test(part) || namesTemplate(part))
     ? "requested"
     : "source-design";
 }

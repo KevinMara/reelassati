@@ -4,6 +4,7 @@ import { normalizeGraphic } from "./motion-graphics";
 import { visualFrame } from "./clip-visual";
 import {
   editPlanGraphicFeedback,
+  allowsAutomaticGraphicPlacement,
   editPlanQualityAssets,
   finalizeEditPlanGraphics,
   mergeGraphicRefinement,
@@ -155,7 +156,7 @@ describe("bounded graphic quality correction", () => {
     expect(reviewEditPlanGraphics(project, repaired.changes, [asset], "", checkpoint).omitted).toEqual([]);
   });
 
-  it("places a supported automatic card clear of the face without changing its content, timing or valid edits", () => {
+  it.each(["", "Place it in available space clear of her face."])("places a supported card clear of the face while preserving copy, timing and valid edits: %s", request => {
     const blocked = {
       ...safe,
       parameters: {
@@ -168,7 +169,7 @@ describe("bounded graphic quality correction", () => {
       project,
       [grade, blocked],
       [asset],
-      "",
+      request,
       checkpoint
     );
     expect(result.qualityReview).toEqual({
@@ -221,6 +222,8 @@ describe("bounded graphic quality correction", () => {
   });
 
   it("never repositions an anchored highlight or a card with an explicit placement request", () => {
+    expect(allowsAutomaticGraphicPlacement("Find available space at the bottom left")).toBe(false);
+    expect(allowsAutomaticGraphicPlacement('Add the title “Available space”')).toBe(false);
     for (const [graphic, request] of [
       [normalizeGraphic({ kind: "highlight", x: 50, y: 40, size: 15 }), ""],
       [{ ...safe.parameters.graphic!, y: 40 }, "Put the card over the face"],
@@ -239,6 +242,18 @@ describe("bounded graphic quality correction", () => {
         result.qualityReview.withdrawn.map(item => item.operationId)
       ).toEqual([blocked.id]);
     }
+  });
+
+  it("moves only the rejected card when the model supplies a position", () => {
+    const feedback = [{ operationId: safe.id, label: safe.label, issues: [{ reason: "source-overlap" as const, detail: "face" }] }];
+    const patch = (placement: unknown) => mergeGraphicRefinement([grade, safe], feedback, {
+      summary: "Moved the card", corrections: [{ operationId: safe.id, placement }],
+    }, () => { throw Error("A position repair must preserve the compiled operation"); });
+    const result = patch({ x: 42, y: 79 });
+    expect(result.changes[0]).toBe(grade);
+    expect(result.changes[1]).toEqual({ ...safe, parameters: { ...safe.parameters, graphic: { ...safe.parameters.graphic, x: 42, y: 79 } } });
+    expect(() => patch({ x: 42, y: 79, text: "Changed" })).toThrow();
+    expect(() => patch({ x: -10, y: 79 })).toThrow();
   });
 
   it("translates an entire animated path and rechecks every frame without clamping its geometry", () => {

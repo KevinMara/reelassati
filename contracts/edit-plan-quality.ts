@@ -72,8 +72,28 @@ export function reviewEditPlanGraphics(
   }
 }
 
-/** Salvage valid work after the single model correction. Only automatic text
- * cards may move; arrows/highlights retain their semantic attachment points.
+export function allowsAutomaticGraphicPlacement(request: string): boolean {
+  if (!request.trim()) return true;
+  // A copy or style request alone does not relinquish a specific placement.
+  const direction = request.replace(/["“«][^"”»]+["”»]/gu, "");
+  return /\b(?:available space|clear space|where(?:ver)? (?:it fits|there is room)|spazio (?:libero|disponibile))\b/iu.test(direction) &&
+    !/\b(?:top|bottom|left|right|cent(?:er|re)|angolo|destra|sinistra|centro|in alto|in basso)\b|\d\s*%/iu.test(direction);
+}
+
+function repositionGraphic(operation: EditOperation, x: number, y: number): EditOperation | undefined {
+  const graphic = normalizeGraphic(operation.parameters?.graphic);
+  if (!graphic || !["text", "callout"].includes(graphic.kind) ||
+      operation.parameters?.graphicMode === "update" ||
+      ![x, y].every(v => Number.isFinite(v) && v >= 0 && v <= 100)) return;
+  const motion = graphic.motion?.map(frame => ({
+    ...frame, x: frame.x + (x - graphic.x), y: frame.y + (y - graphic.y),
+  }));
+  if (motion?.some(frame => frame.x < 0 || frame.x > 100 || frame.y < 0 || frame.y > 100)) return;
+  return { ...operation, parameters: { ...operation.parameters,
+    graphic: { ...graphic, x, y, ...(motion ? { motion } : {}) } } };
+}
+
+/** Only unanchored text cards with delegated placement may move.
  * Every candidate uses the full renderer-aware source and motion checks. Text,
  * size, duration, source timing and every unrelated operation stay untouched. */
 export function finalizeEditPlanGraphics(
@@ -102,7 +122,7 @@ export function finalizeEditPlanGraphics(
     const graphic = normalizeGraphic(operation.parameters?.graphic);
     if (
       !decision ||
-      request.trim() ||
+      !allowsAutomaticGraphicPlacement(request) ||
       operation.parameters?.graphicMode === "update" ||
       !graphic ||
       !["text", "callout"].includes(graphic.kind) ||
@@ -111,7 +131,9 @@ export function finalizeEditPlanGraphics(
       )
     )
       continue;
-    const positions = [...new Set([graphic.x, 25, 50, 75])]
+    const measuredSpaces = editPlanGraphicFeedback(project, changes, assets, { ...review, omitted: [decision] }, checkpoint).rejected[0].layoutCandidates;
+    const measured = measuredSpaces.map(r => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 }));
+    const grid = [...new Set([graphic.x, 25, 50, 75])]
       .flatMap(x =>
         [...new Set([graphic.y, 15, 30, 50, 70, 85])].map(y => ({ x, y }))
       )
@@ -120,30 +142,11 @@ export function finalizeEditPlanGraphics(
           Math.hypot(a.x - graphic.x, a.y - graphic.y) -
           Math.hypot(b.x - graphic.x, b.y - graphic.y)
       );
-    for (const position of positions) {
+    for (const position of [...measured, ...grid]) {
       checkpoint();
-      const dx = position.x - graphic.x,
-        dy = position.y - graphic.y;
-      if (!dx && !dy) continue;
-      const motion = graphic.motion?.map(frame => ({
-        ...frame,
-        x: frame.x + dx,
-        y: frame.y + dy,
-      }));
-      // Do not clamp paths or change their motion to make a placement fit.
-      if (
-        motion?.some(
-          frame => frame.x < 0 || frame.x > 100 || frame.y < 0 || frame.y > 100
-        )
-      )
-        continue;
-      const candidate: EditOperation = {
-        ...operation,
-        parameters: {
-          ...operation.parameters,
-          graphic: { ...graphic, ...position, ...(motion ? { motion } : {}) },
-        },
-      };
+      if (position.x === graphic.x && position.y === graphic.y) continue;
+      const candidate = repositionGraphic(operation, position.x, position.y);
+      if (!candidate) continue;
       const attempt = changes.flatMap(item =>
         item.id === operation.id
           ? [candidate]
@@ -354,10 +357,20 @@ export function mergeGraphicRefinement(
       !prior ||
       replacements.has(id) ||
       Object.keys(row).some(
-        key => !["operationId", "operation", "withdraw"].includes(key)
+        key => !["operationId", "operation", "placement", "withdraw"].includes(key)
       )
     )
       throw invalid();
+    if (row.placement !== undefined) {
+      const p = record(row.placement);
+      if (row.operation !== undefined || row.withdraw !== undefined || !p ||
+          Object.keys(p).some(k => k !== "x" && k !== "y") ||
+          typeof p.x !== "number" || typeof p.y !== "number") throw invalid();
+      const moved = repositionGraphic(prior, p.x, p.y);
+      if (!moved) throw scopeError();
+      replacements.set(id, moved);
+      continue;
+    }
     const withdrawal = record(row.withdraw);
     if (withdrawal) {
       if (
@@ -380,7 +393,12 @@ export function mergeGraphicRefinement(
       !["graphic", "style"].includes(String(operation.type))
     )
       throw scopeError();
-    assertRefinementParameters(operation.type, operation.parameters);
+    const params = record(operation.parameters);
+    const priorNative = prior.parameters?.graphic?.native?.id;
+    if (operation.type === "graphic" && priorNative && params?.presetId === priorNative) {
+      const { presetId: _id, ...controls } = params;
+      assertRefinementParameters(operation.type, controls);
+    } else assertRefinementParameters(operation.type, operation.parameters);
     // The correction receives canonical clip IDs from the compiled draft.
     // Check its stated scope before a new graphic can infer a picture anchor.
     if (
@@ -392,6 +410,8 @@ export function mergeGraphicRefinement(
     const compiled = compile([operation]);
     if (compiled.length !== 1) throw invalid();
     const replacement = compiled[0];
+    if (priorNative && replacement.type === "graphic" && replacement.parameters?.graphic?.native?.id !== priorNative)
+      throw scopeError();
     if (replacement.type !== operation.type) throw scopeError();
     // Reject unsafe controls; never rely on normalization silently dropping or
     // clamping them, or allow compilation to add a new control after this check.

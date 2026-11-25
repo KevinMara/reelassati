@@ -7,6 +7,7 @@ import {
   nativeTextValue,
 } from "./native-graphics";
 import { GRAPHIC_PRESETS } from "./editor-presets";
+import { automaticGraphicIntent } from "./automatic-graphic-protection";
 import { instantiateGraphicPreset } from "./graphic-design-evidence";
 import { editorPresetCatalog, resolveEditorPresetOperation } from "./editor-preset-catalog";
 import { normalizeEditorChatState } from "./editor-chat-state";
@@ -51,6 +52,11 @@ describe("editable native graphic contract", () => {
     const saved = normalizeGraphic(instantiateGraphicPreset(preset.graphic, {native:{values}}))!;
     expect(saved).toMatchObject({text:"Promemoria",secondaryText:"Rivedi il video",native:{values:{"text-3":"Chiudi","text-4":"Salva"}}});
     expect(saved.native?.values).not.toHaveProperty("text-1");
+    const request = 'Add one editable Phone alert · 06 with headline “Promemoria”, message “Rivedi il video” and actions “Chiudi” and “Salva”.';
+    expect(automaticGraphicIntent(request, saved)).toBe("requested");
+    expect(automaticGraphicIntent(request.replace("06", "05"), saved)).toBe("automatic");
+    expect(automaticGraphicIntent(request.replace("Chiudi", "Annulla"), saved)).toBe("automatic");
+    expect(automaticGraphicIntent("Never " + request, saved)).toBe("automatic");
     expect(() => instantiateGraphicPreset(preset.graphic, {text:"Other",native:{values}})).toThrow(/conflicting/i);
   });
   it("requires real copy for each displayed field and preserves it through save and reload", () => {

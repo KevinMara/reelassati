@@ -42,6 +42,7 @@ import {
 import { normalizeClipColorLut } from "../contracts/color-lut";
 import {
   EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION,
+  allowsAutomaticGraphicPlacement,
   editPlanQualityAssets,
   editPlanGraphicFeedback,
   finalizeEditPlanGraphics,
@@ -7670,7 +7671,7 @@ async function handleAi(
               graphicRequest,
               checkpoint
             );
-            if (graphicReview.omitted.length && !graphicRequest.trim()) {
+            if (graphicReview.omitted.length && allowsAutomaticGraphicPlacement(graphicRequest)) {
               // Resolve measured placement locally first. Unresolved graphics
               // remain in the proposal for the single creative correction;
               // this is not permission to silently drop a content objective.
@@ -7741,7 +7742,7 @@ async function handleAi(
             env,
             user,
             "edit-planning",
-            `${EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION} ${EDITORIAL_NOTES_GUIDANCE} ${planningCapabilities} ${EDITOR_GRAPHIC_GUIDANCE}`,
+            `${planningCapabilities} ${EDITOR_GRAPHIC_GUIDANCE} ${EDITORIAL_NOTES_GUIDANCE} ${EDIT_PLAN_GRAPHIC_REFINEMENT_DIRECTION} For a position-only correction to a text card, prefer {"operationId":"exact rejected ID","placement":{"x":50,"y":75}} with measured canvas percentages. This preserves the editable template, its copy, target, timing, and all non-position controls. Honor any specific location requested by the user.`,
             JSON.stringify({
               command: input.command,
               graphicRequest,
@@ -7836,6 +7837,10 @@ async function handleAi(
             }
           } catch (error) {
             checkpoint();
+            console.warn("REELassati graphic correction failed preflight", {
+              reference: invocation.id,
+              issues: [...new Set(graphicReview.omitted.flatMap(item => item.issues.map(issue => issue.reason)))],
+            });
             return rejectPlan(error, changes);
           }
         }
