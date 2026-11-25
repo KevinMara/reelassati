@@ -7010,7 +7010,9 @@ async function handleAi(
         ? input.selectedClipIds.slice(0, 20)
         : [],
       selectedRange: input.range,
-      presetCatalog: designCatalog,
+      presetCatalog: transitionPlanning ? designCatalog : {
+        ...designCatalog, transitions: [], personalTransitions: [],
+      },
       freeSounds: planningContext.freeSounds,
       sharedCatalog: planningContext.sharedCatalog,
       catalogColorLooks: planningContext.catalogColorLooks,
