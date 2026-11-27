@@ -21,6 +21,7 @@ export interface NativeCropSample {
   bottom: number;
 }
 export type NativeFrameNode =
+  | { id: string; kind: "gain"; input: string; samples: { gain: number }[] }
   | { id: string; kind: "matte"; a: string; b: string; matteId: NativeMatteId; samples: { mix: number }[] }
   | { id: string; kind: "crop"; input: string; samples: NativeCropSample[] }
   | {
@@ -109,7 +110,11 @@ export function readNativeFrameProgram(value: unknown): NativeFrameProgram {
     )
       throw new Error("Invalid native graph node");
     let node: NativeFrameNode;
-    if (n.kind === "matte") {
+    if (n.kind === "gain") {
+      node = { id: n.id, kind: "gain", input: input(n.input),
+        samples: n.samples.map(s => ({ gain: numeric(record(s).gain, 0, 1024) })),
+      };
+    } else if (n.kind === "matte") {
       if (!isNativeMatteId(n.matteId) || rawNodes.length !== 1)
         throw new Error("Unknown native image mask");
       node = {
@@ -186,7 +191,7 @@ export function readNativeFrameProgram(value: unknown): NativeFrameProgram {
 /** Integer frames are exact samples; fractional preview positions interpolate
  * between them. Neither wall-clock time nor playback order changes the result. */
 export function nativeSampleAt<
-  T extends { mix: number } | NativeTransformSample | NativeCropSample,
+  T extends { mix: number } | { gain: number } | NativeTransformSample | NativeCropSample,
 >(samples: T[], frame: number): T {
   if (!Number.isFinite(frame) || !samples.length)
     throw new Error("Invalid native frame time");
@@ -196,6 +201,7 @@ export function nativeSampleAt<
   const a = samples[i],
     b = samples[Math.min(i + 1, samples.length - 1)];
   if (f === 0) return a;
+  if ("gain" in a && "gain" in b) return { gain: a.gain + (b.gain - a.gain) * f } as T;
   if ("mix" in a && "mix" in b)
     return { mix: a.mix + (b.mix - a.mix) * f } as T;
   if ("left" in a && "left" in b) {

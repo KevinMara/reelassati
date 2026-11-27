@@ -79,11 +79,13 @@ export function compileFusionFrameProgram(
     if (ids.has(name)) return ids.get(name);
     const node = tools.get(name);
     if (!node) throw new Error(`Unresolved native image node ${name}`);
-    if (!["Dissolve", "Transform", "Merge"].includes(node.tag))
+    if (!["Dissolve", "Transform", "Merge", "BrightnessContrast"].includes(node.tag))
       throw new Error(`Native renderer operation not implemented: ${node.tag}`);
     visiting.add(name);
     const allowed =
-      node.tag === "Dissolve"
+      node.tag === "BrightnessContrast"
+        ? ["Input", "Gain"]
+        : node.tag === "Dissolve"
         ? ["Background", "Foreground", "Mix"]
         : node.tag === "Merge"
           ? [
@@ -123,7 +125,15 @@ export function compileFusionFrameProgram(
           `Native renderer input not implemented: ${node.tag}.${key}`
         );
     let record;
-    if (node.tag === "Dissolve") {
+    if (node.tag === "BrightnessContrast") {
+      record = {
+        kind: "gain",
+        input: imageInput(name, "Input"),
+        samples: Array.from({ length: frames }, (_, t) => ({
+          gain: number(name, "Gain", t, 1),
+        })),
+      };
+    } else if (node.tag === "Dissolve") {
       const transitions = Object.values(fields(fields(node).Transitions));
       if (transitions.some(v => v !== "DFTDissolve"))
         throw new Error("Native custom dissolve plug-in is not implemented");

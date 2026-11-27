@@ -1,6 +1,7 @@
 import roots from "./native-transition-data.json";
 import expanded from "./native-fusion-expanded.json";
 import shutterGraphs from "./native-fusion-shutter.json";
+import gainGraphs from "./native-fusion-gain.json";
 import { shutterDefinitions, shutterIds, type NativeShutterId } from "./native-shutter-transitions";
 import motionRoots from "./native-motion-data.json";
 import { isNativeMatteId, matteDefinition, nativeMattes, type NativeMatteId } from "./native-motion-mattes";
@@ -14,6 +15,7 @@ import {
 export type NativeTransitionId =
   | NativeMatteId
   | NativeShutterId
+  | keyof typeof gainGraphs
   | keyof typeof expanded
   | "stretch"
   | "slide"
@@ -44,6 +46,7 @@ export const nativeTransitionIds: readonly NativeTransitionId[] = [
   "motion-wipe-down",
   ...(Object.keys(expanded) as (keyof typeof expanded)[]),
   ...shutterIds,
+  ...(Object.keys(gainGraphs) as (keyof typeof gainGraphs)[]),
   ...(Object.keys(nativeMattes) as NativeMatteId[]),
 ];
 export const nativeTransitionDefinitions = {
@@ -66,6 +69,15 @@ export const nativeTransitionDefinitions = {
     description: "The outgoing frame pushes toward a threefold enlargement. The incoming frame pulls back from the same enlargement through a centered dissolve. Use on center-matched subjects and keep small text outside the transition.",
   },
   ...shutterDefinitions,
+  ...Object.fromEntries(Object.keys(gainGraphs).map(id => {
+    const pivot = id.slice("mirror-flash-".length).replaceAll("-", " ");
+    return [id, {
+      name: "Mirror flash · " + pivot,
+      inputOrder: ["outgoing", "incoming"] as const,
+      intentionalEmptyMidpoint: false,
+      description: "Both shots shrink into a mirrored grid around the " + pivot + " pivot. The image brightens across the cut and returns to normal. Use for an explicitly requested flash or energetic tiled transition.",
+    }];
+  })) as Record<keyof typeof gainGraphs, { name: string; inputOrder: readonly ["outgoing","incoming"]; intentionalEmptyMidpoint: false; description: string }>,
   ...(Object.fromEntries((Object.keys(nativeMattes) as NativeMatteId[]).map(id => [id, matteDefinition(id)])) as Record<NativeMatteId, ReturnType<typeof matteDefinition>>),
   "stretch-wide": { name: "Wide stretch dissolve", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "The full picture stretches horizontally to six times its width at the cut while the shots blend. Use a clear center subject and avoid stretching faces or readable text." },
   "rotate-pull": { name: "Turning pullback", inputOrder: ["outgoing", "incoming"], intentionalEmptyMidpoint: false, description: "The outgoing shot turns through half a rotation and pulls back, exposing a border, as the incoming shot settles upright. Use for an intentional rotating reveal." },
@@ -171,7 +183,7 @@ export const nativeTransitionDefinitions = {
   },
 } as const;
 const cache = new Map<string, NativeFrameProgram>();
-const fusionSources = { ...roots, ...expanded, ...shutterGraphs };
+const fusionSources = { ...roots, ...expanded, ...shutterGraphs, ...gainGraphs };
 /** Re-evaluate the authored native curves on the actual effect clock. Do not
  * scale a fixed list of poses or substitute a generic animation. */
 export function nativeTransitionProgram(

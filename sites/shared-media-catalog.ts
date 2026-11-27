@@ -3,6 +3,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import type { EditProject } from "../contracts/workspace";
 import { sourceReviewFacts } from "../contracts/source-review";
 import { uploadCatalogEvidence } from "./catalog-evidence";
+import { indexBundledStock, materializeBundledObject } from "./bundled-stock";
 import {
   normalizeSharedCatalogItem,
   CATALOG_CHUNK_BYTES,
@@ -32,6 +33,7 @@ type StoredObject = {
   customMetadata?: Record<string, string>;
 };
 export interface CatalogEnvironment {
+  ASSETS?: { fetch(request: Request): Promise<Response> };
   DB: {
     prepare(query: string): Statement;
     batch(statements: Statement[]): Promise<unknown>;
@@ -174,7 +176,7 @@ export function initializeSharedCatalog(env: CatalogEnvironment) {
       "CREATE TABLE IF NOT EXISTS shared_catalog_visual_leases (id TEXT PRIMARY KEY NOT NULL, lease_id TEXT NOT NULL, expires_at INTEGER NOT NULL)"
     ),
   ])
-    .then(() => undefined)
+    .then(() => indexBundledStock(env))
     .catch(error => {
       catalogInitializations.delete(env.DB);
       throw error;
@@ -563,7 +565,7 @@ async function verifyStoredObject(
   env: CatalogEnvironment,
   object: CatalogObject
 ) {
-  const stored = await env.BUCKET.get(objectKey(object), {
+  const stored = await readCatalogObject(env, object, {
     range: { offset: 0, length: 1 },
   });
   if (!stored) return false;
@@ -572,6 +574,16 @@ async function verifyStoredObject(
     stored.customMetadata?.bytes === String(object.bytes);
   await stored.body.cancel();
   return valid;
+}
+async function readCatalogObject(
+  env: CatalogEnvironment,
+  object: CatalogObject,
+  options?: { range: { offset: number; length: number } }
+) {
+  const key = objectKey(object);
+  const stored = await env.BUCKET.get(key, options);
+  if (stored || !(await materializeBundledObject(env, object))) return stored;
+  return env.BUCKET.get(key, options);
 }
 export async function handleCatalogAdmin(
   request: Request,
@@ -928,8 +940,8 @@ export async function handleCatalogPublic(
   if (partial)
     headers.set("Content-Range", `bytes ${start}-${end}/${object.bytes}`);
   const headOnly = request.method === "HEAD";
-  const stored = await env.BUCKET.get(
-    objectKey(object),
+  const stored = await readCatalogObject(
+    env, object,
     headOnly
       ? { range: { offset: 0, length: 1 } }
       : partial
@@ -964,7 +976,7 @@ export async function copySharedCatalogMedia(
   const { item } = await readSharedCatalog(env, id);
   if (item.kind === "lut")
     fail("Apply this color LUT through the color controls.");
-  const source = await env.BUCKET.get(objectKey(item.media));
+  const source = await readCatalogObject(env, item.media);
   if (
     !source ||
     source.size !== item.media.bytes ||

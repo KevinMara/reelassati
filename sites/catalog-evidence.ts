@@ -9,6 +9,7 @@ import {
 import type { SharedMediaCatalogItem } from "../contracts/shared-media-catalog";
 import { normalizeSharedCatalogItem } from "../contracts/shared-media-catalog";
 import type { CatalogEnvironment } from "./shared-media-catalog";
+import { includedVisuals, releaseAsset } from "./bundled-stock";
 
 export const catalogEvidenceKey = (sha: string) =>
   `catalog-evidence/v1/${sha}.json`;
@@ -108,6 +109,12 @@ export async function readCatalogEvidence(
 ) {
   signal.throwIfAborted();
   const stored = await env.BUCKET.get(catalogEvidenceKey(item.media.sha256));
+  if (!stored && env.ASSETS && includedVisuals.has(item.media.sha256)) {
+    const response = await releaseAsset(env, item.media.sha256 + ".json", signal);
+    const packet = normalizeCatalogEvidence(await response.json(), item);
+    verifyEvidenceBlobs(packet);
+    return packet;
+  }
   if (!stored) return;
   if (stored.size > 2 * 1024 * 1024) {
     await stored.body.cancel();
@@ -262,7 +269,11 @@ export async function readCatalogVisual(
   signal.throwIfAborted();
   if (!packet.visual) return;
   const stored = await env.BUCKET.get(catalogVisualKey(packet.mediaSha256));
-  if (!stored) return;
+  if (!stored) {
+    const bundled = includedVisuals.get(packet.mediaSha256);
+    if (env.ASSETS && bundled?.sampleSha256 === packet.visual.sha256) return normalizeCatalogVisual(bundled, packet);
+    return;
+  }
   if (stored.size > 32000) {
     await stored.body.cancel();
     return;

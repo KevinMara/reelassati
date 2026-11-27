@@ -68,6 +68,7 @@ void main(){
     return;
   }
   if(operation==0){result=texelFetch(imageA,ivec2(p.x,int(size.y)-1-p.y),0);return;}
+  if(operation==7){vec4 src=texelFetch(imageA,p,0);result=vec4(src.rgb*weight,src.a);return;}
   if(operation==1){result=mix(texelFetch(imageA,p,0),texelFetch(imageB,p,0),weight);return;}
   if(operation==5){
     vec2 uv=(gl_FragCoord.xy/size-.5)*maskScale+.5;
@@ -314,7 +315,11 @@ export function createNativeFrameRenderer(
       });
       for (const node of program.nodes) {
         framebuffer(node.id);
-        if (node.kind === "matte") {
+        if (node.kind === "gain") {
+          bind(node.input, 0);
+          gl.uniform1i(uniforms.operation, 7);
+          gl.uniform1f(uniforms.weight, nativeSampleAt(node.samples, frame).gain);
+        } else if (node.kind === "matte") {
           if (!matte) throw new Error("The authored transition mask is missing");
           bind(node.a, 0);
           bind(node.b, 1);
