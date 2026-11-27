@@ -2,6 +2,7 @@ import { isPrimaryFootage } from "@contracts/timeline-layers";
 import { applyShotTransition } from "@contracts/shot-transition";
 import { sharedCatalogClipDefaults } from "@contracts/shared-media-catalog";
 import { assertSupportingMedia } from "@contracts/supporting-media";
+import { requestedClipGain } from "@contracts/editor-catalog-audio";
 import {
   catalogEffectForAsset,
   catalogEffectClipDefaults,
@@ -95,7 +96,8 @@ export function insertChatAsset(
   asset: Asset,
   id: string,
   start: number,
-  requestedDuration?: number
+  requestedDuration?: number,
+  volume?: number
 ): EditProject {
   if (project.clips.some(c => c.id === `chat-clip-${id}`)) return project;
   if (
@@ -134,6 +136,7 @@ export function insertChatAsset(
     fit: "contain",
     ...catalogEffectClipDefaults(asset),
     ...sharedCatalogClipDefaults(asset),
+    ...requestedClipGain(volume),
   };
   const clips = [...project.clips, clip];
   return {
@@ -246,7 +249,8 @@ export function applyChatAction(
       asset,
       action.id,
       action.start,
-      action.duration
+      action.duration,
+      action.volume
     );
   } else if (action.kind === "settings") {
     if (

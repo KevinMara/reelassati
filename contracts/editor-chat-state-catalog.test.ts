@@ -43,6 +43,7 @@ describe("catalog actions survive workspace persistence", () => {
   it("round-trips exact short-SFX timing, saved asset and lifecycle state", () => {
     const original = {
       ...action,
+      insert: { ...action.insert, volume: 0.12 },
       status: "completed",
       runtime: { assetId: "saved-audio", detail: "Sound saved and placed" },
     };
@@ -65,6 +66,7 @@ describe("catalog actions survive workspace persistence", () => {
     { insert: { start: 86400, duration: entry.duration } },
     { insert: { start: 4, duration: entry.duration + 1 } },
     { insert: { start: 4, duration: 0 } },
+    { insert: { start: 4, duration: entry.duration, volume: 12 } },
     { insert: { start: 4 } },
     { insert: "invalid" },
   ])(

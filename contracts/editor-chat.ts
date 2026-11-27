@@ -106,7 +106,7 @@ export type EditorChatAction = EditorChatActionBase &
     | {
         kind: "catalog-audio";
         catalogId: string;
-        insert?: { start: number; duration: number };
+        insert?: import("./editor-catalog-audio").CatalogAudioPlacement;
       }
     | {
         kind: "catalog-effect";
@@ -119,7 +119,13 @@ export type EditorChatAction = EditorChatActionBase &
         catalog: import("./shared-media-catalog").SharedMediaCatalogItem;
         insert?: import("./shared-media-catalog").SharedCatalogPlacement;
       }
-    | { kind: "insert"; assetId: string; start: number; duration?: number }
+    | {
+        kind: "insert";
+        assetId: string;
+        start: number;
+        duration?: number;
+        volume?: number;
+      }
     | {
         kind: "settings";
         aspectRatio?: "9:16" | "16:9" | "1:1";

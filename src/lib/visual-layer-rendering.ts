@@ -35,18 +35,21 @@ export function visualLayerSourceFilter(
       window.count < 1)
   )
     throw new Error("Invalid source frame window");
-  const frameSelection = window
-    ? `:start_time=0:eof_action=pass,trim=start_frame=${window.start}:end_frame=${window.start + window.count}`
-    : "";
   const speed = clip.speed ?? 1;
-  const trim = `start=${number(clip.inPoint)}:end=${number(clip.inPoint + clip.duration * speed)}`;
+  const frameAt = (time: number) => Math.ceil(time * frameRate - 1e-7);
+  const firstFrame = frameAt(clip.start);
+  const frameCount = frameAt(clip.start + clip.duration) - firstFrame;
+  // Sample the source on the canvas clock. A sub-frame trim can have no
+  // decoded frame *starting* inside it while a source frame still covers it.
+  const firstSample =
+    clip.inPoint + (firstFrame / frameRate - clip.start) * speed;
   // Native batches retain absolute source PTS (including decoder preroll).
   // FPS chooses frames on one source-relative clock, then frame indexes bound
   // the effect. Resetting STARTPTS or trimming each input batch loses phase at
   // fractional seeks and slow motion, and can omit valid terminal frames.
   const clock = window
-    ? `setpts=(PTS-${number(clip.inPoint)}/TB)/${speed}`
-    : `trim=${trim},setpts=(PTS-STARTPTS)/${speed}`;
+    ? `setpts=(PTS-${number(clip.inPoint)}/TB)/${speed},fps=${frameRate}:start_time=0:eof_action=pass,trim=start_frame=${window.start}:end_frame=${window.start + window.count}`
+    : `settb=AVTB,setpts=(PTS-${firstSample.toFixed(8)}/TB)/${speed},fps=${frameRate}:start_time=0:round=up:eof_action=pass,trim=end_frame=${frameCount}`;
   const fit =
     clip.fit === "cover"
       ? `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`
@@ -79,5 +82,8 @@ export function visualLayerSourceFilter(
   ]
     .filter(Boolean)
     .join(",");
-  return `${clock},format=rgba,${fit},setsar=1,fps=${frameRate}${frameSelection},${padding}${lut}${colorGradeFilter(clip, options.scope)}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},setpts=PTS+${number(clip.start)}/TB`;
+  const placement = window
+    ? `setpts=PTS+${number(clip.start)}/TB`
+    : `settb=1/${frameRate},setpts=PTS+${firstFrame}`;
+  return `${clock},format=rgba,${fit},setsar=1,${padding}${lut}${colorGradeFilter(clip, options.scope)}${transform ? `,${transform}` : ""}${fades ? `,${fades}` : ""},${placement}`;
 }

@@ -117,7 +117,8 @@ export function applyChatCatalogAudio(
       asset,
       action.id,
       placement.start,
-      placement.duration
+      placement.duration,
+      placement.volume
     ),
     action.id,
     action.label

@@ -1,6 +1,7 @@
 import {
   catalogAudioPlacement,
   findCatalogAudio,
+  validClipGain,
 } from "./editor-catalog-audio";
 import { visualTransitions } from "./clip-visual";
 import { isNativeTransitionKind } from "./native-transitions";
@@ -288,7 +289,8 @@ function actionValue(
       !string(value.assetId) ||
       !finite(value.start) ||
       value.start < 0 ||
-      value.start > 86400
+      value.start > 86400 ||
+      (original.volume !== undefined && !validClipGain(original.volume))
     )
       return undefined;
   } else if (kind === "settings") {

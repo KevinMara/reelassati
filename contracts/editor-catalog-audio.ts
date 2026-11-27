@@ -6,6 +6,23 @@ import {
 export interface CatalogAudioPlacement {
   start: number;
   duration: number;
+  volume?: number;
+}
+
+export function validClipGain(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 2
+  );
+}
+
+export function requestedClipGain(volume: unknown): { volume?: number } {
+  if (volume === undefined) return {};
+  if (!validClipGain(volume))
+    throw new Error("Clip volume must be a linear gain between 0 and 2.");
+  return { volume };
 }
 
 /** Only the bundled, audited catalog can supply a file. No model URL is accepted. */
@@ -68,5 +85,9 @@ export function catalogAudioPlacement(
         ? "This sound extends outside your selected range."
         : "This sound extends beyond the current timeline."
     );
-  return { start: value.start, duration: Math.min(duration, available) };
+  return {
+    start: value.start,
+    duration: Math.min(duration, available),
+    ...requestedClipGain(value.volume),
+  };
 }

@@ -79,7 +79,11 @@ describe("free audio in Reel plans", () => {
   it("places a short real sound without buying generation or rounding its duration to a longer clip", () => {
     const ctx = context();
     const plan = normalizeEditorChatPlan(
-      { actions: [{ ...action, credits: 999, insert: { start: 4 } }] },
+      {
+        actions: [
+          { ...action, credits: 999, insert: { start: 4, volume: 0.12 } },
+        ],
+      },
       ctx
     );
     expect(plan.actions).toHaveLength(1);
@@ -88,7 +92,7 @@ describe("free audio in Reel plans", () => {
       catalogId: sound.id,
       credits: 0,
       scope: "requested",
-      insert: { start: 4, duration: sound.duration },
+      insert: { start: 4, duration: sound.duration, volume: 0.12 },
     });
     expect(plan.totalCredits).toBe(5);
     expect(plan.budgetExceeded).toBe(false);

@@ -53,7 +53,7 @@ const action: CatalogAudioAction = {
   credits: 0,
   dependsOn: [],
   status: "pending",
-  insert: { start: 4, duration: entry.duration },
+  insert: { start: 4, duration: entry.duration, volume: 0.12 },
 };
 
 describe("free catalog file execution", () => {
@@ -156,6 +156,7 @@ describe("free catalog file execution", () => {
       start: 4,
       duration: entry.duration,
       track: "audio",
+      volume: 0.12,
       label: "My transition",
     });
     const replay = applyChatCatalogAudio(inserted, saved, action);
