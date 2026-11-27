@@ -21822,5 +21822,1301 @@
         "displayLabel": "Bottom button"
       }
     ]
+  },
+  {
+    "id": "poster-505b870d1177",
+    "name": "Brush poster · Landscape",
+    "category": "title",
+    "presentation": "poster",
+    "description": "Red brush lettering centered between a small upper credit and a lower-right line.",
+    "design": {
+      "layout": "Red brush lettering centered between a small upper credit and a lower-right line.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for landscape footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-505b870d1177.bin",
+    "sha256": "824e7f9e09ee971a0c2eaefe1256d7eb87702eeabf7999d4f59ced4f9f5cd6be",
+    "sourceSha256": "505b870d117788cd5e00e10e03831908c65e3da93c7d71c4d156dc517c71c5de",
+    "compWidth": 1920,
+    "compHeight": 1080,
+    "duration": 4.971633333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/shamar.ttf",
+        "sha256": "0fb3895abbbd91e95c7bfa15f892d20bb8f4ab97551aae69f77c6e1339033126"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "STUDIO PRODUCTION",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 47.7,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "DEMONS",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 342.9,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "To Life WITH",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 85.86,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#EE2C20"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#EE2C20"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#EE2C20"
+      }
+    ],
+    "bounds": {
+      "x": 0.18541666666666667,
+      "y": 0.05,
+      "width": 0.5958333333333333,
+      "height": 0.6129629629629629
+    },
+    "entranceEnd": 0,
+    "exitStart": 4.971633333333333,
+    "staticHold": true
+  },
+  {
+    "id": "poster-619dd0ca6036",
+    "name": "Offset poster · Landscape",
+    "category": "title",
+    "presentation": "poster",
+    "description": "Tilted gold block lettering with a red extruded shadow, upper-left credits and a separate bottom credit.",
+    "design": {
+      "layout": "Tilted gold block lettering with a red extruded shadow, upper-left credits and a separate bottom credit.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for landscape footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-619dd0ca6036.bin",
+    "sha256": "0cb931d666e1186bf4837690d0d8c326f5d20d428f1f56b6261ec9830a7dcc78",
+    "sourceSha256": "619dd0ca603653c8502fc5520256eeeefe8eb11dcd2ffdc67887ccc35ea22b77",
+    "compWidth": 1920,
+    "compHeight": 1080,
+    "duration": 4.971633333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/peacesans.otf",
+        "sha256": "80d6940f36b4fa1534ef324fdc5c4e82c6b4e5a0f617a9e55b76a8fcd04ee05a"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "THE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 131.04443359375,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "ASTEROID\n                LIFE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 194.0,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "Edited By J.J.Gail",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 40.035546875,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-4",
+        "type": "text",
+        "comp": 1,
+        "layer": 119,
+        "property": 122,
+        "default": "Produced By Studio",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 40.035546875,
+        "label": "Credit 2",
+        "textSlot": 3,
+        "displayLabel": "Credit 2"
+      },
+      {
+        "key": "text-5",
+        "type": "text",
+        "comp": 1,
+        "layer": 158,
+        "property": 161,
+        "default": "A film by Studio",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 40.035546875,
+        "label": "Credit 3",
+        "textSlot": 4,
+        "displayLabel": "Credit 3"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 197,
+        "property": 200,
+        "default": "THE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 131.04443359375,
+        "label": "Supporting line",
+        "linkedCopy": true,
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 236,
+        "property": 239,
+        "default": "ASTEROID\n                LIFE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 194.0,
+        "label": "Headline",
+        "linkedCopy": true,
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 278,
+        "default": "#AE963A"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 286,
+        "default": "#AE963A"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 197,
+        "property": 318,
+        "default": "#A32323"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 236,
+        "property": 326,
+        "default": "#A32323"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 80,
+        "property": 294,
+        "default": "#D0D0D0"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 119,
+        "property": 302,
+        "default": "#D0D0D0"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 158,
+        "property": 310,
+        "default": "#D0D0D0"
+      }
+    ],
+    "bounds": {
+      "x": 0.06666666666666667,
+      "y": 0.06296296296296296,
+      "width": 0.7114583333333333,
+      "height": 0.8962962962962963
+    },
+    "entranceEnd": 0,
+    "exitStart": 4.971633333333333,
+    "staticHold": true
+  },
+  {
+    "id": "poster-bd49df672fb6",
+    "name": "Offset poster · UHD",
+    "category": "title",
+    "presentation": "poster",
+    "description": "Tilted gold block lettering with a red extruded shadow, upper-left credits and a separate bottom credit.",
+    "design": {
+      "layout": "Tilted gold block lettering with a red extruded shadow, upper-left credits and a separate bottom credit.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for uhd footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-bd49df672fb6.bin",
+    "sha256": "4d672368f5fdea7a9baef414a8fee03be2366183301c5a97e9e9d15cd512da13",
+    "sourceSha256": "bd49df672fb6c09a1855adb4e068cb55f183ebf795ec6c68e91fb06c398cc0c8",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 1.2345666666666666,
+    "fonts": [
+      {
+        "url": "/fonts/native/peacesans.otf",
+        "sha256": "80d6940f36b4fa1534ef324fdc5c4e82c6b4e5a0f617a9e55b76a8fcd04ee05a"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "THE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 262.0888671875,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "ASTEROID\n                LIFE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 388.0,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "Edited By J.J.Gail",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 80.07109375,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-4",
+        "type": "text",
+        "comp": 1,
+        "layer": 119,
+        "property": 122,
+        "default": "Produced By Studio",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 80.07109375,
+        "label": "Credit 2",
+        "textSlot": 3,
+        "displayLabel": "Credit 2"
+      },
+      {
+        "key": "text-5",
+        "type": "text",
+        "comp": 1,
+        "layer": 158,
+        "property": 161,
+        "default": "A film by Studio",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 80.07109375,
+        "label": "Credit 3",
+        "textSlot": 4,
+        "displayLabel": "Credit 3"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 197,
+        "property": 200,
+        "default": "THE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 262.0888671875,
+        "label": "Supporting line",
+        "linkedCopy": true,
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 236,
+        "property": 239,
+        "default": "ASTEROID\n                LIFE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 388.0,
+        "label": "Headline",
+        "linkedCopy": true,
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 278,
+        "default": "#AE963A"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 286,
+        "default": "#AE963A"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 197,
+        "property": 318,
+        "default": "#A32323"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 236,
+        "property": 326,
+        "default": "#A32323"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 80,
+        "property": 294,
+        "default": "#D0D0D0"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 119,
+        "property": 302,
+        "default": "#D0D0D0"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 158,
+        "property": 310,
+        "default": "#D0D0D0"
+      }
+    ],
+    "bounds": {
+      "x": 0.06875,
+      "y": 0.06666666666666667,
+      "width": 0.7083333333333334,
+      "height": 0.8888888888888888
+    },
+    "entranceEnd": 0,
+    "exitStart": 1.2345666666666666,
+    "staticHold": true
+  },
+  {
+    "id": "poster-70d7d79fb907",
+    "name": "Brush poster · UHD",
+    "category": "title",
+    "presentation": "poster",
+    "description": "Red brush lettering centered between a small upper credit and a lower-right line.",
+    "design": {
+      "layout": "Red brush lettering centered between a small upper credit and a lower-right line.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for uhd footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-70d7d79fb907.bin",
+    "sha256": "75a548fa4ab7fc3517b8557d4d17f32087f8a9c617c401cebab1ba34ff1ee6af",
+    "sourceSha256": "70d7d79fb9072b29b857da93f5ed6602ad96ecd0dabe56e67c5ae2fc24d4a2c6",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 1.3346666666666667,
+    "fonts": [
+      {
+        "url": "/fonts/native/shamar.ttf",
+        "sha256": "0fb3895abbbd91e95c7bfa15f892d20bb8f4ab97551aae69f77c6e1339033126"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "STUDIO PRODUCTION",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 95.4,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "DEMONS",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 685.8,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "To Life WITH",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 171.72,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#EE2C20"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#EE2C20"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#EE2C20"
+      }
+    ],
+    "bounds": {
+      "x": 0.1875,
+      "y": 0.05277777777777778,
+      "width": 0.5927083333333333,
+      "height": 0.6064814814814815
+    },
+    "entranceEnd": 0,
+    "exitStart": 1.3346666666666667,
+    "staticHold": true
+  },
+  {
+    "id": "poster-fded0c59fa99",
+    "name": "Brush poster · Square",
+    "category": "title",
+    "presentation": "poster",
+    "description": "Red brush lettering centered between a small upper credit and a lower-right line.",
+    "design": {
+      "layout": "Red brush lettering centered between a small upper credit and a lower-right line.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for square footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-fded0c59fa99.bin",
+    "sha256": "c37b76d89fad0d28fca21b1ebd99fc38775ba552cb8da88d109f15f3f452c81a",
+    "sourceSha256": "fded0c59fa99d81086b701cbc71d27aa751727f38557bb319ee06cb582b94b15",
+    "compWidth": 1080,
+    "compHeight": 1080,
+    "duration": 1.3346666666666667,
+    "fonts": [
+      {
+        "url": "/fonts/native/shamar.ttf",
+        "sha256": "0fb3895abbbd91e95c7bfa15f892d20bb8f4ab97551aae69f77c6e1339033126"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "STUDIO PRODUCTION",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "DEMONS",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 192.88125,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "To Life WITH",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 48.29625,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#EE2C20"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#EE2C20"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#EE2C20"
+      }
+    ],
+    "bounds": {
+      "x": 0.18518518518518517,
+      "y": 0.05740740740740741,
+      "width": 0.5981481481481481,
+      "height": 0.5462962962962963
+    },
+    "entranceEnd": 0,
+    "exitStart": 1.3346666666666667,
+    "staticHold": true
+  },
+  {
+    "id": "poster-d97b5bb8785c",
+    "name": "Offset poster · Square",
+    "category": "title",
+    "presentation": "poster",
+    "description": "Tilted gold block lettering with a red extruded shadow, upper-left credits and a separate bottom credit.",
+    "design": {
+      "layout": "Tilted gold block lettering with a red extruded shadow, upper-left credits and a separate bottom credit.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for square footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-d97b5bb8785c.bin",
+    "sha256": "506dc24837fbfb6776badbe1347c892398ef64df564aef381002e4e6aa35f3f7",
+    "sourceSha256": "d97b5bb8785c07e54780de6cee251575e7811942ba0079f8742467ccf9b097d4",
+    "compWidth": 1080,
+    "compHeight": 1080,
+    "duration": 1.2345666666666666,
+    "fonts": [
+      {
+        "url": "/fonts/native/peacesans.otf",
+        "sha256": "80d6940f36b4fa1534ef324fdc5c4e82c6b4e5a0f617a9e55b76a8fcd04ee05a"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "THE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 73.71249389648438,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "ASTEROID\n                LIFE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 109.125,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "Edited By J.J.Gail",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-4",
+        "type": "text",
+        "comp": 1,
+        "layer": 119,
+        "property": 122,
+        "default": "Produced By Studio",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Credit 2",
+        "textSlot": 3,
+        "displayLabel": "Credit 2"
+      },
+      {
+        "key": "text-5",
+        "type": "text",
+        "comp": 1,
+        "layer": 158,
+        "property": 161,
+        "default": "A film by Studio",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Credit 3",
+        "textSlot": 4,
+        "displayLabel": "Credit 3"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 197,
+        "property": 200,
+        "default": "THE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 73.71249389648438,
+        "label": "Supporting line",
+        "linkedCopy": true,
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 236,
+        "property": 239,
+        "default": "ASTEROID\n                LIFE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 109.125,
+        "label": "Headline",
+        "linkedCopy": true,
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 278,
+        "default": "#AE963A"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 286,
+        "default": "#AE963A"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 197,
+        "property": 318,
+        "default": "#A32323"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 236,
+        "property": 326,
+        "default": "#A32323"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 80,
+        "property": 294,
+        "default": "#D0D0D0"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 119,
+        "property": 302,
+        "default": "#D0D0D0"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 158,
+        "property": 310,
+        "default": "#D0D0D0"
+      }
+    ],
+    "bounds": {
+      "x": 0.06666666666666667,
+      "y": 0.06666666666666667,
+      "width": 0.7129629629629629,
+      "height": 0.8907407407407407
+    },
+    "entranceEnd": 0,
+    "exitStart": 1.2345666666666666,
+    "staticHold": true
+  },
+  {
+    "id": "poster-44cf9cf7e85a",
+    "name": "Offset poster · Portrait",
+    "category": "title",
+    "presentation": "poster",
+    "description": "Tilted gold block lettering with a red extruded shadow, upper-left credits and a separate bottom credit.",
+    "design": {
+      "layout": "Tilted gold block lettering with a red extruded shadow, upper-left credits and a separate bottom credit.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for portrait footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-44cf9cf7e85a.bin",
+    "sha256": "f8d16b97276f07a746338f61a6e80bb84c30857f4562be94745e19ce8272dec7",
+    "sourceSha256": "44cf9cf7e85ad2feca5d311cb561c2a5b52f62be88998e7c3b073b11827124c3",
+    "compWidth": 1080,
+    "compHeight": 1920,
+    "duration": 1.2345666666666666,
+    "fonts": [
+      {
+        "url": "/fonts/native/peacesans.otf",
+        "sha256": "80d6940f36b4fa1534ef324fdc5c4e82c6b4e5a0f617a9e55b76a8fcd04ee05a"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "THE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 73.71249389648438,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "ASTEROID\n                LIFE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 109.125,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "Edited By J.J.Gail",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-4",
+        "type": "text",
+        "comp": 1,
+        "layer": 119,
+        "property": 122,
+        "default": "Produced By Studio",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Credit 2",
+        "textSlot": 3,
+        "displayLabel": "Credit 2"
+      },
+      {
+        "key": "text-5",
+        "type": "text",
+        "comp": 1,
+        "layer": 158,
+        "property": 161,
+        "default": "A film by Studio",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Credit 3",
+        "textSlot": 4,
+        "displayLabel": "Credit 3"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 197,
+        "property": 200,
+        "default": "THE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 73.71249389648438,
+        "label": "Supporting line",
+        "linkedCopy": true,
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 236,
+        "property": 239,
+        "default": "ASTEROID\n                LIFE",
+        "font": "PeaceSans",
+        "allCaps": false,
+        "fontSize": 109.125,
+        "label": "Headline",
+        "linkedCopy": true,
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 278,
+        "default": "#AE963A"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 286,
+        "default": "#AE963A"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 197,
+        "property": 318,
+        "default": "#A32323"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 236,
+        "property": 326,
+        "default": "#A32323"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 80,
+        "property": 294,
+        "default": "#D0D0D0"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 119,
+        "property": 302,
+        "default": "#D0D0D0"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 158,
+        "property": 310,
+        "default": "#D0D0D0"
+      }
+    ],
+    "bounds": {
+      "x": 0.06481481481481481,
+      "y": 0.08020833333333334,
+      "width": 0.7148148148148148,
+      "height": 0.8697916666666666
+    },
+    "entranceEnd": 0,
+    "exitStart": 1.2345666666666666,
+    "staticHold": true
+  },
+  {
+    "id": "poster-d3b045982b73",
+    "name": "Brush poster · Portrait",
+    "category": "title",
+    "presentation": "poster",
+    "description": "Red brush lettering centered between a small upper credit and a lower-right line.",
+    "design": {
+      "layout": "Red brush lettering centered between a small upper credit and a lower-right line.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for portrait footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-d3b045982b73.bin",
+    "sha256": "717e0692ea52c373399a851696a377c213cee0faea4b0e12bba76824ad8c6afc",
+    "sourceSha256": "d3b045982b73c4e06ad7c393fc919252775ba169afe5d1834b11061e04675bc8",
+    "compWidth": 1080,
+    "compHeight": 1920,
+    "duration": 1.3346666666666667,
+    "fonts": [
+      {
+        "url": "/fonts/native/shamar.ttf",
+        "sha256": "0fb3895abbbd91e95c7bfa15f892d20bb8f4ab97551aae69f77c6e1339033126"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "STUDIO PRODUCTION",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 47.7,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "DEMONS",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 199.8,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "To Life WITH",
+        "font": "Shamar",
+        "allCaps": false,
+        "fontSize": 48.29625,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#EE2C20"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#EE2C20"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#EE2C20"
+      }
+    ],
+    "bounds": {
+      "x": 0.17407407407407408,
+      "y": 0.06458333333333334,
+      "width": 0.6185185185185185,
+      "height": 0.49270833333333336
+    },
+    "entranceEnd": 0,
+    "exitStart": 1.3346666666666667,
+    "staticHold": true
   }
 ]

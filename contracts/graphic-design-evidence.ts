@@ -39,7 +39,7 @@ export function graphicDesignEvidence(g: MotionGraphic, duration: number) {
                 }
               )
             ),
-            textFields: template?.controls.filter(c => c.type === "text")
+            textFields: template?.controls.filter(c => c.type === "text" && !c.linkedCopy)
               .map(c => ({
                 key: c.key,
                 label: c.displayLabel ?? c.label,

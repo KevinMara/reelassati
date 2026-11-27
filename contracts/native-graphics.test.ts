@@ -18,6 +18,21 @@ const template = NATIVE_GRAPHIC_TEMPLATES.find(
   t => t.name === "Stacked outline"
 )!;
 describe("editable native graphic contract", () => {
+  it("keeps an offset poster's headline and its shadow bound to one editable field", () => {
+    const preset = GRAPHIC_PRESETS.find(p => p.name === "Offset poster · Portrait")!;
+    const template = nativeGraphicTemplate(preset.id)!;
+    const fields = editorPresetCatalog([], [], preset.name).graphics
+      .find(p => p.id === preset.id)!.design.template!.textFields!;
+    expect(fields.map(f => f.slot).sort()).toEqual([0, 1, 2, 3, 4]);
+    const slots = ["NIGHT", "LIVE", "EDIT", "CUT", "CREW"];
+    const values = Object.fromEntries(fields.map(f => [f.key, slots[f.slot]]));
+    const saved = normalizeGraphic(JSON.parse(JSON.stringify(
+      instantiateGraphicPreset(preset.graphic, { native: { values } })
+    )))!;
+    const shadows = template.controls.filter(c => c.linkedCopy);
+    expect(shadows).toHaveLength(2);
+    for (const c of shadows) expect(nativeTextValue(c, saved)).toBe(slots[c.textSlot!]);
+  });
   it("resolves every advertised text binding from planner output through persisted renderer inputs", () => {
     const catalog = editorPresetCatalog();
     for (const template of NATIVE_GRAPHIC_TEMPLATES) {

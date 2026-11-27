@@ -117,6 +117,35 @@ const phoneFields: Record<string, string> = {
   th: "ชื่อการแจ้งเตือน|ข้อความแจ้งเตือน|ข้อความบนปุ่ม|ปุ่มขวา|ปุ่มซ้าย|ปุ่มบน|ปุ่มกลาง|ปุ่มล่าง",
 };
 
+const posters: Record<string, string> = {
+  it: "Titolo da poster modificabile.|Poster a pennello|Poster con ombra sfalsata",
+  es: "Título de cartel editable.|Cartel a pincel|Cartel con sombra desplazada",
+  fr: "Titre d’affiche modifiable.|Affiche au pinceau|Affiche à ombre décalée",
+  de: "Editierbarer Plakattitel.|Pinselplakat|Plakat mit versetztem Schatten",
+  pt: "Título de cartaz editável.|Cartaz com pincel|Cartaz com sombra deslocada",
+  nl: "Bewerkbare postertitel.|Penseelposter|Poster met verschoven schaduw",
+  pl: "Edytowalny tytuł plakatu.|Plakat z pismem pędzlowym|Plakat z przesuniętym cieniem",
+  ro: "Titlu de afiș editabil.|Afiș cu litere pictate|Afiș cu umbră decalată",
+  tr: "Düzenlenebilir afiş başlığı.|Fırça yazılı afiş|Kaydırılmış gölgeli afiş",
+  uk: "Редагований заголовок плаката.|Плакат із пензлевим написом|Плакат зі зміщеною тінню",
+  ru: "Редактируемый заголовок плаката.|Плакат с кистевой надписью|Плакат со смещённой тенью",
+  ar: "عنوان ملصق قابل للتعديل.|ملصق بخط الفرشاة|ملصق بظل مزاح",
+  hi: "संपादन योग्य पोस्टर शीर्षक।|ब्रश अक्षरों वाला पोस्टर|खिसकी हुई छाया वाला पोस्टर",
+  ja: "編集可能なポスタータイトル。|筆文字ポスター|ずらし影ポスター",
+  ko: "편집 가능한 포스터 제목.|붓글씨 포스터|엇갈린 그림자 포스터",
+  zh: "可编辑的海报标题。|笔刷字海报|错位阴影海报",
+  vi: "Tiêu đề áp phích có thể chỉnh sửa.|Áp phích chữ nét cọ|Áp phích đổ bóng lệch",
+  da: "Redigerbar plakattitel.|Plakat med penselskrift|Plakat med forskudt skygge",
+  sv: "Redigerbar affischrubrik.|Affisch med penselskrift|Affisch med förskjuten skugga",
+  no: "Redigerbar plakattittel.|Plakat med penselskrift|Plakat med forskjøvet skygge",
+  fi: "Muokattava julisteotsikko.|Sivellintekstijuliste|Juliste siirretyllä varjolla",
+  cs: "Upravitelný plakátový titulek.|Plakát s malovaným písmem|Plakát s posunutým stínem",
+  hu: "Szerkeszthető plakátcím.|Ecsetbetűs plakát|Eltolt árnyékos plakát",
+  el: "Επεξεργάσιμος τίτλος αφίσας.|Αφίσα με γράμματα πινέλου|Αφίσα με μετατοπισμένη σκιά",
+  he: "כותרת כרזה הניתנת לעריכה.|כרזה בכתב מכחול|כרזה עם צל מוסט",
+  id: "Judul poster yang dapat diedit.|Poster tulisan kuas|Poster bayangan bergeser",
+  th: "ชื่อโปสเตอร์ที่แก้ไขได้|โปสเตอร์ตัวอักษรพู่กัน|โปสเตอร์เงาเหลื่อม",
+};
 export function nativeGraphicsTranslations(
   code: string,
   catalog: Record<string, string>
@@ -135,9 +164,14 @@ export function nativeGraphicsTranslations(
   phoneLabels.forEach((key, i) => { result[key] = fields[i]; });
   result["Three-line cascade"] = cascade;
   result["Editable notification card."] = description;
+  const [posterDescription, brushName, offsetName] = posters[code].split("|");
+  result["Editable poster title."] = posterDescription;
   result["Complete every text field for this animation."] = missing;
   for (const t of NATIVE_GRAPHIC_TEMPLATES) {
-    if (t.platform) {
+    if (t.presentation === "poster") {
+      const [name, format] = t.name.split(" · ");
+      result[t.name] = `${name === "Brush poster" ? brushName : offsetName} · ${catalog[format] ?? format}`;
+    } else if (t.platform) {
       const profile = t.controls.some(
         c => c.type === "text" && c.textSlot === 1
       );

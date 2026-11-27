@@ -212,9 +212,9 @@ export function NativeGraphicComposer({
         value={graphic.color}
         onChange={color => patch({ color })}
       />
-      {second && (
+      {second && (template.presentation !== "poster" || template.controls.some(c => c.colorSlot === 1)) && (
         <ColorPicker
-          label={ui("Second line color")}
+          label={ui(template.presentation === "poster" ? "Accent color" : "Second line color")}
           value={graphic.accent ?? graphic.color}
           onChange={accent => patch({ accent })}
         />
@@ -241,7 +241,7 @@ export function NativeGraphicComposer({
           />
         </label>
       ))}
-      <div className="grid grid-cols-2 gap-2">
+      {template.presentation !== "poster" && <div className="grid grid-cols-2 gap-2">
         {(["enter", "exit"] as const).map(key => (
           <label key={key} className="text-sm">
             {ui(key === "enter" ? "Entrance duration" : "Exit duration")}
@@ -256,7 +256,7 @@ export function NativeGraphicComposer({
             />
           </label>
         ))}
-      </div>
+      </div>}
       <details className="rounded-lg border border-border p-3">
         <summary className="cursor-pointer text-sm">
           {ui("Customize appearance")}
@@ -264,8 +264,9 @@ export function NativeGraphicComposer({
         <div className="mt-3 space-y-3">
           {template.controls
             .filter(
-              c =>
+              (c, i, all) =>
                 c.type !== "text" &&
+                all.findIndex(other => other.key === c.key) === i &&
                 !(c.colorSlot !== undefined
                   ? c.colorSlot < 2
                   : !c.displayLabel && c.label.startsWith("Text"))

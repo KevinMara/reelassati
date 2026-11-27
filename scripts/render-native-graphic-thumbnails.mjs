@@ -13,6 +13,7 @@ for (const t of JSON.parse(
   await fs.readFile("contracts/native-graphics-data.json", "utf8")
 )) {
   if (process.argv.includes("--notifications") && t.category !== "notification") continue;
+  if (process.argv.includes("--posters") && t.presentation !== "poster") continue;
   if (
     process.argv.includes("--missing") &&
     (await fs.stat(`public/native-graphics/${t.id}.png`).then(

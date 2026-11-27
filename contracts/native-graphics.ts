@@ -17,6 +17,8 @@ export interface NativeGraphicControl {
   min?: number;
   max?: number;
   textSlot?: number;
+  /** An authored duplicate (such as a hard shadow) follows its visible text field. */
+  linkedCopy?: boolean;
   /** Explicit source mapping; legacy templates retain their original mapping. */
   colorSlot?: number;
   displayLabel?: string;
@@ -37,6 +39,7 @@ export interface NativeGraphicTemplate {
   name: string;
   description: string;
   category: "title" | "social" | "notification";
+  presentation?: "poster";
   platform?: string;
   url: string;
   sha256: string;
@@ -169,7 +172,7 @@ export function nativeGraphicExtraCopy(
   g: Pick<MotionGraphic, "text" | "secondaryText" | "native">
 ) {
   return (nativeGraphicTemplate(g.native?.id)?.controls ?? []).flatMap(c => {
-    if (c.type === "text" && (c.textSlot ?? 0) >= 2)
+    if (c.type === "text" && !c.linkedCopy && (c.textSlot ?? 0) >= 2)
       return [nativeTextValue(c, g)];
     if (!c.displayedValue) return [];
     const n = Number(g.native?.values[c.key] ?? c.default);

@@ -925,11 +925,13 @@ const BASE_GRAPHIC_PRESETS: readonly GraphicPreset[] = [
 export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
   ...BASE_GRAPHIC_PRESETS,
   ...NATIVE_GRAPHIC_TEMPLATES.map(template => {
-    const texts = template.controls.filter(c => c.type === "text");
+    const texts = template.controls.filter(c => c.type === "text" && !c.linkedCopy);
     return graphic(
       template.id,
       template.name,
-      template.category === "title"
+      template.presentation === "poster"
+        ? "Editable poster title."
+        : template.category === "title"
         ? "Editable animated title."
         : template.category === "social"
           ? "Animated icon and editable handle."
@@ -971,10 +973,12 @@ export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
           )?.default ?? "#FFFFFF"
         ),
         animation: "none",
-        x: 50,
-        y: template.category === "social" ? 65 : 38,
+        x: template.presentation === "poster" ? 100 * (template.bounds.x + template.bounds.width / 2) : 50,
+        y: template.presentation === "poster" ? 100 * (template.bounds.y + template.bounds.height / 2) : template.category === "social" ? 65 : 38,
         size:
-          template.category === "notification"
+          template.presentation === "poster"
+            ? template.bounds.width * 10
+            : template.category === "notification"
             ? 9
             : template.category === "social"
               ? texts.length > 1
@@ -982,7 +986,7 @@ export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
                 : 6
               : 7,
       },
-      4
+      template.presentation === "poster" ? template.duration : 4
     );
   }),
   ...BASE_GRAPHIC_PRESETS.flatMap(p =>
