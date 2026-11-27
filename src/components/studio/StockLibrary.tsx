@@ -1,4 +1,6 @@
 import { SharedCatalogLibrary } from "./SharedCatalogLibrary";
+import type { Asset } from "@contracts/workspace";
+import type { ClipColorLut } from "@contracts/color-lut";
 import { selectedBrand } from "@/lib/workspace-scope";
 import { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, Loader2, Search } from "lucide-react";
@@ -18,7 +20,65 @@ import { CompactSelect } from "@/components/ui/compact-select";
 import { EditorSoundLibrary } from "./EditorSoundLibrary";
 import { EditorEffectLibrary } from "./EditorEffectLibrary";
 
-export function StockLibrary() {
+export function StockLibrary({
+  onInsert,
+  onApplyLook,
+}: {
+  onInsert?: (asset: Asset) => Promise<void>;
+  onApplyLook?: (look: ClipColorLut) => Promise<void>;
+}) {
+  const ui = useUiText();
+  const [source, setSource] = useState("reel");
+  const [kind, setKind] = useState<StockKind | "all" | "lut">("all");
+  return (
+    <section
+      className="space-y-3 rounded-xl border border-border p-3"
+      aria-label={ui("Reel stock")}
+    >
+      <div className="flex flex-wrap gap-2">
+        <CompactSelect
+          aria-label={ui("Source")}
+          value={source}
+          onValueChange={setSource}
+          options={[
+            { value: "reel", label: ui("Reel stock") },
+            { value: "external", label: "Wikimedia Commons · Openverse" },
+          ]}
+        />
+        {source === "reel" && (
+          <CompactSelect
+            aria-label={ui("Stock type")}
+            value={kind}
+            onValueChange={value => setKind(value as typeof kind)}
+            options={[
+              { value: "all", label: ui("All") },
+              { value: "video", label: ui("Video") },
+              { value: "image", label: ui("Images") },
+              { value: "audio", label: ui("Audio") },
+              { value: "lut", label: ui("Color looks") },
+            ]}
+          />
+        )}
+      </div>
+      {source === "reel" ? (
+        <>
+          <SharedCatalogLibrary
+            key={kind}
+            kind={kind}
+            onInsert={onInsert}
+            onApplyLook={onApplyLook}
+          />
+          {kind === "audio" && <EditorSoundLibrary />}
+          {kind === "video" && <EditorEffectLibrary onInsert={onInsert} />}
+        </>
+      ) : (
+        <ExternalStockLibrary />
+      )}
+    </section>
+  );
+}
+
+function ExternalStockLibrary() {
   const ui = useUiText();
   const { updateWorkspace } = useWorkspace();
   const [kind, setKind] = useState<StockKind>("video");
@@ -117,12 +177,9 @@ export function StockLibrary() {
     }
   }
   return (
-    <section
-      className="space-y-4 rounded-xl border border-border p-4"
-      aria-label={ui("Reel stock")}
-    >
+    <section className="space-y-4" aria-label="Wikimedia Commons · Openverse">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="mr-auto font-semibold">{ui("Reel stock")}</h2>
+        <h2 className="mr-auto font-semibold">{ui("Stock media")}</h2>
         <span className="text-xs text-muted-foreground">
           {ui("Free media · no AI credits")}
         </span>
@@ -305,9 +362,6 @@ export function StockLibrary() {
           {ui("Not endorsed or certified by Openverse.")}
         </p>
       )}
-      <SharedCatalogLibrary kind={kind} />
-      {kind === "audio" && <EditorSoundLibrary />}
-      {kind === "video" && <EditorEffectLibrary />}
     </section>
   );
 }

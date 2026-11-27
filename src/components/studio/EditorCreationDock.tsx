@@ -1,4 +1,5 @@
 import { SharedCatalogLibrary } from "./SharedCatalogLibrary";
+import type { ClipColorLut } from "@contracts/color-lut";
 import { useUiText } from "@/lib/i18n/ui";
 import {
   lazy,
@@ -80,6 +81,7 @@ export function EditorCreationDock({
   adjustment,
   onGraphic,
   onMotionKit,
+  onApplyLook,
 }: {
   onAssist?: (context: string) => void;
   activeTool: DockKind;
@@ -93,6 +95,7 @@ export function EditorCreationDock({
   project: EditProject;
   playhead: number;
   onInsert: (asset: Asset, position?: "playhead" | "end") => Promise<void>;
+  onApplyLook?: (look: ClipColorLut) => Promise<void>;
 }) {
   const ui = useUiText();
   const { workspace, capabilities, updateWorkspace, getWorkspaceSnapshot } =
@@ -375,7 +378,7 @@ export function EditorCreationDock({
               onClick={() =>
                 onAssist(
                   kind === "library"
-                    ? "Recommend existing library shots to support this edit, using actual filenames."
+                    ? "Recommend library or Reel stock that supports specific moments in this edit. Use reviewed frames, recorded sounds and footage observations to explain where each choice fits."
                     : kind === "graphics"
                       ? "Propose executable graphic operations for this footage: editable text, callouts, counters, countdowns, arrows or highlights. Base numbers on supplied facts; use observed timestamps and keep faces and captions clear."
                       : `Suggest the best ${kind === "voice" ? "voiceover text and delivery" : kind === "audio" ? "music and sound design" : `${kind} generation prompt`} for this edit. Provide a usable prompt in the summary; do not generate media.`
@@ -390,7 +393,7 @@ export function EditorCreationDock({
         {kind === "captions" ? (
           captions
         ) : kind === "library" ? (
-          <EditorMediaLibrary playhead={playhead} onInsert={onInsert} />
+          <EditorMediaLibrary playhead={playhead} onInsert={onInsert} onApplyLook={onApplyLook} />
         ) : kind === "graphics" ? (
           <div className="space-y-4">
             <div className="flex rounded-lg bg-background/60 p-1">

@@ -22,10 +22,19 @@ import {
   captionTextCss,
 } from "./caption-rendering";
 import { fetchEditorFont, loadEditorFont } from "./editor-fonts";
+import substitutes from "@contracts/native-font-substitutions.json";
 
 afterEach(() => vi.unstubAllGlobals());
 const cue = { id: "c", start: 0, end: 1, text: "Video 2026 — voilà!" };
 describe("bundled exact caption faces", () => {
+  it.each(Object.entries(substitutes))("renders source font %s with the declared bundled substitute", (source, postscript) => {
+    const face = EDITOR_FONTS.find(f => f.postscript === postscript)!;
+    const preset = getCaptionPreset("classic", {fontId: source});
+    expect(preset.fontId).toBe(face.id);
+    expect(editorFontMetrics(source)).toBe(editorFontMetrics(face.id));
+    expect(captionTextCss(preset).fontFamily).toContain(face.id);
+    expect(captionAssStyle("classic", 640, 360, {fontId: source})).toEqual(captionAssStyle("classic", 640, 360, {fontId: face.id}));
+  });
   for (const face of EDITOR_FONTS)
     it(`renders ${face.id} with its actual font and saved metrics`, () => {
       const data = readFileSync(`public${face.url}`);

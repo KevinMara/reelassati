@@ -14,6 +14,8 @@ import {
   type SharedMediaCatalogItem,
 } from "@contracts/shared-media-catalog";
 import type { Asset } from "@contracts/workspace";
+import type { ClipColorLut } from "@contracts/color-lut";
+import { loadColorLut } from "@/lib/color-lut";
 import { useWorkspace } from "@/providers/workspace";
 import { useUiText } from "@/lib/i18n/ui";
 import {
@@ -28,9 +30,11 @@ import { selectedBrand } from "@/lib/workspace-scope";
 export function SharedCatalogLibrary({
   kind,
   onInsert,
+  onApplyLook,
 }: {
-  kind?: "audio" | "video" | "image" | "visual";
+  kind?: "all" | "audio" | "video" | "image" | "visual" | "lut";
   onInsert?: (asset: Asset) => Promise<void>;
+  onApplyLook?: (look: ClipColorLut) => Promise<void>;
 }) {
   const ui = useUiText();
   const { workspace, getWorkspaceSnapshot, updateWorkspace, capabilities } =
@@ -90,6 +94,19 @@ export function SharedCatalogLibrary({
     setBusy(item.id);
     setError("");
     try {
+      if (item.kind === "lut") {
+        if (!onApplyLook) return;
+        const look = {
+          id: item.id,
+          name: item.name,
+          sha256: item.media.sha256,
+          amount: 1,
+        };
+        await loadColorLut(look, controller.signal);
+        controller.signal.throwIfAborted();
+        await onApplyLook(look);
+        return;
+      }
       const scope = await captureUploadRequestScope();
       const asset = await resolveSharedCatalogAsset(
         item.id,
@@ -141,14 +158,15 @@ export function SharedCatalogLibrary({
         <input
           value={query}
           onChange={event => setQuery(event.target.value)}
-          aria-label={ui("Search")}
-          placeholder={ui("Search")}
+          type="search"
+          aria-label={ui("Search stock")}
+          placeholder={ui("Search stock…")}
           className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1.5 text-xs"
         />
         <button
           className="rounded border border-border p-2"
           type="submit"
-          aria-label={ui("Search")}
+          aria-label={ui("Search stock")}
         >
           <Search size={14} />
         </button>
@@ -195,6 +213,35 @@ export function SharedCatalogLibrary({
               poster = item.poster
                 ? platformApiUrl(sharedCatalogMediaPath(item.id, "poster"))
                 : undefined;
+            if (item.kind === "lut")
+              return (
+                <article
+                  key={item.id}
+                  className="min-w-0 space-y-2 rounded-lg border border-border p-2"
+                >
+                  <p className="text-xs font-medium">{item.name}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {item.group} · {item.lut?.size} LUT
+                  </p>
+                  {onApplyLook && (
+                    <button
+                      type="button"
+                      disabled={!!busy}
+                      onClick={() => void save(item, true)}
+                      className="rounded border border-primary/30 px-2 py-1 text-xs text-primary disabled:opacity-40"
+                    >
+                      {ui("Apply")}
+                    </button>
+                  )}
+                  <a
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs underline"
+                    href={source + "?download=1"}
+                    download={item.name + ".cube"}
+                  >
+                    <Download size={12} /> {ui("Download")}
+                  </a>
+                </article>
+              );
             return (
               <article
                 key={item.id}

@@ -3,6 +3,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
+import fontSubstitutions from "../contracts/native-font-substitutions.json" with { type: "json" };
 import {
   adaptAdobeProject,
   adobeMainComposition,
@@ -43,6 +44,7 @@ const rows = JSON.parse(
 // official variable-font static instances. Preserve this mapping as provenance;
 // it is not a claim about the version used by the original template author.
 const fontAliases = {
+  ...fontSubstitutions,
   "MontserratRoman-Black": "Montserrat-Black",
   "Montserrat-BlackItalic": "MontserratItalic-BlackItalic",
   "Montserrat-ExtraBoldItalic": "MontserratItalic-ExtraBoldItalic",
@@ -113,7 +115,7 @@ for (const row of selected) {
       const changed = engine.apply_font_alias(original, replacement);
       if (!changed) throw Error("Unresolved font declaration " + original);
       aliases.push({
-        kind: "font-postscript-alias",
+        kind: Object.hasOwn(fontSubstitutions, original) ? "font-substitution" : "font-postscript-alias",
         original,
         replacement,
         changed,

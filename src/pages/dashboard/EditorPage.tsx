@@ -3079,6 +3079,17 @@ export default function EditorPage() {
             project={project}
             playhead={playhead}
             onInsert={addLibraryAssetAtPlayhead}
+            onApplyLook={selectedClip && !selectedClip.locked && !selectedClip.graphic &&
+              ["video", "overlay"].includes(selectedClip.track) && !busyAction ? async look => {
+                await commitProject("Color adjusted", p => {
+                  const clip = p.clips.find(c => c.id === selectedClip.id);
+                  if (!clip || clip.locked || clip.graphic || !["video", "overlay"].includes(clip.track)) {
+                    throw new Error(ui("Select footage on the timeline to adjust its color."));
+                  }
+                  return replaceTimelineClip(p, clip.id, {...clip, colorLut: look});
+                });
+                setColorPreview(undefined);
+              } : undefined}
             onMotionKit={async draft => {
               const identity = createId("motion-kit");
               await commitProject("Added motion kit", p =>

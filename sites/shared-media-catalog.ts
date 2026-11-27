@@ -921,6 +921,10 @@ export async function handleCatalogPublic(
     ETag: `"${object.sha256}"`,
     "X-Content-Type-Options": "nosniff",
   });
+  if (item.kind === "lut" && match[2] === "media" && url.searchParams.get("download") === "1") {
+    const file = encodeURIComponent(item.name + ".cube").replace(/['()*]/g, c => "%" + c.charCodeAt(0).toString(16));
+    headers.set("Content-Disposition", `attachment; filename="${item.id}.cube"; filename*=UTF-8''${file}`);
+  }
   if (partial)
     headers.set("Content-Range", `bytes ${start}-${end}/${object.bytes}`);
   const headOnly = request.method === "HEAD";

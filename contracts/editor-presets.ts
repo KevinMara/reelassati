@@ -418,7 +418,10 @@ export function getCaptionPreset(
   if (!appearance || typeof appearance !== "object") return base;
   const result = { ...base };
   if (appearance.fontId === "default") delete result.fontId;
-  else if (editorFont(appearance.fontId)) result.fontId = appearance.fontId;
+  else {
+    const face = editorFont(appearance.fontId);
+    if (face) result.fontId = face.id;
+  }
   for (const key of ["color", "outlineColor", "activeColor"] as const)
     if (
       typeof appearance[key] === "string" &&

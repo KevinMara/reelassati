@@ -25,6 +25,7 @@ import { resolveMediaDuration } from "@/lib/media-metadata";
 import { validateFileSelection } from "@/lib/file-validation";
 import { LibraryAssetCard } from "./LibraryAssetCard";
 import type { Asset } from "@contracts/workspace";
+import type { ClipColorLut } from "@contracts/color-lut";
 import { Check, Loader2, Plus } from "lucide-react";
 import {
   Select,
@@ -37,9 +38,11 @@ import {
 export function EditorMediaLibrary({
   playhead,
   onInsert,
+  onApplyLook,
 }: {
   playhead: number;
   onInsert: (asset: Asset, position: "playhead" | "end") => Promise<void>;
+  onApplyLook?: (look: ClipColorLut) => Promise<void>;
 }) {
   const ui = useUiText();
   const { workspace, updateWorkspace, capabilities } = useWorkspace();
@@ -339,7 +342,7 @@ export function EditorMediaLibrary({
           ]}
         />
       </div>
-      {origin === "stock" && <StockLibrary />}
+      {origin === "stock" && <StockLibrary onInsert={insert} onApplyLook={onApplyLook} />}
       <DirectVideoImport
         key={`${owner}:${brand}:${folderId}`}
         disabled={busy || !capabilities.uploads}
