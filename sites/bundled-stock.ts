@@ -25,15 +25,18 @@ const revision = bytesToHex(
 );
 const releaseOrigin = "https://studio.invalid/stock-release/";
 
-/** Static assets belong to this deployed build. The caller cannot supply a source URL. */
+/** Content-addressed binaries live on our frontend CDN. Review packets and the release marker ship with the Worker. */
 export async function releaseAsset(
   env: CatalogEnvironment,
   file: string,
   signal?: AbortSignal
 ) {
-  const response = await env.ASSETS!.fetch(
-    new Request(releaseOrigin + file, { signal })
-  );
+  const response = /^[0-9a-f]{64}\.\d+\.bin$/.test(file)
+    ? await fetch("https://www.reelassati.app/stock-release/" + file, {
+        signal,
+        redirect: "manual",
+      })
+    : await env.ASSETS!.fetch(new Request(releaseOrigin + file, { signal }));
   if (
     !response.ok ||
     response.headers.get("content-type")?.includes("text/html")

@@ -78,6 +78,18 @@ it("finds an included image by its content, copies it into a project and reuses 
     compatibilityDate: "2026-05-01",
     r2Buckets: ["BUCKET"],
     d1Databases: ["DB"],
+    outboundService: async (request: Request) => {
+      const url = new URL(request.url);
+      if (
+        url.origin !== "https://www.reelassati.app" ||
+        !/^\/stock-release\/[a-f0-9]{64}\.\d+\.bin$/.test(url.pathname)
+      )
+        return new Response(null, { status: 404 });
+      requests.push(url.pathname);
+      return new Response(
+        new Uint8Array(await readFile("public" + url.pathname))
+      );
+    },
     serviceBindings: {
       ASSETS: async (request: Request) => {
         const path = new URL(request.url).pathname;
