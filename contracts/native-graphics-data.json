@@ -31764,5 +31764,306 @@
     "entranceEnd": 0,
     "exitStart": 1.1678333333333333,
     "staticHold": true
+  },
+  {
+    "id": "title-7a42ff069c2c",
+    "name": "Distressed night title",
+    "category": "title",
+    "presentation": "poster",
+    "description": "Distressed red headline with a sliding lower credit, a green rule and a smaller supporting line.",
+    "design": {
+      "layout": "Distressed red headline with a sliding lower credit, a green rule and a smaller supporting line.",
+      "motion": "The lower credit slides in from the left as the rule fades in. The supporting line appears next and the headline grows into position.",
+      "bestFor": "A suspense or late-night sequence with a supplied title and credit. Keep the lower left clear.",
+      "avoid": "A neutral corporate, sensitive or calm scene. The distressed lettering suggests horror."
+    },
+    "url": "/native-graphics/title-7a42ff069c2c.bin",
+    "sha256": "9b6fb9d5d225c6fdcf5ba4ba6c4c4d33a9cb3578d76887051cfb7abea28f9f5c",
+    "sourceSha256": "7a42ff069c2c28278b61d64cf2a5c6d6f81ee14b3a1301fc49cb1c37efa356ed",
+    "compWidth": 1920,
+    "compHeight": 1080,
+    "duration": 4.971633333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/deadalonefreetrial.otf",
+        "sha256": "7a42675c5a718d2ee2ae4e3afa217919837eb8f526fd9eb5ae900800a4506838"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "AFTER DARK",
+        "font": "DeadAloneFreeTrial",
+        "allCaps": false,
+        "fontSize": 186.0,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "AFTER DARK",
+        "font": "DeadAloneFreeTrial",
+        "allCaps": false,
+        "fontSize": 186.0,
+        "label": "Headline",
+        "linkedCopy": true,
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "A short film",
+        "font": "DeadAloneFreeTrial",
+        "allCaps": false,
+        "fontSize": 100.0,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-4",
+        "type": "text",
+        "comp": 1,
+        "layer": 119,
+        "property": 122,
+        "default": "MIDNIGHT",
+        "font": "DeadAloneFreeTrial",
+        "allCaps": false,
+        "fontSize": 143.689315795898,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 161,
+        "default": "#B51D1D"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 177,
+        "default": "#B51D1D"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 119,
+        "property": 185,
+        "default": "#B51D1D"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 41,
+        "property": 169,
+        "default": "#1C9924"
+      },
+      {
+        "type": "color",
+        "key": "palette-2",
+        "colorSlot": 2,
+        "label": "Credits",
+        "displayLabel": "Credits",
+        "comp": 1,
+        "layer": 191,
+        "property": 198,
+        "default": "#44722E"
+      }
+    ],
+    "bounds": {
+      "x": 0.0,
+      "y": 0.35555555555555557,
+      "width": 0.625,
+      "height": 0.6138888888888889
+    },
+    "entranceEnd": 0.65,
+    "exitStart": 4.521633333333333,
+    "staticHold": false
+  },
+  {
+    "id": "title-84e9bc9ba8ac",
+    "name": "Ruled serif title",
+    "category": "title",
+    "presentation": "poster",
+    "description": "A white serif headline between thin horizontal rules that extend across the frame.",
+    "design": {
+      "layout": "A white serif headline between thin horizontal rules that extend across the frame.",
+      "motion": "Horizontal rules slide and fade into place around a stationary headline. The source keeps the finished arrangement on screen.",
+      "bestFor": "A restrained editorial or film title over a dark shot with clear space around the center.",
+      "avoid": "Bright backgrounds and busy horizontal detail. Thin white rules need contrast."
+    },
+    "url": "/native-graphics/title-84e9bc9ba8ac.bin",
+    "sha256": "cef3cf329289d9b3a06459374b4b6332cd058f7378f9a1936c8b7b5af2a7fce1",
+    "sourceSha256": "84e9bc9ba8ac293d830e9676a75445088c036becb141806a55efb35d49c8bacb",
+    "compWidth": 1920,
+    "compHeight": 1080,
+    "duration": 4.971633333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/optibodoni-antiqua.otf",
+        "sha256": "260b6f99cf19aab9533f24342969365ec38925dd1c7f7416d10fd70ce503c258"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "NIGHT SHIFT",
+        "font": "OPTIBodoni-Antiqua",
+        "allCaps": false,
+        "fontSize": 133.0,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "NIGHT SHIFT",
+        "font": "OPTIBodoni-Antiqua",
+        "allCaps": false,
+        "fontSize": 133.0,
+        "label": "Headline",
+        "linkedCopy": true,
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 83,
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 97,
+        "property": 104,
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 129,
+        "property": 136,
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 161,
+        "property": 168,
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 193,
+        "property": 200,
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 225,
+        "property": 232,
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 257,
+        "property": 264,
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "key": "palette-1",
+        "colorSlot": 1,
+        "label": "Accent",
+        "displayLabel": "Accent",
+        "comp": 1,
+        "layer": 41,
+        "property": 91,
+        "default": "#1C9924"
+      }
+    ],
+    "bounds": {
+      "x": 0.0,
+      "y": 0.17777777777777778,
+      "width": 1.0,
+      "height": 0.6861111111111111
+    },
+    "entranceEnd": 0.65,
+    "exitStart": 4.521633333333333,
+    "staticHold": false
   }
 ]
