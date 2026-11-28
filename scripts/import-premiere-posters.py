@@ -51,9 +51,14 @@ def make_scene(title, original_copy=False):
     fonts = {f['postscript']: f for f in json.loads((ROOT / 'public/fonts/editor-fonts.json').read_text(encoding='utf8'))['faces']}
     aliases = json.loads((ROOT / 'contracts/native-font-substitutions.json').read_text(encoding='utf8'))
     used = {}
+    rectangles = []
+    order = {}
     # These Premiere graphics store each text layer in sequence coordinates.
-    for component in title['components'][:-1]:
+    for index, component in enumerate(title['components'][:-1]):
         values = component['values']
+        if component['kind'] == 'AE.ADBE Shape':
+            rectangles.append((index, values))
+            continue
         runs = values['Source Text']['runs']
         if not runs:
             continue
@@ -115,7 +120,11 @@ def make_scene(title, original_copy=False):
             # Premiere uses the unadorned word endings. Enabling contextual alternates
             # adds a swash after each word and pushes the next word out of position.
             doc.update(opentype={**doc.get('opentype', {}), 'contextual_alternates': False})
+        if run['font'] == 'RobotoSlab-Bold':
+            # The pinned font revision has slightly wider advances than the source artwork.
+            doc.update(kerning='Metrics', ligatures=True, h_scale=98.3)
         comp['kind']['layers'].append(layer)
+        order[layer['id']] = index
         controls.append({'key':f'text-{len(controls)+1}', 'type':'text', 'comp':1, 'layer':layer['id'],
                          'property':source['uid'], 'default':text, 'font':doc['font'],
                          'allCaps':False, 'fontSize':doc['size'] * values['Scale'] / 100,
@@ -133,6 +142,7 @@ def make_scene(title, original_copy=False):
             # Premiere outlines the union of touching glyphs. Cover internal
             # stroke edges with the intact face in front of the outline.
             comp['kind']['layers'].append(outline)
+            order[outline['id']] = index
             controls.append({**controls[-1], 'layer':outline['id'],
                              'property':outline_source['uid']})
     slots = {}
@@ -168,6 +178,41 @@ def make_scene(title, original_copy=False):
         props['effects']['children'].append(fill)
         value = '#' + ''.join(f'{round(n * 255):02X}' for n in rgb[:3])
         palettes.setdefault(value, []).append((control, layer, color))
+    for index, values in rectangles:
+        left, top, rect_width, rect_height = values['Path']
+        if not rect_width.is_integer() or not rect_height.is_integer() or not controls:
+            raise ValueError('Unsupported rectangle dimensions or missing title')
+        solid_id = next(ids)
+        fill_rgb = values['Appearance']
+        project['items'][str(solid_id)] = {
+            'id': solid_id, 'name': 'Title rule', 'parent': None, 'label': 'None', 'comment': '',
+            'kind': {'type': 'Solid', 'width': int(rect_width), 'height': int(rect_height),
+                     'color': [n / 255 for n in fill_rgb], 'pixel_aspect': 1},
+        }
+        # Start with a clean title transform and editable fill, discard the text group.
+        layer = copy.deepcopy(comp['kind']['layers'][0])
+        layer.update(id=next(ids), name='Title rule', source={'type': 'Solid', 'item': solid_id})
+        layer['props']['children'] = [p for p in layer['props']['children'] if p['match'] != 'text']
+        props = {}
+        for p in nodes(layer['props']):
+            p['uid'] = next(ids)
+            props[p.get('match')] = p
+        x, y = values['Position']
+        ax, ay = values['Anchor Point']
+        # The path vertices live in Premiere layer space. Keep its original
+        # anchor so non-uniform scale and rotation also move the rule correctly.
+        transforms = {'position': [width*x, height*y, 0], 'anchor': [width*ax-left, height*ay-top, 0],
+                      'scale': [values['Horizontal Scale'], values['Scale'], 100],
+                      'rotation': values['Rotation'], 'opacity': values['Opacity']}
+        for key, value in transforms.items():
+            props[key]['value']['v'] = value
+        color = next(p for p in props['ec.generate.fill']['children'] if p['match'] == 'color')
+        color['value']['v'] = [n/255 for n in fill_rgb] + [1]
+        value = '#' + ''.join(f'{v:02X}' for v in fill_rgb)
+        palettes.setdefault(value, []).append(({'textSlot': len(slots)}, layer, color))
+        comp['kind']['layers'].append(layer)
+        order[layer['id']] = index
+    comp['kind']['layers'].sort(key=lambda layer: order[layer['id']])
     # First expose the face color of the headline, followed by its shadow or
     # the supporting lettering. Shared colors update every matching layer.
     ordered = sorted(palettes.items(), key=lambda kv:min(

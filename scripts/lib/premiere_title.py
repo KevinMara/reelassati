@@ -13,6 +13,35 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def rectangle_path(data):
+    """Premiere v2 closed path with four straight, axis-aligned segments."""
+    if len(data) != 121 or struct.unpack_from('<II', data) != (2, 4) or data[-1] != 1:
+        raise ValueError('Shape requires a vector path renderer')
+    points = []
+    for offset in range(8, 120, 28):
+        flag, x, y, lx, ly, rx, ry = struct.unpack_from('<I6f', data, offset)
+        if flag or (lx, ly) != (x, y) or (rx, ry) != (x, y):
+            raise ValueError('Shape has curved edges')
+        points.append((x, y))
+    xs, ys = sorted({p[0] for p in points}), sorted({p[1] for p in points})
+    if (len(xs), len(ys)) != (2, 2) or len(set(points)) != 4 or any(
+        a[0] != b[0] and a[1] != b[1] for a, b in zip(points, points[1:] + points[:1])
+    ):
+        raise ValueError('Shape is not a rectangle')
+    return [xs[0], ys[0], xs[1] - xs[0], ys[1] - ys[0]]
+
+
+def solid_appearance(data):
+    # This appearance profile has a single flat fill and inactive stroke and
+    # gradient settings. A changed paint mode needs its own interpretation.
+    layout = bytearray(data)
+    rgb = layout[403:406]
+    layout[403:406] = bytes(3)
+    if digest(layout) != 'af87524018c6573ed7da247a41add790cf4432f416b74cd829c518d010b70ecc':
+        raise ValueError('Unsupported Premiere shape paint')
+    return list(rgb)
+
+
 def text_document(data):
     """Decode Premiere's 0x11223344 point-text envelope and per-run styles."""
     if data[8:12] != b'\x44\x33\x22\x11' or int.from_bytes(data[:8], 'little') != len(data) - 12:
@@ -104,7 +133,7 @@ def read_title(package):
         component = objects[ref.get('ObjectRef')]
         name = component.findtext('./Component/DisplayName')
         kind = component.findtext('MatchName')
-        if kind != 'AE.ADBE Text' and name != 'Clip':
+        if kind not in ('AE.ADBE Text', 'AE.ADBE Shape') and name != 'Clip':
             raise ValueError(f"Requires effect {kind or name}")
         values = {}
         for index, param in enumerate(component.findall('./Component/Params/Param')):
@@ -112,9 +141,11 @@ def read_title(package):
             if node.findtext('.//IsTimeVarying') == 'true' or node.findtext('.//Keyframes'):
                 raise ValueError("Animated parameter requires a time sampler")
             key = node.findtext('Name') or f'param{index}'
-            if key == 'Source Text':
+            if key in ('Source Text', 'Path', 'Appearance'):
                 value = node.find('.//StartKeyframeValue')
-                values[key] = text_document(base64.b64decode(value.text or blobs[value.get('BinaryHash')]))
+                payload = base64.b64decode(value.text or blobs[value.get('BinaryHash')])
+                values[key] = {'Source Text': text_document, 'Path': rectangle_path,
+                               'Appearance': solid_appearance}[key](payload)
             else:
                 value = node.findtext('.//StartKeyframe')
                 if value:

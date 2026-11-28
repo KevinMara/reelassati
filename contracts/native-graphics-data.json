@@ -25494,5 +25494,493 @@
     "entranceEnd": 0,
     "exitStart": 1.0677333333333334,
     "staticHold": true
+  },
+  {
+    "id": "poster-793233d1f3ed",
+    "name": "Timeless · Landscape",
+    "category": "title",
+    "presentation": "poster",
+    "description": "A gold slab-serif headline with an offset underline and two separate film credits.",
+    "design": {
+      "layout": "A gold slab-serif headline with an offset underline and two separate film credits.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for landscape footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-793233d1f3ed.bin",
+    "sha256": "938e5af90487e9d8e03aab26e030a720b5b961a58fa299cc13fed3c74551dfe4",
+    "sourceSha256": "793233d1f3ed398ebaa785a2203888f277bb5419b7e1f710e851cf1666ecadcb",
+    "compWidth": 1920,
+    "compHeight": 1080,
+    "duration": 4.971633333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/robotoslab-bold.ttf",
+        "sha256": "fd5a9e4711837dd8762ac66015f7c131ce8c131d96cb29b549a8186ba53937bc"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "STUDIO",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 49.0,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "TIMELESS",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 256.0,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "A film by",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 54.0,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 144,
+        "property": 151,
+        "default": "#DDAA47"
+      }
+    ],
+    "bounds": {
+      "x": 0.16145833333333334,
+      "y": 0.29814814814814816,
+      "width": 0.671875,
+      "height": 0.32407407407407407
+    },
+    "entranceEnd": 0,
+    "exitStart": 4.971633333333333,
+    "staticHold": true
+  },
+  {
+    "id": "poster-e9cd23d1fd28",
+    "name": "Timeless · UHD",
+    "category": "title",
+    "presentation": "poster",
+    "description": "A gold slab-serif headline with an offset underline and two separate film credits.",
+    "design": {
+      "layout": "A gold slab-serif headline with an offset underline and two separate film credits.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for uhd footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-e9cd23d1fd28.bin",
+    "sha256": "9d64addc9fbc8acba04f637542a7567781ba80eb8745d87cf67f4fe859cf1c88",
+    "sourceSha256": "e9cd23d1fd287726667e5d87b8986f5a5867ec37107ad6f050f28c6abda03a43",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 0.9676333333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/robotoslab-bold.ttf",
+        "sha256": "fd5a9e4711837dd8762ac66015f7c131ce8c131d96cb29b549a8186ba53937bc"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "STUDIO",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 98.0,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "TIMELESS",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 512.0,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "A film by",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 108.0,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 144,
+        "property": 151,
+        "default": "#DDAA47"
+      }
+    ],
+    "bounds": {
+      "x": 0.16354166666666667,
+      "y": 0.30092592592592593,
+      "width": 0.6692708333333334,
+      "height": 0.3194444444444444
+    },
+    "entranceEnd": 0,
+    "exitStart": 0.9676333333333333,
+    "staticHold": true
+  },
+  {
+    "id": "poster-4c41f37114bb",
+    "name": "Timeless · Square",
+    "category": "title",
+    "presentation": "poster",
+    "description": "A gold slab-serif headline with an offset underline and two separate film credits.",
+    "design": {
+      "layout": "A gold slab-serif headline with an offset underline and two separate film credits.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for square footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-4c41f37114bb.bin",
+    "sha256": "272c4b83ea29c62baa04fb935e87c437812db1cde7855e8527e79473288aa8e4",
+    "sourceSha256": "4c41f37114bb071015fc0111d5ffab629a5abfb4f9cf4658ff945b16a383db5a",
+    "compWidth": 1080,
+    "compHeight": 1080,
+    "duration": 0.9676333333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/robotoslab-bold.ttf",
+        "sha256": "fd5a9e4711837dd8762ac66015f7c131ce8c131d96cb29b549a8186ba53937bc"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "STUDIO",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 36.61016949152543,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "TIMELESS",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 144.0,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "A film by",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 144,
+        "property": 151,
+        "default": "#DDAA47"
+      }
+    ],
+    "bounds": {
+      "x": 0.15925925925925927,
+      "y": 0.37407407407407406,
+      "width": 0.6777777777777778,
+      "height": 0.20925925925925926
+    },
+    "entranceEnd": 0,
+    "exitStart": 0.9676333333333333,
+    "staticHold": true
+  },
+  {
+    "id": "poster-c470a4155963",
+    "name": "Timeless · Portrait",
+    "category": "title",
+    "presentation": "poster",
+    "description": "A gold slab-serif headline with an offset underline and two separate film credits.",
+    "design": {
+      "layout": "A gold slab-serif headline with an offset underline and two separate film credits.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for portrait footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-c470a4155963.bin",
+    "sha256": "d2908f942004e0fe70f0ef90db065e9c57f00082e9bdac0ef3872c429f4bcb84",
+    "sourceSha256": "c470a41559638ddde401936db9ab4f9d95640190d8dd75a50ed001c6a3775fe0",
+    "compWidth": 1080,
+    "compHeight": 1920,
+    "duration": 0.9676333333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/robotoslab-bold.ttf",
+        "sha256": "fd5a9e4711837dd8762ac66015f7c131ce8c131d96cb29b549a8186ba53937bc"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "STUDIO",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "TIMELESS",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 160.0,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "A film by",
+        "font": "RobotoSlab-Bold",
+        "allCaps": false,
+        "fontSize": 36.610169491525426,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#DDAA47"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 144,
+        "property": 151,
+        "default": "#DDAA47"
+      }
+    ],
+    "bounds": {
+      "x": 0.12407407407407407,
+      "y": 0.4114583333333333,
+      "width": 0.75,
+      "height": 0.14895833333333333
+    },
+    "entranceEnd": 0,
+    "exitStart": 0.9676333333333333,
+    "staticHold": true
   }
 ]

@@ -1155,5 +1155,19 @@
     "sourceSha256": "1dc73255617bf0bd2f016a054c8ebbff69e10e1775182091707121668feed059",
     "sourceMember": "OPTIBodoniAntiqua-Medium.otf",
     "license": "/fonts/native/optibodoniantiqua-medium-source.txt"
+  },
+  {
+    "id": "robotoslab-bold",
+    "label": "Roboto Slab Bold",
+    "family": "Roboto Slab",
+    "postscript": "RobotoSlab-Bold",
+    "weight": 700,
+    "bold": true,
+    "italic": false,
+    "url": "/fonts/native/robotoslab-bold.ttf",
+    "sha256": "fd5a9e4711837dd8762ac66015f7c131ce8c131d96cb29b549a8186ba53937bc",
+    "source": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/apache/robotoslab/RobotoSlab%5Bwght%5D.ttf",
+    "sourceSha256": "786ae192477447d33c6672c3055fba7cbfe45184c9a79e77a14f15716ca05b16",
+    "license": "/fonts/native/robotoslab-LICENSE.txt"
   }
 ]

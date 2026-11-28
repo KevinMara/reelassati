@@ -15,6 +15,7 @@ SPECS = [
  ('montserrat','Montserrat-Italic[wght].ttf', [('extrabold-italic',800),('black-italic',900)]),
  ('roboto','Roboto[wdth,wght].ttf', [('light',300),('medium',500),('bold',700),('black',900)]),
  ('roboto','Roboto-Italic[wdth,wght].ttf', [('light-italic',300)]),
+ ('robotoslab','RobotoSlab[wght].ttf', [('bold',700)]),
  ('opensans','OpenSans[wdth,wght].ttf', [('regular',400),('bold',700)]),
  ('bebasneue','BebasNeue-Regular.ttf', [('regular',400)]),
  ('greatvibes','GreatVibes-Regular.ttf', [('regular',400)]),
@@ -27,7 +28,7 @@ def read_url(url):
     with urllib.request.urlopen(url, timeout=60) as response: return response.read()
 def name(font, which): return font['name'].getDebugName(which) or ''
 
-def build(download):
+def build(download, family_filter=None):
     manifest_path = ROOT/'public/fonts/editor-fonts.json'
     old = json.loads(manifest_path.read_text()) if manifest_path.exists() else None
     if not download:
@@ -38,18 +39,24 @@ def build(download):
         print('Verified '+str(len(old['faces']))+' pinned font faces')
         return
     commit = old['sourceCommit'] if old else json.loads(read_url('https://api.github.com/repos/google/fonts/commits/main'))['sha']
-    base = 'https://raw.githubusercontent.com/google/fonts/'+commit+'/ofl/'
+    base = 'https://raw.githubusercontent.com/google/fonts/'+commit+'/'
     dest = ROOT/'public/fonts/native'; dest.mkdir(parents=True,exist_ok=True)
     # Preserve explicitly imported original faces when refreshing Google sources.
-    imported = [f for f in (old or {}).get('faces',[]) if f.get('sourceMember')]
+    specs = [s for s in SPECS if family_filter is None or s[0] == family_filter]
+    replace = {family+'-'+variant for family, _, variants in specs for variant, _ in variants}
+    imported = [f for f in (old or {}).get('faces',[]) if f['id'] not in replace]
     manifest = {'sourceCommit':commit,'faces':imported}
     old_metrics = json.loads((ROOT/'contracts/editor-font-metrics.json').read_text(encoding='utf8')) if imported else {}
     metrics = {f['id']:old_metrics[f['id']] for f in imported}
-    for family, filename, faces in SPECS:
-        url = base+family+'/'+urllib.parse.quote(filename)
+    for family, filename, faces in specs:
+        license_dir, license_name = ('apache', 'LICENSE.txt') if family == 'robotoslab' else ('ofl', 'OFL.txt')
+        family_url = base + license_dir + '/' + family + '/'
+        url = family_url + urllib.parse.quote(filename)
         data = read_url(url)
-        license_path = dest/(family+'-OFL.txt')
-        if not license_path.exists(): license_path.write_bytes(read_url(base+family+'/OFL.txt'))
+        license_path = dest/(family+'-'+license_name)
+        if not license_path.exists(): license_path.write_bytes(read_url(family_url+license_name))
+        if family == 'robotoslab':
+            (dest/'robotoslab-COPYRIGHT.txt').write_bytes(read_url(family_url+'COPYRIGHT.txt'))
         for variant, weight in faces:
             font = TTFont(io.BytesIO(data))
             font.recalcTimestamp = False
@@ -73,4 +80,6 @@ def build(download):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--download',action='store_true')
-    build(parser.parse_args().download)
+    parser.add_argument('--family', choices=sorted({f[0] for f in SPECS}))
+    args = parser.parse_args()
+    build(args.download, args.family)
