@@ -32,6 +32,42 @@ def nodes(group):
         yield from nodes(child)
 
 
+def horizontal_scale(values):
+    return values['Scale'] if values.get('param5', True) else values['Horizontal Scale']
+
+
+def substitute_width(source_font, face):
+    return 1.20 if (source_font, face['postscript']) == ('Arial-Black', 'Roboto-Black') else 1
+
+
+def credit_runs(components, fonts, aliases, width):
+    """Keep each differently styled credit field editable at its authored position."""
+    for component_index, component in enumerate(components):
+        values = component['values']
+        source = values.get('Source Text', {})
+        runs = source.get('runs', [])
+        if len(runs) < 2:
+            yield component
+            continue
+        if source['justify'] != 0 or values['Rotation'] or any('\n' in r['text'] or '\r' in r['text'] for r in runs):
+            raise ValueError('Unsupported aligned, rotated or multiline credit run')
+        x, y = values['Position']
+        offset = 0
+        for run_index, run in enumerate(runs):
+            font = fonts.get(run['font']) or fonts.get(aliases.get(run['font']))
+            if not font or run['tracking']:
+                raise ValueError('Missing credit font or unsupported tracking')
+            face = ImageFont.truetype(str(ROOT / 'public' / font['url'][1:]), 1000)
+            text = run['text']
+            advance = run['size'] * horizontal_scale(values) * substitute_width(run['font'], font) / 100000
+            leading = text[:len(text) - len(text.lstrip())]
+            if text.strip():
+                yield {**component, 'copyGroup': (component_index, run_index), 'values': {
+                    **values, 'Position': [x + (offset + face.getlength(leading) * advance) / width, y],
+                    'Source Text': {**source, 'runs': [{**run, 'text': text.strip()}]}}}
+            offset += face.getlength(text) * advance
+
+
 def make_scene(title, original_copy=False):
     proto_project, proto_comp, proto_layer, proto_fill = schema_seed()
     width, height = title['width'], title['height']
@@ -50,7 +86,9 @@ def make_scene(title, original_copy=False):
     rectangles = []
     order = {}
     # These Premiere graphics store each text layer in sequence coordinates.
-    for index, component in enumerate(title['components'][:-1]):
+    components = title['components'][:-1]
+    rich_title = any(len(c['values'].get('Source Text', {}).get('runs', [])) > 1 for c in components)
+    for index, component in enumerate(credit_runs(components, fonts, aliases, width)):
         values = component['values']
         if component['kind'] == 'AE.ADBE Shape':
             rectangles.append((index, values))
@@ -58,8 +96,6 @@ def make_scene(title, original_copy=False):
         runs = values['Source Text']['runs']
         if not runs:
             continue
-        if len(runs) != 1:
-            raise ValueError('Rich text needs separate style runs')
         run = runs[0]
         font = fonts.get(run['font']) or fonts.get(aliases.get(run['font']))
         if not font or run['size'] is None:
@@ -81,8 +117,9 @@ def make_scene(title, original_copy=False):
         props = {p['match']:p for p in nodes(properties)}
         x, y = values['Position']
         ax, ay = values['Anchor Point']
-        uniform = values.get('param5', True)
-        sx = values['Scale'] if uniform else values['Horizontal Scale']
+        sx = horizontal_scale(values)
+        if rich_title:
+            sx *= substitute_width(run['font'], font)
         justify = values['Source Text']['justify']
         original_text = run['text']
         trailing = original_text[len(original_text.rstrip(' ')):]
@@ -103,9 +140,15 @@ def make_scene(title, original_copy=False):
             # Retain the authored baselines while bringing small film credits
             # up to the editor's mobile readability threshold for this aspect.
             point_size = max(point_size, min(width, height) / 29.5 * 100 / values['Scale'])
+            if rich_title and point_size > run['size']:
+                # Increase mobile cap height while preserving the available column width.
+                props['scale']['value']['v'][0] *= run['size'] / point_size
+        paint_fill = run.get('applyFill', True)
+        if not paint_fill and not run['applyStroke']:
+            raise ValueError('Invisible source lettering')
         doc.update(text=text, font=font['postscript'], size=point_size, fill=rgba(run['fill'] or [255]*3),
                    stroke=rgba(run['stroke'] or [255]*3), stroke_width=run['strokeWidth'],
-                   tracking=run['tracking'], apply_stroke=False, apply_fill=True, space_before=0,
+                   tracking=run['tracking'], apply_stroke=not paint_fill, apply_fill=paint_fill, space_before=0,
                    faux_italic=run['italic'], all_caps=False, justify={0:'Left',1:'Right',2:'Center'}[justify],
                    leading=run['size'] * 1.2 + values['Source Text']['lineSpacing'])
         if (run['font'], font['postscript']) == ('LaoMN-Bold', 'Roboto-Bold'):
@@ -137,7 +180,9 @@ def make_scene(title, original_copy=False):
                          'property':source['uid'], 'default':text, 'font':doc['font'],
                          'allCaps':False, 'fontSize':doc['size'] * values['Scale'] * doc.get('v_scale', 100) / 10000,
                          'height':values['Scale'] * doc['size'], 'label':'Copy'})
-        if run['applyStroke']:
+        if rich_title:
+            controls[-1]['copyGroup'] = component.get('copyGroup', index)
+        if run['applyStroke'] and paint_fill:
             # The runtime fill effect recolors every opaque pixel on a layer.
             # Give Premiere's outline a linked text layer and its own color.
             outline = copy.deepcopy(layer)
@@ -158,7 +203,7 @@ def make_scene(title, original_copy=False):
     for control in sorted(controls, key=lambda c: (-c['height'], layer_names[c['layer']] == 'Letter outline')):
         # An offset duplicate is the shadow of the same title. Editing either
         # line must replace both runs, including when a saved project reopens.
-        signature = (control['default'], control['font'], control['fontSize'])
+        signature = (control['default'], control['font'], control['fontSize'], control.pop('copyGroup', None))
         if signature in slots:
             control['key'], i = slots[signature]
             control['linkedCopy'] = True

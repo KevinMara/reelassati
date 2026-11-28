@@ -88,7 +88,9 @@ def text_document(data):
 
     def color(field):
         channels = table(pointer(field))
-        return [data[channels[i]] if i in channels else 0 for i in range(3)]
+        # Premiere omits channels at their default of 255. Explicit zeroes
+        # are present in the table, including all three channels for black.
+        return [data[channels[i]] if i in channels else 255 for i in range(3)]
 
     paragraph = table(pointer(table(pointer(12))[0]))
     fonts = [string(pos) for pos in vector(paragraph[1])]
@@ -101,6 +103,7 @@ def text_document(data):
             'font': fonts[unpack('<I', style[0])] if 0 in style else fonts[0],
             'size': unpack('<f', style[1]) if 1 in style else 100,
             'fill': color(style[2]) if 2 in style else None,
+            'applyFill': bool(data[style[3]]) if 3 in style else True,
             'stroke': color(style[4]) if 4 in style else None,
             'applyStroke': bool(data[style[5]]) if 5 in style else False,
             'strokeWidth': unpack('<f', style[6]) if 6 in style else 1,
@@ -140,7 +143,9 @@ def read_title(package):
             node = objects[param.get('ObjectRef')]
             if node.findtext('.//IsTimeVarying') == 'true' or node.findtext('.//Keyframes'):
                 raise ValueError("Animated parameter requires a time sampler")
-            key = node.findtext('Name') or f'param{index}'
+            # Both uniform-scale and pinning can have the display name " ".
+            # Preserve their independent values under their parameter slots.
+            key = (node.findtext('Name') or '').strip() or f'param{index}'
             if key in ('Source Text', 'Path', 'Appearance'):
                 value = node.find('.//StartKeyframeValue')
                 payload = base64.b64decode(value.text or blobs[value.get('BinaryHash')])
