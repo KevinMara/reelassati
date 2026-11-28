@@ -165,12 +165,13 @@ export function nativeGraphicsTranslations(
   result["Three-line cascade"] = cascade;
   result["Editable notification card."] = description;
   const [posterDescription, brushName, offsetName] = posters[code].split("|");
+  const posterNames: Record<string, string> = { "Brush poster": brushName, "Offset poster": offsetName };
   result["Editable poster title."] = posterDescription;
   result["Complete every text field for this animation."] = missing;
   for (const t of NATIVE_GRAPHIC_TEMPLATES) {
     if (t.presentation === "poster") {
       const [name, format] = t.name.split(" · ");
-      result[t.name] = `${name === "Brush poster" ? brushName : offsetName} · ${catalog[format] ?? format}`;
+      result[t.name] = `${posterNames[name] ?? name} · ${catalog[format] ?? format}`;
     } else if (t.platform) {
       const profile = t.controls.some(
         c => c.type === "text" && c.textSlot === 1

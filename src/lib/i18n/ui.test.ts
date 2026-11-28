@@ -14,6 +14,14 @@ function placeholders(text: string) {
 }
 
 describe("interface localization", () => {
+  it("preserves film title identities in every localized preset picker", () => {
+    for (const code of INTERFACE_LANGUAGE_CODES.filter(code => code !== "en")) {
+      for (const title of ["The Weekend", "Life in Rome", "Timeless"]) {
+        expect(uiLocales[code][title + " · Portrait"], code).toContain(title);
+      }
+    }
+  });
+
   it("loads only the chosen catalog and caches it without changing creation languages", async () => {
     expect(await loadUiLocale("en")).toEqual({});
     const italian = loadUiLocale("it");
