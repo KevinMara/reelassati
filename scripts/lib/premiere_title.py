@@ -76,6 +76,7 @@ def text_document(data):
             'applyStroke': bool(data[style[5]]) if 5 in style else False,
             'strokeWidth': unpack('<f', style[6]) if 6 in style else 1,
             'tracking': unpack('<f', style[8]) if 8 in style else 0,
+            'italic': bool(unpack('<B', style[15])) if 15 in style else False,
             'fields': sorted(style),
         })
     return {'runs': runs, 'justify': unpack('<B', paragraph[4]) if 4 in paragraph else 0,

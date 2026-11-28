@@ -105,8 +105,16 @@ def make_scene(title, original_copy=False):
         doc.update(text=text, font=font['postscript'], size=point_size, fill=rgba(run['fill'] or [255]*3),
                    stroke=rgba(run['stroke'] or [255]*3), stroke_width=run['strokeWidth'],
                    tracking=run['tracking'], apply_stroke=False, apply_fill=True, space_before=0,
-                   all_caps=False, justify={0:'Left',1:'Right',2:'Center'}[justify],
+                   faux_italic=run['italic'], all_caps=False, justify={0:'Left',1:'Right',2:'Center'}[justify],
                    leading=run['size'] * 1.2 + values['Source Text']['lineSpacing'])
+        if (run['font'], font['postscript']) == ('LaoMN-Bold', 'Roboto-Bold'):
+            # Match the width, cap height and italic credit lines in the source poster.
+            doc.update(h_scale=109, v_scale=91.5 if original_text.strip().isupper() else 94.5,
+                       kerning='Metrics', ligatures=True)
+        if run['font'] == 'Brushwell':
+            # Premiere uses the unadorned word endings. Enabling contextual alternates
+            # adds a swash after each word and pushes the next word out of position.
+            doc.update(opentype={**doc.get('opentype', {}), 'contextual_alternates': False})
         comp['kind']['layers'].append(layer)
         controls.append({'key':f'text-{len(controls)+1}', 'type':'text', 'comp':1, 'layer':layer['id'],
                          'property':source['uid'], 'default':text, 'font':doc['font'],
