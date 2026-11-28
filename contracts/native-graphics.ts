@@ -39,7 +39,7 @@ export interface NativeGraphicTemplate {
   name: string;
   description: string;
   category: "title" | "social" | "notification";
-  presentation?: "poster";
+  presentation?: "poster" | "lower-third";
   platform?: string;
   url: string;
   sha256: string;

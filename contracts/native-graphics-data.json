@@ -25982,5 +25982,607 @@
     "entranceEnd": 0,
     "exitStart": 0.9676333333333333,
     "staticHold": true
+  },
+  {
+    "id": "poster-c484138ea32e",
+    "name": "The Great Fall · Landscape",
+    "category": "title",
+    "presentation": "poster",
+    "description": "A scarlet action-film wordmark with a slanted small-cap headline, a short lead-in and a separate bottom credit.",
+    "design": {
+      "layout": "A scarlet action-film wordmark with a slanted small-cap headline, a short lead-in and a separate bottom credit.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for landscape footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-c484138ea32e.bin",
+    "sha256": "6a53ac8c4cdf93db1138ae9ba5ac083445341754e2fcd2f91189fbca1c8f1c26",
+    "sourceSha256": "c484138ea32e484b7fa6276662026c8a25cfdeb4860d51fc94f4d8311605f64f",
+    "compWidth": 1920,
+    "compHeight": 1080,
+    "duration": 4.971633333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/bebasneue-regular.ttf",
+        "sha256": "f10c681b10d3d7377f1bf75fbfad70ee31d674108bbf80b783f0ea6f54f50c56"
+      },
+      {
+        "url": "/fonts/native/corleone.ttf",
+        "sha256": "f79621632854b955658f8dc740662dc1a662fb7ae1b9361fc2d40917f78ac1f9"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "THE",
+        "font": "BebasNeue-Regular",
+        "allCaps": false,
+        "fontSize": 99.9894,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "ALL RIGHTS  RESERVED",
+        "font": "Corleone",
+        "allCaps": false,
+        "fontSize": 40.27118644067797,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "THE",
+        "font": "BebasNeue-Regular",
+        "allCaps": false,
+        "fontSize": 99.9894,
+        "label": "Supporting line",
+        "linkedCopy": true,
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-4",
+        "type": "text",
+        "comp": 1,
+        "layer": 119,
+        "property": 122,
+        "default": "Great Fall",
+        "font": "Corleone",
+        "allCaps": false,
+        "fontSize": 356.5430859375,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 161,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 169,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 177,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 119,
+        "property": 185,
+        "default": "#DA2410"
+      }
+    ],
+    "bounds": {
+      "x": 0.036458333333333336,
+      "y": 0.19814814814814816,
+      "width": 0.821875,
+      "height": 0.7833333333333333
+    },
+    "entranceEnd": 0,
+    "exitStart": 4.971633333333333,
+    "staticHold": true
+  },
+  {
+    "id": "poster-05515c060dc1",
+    "name": "The Great Fall · UHD",
+    "category": "title",
+    "presentation": "poster",
+    "description": "A scarlet action-film wordmark with a slanted small-cap headline, a short lead-in and a separate bottom credit.",
+    "design": {
+      "layout": "A scarlet action-film wordmark with a slanted small-cap headline, a short lead-in and a separate bottom credit.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for uhd footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-05515c060dc1.bin",
+    "sha256": "60a1c864b5eaf918e91479fca1b34cd89bc61764abdded02cf2550cac5d52d4d",
+    "sourceSha256": "05515c060dc13db02f5cdf77e4e0aff075adf1a4c63a3dbfef05894e909de488",
+    "compWidth": 3840,
+    "compHeight": 2160,
+    "duration": 1.1678333333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/bebasneue-regular.ttf",
+        "sha256": "f10c681b10d3d7377f1bf75fbfad70ee31d674108bbf80b783f0ea6f54f50c56"
+      },
+      {
+        "url": "/fonts/native/corleone.ttf",
+        "sha256": "f79621632854b955658f8dc740662dc1a662fb7ae1b9361fc2d40917f78ac1f9"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "THE",
+        "font": "BebasNeue-Regular",
+        "allCaps": false,
+        "fontSize": 199.9788,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "ALL RIGHTS  RESERVED",
+        "font": "Corleone",
+        "allCaps": false,
+        "fontSize": 80.54237288135594,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "THE",
+        "font": "BebasNeue-Regular",
+        "allCaps": false,
+        "fontSize": 199.9788,
+        "label": "Supporting line",
+        "linkedCopy": true,
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-4",
+        "type": "text",
+        "comp": 1,
+        "layer": 119,
+        "property": 122,
+        "default": "Great Fall",
+        "font": "Corleone",
+        "allCaps": false,
+        "fontSize": 713.086171875,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 161,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 169,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 177,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 119,
+        "property": 185,
+        "default": "#DA2410"
+      }
+    ],
+    "bounds": {
+      "x": 0.03802083333333333,
+      "y": 0.20092592592592592,
+      "width": 0.81875,
+      "height": 0.7435185185185185
+    },
+    "entranceEnd": 0,
+    "exitStart": 1.1678333333333333,
+    "staticHold": true
+  },
+  {
+    "id": "poster-a6254fdf86dc",
+    "name": "The Great Fall · Square",
+    "category": "title",
+    "presentation": "poster",
+    "description": "A scarlet action-film wordmark with a slanted small-cap headline, a short lead-in and a separate bottom credit.",
+    "design": {
+      "layout": "A scarlet action-film wordmark with a slanted small-cap headline, a short lead-in and a separate bottom credit.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for square footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-a6254fdf86dc.bin",
+    "sha256": "0106b1db7e71ecf86410b1de563c26fef5462a42b07a028e4ea870b179a9fcff",
+    "sourceSha256": "a6254fdf86dc855464ba1f9d1cbdf4062aa2ff4e8da8f833970f3240f1268b49",
+    "compWidth": 1080,
+    "compHeight": 1080,
+    "duration": 1.1678333333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/corleone.ttf",
+        "sha256": "f79621632854b955658f8dc740662dc1a662fb7ae1b9361fc2d40917f78ac1f9"
+      },
+      {
+        "url": "/fonts/native/bebasneue-regular.ttf",
+        "sha256": "f10c681b10d3d7377f1bf75fbfad70ee31d674108bbf80b783f0ea6f54f50c56"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "ALL RIGHTS  RESERVED",
+        "font": "Corleone",
+        "allCaps": false,
+        "fontSize": 40.27118644067797,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "THE",
+        "font": "BebasNeue-Regular",
+        "allCaps": false,
+        "fontSize": 56.2440375,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "Great Fall",
+        "font": "Corleone",
+        "allCaps": false,
+        "fontSize": 209.79548583984376,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#DA2410"
+      }
+    ],
+    "bounds": {
+      "x": 0.05555555555555555,
+      "y": 0.32222222222222224,
+      "width": 0.8222222222222222,
+      "height": 0.6277777777777778
+    },
+    "entranceEnd": 0,
+    "exitStart": 1.1678333333333333,
+    "staticHold": true
+  },
+  {
+    "id": "poster-a6dd28f9888e",
+    "name": "The Great Fall · Portrait",
+    "category": "title",
+    "presentation": "poster",
+    "description": "A scarlet action-film wordmark with a slanted small-cap headline, a short lead-in and a separate bottom credit.",
+    "design": {
+      "layout": "A scarlet action-film wordmark with a slanted small-cap headline, a short lead-in and a separate bottom credit.",
+      "motion": "Static point text, held over moving footage with a transparent background.",
+      "bestFor": "A film title or editorial opener with supplied headline and credit lines. Authored for portrait footage.",
+      "avoid": "Busy footage or talking faces beneath the lettering. Every credit must come from the brief."
+    },
+    "url": "/native-graphics/poster-a6dd28f9888e.bin",
+    "sha256": "41f680f88fd71b818c9e2bec01f8c008105816255413ea3452ebbb335f22946c",
+    "sourceSha256": "a6dd28f9888eed076b7b0b283c1088b54251f4f67e7a80aed43c75bf826cb711",
+    "compWidth": 1080,
+    "compHeight": 1920,
+    "duration": 1.1678333333333333,
+    "fonts": [
+      {
+        "url": "/fonts/native/corleone.ttf",
+        "sha256": "f79621632854b955658f8dc740662dc1a662fb7ae1b9361fc2d40917f78ac1f9"
+      },
+      {
+        "url": "/fonts/native/bebasneue-regular.ttf",
+        "sha256": "f10c681b10d3d7377f1bf75fbfad70ee31d674108bbf80b783f0ea6f54f50c56"
+      }
+    ],
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "ALL RIGHTS  RESERVED",
+        "font": "Corleone",
+        "allCaps": false,
+        "fontSize": 40.27118644067797,
+        "label": "Credit 1",
+        "textSlot": 2,
+        "displayLabel": "Credit 1"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "THE",
+        "font": "BebasNeue-Regular",
+        "allCaps": false,
+        "fontSize": 61.446,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-3",
+        "type": "text",
+        "comp": 1,
+        "layer": 80,
+        "property": 83,
+        "default": "Great Fall",
+        "font": "Corleone",
+        "allCaps": false,
+        "fontSize": 231.74048583984376,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 122,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 130,
+        "default": "#DA2410"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 80,
+        "property": 138,
+        "default": "#DA2410"
+      }
+    ],
+    "bounds": {
+      "x": 0.05555555555555555,
+      "y": 0.403125,
+      "width": 0.8611111111111112,
+      "height": 0.5416666666666666
+    },
+    "entranceEnd": 0,
+    "exitStart": 1.1678333333333333,
+    "staticHold": true
+  },
+  {
+    "id": "motion-051fcc1b64d3",
+    "sourceSha256": "051fcc1b64d3c4042b36697bb70500ff4e77db06d39b3acae1dbae413c5db7af",
+    "fonts": [
+      {
+        "url": "/fonts/native/roboto-black.ttf",
+        "sha256": "3e7bb5f37fb5abc3948071119b52399f63d15c39c4de6efcd32a0882a50252b2"
+      },
+      {
+        "url": "/fonts/native/clashdisplay-medium.otf",
+        "sha256": "877979c39ffa9c08bdce0ff7d88d55d8541101e0f3657c3a68e0ef6255084079"
+      }
+    ],
+    "compWidth": 1920,
+    "compHeight": 1080,
+    "duration": 4.0,
+    "controls": [
+      {
+        "key": "text-1",
+        "type": "text",
+        "comp": 1,
+        "layer": 2,
+        "property": 5,
+        "default": "Speaker role",
+        "font": "Roboto-Black",
+        "allCaps": false,
+        "fontSize": 48.0,
+        "label": "Supporting line",
+        "textSlot": 1,
+        "displayLabel": "Supporting line"
+      },
+      {
+        "key": "text-2",
+        "type": "text",
+        "comp": 1,
+        "layer": 41,
+        "property": 44,
+        "default": "Studio name",
+        "font": "ClashDisplay-Medium",
+        "allCaps": false,
+        "fontSize": 72.0,
+        "label": "Headline",
+        "textSlot": 0,
+        "displayLabel": "Headline"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 2,
+        "property": 83,
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "key": "palette-0",
+        "colorSlot": 0,
+        "label": "Lettering",
+        "displayLabel": "Lettering",
+        "comp": 1,
+        "layer": 41,
+        "property": 91,
+        "default": "#FFFFFF"
+      }
+    ],
+    "sha256": "eaf312da75ddac4e5e8b1b897ee37dc00bde4bb25f7e697dc6c7c951d2055d86",
+    "name": "Sliding speaker credit",
+    "url": "/native-graphics/motion-051fcc1b64d3.bin",
+    "category": "title",
+    "presentation": "lower-third",
+    "description": "Two editable white lines slide in from the lower left.",
+    "design": {
+      "layout": "A larger small-cap speaker name above a smaller role on transparent footage.",
+      "motion": "The two lines follow independent horizontal curves, pause together, then slide back left.",
+      "bestFor": "Introducing a speaker when the lower left of a landscape shot is clear.",
+      "avoid": "Faces, captions or important objects in the lower-left area. Use a supplied name and role."
+    },
+    "bounds": {
+      "x": 0.00625,
+      "y": 0.6037037037037037,
+      "width": 0.5291666666666667,
+      "height": 0.12962962962962962
+    },
+    "entranceEnd": 0.75,
+    "exitStart": 3.0833333333333335,
+    "staticHold": true
   }
 ]

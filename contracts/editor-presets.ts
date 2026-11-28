@@ -925,6 +925,8 @@ const BASE_GRAPHIC_PRESETS: readonly GraphicPreset[] = [
 export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
   ...BASE_GRAPHIC_PRESETS,
   ...NATIVE_GRAPHIC_TEMPLATES.map(template => {
+    const sourcePlacement = Boolean(template.presentation);
+    const lowerThird = template.presentation === "lower-third";
     const texts = template.controls.filter(c => c.type === "text" && !c.linkedCopy);
     return graphic(
       template.id,
@@ -945,8 +947,8 @@ export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
               .filter(c => (c.textSlot ?? 0) >= 2)
               .map(c => [c.key, c.default])
           ),
-          enter: 0.65,
-          exit: 0.45,
+          enter: lowerThird ? template.entranceEnd : 0.65,
+          exit: lowerThird ? template.duration - template.exitStart : 0.45,
         },
         text: texts
           .filter(c => c.textSlot === 0)
@@ -973,10 +975,10 @@ export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
           )?.default ?? "#FFFFFF"
         ),
         animation: "none",
-        x: template.presentation === "poster" ? 100 * (template.bounds.x + template.bounds.width / 2) : 50,
-        y: template.presentation === "poster" ? 100 * (template.bounds.y + template.bounds.height / 2) : template.category === "social" ? 65 : 38,
+        x: sourcePlacement ? 100 * (template.bounds.x + template.bounds.width / 2) : 50,
+        y: sourcePlacement ? 100 * (template.bounds.y + template.bounds.height / 2) : template.category === "social" ? 65 : 38,
         size:
-          template.presentation === "poster"
+          sourcePlacement
             ? template.bounds.width * 10
             : template.category === "notification"
             ? 9
@@ -986,7 +988,7 @@ export const GRAPHIC_PRESETS: readonly GraphicPreset[] = [
                 : 6
               : 7,
       },
-      template.presentation === "poster" ? template.duration : 4
+      sourcePlacement ? template.duration : 4
     );
   }),
   ...BASE_GRAPHIC_PRESETS.flatMap(p =>

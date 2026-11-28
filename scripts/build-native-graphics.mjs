@@ -66,7 +66,7 @@ if (sourceDigests.length && selected.length !== new Set(sourceDigests).size)
   throw Error("Selected source is missing or ineligible");
 const keep = id =>
   !selected.some(r => id === "motion-" + r.sha256.slice(0, 12));
-const manifest = sourceDigests.length ? existing.filter(t => keep(t.id)) : existing.filter(t => t.presentation === "poster");
+const manifest = sourceDigests.length ? existing.filter(t => keep(t.id)) : existing.filter(t => t.presentation);
 const evidence = sourceDigests.length
   ? JSON.parse(
       await fs.readFile(path.join(base, "conversion-evidence.json"), "utf8")

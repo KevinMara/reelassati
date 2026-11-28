@@ -212,7 +212,7 @@ export function NativeGraphicComposer({
         value={graphic.color}
         onChange={color => patch({ color })}
       />
-      {second && (template.presentation !== "poster" || template.controls.some(c => c.colorSlot === 1)) && (
+      {second && (!template.presentation || template.controls.some(c => c.colorSlot === 1)) && (
         <ColorPicker
           label={ui(template.presentation === "poster" ? "Accent color" : "Second line color")}
           value={graphic.accent ?? graphic.color}
