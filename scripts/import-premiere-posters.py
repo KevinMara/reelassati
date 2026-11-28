@@ -49,6 +49,7 @@ def make_scene(title, original_copy=False):
     ids = itertools.count(2)
     controls = []
     fonts = {f['postscript']: f for f in json.loads((ROOT / 'public/fonts/editor-fonts.json').read_text(encoding='utf8'))['faces']}
+    aliases = json.loads((ROOT / 'contracts/native-font-substitutions.json').read_text(encoding='utf8'))
     used = {}
     # These Premiere graphics store each text layer in sequence coordinates.
     for component in title['components'][:-1]:
@@ -59,7 +60,7 @@ def make_scene(title, original_copy=False):
         if len(runs) != 1:
             raise ValueError('Rich text needs separate style runs')
         run = runs[0]
-        font = fonts.get(run['font'])
+        font = fonts.get(run['font']) or fonts.get(aliases.get(run['font']))
         if not font or run['size'] is None:
             raise ValueError('Missing source font or explicit point size')
         used[font['sha256']] = {k:font[k] for k in ('url','sha256')}
@@ -97,13 +98,13 @@ def make_scene(title, original_copy=False):
         rgba = lambda c: [v/255 for v in c] + [1]
         doc = source['value']['v']
         point_size = run['size']
-        if height >= width and not original_copy:
+        if not original_copy:
             # Retain the authored baselines while bringing small film credits
-            # up to the editor's mobile readability threshold (width / 30).
-            point_size = max(point_size, width / 29.5 * 100 / values['Scale'])
-        doc.update(text=text, font=run['font'], size=point_size, fill=rgba(run['fill'] or [255]*3),
-                   stroke=rgba(run['stroke'] or [0]*3), stroke_width=run['strokeWidth'],
-                   apply_stroke=5 in run['fields'], apply_fill=True, space_before=0,
+            # up to the editor's mobile readability threshold for this aspect.
+            point_size = max(point_size, min(width, height) / 29.5 * 100 / values['Scale'])
+        doc.update(text=text, font=font['postscript'], size=point_size, fill=rgba(run['fill'] or [255]*3),
+                   stroke=rgba(run['stroke'] or [255]*3), stroke_width=run['strokeWidth'],
+                   tracking=run['tracking'], apply_stroke=False, apply_fill=True, space_before=0,
                    all_caps=False, justify={0:'Left',1:'Right',2:'Center'}[justify],
                    leading=run['size'] * 1.2 + values['Source Text']['lineSpacing'])
         comp['kind']['layers'].append(layer)
@@ -111,8 +112,24 @@ def make_scene(title, original_copy=False):
                          'property':source['uid'], 'default':text, 'font':doc['font'],
                          'allCaps':False, 'fontSize':doc['size'] * values['Scale'] / 100,
                          'height':values['Scale'] * doc['size'], 'label':'Copy'})
+        if run['applyStroke']:
+            # The runtime fill effect recolors every opaque pixel on a layer.
+            # Give Premiere's outline a linked text layer and its own color.
+            outline = copy.deepcopy(layer)
+            outline.update(id=next(ids), name='Letter outline')
+            for p in nodes(outline['props']):
+                p['uid'] = next(ids)
+            outline_source = next(p for p in nodes(outline['props']) if p['match'] == 'sourceText')
+            outline_doc = outline_source['value']['v']
+            outline_doc.update(apply_fill=False, apply_stroke=True)
+            # Premiere outlines the union of touching glyphs. Cover internal
+            # stroke edges with the intact face in front of the outline.
+            comp['kind']['layers'].append(outline)
+            controls.append({**controls[-1], 'layer':outline['id'],
+                             'property':outline_source['uid']})
     slots = {}
-    for control in sorted(controls, key=lambda c: -c['height']):
+    layer_names = {layer['id']:layer['name'] for layer in comp['kind']['layers']}
+    for control in sorted(controls, key=lambda c: (-c['height'], layer_names[c['layer']] == 'Letter outline')):
         # An offset duplicate is the shadow of the same title. Editing either
         # line must replace both runs, including when a saved project reopens.
         signature = (control['default'], control['font'], control['fontSize'])
@@ -137,14 +154,16 @@ def make_scene(title, original_copy=False):
             p.pop('expr', None)
             p.pop('keys', None)
         color = next(p for p in fill['children'] if p['match'] == 'color')
-        rgb = props['sourceText']['value']['v']['fill']
+        doc = props['sourceText']['value']['v']
+        rgb = doc['fill' if doc['apply_fill'] else 'stroke']
         color['value']['v'] = rgb
         props['effects']['children'].append(fill)
         value = '#' + ''.join(f'{round(n * 255):02X}' for n in rgb[:3])
         palettes.setdefault(value, []).append((control, layer, color))
     # First expose the face color of the headline, followed by its shadow or
     # the supporting lettering. Shared colors update every matching layer.
-    ordered = sorted(palettes.items(), key=lambda kv:min(c['textSlot'] for c,_,_ in kv[1]))
+    ordered = sorted(palettes.items(), key=lambda kv:min(
+        (c['textSlot'], layer['name'] == 'Letter outline') for c,layer,_ in kv[1]))
     for slot, (value, bindings) in enumerate(ordered):
         for control, layer, color in bindings:
             controls.append({'type':'color','key':f'palette-{slot}', 'colorSlot':slot,

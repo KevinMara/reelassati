@@ -573,7 +573,7 @@ export function ClipInspector({
                   )}
                 </EditorInfo>
               </div>
-              {slider("volume", "Audio gain", 0, 2, 1)}
+              {slider("volume", "Audio gain", 0, 2, 1, 0.01)}
               <AudioMixControls
                 key={draft.id}
                 clip={draft}

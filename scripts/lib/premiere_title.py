@@ -70,10 +70,12 @@ def text_document(data):
         runs.append({
             'text': string(pointer(run[0])) if 0 in run else '',
             'font': fonts[unpack('<I', style[0])] if 0 in style else fonts[0],
-            'size': unpack('<f', style[1]) if 1 in style else None,
+            'size': unpack('<f', style[1]) if 1 in style else 100,
             'fill': color(style[2]) if 2 in style else None,
             'stroke': color(style[4]) if 4 in style else None,
-            'strokeWidth': unpack('<f', style[6]) if 6 in style else 0,
+            'applyStroke': bool(data[style[5]]) if 5 in style else False,
+            'strokeWidth': unpack('<f', style[6]) if 6 in style else 1,
+            'tracking': unpack('<f', style[8]) if 8 in style else 0,
             'fields': sorted(style),
         })
     return {'runs': runs, 'justify': unpack('<B', paragraph[4]) if 4 in paragraph else 0,
