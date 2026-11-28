@@ -1,3 +1,4 @@
+import { renderEngineBytes } from "./render-engine-bytes";
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import { VIDEO_ANALYSIS_SCHEMA_VERSION } from "@contracts/video-analysis";
 import type { Asset } from "@contracts/workspace";
@@ -74,12 +75,7 @@ export async function analyzeMedia(
   try {
     signal?.throwIfAborted();
     onProgress?.(`Preparing a full-length analysis copy of ${asset.name}…`);
-    const response = await fetch("/vendor/render/core.bin", { signal });
-    if (!response.ok || !response.body)
-      throw new Error("The video analysis engine could not load.");
-    const wasm = await new Response(
-      response.body.pipeThrough(new DecompressionStream("gzip"))
-    ).blob();
+    const wasm = await renderEngineBytes(signal);
     wasmUrl = URL.createObjectURL(
       new Blob([wasm], { type: "application/wasm" })
     );

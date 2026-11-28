@@ -9,6 +9,66 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 
+def legacy_json(data):
+    if len(data) < 10 or int.from_bytes(data[:8], 'little') != len(data) - 8:
+        raise ValueError("Invalid legacy graphics payload length")
+    document = json.loads(data[8:].decode('utf-16le'))
+    if document.get('mVersion') != 1:
+        raise ValueError("Unknown legacy graphics version")
+    return document
+
+
+def legacy_color(value):
+    if type(value) is not int or not 0 <= value <= 0xffffff:
+        raise ValueError("Invalid Premiere RGB value")
+    return [(value >> shift) & 255 for shift in (16, 8, 0)]
+
+
+def legacy_text_document(data):
+    para = legacy_json(data)['mTextParam']
+    if any(para.get(k) for k in ('mShadowVisible', 'mBackFillVisible', 'mIsMask',
+                                 'mIsVerticalText', 'mRTL', 'mWidth', 'mHeight')):
+        raise ValueError("Legacy text needs additional layout or paint")
+    style = para['mStyleSheet']
+    text = style['mText'].encode('utf-16le')
+    length = len(text) // 2
+    # Indices address UTF-16 code units. A terminal insertion style belongs
+    # to the typing caret and can even reference a missing font.
+    changes = {}
+    for key, field in style.items():
+        if not isinstance(field, dict) or 'mParamValues' not in field:
+            if key.startswith('mAdditionalStroke') and field:
+                raise ValueError("Multiple Premiere text strokes")
+            continue
+        previous = -1
+        for index, value in field['mParamValues']:
+            if type(index) is not int or not previous < index <= length:
+                raise ValueError("Invalid Premiere style range")
+            previous = index
+            if index < length:
+                changes.setdefault(index, {})[key] = value
+    active, runs = {}, []
+    offsets = sorted({0, length, *changes})
+    for start, end in zip(offsets, offsets[1:]):
+        active.update(changes.get(start, {}))
+        if any(active.get(k) for k in ('mFauxBold', 'mBaselineShift', 'mBaselineOption',
+                                      'mCapsOption', 'mKerning', 'mUnderline', 'mTsumi')):
+            raise ValueError("Legacy text needs additional shaping")
+        run = dict(font=active['mFontName'], size=active['mFontSize'],
+                   fill=legacy_color(active['mFillColor']), applyFill=active['mFillVisible'],
+                   stroke=legacy_color(active['mStrokeColor']), applyStroke=active['mStrokeVisible'],
+                   strokeWidth=active['mStrokeWidth'], tracking=active['mTracking'],
+                   italic=active['mFauxItalic'])
+        if run['applyStroke'] and not active.get('mFillOverStroke', True):
+            raise ValueError("Unsupported Premiere paint order")
+        piece = text[2*start:2*end].decode('utf-16le')
+        if runs and all(runs[-1][k] == v for k, v in run.items()):
+            runs[-1]['text'] += piece
+        else:
+            runs.append({**run, 'text': piece})
+    return dict(runs=runs, justify=para['mAlignment'], lineSpacing=para['mLeading'])
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -32,6 +92,13 @@ def rectangle_path(data):
 
 
 def solid_appearance(data):
+    if data[8:10] == b'{\x00':
+        style = legacy_json(data)['mStyle']
+        if (style.get('mIsMask') or style.get('mShadowVisible') or style.get('mStrokeVisible')
+                or style.get('mAdditionalStrokes') or not style['mFillVisible']
+                or style['mFillColorType'] != 0):
+            raise ValueError("Unsupported legacy Premiere shape paint")
+        return legacy_color(style['mFillColor'])
     # This appearance profile has a single flat fill and inactive stroke and
     # gradient settings. A changed paint mode needs its own interpretation.
     layout = bytearray(data)
@@ -44,6 +111,8 @@ def solid_appearance(data):
 
 def text_document(data):
     """Decode Premiere's 0x11223344 point-text envelope and per-run styles."""
+    if data[8:10] == b'{\x00':
+        return legacy_text_document(data)
     if data[8:12] != b'\x44\x33\x22\x11' or int.from_bytes(data[:8], 'little') != len(data) - 12:
         raise ValueError("Unsupported Premiere text encoding")
 

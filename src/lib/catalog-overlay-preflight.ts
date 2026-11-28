@@ -1,3 +1,4 @@
+import { renderEngineBytes } from "./render-engine-bytes";
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
@@ -143,11 +144,7 @@ async function browserEngine(signal: AbortSignal): Promise<OverlayPixelEngine> {
   signal.addEventListener("abort", abort, { once: true });
   try {
     signal.throwIfAborted();
-    const core = await fetch("/vendor/render/core.bin", { signal });
-    if (!core.ok || !core.body) throw new Error("Missing renderer");
-    const blob = await new Response(
-      core.body.pipeThrough(new DecompressionStream("gzip"))
-    ).blob();
+    const blob = await renderEngineBytes(signal);
     signal.throwIfAborted();
     wasmUrl = URL.createObjectURL(
       new Blob([blob], { type: "application/wasm" })

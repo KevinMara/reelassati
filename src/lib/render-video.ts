@@ -1,3 +1,4 @@
+import { renderEngineBytes } from "./render-engine-bytes";
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import { withFfmpegLease } from "./ffmpeg-lease";
 import { beginNativeGraphicExport } from "./native-graphic-activity";
@@ -97,15 +98,8 @@ async function renderVideoWithLease(
       true
     );
     options.onProgress(0, "Preparing export");
-    const core = await fetch("/vendor/render/core.bin", {
-      signal: AbortSignal.any([options.signal, AbortSignal.timeout(60000)]),
-    });
-    if (!core.ok || !core.body)
-      throw new Error("The export engine could not load. Try again.");
     options.onProgress(1, "Unpacking export engine");
-    const wasm = await new Response(
-      core.body.pipeThrough(new DecompressionStream("gzip"))
-    ).blob();
+    const wasm = await renderEngineBytes(options.signal);
     options.signal.throwIfAborted();
     wasmUrl = URL.createObjectURL(
       new Blob([wasm], { type: "application/wasm" })

@@ -1,3 +1,4 @@
+import { renderEngineBytes } from "./render-engine-bytes";
 import { FFmpeg, FFFSType } from "@ffmpeg/ffmpeg";
 import type { Asset } from "@contracts/workspace";
 import {
@@ -25,12 +26,7 @@ export async function transcribeMedia(
   signal?.addEventListener("abort", cancel, { once: true });
   try {
     onProgress?.(`Preparing speech from ${asset.name}…`);
-    const response = await fetch("/vendor/render/core.bin", { signal });
-    if (!response.ok || !response.body)
-      throw new Error("The audio engine could not load");
-    const wasm = await new Response(
-      response.body.pipeThrough(new DecompressionStream("gzip"))
-    ).blob();
+    const wasm = await renderEngineBytes(signal);
     wasmUrl = URL.createObjectURL(
       new Blob([wasm], { type: "application/wasm" })
     );
